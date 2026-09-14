@@ -1,0 +1,516 @@
+{
+  "census_id": "C19ag",
+  "issue": 1252,
+  "title": "Timeline.js stroke-gradient-along-path selection helper and its legacy enable toggles, the Figma-style hex/alpha colour fields, the canvas-dimensions proportion-lock and initial-swatch paint, the opacity/smooth/stabilizer/stroke field listeners and the Cap/Join/Paint-Order/Fill-Brush-Mode icon-group mechanism, and the three enable-sync functions (miter-limit, gradient-vs-Join, vector-brush-vs-stroke-props)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19af/#1251. Scope is timeline.js:10393-10668 (276 lines: 173 code, 103 comment, 0 blank, re-derived independently and matching the issue's own proposed union and per-packet table exactly, no boundary correction needed). It starts at the `applyStrokeGradAlongToSelection` lead-in comment (10393), immediately after the `#pm-stroke-c` input listener at 10392 (C19af, out of scope), and ends at the trailing rationale before `wireLiveXformField` (10668; 10669 opens that function's own lead-in, next leaf C19ah, confirmed by direct read: `function wireLiveXformField(id,apply){` is declared at 10669 and does not appear anywhere in 10393-10668 by direct grep). timeline.js is NOT indented at top level. Cited by name/line only, not re-mapped, per the issue: every `window.SM.set*` setter these listeners call — `setFillColor` (timeline.js:615), `setFillEnabled` (timeline.js:647), `setStrokeColor` (timeline.js:608), `setStrokeEnabled` (timeline.js:654), `setCanvasSize` (timeline.js:842), `setOpacity` (timeline.js:799), `setSmoothing`/`setStabilizer` (timeline.js:716), `setStrokeStyle` (timeline.js:727), `setMiterLimit` (timeline.js:721), `setDashOffset` (timeline.js:725), `smoothSelectedStroke` (timeline.js:741), `setStrokeCap` (timeline.js:717), `setStrokeJoin` (timeline.js:719), `setPaintOrder` (timeline.js:723), `setFillBrushMode` (timeline.js:788), `setVectorBrush` (timeline.js:785), `setTool` (timeline.js:373) — all bodies inside the `window.SM={…}` block opening at timeline.js:349, C21/C04, out of scope; the engine-bridge gradient block that explains why Join is inoperative under gradient-along (found by direct grep at engine-bridge.js:1952-2002: the comment lead-in 1952-1958 plus the `if (item.segments && item.strokeColor && c.data && c.data.strokeGradientAlongPath && window.SMMotion)` block 1963-2002 — the issue asked for this line to be cited, it was not given); `ColorPicker` (color-picker.js, `wireColorSwatches` defined at color-picker.js:259, `window.ColorPicker=` export at color-picker.js:276); the `.dataset.hex8` convention and `colorHex8` (CLAUDE.md §2, app.js — NOT read or written anywhere inside this scope's own 276 lines, confirmed by grep, see `boundaries`/(c) below for why); `state.canvasW/H` and `setCanvasSize` (C21a); `isVectorBrush`/`brushGroupId` tags (CLAUDE.md §1); `wireLiveXformField` (10669+, next leaf C19ah); and the `#p-strokegrad-*`, `#fill-enable-toggle`/`#stroke-enable-toggle`, `#p-fill-hex`/`#p-stroke-hex`/`#p-stroke-alpha`, `#btn-dims-lock`/`#p-cw`/`#p-ch`, `#p-opacity`/`#p-smooth`/`#p-stab`/`#p-strokestyle`/`#p-miterlimit`/`#p-dashoffset`/`#p-poststroke-smooth`, `#p-cap-grp`/`#p-join-grp`/`#p-paintorder-grp`/`#p-fillbrushmode-grp`, `#p-vecbrush` markup (src/index.html — each id located directly at index.html:939-941/896/930/885/927/928/768/766-767/886/1168/1167/950/967/972/956/957/962/968/1170/1179/252/926/256/883 respectively, not assumed present from name). This JSON authoring does not authorize source changes; the timeline.js runtime writer is retained by whatever P30/remediation lane already owns it.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "ad29131df4190d46576e45859263428aa31976e7",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19ag-timeline-fill-stroke-panel-census",
+  "assigned_ranges": [
+    {
+      "start": 10393,
+      "end": 10668
+    }
+  ],
+  "coverage_note": "Exactly 276 assigned lines occur once across six packets (one coverage_range per packet, no gaps, no other-owner exclusions): 173 code, 103 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span) — equal to the issue's own proposed union exactly (276 lines, 173/103/0) and equal to the issue's own proposed per-packet table exactly for all six packets (45:37/8/0, 57:39/18/0, 43:33/10/0, 43:29/14/0, 50:14/36/0, 38:21/17/0); no boundary correction was needed. Line 10392 is C19af's own `#pm-stroke-c` input listener (out of scope, confirmed against C19af/#1251's own citation in the merged sibling artifact); line 10393 opens this scope's own `applyStrokeGradAlongToSelection` lead-in comment. Line 10668 is the last line of this scope's own trailing rationale for `syncStrokePropsForVectorBrush`; line 10669 opens `wireLiveXformField`'s own declaration (next leaf C19ah, confirmed by direct read and by grep: neither `wireLiveXformField` nor any of its own local variables appear anywhere in 10393-10668).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "The worktree branches from origin/main at ad29131df4190d46576e45859263428aa31976e7, which has the identical timeline.js blob (git rev-parse ad29131...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123), verified directly in the working worktree before authoring. A later sibling commit (7f1069a, docs(C20n): census motion.js valueAtFrame...) landed on origin/main during authoring but does not touch src/js/timeline.js; the blob at 7f1069a:src/js/timeline.js was re-checked and is unchanged (cc4cfd27...).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n` for every symbol this scope defines or references, restricted to `src/` at the frozen SHA, filtering each symbol's own declaration/definition line."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19ag-timeline-fill-stroke-panel-wiring.json and the six timeline.js packets partitioning lines 10393-10668.",
+    "timeline": "The existing timeline.js runtime writer is retained; this census transfers no writer authority.",
+    "function_boundary": "This scope is six self-registering, top-level DOM-listener/helper-function blocks: the stroke-gradient-along-path selection helper plus its three listeners and the two legacy enable-toggle clicks (packet 1); the three pure hex/alpha helper functions plus the Figma-style hex/alpha field listeners (packet 2); the canvas-dimensions proportion-lock plus the initial fill/stroke swatch paint and the ColorPicker eyedropper wiring (packet 3); the six plain stroke-field listeners plus the icon-group mechanism (`wireIconGroup`/`paintIconGroup`) and its four wirings (packet 4); the miter-limit and gradient-vs-Join enable-sync functions (packet 5); and the vector-brush-vs-stroke-props enable-sync function (packet 6). None of the six packets calls into any of the others except packet 5's `syncMiterLimitEnabled`/`syncJoinEnabledForGradient` and packet 6's `syncStrokePropsForVectorBrush`, which co-operate through the `dataset.brushOff` marker on `#p-join-grp` (10643-10650) to avoid stomping each other's disabled-reason; each packet is bounded by its own lead-in comment or declaration, exactly as the issue's own suggested table lays out.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19af (existing owner, timeline.js through 10392, #1251)",
+      "disposition": "Retains the `#pm-stroke-c` input listener (timeline.js:10392) and everything through it. This scope's own boundary begins at line 10393, the `applyStrokeGradAlongToSelection` lead-in comment, immediately after that listener — confirmed by direct read; C19af's own body is not reproduced or re-mapped here."
+    },
+    {
+      "owner": "C19ah (next leaf, `wireLiveXformField` and the five transform-panel field wirings, timeline.js:10669+, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:10669+. Confirmed call-graph-disjoint: `wireLiveXformField` is declared at 10669 and does not appear anywhere in 10393-10668 by direct grep; this scope's own ten top-level symbols do not appear past line 10668 in a whole-file grep restricted to declaration/call sites."
+    },
+    {
+      "owner": "engine-bridge.js (the gradient-along-path render block — citation supplied, not given by the issue)",
+      "disposition": "The issue asks for 'the engine-bridge gradient block that explains why Join is inoperative under gradient-along (cite its line)' without giving the line itself. Located by direct grep: engine-bridge.js:1952-2002 (comment lead-in 1952-1958 naming the 'stroke gradient along path' feature, then the `if (item.segments && item.strokeColor && c.data && c.data.strokeGradientAlongPath && window.SMMotion)` block 1963-2002 that splits a gradient stroke into N independent 2-point straight segments). Cited by name/line only, not re-mapped; this scope's own 10584-10600 rationale paraphrases exactly this mechanism as the reason a stroke Join has no corner left to render once every corner falls between two separate rendered items."
+    },
+    {
+      "owner": "`applyStrokeGradAlongToSelection` internal call count — content correction, not a boundary correction",
+      "disposition": "The issue's own packet-1 description does not state a call count, but a plausible reading of adjacent census prose conventions ('internal x2') would undercount: by direct grep restricted to 10393-10437, `applyStrokeGradAlongToSelection(` is called exactly THREE times as a callback-passing call (10407 inside the `#p-strokegrad-along` change listener, 10420 inside the `#p-strokegrad-from-c` input listener, 10428 inside the `#p-strokegrad-to-c` input listener), all internal to this same packet, zero external callers anywhere in `src/` by a targeted whole-repo grep. Recorded here as a factual finding; it does not change the declared union/classification (176 lines/173,103,0 already match the issue's own numbers)."
+    },
+    {
+      "owner": "`.dataset.hex8` (CLAUDE.md §2 convention) — scoping note, not a boundary correction",
+      "disposition": "The issue asks for 'the CLAUDE.md §2 `.dataset.hex8` handling at every colour read/write in the span.' By direct grep, the literal token `hex8` occurs only inside two COMMENTS in this scope (10441, 10477 — the word 'hex8' used in prose, not a property access) and `.dataset.hex8` is never read or written anywhere in 10393-10668. The two `<input type=\"color\">` fields this scope itself wires directly, `#p-strokegrad-from-c`/`#p-strokegrad-to-c` (10417-10435), read plain `this.value` with no `.dataset.hex8` fallback — and correctly so: their own markup (index.html:940-941) never calls `setHex8Input` on them and both stops are always a plain 6-digit `#rrggbb` (gradient stops carry no alpha channel in this v1, confirmed by `cssColorToRgba` at the engine-bridge.js consumer side, out of scope). `#p-fill-hex`/`#p-stroke-hex` (10463-10474) are plain `<input type=\"text\">` fields (index.html:885/927, `type=\"text\"` not `type=\"color\"`) — the native `<input type=\"color\">` 8-hex truncation bug the convention exists to work around does not apply to a text field at all; their own value is parsed by this scope's own `parseHexInput` instead. The `.dataset.hex8` reads/writes for THIS panel's actual `<input type=\"color\">` swatches (`#color-fill`/`#color-stroke`/`#pm-fill-c`/`#pm-stroke-c`) live in the immediately preceding C19af packet (10391-10392, out of scope) and in `setHex8Input` (app.js:560, out of scope, cited by name only)."
+    }
+  ],
+  "boundaries": [
+    "Line 10392 (C19af's own `#pm-stroke-c` input listener) is outside coverage; line 10393 (this scope's own `applyStrokeGradAlongToSelection` lead-in comment) begins this scope, confirmed against C19af's own citation.",
+    "Line 10668 (trailing rationale for `syncStrokePropsForVectorBrush`) is the last line of this scope; line 10669 opens the next leaf's (C19ah) `wireLiveXformField` declaration — confirmed by reading the frozen blob at 10669-10672 and by grep: neither `wireLiveXformField` nor any other C19ah-only symbol appears anywhere in 10393-10668.",
+    "No lines inside 10393-10668 are excluded for another owner: every line belongs to exactly one of the six packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) selection-only vs tool-default, confirmed per-listener by reading each called setter's own body (all setter bodies are out of scope, timeline.js:608-842): `applyStrokeGradAlongToSelection` (10398-10404) is genuinely selection-ONLY — it early-returns `if(!selectedPaths.length)return;` (10399) and never writes any `state.*` field, matching its own 10393-10397 lead-in's claim that this property has 'no meaningful future-stroke default.' By contrast `#fill-enable-toggle`/`#stroke-enable-toggle` (10436-10437) call `setFillEnabled`/`setStrokeEnabled` (timeline.js:647/654), which unconditionally write `state.fillEnabled`/`state.strokeEnabled` (the TOOL default for the next stroke) and ONLY THEN, conditionally, also touch `selectedPaths` when `state.tool` is `'select'`/`'subselect'` and a selection exists. The packet-2 hex/alpha fields (`setFillColor`/`setStrokeColor`, timeline.js:608/615) follow the exact same tool-default-plus-conditional-selection shape. `setCanvasSize` (packet 3, timeline.js:842) is a THIRD category: pure document-level state (`state.canvasW/H`), with no selection concept at all. The packet-4 plain fields split further: `setOpacity` (timeline.js:799) is called out in its OWN comment (10-line block starting just after its declaration, out of scope) as historically NOT applying to selection at all, unlike `setFillColor`/`setStrokeColor`; `setStrokeCap`/`setStrokeJoin`/`setMiterLimit`/`setDashOffset`/`setStrokeStyle`/`setPaintOrder` (timeline.js:717-727) all follow the tool-default-plus-conditional-selection shape; `setFillBrushMode` (timeline.js:788) is tool-default ONLY (`state.fillBrushMode=v;` with no selection branch); `smoothSelectedStroke` (10550, timeline.js:741) is selection-ONLY, mirroring `applyStrokeGradAlongToSelection`'s own shape (early-returns if no selection).",
+    "(b) see (a) above for the full precedence/target table across every setter this scope's listeners call.",
+    "(c) the three hex helpers, `hexDisplayValue`/`alphaPctFromHex`/`parseHexInput` (10442-10462), are pure input->output functions with no DOM/state access of their own — see `reconciliation` above for the `.dataset.hex8` scoping finding (the token never appears as a property access anywhere in this scope).",
+    "(d) dimensions-lock: `_dimsLockRatio` (10495) starts `null`; `#btn-dims-lock` click (10496-10499) toggles a `.on` CSS class on itself and captures the ratio `state.canvasW/state.canvasH` into `_dimsLockRatio` ONLY at the moment it is switched ON (10499: `_dimsLockRatio=on?(...):null`), never re-captured while already on. While locked, `#p-cw` input (10508-10515) derives `h=Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio))` and mirrors it into `#p-ch`'s own `.value` (10512) BEFORE calling `window.SM.setCanvasSize(w,h)` (10514); `#p-ch` input (10516-10523) is the exact mirror, multiplying instead of dividing (10519) and mirroring into `#p-cw` (10520). When unlocked, each field passes the OTHER dimension through unchanged from live `state.canvasW`/`state.canvasH` (10509/10517) and still calls `setCanvasSize` unconditionally (10514/10522) — the 2026-08-31 feedback-#188 comment (10501-10507) explains this unconditional call is itself the fix: these two listeners pre-existed but only acted when the ratio link was on, so with the link off the resize did not apply until the drag's final native `change` fired.",
+    "(e) initial-paint block (10524-10537): `window.SM.setFillColor(state.fillColor)`/`setFillEnabled(state.fillEnabled)`/`setStrokeEnabled(state.strokeEnabled)` (10527-10529) read the three named `state.*` fields and re-run their own setters purely to paint the panel's swatches from whatever `state` already holds at script-load time — per the 10524-10526 comment, without this the swatch would show the static HTML's own background (transparent) until first touched. `if(window.ColorPicker){...}` (10530-10537) is a presence guard: `ColorPicker` (color-picker.js) is loaded via its own `<script>` tag elsewhere in index.html and exports `window.ColorPicker` only after that file runs, so this guard tolerates a load-order change or the file being stripped from a build without throwing. The four `window.SM.setTool('eyedropper')` calls (10532-10535) are NOT initial-paint calls — they are `onEyedrop` callbacks registered with `ColorPicker.wireColorSwatches` (color-picker.js:259-273, out of scope) and run LATER, only when the user clicks the eyedropper icon inside that specific colour-well's own popover (opened by a click on `#stroke-well`/`#pm-stroke`/`#fill-well`/`#pm-fill`), switching the active tool so the next canvas click samples a colour for that specific target field; the two `onNone` callbacks (10534-10535, fill wells only) call `window.SM.setFillEnabled(false)` when the popover's 'None' option is picked.",
+    "(f) icon-group mechanism (10556-10577): `wireIconGroup(wrapId,setterName)` (10556-10564) adds ONE click listener to the wrap element; on a click that hits a `.icon-btn` descendant (`e.target.closest('.icon-btn')`, 10559), it toggles the `sel` CSS class (`classList.toggle('sel', b===btn)`, 10560 — NOT an `ac` class) on every button so exactly one carries `sel`, mirrors the clicked button's own `data-value` onto the wrap's own `wrap.dataset.value` (10561), and calls `window.SM[setterName](btn.dataset.value)` (10562). `paintIconGroup(wrapId,value)` (10565-10569) is the read-side inverse: given a value, it writes `wrap.dataset.value` and toggles `sel` on whichever button's own `data-value` matches. The four wrap ids and their setters (10570-10573): `p-cap-grp`->`setStrokeCap`, `p-join-grp`->`setStrokeJoin`, `p-paintorder-grp`->`setPaintOrder`, `p-fillbrushmode-grp`->`setFillBrushMode`; the four matching initial `paintIconGroup` calls (10574-10577) seed each from `state.strokeCap`/`state.strokeJoin`/`state.paintOrder`/`state.fillBrushMode`. External callers of `paintIconGroup`, found by grep restricted to `src/`: `_restoreDrawingDefaults()` (timeline.js:3525-3539, out of scope) repaints `p-cap-grp`/`p-join-grp`/`p-paintorder-grp` from a snapshotted TOOL-default state when leaving a drawing tool; `updateSelPropsPanel()` (timeline.js:3547-3679, out of scope) repaints the same three groups from the newly-selected path's OWN `strokeCap`/`strokeJoin`/`data.paintOrder` on every selection change (3678-3679), and also calls `syncStrokePropsForVectorBrush()` (timeline.js:3510, inside `updatePropsContext()`, timeline.js:3131) as 'the single per-selection decider' per this scope's own 10551-10555/10645-10646 comments. `wireIconGroup` itself has no external callers (only the four calls at 10570-10573, confirmed by grep).",
+    "(g) the three enable-sync functions, as a precedence table: `syncMiterLimitEnabled()` (10581) sets `#p-miterlimit`'s own `.disabled` to true unless `#p-join-grp`'s own `dataset.value==='miter'`; triggered by a click on `#p-join-grp` (10582) and once eagerly at load (10583). `syncJoinEnabledForGradient()` (10601-10609) sets `grp-disabled` class AND `title` on `#p-join-grp` when `#p-strokegrad-along` is checked, and additionally force-disables `#p-miterlimit` in that case (10608) or defers back to `syncMiterLimitEnabled()` otherwise; triggered by `#p-strokegrad-along`'s own `change` (10610) and once eagerly (10611). `syncStrokePropsForVectorBrush()` (10631-10654) sets `grp-disabled`+`title`+`dataset.brushOff='1'` on BOTH `#p-cap-grp` and `#p-join-grp` (plus `.disabled`+`title` on `#p-strokestyle`) when the ENTIRE selection is vector-brush strokes (`anyBrush&&!anyOther`, 10633-10640) — a mixed selection is deliberately left untouched (10637-10639 comment) because ordinary paths in that selection still need the controls live. Ownership marker (`dataset.brushOff`, 10643-10650): the join group is shared between the gradient reason and the brush reason; `syncStrokePropsForVectorBrush` only clears `grp-disabled` off `#p-join-grp` when IT was the one that set it (`g.dataset.brushOff==='1'`, 10649) and, when clearing, re-invokes `syncJoinEnabledForGradient()` (10650) so the gradient's own reason (if still active) re-asserts itself instead of being silently dropped — the inverse guard (10647: `if(id==='p-join-grp'&&!off&&g.dataset.brushOff!=='1')return;`) means `syncStrokePropsForVectorBrush` never overwrites a disabled-reason it did not itself set. `syncStrokePropsForVectorBrush` has one external caller: `updatePropsContext()` (timeline.js:3510, out of scope) and is also exported as `window.syncStrokePropsForVectorBrush` (10655) for that external call to reach it (the other two sync functions have no external callers, confirmed by grep — both are only referenced by their own click/change hooks and by each other's own rationale comments)."
+  ],
+  "areas": [
+    {
+      "area": "stroke-gradient-along-and-legacy-enable-toggles",
+      "packets": [
+        {
+          "id": "C19ag.stroke-gradient-along-and-legacy-enable-toggles",
+          "files": [
+            "src/js/timeline.js:10393-10437"
+          ],
+          "coverage_ranges": [
+            [
+              10393,
+              10437
+            ]
+          ],
+          "classification": {
+            "code": 37,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyStrokeGradAlongToSelection",
+            "selectedPaths",
+            "pushUndo",
+            "saveActiveLayerFrame",
+            "SMEngineBridge",
+            "strokeGradientAlongPath",
+            "setFillEnabled",
+            "setStrokeEnabled",
+            "fillEnabled",
+            "strokeEnabled",
+            "p-strokegrad-along",
+            "p-strokegrad-from-c",
+            "p-strokegrad-to-c"
+          ],
+          "signature": "function applyStrokeGradAlongToSelection(mutate); document.getElementById('p-strokegrad-along').addEventListener('change',fn); document.getElementById('p-strokegrad-from-c').addEventListener('input',fn); document.getElementById('p-strokegrad-to-c').addEventListener('input',fn); document.getElementById('fill-enable-toggle').addEventListener('click',fn); document.getElementById('stroke-enable-toggle').addEventListener('click',fn);",
+          "responsibility": "Defines the shared selection-mutation helper for the stroke-gradient-along-path feature and wires its three DOM listeners, then wires the two legacy (non-Figma-row) Fill/Stroke enable-toggle clicks. `applyStrokeGradAlongToSelection(mutate)` (10398-10404) is a selection-only helper: it early-returns if nothing is selected (10399), otherwise pushes ONE undo step (10400), applies the caller's `mutate` callback to every path in `selectedPaths` (10401), saves the active layer frame and calls `updateUI()` (10402), and finally re-renders via `SMEngineBridge.renderNow()` if the Rust engine is active (10403) — the ONLY render/undo/persistence call in this whole packet. `#p-strokegrad-along` change (10405-10416) either sets `p.data.strokeGradientAlongPath={from,to}` reading the two colour-stop inputs' plain `.value` (10412-10413) when checked, or deletes the data field when unchecked. `#p-strokegrad-from-c`/`#p-strokegrad-to-c` input (10417-10435) each live-paint their own swatch background from `this.value` and then update ONLY the matching `from`/`to` field on paths that already carry `strokeGradientAlongPath`, no-op otherwise. The trailing `#fill-enable-toggle`/`#stroke-enable-toggle` clicks (10436-10437) are the 'left tool-panel' half of the two-eye-icon mirror described at timeline.js:625-633 (out of scope, same file) — they call `window.SM.setFillEnabled`/`setStrokeEnabled` with the boolean flip of the CURRENT `state.fillEnabled`/`state.strokeEnabled`.",
+          "callers": [
+            "`applyStrokeGradAlongToSelection` is called exactly THREE times, all internal to this same packet and none external: 10407 (inside the `#p-strokegrad-along` change listener), 10420 (inside the `#p-strokegrad-from-c` input listener), 10428 (inside the `#p-strokegrad-to-c` input listener) — confirmed by a whole-repo grep restricted to call sites, excluding its own declaration.",
+            "`setFillEnabled`/`setStrokeEnabled` (timeline.js:647/654, out of scope) are called from many other sites across timeline.js/app.js/tools.js/tutorial.js; within THIS packet they are called only at 10436/10437.",
+            "`window.SMEngineBridge.renderNow` (out of scope, engine-bridge.js) is guarded by `if(window.SMEngineBridge)` (10403) — the same optional-engine guard used throughout the codebase."
+          ],
+          "behavior": [
+            "Lines 10393-10397 (comment, 5 lines): lead-in explaining that this property is selection-only, unlike most Fill/Stroke fields which also edit the tool's own default when nothing is selected — see `boundaries` (a) for the full precedence contrast.",
+            "Lines 10398-10404 (code): `applyStrokeGradAlongToSelection(mutate)` — see `responsibility` above for the full body derivation.",
+            "Lines 10405-10416 (code): `#p-strokegrad-along` change listener — `var on=this.checked;` then `applyStrokeGradAlongToSelection(function(p){ if(on){...set...}else{delete...} });`.",
+            "Lines 10417-10425 (code): `#p-strokegrad-from-c` input listener — paints `#p-strokegrad-from`'s own background from `this.value`, then mutates only paths that already have `strokeGradientAlongPath` set.",
+            "Lines 10426-10434 (code): `#p-strokegrad-to-c` input listener — exact mirror of the previous block for the `to` stop.",
+            "Lines 10435-10437 (comment 2 lines + code 1 line collapsed onto one physical block, counted per-line by the classifier): the 'Figma-style color row' lead-in comment (10435-10436 in the frozen blob's own line layout) followed by the legacy `#fill-enable-toggle`/`#stroke-enable-toggle` click listeners at 10436-10437 calling `window.SM.setFillEnabled(!state.fillEnabled)`/`setStrokeEnabled(!state.strokeEnabled)` — see `boundaries` (a) for why these two, unlike `applyStrokeGradAlongToSelection`, DO write the tool default."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "hex-alpha-fields",
+      "packets": [
+        {
+          "id": "C19ag.hex-alpha-fields",
+          "files": [
+            "src/js/timeline.js:10438-10494"
+          ],
+          "coverage_ranges": [
+            [
+              10438,
+              10494
+            ]
+          ],
+          "classification": {
+            "code": 39,
+            "comment": 18,
+            "whitespace": 0
+          },
+          "symbols": [
+            "hexDisplayValue",
+            "alphaPctFromHex",
+            "parseHexInput",
+            "setFillColor",
+            "setStrokeColor",
+            "fillEnabled",
+            "strokeEnabled",
+            "p-fill-hex",
+            "p-stroke-hex",
+            "p-stroke-alpha"
+          ],
+          "signature": "function hexDisplayValue(hex); function alphaPctFromHex(hex); function parseHexInput(raw); document.getElementById('p-fill-hex').addEventListener('change',fn); document.getElementById('p-stroke-hex').addEventListener('change',fn); document.getElementById('p-stroke-alpha').addEventListener('input',fn); ['p-fill-hex','p-stroke-hex'].forEach(fn);",
+          "responsibility": "Three pure hex-string helper functions (no DOM/state access of their own) plus the Figma-style inline hex/alpha text-field listeners that use them. `hexDisplayValue(hex)` (10442-10446): strips '#' (defaulting to '#000000'), and if the result is 8 hex digits whose last byte is 'FF' (case-insensitive), drops that byte — the FF-drop rule — always returns uppercase. `alphaPctFromHex(hex)` (10449-10453): returns 100 unless the stripped hex is exactly 8 digits, in which case it parses the last byte as 0-255 and rounds `(byte/255)*100` to the nearest integer percent. `parseHexInput(raw)` (10457-10462): trims and strips a leading '#'; a 3-digit input is digit-doubled ('abc'->'#AABBCC'); a 6- or 8-digit input is passed through uppercased with '#' prepended; anything else (mid-typing) returns `null`. `#p-fill-hex`/`#p-stroke-hex` change (10463-10474) each parse `this.value`; on failure they reset the field's own displayed value via `hexDisplayValue(state.fillColor/strokeColor)` and return without calling any setter (so an invalid typed string snaps back to the last valid colour); on success they call `window.SM.setFillColor/setStrokeColor(hex)` and, if the fill/stroke is currently disabled, also force it enabled. `#p-stroke-alpha` input (10479-10485) clamps the typed percent to 0-100, computes a 2-digit hex alpha byte from it, and calls `setStrokeColor` with the RGB unchanged and the alpha byte appended ONLY if pct<100 (10483) — matching `hexDisplayValue`'s own FF-drop rule by construction (never writing an explicit 'FF'). Lines 10486-10489 add a shared Enter-to-blur handler to both hex fields so pressing Enter commits the typed value (native 'change' fires on blur).",
+          "callers": [
+            "`hexDisplayValue`: called internally at 10465/10471 (fallback display on invalid input); external callers found by grep restricted to `src/`: color-manager.js:212 (hex-row invalid-input fallback, same pattern as here) and color-manager.js:263 (re-paint on a non-live-editing row), plus two EARLIER, out-of-scope timeline.js call sites at 6222/6232 inside `paintStrokeSwatches(v)`/`paintFillSwatches(v)` (timeline.js:6218/6224) — these are exactly the 'selection-change sync elsewhere' the issue anticipated: both functions repaint `#p-stroke-hex`/`#p-fill-hex` from a freshly-painted colour whenever the swatch itself changes (tool switch, selection change, or any `setFillColor`/`setStrokeColor` call), guarded by `document.activeElement!==...` so an in-progress edit is never clobbered.",
+            "`alphaPctFromHex`: NOT called anywhere inside this packet's own body — the `#p-stroke-alpha` listener (10479-10485) only WRITES an alpha byte, it never reads one back through this helper. External callers: color-manager.js:264 (same opacity-row pattern) and the same two out-of-scope timeline.js sites, 6223/6237, inside `paintStrokeSwatches`/`paintFillSwatches`, keeping `#p-stroke-alpha`/`#p-opacity` in sync with the freshly-painted colour's own alpha byte.",
+            "`parseHexInput`: called internally at 10464/10470. One external caller found by grep: color-manager.js:211, reached as `window.parseHexInput` — this resolves correctly at runtime because timeline.js is loaded as a classic (non-module) `<script src=\"js/timeline.js\">` tag (index.html:2366) with no wrapping top-level IIFE (confirmed: timeline.js is NOT indented at top level, per this artifact's own `owner` field), so a top-level `function` declaration is automatically a `window.*` property without any explicit `window.parseHexInput=` assignment anywhere in the file (confirmed by grep: no such assignment exists)."
+          ],
+          "behavior": [
+            "Lines 10438-10441 (comment, 4 lines): lead-in for `hexDisplayValue`, naming the FF-drop rationale (an opaque colour showing an explicit alpha byte would read as broken).",
+            "Lines 10442-10446 (code): `hexDisplayValue(hex)` body.",
+            "Lines 10447-10448 (comment, 2 lines): lead-in for `alphaPctFromHex`, cross-referencing color-picker.js's own `hexToAlpha` as sharing the same '#rrggbb == fully opaque' convention (out of scope, cited by name only).",
+            "Lines 10449-10453 (code): `alphaPctFromHex(hex)` body.",
+            "Lines 10454-10456 (comment, 3 lines): lead-in for `parseHexInput`.",
+            "Lines 10457-10462 (code): `parseHexInput(raw)` body.",
+            "Lines 10463-10468 (code): `#p-fill-hex` change listener.",
+            "Lines 10469-10474 (code): `#p-stroke-hex` change listener.",
+            "Lines 10475-10478 (comment, 4 lines): lead-in for `#p-stroke-alpha`, explaining Stroke has no separate per-object opacity field the way Fill does (`#p-opacity`), so its own alpha box writes into the stroke colour's own hex8 alpha byte directly.",
+            "Lines 10479-10485 (code): `#p-stroke-alpha` input listener.",
+            "Lines 10486-10489 (code): shared Enter-to-blur wiring for both hex fields.",
+            "Lines 10490-10494 (comment, 5 lines): the NEXT packet's own lead-in (Document Dimensions proportion-lock rationale) — included in this packet's range because it directly precedes packet 3's own first declaration line (10495) with no other natural cut point, matching the issue's own suggested table exactly."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "dimensions-lock-and-initial-swatch-paint",
+      "packets": [
+        {
+          "id": "C19ag.dimensions-lock-and-initial-swatch-paint",
+          "files": [
+            "src/js/timeline.js:10495-10537"
+          ],
+          "coverage_ranges": [
+            [
+              10495,
+              10537
+            ]
+          ],
+          "classification": {
+            "code": 33,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_dimsLockRatio",
+            "setCanvasSize",
+            "canvasW",
+            "canvasH",
+            "setFillColor",
+            "setFillEnabled",
+            "setStrokeEnabled",
+            "ColorPicker",
+            "wireColorSwatches",
+            "setTool",
+            "btn-dims-lock"
+          ],
+          "signature": "var _dimsLockRatio=null; document.getElementById('btn-dims-lock').addEventListener('click',fn); document.getElementById('p-cw').addEventListener('input',fn); document.getElementById('p-ch').addEventListener('input',fn); window.SM.setFillColor(state.fillColor); window.SM.setFillEnabled(...); window.SM.setStrokeEnabled(...); if(window.ColorPicker) ColorPicker.wireColorSwatches([...]);",
+          "responsibility": "Owns the canvas Width/Height proportion-lock and the one-time initial paint of the Fill/Stroke panel's own swatches from live `state`, plus the ColorPicker eyedropper/None hookup for the four colour wells. See `boundaries` (d) for the full lock-ratio algorithm and (e) for the initial-paint block's own reads/guard/re-sync timing.",
+          "callers": [
+            "`_dimsLockRatio` is a packet-local closure variable read/written only at 10499/10510-10511/10518-10519 — no external reads (confirmed by grep restricted to `src/`, it is never assigned to `window`).",
+            "`window.SM.setCanvasSize` (timeline.js:842, out of scope) is called at 10514/10522, the only two call sites in this packet.",
+            "`window.ColorPicker.wireColorSwatches` (color-picker.js:259, out of scope) is called once at 10531; its four `onEyedrop` callbacks (10532-10535) each call `window.SM.setTool('eyedropper')` (timeline.js:373, out of scope), and its two `onNone` callbacks (10534-10535) each call `window.SM.setFillEnabled(false)` — both sets run LATER, from inside color-picker.js's own click handler (color-picker.js:264-271, out of scope), not at load time."
+          ],
+          "behavior": [
+            "Line 10495 (code): `var _dimsLockRatio=null;`.",
+            "Lines 10496-10499 (code): `#btn-dims-lock` click — toggles the `.on` CSS class on itself and, only on the transition, captures or clears `_dimsLockRatio` from `state.canvasW/state.canvasH`.",
+            "Lines 10500-10507 (comment, 6 lines including the closing brace's own line counted as code): 2026-08-31 feedback-#188 rationale for the two live-resize listeners below — explains they pre-existed but only reacted while the ratio link was on.",
+            "Lines 10508-10515 (code): `#p-cw` input listener — see `boundaries` (d).",
+            "Lines 10516-10523 (code): `#p-ch` input listener — the exact mirror.",
+            "Lines 10524-10526 (comment, 3 lines): lead-in for the initial-swatch-paint block.",
+            "Lines 10527-10529 (code): `window.SM.setFillColor(state.fillColor)`; `setFillEnabled(state.fillEnabled)`; `setStrokeEnabled(state.strokeEnabled)`.",
+            "Lines 10530-10537 (code): `if(window.ColorPicker){ ColorPicker.wireColorSwatches([...four pairs...]); }` — see `boundaries` (e)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "stroke-fields-and-icon-groups",
+      "packets": [
+        {
+          "id": "C19ag.stroke-fields-and-icon-groups",
+          "files": [
+            "src/js/timeline.js:10538-10580"
+          ],
+          "coverage_ranges": [
+            [
+              10538,
+              10580
+            ]
+          ],
+          "classification": {
+            "code": 29,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setOpacity",
+            "setSmoothing",
+            "setStabilizer",
+            "setStrokeStyle",
+            "setMiterLimit",
+            "setDashOffset",
+            "smoothSelectedStroke",
+            "wireIconGroup",
+            "paintIconGroup",
+            "setStrokeCap",
+            "setStrokeJoin",
+            "setPaintOrder",
+            "setFillBrushMode",
+            "strokeCap",
+            "strokeJoin",
+            "paintOrder",
+            "fillBrushMode",
+            "p-poststroke-smooth"
+          ],
+          "signature": "document.getElementById('p-opacity').addEventListener('input',fn); ... document.getElementById('p-poststroke-smooth').addEventListener('change',fn); function wireIconGroup(wrapId,setterName); function paintIconGroup(wrapId,value); wireIconGroup('p-cap-grp','setStrokeCap'); ...(x4); paintIconGroup('p-cap-grp',state.strokeCap); ...(x4);",
+          "responsibility": "Six one-line plain-field listeners (`#p-opacity`/`#p-smooth`/`#p-stab`/`#p-strokestyle`/`#p-miterlimit`/`#p-dashoffset`), a one-line `#p-poststroke-smooth` listener calling the one-shot re-smooth action, and the generic Cap/Join/Paint-Order/Fill-Brush-Mode icon-button-group mechanism plus its four concrete wirings and initial paints. See `boundaries` (a) for the tool-default/selection precedence of each setter and (f) for the full icon-group mechanism.",
+          "callers": [
+            "`setOpacity`/`setSmoothing`/`setStabilizer`/`setStrokeStyle`/`setMiterLimit`/`setDashOffset`/`smoothSelectedStroke` (timeline.js:799/716/716/727/721/725/741, out of scope): each called exactly once in this packet, at its own listener line (10538-10543, 10550).",
+            "`wireIconGroup`/`paintIconGroup`: see the shared `boundaries` (f) entry — `wireIconGroup` has no external callers; `paintIconGroup` is called externally from `_restoreDrawingDefaults()` (timeline.js:3525-3539) and `updateSelPropsPanel()` (timeline.js:3678-3679), both out of scope."
+          ],
+          "behavior": [
+            "Lines 10538-10543 (code, 6 lines): the six plain stroke-field listeners, one line each.",
+            "Lines 10544-10549 (comment, 6 lines): 2026-07 rationale for the removed 'Apply' button on the post-stroke smooth field — applies live on 'change' now, referencing `smoothSelectedStroke`'s own internal `pushUndo()` skip logic during a live scrub (out of scope, timeline.js:741+).",
+            "Line 10550 (code): `#p-poststroke-smooth` change -> `window.SM.smoothSelectedStroke(this.value)`.",
+            "Lines 10551-10555 (comment, 5 lines): lead-in for the icon-group mechanism, describing the single-choice/radio-group behavior and the `data-value` wrapper-mirror contract.",
+            "Lines 10556-10564 (code): `function wireIconGroup(wrapId,setterName){...}` — see `boundaries` (f).",
+            "Lines 10565-10569 (code): `function paintIconGroup(wrapId,value){...}`.",
+            "Lines 10570-10573 (code): the four `wireIconGroup(...)` calls.",
+            "Lines 10574-10577 (code): the four matching initial `paintIconGroup(...)` calls seeded from `state.strokeCap`/`state.strokeJoin`/`state.paintOrder`/`state.fillBrushMode`.",
+            "Lines 10578-10580 (comment, 3 lines): the NEXT packet's own lead-in (Miter Limit's own rationale) — included here because it directly precedes packet 5's first declaration line (10581) with no other natural cut point, matching the issue's own suggested table."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "miter-limit-and-join-enable-sync",
+      "packets": [
+        {
+          "id": "C19ag.miter-limit-and-join-enable-sync",
+          "files": [
+            "src/js/timeline.js:10581-10630"
+          ],
+          "coverage_ranges": [
+            [
+              10581,
+              10630
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 36,
+            "whitespace": 0
+          },
+          "symbols": [
+            "syncMiterLimitEnabled",
+            "syncJoinEnabledForGradient",
+            "p-strokegrad-along",
+            "p-join-grp",
+            "p-miterlimit",
+            "grp-disabled",
+            "joinDisabledByGradientTitle"
+          ],
+          "signature": "function syncMiterLimitEnabled(); document.getElementById('p-join-grp').addEventListener('click',syncMiterLimitEnabled); syncMiterLimitEnabled(); function syncJoinEnabledForGradient(); document.getElementById('p-strokegrad-along').addEventListener('change',syncJoinEnabledForGradient); syncJoinEnabledForGradient();",
+          "responsibility": "The first two of the three enable-sync functions (see the shared `boundaries` (g) precedence table). `syncMiterLimitEnabled` is a one-liner disabling `#p-miterlimit` whenever `#p-join-grp` is not set to 'miter'. `syncJoinEnabledForGradient` disables `#p-join-grp` (with an explanatory `title`) whenever `#p-strokegrad-along` is checked, citing the structural reason documented in engine-bridge.js:1952-2002 (out of scope, see `reconciliation` above for the exact citation the issue asked for but did not supply): this engine paints one flat colour per stroked item, so a gradient-along-path is rendered by splitting the stroke into independent straight segments with no join left to draw between them.",
+          "callers": [
+            "`syncMiterLimitEnabled`: registered on `#p-join-grp`'s own click (10582) and called once eagerly (10583); also called from `syncJoinEnabledForGradient`'s own else-branch (10608, same packet) and from `_restoreDrawingDefaults()`/`updateSelPropsPanel()` (timeline.js:3539/3679, out of scope, guarded by `if(window.syncMiterLimitEnabled)` at 3539 since that call site runs before this script region has executed on a fresh page load in some code paths).",
+            "`syncJoinEnabledForGradient`: registered on `#p-strokegrad-along`'s own change (10610) and called once eagerly (10611); also called from `syncStrokePropsForVectorBrush` (10650, next packet) when it releases its own hold on `#p-join-grp`'s `grp-disabled` state — no other external callers found by grep."
+          ],
+          "behavior": [
+            "Line 10581 (code): `function syncMiterLimitEnabled(){...}` one-liner.",
+            "Line 10582 (code): registers it on `#p-join-grp`'s own click.",
+            "Line 10583 (code): eager initial call.",
+            "Lines 10584-10600 (comment, 17 lines): the Join-inoperative-under-gradient rationale, citing feedback #164 and the engine-bridge split-into-segments mechanism.",
+            "Lines 10601-10609 (code, with 10601/10604/10609 among them): `syncJoinEnabledForGradient(){...}` body — reads `#p-join-grp`/`#p-strokegrad-along`, toggles `grp-disabled` and `title` (falling back to a hard-coded French string when `SM.t` is unavailable), and either force-disables `#p-miterlimit` or defers to `syncMiterLimitEnabled()`.",
+            "Line 10610 (code): registers it on `#p-strokegrad-along`'s own change.",
+            "Line 10611 (code): eager initial call.",
+            "Lines 10612-10630 (comment, 19 lines): lead-in for the NEXT packet's own `syncStrokePropsForVectorBrush`, citing feedback #169 and a measured per-control table (Width/Color work, Style/Cap/Join do not) — included here because it directly precedes packet 6's first declaration line (10631) with no other natural cut point, matching the issue's own suggested table."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "vector-brush-stroke-props-sync",
+      "packets": [
+        {
+          "id": "C19ag.vector-brush-stroke-props-sync",
+          "files": [
+            "src/js/timeline.js:10631-10668"
+          ],
+          "coverage_ranges": [
+            [
+              10631,
+              10668
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 17,
+            "whitespace": 0
+          },
+          "symbols": [
+            "syncStrokePropsForVectorBrush",
+            "isVectorBrush",
+            "selectedPaths",
+            "setVectorBrush",
+            "p-vecbrush",
+            "dataset",
+            "brushOff"
+          ],
+          "signature": "function syncStrokePropsForVectorBrush(); window.syncStrokePropsForVectorBrush=syncStrokePropsForVectorBrush; document.getElementById('p-vecbrush').addEventListener('change',fn);",
+          "responsibility": "The third enable-sync function (see the shared `boundaries` (g) table): disables `#p-cap-grp`/`#p-join-grp`/`#p-strokestyle` (with an explanatory `title`) only when the ENTIRE current selection is vector-brush strokes, because a vector brush is a filled ribbon with no real stroke to cap/join/dash. Exported to `window` so `updatePropsContext()` (timeline.js:3510, out of scope) can invoke it as the 'single per-selection decider' on every selection change. Wires `#p-vecbrush`'s own change to `window.SM.setVectorBrush`.",
+          "callers": [
+            "`syncStrokePropsForVectorBrush`: exported at 10655 and called externally from `updatePropsContext()` (timeline.js:3510, out of scope) — confirmed by grep, the only external caller."
+          ],
+          "behavior": [
+            "Lines 10631-10636 (code): `function syncStrokePropsForVectorBrush(){...}` opening — scans `selectedPaths` (guarded for `undefined`) setting `anyBrush`/`anyOther` from each path's own `data.isVectorBrush`.",
+            "Lines 10637-10639 (comment, 3 lines): rationale for requiring the selection to be ENTIRELY brush strokes before disabling anything.",
+            "Lines 10640-10641 (code): computes `off=anyBrush&&!anyOther` and the `why` title string (falling back to a hard-coded French string when `SM.t` is unavailable).",
+            "Lines 10642-10651 (code, with 10645-10646 an interleaved comment): the `['p-cap-grp','p-join-grp'].forEach(...)` loop — see `boundaries` (g) for the `dataset.brushOff` ownership-marker mechanism that guards `#p-join-grp` against fighting `syncJoinEnabledForGradient` over the same element.",
+            "Lines 10652-10654 (code): disables/titles `#p-strokestyle` the same way.",
+            "Line 10655 (code): `window.syncStrokePropsForVectorBrush=syncStrokePropsForVectorBrush;`.",
+            "Line 10656 (code): `#p-vecbrush` change -> `window.SM.setVectorBrush(this.checked)`.",
+            "Lines 10657-10668 (comment, 12 lines): the NEXT leaf's own lead-in (Transform panel live-scrub rationale for `wireLiveXformField`, next leaf C19ah) — included here because it directly precedes C19ah's first declaration line (10669) with no other natural cut point, matching the issue's own suggested table."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`saveActiveLayerFrame` (app.js:4634, out of scope) IS called from this scope, but only from `applyStrokeGradAlongToSelection` (10402) — the one function in this whole span that mutates persisted per-shape data (`p.data.strokeGradientAlongPath`). No other packet calls it directly; every other listener's persistence, if any, happens inside the `window.SM.*` setter bodies they call (timeline.js:608-842, out of scope)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import/frame-materialization function is called anywhere in this scope's own body. All six packets read live `state.*`/DOM values at interaction time or at one-time script-load paint (packet 3's initial-swatch block); none re-triggers a frame load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "`pushUndo` (tweens.js:4741, out of scope) IS called from this scope, once, inside `applyStrokeGradAlongToSelection` (10400) — the only direct `pushUndo` call in this span. Every other listener's undo-snapshot behavior, if any, happens inside the called `window.SM.*` setter bodies (out of scope), several of which (`setStrokeCap`/`setStrokeJoin`/`setMiterLimit`/`setPaintOrder`/`setDashOffset`/`setStrokeStyle`/`setFillColor`/`setStrokeColor`/`setFillEnabled`/`setStrokeEnabled`/`setOpacity`) push their own undo step conditionally, only when a selection exists under `select`/`subselect`/`fsselect` — confirmed by direct read of each body, timeline.js:608-842."
+    },
+    {
+      "consumer": "selection",
+      "consumer_note": "selectedPaths",
+      "disposition": "`applyStrokeGradAlongToSelection` (10399-10401) and `syncStrokePropsForVectorBrush` (10633) both READ `selectedPaths` directly (never write it) to decide, respectively, whether to act at all and whether the entire selection is vector-brush strokes. No packet in this scope writes `selectedPaths`/`_layerSel`/`_layerSelAnchor` — selection mutation happens in select-bridge.js/tools.js (out of scope)."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D) and render/export path",
+      "disposition": "None of this scope's ten top-level symbols (`applyStrokeGradAlongToSelection`, `hexDisplayValue`, `alphaPctFromHex`, `parseHexInput`, `_dimsLockRatio`, `wireIconGroup`, `paintIconGroup`, `syncMiterLimitEnabled`, `syncJoinEnabledForGradient`, `syncStrokePropsForVectorBrush`) appears anywhere in engine-bridge.js, export.js, or rive-export.js by a targeted whole-file grep at the frozen SHA — confirming none of this scope runs on the render or export path itself. The DATA it writes (`p.data.strokeGradientAlongPath`, written only by `applyStrokeGradAlongToSelection`'s own three callers) IS read on the render path, at engine-bridge.js:1963-2002 (out of scope, cited in `reconciliation` above) — this is a producer/consumer relationship through persisted per-shape data, not a direct call."
+    },
+    {
+      "consumer": "native bridges (Tauri/desktop)",
+      "disposition": "No `window.__TAURI__`/native-bridge call exists anywhere in this scope's own body; all effects are DOM/browser-native (`addEventListener`, `getElementById`, `classList`, `dataset`) or calls into `window.SM.*`/`window.ColorPicker`/`window.SMEngineBridge` (all out of scope)."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-gradient-along-toggle-on-off-empty-selection",
+      "proposed": "With `selectedPaths=[]`, dispatch a `change` event on `#p-strokegrad-along` (checked); expect `pushUndo`/`saveActiveLayerFrame` NOT called (early return at 10399). Then with one path selected and the checkbox checked, dispatch the same event; expect `p.data.strokeGradientAlongPath` set to `{from:<p-strokegrad-from-c value>,to:<p-strokegrad-to-c value>}`, `pushUndo` called once, `saveActiveLayerFrame` called once — verifies 10398-10416 — not run."
+    },
+    {
+      "id": "fx-gradient-stop-edit-noop-without-flag",
+      "proposed": "With a selected path that does NOT carry `strokeGradientAlongPath`, dispatch `input` on `#p-strokegrad-from-c`; expect the swatch background to update (10419) but `p.data.strokeGradientAlongPath` to remain absent (early return at 10423) — verifies the from/to listeners only mutate paths already opted in, 10417-10434 — not run."
+    },
+    {
+      "id": "fx-hex-round-trip-ff-drop-and-alpha-pct",
+      "proposed": "Call `hexDisplayValue('#00CC44FF')` and expect `'00CC44'` (FF dropped); call `hexDisplayValue('#00CC4480')` and expect `'00CC4480'` (alpha kept); call `alphaPctFromHex('#00CC4480')` and expect `round(0x80/255*100)=50`; call `alphaPctFromHex('#00CC44')` and expect `100`; call `parseHexInput('abc')` and expect `'#AABBCC'`; call `parseHexInput('zz')` and expect `null` — verifies 10442-10462 as pure functions — not run."
+    },
+    {
+      "id": "fx-hex-field-invalid-input-snaps-back",
+      "proposed": "Set `state.fillColor='#112233'`, type an invalid string into `#p-fill-hex`, dispatch `change`; expect `#p-fill-hex`'s own `.value` reset to `hexDisplayValue('#112233')='112233'` and `window.SM.setFillColor` NOT called — verifies 10464-10465 — not run."
+    },
+    {
+      "id": "fx-stroke-alpha-clamped-and-ff-omitted",
+      "proposed": "Set `state.strokeColor='#00CC44'`, set `#p-stroke-alpha`'s own `.value` to `'150'`, dispatch `input`; expect `setStrokeColor` called with `'#00CC44'` (alpha clamped to 100, byte omitted per 10483's `pct<100` guard). Set `.value` to `'-20'`; expect `setStrokeColor` called with `'#00CC4400'` (clamped to 0, byte `00` appended) — verifies 10480-10484 — not run."
+    },
+    {
+      "id": "fx-dims-lock-ratio-captured-once",
+      "proposed": "Set `state.canvasW=1920,state.canvasH=1080`, click `#btn-dims-lock` (locks, ratio captured = 1.7778); change `state.canvasW` externally to 3840 WITHOUT re-clicking the lock, then dispatch `input` on `#p-cw` with value `960`; expect `#p-ch` set to `round(960/1.7778)=540` using the ORIGINALLY captured ratio, not a freshly recomputed one — verifies the lock captures the ratio only at the moment it is switched ON (10499) — not run."
+    },
+    {
+      "id": "fx-dims-unlocked-resize-still-live",
+      "proposed": "With the lock OFF, dispatch `input` on `#p-cw` with a new value; expect `window.SM.setCanvasSize` called immediately (on 'input', not only on the eventual 'change') with the sibling dimension unchanged from live `state.canvasH` — verifies the 2026-08-31 feedback-#188 fix (10501-10515) — not run."
+    },
+    {
+      "id": "fx-icon-group-single-choice-and-mirror",
+      "proposed": "Click a non-selected `.icon-btn` inside `#p-cap-grp`; expect exactly one button to carry the `sel` class afterward, `#p-cap-grp`'s own `dataset.value` to equal the clicked button's `dataset.value`, and `window.SM.setStrokeCap` called once with that value — verifies `wireIconGroup`, 10556-10564. Then call `paintIconGroup('p-cap-grp','square')` directly and expect the same `sel`/`dataset.value` result with NO setter call — verifies `paintIconGroup` is read-side only, 10565-10569 — not run."
+    },
+    {
+      "id": "fx-miter-limit-disabled-unless-miter-join",
+      "proposed": "Set `#p-join-grp`'s own `dataset.value` to `'round'`, call `syncMiterLimitEnabled()`; expect `#p-miterlimit.disabled===true`. Set it to `'miter'`, call again; expect `disabled===false` — verifies 10581 — not run."
+    },
+    {
+      "id": "fx-join-disabled-by-gradient-overrides-then-restores",
+      "proposed": "Check `#p-strokegrad-along`, dispatch `change`; expect `#p-join-grp` to carry `grp-disabled` and a non-empty `title`, and `#p-miterlimit.disabled===true` regardless of the join value (10608). Uncheck it, dispatch `change` again; expect `grp-disabled` removed and `#p-miterlimit`'s own disabled state to revert to whatever `syncMiterLimitEnabled()` alone would compute — verifies 10601-10611 — not run."
+    },
+    {
+      "id": "fx-vector-brush-disables-only-when-selection-entirely-brush",
+      "proposed": "With `selectedPaths` containing ONE `data.isVectorBrush=true` path and one ordinary path, call `syncStrokePropsForVectorBrush()`; expect `#p-cap-grp`/`#p-join-grp`/`#p-strokestyle` to remain enabled (mixed selection, 10637-10640). With BOTH paths brush strokes, call again; expect all three disabled with `dataset.brushOff==='1'` on both groups — verifies 10631-10654 — not run."
+    },
+    {
+      "id": "fx-join-ownership-marker-does-not-stomp-gradient-reason",
+      "proposed": "Check `#p-strokegrad-along` (join disabled for the gradient reason, `dataset.brushOff` absent on `#p-join-grp`), then select an all-brush selection and call `syncStrokePropsForVectorBrush()`; expect `#p-join-grp` to remain `grp-disabled` but its OWN `dataset.brushOff` to stay unset (10647's guard: `!off&&g.dataset.brushOff!=='1'` only fires the early return when `off` is false, so with `off=true` it proceeds to set `dataset.brushOff='1'` too — re-derive the exact expected flag state by executing the guard, not by assumption) — then switch the selection back to a non-brush selection while gradient-along is STILL checked; expect `#p-join-grp` to stay disabled (gradient reason) rather than being incorrectly re-enabled by the brush-sync's own clear branch, because `syncJoinEnabledForGradient()` is re-invoked at 10650 — verifies the two functions' co-operation, 10642-10651 — not run."
+    }
+  ],
+  "future_proposals": [
+    "The `#p-strokegrad-from-c`/`#p-strokegrad-to-c` `<input type=\"color\">` fields read plain `this.value` with no alpha handling at all (10419/10428) — a future request for a semi-transparent gradient stop would need either a hex8-capable custom widget (matching the `.dataset.hex8` convention used elsewhere) or an explicit design decision that gradient-along-path stops stay opaque-only; not confirmed as a current defect, flagged for awareness since nothing in this scope enforces or documents that limitation explicitly beyond the native `<input type=\"color\">`'s own inability to carry alpha.",
+    "`syncStrokePropsForVectorBrush`'s own selection scan (10633-10636) treats a path with no `.data` at all the same as a non-brush path (`if(!p||!p.data)return;` skips it without setting either flag) — a selection of ONLY such data-less items would compute `anyBrush=false,anyOther=false`, so `off=false&&!false=false`, leaving the controls enabled; this matches the function's own intent (nothing to disable for) but was not exercised by any proposed fixture above and is flagged for awareness rather than confirmed as a defect.",
+    "The dims-lock ratio (`_dimsLockRatio`) is captured from `state.canvasW/state.canvasH` at the click that turns the lock ON (10499) and is never re-validated against a canvas resize that happens through some OTHER path (e.g. a document-preset menu, out of scope) while the lock stays on — a future such resize would leave the lock applying a now-stale ratio to the next manual `#p-cw`/`#p-ch` edit; not confirmed as a current defect (no such other path was found calling `setCanvasSize` while re-arming the lock), flagged for awareness given the lock's own single capture-point design."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n` was run for every symbol this scope defines or references (function/variable names, DOM ids, `window.SM.*`/`state.*` fields), at the frozen SHA, filtering each symbol's own declaration/definition line — results are reproduced verbatim under each packet's own `callers` field and in `boundaries`/`reconciliation`, and are re-checkable with the same commands.",
+    "A SEPARATE whole-file grep restricted to engine-bridge.js/export.js/rive-export.js for all ten top-level symbol names this scope defines returned ZERO hits — directly supporting the `source_consumers` render/export-path disposition above; a follow-up grep for `strokeGradientAlongPath` (the DATA this scope's packet 1 writes) found it consumed at engine-bridge.js:1571/1963-2002, confirming the producer/consumer relationship is through persisted data, not a call.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 173/103/0 over 276 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all six packets (45:37/8/0, 57:39/18/0, 43:33/10/0, 43:29/14/0, 50:14/36/0, 38:21/17/0); no boundary correction to the declared numbers was needed.",
+    "All twenty-nine DOM ids this scope's own listeners reference (`#p-strokegrad-along`/`-from-c`/`-to-c`/`-from`/`-to`, `#fill-enable-toggle`, `#stroke-enable-toggle`, `#p-fill-hex`, `#p-stroke-hex`, `#p-stroke-alpha`, `#btn-dims-lock`, `#p-cw`, `#p-ch`, `#p-opacity`, `#p-smooth`, `#p-stab`, `#p-strokestyle`, `#p-miterlimit`, `#p-dashoffset`, `#p-poststroke-smooth`, `#p-cap-grp`, `#p-join-grp`, `#p-paintorder-grp`, `#p-fillbrushmode-grp`, `#p-vecbrush`, `#stroke-well`, `#pm-stroke`, `#color-stroke`, `#pm-stroke-c`, `#fill-well`, `#pm-fill`, `#color-fill`, `#pm-fill-c`) were each located directly in src/index.html at the frozen SHA rather than assumed present from name — line numbers recorded in the `owner` field above.",
+    "The engine-bridge.js gradient-along-path render block was located directly via `git grep` rather than assumed from the issue's own prose, since the issue asked for its line but did not supply one (engine-bridge.js:1952-2002, recorded in `reconciliation` above).",
+    "The classic-script (non-module) load of timeline.js (`<script src=\"js/timeline.js\">`, index.html:2366, no `type=\"module\"`) was confirmed directly, supporting the finding that `parseHexInput` reaches `window.parseHexInput` (color-manager.js:211) without any explicit `window.parseHexInput=` assignment anywhere in the file.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing source_path src/js/timeline.js were enumerated and their own `assigned_ranges` read directly to confirm zero overlap with 10393-10668 before writing this artifact's own ranges; the validator re-confirms this same check independently at run time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 276,
+    "expected_classification": {
+      "code": 173,
+      "comment": 103,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        10393,
+        10437
+      ],
+      [
+        10438,
+        10494
+      ],
+      [
+        10495,
+        10537
+      ],
+      [
+        10538,
+        10580
+      ],
+      [
+        10581,
+        10630
+      ],
+      [
+        10631,
+        10668
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 10393-10437=(37,8,0); 10438-10494=(39,18,0); 10495-10537=(33,10,0); 10538-10580=(29,14,0); 10581-10630=(14,36,0); 10631-10668=(21,17,0); sums to (173,103,0)=276 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 276 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/cc_1252.py engineering/inventory/census/C19ag-timeline-fill-stroke-panel-wiring.json <candidate-sha> exits 0",
+      "python3 /tmp/cc_1252.py engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json <candidate-sha> still exits 0",
+      "python3 /tmp/cc_1252.py engineering/inventory/census/C19ai-timeline-blend-matte-dropdowns-view-tween-buttons.json <candidate-sha> still exits 0",
+      "python3 /tmp/cc_1252.py engineering/inventory/census/C19aj-timeline-toolbar-onion-transport-layer-buttons.json <candidate-sha> still exits 0",
+      "python3 /tmp/cc_1252.py engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json <candidate-sha> still exits 0"
+    ]
+  }
+}

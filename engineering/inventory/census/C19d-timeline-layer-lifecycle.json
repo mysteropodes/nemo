@@ -1,0 +1,556 @@
+{
+  "census_id": "C19d",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1127",
+  "title": "Timeline layer lifecycle and folder relationship boundaries",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_path": "src/js/timeline.js",
+  "source_line_count": 11907,
+  "observed_main_sha": "71a72b5a0410544bdd37150d2accbaaacf490904",
+  "status": "read-only census and bounded proposals only; no runtime writer, behavior pass or Ready extraction claim",
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 862,
+      "end": 1081,
+      "lines": 220,
+      "classification": {
+        "code": 104,
+        "comment": 116,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "220 lines once: 104 code/116 comments/no whitespace. 1076-1081 are comment-only references, not trim implementation.",
+  "boundaries": [
+    "862 starts complete addLayer after C19b work-area.",
+    "Named methods complete through deleteLayer1075.",
+    "1076-1081 precede trimToWorkArea1082 and are context only.",
+    "SM facade boundaries349/2695 excluded."
+  ],
+  "whole_file_writer_guidance": "P30/#1032 open PR #1114 retains whole timeline.js runtime writer; D01/T05 and existing Motion claims stay separate. This artifact has no runtime writer.",
+  "reconciliation": [
+    "C01 save/history/export/import retained.",
+    "C02 Motion parent/UID/bounds/animation ports retained.",
+    "C04 selection/presentation retained.",
+    "C06 facade/bootstrap retained.",
+    "P20 folder codec retained.",
+    "C19b trim starts1082 excluded."
+  ],
+  "areas": [
+    {
+      "area": "lifecycle",
+      "packets": [
+        {
+          "id": "C19d.add-layer",
+          "files": [
+            "src/js/timeline.js:862-862"
+          ],
+          "coverage_ranges": [
+            [
+              862,
+              862
+            ]
+          ],
+          "symbols": [
+            "addLayer"
+          ],
+          "responsibility": "Creates/appends ordinary layer through createUserLayer, selects and loads it.",
+          "writer": "saveAllLayerFrames(); pushUndoLayers(true); createUserLayer(nextLayerName()) appends state.layers and userLayers; activateUL(idx), _layerSel=[idx], _layerSelAnchor=idx; loadFrame(currentFrame); updateUI().",
+          "public_api": "window.SM.addLayer() -> undefined; factory index is selected but not returned.",
+          "consumers": [
+            "timeline.js:6691,11415 menus",
+            "nemo-script.js:434 layer creation",
+            "vectorize-bridge.js:461 destination layer",
+            "labs/command-palette.js:33",
+            "labs/auto-actions.js:34 resolves addLayer dynamically to window.SM"
+          ],
+          "oracle": "Proposed, unrun: invoke the command in isolation to verify factory append, one pushUndoLayers call, selected appended index and exact save/load/update order. Separately exercise vectorize-bridge460-461 and assert its preceding pushUndo plus the command snapshot; include dynamic auto-actions dispatch without inventing a keyboard binding.",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before creating the layer; synchronizes live frame content before the undo snapshot.",
+            "load": "Calls loadFrame(state.currentFrame) after activating the new layer. Project import independently reconstructs persisted fields at timeline.js:2354-2693.",
+            "history": "The command calls pushUndoLayers(true) once after its explicit save. The vectorize workflow at vectorize-bridge.js:460-461 also calls pushUndo before invoking addLayer, so that workflow has an additional caller-owned snapshot call; no deduplication is assumed.",
+            "selection": "activateUL writes activeLayerIdx and activates the appended Paper layer; assigns _layerSel=[idx] and _layerSelAnchor=idx. The command does not explicitly call syncBarSelToLayerSel.",
+            "animation": "Creates the factory frame array at app.js:377-387, with first frame keyed; existing Motion track/effective-frame owners remain unchanged.",
+            "render": "Local tail calls activateUL, assigns _layerSel/_layerSelAnchor, calls loadFrame(currentFrame) and updateUI. No parenting call, direct renderTimeline or engine.renderNow call occurs in this command; load/update consumers remain their existing owners.",
+            "export": "The new descriptor flows to exportJSON at timeline.js:2049-2246; layer-kind flags and settings appear at2117. Existing render/export consumers decide whether that kind produces content.",
+            "native": "No direct native command or resource acquisition. Descriptor rendering goes through engine-bridge.js; this source census proves no packaged/native workflow."
+          },
+          "construct_boundary": "complete",
+          "notes": "factory appends parallel arrays; history/save/selection/update",
+          "proposed_api": "planLayerLifecycle(kind,context) -> {draft,selection,ports}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.add-null",
+          "files": [
+            "src/js/timeline.js:863-908"
+          ],
+          "coverage_ranges": [
+            [
+              863,
+              908
+            ]
+          ],
+          "symbols": [
+            "addNullLayer"
+          ],
+          "responsibility": "Creates Null, centers over pre-selection and calls Motion parenting.",
+          "writer": "Saves and snapshots once, appends through createUserLayer, writes isNullLayer=true, nullShape=cross, color=#ff2d78 and nullPos. Copies pre-selection before append; valid indices feed optional Motion bounds/UID/parenting calls. Activates/selects/loads the new index and calls updateUI.",
+          "public_api": "window.SM.addNullLayer() -> undefined.",
+          "consumers": [
+            "timeline.js:6692,11416 menus",
+            "nemo-script.js:443 null creation"
+          ],
+          "oracle": "Proposed, unrun: selected layers union center, absent Motion port, parent rejection still command selection, persisted null fields and engine null marker",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before creating the layer; synchronizes live frame content before the undo snapshot.",
+            "load": "Calls loadFrame(state.currentFrame) after activating the new layer. Project import independently reconstructs persisted fields at timeline.js:2354-2693.",
+            "history": "Calls pushUndoLayers(true) once after the explicit save; the true flag avoids an extra save inside the history helper. C01 undo/redo consumes the full-layer snapshot.",
+            "selection": "activateUL writes activeLayerIdx and activates the appended Paper layer; assigns _layerSel=[idx] and _layerSelAnchor=idx. The command does not explicitly call syncBarSelToLayerSel.",
+            "animation": "With SMMotion present and nonempty valid selection, calls layerWorldBoundsUnion at currentFrame for center, then ensureLayerUid and setLayerParent for each selected index. The Motion port owns static versus keyed parenting, compensation and refusal; this command does not inspect a success result.",
+            "render": "Calls loadFrame and updateUI. Neither a direct renderTimeline nor engine.renderNow call is present in this command; delegated update/parenting ports may render.",
+            "export": "exportJSON2117 includes isNullLayer, nullPos and nullShape; import2423 restores Null identity/fields. Color is part of the ordinary layer record. Selected children parent fields/keys use the separate existing Motion serialization paths. addNullLayer does not initialize folderCollapsed.",
+            "native": "No direct native command or resource acquisition. Descriptor rendering goes through engine-bridge.js; this source census proves no packaged/native workflow."
+          },
+          "construct_boundary": "complete",
+          "notes": "No locked-layer or folder-kind filter is applied to the selected parent candidates. Missing Motion leaves the new Null centered on canvas and unparented; a rejected individual parenting operation does not roll back layer creation.",
+          "proposed_api": "planLayerLifecycle(kind,context) -> {draft,selection,ports}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.folder-collapse",
+          "files": [
+            "src/js/timeline.js:909-919"
+          ],
+          "coverage_ranges": [
+            [
+              909,
+              919
+            ]
+          ],
+          "symbols": [
+            "toggleFolderLayerCollapsed"
+          ],
+          "responsibility": "Toggles folder disclosure.",
+          "writer": "Writes ld.folderCollapsed=!ld.folderCollapsed then renderLayerList/renderTimeline; no save, history, selection or loadFrame.",
+          "public_api": "window.SM.toggleFolderLayerCollapsed(layerIndex) -> undefined; absent/non-folder target returns without effects.",
+          "consumers": [
+            "timeline.js:6429 disclosure click",
+            "motion.js:7119 disclosure click"
+          ],
+          "oracle": "Proposed, unrun: non-folder/no-layer no-op; toggle twice; verify only disclosure field and two renders, no undo/save",
+          "consumer_matrix": {
+            "save": "No save call. Writes persistent ld.folderCollapsed directly; later project export captures it.",
+            "load": "No loadFrame call. Project import restores folderCollapsed at timeline.js:2425.",
+            "history": "No undo snapshot; a disclosure toggle is not locally undoable through this method.",
+            "selection": "No local active-layer, frame or layer-selection write.",
+            "animation": "No timing/parent/key change; disclosure affects row presentation rather than document content visibility.",
+            "render": "Calls renderLayerList and renderTimeline only. The folder render-order consumers read the changed disclosure value.",
+            "export": "exportJSON2117 includes folderCollapsed even though no save/undo is called here.",
+            "native": "No direct native bridge, decoder or system resource operation."
+          },
+          "construct_boundary": "complete",
+          "notes": "The field mutates even though the command has no save/history/renderNow transaction.",
+          "proposed_api": "planFolderRelationship(layers,folder,indices) -> {parentOps,reveal}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.folder-reparent",
+          "files": [
+            "src/js/timeline.js:920-944"
+          ],
+          "coverage_ranges": [
+            [
+              920,
+              944
+            ]
+          ],
+          "symbols": [
+            "reparentLayersIntoFolder"
+          ],
+          "responsibility": "Parents non-folder indices through Motion.",
+          "writer": "Validates folder/SMMotion, ensures folder UID before the snapshot, then saveAllLayerFrames and pushUndoLayers(true). Skips self/missing/folder entries; calls setLayerParent and increments moved regardless of refusal. A nonzero count opens folderCollapsed, refreshes and toasts.",
+          "public_api": "window.SM.reparentLayersIntoFolder(indices,folderIndex) -> undefined.",
+          "consumers": [
+            "timeline.js:6949 folder drop in finishLayerReorder"
+          ],
+          "oracle": "Proposed, unrun: absent/nonfolder/SMMotion guards; self, missing and nested-folder skips; duplicate indices; missing folder UID before snapshot; setter refuses without mutation yet moved still increments, disclosure opens and count toast reflects attempts; keyed/static parenting and one explicit snapshot.",
+          "consumer_matrix": {
+            "save": "ensureLayerUid(fld) runs before saveAllLayerFrames and pushUndoLayers(true); a missing folder UID can be assigned before the history snapshot.",
+            "load": "After delegated parenting, calls loadFrame(currentFrame). Project import restores existing parent fields/keys.",
+            "history": "One explicit full-layer snapshot after guards, including when the Motion setter subsequently refuses a relation; no success-based rollback is present.",
+            "selection": "No local _layerSel, _sel or activeLayerIdx assignment. Motion parenting is a separate port; command does not reselect targets.",
+            "animation": "SMMotion.setLayerParent owns cycle/parent-B refusal, keyed parent changes and transform compensation (motion.js:3618+). Return value is not a success contract here.",
+            "render": "Calls loadFrame, renderLayerList, renderTimeline and updateUI after the attempt; the Motion setter may also render.",
+            "export": "Existing parent relationships serialize through timeline.js:2121-2125 and2462-2473; P20 legacy folderId codec is a different relation model. A nonzero attempt count can also set persisted folderCollapsed=false.",
+            "native": "No direct native bridge. Engine parent/subtree consumers receive the resulting document through normal scene construction."
+          },
+          "construct_boundary": "complete",
+          "notes": "result ignored but moved increments",
+          "proposed_api": "planFolderRelationship(layers,folder,indices) -> {parentOps,reveal}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.folder-remove",
+          "files": [
+            "src/js/timeline.js:945-956"
+          ],
+          "coverage_ranges": [
+            [
+              945,
+              956
+            ]
+          ],
+          "symbols": [
+            "removeLayerFromFolder"
+          ],
+          "responsibility": "Unparents folder child.",
+          "writer": "Guards layer/SMMotion and folderLayerParentIdx(idx)>=0, then saves and snapshots; delegates setLayerParent(idx,null), reloads/renders/updates and toasts without checking success.",
+          "public_api": "window.SM.removeLayerFromFolder(layerIndex) -> undefined.",
+          "consumers": [
+            "timeline.js:6721 context menu",
+            "motion.js:7393 context menu"
+          ],
+          "oracle": "Proposed, unrun: nonfolder parent no-op versus folder child detach; port absence; one snapshot and relationship result",
+          "consumer_matrix": {
+            "save": "After guards, calls saveAllLayerFrames before pushUndoLayers(true).",
+            "load": "After delegated parenting, calls loadFrame(currentFrame). Project import restores existing parent fields/keys.",
+            "history": "After eligibility guards, calls saveAllLayerFrames then pushUndoLayers(true) once before setLayerParent(idx,null). A null target bypasses the Motion setter's truthy-target conflict/cycle guards; the command unconditionally refreshes and toasts after the call.",
+            "selection": "No local _layerSel, _sel or activeLayerIdx assignment. Motion parenting is a separate port; command does not reselect targets.",
+            "animation": "setLayerParent(idx,null) inserts a null parent key through upsertParentKeyAt if parentKeys already exists; otherwise writes parentLayerUid=null and compensates Position using composedPivotWorld before/after. The truthy-parent conflict/cycle refusal paths do not apply to this null target.",
+            "render": "Calls loadFrame, renderLayerList, renderTimeline and updateUI after the attempt; the Motion setter may also render.",
+            "export": "Existing parent relationships serialize through timeline.js:2121-2125 and2462-2473; P20 legacy folderId codec is a different relation model.",
+            "native": "No direct native bridge. Engine parent/subtree consumers receive the resulting document through normal scene construction."
+          },
+          "construct_boundary": "complete",
+          "notes": "folderLayerParentIdx (timeline.js:5593+) determines eligibility. Parent removal semantics and compensation remain in Motion, not duplicated here.",
+          "proposed_api": "planFolderRelationship(layers,folder,indices) -> {parentOps,reveal}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.add-effect",
+          "files": [
+            "src/js/timeline.js:957-966"
+          ],
+          "coverage_ranges": [
+            [
+              957,
+              966
+            ]
+          ],
+          "symbols": [
+            "addEffectLayer"
+          ],
+          "responsibility": "Creates effect layer.",
+          "writer": "Writes isEffectLayer=true and effects=[] after createUserLayer; save/pushUndo/select/load/update. No blur effect object is created.",
+          "public_api": "window.SM.addEffectLayer() -> undefined.",
+          "consumers": [
+            "timeline.js:6694,11418 menus"
+          ],
+          "oracle": "Proposed, unrun: assert empty array despite comment, effect flag, selection/history and engine effect-layer consumer",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before creating the layer; synchronizes live frame content before the undo snapshot.",
+            "load": "Calls loadFrame(state.currentFrame) after activating the new layer. Project import independently reconstructs persisted fields at timeline.js:2354-2693.",
+            "history": "Calls pushUndoLayers(true) once after the explicit save; the true flag avoids an extra save inside the history helper. C01 undo/redo consumes the full-layer snapshot.",
+            "selection": "activateUL writes activeLayerIdx and activates the appended Paper layer; assigns _layerSel=[idx] and _layerSelAnchor=idx. The command does not explicitly call syncBarSelToLayerSel.",
+            "animation": "Initializes isEffectLayer=true and effects=[]; no default blur object is inserted despite the preceding comment. Existing effects evaluation remains the renderer owner.",
+            "render": "Local tail calls activateUL, assigns _layerSel/_layerSelAnchor, calls loadFrame(currentFrame) and updateUI. No parenting call, direct renderTimeline or engine.renderNow call occurs in this command; load/update consumers remain their existing owners.",
+            "export": "The new descriptor flows to exportJSON at timeline.js:2049-2246; layer-kind flags and settings appear at2117. Existing render/export consumers decide whether that kind produces content.",
+            "native": "No direct native command or resource acquisition. Descriptor rendering goes through engine-bridge.js; this source census proves no packaged/native workflow."
+          },
+          "construct_boundary": "complete",
+          "notes": "Source sets an empty effects array; the mild-blur comment is not evidence of a configured blur.",
+          "proposed_api": "planLayerLifecycle(kind,context) -> {draft,selection,ports}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.add-guide",
+          "files": [
+            "src/js/timeline.js:967-975"
+          ],
+          "coverage_ranges": [
+            [
+              967,
+              975
+            ]
+          ],
+          "symbols": [
+            "addGuideLayer"
+          ],
+          "responsibility": "Creates centered guide.",
+          "writer": "Writes isGuideLayer, guidePos center, guideOrientation horizontal, color #00baff after factory; save/pushUndo/select/load/update.",
+          "public_api": "window.SM.addGuideLayer() -> undefined.",
+          "consumers": [
+            "timeline.js:6695,11419 menus"
+          ],
+          "oracle": "Proposed, unrun: canvas dimensions defaults, persisted guide fields, editor overlay consumer and one snapshot",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before creating the layer; synchronizes live frame content before the undo snapshot.",
+            "load": "Calls loadFrame(state.currentFrame) after activating the new layer. Project import independently reconstructs persisted fields at timeline.js:2354-2693.",
+            "history": "Calls pushUndoLayers(true) once after the explicit save; the true flag avoids an extra save inside the history helper. C01 undo/redo consumes the full-layer snapshot.",
+            "selection": "activateUL writes activeLayerIdx and activates the appended Paper layer; assigns _layerSel=[idx] and _layerSelAnchor=idx. The command does not explicitly call syncBarSelToLayerSel.",
+            "animation": "Sets guidePos to canvas center and guideOrientation=horizontal. Existing layer Motion transforms position/rotation; no new keyframe system.",
+            "render": "Local tail calls activateUL, assigns _layerSel/_layerSelAnchor, calls loadFrame(currentFrame) and updateUI. No parenting call, direct renderTimeline or engine.renderNow call occurs in this command; load/update consumers remain their existing owners.",
+            "export": "Guide identity/settings persist at timeline.js:2117 and2426. Engine-bridge.js:927 and2834+ build editor guide content; external output inclusion requires its own fixture, not this census.",
+            "native": "No direct native command or resource acquisition. Descriptor rendering goes through engine-bridge.js; this source census proves no packaged/native workflow."
+          },
+          "construct_boundary": "complete",
+          "notes": "history/save/select",
+          "proposed_api": "planLayerLifecycle(kind,context) -> {draft,selection,ports}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.widget-facades",
+          "files": [
+            "src/js/timeline.js:976-985"
+          ],
+          "coverage_ranges": [
+            [
+              976,
+              985
+            ]
+          ],
+          "symbols": [
+            "SM.addJoystickLayer",
+            "SM.addSliderLayer"
+          ],
+          "responsibility": "Delegates to SMRigWidget.",
+          "writer": "Only if window.SMRigWidget calls addWidgetLayer joystick/slider. No local state, history, selection, render, save or return value.",
+          "public_api": "window.SM.addJoystickLayer() and window.SM.addSliderLayer() -> undefined; neither returns addWidgetLayer result.",
+          "consumers": [
+            "timeline.js:6696-6697,11420-11421 menus",
+            "rig-widget.js:441-473 owns delegated creation"
+          ],
+          "oracle": "Proposed, unrun: missing port no-op; verify exact kind forwarded once; widget factory owns controls/history/render",
+          "consumer_matrix": {
+            "save": "No local save. With the port present, rig-widget.js:addWidgetLayer owns saveAllLayerFrames before creation.",
+            "load": "No local load. addWidgetLayer activates and loads a created layer on its success path; absent SMRigWidget is a no-op.",
+            "history": "No local snapshot. addWidgetLayer calls pushUndoLayers(true); its partial-failure behavior remains outside these facades.",
+            "selection": "No local selection write. addWidgetLayer calls activateUL on success but does not assign _layerSel/_layerSelAnchor in its inspected441-473 path.",
+            "animation": "Delegated widget factory creates expression controls and their widget descriptor together; these facades forward only joystick or slider.",
+            "render": "No local render. Successful factory calls updateUI and optional engine renderNow.",
+            "export": "Widget flags/descriptors persist through existing timeline.js:2117 and2434-2435; facade has no schema.",
+            "native": "No direct native bridge. Runtime widget resources remain rig-widget owners."
+          },
+          "construct_boundary": "complete",
+          "notes": "Missing window.SMRigWidget is guarded; a present object without addWidgetLayer is not separately guarded. The factory return value (index or -1) is discarded.",
+          "proposed_api": "createWidget(kind,{factory}) -> result",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.add-folder",
+          "files": [
+            "src/js/timeline.js:986-1026"
+          ],
+          "coverage_ranges": [
+            [
+              986,
+              1026
+            ]
+          ],
+          "symbols": [
+            "addFolderLayer"
+          ],
+          "responsibility": "Creates Null+Folder and parents selection.",
+          "writer": "Saves and snapshots once, appends through createUserLayer, writes isNullLayer/isFolderLayer=true, folderCollapsed=false, nullShape=cross, effects=[], color=#ffb020 and nullPos. Copies pre-selection before append; valid indices feed optional Motion bounds/UID/parenting calls. Activates/selects/loads the new index and calls updateUI.",
+          "public_api": "window.SM.addFolderLayer() -> undefined.",
+          "consumers": [
+            "timeline.js:6693,11417 menus"
+          ],
+          "oracle": "Proposed, unrun: compare nested folder input with reparent guard; center/parent calls; folder engine subtree and persistence fields",
+          "consumer_matrix": {
+            "save": "Calls saveAllLayerFrames before creating the layer; synchronizes live frame content before the undo snapshot.",
+            "load": "Calls loadFrame(state.currentFrame) after activating the new layer. Project import independently reconstructs persisted fields at timeline.js:2354-2693.",
+            "history": "Calls pushUndoLayers(true) once after the explicit save; the true flag avoids an extra save inside the history helper. C01 undo/redo consumes the full-layer snapshot.",
+            "selection": "activateUL writes activeLayerIdx and activates the appended Paper layer; assigns _layerSel=[idx] and _layerSelAnchor=idx. The command does not explicitly call syncBarSelToLayerSel.",
+            "animation": "With SMMotion present and nonempty valid selection, calls layerWorldBoundsUnion at currentFrame for center, then ensureLayerUid and setLayerParent for each selected index. The Motion port owns static versus keyed parenting, compensation and refusal; this command does not inspect a success result.",
+            "render": "Calls loadFrame and updateUI. Neither a direct renderTimeline nor engine.renderNow call is present in this command; delegated update/parenting ports may render.",
+            "export": "Layer-kind fields/nullPos and folderCollapsed flow through timeline.js:2117 and2423-2425. Parent target/keys are existing serialized Motion relationships; no new serialization authority is created.",
+            "native": "No direct native command or resource acquisition. Descriptor rendering goes through engine-bridge.js; this source census proves no packaged/native workflow."
+          },
+          "construct_boundary": "complete",
+          "notes": "Unlike reparentLayersIntoFolder, validSel does not exclude existing folder layers. The Motion setter may reject a relation; no result is checked and creation is retained. This is a source-observed difference, not a verified nested-folder rendering result.",
+          "proposed_api": "planFolderRelationship(layers,folder,indices) -> {parentOps,reveal}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.delete-layer",
+          "files": [
+            "src/js/timeline.js:1027-1075"
+          ],
+          "coverage_ranges": [
+            [
+              1027,
+              1075
+            ]
+          ],
+          "symbols": [
+            "deleteLayer"
+          ],
+          "responsibility": "Deletes camera pseudo-layer or selected layers.",
+          "writer": "Camera branch clears cameraLayerOn/cameraKeys/cameraView, setTool/select and renders without save/pushUndo. Ordinary branch save/pushUndo, removes parallel arrays descending, adjusts expanded index, selection/bar sync, activate/load/update.",
+          "public_api": "window.SM.deleteLayer() -> undefined; camera, last-layer refusal and ordinary deletion are separate branches.",
+          "consumers": [
+            "timeline.js:6705 menu,10200 keyboard,11424 button",
+            "nemo-script.js:260 Layer.remove"
+          ],
+          "oracle": "Proposed, unrun: camera branch has no local history/save; one-layer refusal; ordinary locked/mixed/duplicate/invalid selections, descending deletion and keep-last guard; deleting below active index without reducing total below it; _motionExpandedLayer corrections; exact layer/bar selection; retained dangling parent/tween metadata and decoder lifetime disposition; one ordinary snapshot and undo/redo.",
+          "consumer_matrix": {
+            "save": "Camera branch and last-layer refusal do not save. Ordinary deletion calls saveAllLayerFrames before its snapshot.",
+            "load": "Ordinary branch activates/clamps the resulting active index and calls loadFrame(currentFrame). Camera branch calls setTool(select) and UI refresh instead of a local loadFrame.",
+            "history": "Camera clears cameraLayerOn/cameraKeys/cameraView without a local snapshot. Ordinary branch calls pushUndoLayers(true) once; last-layer refusal returns before it.",
+            "selection": "Ordinary branch sorts a copied _layerSel (or active fallback) descending, removes arrays, adjusts _motionExpandedLayer, clamps active only at upper bound, sets _layerSel/anchor to that index and calls optional syncBarSelToLayerSel before activate/load. No lock filter is present.",
+            "animation": "Ordinary deletion removes frame-bearing layer descriptors without local parent-reference or global tween-map cleanup. Camera branch clears cameraKeys and view flags directly. Other state owners remain unchanged.",
+            "render": "Ordinary: Paper layer remove, activateUL, loadFrame, updateUI and toast. Camera: setTool(select), renderLayerList, renderTimeline, updateUI, optional updateCameraPanel/renderNow, toast.",
+            "export": "Remaining layers and camera state persist through exportJSON; native-video sessions and external stores are not explicitly released by this method. Do not infer complete resource cleanup from descriptor removal.",
+            "native": "No local native-video/session disposal call. Native resource lifetime and later renderer/export behavior require separate consumer fixtures."
+          },
+          "construct_boundary": "complete",
+          "notes": "camera branch bypasses ordinary snapshot",
+          "proposed_api": "planLayerLifecycle(kind,context) -> {draft,selection,ports}",
+          "admission": "Pending linked executable-leaf admission and whole-file writer availability; source-derived fixtures are unrun."
+        },
+        {
+          "id": "C19d.trailing-references",
+          "files": [
+            "src/js/timeline.js:1076-1081"
+          ],
+          "coverage_ranges": [
+            [
+              1076,
+              1081
+            ]
+          ],
+          "symbols": [
+            "key-lock/trim comments"
+          ],
+          "responsibility": "References next methods only.",
+          "writer": "no implementation",
+          "public_api": "none; comment-only references to key lock and trimToWorkArea at 1082",
+          "consumers": [
+            "C19b trimToWorkArea1082-1120",
+            "setLayerKeyLock1121-1127 is outside this census and remains for metadata mapping"
+          ],
+          "oracle": "No fixture: reference-only context.",
+          "consumer_matrix": {
+            "save": "N/A",
+            "load": "N/A",
+            "history": "N/A",
+            "selection": "N/A",
+            "animation": "N/A",
+            "render": "N/A",
+            "export": "N/A",
+            "native": "N/A"
+          },
+          "construct_boundary": "comment-only context",
+          "notes": "1076-1077 refer to key-lock behavior;1078-1081 introduce the C19b trim command. Comment classification only, no duplicate implementation/API claim."
+        }
+      ]
+    }
+  ],
+  "source_baselines": [
+    "createUserLayer appends state.layers/userLayers.",
+    "reparent moved increments even when setLayerParent rejects.",
+    "effect initializes effects=[] despite mild-blur comment.",
+    "folder creation does not filter nested folders while reparent does.",
+    "camera deletion bypasses ordinary snapshot."
+  ],
+  "future_proposals": [
+    {
+      "id": "C19d.proposal-kind-defaults",
+      "scope": "layer-kind initialization data only; excludes UID allocation, live state, parenting and UI",
+      "module": "src/js/domain/document/layer-kind-defaults.js",
+      "api": "layerKindDefaults(kind,canvasSize,center) -> explicit descriptor field patch",
+      "admission": "Pending separate bounded leaf; independent literal fixtures preserve current defaults including empty effects."
+    },
+    {
+      "id": "C19d.proposal-create-command",
+      "scope": "ordinary/null/guide/effect/folder creation application adapter with explicit factory, save/history, optional parenting and selection ports",
+      "module": "src/js/application/layer-create.js",
+      "api": "createLayer(kind,{document,selection,factory,history,motion,ui}) -> result; legacy facade still returns undefined",
+      "admission": "Pending separate leaf; split per kind if consumer acceptance exceeds one bounded outcome."
+    },
+    {
+      "id": "C19d.proposal-folder-commands",
+      "scope": "collapse and parent/unparent adapters remain separate operations, preserving different history contracts",
+      "module": "src/js/application/folder-commands.js",
+      "api": "toggleDisclosure(index,ports); reparent(indices,folderIndex,ports); removeParent(index,ports)",
+      "admission": "Pending separate leaves by operation; no new parent algorithm."
+    },
+    {
+      "id": "C19d.proposal-delete-command",
+      "scope": "ordinary layer deletion plan and application adapter; camera branch separately characterized",
+      "module": "src/js/application/layer-delete.js",
+      "api": "planLayerDeletion(layerCount,selectedIndices,activeIndex) -> ordered removals/active index; delete adapter owns Paper/history/UI",
+      "admission": "Pending separate bounded leaf; camera deletion behavior stays an explicit separate port/leaf."
+    },
+    {
+      "id": "C19d.proposal-widget-facade",
+      "scope": "delegate existing widget creation without a second widget model",
+      "module": "src/js/application/widget-commands.js",
+      "api": "createWidget(kind,{widgetPort}) with legacy undefined return preserved",
+      "admission": "Reference existing rig-widget owner before admitting any new leaf; no duplicate factory."
+    }
+  ],
+  "fixtures": [
+    "factory append/parallel arrays",
+    "Null/folder center and parent success/failure",
+    "nested-folder difference",
+    "effect empty baseline",
+    "camera no-history vs ordinary delete",
+    "collapse/remove/reparent selection/render",
+    "widget port present/absent"
+  ],
+  "validation": {
+    "expected_assigned_lines": 220,
+    "expected_classification": {
+      "code": 104,
+      "comment": 116,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove862 => reject omission",
+      "overlap957 => reject"
+    ],
+    "symbol_checks": [
+      "addLayer",
+      "addNullLayer",
+      "toggleFolderLayerCollapsed",
+      "reparentLayersIntoFolder",
+      "removeLayerFromFolder",
+      "addEffectLayer",
+      "addGuideLayer",
+      "addJoystickLayer/addSliderLayer",
+      "addFolderLayer",
+      "deleteLayer"
+    ]
+  },
+  "exclusions": [
+    "before862 C19b work-area",
+    "trim implementation1082 onward",
+    "factory/parenting/widget/engine edits",
+    "runtime repairs"
+  ],
+  "owner": "Ilya/D1; Terra/medium initial mapping, Codexitron/Ilya O source-contract completion and integration",
+  "source_consumers": {
+    "factory": "app.js:377-387 createUserLayer; app.js:4634/4693 save helpers; app.js:4746 loadFrame",
+    "history": "tweens.js:4877 layersSnapshotNow,4928 pushUndoLayers,4996 undo and corresponding redo",
+    "document": "timeline.js:2049-2246 exportJSON and2354-2693 importJSON; C01 owns shared document/history ports, P20 owns only accepted legacy folder codec slice",
+    "render": "engine-bridge.js:871-944 handles null/folder/guide/effect kinds; browser/WASM source observation, not native acceptance",
+    "parenting": "motion.js:3618+ setLayerParent; timeline.js:5593+ folderLayerParentIdx",
+    "widgets": "rig-widget.js:441-473 addWidgetLayer"
+  }
+}

@@ -2,9 +2,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { evaluateCoverageSummary } = require('../scripts/nemo/lib/jobs.cjs');
+const path = require('node:path');
 
 const root = '/repo';
 const entry = (linesPct, branchesPct) => ({ lines: { pct: linesPct }, branches: { pct: branchesPct } });
+
+test('the registered opacity feature and registry remain in the real coverage denominator', () => {
+  const config = require('../.c8rc.json');
+  const files = ['src/js/application/capability-registry.js', 'src/js/application/opacity-capability.js'];
+  for (const file of files) assert.ok(config.include.includes(file), `${file} was admitted without coverage`);
+  const summary = Object.fromEntries(config.include.map(file => [path.resolve(root, file), entry(100, 100)]));
+  for (const file of files) {
+    const missing = { ...summary };
+    delete missing[path.resolve(root, file)];
+    assert.equal(evaluateCoverageSummary(missing, config, root).ok, false, `missing execution for ${file} must fail`);
+  }
+});
 
 test('evaluateCoverageSummary passes when every included file meets the threshold', () => {
   const config = { include: ['a.js', 'b.js'], lines: 90, branches: 80, exceptions: [] };

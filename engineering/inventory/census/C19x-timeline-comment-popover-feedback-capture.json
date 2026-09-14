@@ -1,0 +1,473 @@
+{
+  "census_id": "C19x",
+  "issue": 1226,
+  "title": "Timeline.js team-comment popover and debug-feedback capture — comment/screenshot state, action-trail recording, open/close placement, initCommentPopover",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19w/#1216 (PR #1217); first OPEN slice of the timeline.js tail past the shortcut/rebinding UI (timeline.js:7450-7723, already owned by `C06.preferences.shortcuts-system`, cite by name/line only, not re-mapped — its own artifact declares that exact span). Scope is timeline.js:7724-7994: the team-review comment-pin lead-in and module state (`_activeComment`, `_activeFbTags`, `_activeShotDataUrls`), the screenshot-strip trio (`renderCommentShotThumbs`, `setCommentShots`, `addCommentShots`, `loadCommentShotFiles`), precise action/click-trail recording (`updateRecordUI`, `startRecording`, `stopRecording`), open/close placement (`openCommentPopover`, `closeCommentPopover`), and the popover's own event wiring (`initCommentPopover`) plus its `DOMContentLoaded` registration. Matches the issue's own suggested four-packet table exactly (verified by `sed -n` and by independently re-deriving every packet's classification, see `surface_inventory_cross_check`) — the issue's own optional internal 2-space-comment sub-split of `init-comment-popover` (7904 screenshot attachment, 7980 outside-click) was evaluated and NOT taken: both regions sit inside `initCommentPopover`'s own single top-level function body, sharing its closure (`saveBtn`/`delBtn`/`pop`/`_activeComment` etc.) and its single `DOMContentLoaded` registration line (7994, which must stay with the function it registers) — neither region is an independently callable unit or separately testable without the enclosing function, the same reasoning C19w gave for rejecting an analogous split of `renderDuplicatorEffectors` (see that artifact's own `owner` field). P30/#1032 retains the timeline.js runtime writer; this JSON authoring does not authorize source changes. Cited by name/line only, not re-mapped: `feedback-bridge.js` (`SMFeedback.submitFeedback`/`.actionLogMark`/`.clickLogMark`/`.actionTrailSince`/`.clickTrailSince`/`.uploadScreenshotsIfAny` — CLAUDE.md §6), the Comment tool in `tools.js` that calls `openCommentPopover` (tools.js:7290), `state.comments` writers/readers elsewhere (the state-schema declaration and default `comments:[]`, app.js:321-325; `exportJSON`/its paired import, timeline.js:2217/2631, C19g, merged; the pins overlay `buildCommentPinItems`, engine-bridge.js:3419-3429; the avatar-stack/glance-panel `refreshFbAvatars`/`renderFbAvatarPopover`, timeline.js:9336-9391, not yet censused by any sibling at authoring time), the `#comment-popover` markup and its ids (src/index.html:2056-2110), `view.projectToView` (Paper.js), `pushUndo*` (tweens.js — NOT actually called anywhere in this span, see `boundaries`), `saveActiveLayerFrame` (app.js:4634, C21o, merged), `updateUI` (timeline.js:2727, C19h, merged), `saveUserProfile` (app.js:356), `SM.t` (i18n.js:4185/4239), `showToast` (timeline.js:7447, C19w, merged), `SMEngineBridge.renderNow` (engine-bridge.js), and the text-tool section beginning at timeline.js:7995 (`// ---- Outil texte (v20, 2026-07 rework) ----`, next leaf, not yet censused at authoring time).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a155706476b26b0bd03dc502a7e4168d5e941f20",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19x-timeline-comment-popover-census",
+  "assigned_ranges": [
+    {
+      "start": 7724,
+      "end": 7994
+    }
+  ],
+  "coverage_note": "Exactly 271 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 210 code, 61 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span, 7724-7994=(210,61,0) both ways) — equal to the issue's own proposed table exactly, no boundary correction needed. Line 7723 is C06.preferences.shortcuts-system's own closing brace of `renderShortcutsList` (out of scope, that artifact's own declared assigned_ranges end); line 7724 opens this scope's own lead-in comment for the anchored-comment-pin state. Line 7994 is `initCommentPopover`'s own `DOMContentLoaded` registration; line 7995 opens the next leaf's own `// ---- Outil texte (v20, 2026-07 rework) ----` header, confirmed by direct read of 7993-7998. A sweep of every C*.json in this directory sharing source_path: src/js/timeline.js (C19a through C19w) confirms the existing coverage is contiguous through line 7723 with zero gaps/overlaps (C19w's own assigned_ranges end at 7448; C06.preferences.shortcuts-system's own assigned_ranges cover 7450-7723, leaving only the lone `// ---- KEYBOARD ----` header line 7449 unmapped, explicitly reserved by the issue for the P03C small-span reconciliation leaf and NOT claimed here), and this artifact is the immediate next contiguous span.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (a155706476b26b0bd03dc502a7e4168d5e941f20, the merge of PR #1221/C21o) has the identical timeline.js blob (git rev-parse a155706476b26b0bd03dc502a7e4168d5e941f20:src/js/timeline.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at a155706476b26b0bd03dc502a7e4168d5e941f20, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for the ten function symbols this scope defines (renderCommentShotThumbs, setCommentShots, addCommentShots, loadCommentShotFiles, updateRecordUI, startRecording, stopRecording, openCommentPopover, closeCommentPopover, initCommentPopover), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`. Field-level read/write claims (module-state resets, DOM ids, the team-comment vs. debug-feedback persistence split) were derived by a plain-pattern grep restricted to the frozen blob's own lines 7724-7994, cross-checked line-by-line against a direct `sed -n`/`awk` read of the same range, and cross-cited against the caller `tools.js:7275-7291` (Comment tool), the sole external reader `engine-bridge.js:3419-3429` (`buildCommentPinItems`), the persistence pair `timeline.js:2217`/`timeline.js:2631` (C19g), and `feedback-bridge.js:281-330` (`submitFeedback`'s own entry shape), all read directly, not assumed from any sibling artifact's own JSON.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-27/08-27, feedback #208 multi-image 2026-xx) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json and the four timeline.js packets partitioning lines 7724-7994.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a single coherent feature (the team-review anchored-comment popover, which doubles as the debug-feedback capture UI) split across four packets purely by which construct each covers: the module-level state plus the variable-length screenshot-thumbnail strip (`_activeComment`/`_activeFbTags`/`_activeShotDataUrls`, `renderCommentShotThumbs`, `setCommentShots`, `addCommentShots`, `loadCommentShotFiles`), the precise Record/Stop action-trail bracketing (`updateRecordUI`/`startRecording`/`stopRecording`), the popover's own placement/reset (`openCommentPopover`/`closeCommentPopover`), and the one-time event-wiring entry point (`initCommentPopover`) plus its own `DOMContentLoaded` registration. `openCommentPopover` calls `updateRecordUI` (7874) and `setCommentShots` (7877, this artifact's own packet 1) to reset both sub-panels on open/reopen; `initCommentPopover`'s own handlers call back into `startRecording`/`stopRecording` (7902, 7938, 7961), `loadCommentShotFiles` (7915, 7919, 7931), and `closeCommentPopover` (7957, 7967, 7970, 7977, 7991) — every callee this scope's own packet 4 reaches is declared earlier in this SAME scope, none external.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C06.preferences.shortcuts-system (existing owner, timeline.js:7450-7723, merged)",
+      "disposition": "Retains the shortcut tables and rebinding UI immediately before this scope. This scope's own boundary begins at line 7724, the lead-in comment for the anchored-comment-pin state, immediately after that artifact's own `renderShortcutsList` closing brace at 7723 — confirmed against its own declared assigned_ranges. The lone `// ---- KEYBOARD ----` header (line 7449, between C19w's own end at 7448 and this artifact's predecessor's start at 7450) is explicitly left for the P03C small-span reconciliation leaf per the issue's own instruction — not claimed by this scope."
+    },
+    {
+      "owner": "next leaf (`// ---- Outil texte (v20, 2026-07 rework) ----`, timeline.js:7995+, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:7995+ (the canvas text tool). Confirmed call-graph-disjoint from this scope: a whole-file grep of every symbol this scope declares finds zero hits past line 7994, and the text-tool section's own header comment begins immediately at 7995 with no shared lead-in. This scope's own boundary ends at line 7994, `initCommentPopover`'s own `DOMContentLoaded` registration."
+    },
+    {
+      "owner": "tools.js (Comment tool, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. The Comment tool's `mousedown` handler (tools.js:7283-7291, inside the `state.tool==='pen'`/select branch chain's `else if(state.tool==='comment')` arm) is the SOLE external caller of `openCommentPopover` found anywhere in `src/js` — it computes a zoom-scaled hit radius (`14/view.zoom`), finds an existing pin on the current frame within that radius via `(state.comments||[]).filter(...).find(...)`, and calls `openCommentPopover(event.point, existing)` (tools.js:7290) — `existing` is `undefined` for a fresh pin, an entry from `state.comments` for a reopen, matching this scope's own `_activeComment=existing||{...}` branch (7835) exactly."
+    },
+    {
+      "owner": "state.comments writers/readers elsewhere: app.js:321-325 (state-schema declaration), timeline.js:2217/2631 (C19g, exportJSON/import, merged), engine-bridge.js:3419-3429 (buildCommentPinItems, existing owner), timeline.js:9336-9391 (refreshFbAvatars/renderFbAvatarPopover, not yet censused by any sibling at authoring time)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `app.js:325` declares the default project field `comments:[]` with an 11-line comment (315-325) documenting the entry shape `{id,x,y,frame,authorId,authorName,authorColor,text,createdAt,resolved}` in world (canvas) coordinates — matching field-for-field what THIS scope's own `openCommentPopover` constructs for a fresh draft (7836-7842). `exportJSON` (timeline.js:2217, C19g) writes `comments:state.comments||[]` into the project JSON; its paired import (timeline.js:2631, C19g) reads it back with `state.comments=d.comments||[]` — this scope never calls either directly, `state.comments` is a plain array this scope mutates in place via `.push`/`.splice` (7968, 7976) and relies on C19g's own save/load to persist, matching the pattern C19w recorded for `ld.duplicator` (a live-reference config object, not a copy). `buildCommentPinItems` (engine-bridge.js:3419-3429) is the render-path READER: it filters `state.comments` to the current frame and draws one circle marker per pin (author color, dimmed if `resolved`) into the editor-overlay layer — confirmed NEVER exported (its own preceding comment states export.js renders straight from Paper's document, which never sees this overlay layer). `refreshFbAvatars`/`renderFbAvatarPopover` (timeline.js:9336-9391, immediately preceded by their own 6-line lead-in explicitly distinguishing `state.comments` team pins from `SMFeedback` debug entries) build the top-bar avatar stack and its read-only click-to-jump popover from the SAME array — called from THIS scope's own Save/Delete handlers (7970, 7977) to keep the avatar stack in sync immediately after a push/splice, but their own bodies are not part of this scope and are not yet claimed by any sibling artifact at authoring time."
+    },
+    {
+      "owner": "feedback-bridge.js (SMFeedback.*, existing owner, out of scope, CLAUDE.md §6)",
+      "disposition": "Retains its own body in full — cited by name/line only. `actionLogMark`/`clickLogMark`/`actionTrailSince`/`clickTrailSince` (feedback-bridge.js:154-157) are the four marks/readers this scope's own `startRecording`/`stopRecording` (packet 2) call to bracket a precise repro window, in preference to `submitFeedback`'s own generic 'last 20 actions/clicks' fallback (`recentActionTrail(20)`/`recentClickTrail(20)`, feedback-bridge.js:294-295, used only when `opts.actionTrail`/`opts.clickTrail` is falsy — i.e. Record was never pressed). `submitFeedback` (feedback-bridge.js:281-330+) is the ONE external call this scope's own packet 4 makes (7950-7954) with the payload `{note,tags,blocking,pos,actionTrail,clickTrail,screenshotDataUrls}` — every field this scope supplies matches a field `submitFeedback`'s own `entry` object reads from `opts` (note, tags, blocking, pos, actionTrail, clickTrail, screenshotDataUrls), confirmed by direct read of both bodies, no discrepancy found. `uploadScreenshotsIfAny` (CLAUDE.md §6, cited by name only) is NOT called anywhere in this scope — it runs downstream, inside `submitFeedback`'s own async body, after this scope's own call returns a Promise this scope only `.then()`/`.catch()`s for a toast (7955-7956)."
+    },
+    {
+      "owner": "app.js (saveActiveLayerFrame:4634 C21o merged; saveUserProfile:356; state schema:321-325)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `saveActiveLayerFrame()` is called once each from the Save and Delete handlers (7970, 7977, packet 4) immediately after mutating `state.comments` — even though `state.comments` itself is a project-level array with no per-layer-frame `strokes` entry of its own (unlike C19w's own `ld.duplicator`, which IS per-layer), so this call is a general 'flush the current layer/frame state' safety measure bundled with the comment save, not specifically required to persist the comment array itself (that happens through `exportJSON`'s own `state.comments` field, C19g). `saveUserProfile()` (app.js:356) is called once, from the debug-feedback Save handler only (7949), immediately after this scope writes an optional name/email back onto `state.userProfile` (7947-7948) — the team-comment Save handler never touches `userProfile` or calls this function."
+    },
+    {
+      "owner": "timeline.js:updateUI (2727, C19h, merged) and timeline.js:showToast (7447, C19w, merged)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `updateUI()` (unguarded, no `frameOnly` argument) is called once each from Save and Delete (7970, 7977) — a full UI refresh after a comment-array mutation, not a `frameOnly` refresh, since a new/removed pin can change what the pins overlay and avatar stack show independently of the current frame's own content. `showToast` is called three times, all inside the debug-feedback Save handler only (7940, guard message; 7955, success; 7956, failure) — the team-comment Save/Delete handlers show no toast at all."
+    },
+    {
+      "owner": "src/index.html:2056-2110 (`#comment-popover` markup and its static child elements)",
+      "disposition": "Retains the static DOM structure in full — cited by line only (`#comment-popover` 2056, `#comment-author-row` 2057, `#comment-text` 2058, `#comment-record` 2064, `#comment-record-status` 2066, `#comment-fb-tags` + four `.fb-tag` buttons with `data-tag` bug/perf/idea/polish 2067-2072, `#comment-fb-blocking` 2073, `#comment-fb-name`/`#comment-fb-email` 2082/2085, `#comment-shot-drop` 2098, `#comment-shot-thumbs` 2101, `#comment-shot-input` 2102, `#comment-resolved` 2104, `#comment-delete` 2105, `#comment-save` 2108, `#comment-save-feedback` 2109). This scope only reads/writes these elements' `.value`/`.checked`/`.style.*`/`.textContent`/`.innerHTML`/`.classList` and appends dynamic thumbnail children into `#comment-shot-thumbs`; it declares no markup of its own."
+    },
+    {
+      "owner": "Paper.js (`view.projectToView`) and the browser (`FileReader`, drag/paste/DOM APIs)",
+      "disposition": "Retain their own bodies in full — cited by name only, not reproduced. `view.projectToView(worldPt)` (7846) is the ONE Paper.js call in this scope, converting the pin's world-space anchor to view-space pixels for placement; `FileReader`/`DataTransfer`/`ClipboardEvent`/`querySelectorAll` are browser built-ins, not project modules."
+    },
+    {
+      "owner": "tweens.js (pushUndo*)",
+      "disposition": "NOT called anywhere in this scope, despite being named in the issue's own not-re-mapped list — confirmed by a grep of `pushUndo` restricted to lines 7724-7994 (zero hits). Team-comment add/edit/resolve/delete (7962-7969, 7975-7976) and every debug-feedback field mutation in packet 4 have NO undo integration at all, unlike C19w's own mograph-duplicator panel (which wraps every mutating handler in `pushUndo()`) — flagged, not confirmed as a defect, in `future_proposals`."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 7723 (C06.preferences.shortcuts-system's own closing brace of `renderShortcutsList`) is outside coverage; line 7724 (this scope's anchored-comment-pin lead-in) begins this scope, confirmed against that artifact's own declared assigned_ranges end (7723).",
+    "Line 7994 (`initCommentPopover`'s own `DOMContentLoaded` registration) is the last line of this scope; line 7995 opens the next leaf's own `// ---- Outil texte (v20, 2026-07 rework) ----` header — confirmed by reading the frozen blob at 7993-7998.",
+    "No lines inside 7724-7994 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The two persistence targets and how the popover decides between them (packet 4, the Save/`comment-save` vs. `comment-save-feedback` handlers): a TEAM COMMENT (IN-project) is decided by `saveBtn`'s own handler (7959-7972) — it writes `_activeComment.text`/`.resolved` from the DOM (7962-7963), lazily inits `state.comments=[]` if absent (7964), tests membership with `state.comments.indexOf(_activeComment)<0` (7965) — an IDENTITY check against the live object reference, not a value/id comparison — and if not yet present, discards a never-typed-into blank draft outright (`!_activeComment.text.trim()`, 7967, `closeCommentPopover();return;`) or else pushes it (7968); either way (existing or freshly kept) it then calls `saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();` (7970) and a guarded `SMEngineBridge.renderNow()` (7971). A DEBUG FEEDBACK entry (OUT-of-project, CLAUDE.md §6) is the SEPARATE `comment-save-feedback` handler (7934-7958): it requires a non-empty note (7940, else a toast and return), reads the blocking checkbox and optional name/email (persisted to `state.userProfile` then `saveUserProfile()`, 7947-7949), and calls `window.SMFeedback.submitFeedback({...})` (7950-7954) — this path NEVER touches `state.comments` at all (confirmed: no `state.comments` reference anywhere in 7934-7958), so a feedback submission never becomes a team comment and vice versa, matching the packet 1 lead-in's own stated invariant (7724-7728). Delete (`delBtn`, 7973-7979) removes by `state.comments.indexOf(_activeComment)` then `.splice` (7975-7976) — the SAME identity-based lookup as Save's own membership test, so Delete only ever removes an entry that is ALREADY in the array (a never-saved draft has no array entry to remove, `idx>=0` guards the no-op case).",
+    "The module-level state (`_activeComment`, `_activeFbTags`, `_activeShotDataUrls`, `_recording`, `_recActionMark`/`_recClickMark`/`_recStartTime`, `_recordedActionTrail`/`_recordedClickTrail`) and the exact reset point of each on open/close: `openCommentPopover` (packet 3) resets `_activeFbTags=[]` + every `.fb-tag` button's own `active` class (7870-7871), the blocking checkbox (7872), `_recording`/`_recordedActionTrail`/`_recordedClickTrail` (7873, followed by `updateRecordUI()` 7874 to repaint the record button/status from that cleared state), and the screenshot strip via `setCommentShots(...)` (7877-7878, itself in packet 1) — reading EITHER the new `screenshotDataUrls` array or the old singular `screenshotDataUrl` field for backward compatibility with an entry saved before feedback #208. `closeCommentPopover` (packet 3) resets `_activeComment=null`, the SAME three recording fields (`_recording`/`_recordedActionTrail`/`_recordedClickTrail`, 7886), and calls `setCommentShots([])` (7887) — `_activeFbTags` is deliberately NOT reset on close (only on the NEXT open, 7870), and `_recActionMark`/`_recClickMark`/`_recStartTime` are never reset by either open or close, only ever reassigned by `startRecording` (7820-7822) — stale marks from a previous recording session are harmless since `_recording` itself gates every read of them.",
+    "The screenshot strip contract (packet 1 + the wiring in packet 4): accepted inputs are drag&drop (`shotDrop`'s own `drop` listener, 7913-7917, reading `e.dataTransfer.files`), click-to-browse (`shotDrop`'s own `click` listener opens `shotInput.click()`, 7910; `shotInput`'s own `change` listener, 7918-7921, reading `shotInput.files`, a `multiple`-attribute `<input type=file>` per index.html:2102), and Cmd+V paste (`pop`'s own `paste` listener, 7922-7932, reading `e.clipboardData.items`, filtering to `image/*` entries via `.getAsFile()`) — all three funnel into the SAME `loadCommentShotFiles(files)` (packet 1, 7775-7787). MIME filter: `loadCommentShotFiles` itself filters to `f.type.indexOf('image/')===0` (7776); the paste listener applies an EQUIVALENT per-item filter before collecting into `pastedFiles` (7929) so only image clipboard items ever reach `loadCommentShotFiles`. Ordering guarantee: `pending`/`results` (7778) is a pre-sized `Array(imgFiles.length)`, each `FileReader`'s own `onload` writes into `results[i]` at ITS OWN closed-over index `i` (7779-7785, not push order) — so despite `FileReader` being async and files potentially finishing out of order, `results` always ends up in the ORIGINAL pick/drop/paste order once the last one (`--pending===0`) fires `addCommentShots(results)` (7783). Upload happens in feedback-bridge.js at submit time (`uploadScreenshotsIfAny`, CLAUDE.md §6, cited by name only) — this scope only ever holds data URLs in `_activeShotDataUrls`, confirmed: no `fetch`/upload/network call anywhere in 7724-7994.",
+    "The recording contract: `startRecording` (packet 2, 7817-7825) reads two marks via `window.SMFeedback.actionLogMark()`/`.clickLogMark()` (7820-7821, feedback-bridge.js:154-155) at Record-click time; `stopRecording` (7826-7832) reads the trails SINCE those marks via `.actionTrailSince(mark)`/`.clickTrailSince(mark)` (7829-7830, feedback-bridge.js:156-157) at Stop-click time. `updateRecordUI` (packet 2, 7797-7816) writes to the DOM: while `_recording` is true, `#comment-record`'s own textContent becomes `SM.t('commentStopRecordBtn')` plus an `.ac` (active) class, and `#comment-record-status` shows `commentRecordingInProgressHint` (7801-7803); once stopped, the button reverts to `commentRecordBtn` text/no `.ac` class (7805-7806), and the status either shows a tallied `'✓ N action(s)/clic(s) enregistré(s)...'` count (`_recordedActionTrail.length + _recordedClickTrail.length`, 7809-7810) if either trail is non-null, or hides entirely (7811-7813) if nothing was ever recorded. The recording flag suppresses dismissal in exactly two places, both cited by line: the outside-click listener's own early return `if(_recording)return;` (7990, packet 4, BEFORE the `pop.contains` containment check — so a click anywhere, including outside the popover, never reaches `closeCommentPopover` while recording) and the debug-feedback Save handler's own `if(_recording)stopRecording();` (7938, packet 4) — a 'forgot to hit Stop' safety net that captures the trail up to the moment of Save rather than silently discarding it; the SAME guard exists on the team-comment Save handler (7961) for the identical reason, even though a team comment never reads the recorded trails at all (they are debug-feedback-only fields).",
+    "The placement math of `openCommentPopover` (packet 3, 7843-7861) as pure input→output: given `worldPt` (a Paper.js Point in canvas/world space) and the `#canvas-area` element's own `getBoundingClientRect()` (7845), `view.projectToView(worldPt)` (7846, the one Paper.js call in this scope) converts to view-space pixels; `rawLeft=rect.left+vp.x+12,rawTop=rect.top+vp.y-8` (7847) offsets 12px right / 8px up from the pin itself. The 2026-08-27 clamp fix (7848-7858 lead-in) then clamps BOTH axes into `[margin, window.innerWidth|innerHeight - estW|estH - margin]` with `estW=240,estH=420,margin=8` (7859) — `estW` matches the popover's own fixed CSS width (index.html:2056, `width:240px`); `estH` is a generous static estimate (the popover isn't visible yet at measurement time, so `offsetHeight` would read 0) backed by the CSS's own `max-height:calc(100vh - 24px);overflow-y:auto` as the real safety net for whatever this estimate undershoots. Final `pop.style.left`/`.top` (7860-7861) are the clamped, rounded pixel values — no further layout pass reads `worldPt` again.",
+    "Every DOM id and CSS class touched by this scope (cross-checked against src/index.html:2056-2110, cited above): `#comment-popover`, `#comment-author-row`, `#comment-text`, `#comment-record`, `#comment-record-status`, `#comment-fb-tags` + its child `.fb-tag` buttons (toggling an `active` class per button, keyed by each button's own `dataset.tag`), `#comment-fb-blocking`, `#comment-fb-name`, `#comment-fb-email`, `#comment-shot-drop`, `#comment-shot-thumbs` (+ the dynamically-appended per-thumbnail `<div>`/`<img>`/remove-`<button>` this scope itself builds in `renderCommentShotThumbs`), `#comment-shot-input`, `#comment-resolved`, `#comment-delete`, `#comment-save`, `#comment-save-feedback`, and `#canvas-area` (read-only, for `getBoundingClientRect()`). No id/class is read or written by this scope that is absent from index.html:2056-2110.",
+    "The complete external function-call inventory from this span (owning module cited by name only, bodies not reproduced): `document.*`/`window.*` DOM and browser built-ins (not a project module). `SM.t` (i18n.js:4185, exported 4239) — every translated string/title this scope's dynamic DOM elements set. `window.SMFeedback` (feedback-bridge.js) — `.actionLogMark`/`.clickLogMark` (7820-7821), `.actionTrailSince`/`.clickTrailSince` (7829-7830), `.submitFeedback` (7950). `view.projectToView` (Paper.js) — 7846. `saveUserProfile` (app.js:356) — 7949. `saveActiveLayerFrame` (app.js:4634, C21o) — 7970, 7977. `updateUI` (timeline.js:2727, C19h) — 7970, 7977. `refreshFbAvatars` (timeline.js:9344, not yet censused) — 7970, 7977. `window.SMEngineBridge.renderNow` (engine-bridge.js) — 7971, 7978 (both guarded on `window.SMEngineBridge&&....renderNow`). `showToast` (timeline.js:7447, C19w) — 7940, 7955, 7956. `Point` (Paper.js constructor) — 7952 (`new Point(_activeComment.x,_activeComment.y)`). No other external function is called anywhere in lines 7724-7994 — confirmed by reading every statement in the span directly (the dump reproduced verbatim in each packet's own `behavior` field below).",
+    "Render-path confirmation: NONE of this scope's ten symbols is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or from `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a whole-src grep of all ten names restricted to engine-bridge.js (zero hits) and export.js/rive-export.js (zero hits). The ONE render-path touch-point involving `state.comments` is `buildCommentPinItems` (engine-bridge.js:3419-3429, cited by name/line only, existing owner, NOT part of this scope) — it reads the array this scope mutates but is not itself one of this scope's own declared functions and is never called BY this scope. Every call INTO this scope's own ten functions is either a user-gesture handler (pointer click, drag, paste, file-input change) or the Comment tool's own `openCommentPopover(event.point, existing)` call (tools.js:7290) — panel/UI only, matching the issue's own expectation."
+  ],
+  "areas": [
+    {
+      "area": "comment-state-and-screenshot-strip",
+      "packets": [
+        {
+          "id": "C19x.comment-state-and-screenshot-strip",
+          "files": [
+            "src/js/timeline.js:7724-7787"
+          ],
+          "coverage_ranges": [
+            [
+              7724,
+              7787
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 20,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_activeComment",
+            "_activeFbTags",
+            "_activeShotDataUrls",
+            "renderCommentShotThumbs",
+            "setCommentShots",
+            "addCommentShots",
+            "loadCommentShotFiles"
+          ],
+          "signature": "var _activeComment; var _activeFbTags; var _activeShotDataUrls; function renderCommentShotThumbs(); function setCommentShots(dataUrls); function addCommentShots(dataUrls); function loadCommentShotFiles(files)",
+          "responsibility": "5-line lead-in (7724-7728): states the core invariant this whole artifact enforces — `_activeComment` is either an existing `state.comments` entry (edit-in-place) or a fresh draft not yet pushed, and Save decides which by array membership, so a cancelled/blurred empty draft never litters the project. Three module-level state declarations (`_activeComment` 7729, `_activeFbTags` 7733, `_activeShotDataUrls` 7743, each preceded by its own multi-line rationale comment) plus the variable-length screenshot-thumbnail strip: `renderCommentShotThumbs()` (7744-7763, rebuilds `#comment-shot-thumbs` from scratch), `setCommentShots(dataUrls)` (7767-7770, REPLACES the whole set — used only on popover open/reset), `addCommentShots(dataUrls)` (7771-7774, APPENDS), and `loadCommentShotFiles(files)` (7775-7787, filters to images, reads each via FileReader, preserves pick order, then appends).",
+          "callers": [
+            "See C19x.init-comment-popover for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "behavior": [
+            "Lines 7724-7728 (comment, 5 lines): lead-in — `_activeComment` is an existing entry or a fresh draft; Save decides which by array membership; a cancelled/blurred empty draft never litters the project.",
+            "Line 7729 (code): `var _activeComment=null;`.",
+            "Lines 7730-7732 (comment, 3 lines): `_activeFbTags` is debug-feedback-only, reset on every open, unrelated to `_activeComment`/`state.comments` since a feedback submission never becomes a team comment.",
+            "Line 7733 (code): `var _activeFbTags=[];`.",
+            "Lines 7734-7742 (comment, 9 lines, feedback #208): `_activeShotDataUrls` is an ARRAY of data URLs for the thumbnail strip, held for the popover's lifetime; the actual GitHub upload (base64→Contents API, one commit per image) happens in feedback-bridge.js's own `uploadScreenshotsIfAny()` at submit time, not here; was a single-slot field that a new drop/paste/pick silently REPLACED, now every add APPENDS.",
+            "Line 7743 (code): `var _activeShotDataUrls=[];`.",
+            "Line 7744 (code): `function renderCommentShotThumbs(){`.",
+            "Lines 7745-7747 (code, 3 lines): `#comment-shot-thumbs` lookup, `innerHTML=''` wipe, `style.display` toggled `'flex'`/`'none'` on `_activeShotDataUrls.length`.",
+            "Lines 7748-7762 (code, 15 lines): per-thumbnail loop — a positioned `<div>` cell, an `<img>` (`max-width/height:70px`, `object-fit:cover`), a small circular remove `<button>` (`title` from `SM.t('commentShotRemoveTitle')` with a hard-coded French fallback, `textContent='×'`) whose `click` listener (7759) stops propagation, splices this thumbnail out of `_activeShotDataUrls` by its closed-over `idx`, and self-recursively calls `renderCommentShotThumbs()` to repaint.",
+            "Line 7763 (code): `}` closing brace of `renderCommentShotThumbs`.",
+            "Lines 7764-7766 (comment, 3 lines): `setCommentShots` REPLACES the whole set; its only caller that still needs 'set, not append' is opening/resetting the popover.",
+            "Line 7767 (code): `function setCommentShots(dataUrls){`.",
+            "Line 7768 (code): `_activeShotDataUrls=(dataUrls||[]).slice();` — a defensive copy, never the caller's own array reference.",
+            "Line 7769 (code): `renderCommentShotThumbs();`.",
+            "Line 7770 (code): `}` closing brace of `setCommentShots`.",
+            "Line 7771 (code): `function addCommentShots(dataUrls){`.",
+            "Line 7772 (code): `dataUrls.forEach(function(d){ if(d)_activeShotDataUrls.push(d); });` — APPENDS, skipping any falsy entry.",
+            "Line 7773 (code): `renderCommentShotThumbs();`.",
+            "Line 7774 (code): `}` closing brace of `addCommentShots`.",
+            "Line 7775 (code): `function loadCommentShotFiles(files){`.",
+            "Line 7776 (code): `var imgFiles=Array.prototype.filter.call(files||[],function(f){return f&&f.type.indexOf('image/')===0;});` — the MIME filter, tolerant of a plain array or a `FileList`/`DataTransferItemList`-derived array-like.",
+            "Line 7777 (code): `if(!imgFiles.length)return;` — no-op on an empty/all-non-image selection.",
+            "Line 7778 (code): `var pending=imgFiles.length, results=new Array(imgFiles.length);` — a pre-sized results array, the ordering mechanism (see `boundaries`).",
+            "Lines 7779-7786 (code, 8 lines): per-file loop — a `FileReader` per file, its own `onload` (closed over `i`) writes `reader.result` into `results[i]` (7782, NOT push order) and, once every reader has fired (`--pending===0`, 7783), calls `addCommentShots(results)` exactly once; `reader.readAsDataURL(file)` (7785) starts the (async) read.",
+            "Line 7787 (code): `}` closing brace of `loadCommentShotFiles`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "action-trail-recording",
+      "packets": [
+        {
+          "id": "C19x.action-trail-recording",
+          "files": [
+            "src/js/timeline.js:7788-7832"
+          ],
+          "coverage_ranges": [
+            [
+              7788,
+              7832
+            ]
+          ],
+          "classification": {
+            "code": 38,
+            "comment": 7,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_recording",
+            "_recActionMark",
+            "_recClickMark",
+            "_recStartTime",
+            "_recordedActionTrail",
+            "_recordedClickTrail",
+            "updateRecordUI",
+            "startRecording",
+            "stopRecording",
+            "SMFeedback"
+          ],
+          "signature": "var _recording,_recActionMark,_recClickMark,_recStartTime; var _recordedActionTrail,_recordedClickTrail; function updateRecordUI(); function startRecording(); function stopRecording()",
+          "responsibility": "7-line lead-in (7788-7794): precise start/stop recording bracketed around the actual repro gesture, in preference to feedback-bridge.js's own generic 'last 20 actions' guess at submit time; notes the popover must survive both outside clicks AND tool switches while recording, pointing ahead to the outside-click listener and `closeCommentPopover`'s own guard (both in later packets of this SAME artifact). Six module-level fields (7795-7796) plus three functions: `updateRecordUI()` (7797-7816, paints the record button/status from current state), `startRecording()` (7817-7825, marks both trail logs and flips `_recording=true`), `stopRecording()` (7826-7832, reads both trails since their marks and flips `_recording=false`).",
+          "callers": [
+            "See C19x.init-comment-popover for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "behavior": [
+            "Lines 7788-7794 (comment, 7 lines): lead-in — precise Record/Stop bracketing vs. feedback-bridge's own generic last-20-actions guess; must survive outside clicks and tool switches while recording; points at the outside-click listener and `closeCommentPopover`'s own guard.",
+            "Line 7795 (code): `var _recording=false,_recActionMark=0,_recClickMark=0,_recStartTime=0;`.",
+            "Line 7796 (code): `var _recordedActionTrail=null,_recordedClickTrail=null;`.",
+            "Line 7797 (code): `function updateRecordUI(){`.",
+            "Line 7798 (code): `#comment-record`/`#comment-record-status` DOM lookups.",
+            "Line 7799 (code): `if(!btn)return;` — DOM-existence guard.",
+            "Lines 7800-7803 (code, 4 lines): while recording — button text `SM.t('commentStopRecordBtn')`, adds `.ac` class, status shown with `SM.t('commentRecordingInProgressHint')`.",
+            "Line 7804 (code): `}else{`.",
+            "Lines 7805-7806 (code, 2 lines): not recording — button text `SM.t('commentRecordBtn')`, removes `.ac`.",
+            "Lines 7807-7814 (code, 8 lines): status text — if either recorded trail is non-null, shows a tallied `'✓ N action(s)/clic(s) enregistré(s) pour ce commentaire.'` count summing both trail lengths (7808-7810); otherwise hides the status entirely (7811-7813).",
+            "Line 7815 (code): `}` closes the `if(_recording)` branch.",
+            "Line 7816 (code): `}` closing brace of `updateRecordUI`.",
+            "Line 7817 (code): `function startRecording(){`.",
+            "Line 7818 (code): `if(!window.SMFeedback)return;` — guard, no-op if the feedback bridge isn't loaded.",
+            "Line 7819 (code): `_recording=true;`.",
+            "Line 7820 (code): `_recActionMark=window.SMFeedback.actionLogMark();`.",
+            "Line 7821 (code): `_recClickMark=window.SMFeedback.clickLogMark();`.",
+            "Line 7822 (code): `_recStartTime=Date.now();` — recorded but never read anywhere in this scope (no display of elapsed time), see `future_proposals`.",
+            "Line 7823 (code): `_recordedActionTrail=null;_recordedClickTrail=null;` — clears any prior session's own leftover trails.",
+            "Line 7824 (code): `updateRecordUI();`.",
+            "Line 7825 (code): `}` closing brace of `startRecording`.",
+            "Line 7826 (code): `function stopRecording(){`.",
+            "Line 7827 (code): `if(!_recording||!window.SMFeedback)return;` — no-op if not currently recording or the bridge is gone.",
+            "Line 7828 (code): `_recording=false;`.",
+            "Line 7829 (code): `_recordedActionTrail=window.SMFeedback.actionTrailSince(_recActionMark);`.",
+            "Line 7830 (code): `_recordedClickTrail=window.SMFeedback.clickTrailSince(_recClickMark);`.",
+            "Line 7831 (code): `updateRecordUI();`.",
+            "Line 7832 (code): `}` closing brace of `stopRecording`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "open-close-comment-popover",
+      "packets": [
+        {
+          "id": "C19x.open-close-comment-popover",
+          "files": [
+            "src/js/timeline.js:7833-7888"
+          ],
+          "coverage_ranges": [
+            [
+              7833,
+              7888
+            ]
+          ],
+          "classification": {
+            "code": 43,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openCommentPopover",
+            "closeCommentPopover",
+            "_activeComment",
+            "_activeFbTags",
+            "_recording",
+            "setCommentShots",
+            "updateRecordUI"
+          ],
+          "signature": "function openCommentPopover(worldPt,existing); function closeCommentPopover()",
+          "responsibility": "`openCommentPopover(worldPt,existing)` (7833-7881): the pin's own world→view placement with viewport clamping (7859+), builds a fresh draft or adopts `existing`, resets every feedback/recording/screenshot sub-panel, and shows the popover focused on the text field. `closeCommentPopover()` (7882-7888): the symmetric teardown — hides the popover, clears `_activeComment` and the recording fields, empties the screenshot strip.",
+          "callers": [
+            "`openCommentPopover` — 1 external caller found by a whole-`src/js` grep: tools.js:7290, inside the Comment tool's own `mousedown` handler (`state.tool==='comment'` branch, tools.js:7283-7291) — see this artifact's own `reconciliation` entry for tools.js.",
+            "`closeCommentPopover` — timeline.js-internal, CONFIRMED (no cross-file caller by a whole-src grep): 5 call sites beyond its own declaration (7882), all inside THIS SAME artifact — 7957, 7967, 7970, 7977 (packet 4, all inside `initCommentPopover`'s own handlers) and 7991 (packet 4, the outside-click listener)."
+          ],
+          "behavior": [
+            "Line 7833 (code): `function openCommentPopover(worldPt,existing){`.",
+            "Line 7834 (code): `if(!document.getElementById('comment-popover'))return;` — DOM-existence guard.",
+            "Lines 7835-7842 (code, 8 lines): `_activeComment=existing||{...}` — a fresh draft object (id from `Date.now()`+random, `x`/`y` from `worldPt`, `frame:state.currentFrame`, author fields from `state.userProfile`, empty `text`, `createdAt:Date.now()`, `resolved:false`) built ONLY when `existing` is falsy; an existing entry is adopted as-is (no clone — edits land directly on the SAME object already in `state.comments`).",
+            "Lines 7843-7845 (code, 3 lines): `#comment-popover`/`#canvas-area` lookups, `rect=ca.getBoundingClientRect()`.",
+            "Line 7846 (code): `vp=view.projectToView(worldPt);` — the one Paper.js call in this scope.",
+            "Line 7847 (code): `rawLeft=rect.left+vp.x+12,rawTop=rect.top+vp.y-8;` — 12px right / 8px up offset from the pin.",
+            "Lines 7848-7858 (comment, 11 lines, dated 2026-08-27): viewport-clamp rationale — a popover pinned near the bottom/right edge previously ran off-screen with nothing to scroll it back; `estW`/`estH` are estimates since the popover isn't visible yet (`offsetWidth/Height` would read 0); the CSS's own `max-height`+`overflow-y:auto` is the real safety net for whatever the estimate undershoots.",
+            "Line 7859 (code): `var estW=240,estH=420,margin=8;`.",
+            "Lines 7860-7861 (code, 2 lines): `pop.style.left`/`.top` — each clamped into `[margin, window.innerWidth|innerHeight-estW|estH-margin]`, rounded.",
+            "Lines 7862-7863 (code, 2 lines): `#comment-author-row` textContent — `'Par '`/`'Nouveau — '` prefix (existing vs. draft) plus author name (fallback 'Anonyme') and `'· frame '+(frame+1)` (1-indexed for display).",
+            "Line 7864 (code): `#comment-text` value from `_activeComment.text||''`.",
+            "Lines 7865-7867 (code, 3 lines): `#comment-fb-name`/`#comment-fb-email` pre-filled from `state.userProfile.name`/`.email`, each behind its own DOM-existence guard.",
+            "Line 7868 (code): `#comment-resolved` checked from `!!_activeComment.resolved`.",
+            "Line 7869 (code): `#comment-delete` shown only when `existing` is truthy (no Delete for a not-yet-saved draft).",
+            "Line 7870 (code): `_activeFbTags=[];` — reset on every open (never restored from an existing entry — a team comment has no persisted tags of its own; tags are debug-feedback-only).",
+            "Line 7871 (code): every `.fb-tag` button's own `active` class removed.",
+            "Line 7872 (code): `#comment-fb-blocking` unchecked, behind a DOM-existence guard.",
+            "Line 7873 (code): `_recording=false;_recordedActionTrail=null;_recordedClickTrail=null;` — resets the recording state for the newly opened/reopened pin.",
+            "Line 7874 (code): `updateRecordUI();` — repaints the record button/status from the just-cleared state.",
+            "Lines 7875-7876 (comment, 2 lines): compat note — a pre-#208 entry has the old singular `screenshotDataUrl` field, not the new array; read either shape.",
+            "Lines 7877-7878 (code, 2 lines): `setCommentShots(existing&&existing.screenshotDataUrls ? existing.screenshotDataUrls : (existing&&existing.screenshotDataUrl ? [existing.screenshotDataUrl] : []));` — the array shape wins if present, else the singular shape wrapped in a 1-element array, else empty for a fresh draft.",
+            "Line 7879 (code): `pop.style.display='block';`.",
+            "Line 7880 (code): `#comment-text` focused.",
+            "Line 7881 (code): `}` closing brace of `openCommentPopover`.",
+            "Line 7882 (code): `function closeCommentPopover(){`.",
+            "Lines 7883-7884 (code, 2 lines): `#comment-popover` lookup, `style.display='none'` if found.",
+            "Line 7885 (code): `_activeComment=null;`.",
+            "Line 7886 (code): `_recording=false;_recordedActionTrail=null;_recordedClickTrail=null;` — same three recording fields `openCommentPopover` resets; `_activeFbTags` is NOT reset here (only on next open).",
+            "Line 7887 (code): `setCommentShots([]);` — empties the thumbnail strip.",
+            "Line 7888 (code): `}` closing brace of `closeCommentPopover`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "init-comment-popover",
+      "packets": [
+        {
+          "id": "C19x.init-comment-popover",
+          "files": [
+            "src/js/timeline.js:7889-7994"
+          ],
+          "coverage_ranges": [
+            [
+              7889,
+              7994
+            ]
+          ],
+          "classification": {
+            "code": 85,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "initCommentPopover",
+            "startRecording",
+            "stopRecording",
+            "loadCommentShotFiles",
+            "SMFeedback",
+            "saveUserProfile",
+            "submitFeedback",
+            "closeCommentPopover",
+            "saveActiveLayerFrame",
+            "updateUI",
+            "refreshFbAvatars",
+            "SMEngineBridge",
+            "_activeComment",
+            "_activeFbTags",
+            "_recording"
+          ],
+          "signature": "function initCommentPopover()",
+          "responsibility": "`initCommentPopover()` (7889-7993): wires every event listener the popover needs — feedback tag-chip toggles, the Record/Stop button, the three screenshot-input paths (drop, browse, paste), the debug-feedback Save handler, the team-comment Save handler, the Delete handler, and an outside-click dismissal listener guarded against firing mid-recording — plus its own `DOMContentLoaded` registration (7994) so it runs once at load whether or not the DOM is already ready.",
+          "callers": [
+            "`initCommentPopover` — timeline.js-internal, CONFIRMED (no cross-file caller by a whole-src grep): its only call is its OWN `DOMContentLoaded` registration line (7994), which is also its only invocation — no other file or line calls `initCommentPopover()` directly.",
+            "`loadCommentShotFiles` — CONFIRMED 3 call sites beyond its own declaration (packet 1, 7775), ALL inside this packet's own `initCommentPopover` body: 7915 (drop), 7919 (file-input change), 7931 (paste) — matching the screenshot-strip contract recorded in `boundaries`.",
+            "`startRecording`/`stopRecording` — CONFIRMED, called only from THIS packet beyond their own declarations (packet 2): the Record/Stop button's own toggle (7902), and two 'forgot to hit Stop' safety nets, one per Save handler (7938 debug-feedback, 7961 team-comment).",
+            "`closeCommentPopover` — 5 of its 5 total external call sites are inside this packet (7957, 7967, 7970, 7977, 7991) — see C19x.open-close-comment-popover's own `callers` field for the complete accounting."
+          ],
+          "behavior": [
+            "Line 7889 (code): `function initCommentPopover(){`.",
+            "Line 7890 (code): `#comment-save`/`#comment-delete`/`#comment-popover` lookups.",
+            "Line 7891 (code): `if(!saveBtn||!pop)return;` — DOM-existence guard (note: NOT gated on `delBtn`, which can be legitimately absent-of-purpose but is still dereferenced below at 7973 assuming it exists whenever `saveBtn`/`pop` do, since all three share the same static markup block).",
+            "Lines 7892-7899 (code, 8 lines): every `.fb-tag` button's own `click` listener — toggles `this.dataset.tag` in/out of `_activeFbTags` (via `indexOf`/`splice`/`push`) and the button's own `active` class in lockstep.",
+            "Line 7900 (code): `#comment-record` lookup.",
+            "Lines 7901-7903 (code, 3 lines): its own `click` listener — `if(_recording)stopRecording();else startRecording();` (the Record/Stop toggle).",
+            "Lines 7904-7907 (comment, 4 lines, feedback #208): screenshot attachment via drag&drop (one or several files), click-to-browse (multi-select), or Cmd+V paste — each ADDS instead of replacing; per-thumbnail remove buttons are wired in `renderCommentShotThumbs` (packet 1).",
+            "Line 7908 (code): `#comment-shot-drop`/`#comment-shot-input` lookups.",
+            "Lines 7909-7917 (code, 9 lines): `shotDrop` guard, its own `click` (opens the hidden file input), `dragover` (prevents default, highlights border), `dragleave` (reverts border), and `drop` (prevents default, reverts border, calls `loadCommentShotFiles` on `e.dataTransfer.files` if any).",
+            "Lines 7918-7921 (code, 4 lines): `shotInput`'s own `change` listener — calls `loadCommentShotFiles(shotInput.files)` if any, then clears `shotInput.value` so picking the SAME file again still fires `change`.",
+            "Lines 7922-7932 (code, 11 lines): `pop`'s own `paste` listener — reads `e.clipboardData.items`, guards on existing, collects every `image/*` item's own `getAsFile()` result into `pastedFiles` (a paste can carry several images at once, per the 7925-7927 comment), calls `loadCommentShotFiles(pastedFiles)` if any were found.",
+            "Line 7933 (code): `#comment-save-feedback` lookup.",
+            "Lines 7934-7958 (code+comment, 25 lines): its own `click` listener — the DEBUG FEEDBACK save path. Guards on `_activeComment`/`window.SMFeedback` (7935); force-stops an in-progress recording rather than silently discarding it (7936-7938); requires a non-empty note, else toasts `toastWriteNoteBeforeSavingFeedback` and returns (7939-7940); reads the blocking checkbox (7941); persists optional name/email back onto `state.userProfile` then calls `saveUserProfile()` (7942-7949, so `submitFeedback`'s own `entry.author` and every FUTURE feedback pick them up); calls `window.SMFeedback.submitFeedback({note,tags,blocking,pos:new Point(...),actionTrail,clickTrail,screenshotDataUrls})` (7950-7954); on success toasts `toastFeedbackAndCaptureSent` (has screenshots) or `toastFeedbackSavedOutsideProject` (7955); on failure `console.warn`s and toasts `toastFeedbackSaveFailed` (7956); either way calls `closeCommentPopover()` (7957) SYNCHRONOUSLY, before the async `submitFeedback` promise settles.",
+            "Lines 7959-7972 (code+comment, 14 lines): `saveBtn`'s own `click` listener — the TEAM COMMENT save path. Guards on `_activeComment` (7960); force-stops an in-progress recording (7961, discarded for a team comment, never read below); writes `.text`/`.resolved` from the DOM (7962-7963); lazily inits `state.comments=[]` (7964); tests membership by IDENTITY via `indexOf` (7965); if not yet present, discards a never-typed-into blank draft outright (7967) or else pushes it (7968); either way calls `saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();` (7970) and a guarded `SMEngineBridge.renderNow()` (7971).",
+            "Lines 7973-7979 (code, 7 lines): `delBtn`'s own `click` listener — guards on `_activeComment`/`state.comments` (7974); finds and splices `_activeComment` out by identity (7975-7976); then the SAME four-call sequence as Save (`saveActiveLayerFrame();closeCommentPopover();updateUI();refreshFbAvatars();`, 7977) and guarded `renderNow()` (7978).",
+            "Lines 7980-7987 (comment, 8 lines): outside-click rationale — dismisses an unsaved draft/unsaved edits without a Cancel button, matching the color-picker popover's own convention; SUPPRESSED entirely while recording, since reproducing a bug requires switching to the actual tool involved, itself a click outside this popover.",
+            "Lines 7988-7992 (code, 5 lines): `document`'s own `mousedown` listener, capture phase (`true` as the third argument) — early-returns if the popover is already hidden (7989) or recording is active (7990, BEFORE the containment check), otherwise calls `closeCommentPopover()` if the click target is outside `pop` (7991).",
+            "Line 7993 (code): `}` closing brace of `initCommentPopover`.",
+            "Line 7994 (code): `if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initCommentPopover);else initCommentPopover();` — runs `initCommentPopover` once, immediately if the DOM is already interactive/complete, otherwise deferred to `DOMContentLoaded`."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "This scope never calls `exportJSON` directly — persistence of the `state.comments` array itself is C19g's own responsibility (timeline.js:2217, `comments:state.comments||[]`), triggered whenever the project is next saved. What THIS scope does call, from both Save and Delete (7970, 7977), is `saveActiveLayerFrame()` (app.js:4634, C21o) — a general per-layer-frame flush bundled alongside the comment mutation, not specifically required to persist `state.comments` (a project-level array, not a per-frame `strokes` entry). The debug-feedback path (packet 4, `comment-save-feedback`) never touches `state.comments`/`exportJSON` at all — it persists entirely OUTSIDE the project via `SMFeedback.submitFeedback` (CLAUDE.md §6)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "This scope never calls the project's own load path — `state.comments=d.comments||[]` is C19g's own responsibility (timeline.js:2631). `openCommentPopover` (packet 3) is the READER that turns a loaded `state.comments` entry back into an editable popover: it adopts `existing` as `_activeComment` verbatim (7835, no clone) and reads its `screenshotDataUrls`/legacy `screenshotDataUrl` field (7877-7878) — the ONLY place in this scope a loaded comment's screenshot shape is interpreted."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "ZERO `pushUndo`/`pushUndoLayers` calls anywhere in this scope's own 271 lines (confirmed by grep restricted to 7724-7994) — every mutating handler (team-comment save/delete, 7962-7969/7975-7976; every debug-feedback field write) has NO undo integration. This is a real divergence from C19w's own mograph-duplicator panel (which wraps every mutating handler in `pushUndo()` after a documented 2026-07-30 QA fix) — flagged, not confirmed as a defect (no execution performed), in `future_proposals`."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Reads `state.currentFrame` (7837, stamping a fresh draft's own frame) and `state.activeLayerIdx` NOWHERE in this scope (confirmed by grep) — the popover is frame-anchored, not layer- or selection-anchored; it never reads or writes `_layerSel`/`_layerSelAnchor` (C19q's own module-scope selection state) or `selectedPaths` (tools.js/select-bridge.js)."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "No mode branch anywhere in this scope's own ten functions — `openCommentPopover` stamps `frame:state.currentFrame` (7837) identically regardless of mode, and the ONE render-path reader of the resulting `state.comments` array (`buildCommentPinItems`, engine-bridge.js:3419-3429, cited by name/line only, existing owner) filters to `cm.frame===state.currentFrame` the same way in both modes. `state.currentFrame` is read exactly once, synchronously, at draft-creation time (7837) — never cached across a frame boundary."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's ten declared functions are called from `export.js` or `rive-export.js` at the frozen SHA (confirmed: zero matches for any of the ten symbol names in either file). The pins themselves are never exported either — `buildCommentPinItems`'s own preceding comment (engine-bridge.js) states export.js renders straight from Paper's document, which never sees the editor-overlay layer pins are drawn into. The debug-feedback path is likewise editor-only — `submitFeedback` publishes to GitHub/local storage, never to a rendered frame."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called exactly twice in this scope's own body: once each from the team-comment Save (7971) and Delete (7978) handlers, both guarded on `window.SMEngineBridge&&....renderNow`, forcing an immediate repaint after a pin add/edit/remove so the pins overlay reflects the change without waiting for the next natural render. No Tauri-specific API (`window.__TAURI__`) is referenced anywhere in this scope — any Tauri-side work (e.g. writing a feedback entry to disk) happens downstream inside `SMFeedback.submitFeedback`'s own body (CLAUDE.md §6), not here."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-open-fresh-draft-vs-existing-entry",
+      "proposed": "Call `openCommentPopover(new Point(100,50))` with no second argument; expect `_activeComment` to be a NEW object (not `===` any `state.comments` entry) with `x:100,y:50,frame:state.currentFrame`, `text:''`, `resolved:false`, and `#comment-delete` hidden (7869). Then call `openCommentPopover(pt, state.comments[0])` for some existing entry; expect `_activeComment===state.comments[0]` (same reference, no clone) and `#comment-delete` visible — not run."
+    },
+    {
+      "id": "fx-save-discards-blank-draft",
+      "proposed": "Open a fresh draft (no existing entry), leave `#comment-text` empty, click `#comment-save`; expect `state.comments` UNCHANGED (the 7967 blank-draft guard fires) and the popover closed — verifies 7965-7969 without ever pushing an empty pin — not run."
+    },
+    {
+      "id": "fx-save-vs-save-feedback-never-cross-persist",
+      "proposed": "Open a draft, type a note, click `#comment-save`; expect exactly one push into `state.comments`, `SMFeedback.submitFeedback` NEVER called. Reset, open a new draft, type a note, click `#comment-save-feedback` instead; expect `SMFeedback.submitFeedback` called exactly once with the typed note, `state.comments` UNCHANGED — verifies the two persistence targets never cross, per `boundaries` — not run."
+    },
+    {
+      "id": "fx-screenshot-strip-multi-add-and-order",
+      "proposed": "Call `loadCommentShotFiles([fileB, fileA])` where `fileA`'s own `FileReader.onload` is stubbed to fire BEFORE `fileB`'s (simulating out-of-order async completion); expect `_activeShotDataUrls` to end up `[dataUrlB, dataUrlA]` — ORIGINAL argument order, not completion order — verifying the `results[i]`-by-closed-over-index mechanism (7778-7784) — not run."
+    },
+    {
+      "id": "fx-record-stop-tallies-and-suppresses-dismissal",
+      "proposed": "Open the popover, click `#comment-record`, perform two stubbed actions and one stubbed click via `window.SMFeedback`'s own log, click `#comment-record` again (Stop); expect `_recordedActionTrail.length+_recordedClickTrail.length===3` reflected in `#comment-record-status`'s own textContent (7809-7810). Then re-open recording and simulate a `mousedown` OUTSIDE the popover while `_recording` is still true; expect the popover to STAY open (7990's early return fires before the containment check) — not run."
+    },
+    {
+      "id": "fx-outside-click-closes-only-when-not-recording",
+      "proposed": "With the popover open and NOT recording, dispatch a `mousedown` on `document.body` (outside `#comment-popover`); expect `closeCommentPopover()` to fire (7991) and `pop.style.display==='none'`. With the popover already hidden, dispatch the same event; expect the listener's own early return (7989) and no exception — not run."
+    }
+  ],
+  "future_proposals": [
+    "This scope has NO `pushUndo`/`pushUndoLayers` call anywhere in its own 271 lines — every team-comment and debug-feedback mutation (add, edit, resolve-toggle, delete) is unrecoverable via the app's own Undo stack, unlike C19w's own mograph-duplicator panel (which added `pushUndo()` to every dynamic handler after a documented QA fix). Flagged for the eventual runtime-behavior review as a possible missing-undo source for team comments specifically (accidental Delete has no Undo path); not exercised or confirmed as a defect by this census (no execution was performed).",
+    "`_recStartTime=Date.now()` (7822, `startRecording`) is written but never read anywhere in this scope — no elapsed-time display exists in `updateRecordUI` or anywhere else in 7724-7994 (confirmed by grep). Noted for awareness (a live 'recording for Ns…' indicator would be a natural extension of the existing status line), not flagged as a defect since the field may simply be reserved for a not-yet-built feature.",
+    "`initCommentPopover`'s own DOM-existence guard (7891) checks `!saveBtn||!pop` but not `!delBtn`, even though `delBtn` is dereferenced unconditionally at 7973 (`delBtn.addEventListener(...)`) — if the static markup ever drops `#comment-delete` while keeping `#comment-save`/`#comment-popover`, this would throw. All three ids currently live in the SAME static markup block (index.html:2056-2110) with no conditional rendering found, so this is a latent inconsistency rather than an observed failure; not exercised or confirmed as a defect by this census."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the ten function symbols this scope defines (renderCommentShotThumbs, setCommentShots, addCommentShots, loadCommentShotFiles, updateRecordUI, startRecording, stopRecording, openCommentPopover, closeCommentPopover, initCommentPopover), at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `engine-bridge.js`/`export.js`/`rive-export.js` for all ten symbol names returned ZERO hits, directly supporting the export/render-path `source_consumers` entries above (none of the ten is reachable from `getEffectiveStrokes`, `buildSceneJson`/`scenePayload`, or either export module).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 210/61/0 over 271 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets; no boundary correction was needed (the issue's own optional internal-comment sub-split of `init-comment-popover` was evaluated and rejected — see `owner`).",
+    "The `submitFeedback` payload-field claims were cross-checked directly against feedback-bridge.js's own `entry` object (feedback-bridge.js:281-308, read verbatim via `sed -n`, not assumed) — every field this scope's own call supplies (note, tags, blocking, pos, actionTrail, clickTrail, screenshotDataUrls) has a matching read in that body with no discrepancy found.",
+    "The `state.comments` entry-shape claim was cross-checked against app.js:315-325 (the state-schema default `comments:[]` and its own 11-line comment documenting the exact field set), read directly, and against `buildCommentPinItems` (engine-bridge.js:3419-3429, the render-path reader), also read directly — no discrepancy found between what `openCommentPopover` writes (7836-7842) and what both consumers expect.",
+    "The `tools.js` caller was confirmed by direct read of tools.js:7283-7291 (the `state.tool==='comment'` branch), not assumed from its own name.",
+    "`engineering/inventory/census/*.json` siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19w plus C06.preferences.shortcuts-system (which claims 7450-7723), forming a contiguous run from line 862 through line 7723 with zero gaps and zero overlaps except the single explicitly-reserved `// ---- KEYBOARD ----` header line (7449, left for the P03C small-span reconciliation leaf per the issue's own instruction) — independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency; this artifact's own range (7724-7994) is the immediate next contiguous span after 7723, and the validator's cross-sibling overlap check additionally confirms this programmatically against every C*.json in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 271,
+    "expected_classification": {
+      "code": 210,
+      "comment": 61,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        7724,
+        7787
+      ],
+      [
+        7788,
+        7832
+      ],
+      [
+        7833,
+        7888
+      ],
+      [
+        7889,
+        7994
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 7724-7787=(44,20,0); 7788-7832=(38,7,0); 7833-7888=(43,13,0); 7889-7994=(85,21,0); sums to (210,61,0)=271 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 271 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 census_check.py engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json <candidate-sha> exits 0",
+      "python3 census_check.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0",
+      "python3 census_check.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json <candidate-sha> still exits 0"
+    ]
+  }
+}

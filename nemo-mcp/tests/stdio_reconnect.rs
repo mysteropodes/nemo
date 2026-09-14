@@ -156,11 +156,15 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
+        let discovery = discovery.structured_content.unwrap();
+        assert_eq!(discovery["apiVersion"], 1);
+        assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(
-            discovery.structured_content,
-            Some(json!({"apiVersion": 1, "instances": [
-                discovered(&other, "other-document", 41), discovered(&initial, "initial-document", 7)
-            ]}))
+            discovery["instances"],
+            json!([
+                discovered(&other, "other-document", 41),
+                discovered(&initial, "initial-document", 7)
+            ])
         );
         assert_snapshot(
             bounded(client.call_tool(query(SELECTED))).await.unwrap(),
@@ -179,11 +183,12 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
+        let discovery = discovery.structured_content.unwrap();
+        assert_eq!(discovery["apiVersion"], 1);
+        assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(
-            discovery.structured_content,
-            Some(json!({"apiVersion": 1, "instances": [
-                discovered(&other, "other-document", 41)
-            ]}))
+            discovery["instances"],
+            json!([discovered(&other, "other-document", 41)])
         );
 
         let _replacement_registration =
@@ -191,11 +196,15 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
+        let discovery = discovery.structured_content.unwrap();
+        assert_eq!(discovery["apiVersion"], 1);
+        assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(
-            discovery.structured_content,
-            Some(json!({"apiVersion": 1, "instances": [
-                discovered(&other, "other-document", 41), discovered(&replacement, "replacement-document", 23)
-            ]}))
+            discovery["instances"],
+            json!([
+                discovered(&other, "other-document", 41),
+                discovered(&replacement, "replacement-document", 23)
+            ])
         );
         assert_snapshot(
             bounded(client.call_tool(query(SELECTED))).await.unwrap(),

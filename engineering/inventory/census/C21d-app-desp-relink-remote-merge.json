@@ -1,0 +1,520 @@
+{
+  "census_id": "C21d",
+  "issue": 1190,
+  "title": "app.js path deserialisation (`desP`), remote-snapshot merge, brush-companion/linked-fill relink and brush-texture strip",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21d census only; app.js:41-313 (C21a, PR #1181 merged), app.js:360-585 (C21b, PR #1184 merged), app.js:586-826 (C21c, PR #1188 merged, `serP` and its coordinate-rounding helper `_r3`, cited by line only) remain separate owners, cited by line only. app.js:1025+ (`serR`/`desR` bitmap-import lead-in and the image cache, the next leaf C21e) is out of scope and cited by line only where a packet's own `callers`/`behavior` needed to name a sibling desR call in the same forEach (e.g. app.js:4795's `if(sd.isRaster)desR(sd,...)` branch). Every named module cited under each packet's own `callers` field (export.js/timeline.js/tools.js/tweens.js/storyboard.js/labs/*.js/bitmap-brush.js/brush-menu-bridge.js/brush-preset-picker.js/project.js as callers of this scope's five functions; engine-bridge.js/select-bridge.js as the render-time/select-time consumers CLAUDE.md's own §1/§5ter notes name) remain separate owners, cited by call site only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21d-app-desp-relink-census",
+  "assigned_ranges": [
+    {
+      "start": 827,
+      "end": 1024
+    }
+  ],
+  "coverage_note": "Exactly 198 assigned lines occur once across five packets (one coverage_range per packet, no gaps, no other-owner overlap): 98 code, 100 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own `classify()` runs: 20+43+14+13+8=98 code; 50+25+9+8+8=100 comment; 0 blank throughout — no packet contains a blank line, confirmed line-by-line). Line 826 (`serP`'s own closing `};}` — C21c's own last line) is out of scope; line 827 opens this scope's own persisted-`closed`-flag lead-in comment for `desP`. Line 1024 (`stripAnyBrushTexture`'s own closing `}`) is the last line of this scope; line 1025 opens C21e's own bitmap-import lead-in comment for `serR`/`desR`.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (d0082229fc55ae1d9dd3ca6dfdc662bba009ef6a) has the identical app.js blob (git rev-parse d0082229:src/js/app.js == git rev-parse 59a5a38c:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at d0082229.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n '<symbol>(' 59a5a38c -- src/js` against the frozen blob (word-boundary call-site grep, `\\bdesP(` / `\\bmergeRemoteSnapshot(` / `\\brelinkBrushCompanions(` / `\\brelinkLinkedFills(` / `\\bstripAnyBrushTexture(`), filtering out the declaration line itself and any hit whose trimmed line starts with `//` (comment-only mention), then reading each surviving hit's line and enclosing function directly (enclosing function located by scanning backward for the nearest preceding `function <name>(` declaration, including anonymous-IIFE-scoped named functions and `SM.<name>:function(...)`/`window.SM.<name>=function(...)` object-literal methods).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source feedback quotes and CLAUDE.md §1/§5ter citations are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21d-app-desp-relink-remote-merge.json and the five app.js packets partitioning lines 827-1024.",
+    "app_js": "app.js retains the whole runtime writer for `desP`/`mergeRemoteSnapshot`/`relinkBrushCompanions`/`relinkLinkedFills`/`stripAnyBrushTexture`; this JSON authoring does not authorize source changes.",
+    "c21c_boundary": "Lines 586-826 (`_r3`, `serP`) belong to C21c/#1186 (PR #1188, merged) — cited by line only; every `serP`-emission-line citation in this artifact (e.g. 'serP:715') points into that scope without re-describing its body.",
+    "c21e_boundary": "Lines 1025+ (`serR`/`desR`'s own bitmap-import lead-in, and the image cache) are the next leaf's territory (C21e, not yet filed as an issue at authoring time) — this artifact cites `desR` by name only where a packet's own `behavior`/`callers` needed to name the sibling raster branch in the same `forEach`/ternary as a `desP` call (e.g. app.js:4795, export.js:239), never reproducing `desR`'s own body or reading past line 1024 for mapping purposes.",
+    "other_consumers_boundary": "engine-bridge.js (`buildSceneJson`, the `_changed`-hook/retained-path stamp machinery CLAUDE.md §5ter names), select-bridge.js, timeline.js, tools.js, tweens.js, storyboard.js, the labs/*.js prototypes, bitmap-brush.js, brush-menu-bridge.js, brush-preset-picker.js and project.js retain their own bodies in full — cited by line/call-site only for the specific caller findings each packet's `callers` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21c / #1186 (existing owner, PR #1188 merged)",
+      "disposition": "Retains app.js:586-826 (`_r3`, `serP`). This scope's own boundary begins at line 827 (the persisted-`closed`-flag lead-in comment immediately after `serP`'s own closing `};}` at line 826)."
+    },
+    {
+      "owner": "C21e (next leaf, not yet filed as an issue at authoring time beyond this issue's own forward reference)",
+      "disposition": "Owns app.js:1025+ (`serR`'s own bitmap-import lead-in comment, then `serR`/`desR` and the image cache) — this scope's last line (1024, `stripAnyBrushTexture`'s own closing `}`) is followed immediately by C21e's own lead-in comment at line 1025; no packet in this scope reproduces or reads past line 1024 for mapping purposes, and `desR` is cited by name only where a packet's own `callers`/`behavior` needed to name the sibling raster branch sharing a `forEach`/ternary with a `desP` call."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, `_changed`-hook and retained-path stamp consumer)",
+      "disposition": "Retains `buildSceneJson`'s `Item.prototype`/`Path.prototype`/`CompoundPath.prototype`/`Raster.prototype` `_changed` hook and its self-test in full (CLAUDE.md §5ter) — cited by line only for the `p.data.__engineSrcDict=d;` stamp-ordering finding this scope's `desp` packet required."
+    },
+    {
+      "owner": "tools.js / timeline.js / tweens.js / storyboard.js / labs/*.js / bitmap-brush.js / brush-menu-bridge.js / brush-preset-picker.js / project.js (existing owners, callers of this scope's five functions)",
+      "disposition": "Retain their own bodies in full — cited by line/call-site only under each packet's complete caller list below."
+    }
+  ],
+  "boundaries": [
+    "Line 826 (`serP`'s own `};}`, C21c's last line) is outside coverage; line 827 (a full-line `//` comment) begins this scope.",
+    "Line 1024 (`stripAnyBrushTexture`'s own closing `}`) is the last line of this scope; line 1025 opens C21e's own bitmap-import lead-in comment for `serR`/`desR` and is excluded — confirmed by reading through line 1030.",
+    "No lines inside 827-1024 are excluded for another owner: every line belongs to exactly one of the five packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The `closed` set-after-loop rule (827-836 comment, code at 837): `desP` builds the Path's segments via a `for` loop of `p.add(new Segment(...))` calls, THEN sets `if(d.closed)p.closed=true;` as the LAST statement on the declaration line — confirmed by direct read, matching the comment's own claim that `Path.add()` only appends open-ended and closing must happen explicitly once all segments exist. Default when `d.closed` is absent/falsy: the Path stays open (Paper.js's own construction default for a freshly-`new Path({insert:true})`), never explicitly set to `false`.",
+    "The historical strokeColor fallback: `desP`'s own literal fallback (app.js:853) is `'#fff'` (3-digit shorthand) — NOT `'#ffffff'` (serP's own literal, app.js:715, C21c's territory, cited by line only). The two functions use textually DIFFERENT fallback literals for the same semantic case (a falsy/exempted stored `strokeColor`), confirmed by direct read of both lines; this scope does not assert the two render or compare identically at every future consumer, only that they are textually distinct (same finding C21c's own `boundaries` already recorded from serP's side, cross-confirmed here from desP's side).",
+    "The brush-texture-anchor exemption from `desP`'s own `'#fff'` fallback (app.js:853) is the OR-chain `d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel` — a superset, in one respect, of serP's own `isTexAnchor` (which covers only `brushTexturePreset||isBrushTextureCopy||bitmapBrushSpec`, app.js:644, C21c's territory): `desP`'s chain ALSO folds in `isVectorBrush` and the two channel-derived booleans (`dNoStrokeChannel`/`dIsShadowChannel`, mirroring serP's own `isNoStrokeChannel`/`isShadowNoStroke` via a fresh `userLayers.indexOf(layer)` lookup on the DESTINATION layer, app.js:841-843) directly into the SAME `||` clause guarding the fallback, rather than as separate top-level exemptions the way serP's return-literal structures them (`isVB||isNoStrokeChannel||isShadowNoStroke||isTexAnchor&&!p.strokeColor`). Functionally equivalent in effect (the whole exemption chain is only reachable when `d.strokeColor` is already falsy, via the outer `d.strokeColor||(...)` short-circuit at app.js:853) but structurally reorganized rather than a line-for-line mirror of serP's own condition shape — confirmed by direct read of both lines, not by execution.",
+    "The `__engineSrcDict` stamp contract (app.js:880-895, CLAUDE.md §5ter): `p.data.__engineSrcDict=d;` (895) is the LAST statement in `desP`'s body before `prev.activate();return p;` (896) — confirmed by direct read: every other `p.data.*`/`p.*` write in the function (853 through 879) precedes it. The comment (880-894) states this ordering is load-bearing: constructing the Path's segments via the `for` loop at 837 fires a `Item.prototype._changed` hook (engine-bridge.js, cited by line only) once per added `Segment`, and that hook NULLS this same stamp on any geometry change — so stamping earlier would be immediately undone by the segment-construction loop itself. The comment also states its own §1 consumer check: `serP` reads only named fields (no wholesale `data` copy, so `__engineSrcDict` can never leak into a save), and `onionLayerItems`/tween-matching/select-bridges ignore unknown `data.*` fields."
+  ],
+  "areas": [
+    {
+      "area": "path-deserialisation",
+      "packets": [
+        {
+          "id": "C21d.desp",
+          "files": [
+            "src/js/app.js:827-896"
+          ],
+          "coverage_ranges": [
+            [
+              827,
+              896
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 50,
+            "whitespace": 0
+          },
+          "symbols": [
+            "desP",
+            "closed",
+            "hasRealStroke",
+            "strokeColor",
+            "__engineSrcDict",
+            "brushGroupId",
+            "linkedFillId",
+            "isDuplicatorCopy",
+            "dup3D",
+            "isTextRoot"
+          ],
+          "signature": "function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=new Path({insert:true});for(...)p.add(new Segment(...));if(d.closed)p.closed=true; ... p.data.__engineSrcDict=d;prev.activate();return p;}",
+          "responsibility": "Deserializes one persisted stroke dict `d` (serP's own shape, C21c) back into a live Paper.js Path inserted into `layer`, mirroring serP's field emission chain field-for-field on read-back, restoring the historically-missing `closed` flag AFTER segment construction, and stamping the retained-path identity (`__engineSrcDict`) as the LAST write so the segment-construction loop's own `_changed` firings cannot clear it.",
+          "behavior": [
+            "Lines 827-836 (comment, 10 lines): documents the historical `closed`-flag bug — every path rebuilt via `desP()` (onion-skin ghosts, tween/inbetween generation, undo/redo snapshots, project load: everything through serP/desP) silently lost its `closed` flag and came back open. Filled shapes hid the symptom (fill rendering implicitly closes the boundary); stroked closed shapes and Outline onion-skin mode (which clears `fillColor` to show just the silhouette) visibly showed a gap at the seam. States the fix must set `closed` AFTER the segment loop, since `Path.add()` only appends open-ended.",
+            "Line 837 (code, the declaration line): `function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=new Path({insert:true});for(...)p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}if(d.closed)p.closed=true;` — three formal parameters: `d` (the persisted stroke dict, serP's own return value or an equivalent plain object), `layer` (the Paper.js Layer to activate and insert the new Path INTO — `new Path({insert:true})` inserts into whichever layer is `project.activeLayer` at construction time, hence the explicit `layer.activate()` first), `op` (an optional opacity OVERRIDE, see the dedicated `op` finding below). Reads `d.segments` (the array of `{point,handleIn,handleOut}` triples — serP:715 `segments:p.segments.map(...)`) to rebuild each `Segment` via `new Point(...)` triples; no default when absent — `d.segments.length` is read unconditionally, so a dict with no `segments` field throws rather than falling back to an empty path. Reads `d.closed` (serP:715 `closed:!!p.closed`, always emitted, never omitted) — default when absent/falsy: the Path stays OPEN (no explicit `p.closed=false`), per the `closed` set-after-loop rule in `boundaries`.",
+            "Restores `prev=project.activeLayer` before switching (837) so `prev.activate()` (896) can restore it afterward — `desP` is transparent to whichever layer was active before it ran, letting a caller invoke it repeatedly across different target layers (e.g. `loadFrame`'s per-layer loop) without manually re-activating anything between calls.",
+            "Lines 838-843 (comment 838-840, code 841-843): mirrors serP's own `isNoStrokeChannel`/`isShadowNoStroke` derivation, but computed from the DESTINATION `layer` parameter rather than a live Path's own `.layer` (since `p` doesn't exist yet at this point) — `dLayerIdx=userLayers.indexOf(layer)` (C21b's own registry, app.js:365, cited by line only), `dChLayer=dLayerIdx>=0?state.layers[dLayerIdx]:null`, `dNoStrokeChannel=!!(dChLayer&&dChLayer.channel==='fill')`, `dIsShadowChannel=!!(dChLayer&&dChLayer.channel==='shadow')` — note this is `dIsShadowChannel` (unconditional on the layer's channel alone), NOT a mirror of serP's own `isShadowNoStroke` (which additionally requires `!p.strokeColor`); the caller-side `!d.strokeColor` short-circuit at line 853 (`d.strokeColor||(...)`) supplies that same additional condition instead.",
+            "Lines 844-852 (comment, 9 lines): documents `hasRealStroke===false` as AUTHORITATIVE over the stored `strokeColor` string — even when that string is serP's own `'#ffffff'` fallback. Without this, every strokeless FILL (paint-bucket fills, fill-brush shapes carrying none of the exemption flags) came back from ANY desP round-trip wearing a white outline it never had (\"un trait blanc apparaît autour du fill après ctrl+Z\"). Legacy data predating the field (`d.hasRealStroke===undefined`) keeps the OLD fallback chain untouched (falls through to the `d.strokeColor||(...)` chain below, since `undefined===false` is false).",
+            "Line 853 (code, one physical line — the densest line in this scope, 29 field reads):",
+            "  `p.strokeColor=d.hasRealStroke===false?null:(d.strokeColor||((d.isVectorBrush||d.brushTexturePreset||d.bitmapBrushSpec||d.isBrushTextureCopy||dNoStrokeChannel||dIsShadowChannel)?null:'#fff'));` — reads `d.hasRealStroke` (serP:715, no default: `===false` is a strict check, so `undefined`/`true`/anything else falls through), `d.strokeColor` (serP:715, default when falsy: the six-name OR-exemption chain, else the literal `'#fff'`), `d.isVectorBrush`/`d.brushTexturePreset`/`d.bitmapBrushSpec`/`d.isBrushTextureCopy` (serP:715/724, all default to 'not exempt' i.e. undefined/falsy when absent) — the `'#fff'` vs. serP's own `'#ffffff'` distinction and the exemption-chain shape difference are both recorded in `boundaries` above.",
+            "  `p.strokeWidth=d.strokeWidth||3;` — reads `d.strokeWidth` (serP:715 `strokeWidth:p.strokeWidth`, no write-side default), default on READ when falsy/absent: `3`. Note: `||` means a genuinely-stored `0` would ALSO be promoted to `3` here (serP itself never floors it) — flagged in `future_proposals` as a latent asymmetry, not reproduced.",
+            "  `p.strokeCap=typeof d.strokeCap==='string'?d.strokeCap:'round';` — reads `d.strokeCap` (serP:715 `strokeCap:p.strokeCap||'round'`, so serP itself never persists anything but a string or the fallback), default `'round'` when not a string.",
+            "  `p.strokeJoin=typeof d.strokeJoin==='string'?d.strokeJoin:'round';` — same shape, default `'round'`, serP:715 `strokeJoin:p.strokeJoin||'round'`.",
+            "  `if(d.miterLimit!==undefined)p.miterLimit=d.miterLimit;` — reads `d.miterLimit` (serP:715 `miterLimit:p.miterLimit`, no write-side default) with an explicit `!==undefined` guard (a genuine `0` miter limit would round-trip); default when absent: left at whatever the freshly-constructed Path already has (Paper.js's own construction default, not explicitly set here).",
+            "  `if(d.fillColor)p.fillColor=d.fillColor;else p.fillColor=null;` — reads `d.fillColor` (serP:715 `fillColor:p.fillColor?colorHex8(p.fillColor):null`), default `null` when falsy/absent — the ONLY field on this line with an explicit `else` branch rather than an implicit 'leave at construction default'.",
+            "  `p.opacity=op!==undefined?op:(d.opacity!==undefined?d.opacity:1);` — the formal parameter `op` takes priority over `d.opacity` (serP:715 `opacity:p.opacity!==undefined?p.opacity:1`); default `1` only when BOTH `op` and `d.opacity` are undefined. See the dedicated `op` parameter finding below.",
+            "  `if(d.dashArray&&d.dashArray.length)p.dashArray=d.dashArray;` — reads `d.dashArray` (serP:715 `dashArray:(p.dashArray&&p.dashArray.length)?p.dashArray.slice():undefined`, non-empty-array-gated on both sides), default: left at construction default (no dash) when absent/empty. Unlike serP's own write side, desP assigns the array REFERENCE directly (no `.slice()` defensive copy) — the array came from a freshly-parsed/passed-in `d`, not a live object another consumer still holds, so this asymmetry is not itself a live-reference hazard.",
+            "  `if(d.dashOffset!==undefined)p.dashOffset=d.dashOffset;` — reads `d.dashOffset` (serP:715 `dashOffset:p.dashOffset`, no write-side gate at all) with an explicit `!==undefined` guard; default: construction default (0) when absent.",
+            "  `if(d.paintOrder){p.data.paintOrder=d.paintOrder;}` — reads `d.paintOrder` (serP:715 `paintOrder:(p.data&&p.data.paintOrder)?p.data.paintOrder:undefined`), default: `p.data.paintOrder` stays absent/undefined.",
+            "  `if(d.isVectorBrush){p.data.isVectorBrush=true;if(d.centerSegments)p.data.centerSegments=d.centerSegments;if(d.widthProfile)p.data.widthProfile=d.widthProfile;if(d.strokeProfile)p.data.strokeProfile=d.strokeProfile;if(d.profileBase)p.data.profileBase=d.profileBase;if(d.isFillShape)p.data.isFillShape=true;applyBrushKeyline(p);}` — reads `d.isVectorBrush` (serP:715 `isVectorBrush:isVB||undefined`, boolean-literal `true` written here rather than a passthrough of the source value, default: block skipped entirely when falsy/absent — every nested field below it stays unset too), and inside the block: `d.centerSegments` (serP:715 `centerSegments:center`, default: absent), `d.widthProfile` (serP:715 `widthProfile:widthProfile`, default: absent), `d.strokeProfile` (serP:715 `strokeProfile:(p.data&&p.data.strokeProfile)||undefined`, default: absent), `d.profileBase` (serP:715 `profileBase:(p.data&&p.data.profileBase)||undefined`, default: absent), `d.isFillShape` (serP:715 `isFillShape:(p.data&&p.data.isFillShape)?true:undefined`, boolean-literal, default: absent/false). `applyBrushKeyline(p)` (C21b's own function, app.js, cited by line only) is called UNCONDITIONALLY inside this block on every vector-brush restore, not gated by any further `d.*` field.",
+            "  `if(d.isFillCloseLine)p.data.isFillCloseLine=true;` — reads `d.isFillCloseLine` (serP:715 `isFillCloseLine:(p.data&&p.data.isFillCloseLine)?true:undefined`), boolean-literal, default absent.",
+            "  `if(d.fillSeed)p.data.fillSeed=d.fillSeed;` — reads `d.fillSeed` (serP:715 `fillSeed:fillSeed`, itself a truthy-gated var from serP:602), default absent. Note: a truthy-gate on READ, matching serP's own truthy-gated var computation, but see `d.fillGapPx` below for the read-side's EXTRA gate.",
+            "  `if(d.fillSeeds&&d.fillSeeds.length)p.data.fillSeeds=d.fillSeeds;` — reads `d.fillSeeds` (serP:715 `fillSeeds:fillSeeds`, non-empty-array-gated var from serP:610), default absent.",
+            "  `if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)p.data.fillGapPx=d.fillGapPx;` — reads `d.fillGapPx` (serP:602 var `fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined`, emitted at serP:715 `fillGapPx:fillGapPx` with NO fillSeed/fillSeeds gate on the WRITE side) but desP's READ side adds an extra gate not present in serP's own write condition: `fillGapPx` is restored ONLY if `d.fillSeed` OR a non-empty `d.fillSeeds` is ALSO present. Asymmetry: if a dict ever legitimately carried `fillGapPx` without either seed field (not observed in this census, would require a code path that sets `p.data.fillGapPx` without ever setting `fillSeed`/`fillSeeds`), serP would persist it but desP would silently drop it on restore — flagged in `future_proposals`, not reproduced.",
+            "  `if(d.fillWalls)p.data.fillWalls=d.fillWalls;` — reads `d.fillWalls` (serP:715 `fillWalls:fillWalls`, non-empty-array-gated var from serP:603), default absent.",
+            "  `if(d.strokeId)p.data.strokeId=d.strokeId;` — reads `d.strokeId` (serP:715 `strokeId:strokeId`, truthy-gated var from serP:603), default absent.",
+            "  `if(d.brushGroupId)p.data.brushGroupId=d.brushGroupId;` — reads `d.brushGroupId` (serP:715 `brushGroupId:brushGroupId`, truthy-gated var from serP:625), default absent. This is the id `relinkBrushCompanions` (next-next packet) regroups by after this function returns.",
+            "  `if(d.isLinkedFillCompanion)p.data.isLinkedFillCompanion=true;` — reads `d.isLinkedFillCompanion` (serP:715 `isLinkedFillCompanion:isLinkedFillCompanion`, boolean-coerced var from serP:617-618), boolean-literal on restore, default absent/false.",
+            "  `if(d.linkedFillId)p.data.linkedFillId=d.linkedFillId;` — reads `d.linkedFillId` (serP:715 `linkedFillId:linkedFillId`, truthy-gated var from serP:618), default absent. This is the id `relinkLinkedFills` (packet 4) pairs ribbon and backdrop by.",
+            "  `if(d.tweenOn)p.data.tweenOn=true;` — reads `d.tweenOn` (serP:715 `tweenOn:(p.data&&p.data.tweenOn)?true:undefined`), boolean-literal, default absent/false.",
+            "  `if(d.boxAngle)p.data.boxAngle=d.boxAngle;` — reads `d.boxAngle` (serP:715 `boxAngle:(p.data&&p.data.boxAngle)?p.data.boxAngle:undefined`), default absent.",
+            "  `if(d.xformAnchorKey)p.data.xformAnchorKey=d.xformAnchorKey;` — reads `d.xformAnchorKey` (serP:722), default absent.",
+            "  `if(d.xformAnchorCustom)p.data.xformAnchorCustom=d.xformAnchorCustom;` — reads `d.xformAnchorCustom` (serP:723), default absent.",
+            "  `if(d.isBrushTextureCopy)p.data.isBrushTextureCopy=true;` — reads `d.isBrushTextureCopy` (serP:724, boolean-coerced var from serP:625-629), boolean-literal, default absent/false. (Also read earlier on this SAME line as part of the strokeColor exemption chain — two independent reads of the same field.)",
+            "  `if(d.brushTexturePreset)p.data.brushTexturePreset=d.brushTexturePreset;` — reads `d.brushTexturePreset` (serP:724), default absent. (Also read earlier as part of the exemption chain.)",
+            "  `if(d.bitmapBrushSpec)p.data.bitmapBrushSpec=d.bitmapBrushSpec;` — reads `d.bitmapBrushSpec` (serP:724, var from C21c's `serp-texture-anchor-channel-shadow-vars` packet, app.js:645), default absent. (Also read earlier as part of the exemption chain.)",
+            "  `if(d.bitmapPressureProfile)p.data.bitmapPressureProfile=d.bitmapPressureProfile;` — reads `d.bitmapPressureProfile` (serP:724, var app.js:652), default absent.",
+            "  `if(d.preTextureOpacity!==undefined)p.data.preTextureOpacity=d.preTextureOpacity;` — reads `d.preTextureOpacity` (serP:724, `!==undefined`-guarded var) with the SAME explicit `!==undefined` guard on restore (a genuine `0` restore-opacity round-trips both ways), default absent.",
+            "  `if(d.preTextureStroke!==undefined)p.data.preTextureStroke=d.preTextureStroke;` — same `!==undefined` pattern, serP:724, default absent.",
+            "  `if(d.channelTag)p.data.channelTag=d.channelTag;` — reads `d.channelTag` (serP:724, var app.js:680), default absent.",
+            "  `if(d.shadowSwatchId)p.data.shadowSwatchId=d.shadowSwatchId;` — reads `d.shadowSwatchId` (serP:724, var app.js:684), default absent.",
+            "  `if(d.ownerId)p.data.ownerId=d.ownerId;` / `if(d.ownerName)p.data.ownerName=d.ownerName;` / `if(d.ownerColor)p.data.ownerColor=d.ownerColor;` — read `d.ownerId`/`d.ownerName`/`d.ownerColor` (serP:724, truthy-gated passthrough vars, app.js:690-693), default absent for all three.",
+            "  `if(d.revisionParentId)p.data.revisionParentId=d.revisionParentId;` — reads `d.revisionParentId` (serP:724, app.js:693), default absent.",
+            "  `if(d.isRevisionGhost)p.data.isRevisionGhost=true;` — reads `d.isRevisionGhost` (serP:724, boolean-coerced var app.js:694), boolean-literal, default absent/false.",
+            "  `if(d.revisionAction)p.data.revisionAction=d.revisionAction;` — reads `d.revisionAction` (serP:724, app.js:695), default absent.",
+            "  `if(d.preRevisionOpacity!==undefined)p.data.preRevisionOpacity=d.preRevisionOpacity;` — reads `d.preRevisionOpacity` (serP:724, `!==undefined`-guarded var app.js:702), same guard shape on restore, default absent.",
+            "  `if(d.fillGradient)p.data.fillGradient=d.fillGradient;` — reads `d.fillGradient` (serP:729), default absent, whole-object passthrough (no reshape).",
+            "  `if(d.groupId)p.data.groupId=d.groupId;` — reads `d.groupId` (serP:732), default absent.",
+            "  `if(d.elemHidden){p.data.elemHidden=true;p.visible=false;}` — reads `d.elemHidden` (serP:762), boolean-literal AND a LIVE effect beyond tagging: sets `p.visible=false` directly, so a hidden element restores actually invisible, not merely tagged-but-visible. Default absent/false (item stays visible).",
+            "  `if(d.paramShape)p.data.paramShape=d.paramShape;` — reads `d.paramShape` (serP:762), default absent, whole-object passthrough.",
+            "  `if(d.effects&&d.effects.length)p.data.effects=d.effects;` — reads `d.effects` (serP:769, non-empty-array-gated on both sides), default absent.",
+            "Lines 854-858 (comment 854-855, code 856-858): Tracked-role attach (2026-08-29, feedback #151) — the comment points back to serP's own comment on these three fields (C21c's `serp-gradient-group-trackrole-fields` packet, app.js:733-751) for the full round-trip contract, rather than re-documenting it here.",
+            "  `if(d.trackRoleId)p.data.trackRoleId=d.trackRoleId;` — reads `d.trackRoleId` (serP:752), default absent.",
+            "  `if(d.attachedToRoleId)p.data.attachedToRoleId=d.attachedToRoleId;` — reads `d.attachedToRoleId` (serP:753), default absent.",
+            "  `if(d.attachOffset)p.data.attachOffset={x:d.attachOffset.x,y:d.attachOffset.y};` — reads `d.attachOffset` (serP:754, itself a defensive-copied `{x,y}`), and restores via a FRESH `{x,y}` object literal rather than the source reference — the same defensive-copy discipline serP's own write side uses (C21c `boundaries`), default absent.",
+            "Line 859 (code): `if(d.isVectorText)p.data.isVectorText=true;if(d.vectorChar)p.data.vectorChar=d.vectorChar;if(d.isText)p.data.isText=true;` — reads `d.isVectorText` (serP:775, boolean-literal, default absent/false), `d.vectorChar` (serP:776, default absent), `d.isText` (serP, C21c's `serp-paramshape-text-fields` packet — `isText:(p.data&&p.data.isText)?true:undefined` — boolean-literal, default absent/false).",
+            "Line 860 (code): `if(d.charIndex!=null)p.data.charIndex=d.charIndex;if(d.wordIndex!=null)p.data.wordIndex=d.wordIndex;if(d.lineIndex!=null)p.data.lineIndex=d.lineIndex;` — reads `d.charIndex`/`d.wordIndex`/`d.lineIndex` (serP's own `!=null`-guarded vars, C21c's `serp-paramshape-text-fields`, app.js:782-784) with the SAME `!=null` guard on restore (catches `null`/`undefined` but not `0`, so a legitimate first-index `0` round-trips both ways) — default absent for all three.",
+            "Lines 861-864 (comment 861-863, code 864): documents the Mograph duplicator copy tags (`applyLayerDuplicator`, app.js, OUTSIDE this scope and outside serP's own 600-826 range) as 'belt-and-suspenders for future layer.children consumers; the layer is force-locked so no interactive path reads these today'.",
+            "  `if(d.isDuplicatorCopy)p.data.isDuplicatorCopy=true;if(d.dupIndex!=null)p.data.dupIndex=d.dupIndex;` — reads `d.isDuplicatorCopy` (boolean-literal, default absent/false) and `d.dupIndex` (`!=null` guard, allows `0`, default absent). NEITHER field is emitted anywhere in serP's own return-object literal (586-826, C21c's complete field map) — confirmed by cross-checking every field name in C21c's own packet list against these two identifiers: `isDuplicatorCopy`/`dupIndex` do not appear. The actual writer is `applyLayerDuplicator` itself (app.js:1774 `sd2.isDuplicatorCopy=true;sd2.dupIndex=k;`, outside both this scope and serP's, cited by line only): it stamps these two fields directly onto a SYNTHESIZED per-clone stroke dict `sd2` at `getEffectiveStrokesRendered` time, never through `serP`. `desP` therefore restores these fields not because serP persists them, but because `desP` is the SAME function `loadFrame` uses to materialize the duplicator's synthesized, per-frame, per-clone dicts into live Paper items for rendering — a genuine 'desP reads keys serP never emits' case, recorded in the cross-check finding below.",
+            "Lines 865-871 (comment 865-870, code 871): documents `dupCloneId` ('ID de chaque cloner') and `dup3D` (per-clone 3D delta) with the SAME 'carried for future/other consumers, force-locked' reasoning as `isDuplicatorCopy`/`dupIndex` just above, but notes `buildSceneJson` (engine-bridge.js, cited by line only) DOES read `dup3D` off the live object for its per-clone 3D projector cache — the one real, current consumer.",
+            "  `if(d.dupCloneId)p.data.dupCloneId=d.dupCloneId;if(d.dup3D)p.data.dup3D=d.dup3D;` — reads `d.dupCloneId` (default absent) and `d.dup3D` (default absent, whole-object passthrough). Same as `isDuplicatorCopy`/`dupIndex`: NEITHER appears in serP's own 600-826 field map (confirmed by the same cross-check) — both are synthesized directly by `applyLayerDuplicator` (app.js:1783 `sd2.dupCloneId='dup'+(dup.seed||0)+'_'+k;`, app.js:1784 `if(dup3D)sd2.dup3D=dup3D;`, both outside this scope, cited by line only) onto the same per-clone `sd2` dict, never via `serP`.",
+            "Line 872 (code, ROOT-only vector-text block): `if(d.isTextRoot){p.data.isTextRoot=true;p.data.text=d.text||'';p.data.vectorFont=d.vectorFont||'Roboto-Regular';p.data.size=d.textSize||48;p.data.color=d.textColor||'#000000';p.data.align=d.textAlign||'left';if(d.textFixedWidth)p.data.fixedWidth=d.textFixedWidth;if(d.anchorTopLeft)p.data.anchorTopLeft={x:d.anchorTopLeft.x,y:d.anchorTopLeft.y};` — reads `d.isTextRoot` (serP, C21c's `serp-paramshape-text-fields` packet, `isTextRoot:(p.data&&p.data.isTextRoot)?true:undefined`), gating the whole block; boolean-literal, default: block skipped, every nested field stays unset. Inside: `d.text` (serP `text:(p.data&&p.data.isTextRoot)?p.data.text:undefined`) restored to `p.data.text`, default `''` when falsy/absent. `d.vectorFont` (serP, same isTextRoot gate, SOURCE `p.data.vectorFont`) restored to `p.data.vectorFont`, default `'Roboto-Regular'`. `d.textSize` (serP `textSize:(...)?p.data.size:undefined` — persisted key is `textSize`, SOURCE field is `p.data.size`) restored to `p.data.size` — the SAME rename serP's own write side uses, mirrored exactly on read, default `48`. `d.textColor` (serP SOURCE `p.data.color`) restored to `p.data.color`, same rename, default `'#000000'`. `d.textAlign` (serP SOURCE `p.data.align`) restored to `p.data.align`, same rename, default `'left'`. `d.textFixedWidth` (serP, double-gated `isTextRoot&&p.data.fixedWidth`, SOURCE `p.data.fixedWidth`) restored to `p.data.fixedWidth`, default absent (no fallback value). `d.anchorTopLeft` (serP, double-gated, defensive-copied `{x,y}`) restored via a FRESH `{x,y}` object, default absent.",
+            "Lines 873-877 (comment 873-874, code 875-877): points back to serP's own comment on the Typography-panel field set (C21c's `serp-typography-mask-gradient-fields` packet) for the full story of why these were historically missing, rather than re-documenting it here.",
+            "  `if(d.bold)p.data.bold=true;if(d.italic)p.data.italic=true;if(d.underline)p.data.underline=true;if(d.strike)p.data.strike=true;` — reads `d.bold`/`d.italic`/`d.underline`/`d.strike` (serP:806-809, all double-gated `isTextRoot&&field` boolean-literals), boolean-literal on restore too, default absent/false for all four. Note: these are NOT gated on `d.isTextRoot` again at restore time (unlike serP's own double-gate on WRITE) — but since serP itself only ever emits them when `isTextRoot` was true, and this whole line sits inside the `if(d.isTextRoot){...}` block opened at 872, the effective gating is identical in practice.",
+            "  `if(d.letterSpacing)p.data.letterSpacing=d.letterSpacing;if(d.wordSpacing)p.data.wordSpacing=d.wordSpacing;` — reads `d.letterSpacing`/`d.wordSpacing` (serP:810-811, double-gated truthy passthroughs), same truthy-gate on restore (so a legitimate `0` spacing value would not round-trip either direction — a symmetric, not one-sided, limitation), default absent.",
+            "  `p.data.lineHeightMult=d.lineHeightMult||1.25;` — reads `d.lineHeightMult` (serP:812, triple-gated including the `!==1.25` default-elision) — UNCONDITIONALLY assigns (not gated by `if`, unlike every sibling field on this line), default `1.25` when falsy/absent, matching serP's own documented default value exactly.",
+            "  `if(d.textCase&&d.textCase!=='none')p.data.textCase=d.textCase;` — reads `d.textCase` (serP:813, triple-gated including the `!=='none'` default-elision), same double-condition on restore (truthy AND not the string `'none'`), default absent (i.e. the Typography panel reads no `textCase` back as its own `'none'` default).",
+            "Line 878 (code): `if(d.isMask){p.data.isMask=true;p.data.maskMode=d.maskMode||'add';if(d.maskFeather)p.data.maskFeather=d.maskFeather;}` — reads `d.isMask` (serP:820, boolean-literal), gating the block, default: block skipped, mask fields stay unset. Inside: `d.maskMode` (serP:821) UNCONDITIONALLY assigned with default `'add'` when falsy/absent — matching serP's own documented editor default for a new mask. `d.maskFeather` (serP:822) truthy-gated, default absent.",
+            "Line 879 (code): `if(d.strokeGradientAlongPath)p.data.strokeGradientAlongPath=d.strokeGradientAlongPath;` — reads `d.strokeGradientAlongPath` (serP:826, the LAST field serP's own return literal emits), default absent, whole-object passthrough.",
+            "Lines 880-894 (comment, 15 lines): the `__engineSrcDict` stamp contract — see `boundaries` above for the full ordering argument (CLAUDE.md §5ter).",
+            "Line 895 (code): `p.data.__engineSrcDict=d;` — the retained-path stamp itself: tags the newly-built `p` with the SOURCE dict `d` it was built from, by object-identity. Not a `d.*` field read — `d` here is the WHOLE parameter object, stamped onto the live item for engine-bridge.js's dict→engine-path-key mapping (cited by line only).",
+            "Line 896 (code, closing line): `prev.activate();return p;` — restores the PREVIOUSLY active layer (captured at 837) before returning the freshly built `p`, so a caller iterating this function across several different `layer` arguments in sequence never has to re-activate anything itself."
+          ],
+          "callers": [
+            "`desP` — 17 call-site reference(s) across 11 file(s) at the frozen SHA, excluding `//`-comment-only mentions and the declaration line itself (app.js:837): src/js/app.js:4127 (`propagateLFSFill`): `lineStrokes.forEach(function(sd){desP(sd,scratch,1);});` — hardcoded `op=1`: rebuilds the Ligne shape's own strokes at full opacity onto a scratch layer purely to measure bounds for same-color-fill propagation targeting, not for display. | src/js/app.js:4795 (`loadFrame`): `strokes.forEach(function(sd){if(sd.isRaster)desR(sd,userLayers[i]);else desP(sd,userLayers[i]);});relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);` — no `op` argument, and the function's OWN comment (app.js:4784-4794) explains why: passing a hardcoded value here would discard every stroke's real stored/tween-interpolated opacity on every ordinary frame navigation; falls through to `d.opacity`. Immediately followed on the SAME rebuilt layer by both relink helpers (next two packets) — the primary, most-frequently-executed call site (every frame change). | src/js/export.js:239 (`exportBuildFrame`): `var p=sd.isRaster?desR(sd,L,sd.opacity!==undefined?sd.opacity:1):desP(sd,L,sd.opacity!==undefined?sd.opacity:1);` — explicit `op` computed to the SAME value desP would derive on its own if omitted (`d.opacity` or the literal `1`); redundant, not divergent. | src/js/labs/layer-effects-bake.js:30 (`rasterizeLayer`): `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — no `op`; LABS per-frame bake-to-raster prototype (CSS-filter effect stack). | src/js/labs/oca-export.js:117 (`pngBytesFor`): `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — no `op`; LABS OpenToonz-format export prototype rasterizing each frame to PNG bytes. | src/js/labs/pose-library.js:65 (`window.SMLabs.stampPose`): `var p = desP(copy, layer);` — no `op`; `copy` is a fresh `JSON.parse(JSON.stringify(sd))` of a saved-pose snapshot with `strokeId` refreshed (`freshId()`) and `brushGroupId` deleted immediately before this call. | src/js/labs/shader-effects-bake.js:178 (`rasterizeLayer`): `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch); });` — no `op`; LABS WebGL shader-filter bake prototype, same shape as layer-effects-bake.js. | src/js/labs/storyboard-mode.js:149 (`thumbFor`): `if (sd.isRaster) desR(sd, scratch); else desP(sd, scratch);` — no `op`; LABS storyboard-thumbnail prototype. | src/js/storyboard.js:140 (`thumbDataUrl`): `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, _thumbLayer); else desP(sd, _thumbLayer); });` — no `op`; the PRODUCT StoryBoard card-thumbnail renderer (not a labs prototype). | src/js/storyboard.js:715 (`updatePreview`): `strokes.forEach(function (sd) { if (sd.isRaster) desR(sd, previewLayer); else desP(sd, previewLayer); });` — no `op`; StoryBoard's live hover-preview renderer (CLAUDE.md §8's `startLivePreview`). | src/js/timeline.js:3829 (`selectGhostAll`): `var p=desP(sd,layer);p.data.ghostFrame=fi;` — no `op`; Ghost-All's interactive drag-proxy stamp of every OTHER keyframe's strokes onto the live layer (skipping raster and `isRevisionGhost` strokes), tagged with the source frame index for write-back. | src/js/tools.js:1592 (`_materializeClones`): `var clone=desP(d,layer,d.opacity);` — explicit `op=d.opacity`, the same value desP would use if omitted; the primary clone (paste/duplicate) path for an anchor/simple stroke, after `strokeId`/`trackRoleId` are cleared and `brushGroupId` is remapped to a fresh id on `d`. | src/js/tools.js:1626 (`_materializeClones`): `var dabClone=desP(dd,layer,dd.opacity);` — same explicit-`op` pattern, for a brush-texture anchor's DAB companions, cloned in a second pass keyed off the fresh `brushGroupId` assigned to their anchor. | src/js/tools.js:2077 (`forkIfForeignOwner`): `ghost=desP(preEdit,layer);ghost.insertBelow(path);` — no `op`; rebuilds a pre-edit snapshot (`findPreEditStrokeData`) as the frozen 'before' ghost for Team Review's fork-on-foreign-edit safety net, only when a matching snapshot exists (falls back to `path.clone()` otherwise, not a desP call). | src/js/tweens.js:4594 (`renderGhostAll`): `var p=desP(sd,ghostAllLayer,op);` — explicit `op` computed as `Math.max(.12,.4-dist*.03)` (a frame-distance fade) — OVERRIDES the stroke's own stored opacity so every Ghost-All silhouette fades uniformly by distance from the current frame, regardless of the stroke's real opacity. | src/js/tweens.js:4748 (`renderOS`, previous-onion loop): `var p=desP(sd,onionPrevLayer,effOp);` — explicit `op=effOp`, a distance-based fade optionally multiplied by the stroke's own `sd.opacity` only for brush-texture strokes (`isTex?op*(sd.opacity!==undefined?sd.opacity:1):op`) — OVERRIDES stored opacity for the onion-skin 'previous frames' ghost layer. | src/js/tweens.js:4749 (`renderOS`, next-onion loop): `var p=desP(sd,onionNextLayer,effOp2);` — mirror of the previous-onion site for the 'next frames' ghost layer."
+          ],
+          "effects": "Inserts a new live Path into `layer` (side effect on the Paper.js scene graph) and mutates `layer`'s previously-active-layer state transiently (restored before return). No `state.*`/DOM/localStorage write of its own. `op` parameter: when the caller passes a value other than `undefined`, it OVERRIDES the persisted `d.opacity` entirely — used by every ephemeral/overlay caller that needs a COMPUTED fade regardless of the stroke's real stored opacity (Ghost All's `renderGhostAll`, onion-skin's `renderOS`, and `propagateLFSFill`'s hardcoded `1`), while the single most-executed caller (`loadFrame`) deliberately OMITS it so ordinary frame navigation preserves the stroke's actual/tween-interpolated opacity (see that call site's own in-source comment, app.js:4784-4794, cited by line only). `_materializeClones` (tools.js) passes `d.opacity`/`dd.opacity` explicitly — the SAME value omission would produce, a redundant-but-harmless pattern distinct from the two genuine-override callers. Cross-check against serP's own field map (C21c, 600-826): every field serP's return-object literal emits (roughly 80 distinct field names across `segments`/`closed`/style/vector-brush/fill-link/tween/box/anchor/texture/channel/owner/revision/gradient/group/trackrole/elemHidden/paramShape/effects/vector-text/duplicator-adjacent/typography/mask/gradient-along-path) IS read back by `desP` somewhere in 837-895 — confirmed by cross-referencing every `d.<field>` read against C21c's own packet-by-packet field list; no serP-emitted field was found unread. The REVERSE direction has a confirmed exception: `desP` reads four fields — `d.isDuplicatorCopy`, `d.dupIndex`, `d.dupCloneId`, `d.dup3D` (864, 871) — that do NOT appear anywhere in serP's own 600-826 return-object literal; these are instead stamped directly onto a SYNTHESIZED per-clone stroke dict by `applyLayerDuplicator` (app.js:1774/1783/1784, outside both this scope and serP's, cited by line only) at `getEffectiveStrokesRendered` time, never through `serP` at all — `desP` supports them because it is the SAME function used to materialize those synthesized dicts into live Paper items for rendering, not because serP persists them."
+        }
+      ]
+    },
+    {
+      "area": "remote-snapshot-merge",
+      "packets": [
+        {
+          "id": "C21d.merge-remote-snapshot",
+          "files": [
+            "src/js/app.js:897-964"
+          ],
+          "coverage_ranges": [
+            [
+              897,
+              964
+            ]
+          ],
+          "classification": {
+            "code": 43,
+            "comment": 25,
+            "whitespace": 0
+          },
+          "symbols": [
+            "mergeRemoteSnapshot",
+            "strokeId",
+            "isKeyframe",
+            "revisionParentId",
+            "isRevisionGhost",
+            "ownerId"
+          ],
+          "signature": "function mergeRemoteSnapshot(remoteData, remoteProfile) { var report = { added: 0, conflicts: 0, identical: 0, layersSkipped: 0 }; ... return report; }",
+          "responsibility": "Merges a remote collaborator's exported project JSON into the current live document's persisted-stroke data (never live Paper objects): layers matched by name, frames matched by index (local-keyframe-only), strokes matched by strokeId — pure additions append as-is, identical strokes no-op, genuine conflicts append the remote version as a new contested revision (Phase 1's ghost/revision shape) while leaving local content untouched.",
+          "behavior": [
+            "Lines 897-907 (comment, 11 lines): documents the overall design — Phase 2 (async multi-user sync): merges a remote collaborator's exported project JSON into the CURRENT live document at the DATA level (`state.layers` serialized strokes, not live Paper objects), so it works identically whether called after reading a real file (desktop) or fed a plain object (tests). Layers are matched by NAME (states this is a known simplification: no stable cross-user layer id exists yet, collaborators are assumed to share the same layer list — compares to TVPaint's exposure-sheet-driven workflow). Frames are matched by INDEX, and only merged where the LOCAL frame is already a real keyframe (`isKeyframe`) — merging into a tween inbetween would just get overwritten by the next retween; creating brand-new keyframes via merge is explicitly out of scope.",
+            "Lines 908-921 (comment, 14 lines, including a blank `//` separator at 908): documents the per-remote-stroke matching rule (matched by `data.strokeId`, the SAME id `forkIfForeignOwner` already relies on — cited by line only, this scope's `relink-brush-companions`/`relink-linked-fills` packets use a DIFFERENT id family, `brushGroupId`/`linkedFillId`, for a different purpose): not present locally at all -> pure addition, appended as-is; present locally with IDENTICAL data -> no-op, already in sync; present locally but DIFFERENT -> genuine conflict, local is left untouched (still the visible/active content) and the remote version is appended as a NEW stroke carrying `revisionParentId` = the local strokeId. States this deliberately reuses Phase 1's ghost/revision data shape UNCHANGED (`buildRevisionOutlineItems`/`acceptRevision`/`rejectRevision`, cited by line only) — the remote edit renders as a dashed correction outline in the remote author's color, resolved exactly like a supervisor's in-app revision, WITHOUT ever setting `isRevisionGhost` on it (it isn't superseded, just contested).",
+            "Line 922 (code, declaration): `function mergeRemoteSnapshot(remoteData, remoteProfile) {` — two parameters: `remoteData` (a full exported-project-JSON-shaped object, i.e. `{layers:[{name,frames:[{isKeyframe,strokes:[...]}]}]}`), `remoteProfile` (the OTHER collaborator's `{id,name,color}` identity, used to tag any stroke this call adds/forks).",
+            "Line 923 (code): `var report = { added: 0, conflicts: 0, identical: 0, layersSkipped: 0 };` — the return value's shape, all four counters start at 0.",
+            "Line 924 (code): `if (!remoteData || !remoteData.layers) return report;` — REFUSAL #1: a falsy `remoteData` or one with no `.layers` array returns the all-zero report immediately, no side effects.",
+            "Line 925 (code): `remoteData.layers.forEach(function (remoteLd) {` — iterates every remote layer.",
+            "Line 926 (code): `var localIdx = state.layers.findIndex(function (ld) { return ld.name === remoteLd.name; });` — THE matching rule for layers: exact string equality on `.name`, first match wins (`findIndex`), no fallback to any id.",
+            "Line 927 (code): `if (localIdx < 0 || !remoteLd.frames) { report.layersSkipped++; return; }` — REFUSAL #2: no local layer with a matching name, OR the remote layer has no `.frames` array at all -> `report.layersSkipped++` and skip this remote layer entirely (the ONLY refusal that increments a report counter).",
+            "Line 928 (code): `var localLd = state.layers[localIdx];` — resolves the matched local layer descriptor.",
+            "Line 929 (code): `var frameCount = Math.min(localLd.frames.length, remoteLd.frames.length);` — THE matching rule for frames: position/INDEX only, bounded by the SHORTER of the two frame arrays (a longer remote or local tail beyond the other's length is silently never visited by the loop below — not a counted refusal, simply out of the iterated range).",
+            "Lines 930-934 (code): `for (var fi = 0; fi < frameCount; fi++) { var localFrame = localLd.frames[fi]; var remoteFrame = remoteLd.frames[fi]; if (!localFrame || !localFrame.isKeyframe || !remoteFrame || !remoteFrame.strokes) continue; if (!localFrame.strokes) localFrame.strokes = []; ...` — REFUSAL #3 (silent, no counter): a missing local/remote frame at this index, a local frame that is NOT `isKeyframe` (the per-frame keyframe-only gate the comment names), or a remote frame with no `.strokes` array, all `continue` past this frame index with zero effect and zero report increment. `if (!localFrame.strokes) localFrame.strokes = [];` — a local KEYFRAME with no `strokes` array yet gets one created (an empty-frame edge case, not itself a refusal).",
+            "Line 935 (code): `remoteFrame.strokes.forEach(function (rs) {` — iterates every remote stroke dict in this frame.",
+            "Line 936 (code): `if (!rs.strokeId) return; // no stable id -> can't merge safely, skip` — REFUSAL #4 (silent, no counter, explicit in-source comment): a remote stroke with no `strokeId` at all is skipped entirely — not addable, not comparable, not reflected in `report` in any way.",
+            "Line 937 (code): `var localMatch = localFrame.strokes.find(function (ls) { return ls.strokeId === rs.strokeId; });` — THE matching rule for strokes within a matched frame: exact `strokeId` equality.",
+            "Lines 938-946 (code): pure-addition WRITE branch — `if (!localMatch) { var added = JSON.parse(JSON.stringify(rs)); added.ownerId = added.ownerId || remoteProfile.id; added.ownerName = added.ownerName || remoteProfile.name; added.ownerColor = added.ownerColor || remoteProfile.color; localFrame.strokes.push(added); report.added++; return; }` — deep-clones the remote stroke dict (`JSON.parse(JSON.stringify(rs))`, never the reference), fills in owner attribution ONLY where the remote dict didn't already carry its own (`||`, so a remote stroke that already names its true author is left alone), pushes it onto the LOCAL frame's `strokes` array, increments `report.added`.",
+            "Line 947 (code): identical-data no-op — `if (JSON.stringify(localMatch) === JSON.stringify(rs)) { report.identical++; return; }` — a full deep string-equality check (not a shallow/id-only compare); increments `report.identical`, no write.",
+            "Lines 948-956 (code): genuine-conflict WRITE branch — `var conflictClone = JSON.parse(JSON.stringify(rs)); conflictClone.strokeId = 'merge_' + rs.strokeId + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); conflictClone.ownerId = remoteProfile.id; conflictClone.ownerName = remoteProfile.name; conflictClone.ownerColor = remoteProfile.color; conflictClone.revisionParentId = localMatch.strokeId; conflictClone.isRevisionGhost = undefined; localFrame.strokes.push(conflictClone); report.conflicts++;` — deep-clones the remote stroke, assigns it a BRAND-NEW `strokeId` (prefixed `merge_`, timestamp+random-suffixed — guaranteed not to collide with the original), UNCONDITIONALLY overwrites `ownerId`/`ownerName`/`ownerColor` to the remote profile's own identity (no `||` fallback here, unlike the addition branch), sets `revisionParentId` to the LOCAL match's own `strokeId` (linking the new contested stroke back to what it disagrees with), explicitly sets `isRevisionGhost = undefined` (i.e. NOT a ghost — an active, visible, contested revision, distinct from Phase 1's frozen 'before' ghosts), pushes it, increments `report.conflicts`. The LOCAL stroke itself is never modified — it remains the visible/active content, per the lead-in comment.",
+            "Lines 957-964 (code): closes the remote-stroke `forEach` (957), the frame `for` loop (958), the remote-layer `forEach` (959); `if (report.added || report.conflicts) { loadFrame(state.currentFrame); renderOS(); renderArcs(); updateUI(); }` (960-962) — the ONLY side effects beyond direct array mutation: a full `loadFrame`/`renderOS`/`renderArcs`/`updateUI` refresh, but ONLY if something was actually added or conflicted (a merge that only produced `identical`/`layersSkipped` outcomes triggers no re-render at all, correctly, since nothing changed on screen); `return report;` (963) returns the completed counters."
+          ],
+          "callers": [
+            "`mergeRemoteSnapshot` — 1 bare-identifier call site across 1 file at the frozen SHA (excluding the declaration line itself, app.js:922), plus the exposed-wrapper chain that reaches it: src/js/timeline.js:2247 (inside the `window.SM={...}` object-literal definition): `mergeRemoteSnapshot:function(remoteData,remoteProfile){return mergeRemoteSnapshot(remoteData,remoteProfile);}` — the ONLY call site anywhere in `src/js` that invokes the bare `mergeRemoteSnapshot(` identifier; a thin pass-through exposing the app.js-global function as `window.SM.mergeRemoteSnapshot` for cross-module callers, confirmed by `git grep -n '\\bmergeRemoteSnapshot('` across all of `src/js`. Reached in turn from: src/js/project.js:389 (`pullAndMerge`, inside the Team Sync IIFE `window.SMProject` exposes): `var report=window.SM.mergeRemoteSnapshot(data,{id:entry.profileId,name:entry.profileName,color:entry.profileColor});` — calls the EXPOSED wrapper (not the bare identifier), immediately followed by `saveAllLayerFrames();` and a toast reporting `report.added`/`report.conflicts`. And from: src/js/timeline.js:9252 (`renderSyncUpdates`'s per-row 'Merge' button click handler, Team Sync panel): `window.SMProject.pullAndMerge(entry).then(function(){btn.disabled=true;btn.textContent=SM.t('syncMergedBtn');});` — the actual UI entry point: one row per OTHER collaborator's latest published snapshot in the shared sync folder (`checkSharedUpdates`, project.js). No file named `sync-bridge.js` exists in this repository at the frozen SHA (confirmed: `ls src/js` has no such file) — the feature lives in project.js's Team Sync IIFE (`window.SMProject`) and timeline.js's UI/API-exposure code; the issue's own 'sync-bridge/team review' phrasing names the FEATURE AREA, not a literal filename."
+          ],
+          "effects": "Direct mutation of `state.layers[*].frames[*].strokes` arrays (push only, never removes/replaces existing entries) — a genuine `state.*` write, unlike every function in the `desp` packet which only touches the live Paper.js scene graph. Conditional full-refresh side effect (`loadFrame`/`renderOS`/`renderArcs`/`updateUI`) only when `report.added||report.conflicts` is truthy. Four distinct refusal paths, only ONE of which increments a report counter (`layersSkipped`, line 927) — a name-mismatched/frameless remote layer is the only refusal visible in the returned report; a non-keyframe/missing local frame (933), a missing remote-frame `.strokes` (933), and a remote stroke with no `strokeId` (936) are all silently skipped with zero trace in `report`, confirmed by direct read (no counter increment on any of those three lines)."
+        }
+      ]
+    },
+    {
+      "area": "brush-companion-relink",
+      "packets": [
+        {
+          "id": "C21d.relink-brush-companions",
+          "files": [
+            "src/js/app.js:965-987"
+          ],
+          "coverage_ranges": [
+            [
+              965,
+              987
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 9,
+            "whitespace": 0
+          },
+          "symbols": [
+            "relinkBrushCompanions",
+            "brushGroupId",
+            "isBrushTextureCopy",
+            "brushCompanions"
+          ],
+          "signature": "function relinkBrushCompanions(layer){if(!layer)return;var groups={};layer.children.forEach(...);Object.keys(groups).forEach(...);}",
+          "responsibility": "Rebuilds every brush-texture anchor's live, un-serializable `data.brushCompanions` array (Path object references to its dabs) by regrouping a layer's CURRENT children by the persisted `brushGroupId` tag `desP` already restored onto each of them — the id-relink half of the 'stable id + relink function' pattern CLAUDE.md §1 names, `relinkLinkedFills` (packet 4) being the other instance of the same pattern for a different field.",
+          "behavior": [
+            "Lines 965-973 (comment, 9 lines): documents `relinkBrushCompanions` as `fillRegenerateLinked`/`strokeId`'s counterpart (tools.js, cited by line only) — `desP()` restores `brushGroupId`/`isBrushTextureCopy`/`brushTexturePreset` onto each freshly-reconstructed Path (the `desp` packet above), but the PRIMARY's LIVE `data.brushCompanions` array (of Path OBJECT references, used by select-bridge.js/timeline.js to move/re-texture the whole group as one unit, cited by line only) is inherently un-serializable — this function rebuilds it by regrouping `layer`'s CURRENT children by `brushGroupId`. States it must be called once AFTER a layer's children have all been `desP()`'d (names `loadFrame`, undo/redo restore, onion-skin/ghost layers 'if they ever need companions to move together' — a hedge, not a confirmed current caller, see `callers` below for what is actually confirmed).",
+            "Line 974 (code, declaration): `function relinkBrushCompanions(layer){` — one parameter, the Paper.js Layer whose children were just rebuilt.",
+            "Line 975 (code): `if(!layer)return;` — REFUSAL: a falsy `layer` argument returns immediately, no effect.",
+            "Line 976 (code): `var groups={};` — the regrouping accumulator, keyed by `brushGroupId`.",
+            "Lines 977-980 (code): `layer.children.forEach(function(c){var gid=c.data&&c.data.brushGroupId;if(!gid)return;(groups[gid]=groups[gid]||[]).push(c);});` — scans EVERY child of `layer` (not filtered to `Path` instances specifically — any child with a truthy `data.brushGroupId` is collected, confirmed by direct read: no `instanceof Path` guard anywhere in this function), reads `c.data.brushGroupId` (the SAME persisted key `desP` restores at app.js:864 in the `desp` packet, and the SAME key serP emits at serP:715, C21c), groups every matching child by that id.",
+            "Lines 981-986 (code): `Object.keys(groups).forEach(function(gid){var members=groups[gid];var primary=members.filter(function(c){return!(c.data&&c.data.isBrushTextureCopy);})[0];if(!primary)return;primary.data.brushCompanions=members.filter(function(c){return c!==primary;});});` — for each group id, identifies the PRIMARY (anchor) as the first member whose `data.isBrushTextureCopy` is NOT truthy (i.e. the anchor, not a dab — the SAME `isBrushTextureCopy` key the `desp` packet's strokeColor-exemption chain and CLAUDE.md §1's two-camouflage-mode note both reference); REFUSAL: if EVERY member of a group happens to carry `isBrushTextureCopy` truthy (no anchor found — `primary` is `undefined`), that group is silently skipped, its members left without a `brushCompanions` array at all. Otherwise, rebuilds `primary.data.brushCompanions` as a FRESH array of every OTHER member (excluding `primary` itself by reference `!==`) — this is the live-object-reference array `stripAnyBrushTexture` (packet 5) later `.forEach(c=>c.remove())`s and `applyBrushTexture`/select-bridge.js/timeline.js move as one unit (cited by line only).",
+            "Line 987 (code, closing): `}` — closes the function body."
+          ],
+          "callers": [
+            "`relinkBrushCompanions` — 2 call-site reference(s) across 2 file(s) at the frozen SHA, excluding the declaration line itself (app.js:974): src/js/app.js:4795 (`loadFrame`): called immediately after the per-layer desP/desR rebuild loop completes, once per user layer, on that same freshly-rebuilt `userLayers[i]` — the primary 'every frame navigation' call site, paired with `relinkLinkedFills` on the same line. | src/js/tools.js:1631 (`_materializeClones`): `if(typeof relinkBrushCompanions==='function')relinkBrushCompanions(layer);` — guarded by a `typeof` check (defensive, not a real load-order hazard since both are global app.js functions), called once AFTER both the anchor-clone loop (tools.js:1592) and the dab-clone loop (tools.js:1626) complete, regrouping the freshly-cloned brush-texture group by the fresh `brushGroupId` `_materializeClones` itself assigned."
+          ],
+          "effects": "Mutates `data.brushCompanions` (a live-Path-reference array, never persisted itself — only `brushGroupId`/`isBrushTextureCopy`/`brushTexturePreset` are, via serP/desP) on each group's PRIMARY child only; dabs (non-primary members) are left untouched by this function (their OWN `data.brushCompanions` is never set — only the anchor's is). No `state.*`/DOM/localStorage write. Scans ALL of `layer.children`, not filtered by type — a non-Path child with a `data.brushGroupId` (not observed in this census, would be unusual) would also be swept into a group."
+        }
+      ]
+    },
+    {
+      "area": "linked-fill-relink",
+      "packets": [
+        {
+          "id": "C21d.relink-linked-fills",
+          "files": [
+            "src/js/app.js:988-1008"
+          ],
+          "coverage_ranges": [
+            [
+              988,
+              1008
+            ]
+          ],
+          "classification": {
+            "code": 13,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "relinkLinkedFills",
+            "linkedFillId",
+            "isLinkedFillCompanion",
+            "linkedFill"
+          ],
+          "signature": "function relinkLinkedFills(layer){if(!layer)return;var byId={};layer.children.forEach(...);layer.children.forEach(...);}",
+          "responsibility": "Rebuilds a vector-brush ribbon's live, un-serializable `data.linkedFill` reference to its fill-backdrop companion, by a two-pass scan of a layer's CURRENT children keyed on the persisted `linkedFillId` tag both sides of the pairing carry — the second instance of the same id-relink pattern `relinkBrushCompanions` (packet 3) implements for `brushGroupId`.",
+          "behavior": [
+            "Lines 988-995 (comment, 8 lines): documents this as the 'same live reference can't survive JSON, stable id + relink' pattern as `relinkBrushCompanions` just above, for a vector-brush ribbon's fill BACKDROP (draw-bridge.js's `linkedFillId`, cited by line only) — re-establishes `ribbon.data.linkedFill` after every layer rebuild, since `desP` only restores the id-based tags (`isLinkedFillCompanion`/`linkedFillId`), never the live pairing itself. States that without this, every `rebuildVectorBrushOutline` call after a save/reload/undo silently stopped re-syncing the backdrop's shape to the ribbon's — the exact 'fill pas attaché au stroke' desync draw-bridge.js's own comment already names (cited by line only, not re-verified here).",
+            "Line 996 (code, declaration): `function relinkLinkedFills(layer){` — one parameter, the Paper.js Layer whose children were just rebuilt.",
+            "Line 997 (code): `if(!layer)return;` — REFUSAL: a falsy `layer` argument returns immediately.",
+            "Line 998 (code): `var byId={};` — the lookup accumulator, keyed by `linkedFillId`.",
+            "Lines 999-1001 (code): `layer.children.forEach(function(c){if(c.data&&c.data.isLinkedFillCompanion&&c.data.linkedFillId)byId[c.data.linkedFillId]=c;});` — first pass, collects every FILL-side companion (the backdrop shape itself, tagged `isLinkedFillCompanion`) into `byId`, keyed by its own `linkedFillId` (verified: the persisted key involved is `linkedFillId` on BOTH sides of the pairing — the ribbon's `data.linkedFillId` and the companion's OWN `data.linkedFillId` are the SAME value, per serP's own emission at serP:715/618 and desP's restore at the `desp` packet's line 853-region reads; `strokeId` is NOT used anywhere in this function — confirmed by direct read, no occurrence of `strokeId` in `relinkLinkedFills`'s body — the issue's own hedge citing 'linkedFillId/strokeId' as the possible key is resolved here: only `linkedFillId` is the actual pairing key).",
+            "Lines 1002-1006 (code): `layer.children.forEach(function(c){var lid=c.data&&c.data.linkedFillId;if(!lid||(c.data&&c.data.isLinkedFillCompanion))return;var fill=byId[lid];if(fill&&!fill.removed)c.data.linkedFill=fill;});` — second pass, iterates EVERY child again looking for the RIBBON side: reads `c.data.linkedFillId`, REFUSAL (per-child, silent): no `linkedFillId` at all, OR this child IS itself the companion (`isLinkedFillCompanion` truthy — 'only the ribbon side looks its pair up', per the inline comment at line 1004) -> skip. Otherwise looks up the companion via `byId[lid]`; REFUSAL (per-child, silent): no companion was found in the first pass, OR the found companion has since been `.removed` from the document (`fill.removed`, a Paper.js Item property) -> `c.data.linkedFill` is left UNSET (or whatever it was before this call — the function never explicitly clears a stale `linkedFill`). Only when a live, non-removed companion is found does `c.data.linkedFill=fill;` establish the pairing.",
+            "Line 1007 (code): closes the second `forEach` (1006 already included above; this line is the `});` that closes the OUTER `layer.children.forEach` for the second pass).",
+            "Line 1008 (code, closing): `}` — closes the function body."
+          ],
+          "callers": [
+            "`relinkLinkedFills` — 1 call-site reference across 1 file at the frozen SHA, excluding the declaration line itself (app.js:996) — confirmed by `git grep -n '\\brelinkLinkedFills('` across all of `src/js`: no other file or line calls it. src/js/app.js:4795 (`loadFrame`): called immediately after `relinkBrushCompanions` on the SAME line, same per-layer rebuild site. Asymmetry worth flagging: `_materializeClones` (tools.js:1631) calls `relinkBrushCompanions` after cloning but does NOT call `relinkLinkedFills` — a pasted/duplicated vector-brush ribbon's fill backdrop (`data.linkedFill`) is therefore only re-established at the NEXT full `loadFrame`, not at clone/paste time itself; `_materializeClones` does regenerate the backdrop directly inline for a vector-brush clone with `snap.vbLinkedFill` (tools.js:1594-1611, cited by line only), which is presumably why this gap was never hit in practice for that path, but a non-vector-brush linked-fill pairing cloned through a different route would not have that inline regeneration."
+          ],
+          "effects": "Mutates `data.linkedFill` (a live-Path reference, never persisted itself — only `isLinkedFillCompanion`/`linkedFillId` are, via serP/desP) on each RIBBON child only; the companion's own `data` is never written by this function. No `state.*`/DOM/localStorage write. Guards against a companion that was found by id but has since been removed from the document (`fill.removed`) — a stale `byId` entry pointing at a detached Item never gets wired up as a live `linkedFill`. Verified actual key names by direct read: `linkedFillId` (not `strokeId`) is the sole pairing key; `strokeId` does not appear anywhere in this function's body."
+        }
+      ]
+    },
+    {
+      "area": "brush-texture-strip",
+      "packets": [
+        {
+          "id": "C21d.strip-brush-texture",
+          "files": [
+            "src/js/app.js:1009-1024"
+          ],
+          "coverage_ranges": [
+            [
+              1009,
+              1024
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 8,
+            "whitespace": 0
+          },
+          "symbols": [
+            "stripAnyBrushTexture",
+            "brushCompanions",
+            "preTextureOpacity",
+            "preTextureStroke",
+            "brushTexturePreset",
+            "bitmapBrushSpec",
+            "brushGroupId",
+            "bitmapPressureProfile"
+          ],
+          "signature": "function stripAnyBrushTexture(p){if(!p||!p.data)return;if(p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){c.remove();});p.data.brushCompanions=null;...}",
+          "responsibility": "Strips either camouflage mode of a brush texture (vector-preset dabs or Bitmap Brush raster) off an anchor Path, removing every live dab companion from the document, restoring whichever pre-texture opacity/strokeColor the camouflage recorded, and deleting every texture-identity tag — the single shared strip-then-reapply primitive both 'Apply to selection' buttons and every hover-preview path in the codebase route through.",
+          "behavior": [
+            "Lines 1009-1016 (comment, 8 lines): documents `stripAnyBrushTexture` as stripping ANY brush texture — vector-preset dabs OR Bitmap Brush's raster, 'same camouflage convention, applyBrushTexture/applyBitmapBrushTexture' (tools.js/bitmap-brush.js, cited by line only) — off an anchor back to a plain stroke, restoring whatever `strokeColor`/opacity the camouflage remembered. States it is SHARED by both 'Apply to selection' buttons (timeline.js's vector-preset one, bitmap-brush.js's own) so switching FROM either kind TO the other, or to no texture, always goes through the same clean strip-then-reapply path instead of two separate half-implementations drifting apart.",
+            "Line 1017 (code, declaration): `function stripAnyBrushTexture(p){` — one parameter, the anchor Path to strip.",
+            "Line 1018 (code): `if(!p||!p.data)return;` — REFUSAL: a falsy `p` or a `p` with no `.data` object returns immediately, no effect.",
+            "Line 1019 (code): `if(p.data.brushCompanions)p.data.brushCompanions.forEach(function(c){c.remove();});` — reads `p.data.brushCompanions` (the live array `relinkBrushCompanions`, packet 3, just rebuilt — NOT itself a persisted field), and for each companion (dab) Path, calls Paper.js's own `.remove()` — an ACTUAL document mutation removing every dab from the scene graph entirely, not merely clearing a reference.",
+            "Line 1020 (code): `p.data.brushCompanions=null;` — clears the anchor's own companion-array reference to `null` (not `undefined`/`delete`) now that every referenced Path has been removed.",
+            "Line 1021 (code): `if(p.data.preTextureOpacity!==undefined){p.opacity=p.data.preTextureOpacity;delete p.data.preTextureOpacity;}` — reads `p.data.preTextureOpacity` (the SAME `!==undefined`-guarded field the `desp` packet restores and serP:724 persists) with an explicit `!==undefined` guard (a genuine `0` restore-opacity is honored); if present, restores it onto `p.opacity` directly (the fill-less-anchor camouflage mode, CLAUDE.md §1: 'an anchor WITHOUT a fill is hidden by opacity=0'), then `delete`s the tag (not merely nulled) so a SECOND strip on an already-stripped anchor is a no-op for this branch.",
+            "Line 1022 (code): `if(p.data.preTextureStroke!==undefined){p.strokeColor=p.data.preTextureStroke;delete p.data.preTextureStroke;}` — same `!==undefined`-guarded pattern for `p.data.preTextureStroke` (the OTHER camouflage mode, CLAUDE.md §1: 'an anchor WITH a fill keeps its opacity and has only strokeColor nulled') — restores it onto `p.strokeColor` directly, then `delete`s the tag. Note: if `preTextureStroke` was itself `null` (the fill-anchor camouflage's own recorded pre-texture value, per CLAUDE.md §1's exemption of textured anchors from the historical white-stroke fallback), this line correctly restores `p.strokeColor=null` rather than leaving the anchor's stroke in whatever transient state the texture left it — the explicit `!==undefined` guard is what makes a legitimate `null` restore-value distinguishable from 'never had this tag at all'.",
+            "Line 1023 (code): `delete p.data.brushTexturePreset;delete p.data.bitmapBrushSpec;delete p.data.brushGroupId;delete p.data.bitmapPressureProfile;` — unconditionally `delete`s all four remaining texture-identity tags (the vector-preset name, the bitmap spec object, the shared companion-group id, and the bitmap pressure-profile point cloud) — no restore value for any of these, they simply cease to exist on the anchor. Note: `p.data.isBrushTextureCopy` is NOT deleted by this function (it marks a DAB, not the anchor being stripped — the anchor itself never carried that flag; dabs are handled by removal at line 1019, not by having their own tags cleared, since they are being deleted from the document entirely).",
+            "Line 1024 (code, closing): `}` — closes the function body."
+          ],
+          "callers": [
+            "`stripAnyBrushTexture` — 9 call-site reference(s) across 4 file(s) at the frozen SHA, excluding the declaration line itself (app.js:1017): src/js/bitmap-brush.js:794 (`applyBitmapBrushToSelection`): `eligible.forEach(function (p) { stripAnyBrushTexture(p); applyBitmapBrushTexture(p); });` — strip-then-reapply: converts/re-applies a Bitmap Brush texture onto the selection's eligible anchors. | src/js/bitmap-brush.js:805 (`removeBitmapBrushFromSelection`): `eligible.forEach(function (p) { stripAnyBrushTexture(p); });` — strip-only: the Stroke panel's 'remove bitmap brush' action. | src/js/brush-menu-bridge.js:71 (`previewVectorBrush`): `stripAnyBrushTexture(rec.p);if (key && key !== 'none') applyBrushTexture(rec.p, key);` — hover-preview strip-then-reapply for the floating Brush panel's vector presets. | src/js/brush-menu-bridge.js:95 (`previewBitmapBrush`): `stripAnyBrushTexture(p);window.SMBitmapBrush.applyToPath(p, spec);` — hover-preview strip-then-reapply for bitmap brush tips. | src/js/brush-menu-bridge.js:109 (`revertBrushPreview`): `stripAnyBrushTexture(rec.p);if (rec.bitmapSpec) window.SMBitmapBrush.applyToPath(rec.p, rec.bitmapSpec); else if (rec.preset) applyBrushTexture(rec.p, rec.preset);` — strip-then-restore-original on hover-out, from the pre-hover snapshot. | src/js/brush-preset-picker.js:40 (`hoverPreview`): `stripAnyBrushTexture(rec.p);if (key && key !== 'none') applyBrushTexture(rec.p, key);` — same hover-preview pattern as brush-menu-bridge.js's vector preview, for the Brush preset picker panel. | src/js/brush-preset-picker.js:48 (`revertHoverPreview`): `stripAnyBrushTexture(rec.p);if (rec.preset) applyBrushTexture(rec.p, rec.preset);` — strip-then-restore-original on hover-out. | src/js/timeline.js:709 (`SM.setBrushPreset`, a method on the `window.SM` object literal): `stripAnyBrushTexture(p);if(state.brushPreset&&state.brushPreset!=='none')applyBrushTexture(p,state.brushPreset);` — strip-then-reapply triggered on every preset pick (2026-07-17 fix, no longer requiring a separate 'Apply to selection' click). | src/js/timeline.js:10801 (`applyVectorBrushToSelection`): `stripAnyBrushTexture(p);if(preset&&preset!=='none')applyBrushTexture(p,preset);` — the Stroke panel's own 'Apply to selection' button for vector-preset brush textures, strip-then-reapply."
+          ],
+          "effects": "Removes live Path objects from the document (`p.data.brushCompanions[*].remove()`) — an actual scene-graph mutation, not just a data-tag change. Restores `p.opacity`/`p.strokeColor` from the two `!==undefined`-guarded pre-texture fields, then `delete`s each restored tag (not merely nulled) so a second strip is idempotent for those two fields. Unconditionally `delete`s `brushTexturePreset`/`bitmapBrushSpec`/`brushGroupId`/`bitmapPressureProfile` with no restore value. No `state.*`/DOM/localStorage write of its own — callers are responsible for `saveActiveLayerFrame()`/`updateUI()`/`SMEngineBridge.renderNow()` afterward (confirmed present at 8 of the 9 call sites; `revertBrushPreview`/`revertHoverPreview` also call `SMEngineBridge.renderNow()` but not `saveActiveLayerFrame` — hover-preview revert is not itself a persisted edit)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "engine-bridge.js (`buildSceneJson`, the `_changed`-hook/retained-path stamp CLAUDE.md §5ter names)",
+      "disposition": "Retains, in full, the `Item.prototype`/`Path.prototype`/`CompoundPath.prototype`/`Raster.prototype` `_changed` hook and its self-test that CLEARS `p.data.__engineSrcDict` (this scope's `desp` packet, line 895) on any live geometry mutation — cited by line only. This scope's own finding is limited to the STAMP-ORDERING contract on the `desP` side (set LAST); engine-bridge.js's own hook body is not re-described here. `buildSceneJson` also reads `dup3D` (per the `desp` packet's own effects note) off the live object for its per-clone 3D projector cache — the one confirmed current consumer of that field, despite `dup3D` never passing through `serP`."
+    },
+    {
+      "consumer": "select-bridge.js / timeline.js (`data.brushCompanions` movers)",
+      "disposition": "Move/re-texture a brush-texture group's dabs as one unit via the live `data.brushCompanions` array `relinkBrushCompanions` rebuilds — cited by line only, per that packet's own lead-in comment; not independently re-verified by grep in this census beyond the comment's own citation."
+    },
+    {
+      "consumer": "draw-bridge.js (`rebuildVectorBrushOutline`)",
+      "disposition": "Reads the live `data.linkedFill` reference `relinkLinkedFills` rebuilds, to keep a vector-brush ribbon's fill backdrop shape synced to the ribbon's own edited geometry — cited by line only, per that packet's own lead-in comment; not independently re-verified by grep in this census beyond the comment's own citation."
+    },
+    {
+      "consumer": "tools.js / bitmap-brush.js (`applyBrushTexture` / `applyBitmapBrushTexture`)",
+      "disposition": "The two texture-APPLYING counterparts `stripAnyBrushTexture` is always paired with at every one of its 9 call sites (either `stripAnyBrushTexture(p);applyBrushTexture(p,...)` or the bitmap equivalent) — cited by line only; these functions' own bodies (which WRITE `brushTexturePreset`/`bitmapBrushSpec`/`preTextureOpacity`/`preTextureStroke`/`brushCompanions` in the first place) are not re-described here."
+    },
+    {
+      "consumer": "project.js / timeline.js (Team Sync feature area)",
+      "disposition": "The complete call chain reaching `mergeRemoteSnapshot` — `window.SM.mergeRemoteSnapshot` (timeline.js:2247 wrapper) <- `SMProject.pullAndMerge` (project.js:385-392) <- the Team Sync panel's per-row 'Merge' button (timeline.js:9235-9257's `renderSyncUpdates`) — retains its own body (folder scanning, profile bookkeeping, toast wording) in full; this scope cites only the exact call sites reaching the bare `mergeRemoteSnapshot(` identifier, per that packet's own `callers` field."
+    },
+    {
+      "consumer": "applyLayerDuplicator (app.js, outside this scope, cited by line only)",
+      "disposition": "The confirmed WRITER of `isDuplicatorCopy`/`dupIndex`/`dupCloneId`/`dup3D` onto a synthesized per-clone stroke dict (app.js:1774/1783/1784) — `desP` reads these four fields (the `desp` packet's lines 864/871) despite `serP` (600-826) never emitting any of them; this is the confirmed 'desP reads keys serP never writes' finding, not a hypothetical."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-desp-closed-set-after-loop",
+      "proposed": "Call `desP({segments:[{point:[0,0],handleIn:[0,0],handleOut:[0,0]},{point:[10,0],handleIn:[0,0],handleOut:[0,0]}],closed:true}, layer)`; expect the returned Path's `closed===true` and its segment count to equal the input's — verifies the closed flag survives a full round-trip even though it is applied AFTER the segment-construction loop — not run."
+    },
+    {
+      "id": "fx-desp-hasrealstroke-false-authoritative",
+      "proposed": "Call `desP({segments:[...], strokeColor:'#ffffff', hasRealStroke:false}, layer)`; expect the returned Path's `strokeColor===null` (NOT `'#ffffff'`) — verifies `hasRealStroke===false` overrides even a truthy stored `strokeColor` string, per the comment at app.js:844-852 — not run."
+    },
+    {
+      "id": "fx-desp-fff-vs-ffffff-fallback",
+      "proposed": "Call `desP({segments:[...], strokeColor:null}, layer)` on a plain (non-exempt) dict; expect the returned Path's `strokeColor` to stringify as `'#fff'` (3-digit), textually distinct from what `serP` would have written (`'#ffffff'`, 6-digit) for the equivalent live Path — not run, verifies the `boundaries` finding directly."
+    },
+    {
+      "id": "fx-desp-strokewidth-zero-promoted-to-3",
+      "proposed": "Call `desP({segments:[...], strokeWidth:0}, layer)`; expect the returned Path's `strokeWidth===3` (the `||3` fallback promotes a genuine `0` upward) — not run, verifies the `future_proposals` asymmetry finding."
+    },
+    {
+      "id": "fx-desp-fillgappx-dropped-without-fillseed",
+      "proposed": "Call `desP({segments:[...], fillGapPx:5}, layer)` with NEITHER `fillSeed` NOR `fillSeeds` present; expect the returned Path's `data.fillGapPx===undefined` (silently dropped by the read-side's extra gate) even though `serP` itself has no such gate on the write side — not run, verifies the asymmetry finding in the `desp` packet's own behavior entry."
+    },
+    {
+      "id": "fx-desp-isduplicatorcopy-not-from-serp",
+      "proposed": "Confirm by static analysis (already performed, not re-run as a live test) that `isDuplicatorCopy`/`dupIndex`/`dupCloneId`/`dup3D` never appear in serP's own 600-826 return-object literal, then call `desP({segments:[...], isDuplicatorCopy:true, dupIndex:2, dupCloneId:'dup1_2', dup3D:{dz:5}}, layer)`; expect all four to land on `p.data` correctly despite serP never emitting them — not run as a live test."
+    },
+    {
+      "id": "fx-desp-enginesrcdict-set-last",
+      "proposed": "Instrument (or read) the live `Item.prototype._changed` hook's own self-test counter around a `desP` call with a multi-segment dict; expect the hook to fire once per `Segment` added during construction (837) and `p.data.__engineSrcDict` to still equal `d` by reference AFTER `desP` returns (i.e. the final stamp at line 895 survives every `_changed` firing that preceded it) — not run."
+    },
+    {
+      "id": "fx-desp-op-overrides-opacity",
+      "proposed": "Call `desP({segments:[...], opacity:0.3}, layer, 0.9)`; expect the returned Path's `opacity===0.9` (the `op` PARAMETER wins over `d.opacity`) — then call `desP({segments:[...], opacity:0.3}, layer)` with `op` omitted; expect `opacity===0.3` — not run."
+    },
+    {
+      "id": "fx-mergeremotesnapshot-layer-name-match-frame-index-keyframe-gate",
+      "proposed": "Build a `state.layers` with one layer named 'A' whose frame 2 is a keyframe and frame 3 is not; feed `mergeRemoteSnapshot` a `remoteData` with a layer named 'A' carrying strokes at both frame indices; expect frame 2's remote strokes to be considered for merge and frame 3's to be silently skipped (no report increment) — not run."
+    },
+    {
+      "id": "fx-mergeremotesnapshot-addition-identical-conflict-three-way",
+      "proposed": "Feed `mergeRemoteSnapshot` three remote strokes in one keyframe: one with a `strokeId` absent locally (expect `report.added===1`, a NEW local stroke with owner tags filled in), one JSON-identical to an existing local stroke sharing its `strokeId` (expect `report.identical===1`, no new stroke), one sharing a `strokeId` with a local stroke but differing in geometry (expect `report.conflicts===1`, a new stroke with a `merge_`-prefixed strokeId, `revisionParentId` equal to the local stroke's own id, and `isRevisionGhost===undefined`) — not run."
+    },
+    {
+      "id": "fx-mergeremotesnapshot-no-strokeid-silently-skipped",
+      "proposed": "Feed a remote stroke with no `strokeId` field at all; expect it to be ignored (no report field changes at all, not even `layersSkipped`) — not run, verifies the 'silent, uncounted' refusal finding."
+    },
+    {
+      "id": "fx-relinkbrushcompanions-regroups-by-id",
+      "proposed": "Build a layer with 3 children sharing `data.brushGroupId='g1'` (one WITHOUT `isBrushTextureCopy`, two WITH it) and call `relinkBrushCompanions(layer)`; expect the non-copy child's `data.brushCompanions` to equal exactly the other two (by reference), and the two dabs to have no `brushCompanions` of their own — not run."
+    },
+    {
+      "id": "fx-relinkbrushcompanions-all-dabs-no-anchor-skipped",
+      "proposed": "Build a layer with 2 children sharing a `brushGroupId`, BOTH carrying `isBrushTextureCopy:true` (no anchor); call `relinkBrushCompanions(layer)`; expect neither child to receive a `data.brushCompanions` array (the group is silently skipped, `primary` is undefined) — not run."
+    },
+    {
+      "id": "fx-relinklinkedfills-pairs-by-linkedfillid-not-strokeid",
+      "proposed": "Build a layer with a ribbon (`data.linkedFillId='lf1'`) and a companion (`data.isLinkedFillCompanion:true, data.linkedFillId='lf1'`), both carrying UNRELATED/absent `strokeId`s; call `relinkLinkedFills(layer)`; expect `ribbon.data.linkedFill===companion` by reference — not run, verifies `linkedFillId` alone (not `strokeId`) is the pairing key."
+    },
+    {
+      "id": "fx-relinklinkedfills-removed-companion-not-linked",
+      "proposed": "Same setup as above, but call `companion.remove()` before `relinkLinkedFills(layer)`; expect `ribbon.data.linkedFill` to remain unset (the `fill.removed` guard rejects a detached companion) — not run."
+    },
+    {
+      "id": "fx-stripanybrushtexture-removes-dabs-and-restores-opacity",
+      "proposed": "Build an anchor with `data.brushCompanions=[dabA,dabB]` (both live, inserted Paths), `data.preTextureOpacity=0.4`, `p.opacity=1` (camouflaged); call `stripAnyBrushTexture(anchor)`; expect `dabA.parent===null` and `dabB.parent===null` (removed from the document), `anchor.data.brushCompanions===null`, `anchor.opacity===0.4`, and `anchor.data.preTextureOpacity===undefined` (deleted) — not run."
+    },
+    {
+      "id": "fx-stripanybrushtexture-pretexturestroke-null-restores-null",
+      "proposed": "Build an anchor with `data.preTextureStroke=null` (the fill-anchor camouflage's own recorded value) and a non-null live `p.strokeColor`; call `stripAnyBrushTexture(anchor)`; expect `anchor.strokeColor===null` afterward (the explicit `!==undefined` guard restores a legitimate `null`, not skipping the restore because the value looks falsy) — not run."
+    },
+    {
+      "id": "fx-stripanybrushtexture-idempotent-second-call",
+      "proposed": "Call `stripAnyBrushTexture(anchor)` twice in a row on an already-stripped anchor; expect the second call to be a no-op (no thrown error, no change to `opacity`/`strokeColor`, since `preTextureOpacity`/`preTextureStroke` were `delete`d by the first call) — not run."
+    }
+  ],
+  "future_proposals": [
+    "`desP`'s `p.strokeWidth=d.strokeWidth||3;` (app.js:853) would silently promote a genuinely-stored `strokeWidth:0` back up to `3` on restore, since `serP` itself never floors a zero stroke width (`strokeWidth:p.strokeWidth`, C21c, no default). Not confirmed as a live bug (no code path was found in this census that intentionally sets a live Path's `strokeWidth` to exactly `0`), only flagged as a latent asymmetry — same category as C21c's own `lineHeightMult`/`textCase` default-elision footgun note.",
+    "`desP`'s restore of `fillGapPx` (app.js:853: `if((d.fillSeed||(d.fillSeeds&&d.fillSeeds.length))&&d.fillGapPx!==undefined)...`) is gated on `fillSeed`/`fillSeeds` ALSO being present, a condition `serP`'s own write side (C21c, `fillGapPx=(p.data&&p.data.fillGapPx!==undefined)?p.data.fillGapPx:undefined`) does not require. A future code path that ever sets `p.data.fillGapPx` without also setting `fillSeed`/`fillSeeds` would have that value persisted by `serP` but silently dropped on the next `desP` round-trip — flagged as a discussion point, not reproduced live.",
+    "`isDuplicatorCopy`/`dupIndex`/`dupCloneId`/`dup3D` are read by `desP` (app.js:864/871) but never appear in `serP`'s own 600-826 field map — they are synthesized directly by `applyLayerDuplicator` (app.js:1774/1783/1784, outside this scope) onto a per-clone dict at render/materialization time, never persisted through the normal save path (consistent with CLAUDE.md §1's own note that a duplicator-copy layer is force-locked and excluded from `saveActiveLayerFrame`/`saveAllLayerFrames`). A future reader of this file who only reads `serP`'s field map (C21c) and assumes it is the COMPLETE set of fields `desP` can ever receive would be surprised by these four — worth naming explicitly for anyone auditing the desP/serP pair as a strict mirror, since in every OTHER respect (98 remaining fields) it is one.",
+    "`relinkBrushCompanions` and `relinkLinkedFills` are called together at exactly one site (`loadFrame`, app.js:4795) but `_materializeClones` (tools.js:1631) calls ONLY the brush-companion relink, not the linked-fill one — a clone/paste of a vector-brush ribbon with a linked fill backdrop relies on `_materializeClones`'s OWN inline backdrop regeneration (tools.js:1594-1611, cited by line only, not re-verified in this census) rather than on `relinkLinkedFills`. A future refactor that removed that inline regeneration in favor of a generic 'call both relink helpers after any layer rebuild' rule would need to re-verify this path specifically.",
+    "The issue's own text hedges the linked-fill relink's key as 'linkedFillId/strokeId — verify the actual key'; direct read of `relinkLinkedFills`'s body (988-1008) confirms `strokeId` does not appear anywhere in it — only `linkedFillId` (and `isLinkedFillCompanion`) participate in the pairing. This is a correction of the issue's own hedge, not a new finding requiring further action."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n '\\bdesP('` / `'\\bmergeRemoteSnapshot('` / `'\\brelinkBrushCompanions('` / `'\\brelinkLinkedFills('` / `'\\bstripAnyBrushTexture('` was run once each at the frozen SHA, filtering out the declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same five commands. Enclosing function names were located by scanning backward from each call-site line for the nearest preceding `function <name>(` declaration (including object-literal methods like `SM.setBrushPreset:function(v){...}` and `window.SMLabs.stampPose = function (name) {...}`).",
+    "Every packet's `classification` (code/comment/whitespace) was independently computed by a Python script implementing the SAME blank/`//`-line/`/*...*/`-block algorithm as the validator's own `classify()` function, run against the frozen blob per coverage_range — not eyeballed from the source dump — and matches the issue's own proposed 98/100/0 total exactly (20+43+14+13+8=98 code; 50+25+9+8+8=100 comment; 0 blank).",
+    "The `serP`-emits vs. `desP`-reads field cross-check (the `desp` packet's own `effects` field) was produced by manually enumerating every `d.<field>` read in `desP`'s body (827-895) and every field name in C21c's own eight-packet field list (586-826), then diffing the two sets by hand — not by an automated script — and re-checkable by the same manual comparison against both artifacts' `behavior`/`symbols` fields.",
+    "The `mergeRemoteSnapshot` caller chain (timeline.js:2247 <- project.js:389 <- timeline.js:9252) was traced by following each `window.SM.mergeRemoteSnapshot`/`window.SMProject.pullAndMerge` reference directly, confirmed with `git grep -n 'pullAndMerge'` and `git grep -n 'mergeRemoteSnapshot'` across all of `src/js` at the frozen SHA — no file named `sync-bridge.js` exists in this repository at this SHA (confirmed: `ls src/js` lists no such file), correcting the issue's own filename hedge to the actual location (project.js's Team Sync IIFE, exposed as `window.SMProject`)."
+  ],
+  "validation": {
+    "expected_assigned_lines": 198,
+    "expected_classification": {
+      "code": 98,
+      "comment": 100,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        827,
+        896
+      ],
+      [
+        897,
+        964
+      ],
+      [
+        965,
+        987
+      ],
+      [
+        988,
+        1008
+      ],
+      [
+        1009,
+        1024
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals `classify(coverage_ranges)`, independently re-derived by script against the frozen blob: 827-896=(20,50,0); 897-964=(43,25,0); 965-987=(14,9,0); 988-1008=(13,8,0); 1009-1024=(8,8,0); sums to (98,100,0)=198 — identical to the issue's own proposed union.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 198 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21d.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json d008222 exits 0",
+      "python3 /tmp/census_check_c21d.py engineering/inventory/census/C21c-app-path-serialisation-serp.json d008222 still exits 0",
+      "python3 /tmp/census_check_c21d.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json d008222 still exits 0",
+      "python3 /tmp/census_check_c21d.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json d008222 still exits 0"
+    ]
+  }
+}

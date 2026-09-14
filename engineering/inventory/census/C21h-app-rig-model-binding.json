@@ -1,0 +1,670 @@
+{
+  "census_id": "C21h",
+  "issue": 1202,
+  "title": "app.js rig model and binding — ensureLayerRig, relinkRigBinds, point weighing, rigBindStroke/rigBindMesh, rigAutoAssignLayer",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21h census only; app.js:2290+ (the rig DEFORMER and IK — applyRigDeform, rigResetPose, rigCommitFrame, rigSetIK/rigAnchorPoint/rigDragIKEnd, the next leaf C21i) is cited by name/line only, not re-mapped, even where it is the ONLY caller of one of this scope's own symbols (_rigChordAngle/_rigNormalizeAngle, _boneSegsToPath's bonePaths cache) — those call sites are recorded verbatim in each packet's own `callers` field without reproducing applyRigDeform's body. The mograph duplicator runtime (_resolveDuplicatorPath/applyLayerDuplicator/getEffectiveStrokesRendered, C21g/#1199, not yet merged to main at authoring time), cloneStrokeForTransform/applyMatrixToStrokeData/symMatrixOf (C21f/#1198, merged), loadFrame/desP/desR (C21d/#1193 lineage), the image-mesh store (SMImageMesh, image-mesh.js) and the on-canvas rig UI (rig-bridge.js, the Pen-tool bone-draw/influence-circle/manual-weight-popover front end) are cited by name/line only, not re-mapped — their own bodies are not reproduced beyond the exact lines each packet's own `callers`/`behavior` needed.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "49586097fef6477c5922c875d905e56b93b09f3e",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21h-app-rig-model-binding-census",
+  "assigned_ranges": [
+    {
+      "start": 1884,
+      "end": 2289
+    }
+  ],
+  "coverage_note": "Exactly 406 assigned lines occur once across nine packets (one coverage_range per packet, no gaps, no other-owner overlap): 178 code, 228 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 5+6+20+16+16+6+32+18+59=178 code; 21+3+16+15+20+4+81+25+43=228 comment; 0 blank in every packet). Line 1883 (C21g's own `convertSelectionToObjectDuplicator` closing brace) is out of scope; line 1884 opens this scope's own `// ---- RIG (2026-07-29)` section header. Line 2289 is the closing `}` of rigAutoAssignLayer; line 2290 opens the lead-in comment for applyRigDeform (C21i's own territory, the rig DEFORMER).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (49586097fef6477c5922c875d905e56b93b09f3e) has the identical app.js blob (git rev-parse 49586097fef6477c5922c875d905e56b93b09f3e:src/js/app.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at 49586097fef6477c5922c875d905e56b93b09f3e, verified directly in the working worktree before authoring (HEAD matches, blob matches).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for the eleven function symbols (ensureLayerRig, rigFreshId, _boneSegsToPath, relinkRigBinds, rigWeighOnePoint, rigWeighOnePointByControl, _rigChordAngle, _rigNormalizeAngle, rigBindStroke, rigBindMesh, rigAutoAssignLayer) and a plain `git grep -n 'SM_RIG_CONTROL_POINT_WEIGHTS'`/`git grep -n 'centerWeights'`/`git grep -n '\\.weights\\b'` for the data-shape questions the issue's own prompt asked for, each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly (located by scanning backward from the call-site line for the nearest preceding `function <name>(` declaration, confirmed by checking no closer declaration intervenes).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the Shapper-lineage header, the 2026-07-29 \"in doubt, drop\" relink posture, the 2026-08-30 mesh-bind and radius-auto-sizing fixes, the 2026-08-31 control-point-anchoring model and its offset/ptIndex coexistence note, the 2026-09 restHandles QA-sweep cross-references in timeline.js/app.js:3235) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21h-app-rig-model-binding.json and the nine app.js packets partitioning lines 1884-2289.",
+    "app_js": "app.js retains the whole runtime for these eleven symbols; this JSON authoring does not authorize source changes.",
+    "c21i_boundary": "Lines 2290+ (applyRigDeform's own lead-in comment through rigResetPose/rigCommitFrame/rigSetIK/rigAnchorPoint/rigDragIKEnd, the next leaf C21i, not yet filed as an issue at authoring time) are cited by name/line only — including every call FROM inside that range INTO this scope's own symbols (app.js:2299 and 2327's bonePaths/_rigChordAngle/_rigNormalizeAngle calls inside applyRigDeform's anchorFor, app.js:2549's relinkRigBinds call inside rigCommitFrame, app.js:2562's ensureLayerRig call inside rigSetIK) — none of applyRigDeform's, rigCommitFrame's, or rigSetIK's own bodies are reproduced here beyond the cited call-site lines.",
+    "c21g_boundary": "The mograph duplicator runtime (C21g/#1199) shares no direct call edge with this scope — confirmed by whole-src grep: none of this scope's eleven symbols appear inside app.js:1456-1795 (_resolveDuplicatorPath/applyLayerDuplicator) or getEffectiveStrokesRendered, and neither duplicator symbol is called from within lines 1884-2289. Cited by name only per the issue's own scope note.",
+    "other_consumers_boundary": "rig-bridge.js (the Pen-tool bone-draw/influence-circle-drag/manual-weight-popover front end), timeline.js (the Rig panel's \"Assigner automatiquement\" button, exportJSON's ld.rig whitelist, duplicateLayer/splitLayerAtPlayhead's rig copies), image-mesh.js (SMImageMesh.get/worldVerts) and engine-bridge.js (SMEngineBridge.rasterImageRect) retain their own bodies in full — cited by line/call-site only for the specific findings each packet's `callers`/`behavior` needed."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21g / #1199 (existing owner, PR not yet merged to main at authoring time)",
+      "disposition": "Owns app.js:1456-1795 (_resolveDuplicatorPath/applyLayerDuplicator) and getEffectiveStrokesRendered (1796+). Confirmed by whole-src grep that this scope's own eleven symbols are never called from within that range and never call into it — the two leaves are call-graph-disjoint, not merely line-adjacent. This scope's own boundary begins at line 1884 (the `// ---- RIG (2026-07-29)` header), immediately after C21g's own `convertSelectionToObjectDuplicator` closing brace at 1883."
+    },
+    {
+      "owner": "C21i (next leaf, applyRigDeform/rigResetPose/rigCommitFrame/rigSetIK/rigAnchorPoint/rigDragIKEnd, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:2290+ through applyRigDeform's own closing brace and the 3-point IK chain that follows. This scope's own symbols are called repeatedly from inside that range (_boneSegsToPath via applyRigDeform's bonePaths cache at 2299; _rigChordAngle/_rigNormalizeAngle via anchorFor's ptIndex branch at 2327; relinkRigBinds from rigCommitFrame at 2549; ensureLayerRig from rigSetIK at 2562) — those call sites are cited by file:line only in each packet's own `callers` list; applyRigDeform's/rigCommitFrame's/rigSetIK's own bodies are not reproduced."
+    },
+    {
+      "owner": "rig-bridge.js (existing owner, the on-canvas rig UI: bone-draw, influence-circle drag, manual weight-override popover)",
+      "disposition": "Retains its own body in full — cited by line only, as the complete external caller list of ensureLayerRig (343, 522), rigFreshId (381), _boneSegsToPath (186, 378, 638), rigWeighOnePoint (660) and rigAutoAssignLayer (481). Notably, rig-bridge.js never calls rigBindStroke or rigBindMesh directly — confirmed by whole-src grep, each of those two functions has exactly ONE caller in the entire repository (rigAutoAssignLayer, this scope's own packet 9): the Rig tool's \"click a shape to bind it individually\" affordance does not exist as a separate code path; every bind pass, whether triggered by the auto-assign button or by releasing an influence-circle radius drag, re-binds every selectable shape/mesh on the layer at once."
+    },
+    {
+      "owner": "timeline.js (existing owner, the Rig panel UI, exportJSON, duplicateLayer/splitLayerAtPlayhead)",
+      "disposition": "Retains its own body in full — cited by line only. The \"Assigner automatiquement\" button handler (11538-11559) is rigAutoAssignLayer's other external caller (11552), reading radius/rotate/softness and the two drive-shapes/drive-meshes checkboxes from the Rig panel, pushUndo() first, SMEngineBridge.renderNow() after. exportJSON's own ld.rig field whitelist (2155-2163) is the persisted-shape authority for `binds[]` and is NOT part of this scope (timeline.js, not app.js:1884-2289) but is cited by line in this artifact's `boundaries` because it omits two fields this scope WRITES (centerRest/centerWeights, see `boundaries`)."
+    },
+    {
+      "owner": "app.js:3235 cloneRigForSymbol (existing owner, general app.js territory outside both this leaf and C21g/C21i)",
+      "disposition": "Retains its own body in full — cited by line only. A second, independently-maintained persisted-shape whitelist (used when a rigged layer is folded into a Component via maybeAutoConvertToComponent) with the identical field list and the identical omission as exportJSON's own copy — see `boundaries`."
+    },
+    {
+      "owner": "image-mesh.js (existing owner, SMImageMesh.get/worldVerts) and engine-bridge.js (existing owner, SMEngineBridge.rasterImageRect)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. rigBindMesh (packet 8) and rigAutoAssignLayer's mesh-radius pass (packet 9) both read through these three functions to map a mesh's normalized vertices into world space; neither is re-mapped here."
+    }
+  ],
+  "boundaries": [
+    "Line 1883 (C21g's own closing brace) is outside coverage; line 1884 (the `// ---- RIG (2026-07-29)` header) begins this scope.",
+    "Line 2289 (`rigAutoAssignLayer`'s own closing `}`) is the last line of this scope; line 2290 opens the lead-in comment for `applyRigDeform`, C21i's own territory, and is excluded — confirmed by reading through line 2296.",
+    "No lines inside 1884-2289 are excluded for another owner: every line belongs to exactly one of the nine packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The persisted shape of `ld.rig`, as this scope's own header comment declares it (lines 1898-1904) and as every write site in this scope confirms: `ld.rig = {bones:{id:{segments,restSegments,closed[,radius]}}, ikChains:{endId:{...}}, binds:[{strokeId|meshId, rest, restHandles?, weights, rotate, centerRest?, centerWeights?}], nextId}`. `bones{}`/`ikChains{}` are read but never written by this scope's own eleven symbols (ensureLayerRig only lazily initialises them to `{}`/`{}` at 1906 if `ld.rig` itself is absent; every bone/ikChain field write lives in rig-bridge.js and C21i's rigSetIK, out of scope, cited by name only). `binds[]` fields WRITTEN in this scope: `strokeId` (2118, rigBindStroke, copied from `path.data.strokeId`), `meshId` (2185, rigBindMesh, copied from `raster.data.meshId`), `rest` (2117/2178), `restHandles` (2111-2116, path binds only — rigBindMesh never writes this field, a mesh bind has no bezier handles), `weights` (2117/2180), `rotate` (2118/2185, `!!rotate`), `centerRest`/`centerWeights` (2139-2140, path binds only, gated on `path.data.isVectorBrush && path.data.centerSegments.length`). `nextId` is read (1909, `rig.nextId++`, a side effect of every `rigFreshId` call) but never independently written outside that increment within this scope.",
+    "RUNTIME-ONLY fields (underscore-prefixed, CLAUDE.md §1's \"a live reference never survives save/reload\" rule): `binds[i]._live` (the resolved live Paper Path) is SET at two places in this scope — rigBindStroke's own bind literal (2118, `_live:path`) and relinkRigBinds' filter (1951, `b._live=item`) — and never persisted: exportJSON's own ld.rig.binds map (timeline.js:2163) and cloneRigForSymbol's identical map (app.js:3245) both list only `{strokeId,meshId,rest,restHandles,weights,rotate}`, omitting `_live`/`_liveRaster` entirely by construction (a hand-written field whitelist, not a delete-before-stringify step) — timeline.js's own comment (2145-2153) states this was previously copied wholesale into JSON.stringify (a 2026-07-30 fix, corrected here), which risked throwing mid-save on Paper's own circular internal references. `binds[i]._liveRaster` (the resolved live Raster) is SET at rigBindMesh's own bind literal (2186, `_liveRaster:raster`) and relinkRigBinds' filter (1946, `b._liveRaster=ras`) — same never-persisted disposition, same two whitelists confirmed to omit it. Neither field is ever explicitly deleted/cleared within this scope; a DROPPED bind (relinkRigBinds' filter returning false) simply removes the whole bind object from the array, so no stale `_live`/`_liveRaster` reference is ever left dangling inside a surviving bind — the field is always either freshly overwritten (a surviving bind, every loadFrame) or entirely gone (a dropped bind).",
+    "The persisted stable id used for each relink is `strokeId` for a path bind (set once at bind time from `path.data.strokeId`, which itself is minted/reused by `ensureStrokeId`, tools.js:1910, out of scope, cited by name only) and `meshId` for a mesh bind (set once at bind time from `raster.data.meshId`, minted/reused by SMImageMesh, out of scope, cited by name only) — relinkRigBinds (packet 3) is the SOLE reader that turns either id back into a live Paper item, via two independent lookup maps (`byId`/`byMesh`) built once per call from `layer.children`.",
+    "The two weight shapes: a LEGACY per-point entry `{boneId,offset,w}` (rigWeighOnePoint, packet 4, anchored anywhere along a bone's curve via getNearestLocation) and a control-point entry `{boneId,ptIndex,w}` (rigWeighOnePointByControl, packet 5, anchored on one of a bone's own restSegments[] control points, the current default). Both shapes coexist inside the same `weights`/`centerWeights` array without ambiguity because the discriminator is the presence of `ptIndex`, not a version flag (this scope's own lead-in comment at 2002-2005). The `window.SM_RIG_CONTROL_POINT_WEIGHTS===false` switch (weighForPoints, 2090; rigBindMesh's own inlined copy of the same ternary, 2179) selects rigWeighOnePoint (legacy) only when that global is explicitly `false`; a whole-repo grep for `SM_RIG_CONTROL_POINT_WEIGHTS` at the frozen SHA returns exactly these two reads and NO writer anywhere in `src` — the flag can only be flipped from a devtools console, so every UI-driven bind pass in this build takes the control-point (packet 5) branch; rigWeighOnePoint (packet 4) is exercised live only via rig-bridge.js:660's manual \"Réinitialiser (auto)\" popover button, which calls it directly and unconditionally rather than through the gated `weighForPoints`/`meshWeigh` closures. Every reader of the resulting `weights`/`centerWeights` arrays is OUT of this scope: applyRigDeform's own anchorFor (app.js:2318-2334, C21i, cited by line only) branches on `wentry.ptIndex!=null` to pick the control-point path (reading `bone.restSegments[k]`/`bone.segments[k]` directly, via `_rigChordAngle`/`_rigNormalizeAngle`, packet 6) versus the offset path (`bonePaths(bid).cur/.rest.getLocationAt(offset)`, via `_boneSegsToPath`, packet 2); rig-bridge.js's own weight-override popover (581, 660) reads/rewrites individual `bind.weights[vi]` entries directly, outside a full bind pass.",
+    "Every Paper item this scope CREATES: exactly one, `_boneSegsToPath`'s own `new Path({insert:false})` (1914, packet 2) — confirmed UNINSERTED by the literal option and by there being no `.insert()`/`layer.add`/`layer.insertChild` call anywhere on the returned path in this scope or in any of its six callers (rigWeighOnePoint 1974, rigAutoAssignLayer 2213/2238, and — out of scope, cited by line only — applyRigDeform's bonePaths cache at 2299, rig-bridge.js:186/378/638); every in-scope caller explicitly `.remove()`s it immediately after the one query it needed (getNearestLocation), confirmed at 1976/2215/2240, matching the header comment's own claim (1911-1912, \"never inserted into any layer\"). `Segment`/`Point` objects built inside `_boneSegsToPath`'s own `.forEach` (1915) are plain constructor arguments, never separately inserted anywhere.",
+    "Calls OUT of scope, by symbol: `ensureLayerRig` self-use within this scope only (rigBindStroke 2033, rigBindMesh 2168, rigAutoAssignLayer 2189) plus the two C21i sites already listed in `reconciliation`; `ensureStrokeId` (tools.js:1910, rigBindStroke 2052); `SMImageMesh.get`/`SMImageMesh.worldVerts` (image-mesh.js, rigBindMesh 2166/2177, rigAutoAssignLayer's mesh-radius pass 2230/2233); `SMEngineBridge.rasterImageRect` (engine-bridge.js:579, rigBindMesh 2167/2170, rigAutoAssignLayer 2227/2231); Paper's own `getNearestLocation`/`getLocationAt` (bp.getNearestLocation, rigWeighOnePoint 1975 and rigAutoAssignLayer 2214/2239 — getLocationAt itself is never called within this scope, only inside C21i's own anchorFor, cited by line only); `isSelectablePathChild` (app.js:576, rigAutoAssignLayer 2208/2273); `Object.keys` on `rig.bones` (rigAutoAssignLayer 2190, plain language builtin, not cited as a call-out).",
+    "`layer.children` reads (another CLAUDE.md §1 `layer.children` consumer, cited there by name): relinkRigBinds (packet 3, 1931/1937) reads EVERY child unconditionally and keys off `c.data.strokeId`/`c.data.meshId` presence alone — it does not special-case `isVectorBrush`, `isDuplicatorCopy`, `isBrushTextureCopy` or any other tag; this is sufficient rather than an oversight, confirmed directly: a texture dab (tools.js:5199, `dab.data={isBrushTextureCopy:true,brushGroupId:groupId}`) carries neither `strokeId` nor `meshId`, so the guard's own `if(c.data&&c.data.strokeId)`/`if(c.data&&c.data.meshId)` silently excludes it without any explicit filter. `isDuplicatorCopy`-tagged items are not applicable here at all: a duplicator source layer's synthetic clones are never materialised as ordinary `layer.children` Paper items (they are produced on the fly by `getEffectiveStrokesRendered` at render time only, C21g territory, cited by name only), so `relinkRigBinds`/`rigAutoAssignLayer` never observe one. rigAutoAssignLayer's own two `layer.children.forEach` passes (packet 9, 2207-2221 and 2265-2287) DO special-case explicitly: `isSelectablePathChild` (app.js:576, out of scope, cited by name) excludes any child with `data.isLinkedFillCompanion` or `data.isBrushTextureCopy` from the paths branch; `c instanceof CompoundPath` is explicitly counted as `skippedUnsupported` rather than silently ignored (2272); the mesh branch requires `c instanceof Raster && c.data && c.data.meshId` (2229/2266), so a plain (unmeshed) Raster is silently skipped by the same presence check as a dab.",
+    "The complete caller list of every exported (i.e. not `_`-prefixed, called from outside app.js) symbol is recorded verbatim in each packet's own `callers` field, derived by the whole-src grep described in `source_baselines.runtime`; the two `_`-prefixed helpers with an outside-caller convention broken by this scope (`_boneSegsToPath`, called from rig-bridge.js) are recorded the same way — the leading underscore here marks \"internal to the rig subsystem,\" not \"private to this one file,\" matching how `_rigChordAngle`/`_rigNormalizeAngle` (packet 6) are named but in fact have zero external callers (their only caller is C21i's own applyRigDeform, cited by line only).",
+    "`rigAutoAssignLayer` returns `{n, skippedUnsupported}` from its own normal exit (2288) but returns the bare number `0` from its early guard when the layer has no bones at all (2191, `if(!boneIds.length)return 0;`) — a return-SHAPE inconsistency (a caller reading `.n off this branch's result would see `undefined`, not `0`). Neither observed external caller is exposed to this branch's own shape in practice: timeline.js's own button handler (11538-11543) already toasts-and-returns on the identical `!rig||!Object.keys(rig.bones).length` condition BEFORE calling rigAutoAssignLayer at all; rig-bridge.js:481 calls it but never reads the return value (only `applyRigDeform` is called next, unconditionally, using the same `_radiusDrag.ld` reference, not anything rigAutoAssignLayer returned). No `pushUndo`/`renderNow`/`updateUI` call exists inside rigAutoAssignLayer's own 102 lines — both observed external callers push undo and re-render themselves, on the OUTSIDE of the call (timeline.js:11546 pushUndo() before, 11553 SMEngineBridge.renderNow() after; rig-bridge.js's own pushUndo lives further up its own radius-drag-start handler, not shown adjacent to the onUp call at 481, and its renderNow/resume calls are at 483-484, immediately after applyRigDeform).",
+    "`rigBindStroke`'s SOLE persistence-adjacent write of vector-brush centerline data (`bind.centerRest`/`bind.centerWeights`, 2139-2140, gated on `path.data.isVectorBrush && path.data.centerSegments.length`) is dropped by BOTH out-of-scope persisted-shape whitelists that determine what survives a save/reload or a fold-into-Component: exportJSON's own `binds` map (timeline.js:2163) and `cloneRigForSymbol`'s identical map (app.js:3245) both list exactly `{strokeId,meshId,rest,restHandles,weights,rotate}` — neither whitelist has ever included `centerRest`/`centerWeights` at this SHA, confirmed by direct read of both map literals; see `future_proposals` for the concrete consequence this implies."
+  ],
+  "areas": [
+    {
+      "area": "rig-header-ensure-fresh-id",
+      "packets": [
+        {
+          "id": "C21h.rig-header-ensure-fresh-id",
+          "files": [
+            "src/js/app.js:1884-1909"
+          ],
+          "coverage_ranges": [
+            [
+              1884,
+              1909
+            ]
+          ],
+          "classification": {
+            "code": 5,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "ensureLayerRig",
+            "rigFreshId"
+          ],
+          "signature": "function ensureLayerRig(ld){if(!ld.rig)ld.rig={bones:{},ikChains:{},binds:[],nextId:1};return ld.rig;} function rigFreshId(rig,prefix){return prefix+(rig.nextId++);}",
+          "responsibility": "Section header (1884-1904, 21 comment lines) for the whole rig subsystem: states its Shapper lineage (a mask-influence extension with no bone HIERARCHY, per-vertex 0..1 influence weights against movable control points/paths) and its own two deliberate departures (bones are real VECTOR PATHS drawn via a Pen-tool interaction, rig-bridge.js, cited by name only; rotation-aware skinning samples a bone's LOCAL TANGENT continuously via getLocationAt rather than one chord angle for the whole bone). Declares the complete persisted shape up front: `ld.rig = {bones:{id:{segments,restSegments,closed}}, ikChains:{endId:{...}}, binds:[{strokeId,rest,weights,rotate}], nextId}` — plain JSON throughout, per CLAUDE.md §1's \"a live Paper reference never survives save/reload\" rule, explicitly contrasted with the dormant labs/rig-deform.js prototype's own anti-pattern (`binds[i].path`, a live reference). Declares `binds[i]._live` as underscore-prefixed, runtime-only, rebuilt by relinkRigBinds after every loadFrame, never persisted — see this artifact's `boundaries` for the confirmed enforcement of that contract. `ensureLayerRig(ld)` (1905-1908) lazily initialises `ld.rig` to the empty shape above only if absent, then returns it either way — a plain get-or-create, no validation of an existing `ld.rig`'s own shape. `rigFreshId(rig,prefix)` (1909, single line) mints a fresh id string by string-concatenating `prefix` with the current `rig.nextId`, then POST-increments `rig.nextId` as a side effect of the expression itself (`rig.nextId++` inside the return statement) — every call therefore mutates `rig` even though the function reads as a pure formatter at a glance.",
+          "callers": [
+            "app.js:2033 — rigBindStroke (this scope, packet 7): `var rig=ensureLayerRig(ld);`, first statement of the function.",
+            "app.js:2168 — rigBindMesh (this scope, packet 8): `var rig=ensureLayerRig(ld);`, after the raster/meshId/SMImageMesh guards.",
+            "app.js:2189 — rigAutoAssignLayer (this scope, packet 9): `var rig=ensureLayerRig(ld);`, first statement of the function.",
+            "app.js:2562 — rigSetIK (C21i, the next leaf, cited by line only): `var rig=ensureLayerRig(ld);`, first statement, immediately after the IK section header.",
+            "rig-bridge.js:343 — the bone-draw pointer-down handler, on starting a brand-new bone (inside the `if (!_rigDraw.path)` branch, right after the fresh-bone undo checkpoint): `ensureLayerRig(ld);` — return value discarded, called purely for its lazy-init side effect before `Object.keys(ld.rig.bones)` is read a few lines later.",
+            "rig-bridge.js:522 — finalizeRigBone, after resolving the target layer (`_rigDraw.ld` or a fallback to the active layer) and validating the in-progress path has ≥2 segments: `ensureLayerRig(ld);` — same discard-the-return, lazy-init-only usage, immediately before writing the new bone's own `segsOut` into `ld.rig.bones[boneId]`.",
+            "rigFreshId's sole external caller: rig-bridge.js:381, inside the same bone-draw onDown handler's \"plain click = new branch, not extend\" path: `_rigDraw.boneId = rigFreshId(ld.rig, 'bone');` — mints the id for a brand-new bone (as opposed to the Alt+click \"reopen and extend\" path a few lines above, which reuses `bestBoneId` instead of calling rigFreshId at all)."
+          ],
+          "behavior": [
+            "Lines 1884-1904 (comment, 21 lines): the RIG section header — Shapper lineage, the two deliberate departures, the persisted-shape declaration, and the `_live` runtime-only contract.",
+            "Lines 1905-1908 (code, 4 lines): `ensureLayerRig` — lazy-init guard, return.",
+            "Line 1909 (code, 1 line): `rigFreshId` — single-expression declaration, prefix concatenation plus the post-increment side effect on `rig.nextId`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "bone-segs-to-path",
+      "packets": [
+        {
+          "id": "C21h.bone-segs-to-path",
+          "files": [
+            "src/js/app.js:1910-1918"
+          ],
+          "coverage_ranges": [
+            [
+              1910,
+              1918
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_boneSegsToPath"
+          ],
+          "signature": "function _boneSegsToPath(segs,closed){var p=new Path({insert:false});segs.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point((s.handleIn||[0,0])[0],(s.handleIn||[0,0])[1]),new Point((s.handleOut||[0,0])[0],(s.handleOut||[0,0])[1])));});if(closed)p.closed=true;return p;}",
+          "responsibility": "Builds a throwaway, UNINSERTED Paper Path from a bone's own `segs` array (either its live `segments` or its `restSegments`, chosen by the caller) — purely so `getNearestLocation`/`getLocationAt` (Paper's own path-query API) and tangent sampling are available, per the lead-in comment (1910-1912). Every segment's point/handleIn/handleOut is read from the plain `[x,y]` array shape this scope's own bind functions persist, defaulting a missing handle to `[0,0]` (i.e. no curvature) via `||[0,0]`. Closes the path if the bone itself is closed. The returned Path is never inserted into any layer (`{insert:false}`) and, per this artifact's `boundaries`, every one of its six callers (three in this scope, three outside it) explicitly `.remove()`s it immediately after the one query it needed.",
+          "callers": [
+            "app.js:1974 — rigWeighOnePoint (this scope, packet 4): `var bp=_boneSegsToPath(bone.restSegments,bone.closed);` — built from a bone's REST geometry, queried once via getNearestLocation, removed on the next line.",
+            "app.js:2213 — rigAutoAssignLayer's path-radius-growth pass (this scope, packet 9): same `bone.restSegments`/`bone.closed` pairing, per (vertex, bone) pair inside the nested forEach.",
+            "app.js:2238 — rigAutoAssignLayer's mesh-radius-growth pass (this scope, packet 9): identical pairing, for a mesh-vertex world point instead of a path-segment point.",
+            "app.js:2299 — applyRigDeform's own `bonePaths(bid)` cache (C21i, cited by line only): builds BOTH `rest:_boneSegsToPath(bone.restSegments,bone.closed)` and `cur:_boneSegsToPath(bone.segments,bone.closed)` in one cached entry per bone id, the only caller in the whole codebase that requests the LIVE `segments` variant rather than `restSegments`.",
+            "rig-bridge.js:186 — boneCircleCenter (the influence-circle center helper): `var bp = _boneSegsToPath(bone.segments, bone.closed);`, reads only `bp.bounds.center` before removing it.",
+            "rig-bridge.js:378 — the bone-draw onDown handler's Alt+click \"reopen and extend\" branch: `_rigDraw.path = _boneSegsToPath(ld.rig.bones[bestBoneId].segments, false);` — the ONE caller that does NOT remove the result immediately; it is kept live as the in-progress drawing path itself (reassigned to `_rigDraw.path`, a genuine exception to the \"always throwaway\" pattern, since this call's purpose is to resume editing an existing bone's own geometry, not to query it).",
+            "rig-bridge.js:638 — the manual weight-override popover's \"Ajouter\" (add) button handler: `var bp = _boneSegsToPath(bone.restSegments, bone.closed);`, queried once via getNearestLocation to seed a fresh `{boneId,offset,w:0.5}` entry, removed immediately after."
+          ],
+          "behavior": [
+            "Lines 1910-1912 (comment, 3 lines): lead-in — states the throwaway, never-inserted, query-only purpose.",
+            "Line 1913 (code, 1 line): declaration, two formal parameters (`segs`, `closed`).",
+            "Line 1914 (code, 1 line): `new Path({insert:false})`.",
+            "Line 1915 (code, 1 line): `segs.forEach` building one `Segment` per entry, defaulting absent handles to `[0,0]`.",
+            "Line 1916 (code, 1 line): `if(closed)p.closed=true;`.",
+            "Line 1917 (code, 1 line): `return p;`.",
+            "Line 1918 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "relink-rig-binds",
+      "packets": [
+        {
+          "id": "C21h.relink-rig-binds",
+          "files": [
+            "src/js/app.js:1919-1954"
+          ],
+          "coverage_ranges": [
+            [
+              1919,
+              1954
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "relinkRigBinds"
+          ],
+          "signature": "function relinkRigBinds(ld,layer){if(!ld.rig||!ld.rig.binds||!ld.rig.binds.length)return;var byId={};layer.children.forEach(function(c){if(c.data&&c.data.strokeId)byId[c.data.strokeId]=c;});var byMesh={};layer.children.forEach(function(c){if(c.data&&c.data.meshId)byMesh[c.data.meshId]=c;});ld.rig.binds=ld.rig.binds.filter(function(b){if(b.meshId){var ras=byMesh[b.meshId];var mesh=window.SMImageMesh&&SMImageMesh.get(b.meshId);if(!ras||!mesh||mesh.verts.length!==b.rest.length)return false;b._liveRaster=ras;return true;}var item=byId[b.strokeId];if(!item||!item.segments||item.segments.length!==b.rest.length)return false;b._live=item;return true;});}",
+          "responsibility": "Rebuilds every bind's runtime-only live Paper reference after `loadFrame` replaces `userLayers[i].children` wholesale (the old references are orphaned the moment a layer rebuilds), per this scope's own header contract (packet 1). Same strokeId-lookup pattern as `relinkBrushCompanions`/`relinkLinkedFills` (out of scope, cited by name only), called right alongside them (see `callers`, app.js:4795). Two independent one-pass lookup maps are built from `layer.children`: `byId` keyed on `c.data.strokeId` (for path binds) and `byMesh` keyed on `c.data.meshId` (for mesh binds, a 2026-08-30 addition — the lead-in comment states that without this second map every mesh bind was dropped on the very first loadFrame, since a mesh bind's own target Raster has no `strokeId` at all). `ld.rig.binds` is then REPLACED (not mutated in place) by `.filter(...)`'s own result: a mesh bind (`b.meshId` truthy) is kept only if its Raster is still present in `byMesh`, `SMImageMesh.get(b.meshId)` still resolves an actual mesh, and the mesh's own vertex count still equals `b.rest.length`; a path bind is kept only if its item is still present in `byId`, still has `.segments`, and that segment count still equals `b.rest.length`. Any mismatch DROPS the bind outright rather than risk deforming the wrong vertices — \"in doubt, drop,\" explicitly cross-referenced in this scope's own lead-in comment (1926-1927) to CLAUDE.md §5quater's `_canReuseMaterialized` \"in doubt, rebuild\" posture (cited by name only). A surviving bind gets its runtime-only field freshly overwritten: `b._liveRaster=ras` for a mesh bind, `b._live=item` for a path bind.",
+          "callers": [
+            "app.js:2549 — rigCommitFrame (C21i, the Rig tool's \"Commit\" step, cited by line only): `relinkRigBinds(ld,userLayers[state.activeLayerIdx]);`, called immediately before `applyRigDeform(ld)` in the same statement group, ensuring the bake that follows uses freshly-relinked live references rather than whatever was live from the last pose-drag tick.",
+            "app.js:4795 — loadFrame's own per-layer strokes-materialise loop (general app.js territory, cited by line only), inside the same statement as `relinkBrushCompanions(userLayers[i]);relinkLinkedFills(userLayers[i]);`, guarded by `if(state.layers[i].rig)relinkRigBinds(state.layers[i],userLayers[i]);` — the ONLY call site where this scope's own header claim (\"called right alongside\" the brush-companion/linked-fill relinkers) is literally true, all three calls chained in the same statement."
+          ],
+          "behavior": [
+            "Lines 1919-1927 (comment, 9 lines): lead-in — explains why a relink is needed after every loadFrame, the strokeId-lookup precedent, and the \"in doubt, drop\" posture with its §5quater cross-reference.",
+            "Line 1928 (code, 1 line): declaration, two formal parameters (`ld`, `layer`).",
+            "Line 1929 (code, 1 line): early-return guard — no rig, no binds array, or an empty binds array.",
+            "Lines 1930-1931 (code, 2 lines): build `byId` from every child carrying `data.strokeId`.",
+            "Lines 1932-1935 (comment, 4 lines): explains the mesh-bind addition and the bug it fixed (every mesh bind dropped on first loadFrame without this second map).",
+            "Lines 1936-1937 (code, 2 lines): build `byMesh` from every child carrying `data.meshId`.",
+            "Line 1938 (code, 1 line): begin `.filter(...)`, reassigning `ld.rig.binds` to the filtered result.",
+            "Line 1939 (code, 1 line): `if(b.meshId){` — dispatch to the mesh branch.",
+            "Line 1940-1941 (code, 2 lines): resolve the live Raster from `byMesh` and the live mesh from `SMImageMesh.get`.",
+            "Lines 1942-1944 (comment, 3 lines): explains the vertex-count identity check's role, the same as `segments.length` plays for a path.",
+            "Lines 1945-1948 (code, 4 lines): the mesh keep/drop guard, `b._liveRaster=ras`, `return true`.",
+            "Lines 1949-1953 (code, 5 lines): the path branch — resolve from `byId`, the keep/drop guard (missing item, missing segments, or a segment-count mismatch), `b._live=item`, `return true`.",
+            "Line 1954 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "weigh-one-point",
+      "packets": [
+        {
+          "id": "C21h.weigh-one-point",
+          "files": [
+            "src/js/app.js:1955-1985"
+          ],
+          "coverage_ranges": [
+            [
+              1955,
+              1985
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigWeighOnePoint"
+          ],
+          "signature": "function rigWeighOnePoint(rig,boneIds,p,radius,softness){var w=[];boneIds.forEach(function(bid){var bone=rig.bones[bid];if(!bone)return;var bp=_boneSegsToPath(bone.restSegments,bone.closed);var loc=bp.getNearestLocation(p);bp.remove();if(!loc)return;var dist=loc.point.getDistance(p);var boneRadius=bone.radius||radius;var t=Math.max(0,1-dist/boneRadius);var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;if(infl>0)w.push({boneId:bid,offset:loc.offset,w:infl});});return w;}",
+          "responsibility": "The LEGACY per-point weighing model: weighs point `p` against the NEAREST location anywhere along each candidate bone's own REST curve (via `_boneSegsToPath`/`getNearestLocation`, packet 2), not just its control points — so a straight or curved bone influences vertices along its whole length, not only at its ends, per the lead-in comment (1955-1964). For each bone id: build the throwaway rest-path, find the nearest location to `p`, remove the throwaway path, compute the Euclidean distance from that location's own point to `p`, resolve the effective radius as `bone.radius||radius` (a per-bone override wins over the caller's default), a LINEAR falloff `t=max(0,1-dist/boneRadius)`, then blend toward a cubic smoothstep by `softness` (`t+(t²(3-2t)-t)·softness`: 0 = identical to `t`, 1 = full smoothstep, zero derivative at both the bone and the radius edge). Pushes `{boneId,offset,w:infl}` only if `infl>0` — at most ONE weight entry per bone id, keyed by the bone's own path-length `offset` of the nearest location (re-sampled later via `getLocationAt`, same offset, current bone geometry, so both position and local tangent stay anchored to the same point on the bone as it's posed, per the outer lead-in at 1955-1964). Factored out of a full bind pass specifically so a single vertex can be recomputed later without a second copy of the math (the manual weight-override popover's \"Réinitialiser (auto)\" button, rig-bridge.js, feedback #112, per the lead-in at 1965-1969).",
+          "callers": [
+            "app.js:2092 — rigBindStroke's own `weighForPoints` closure (this scope, packet 7): selected only when `window.SM_RIG_CONTROL_POINT_WEIGHTS===false`; the default branch is rigWeighOnePointByControl (packet 5) instead. See `boundaries` — this global has NO writer anywhere in `src` at this SHA, so this branch is never taken by ordinary UI-driven binding.",
+            "app.js:2181 — rigBindMesh's own inlined `meshWeigh` ternary (this scope, packet 8): the same gated choice, duplicated rather than shared with rigBindStroke's own `weighForPoints` (see `future_proposals`).",
+            "rig-bridge.js:660 — the manual weight-override popover's \"Réinitialiser (auto)\" button handler: `bind.weights[vi] = rigWeighOnePoint(ld.rig, boneIds, new Point(restPt[0], restPt[1]), panelDefaultRadius(), panelSoftness());` — calls rigWeighOnePoint DIRECTLY and unconditionally, bypassing the `SM_RIG_CONTROL_POINT_WEIGHTS` gate entirely; this is the only call site in the whole codebase where rigWeighOnePoint's legacy per-point shape is reachable through ordinary UI interaction (recomputing one vertex's weights back to the offset-anchored model regardless of which model produced the surrounding bind)."
+          ],
+          "behavior": [
+            "Lines 1955-1969 (comment, 15 lines): lead-in — the nearest-anywhere-on-curve weighing model, the `offset` capture/re-sample contract, and the popover-recompute factoring rationale.",
+            "Line 1970 (code, 1 line): declaration, five formal parameters.",
+            "Line 1971 (code, 1 line): `var w=[];`.",
+            "Lines 1972-1974 (code, 3 lines): begin `boneIds.forEach`, resolve `bone`, no-op if absent, build the throwaway rest-path.",
+            "Lines 1975-1977 (code, 3 lines): nearest-location query, remove the throwaway path, no-op if no location resolved.",
+            "Lines 1978-1981 (code, 4 lines): distance, effective radius, linear falloff `t`, softness-blended influence.",
+            "Line 1982 (code, 1 line): push the weight entry if positive influence.",
+            "Line 1983 (code, 1 line): close the forEach callback.",
+            "Line 1984 (code, 1 line): `return w;`.",
+            "Line 1985 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "weigh-one-point-by-control",
+      "packets": [
+        {
+          "id": "C21h.weigh-one-point-by-control",
+          "files": [
+            "src/js/app.js:1986-2021"
+          ],
+          "coverage_ranges": [
+            [
+              1986,
+              2021
+            ]
+          ],
+          "classification": {
+            "code": 16,
+            "comment": 20,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigWeighOnePointByControl"
+          ],
+          "signature": "function rigWeighOnePointByControl(rig,boneIds,p,radius,softness){var w=[];boneIds.forEach(function(bid){var bone=rig.bones[bid];if(!bone)return;var segs=bone.restSegments||[];var boneRadius=bone.radius||radius;for(var k=0;k<segs.length;k++){var cp=segs[k].point;if(!cp)continue;var dist=Math.sqrt((p.x-cp[0])*(p.x-cp[0])+(p.y-cp[1])*(p.y-cp[1]));var t=Math.max(0,1-dist/boneRadius);var infl=softness?t+(t*t*(3-2*t)-t)*softness:t;if(infl>0)w.push({boneId:bid,ptIndex:k,w:infl});}});return w;}",
+          "responsibility": "Shapper's own anchoring model (2026-08-31, sourced from the AE expression Cyril supplied, per the lead-in): weighs point `p` against EVERY control point of each candidate bone's own `restSegments` individually, via plain Euclidean distance (no Paper Path/getNearestLocation involved at all, unlike packet 4) — not against a single nearest location on the bone's curve. The lead-in's own design note (1995-2000) is explicit about WHY the two models differ, not just how they're stored: the offset model (packet 4) binds a vertex to ONE place on ONE bone, so moving a control point re-evaluates the whole curve underneath it; the control-point model spreads a vertex across SEVERAL anchors with explicit shares, so which point pulls what is both predictable and independently editable. Same falloff formula as packet 4 (linear `t`, optionally blended toward cubic smoothstep by `softness`), but evaluated PER control point index `k`, not once per bone — so this function can push MULTIPLE entries for the same `boneId` (one per surviving control point), unlike rigWeighOnePoint's own at-most-one-per-bone shape. Pushes `{boneId,ptIndex:k,w:infl}` only if `infl>0`. This is the model EMITTED for every new bind under the default (unflipped) global (see `boundaries`); entries carrying `offset` instead (every rig saved before this model existed) keep taking the old path through applyRigDeform's own `anchorFor` — both shapes coexist inside one weight list without ambiguity because the discriminator is the presence of `ptIndex`, not a version flag that could drift (lead-in, 2002-2005).",
+          "callers": [
+            "app.js:2092 — rigBindStroke's own `weighForPoints` closure (this scope, packet 7): the DEFAULT branch (`window.SM_RIG_CONTROL_POINT_WEIGHTS!==false`), i.e. taken by every ordinary bind pass in this build.",
+            "app.js:2181 — rigBindMesh's own inlined `meshWeigh` ternary (this scope, packet 8): same default-branch selection, an independently-duplicated copy of the identical ternary (see `future_proposals`).",
+            "No caller outside app.js was found by a whole-src grep for `rigWeighOnePointByControl\\(` — unlike rigWeighOnePoint (packet 4), no popover or other rig-bridge.js interaction calls this function directly; the manual weight-override popover's \"Réinitialiser (auto)\" button (rig-bridge.js:660) always recomputes via the LEGACY model regardless of which model produced the vertex's existing weight entries."
+          ],
+          "behavior": [
+            "Lines 1986-2005 (comment, 20 lines): lead-in — the Shapper/AE-expression provenance, the per-shape-point `{pointIndex,influence}` inspectability rationale, the explicit offset-vs-control-point behavioral contrast, and the `ptIndex`-presence discriminator (no version flag).",
+            "Line 2006 (code, 1 line): declaration, five formal parameters.",
+            "Line 2007 (code, 1 line): `var w=[];`.",
+            "Lines 2008-2011 (code, 4 lines): begin `boneIds.forEach`, resolve `bone` (no-op if absent), read `bone.restSegments||[]`, resolve the effective radius.",
+            "Lines 2012-2014 (code, 3 lines): begin the `for(k...)` loop over control points, skip an entry with no `.point`, compute the plain Euclidean distance.",
+            "Lines 2015-2017 (code, 3 lines): linear falloff, softness-blended influence, push `{boneId,ptIndex:k,w:infl}` if positive.",
+            "Line 2018 (code, 1 line): close the `for` loop.",
+            "Line 2019 (code, 1 line): close the forEach callback.",
+            "Line 2020 (code, 1 line): `return w;`.",
+            "Line 2021 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "chord-angle-normalize",
+      "packets": [
+        {
+          "id": "C21h.chord-angle-normalize",
+          "files": [
+            "src/js/app.js:2022-2031"
+          ],
+          "coverage_ranges": [
+            [
+              2022,
+              2031
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_rigChordAngle",
+            "_rigNormalizeAngle"
+          ],
+          "signature": "function _rigChordAngle(segs,k){if(!segs||segs.length<2)return 0;var prev=segs[Math.max(k-1,0)].point,next=segs[Math.min(k+1,segs.length-1)].point;return Math.atan2(next[1]-prev[1],next[0]-prev[0]);} function _rigNormalizeAngle(a){return((a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;}",
+          "responsibility": "`_rigChordAngle(segs,k)`: the chord DIRECTION at control point `k`, Shapper's own `atan2(next-prev)` formula, per the lead-in's explicit citation (2022-2023). End-clamps `k-1`/`k+1` to the array bounds via `Math.max(k-1,0)`/`Math.min(k+1,segs.length-1)` so the FIRST and LAST points borrow the direction of their one available neighbour rather than reading past the array or degrading to a zero vector, which would snap a shape flat at its tips (lead-in, 2024-2025). Returns `0` outright for a bone with fewer than 2 points (no chord direction is definable at all). `_rigNormalizeAngle(a)`: wraps any angle `a` into `(-π,π]` via a double-mod expression (`((a+π)%(2π)+2π)%(2π)-π`), the standard technique for producing a positive intermediate result before the final `%` so JS's own negative-modulo behaviour doesn't leak a value outside the intended range.",
+          "callers": [
+            "app.js:2327 — the SOLE caller of either function in the whole codebase, inside applyRigDeform's own `anchorFor` (C21i, cited by line only), the `ptIndex!=null` (control-point) branch: `da:_rigNormalizeAngle(_rigChordAngle(bone.segments,k)-_rigChordAngle(bone.restSegments,k))` — computes the bone's own rotation delta as the normalized difference between its CURRENT chord angle at control point `k` and its REST chord angle at the same index, feeding the resulting `da` into the same rest-to-current handle-rotation math the offset-anchored branch derives from `getLocationAt`'s own tangent instead (packet 2's `_boneSegsToPath`, via `bonePaths(bid)`)."
+          ],
+          "behavior": [
+            "Lines 2022-2025 (comment, 4 lines): lead-in — Shapper's own chord-angle formula and its end-clamping rationale.",
+            "Lines 2026-2029 (code, 4 lines): `_rigChordAngle` — guard, clamped prev/next lookup, atan2.",
+            "Line 2030 (code, 1 line): closing brace of `_rigChordAngle`.",
+            "Line 2031 (code, 1 line): `_rigNormalizeAngle`, single-expression declaration."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "bind-stroke",
+      "packets": [
+        {
+          "id": "C21h.bind-stroke",
+          "files": [
+            "src/js/app.js:2032-2144"
+          ],
+          "coverage_ranges": [
+            [
+              2032,
+              2144
+            ]
+          ],
+          "classification": {
+            "code": 32,
+            "comment": 81,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigBindStroke"
+          ],
+          "signature": "function rigBindStroke(ld,path,boneIds,radius,rotate,softness){var rig=ensureLayerRig(ld);if(!path){console.warn('[rig] cible invalide');return false;}if(path.className==='CompoundPath'){console.warn('[rig] les CompoundPath (résultats booléens à trous/îles) ne sont pas encore supportés par le rig');return false;}if(!path.segments||!path.segments.length){console.warn('[rig] cible invalide ou vide');return false;}ensureStrokeId(path);rig.binds=rig.binds.filter(function(b){return b.strokeId!==path.data.strokeId;});radius=radius||200;softness=Math.max(0,Math.min(1,softness||0));function weighForPoints(pts){var weigh=(window.SM_RIG_CONTROL_POINT_WEIGHTS===false)?rigWeighOnePoint:rigWeighOnePointByControl;return pts.map(function(pt){return weigh(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);});}var rest=path.segments.map(function(s){return[s.point.x,s.point.y];});var restHandles=path.segments.map(function(s){return{i:(s.handleIn&&(s.handleIn.x||s.handleIn.y))?[s.handleIn.x,s.handleIn.y]:null,o:(s.handleOut&&(s.handleOut.x||s.handleOut.y))?[s.handleOut.x,s.handleOut.y]:null,};});var weights=weighForPoints(rest);var bind={strokeId:path.data.strokeId,rest:rest,restHandles:restHandles,weights:weights,rotate:!!rotate,_live:path};if(path.data.isVectorBrush&&path.data.centerSegments&&path.data.centerSegments.length){var centerRest=path.data.centerSegments.map(function(s){return{point:[s.point[0],s.point[1]],handleIn:s.handleIn?[s.handleIn[0],s.handleIn[1]]:null,handleOut:s.handleOut?[s.handleOut[0],s.handleOut[1]]:null};});bind.centerRest=centerRest;bind.centerWeights=weighForPoints(centerRest.map(function(r){return r.point;}));}rig.binds.push(bind);return true;}",
+          "responsibility": "Binds one Path's own vertices to one or more bones, weighted by the chosen anchoring model (packets 4/5), and is this scope's single most heavily-commented function (81 comment lines against 32 code lines). Guard order is deliberate: the CompoundPath check runs BEFORE the segments/length guard, because a CompoundPath has no `.segments` of its own (its geometry lives in `.children`, each a Path) — checking segments first would catch every CompoundPath under the generic \"cible invalide ou vide\" message and this dedicated, more useful \"pas encore supporté\" message would never fire, confirmed live per the comment (2034-2039) until this exact reorder. `ensureStrokeId(path)` (tools.js:1910, out of scope, cited by name) mints/reuses the persisted id this bind and `relinkRigBinds` (packet 3) key off. Re-binding the SAME shape REPLACES rather than stacks its own prior bind (`rig.binds=rig.binds.filter(b=>b.strokeId!==path.data.strokeId)`, BEFORE the new bind is pushed) — because applyRigDeform (C21i) iterates every bind and SUMS every entry touching a given strokeId, so a duplicate used to silently double that shape's own deformation instead of cleanly superseding it (2053-2058). `radius` defaults to 200; `softness` is clamped to `[0,1]` and is ONE value for the whole bind pass, not per-bone (the per-bone knob that varies limb-to-limb is `bone.radius`, which already exists — a different falloff SHAPE per bone is a rarer need than a different reach, per the lead-in at 2072-2075). The nested `weighForPoints(pts)` closure is the shared per-point-list weighing helper (factored out so the manual weight-override popover's \"Réinitialiser (auto)\" button can recompute ONE vertex the exact same way a full bind pass would, per CLAUDE.md §3, cited by name at 2084): it chooses rigWeighOnePoint vs rigWeighOnePointByControl by the `SM_RIG_CONTROL_POINT_WEIGHTS` global (see `boundaries` for its never-written status), and maps every point through it. `rest` is the plain `[x,y]` un-posed baseline from `path.segments`. `restHandles` (2026-08-31 addition) is a SEPARATE parallel array of `{i,o}` raw handle vectors (`null` when a handle is exactly zero in both x/y), deliberately NOT reshaping `rest` itself so an old saved rig without `restHandles` behaves exactly as before (applyRigDeform guards on `b.restHandles` truthy, C21i, cited by line only) — needed because the prior boundary-only-moves-points assumption (\"hundreds of near-straight, already-smoothed segments\", true of a vector-brush ribbon) is false of Pen-drawn shapes with a handful of points and real bezier handles, which used to flatten every curve the moment a bone turned (2096-2110). `weights=weighForPoints(rest)`. The `bind` object is `{strokeId,rest,restHandles,weights,rotate:!!rotate,_live:path}` — `_live` set HERE at bind time in addition to `relinkRigBinds`'s own later resets on every loadFrame. If the path is a vector-brush ribbon WITH `centerSegments`, the ribbon's own few-point CENTERLINE gets an independent second snapshot/weighing: `bind.centerRest` (point + handleIn + handleOut per centerSegment, captured from the FIXED rest vectors so repeated pose ticks never compound rotation on top of already-rotated handles) and `bind.centerWeights=weighForPoints(centerRest.map(r=>r.point))` — kept in sync purely so a future brush-width regeneration (`rebuildVectorBrushOutline`, out of scope, cited by name) has a plausible starting deformation to build FROM, explicitly NOT used for the on-screen render itself, which stays the boundary's own precise per-vertex deform (2119-2131). Finally `rig.binds.push(bind); return true;`.",
+          "callers": [
+            "app.js:2274 — the SOLE caller in the entire codebase, inside rigAutoAssignLayer's own paths loop (this scope, packet 9): `if(rigBindStroke(ld,c,boneIds,neededRadius,rotate,softness))n++;` — confirmed by whole-src grep (no other reference to `rigBindStroke\\(` besides its own declaration). There is no separate \"click one shape to bind it\" code path anywhere in rig-bridge.js or timeline.js: every bind pass, whatever triggers it, goes through rigAutoAssignLayer, which always binds every selectable shape/mesh on the layer at once (see `reconciliation`)."
+          ],
+          "behavior": [
+            "Line 2032 (code, 1 line): declaration, six formal parameters.",
+            "Line 2033 (code, 1 line): `ensureLayerRig(ld)`.",
+            "Lines 2034-2039 (comment, 6 lines): the CompoundPath-before-segments guard-order rationale.",
+            "Lines 2040-2042 (code, 3 lines): the three early-return guards (invalid target, CompoundPath, empty/no segments), each with its own French `console.warn`.",
+            "Lines 2043-2051 (comment, 9 lines): states vector-brush ribbons and their linked-fill companion are supported like any other Path, and that a rig-posed deformation persists via `desP`'s own segments-based reconstruction (out of scope, cited by name).",
+            "Line 2052 (code, 1 line): `ensureStrokeId(path)`.",
+            "Lines 2053-2058 (comment, 6 lines): the re-bind-replaces-not-stacks rationale.",
+            "Line 2059 (code, 1 line): the replace-filter itself.",
+            "Line 2060 (code, 1 line): `radius=radius||200;`.",
+            "Lines 2061-2075 (comment, 15 lines): the falloff-softness design note (hard-linear vs full smoothstep, blended, one value per layer-wide bind pass, per-bone reach lives on `bone.radius` separately).",
+            "Line 2076 (code, 1 line): the softness clamp.",
+            "Lines 2077-2084 (comment, 8 lines): the shared `weighForPoints` factoring rationale, cross-referencing the manual weight-override popover and CLAUDE.md §3.",
+            "Lines 2085-2094 (code, 10 lines): the `weighForPoints` closure itself — lines 2086-2089 are its own inline comment (new binds use control-point anchoring; existing binds are untouched), lines 2090-2093 are its body (the gated ternary, the `.map`).",
+            "Line 2095 (code, 1 line): `rest` — map segments to plain `[x,y]`.",
+            "Lines 2096-2110 (comment, 15 lines): the rest-tangents/`restHandles` design note (why a separate parallel array, why old rigs are unaffected, what the boundary-only-moves-points assumption used to flatten).",
+            "Lines 2111-2116 (code, 6 lines): `restHandles` — map segments to `{i,o}` raw handle vectors, null-if-zero.",
+            "Line 2117 (code, 1 line): `weights=weighForPoints(rest)`.",
+            "Line 2118 (code, 1 line): the `bind` object literal.",
+            "Lines 2119-2131 (comment, 13 lines): the centerSegments-sync design note (why, what it's for, what it explicitly is NOT for).",
+            "Line 2132 (code, 1 line): the vector-brush-with-centerSegments guard.",
+            "Lines 2133-2137 (comment, 5 lines): the fixed-rest-vectors rationale (why rotation always computes from `centerRest`, never from live handles, to avoid compounding rotation across pose ticks).",
+            "Lines 2138-2141 (code, 4 lines): `centerRest` snapshot, `bind.centerRest`, `bind.centerWeights`, closing brace of the guard.",
+            "Line 2142 (code, 1 line): `rig.binds.push(bind);`.",
+            "Line 2143 (code, 1 line): `return true;`.",
+            "Line 2144 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "bind-mesh",
+      "packets": [
+        {
+          "id": "C21h.bind-mesh",
+          "files": [
+            "src/js/app.js:2145-2187"
+          ],
+          "coverage_ranges": [
+            [
+              2145,
+              2187
+            ]
+          ],
+          "classification": {
+            "code": 18,
+            "comment": 25,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigBindMesh"
+          ],
+          "signature": "function rigBindMesh(ld,raster,boneIds,radius,rotate,softness){if(!raster||!raster.data||!raster.data.meshId)return false;var mesh=window.SMImageMesh&&SMImageMesh.get(raster.data.meshId);if(!mesh||!window.SMEngineBridge||!SMEngineBridge.rasterImageRect)return false;var rig=ensureLayerRig(ld);softness=Math.max(0,Math.min(1,softness||0));var rect=SMEngineBridge.rasterImageRect(raster);var restMesh={verts:mesh.verts,offsets:mesh.verts.map(function(){return[0,0];})};var world=SMImageMesh.worldVerts(restMesh,rect,null);var rest=world.map(function(p){return[p[0],p[1]];});var meshWeigh=(window.SM_RIG_CONTROL_POINT_WEIGHTS===false)?rigWeighOnePoint:rigWeighOnePointByControl;var weights=rest.map(function(pt){return meshWeigh(rig,boneIds,new Point(pt[0],pt[1]),radius,softness);});rig.binds=rig.binds.filter(function(b){return b.meshId!==raster.data.meshId;});rig.binds.push({meshId:raster.data.meshId,rest:rest,weights:weights,rotate:!!rotate,_liveRaster:raster});return true;}",
+          "responsibility": "Binds an image's mesh vertices to bones (2026-08-30) — deliberately the SAME shape as rigBindStroke (packet 7): same weighing helpers, same replace-not-stack rule, per the lead-in (2155-2163), because the skeleton has no business knowing what it drives: bones, poses and IK are identical whether the vertices come from a Path or an image mesh. Only the rest positions are read differently (mesh vertices are stored NORMALIZED, so they are mapped into world space through the raster's own rect) and only the destination differs (applyRigDeform writes MESH OFFSETS back, not points directly — C21i, cited by name only). Guards, in order: `raster`/`raster.data`/`raster.data.meshId` all present; `SMImageMesh.get(meshId)` resolves an actual mesh; `SMEngineBridge` and its `rasterImageRect` helper both present (both out of scope, cited by name). `rect=SMEngineBridge.rasterImageRect(raster)` — the raster's own on-screen rect (rotation-aware, per its own out-of-scope documentation, cited by name only). REST positions are deliberately computed from a SYNTHETIC zero-offset mesh (`restMesh={verts:mesh.verts,offsets:all-zero}`) rather than the mesh's own CURRENT (possibly already-sculpted) offsets — exactly mirroring rigBindStroke's own un-posed-baseline contract (2171-2175): passing the current deformed positions would bake the existing sculpt into the rest pose and make it impossible to return to it. `SMImageMesh.worldVerts(restMesh,rect,null)` (out of scope, cited by name) maps those normalized rest vertices into world space through the rect; `rest` is the plain `[x,y]` result. `meshWeigh` is a SEPARATE inlined copy of the identical `SM_RIG_CONTROL_POINT_WEIGHTS`-gated ternary rigBindStroke's own `weighForPoints` closure uses (packet 7, line 2090 vs this packet's line 2179) — not shared/factored, a minor duplication noted in `future_proposals`. `weights` maps every rest point through `meshWeigh`. Re-binding REPLACES rather than stacks, same rule as a path's, keyed by `meshId` instead of `strokeId`. The pushed bind object is `{meshId,rest,weights,rotate:!!rotate,_liveRaster:raster}` — notably carrying NO `restHandles`/`centerRest`/`centerWeights` fields at all, since a mesh bind has no bezier handles or brush centerline to speak of (those are path-only concepts, confirmed by their total absence from this literal, contrasted with rigBindStroke's own bind literal at packet 7's line 2118).",
+          "callers": [
+            "app.js:2267 — the SOLE caller in the entire codebase, inside rigAutoAssignLayer's own mesh loop (this scope, packet 9), which runs BEFORE the paths loop: `if(rigBindMesh(ld,c,boneIds,neededRadius,rotate,softness))n++;` — confirmed by whole-src grep (no other reference to `rigBindMesh\\(` besides its own declaration). Like rigBindStroke, there is no separate single-image bind code path outside rigAutoAssignLayer."
+          ],
+          "behavior": [
+            "Lines 2145-2163 (comment, 19 lines): lead-in — states the deliberate rigBindStroke-mirroring design, why only rest-position READING and the write DESTINATION differ.",
+            "Line 2164 (code, 1 line): declaration, six formal parameters.",
+            "Lines 2165-2167 (code, 3 lines): the three guard lines (raster/data/meshId; mesh resolves; SMEngineBridge/rasterImageRect present).",
+            "Line 2168 (code, 1 line): `ensureLayerRig(ld)`.",
+            "Line 2169 (code, 1 line): the softness clamp.",
+            "Line 2170 (code, 1 line): `rect=SMEngineBridge.rasterImageRect(raster)`.",
+            "Lines 2171-2175 (comment, 5 lines): the synthetic-zero-offset-rest rationale.",
+            "Lines 2176-2178 (code, 3 lines): `restMesh`, `world=SMImageMesh.worldVerts(...)`, `rest`.",
+            "Line 2179 (code, 1 line): the inlined `meshWeigh` gated ternary.",
+            "Lines 2180-2182 (code, 3 lines): `weights=rest.map(...)`.",
+            "Line 2183 (comment, 1 line): \"Re-binding replaces rather than stacks, same rule as a path's.\".",
+            "Line 2184 (code, 1 line): the replace-filter, keyed by `meshId`.",
+            "Line 2185 (code, 1 line): `rig.binds.push({...})`.",
+            "Line 2186 (code, 1 line): `return true;`.",
+            "Line 2187 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "auto-assign-layer",
+      "packets": [
+        {
+          "id": "C21h.auto-assign-layer",
+          "files": [
+            "src/js/app.js:2188-2289"
+          ],
+          "coverage_ranges": [
+            [
+              2188,
+              2289
+            ]
+          ],
+          "classification": {
+            "code": 59,
+            "comment": 43,
+            "whitespace": 0
+          },
+          "symbols": [
+            "rigAutoAssignLayer"
+          ],
+          "signature": "function rigAutoAssignLayer(ld,layer,defaultRadius,rotate,softness,opts){var rig=ensureLayerRig(ld);var boneIds=Object.keys(rig.bones);if(!boneIds.length)return 0;var neededRadius=defaultRadius||200;layer.children.forEach(function(c){if(!(c instanceof Path)||!isSelectablePathChild(c))return;c.segments.forEach(function(s){boneIds.forEach(function(bid){var bone=rig.bones[bid];if(!bone||bone.radius)return;var bp=_boneSegsToPath(bone.restSegments,bone.closed);var loc=bp.getNearestLocation(s.point);bp.remove();if(!loc)return;var dist=loc.point.getDistance(s.point);if(dist>neededRadius)neededRadius=dist;});});});if(typeof Raster!=='undefined'&&window.SMImageMesh&&window.SMEngineBridge&&SMEngineBridge.rasterImageRect){layer.children.forEach(function(c){if(!(c instanceof Raster)||!c.data||!c.data.meshId)return;var mesh=SMImageMesh.get(c.data.meshId);if(!mesh)return;var rect=SMEngineBridge.rasterImageRect(c);var rest={verts:mesh.verts,offsets:mesh.verts.map(function(){return[0,0];})};SMImageMesh.worldVerts(rest,rect,null).forEach(function(wp){var pt=new Point(wp[0],wp[1]);boneIds.forEach(function(bid){var bone=rig.bones[bid];if(!bone||bone.radius)return;var bp=_boneSegsToPath(bone.restSegments,bone.closed);var loc=bp.getNearestLocation(pt);bp.remove();if(!loc)return;var dist=loc.point.getDistance(pt);if(dist>neededRadius)neededRadius=dist;});});});}neededRadius=Math.ceil(neededRadius*1.05);var n=0,skippedUnsupported=0;var wantPaths=!opts||opts.paths!==false;var wantMeshes=!opts||opts.meshes!==false;if(wantMeshes&&typeof Raster!=='undefined'){layer.children.forEach(function(c){if(!(c instanceof Raster)||!c.data||!c.data.meshId)return;if(rigBindMesh(ld,c,boneIds,neededRadius,rotate,softness))n++;});}layer.children.forEach(function(c){if(!wantPaths)return;if(c instanceof CompoundPath){skippedUnsupported++;return;}if(!(c instanceof Path)||!isSelectablePathChild(c))return;if(rigBindStroke(ld,c,boneIds,neededRadius,rotate,softness))n++;});return{n:n,skippedUnsupported:skippedUnsupported};}",
+          "responsibility": "Step 2 of the Rig tool's own 3-step flow (draw bones, auto-assign, pose), per Cyril's spec cited directly (2026-07-29, \"un bouton d'assignation qui assigne automatiquement les éléments du layer sélectionné aux bones\"). Binds EVERY selectable shape AND every meshed image on the layer against EVERY bone in one pass, relying on rigBindStroke's/rigBindMesh's own per-bone-radius weighting to produce a sensible \"nearest bone wins, blended near a boundary\" result without per-shape bone selection — and REPLACES whatever binds already existed (via rigBindStroke's/rigBindMesh's own replace-not-stack rule), so re-running this after adjusting an influence circle is the expected \"try again\" gesture, not something that piles up stale binds (2145-2154). `boneIds=Object.keys(rig.bones)`; a bare `return 0` (NOT the normal `{n,skippedUnsupported}` shape) if there are no bones at all — a return-shape inconsistency, see `boundaries`. AUTO-SIZING the fallback radius (2026-07-29 fix, \"l'autoassign marche pas alors que j'ai mis les bones sur la shape\") is the largest single block: since the per-vertex weight is a LINEAR falloff hard-clamped to 0 past the radius, and the fixed 200px default is narrower than half the width of any shape over ~400px (the common case for a torso/limb on a 1920x1080 canvas), auto-assign used to create a bind that visibly did nothing when posed — indistinguishable from \"doesn't work\" to the artist (2192-2205). The fix scans every selectable PATH's own vertices once (nested `layer.children.forEach` × `c.segments.forEach` × `boneIds.forEach`, each iteration allocating and immediately removing a throwaway `_boneSegsToPath`, packet 2) and grows `neededRadius` to the farthest one actually needs — but ONLY for a bone that doesn't already have its own manually-set `bone.radius` (`if(!bone||bone.radius)return;`), so a bone the artist already resized via its own influence circle keeps that manual radius untouched. Mesh vertices count toward the SAME measurement (2026-08-30 addition, 2222-2226): a second, structurally identical triple-nested scan over every meshed Raster's own world-mapped vertices, guarded by `typeof Raster!=='undefined'&&window.SMImageMesh&&window.SMEngineBridge&&SMEngineBridge.rasterImageRect` — skipping it would reproduce, for images, the exact 0-weight-edge bug the path scan exists to fix. A small margin (`Math.ceil(neededRadius*1.05)`) ensures the single farthest vertex gets a sliver of pull instead of landing exactly on the falloff's own zero boundary. `skippedUnsupported` counts every `CompoundPath` child encountered in the paths loop — rigBindStroke's own guard already rejects a CompoundPath (no single `.segments` to bind), counted HERE so the caller can surface an honest toast instead of a silent \"0 forme(s) assignée(s)\" (2251-2256). `wantPaths`/`wantMeshes` (2026-08-30, \"oui mais faut avoir le choix\") are independent opt-outs, both defaulting to on via `!opts||opts.X!==false`, so a layer with both a drawing and a meshed image can be rigged to drive either, both, or neither kind of content. The MESH loop runs BEFORE the PATHS loop (both gated by their own `want*` flag inside their own forEach, not hoisted above it). The paths loop's own trailing comment (2275-2286) states explicitly why a vector-brush ribbon's linked-fill companion is NOT independently bound here: its own sparse 2-point centerline geometry can't represent an arbitrarily bent multi-joint curve the way the ribbon's many finely-sampled boundary points can (QA-confirmed live: a visible mismatched red sliver cutting across the bend) — applyRigDeform (C21i, cited by name only) instead copies the ribbon's OWN already-correctly-deformed boundary onto the companion after every deform, guaranteeing an exact match by construction rather than a second, independently-approximated deformation that can diverge. Returns `{n,skippedUnsupported}` from its normal exit.",
+          "callers": [
+            "rig-bridge.js:481 — the influence-circle radius-drag release handler (`onUp`'s own `_radiusDrag` branch, guarded by `if (window.rigAutoAssignLayer)`): `rigAutoAssignLayer(_radiusDrag.ld, userLayers[li], panelDefaultRadius(), panelRotate(), panelSoftness());` — return value DISCARDED entirely; `applyRigDeform(_radiusDrag.ld)` is called next, unconditionally, on the same `_radiusDrag.ld` reference, not on anything rigAutoAssignLayer returned. Re-runs auto-assign on release specifically so the deformation follows the radius the artist just dragged, without a second trip to the \"Assigner automatiquement\" button (2026-07-29).",
+            "timeline.js:11552 — the \"Assigner automatiquement\" button's own click handler (`btn-rig-auto-assign`), the ONLY caller that reads the return value: `var res=rigAutoAssignLayer(ld,userLayers[state.activeLayerIdx],radius,rotate,softness,{paths:!driveShapes||driveShapes.checked,meshes:!driveMeshes||driveMeshes.checked});` — reads radius/rotate/softness and the two drive-shapes/drive-meshes checkboxes from the Rig panel; calls `pushUndo()` BEFORE (11546) and `SMEngineBridge.renderNow()` AFTER (11553); this handler already toasts-and-returns on `!rig||!Object.keys(rig.bones).length` (11541-11542) BEFORE calling rigAutoAssignLayer at all, so it never observes the bare-`0` early-return shape."
+          ],
+          "behavior": [
+            "Line 2188 (code, 1 line): declaration, six formal parameters.",
+            "Lines 2189-2191 (code, 3 lines): `ensureLayerRig`, `boneIds=Object.keys(rig.bones)`, the bare-`0` no-bones early return.",
+            "Lines 2192-2205 (comment, 14 lines): the auto-size rationale (the 0-weight-edge bug, the fixed 200px-too-narrow default, the scan-and-grow approach, the manual-radius-preserved caveat).",
+            "Line 2206 (code, 1 line): `neededRadius=defaultRadius||200;`.",
+            "Lines 2207-2221 (code, 15 lines): the path-vertex radius-growth triple-nested scan.",
+            "Lines 2222-2226 (comment, 5 lines): the mesh-vertices-count-too rationale.",
+            "Lines 2227-2247 (code, 21 lines): the mesh-vertex radius-growth triple-nested scan, guarded by the four-part `typeof Raster/SMImageMesh/SMEngineBridge/rasterImageRect` check.",
+            "Lines 2248-2249 (comment, 2 lines): the 1.05 margin rationale.",
+            "Line 2250 (code, 1 line): the margin itself.",
+            "Lines 2251-2256 (comment, 6 lines): the `skippedUnsupported`/CompoundPath rationale.",
+            "Line 2257 (code, 1 line): `var n=0,skippedUnsupported=0;`.",
+            "Lines 2258-2261 (comment, 4 lines): the wantPaths/wantMeshes independent-choice rationale.",
+            "Lines 2262-2263 (code, 2 lines): `wantPaths`/`wantMeshes` resolution.",
+            "Lines 2264-2269 (code, 6 lines): the mesh-bind loop, gated by `wantMeshes`.",
+            "Lines 2270-2274 (code, 5 lines): the paths-bind loop's own guard chain (wantPaths, CompoundPath-as-skipped, Path/isSelectablePathChild) through the `rigBindStroke` call.",
+            "Lines 2275-2286 (comment, 12 lines): the linked-fill-companion-not-independently-bound rationale, citing applyRigDeform's own boundary-copy behavior by name.",
+            "Line 2287 (code, 1 line): closing `});` of the paths forEach.",
+            "Line 2288 (code, 1 line): `return {n:n,skippedUnsupported:skippedUnsupported};`.",
+            "Line 2289 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "rig-bridge.js (the on-canvas Rig tool: bone-draw Pen interaction, influence-circle drag, manual weight-override popover)",
+      "disposition": "Retains its own body in full — cited by line only. The complete external caller of ensureLayerRig (343, 522), rigFreshId (381), _boneSegsToPath (186, 378, 638), rigWeighOnePoint (660) and rigAutoAssignLayer (481). Never calls rigBindStroke or rigBindMesh directly — confirmed each has exactly one caller in the repository, rigAutoAssignLayer."
+    },
+    {
+      "consumer": "timeline.js (the Rig panel UI's \"Assigner automatiquement\" button, exportJSON's own ld.rig field whitelist, duplicateLayer/splitLayerAtPlayhead's rig copies)",
+      "disposition": "Retains its own body in full — cited by line only. rigAutoAssignLayer's other external caller (11552), and the ONE caller observed to read its return value. exportJSON's own `binds` whitelist (2155-2163) determines what of this scope's own WRITES (rigBindStroke's `centerRest`/`centerWeights`) actually survives a save/reload — see `boundaries`."
+    },
+    {
+      "consumer": "app.js:3235 cloneRigForSymbol (general app.js territory, outside this leaf, C21g and C21i)",
+      "disposition": "Retains its own body in full — cited by line only. A second, independently-maintained persisted-shape whitelist with the identical field list and the identical `centerRest`/`centerWeights` omission as exportJSON's own copy — see `boundaries`."
+    },
+    {
+      "consumer": "app.js:2290+ applyRigDeform/rigResetPose/rigCommitFrame/rigSetIK/rigAnchorPoint/rigDragIKEnd (C21i, the next leaf)",
+      "disposition": "Retains its own body in full — cited by line only. The complete reader of `bind.weights`/`bind.centerWeights` (applyRigDeform's own anchorFor/displaceOne, app.js:2373/2390/2479), the sole caller of `_boneSegsToPath`'s bonePaths-cache variant (2299) and of `_rigChordAngle`/`_rigNormalizeAngle` (2327), and the caller of `relinkRigBinds` (2549, rigCommitFrame) and `ensureLayerRig` (2562, rigSetIK) from outside this scope."
+    },
+    {
+      "consumer": "image-mesh.js (SMImageMesh.get/worldVerts) and engine-bridge.js (SMEngineBridge.rasterImageRect)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. Both are read-only dependencies of rigBindMesh (packet 8) and rigAutoAssignLayer's own mesh-radius pass (packet 9); neither is written to by this scope."
+    },
+    {
+      "consumer": "tools.js (isSelectablePathChild, ensureStrokeId)",
+      "disposition": "Retains its own body in full — cited by name/line only. isSelectablePathChild (app.js:576, general app.js territory, not tools.js — corrected here after direct verification) excludes `isLinkedFillCompanion`/`isBrushTextureCopy` children from rigAutoAssignLayer's own paths loop; ensureStrokeId (tools.js:1910) mints/reuses the id rigBindStroke persists as `strokeId`."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-ensurelayerrig-lazy-init-idempotent",
+      "proposed": "Call `ensureLayerRig({})` twice on the same object; expect the FIRST call to install `{bones:{},ikChains:{},binds:[],nextId:1}` and the SECOND call to return the exact SAME object (`===`), not a fresh one — verifies the lazy get-or-create guard at line 1906 — not run."
+    },
+    {
+      "id": "fx-rigfreshid-increments-and-formats",
+      "proposed": "Call `rigFreshId({nextId:5},'bone')` twice; expect the first call to return `'bone5'` and the SECOND call to return `'bone6'`, and `rig.nextId` to equal `7` afterward — verifies the post-increment side effect at line 1909 — not run."
+    },
+    {
+      "id": "fx-bonesegstopath-never-inserted",
+      "proposed": "Call `_boneSegsToPath([{point:[0,0]},{point:[10,0]}], false)` and check `result.layer` is `null`/`undefined` and `paper.project.activeLayer.children.indexOf(result)===-1` — verifies the `{insert:false}` contract at line 1914 — not run."
+    },
+    {
+      "id": "fx-relinkrigbinds-drops-vertex-count-mismatch",
+      "proposed": "Build a bind with `rest` of length 5, then relink against a live Path with 4 segments sharing the same `strokeId`; expect the bind to be DROPPED (absent from `ld.rig.binds` afterward), not resized or clamped — verifies the \"in doubt, drop\" vertex-count guard at line 1950 — not run."
+    },
+    {
+      "id": "fx-relinkrigbinds-mesh-vs-path-keying",
+      "proposed": "Build one path bind (has `strokeId`, no `meshId`) and one mesh bind (has `meshId`, no `strokeId`) in the same `ld.rig.binds`, relink against a layer containing both a strokeId-tagged Path and a meshId-tagged Raster; expect BOTH binds to survive, the path bind gaining `_live` and the mesh bind gaining `_liveRaster` — verifies the two independent lookup maps at lines 1930-1937 don't cross-contaminate — not run."
+    },
+    {
+      "id": "fx-weighonepoint-vs-bycontrol-shape",
+      "proposed": "Call `rigWeighOnePoint(rig,['b1'],p,100,0)` and `rigWeighOnePointByControl(rig,['b1'],p,100,0)` against a bone with 3 restSegments; expect the FIRST to return at most ONE entry (shaped `{boneId,offset,w}`) and the SECOND to return up to THREE entries (shaped `{boneId,ptIndex,w}`, one per control point within radius) — verifies the two models' structurally different fan-out — not run."
+    },
+    {
+      "id": "fx-softness-zero-matches-legacy-linear",
+      "proposed": "Call `rigWeighOnePoint(rig,boneIds,p,radius,0)` and independently compute the plain linear falloff `max(0,1-dist/radius)`; expect the two to be numerically IDENTICAL — verifies the `softness=0` branch is byte-identical to the pre-softness behavior, per the source comment's own claim at line 2065-2066 — not run."
+    },
+    {
+      "id": "fx-rigchordangle-end-clamp",
+      "proposed": "Call `_rigChordAngle(segs, 0)` and `_rigChordAngle(segs, segs.length-1)` on a 3-point `segs`; expect neither to throw or read `undefined`, and each to return the direction toward/from its ONE available neighbour rather than `0` — verifies the `Math.max(k-1,0)`/`Math.min(k+1,segs.length-1)` clamping at line 2028 — not run."
+    },
+    {
+      "id": "fx-rignormalizeangle-wraps-negative",
+      "proposed": "Call `_rigNormalizeAngle(-4*Math.PI/3)` (a value outside `(-π,π]` after a naive subtraction); expect the result to land inside `(-π,π]` — verifies the double-mod expression at line 2031 handles JS's own negative-modulo behavior correctly — not run."
+    },
+    {
+      "id": "fx-rigbindstroke-rejects-compoundpath-with-own-message",
+      "proposed": "Call `rigBindStroke(ld, compoundPathInstance, boneIds, 200, false, 0)` and capture `console.warn` output; expect the CompoundPath-specific French message (not the generic \"cible invalide ou vide\") and a `false` return — verifies the guard-order fix at lines 2034-2041 — not run."
+    },
+    {
+      "id": "fx-rigbindstroke-replace-not-stack",
+      "proposed": "Call `rigBindStroke(ld, path, boneIds, 200, false, 0)` twice on the SAME path (same `strokeId`); expect `ld.rig.binds` to contain exactly ONE entry for that strokeId afterward, not two — verifies the replace-filter at line 2059 — not run."
+    },
+    {
+      "id": "fx-rigbindstroke-centersegments-only-for-vectorbrush",
+      "proposed": "Call rigBindStroke on a plain Pen-drawn Path (no `data.isVectorBrush`) and on a vector-brush ribbon WITH `data.centerSegments`; expect the plain Path's bind to have NO `centerRest`/`centerWeights` keys at all, and the ribbon's bind to have both, with `centerRest.length === path.data.centerSegments.length` — verifies the gate at line 2132 — not run."
+    },
+    {
+      "id": "fx-rigbindmesh-rest-ignores-current-offsets",
+      "proposed": "Sculpt a mesh's offsets away from zero, then call `rigBindMesh`; expect the resulting bind's `rest` to equal the WORLD position the mesh would occupy at ZERO offset (not its current, already-sculpted position) — verifies the synthetic-zero-offset restMesh at line 2176 — not run."
+    },
+    {
+      "id": "fx-rigbindmesh-no-resthandles-field",
+      "proposed": "Call `rigBindMesh` and inspect the returned bind's own keys; expect no `restHandles`/`centerRest`/`centerWeights` property to exist at all (not even as `undefined`) — verifies the bind literal at line 2185 carries exactly `{meshId,rest,weights,rotate,_liveRaster}` — not run."
+    },
+    {
+      "id": "fx-rigautoassign-no-bones-bare-zero",
+      "proposed": "Call `rigAutoAssignLayer(ld, layer, 200, false, 0, {})` on a layer whose `ld.rig.bones` is empty; expect the return value to be the bare number `0`, NOT `{n:0,skippedUnsupported:0}` — verifies (and documents) the return-shape inconsistency at line 2191 — not run."
+    },
+    {
+      "id": "fx-rigautoassign-radius-grows-past-default",
+      "proposed": "Call `rigAutoAssignLayer` with `defaultRadius=200` on a layer containing a 1000px-wide shape and one bone with no manually-set `bone.radius`; expect the resulting bind's own effective radius (derivable from its weight entries' own falloff) to exceed 200, and the farthest vertex to receive a strictly positive (if small) weight — verifies the auto-sizing pass at lines 2207-2250 actually prevents the pre-fix \"visibly does nothing\" symptom — not run."
+    },
+    {
+      "id": "fx-rigautoassign-manual-bone-radius-preserved",
+      "proposed": "Set `bone.radius=50` manually on one bone, then call `rigAutoAssignLayer` with a far-larger auto-grown `neededRadius`; expect that bone's own weight falloff to still use `50`, not the auto-grown value — verifies the `if(!bone||bone.radius)return;` skip at lines 2211/2237 — not run."
+    },
+    {
+      "id": "fx-rigautoassign-compoundpath-counted-not-bound",
+      "proposed": "Call `rigAutoAssignLayer` on a layer containing one CompoundPath among otherwise-bindable Paths; expect the CompoundPath to contribute to `skippedUnsupported` and NOT appear in any resulting bind, while the ordinary Paths still bind normally — verifies line 2272 — not run."
+    },
+    {
+      "id": "fx-rigautoassign-wantpaths-wantmeshes-independent",
+      "proposed": "Call `rigAutoAssignLayer(ld,layer,200,false,0,{paths:false,meshes:true})` on a layer with both a shape and a meshed image; expect only the meshed image to gain a bind (`n` reflects only the mesh), the shape's own prior bind (if any) to be left untouched (rigBindStroke never called for it, so its replace-filter never runs) — verifies lines 2262-2274's independent gating — not run."
+    }
+  ],
+  "future_proposals": [
+    "`rigBindStroke`'s own vector-brush centerline snapshot (`bind.centerRest`/`bind.centerWeights`, app.js:2139-2140) is dropped by BOTH out-of-scope persisted-shape whitelists that gate what survives a save/reload (exportJSON, timeline.js:2163) or a fold-into-Component (cloneRigForSymbol, app.js:3245) — neither has ever included these two fields at this SHA, confirmed by direct read of both map literals. Concretely: a vector-brush ribbon's own future-width-regeneration starting point (the whole purpose this scope's own comment at 2119-2131 states `centerRest`/`centerWeights` exist for) is silently lost on every save/reload and every Motion auto-conversion-to-Component, even though the boundary's own render-time deformation (which DOES round-trip, via `restHandles`) is unaffected. This is the SAME class of bug both whitelists' own comments describe having already fixed twice before for other fields (`meshId` missing from cloneRigForSymbol's own whitelist, 2026-08-30; `restHandles` missing from both, 2026-09 QA sweep) — CLAUDE.md §1's \"a new tag must be verified in every consumer, not just where it was introduced\" family of bug, still open for this one field pair. Not changed here (out of this census's write scope; the whitelists themselves live in timeline.js/app.js outside this leaf's own 406 lines).",
+    "`window.SM_RIG_CONTROL_POINT_WEIGHTS` (read at app.js:2090 and 2179, gating which of the two weighing models a fresh bind pass uses) has NO writer anywhere in `src` at this SHA — confirmed by a whole-repo grep returning exactly these two read sites. The flag can only ever be set from a devtools console session, meaning every ordinary UI-driven bind in this shipped build takes the control-point (packet 5) branch permanently; the legacy per-point model (packet 4) is reachable live ONLY through rig-bridge.js:660's manual \"Réinitialiser (auto)\" popover button, which calls rigWeighOnePoint directly and unconditionally rather than through either gated ternary. If the legacy model is meant to stay reachable as a real user-facing toggle (not just a developer escape hatch), it currently has no UI; if it is meant to be permanently retired now that every new bind uses control-point anchoring, the two `===false` ternaries and the unused branch could be simplified. Not changed here.",
+    "rigBindMesh's own `meshWeigh` selection (app.js:2179) is a byte-for-byte duplicate of rigBindStroke's `weighForPoints` closure's own ternary (app.js:2090) — the SAME `SM_RIG_CONTROL_POINT_WEIGHTS===false?rigWeighOnePoint:rigWeighOnePointByControl` expression, written twice rather than factored into a shared helper (unlike the `_boneSegsToPath`/`_rigChordAngle` helpers this scope already DOES share between its two bind functions). A future third weighing model would need to be threaded through both sites identically, the same drift risk CLAUDE.md §3 flags for other duplicated-pair code in this codebase (engine.rs's `render`/`render_to_pixels`, cited by name only). Minor; not changed here.",
+    "`rigAutoAssignLayer`'s own no-bones early return (app.js:2191, `return 0`) has a different SHAPE than its normal exit (`return{n:n,skippedUnsupported:skippedUnsupported}`, line 2288) — a caller reading `.n`/`.skippedUnsupported` off the early-return branch's result would read `undefined`, not `0`. Neither of the two confirmed external callers is currently exposed to this: timeline.js's own button handler already guards on the identical no-bones condition before calling at all, and rig-bridge.js's radius-drag-release caller discards the return value entirely. Latent, not active; returning `{n:0,skippedUnsupported:0}` from the early guard would remove the inconsistency at no behavioral cost to either observed caller. Not changed here.",
+    "The path-vertex and mesh-vertex radius-growth scans (app.js:2207-2247) each allocate and immediately remove one throwaway `_boneSegsToPath` PER (vertex, bone) PAIR, with no cache across vertices — unlike applyRigDeform's own `bonePaths(bid)` cache (C21i, app.js:2296-2302, cited by line only), which builds each bone's own throwaway path ONCE per pose tick and reuses it for every bind. For a layer with many vertices and several bones this is an uncapped, unbatched cost paid once per auto-assign click (not per frame/scrub tick, so lower urgency than the per-frame cost classes CLAUDE.md §5 documents) — flagged as a plausible follow-up (hoist a per-bone-id `_boneSegsToPath` cache keyed the same way applyRigDeform's own `boneCache` already is, out of scope, cited by name), not changed here."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the eleven function symbols (ensureLayerRig, rigFreshId, _boneSegsToPath, relinkRigBinds, rigWeighOnePoint, rigWeighOnePointByControl, _rigChordAngle, _rigNormalizeAngle, rigBindStroke, rigBindMesh, rigAutoAssignLayer), at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same commands.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a small Python script implementing the validator's OWN classify() algorithm (blank/`//`-prefixed/`/*...*/`-block line counting) against a direct `git show 59a5a38c:src/js/app.js` dump, run once per packet and once for the total — 178/228/0 over 406 lines, matching the issue's own proposed union exactly, and matching the issue's own proposed per-packet figures exactly for all nine packets.",
+    "Every writer of `ld.rig`'s own top-level fields and every `binds[]` field was found by separate greps for the bare field patterns (`\\.weights\\b`, `centerWeights`, `_live\\b`, `_liveRaster`, `SM_RIG_CONTROL_POINT_WEIGHTS`) across `src/js/app.js`, `src/js/rig-bridge.js` and `src/js/timeline.js`, rather than assuming this scope's own eleven symbols are the only writers — this surfaced both out-of-scope persisted-shape whitelists (exportJSON, cloneRigForSymbol) and confirmed the `centerRest`/`centerWeights` omission documented in `boundaries`/`future_proposals`.",
+    "`rigBindStroke`'s and `rigBindMesh`'s own complete caller lists (exactly one each, both inside rigAutoAssignLayer) were confirmed by the same whole-src grep technique, filtered to exclude each function's own declaration line — this directly falsified an initial plausible assumption (that rig-bridge.js's own canvas click-to-bind affordance would call one of these two functions per-shape) before it was written into this artifact.",
+    "The texture-dab exclusion claim in `boundaries` (relinkRigBinds implicitly skips dabs without special-casing) was confirmed by reading `applyBrushTexture`'s own dab-tagging code (tools.js:5149-5200, out of scope, cited by line only), not assumed from CLAUDE.md §1's own general list of `data.*` tags."
+  ],
+  "validation": {
+    "expected_assigned_lines": 406,
+    "expected_classification": {
+      "code": 178,
+      "comment": 228,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        1884,
+        1909
+      ],
+      [
+        1910,
+        1918
+      ],
+      [
+        1919,
+        1954
+      ],
+      [
+        1955,
+        1985
+      ],
+      [
+        1986,
+        2021
+      ],
+      [
+        2022,
+        2031
+      ],
+      [
+        2032,
+        2144
+      ],
+      [
+        2145,
+        2187
+      ],
+      [
+        2188,
+        2289
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by a Python re-implementation of the validator's own classify() run against the frozen blob: 1884-1909=(5,21,0); 1910-1918=(6,3,0); 1919-1954=(20,16,0); 1955-1985=(16,15,0); 1986-2021=(16,20,0); 2022-2031=(6,4,0); 2032-2144=(32,81,0); 2145-2187=(18,25,0); 2188-2289=(59,43,0); sums to (178,228,0)=406 — identical to the issue's own proposed union and per-packet table exactly.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 406 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C21h-app-rig-model-binding.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0",
+      "C21g-app-duplicator-runtime.json was not present on main at authoring time (PR not yet merged) and is therefore not included in this artifact's own required_checks list; per the issue's own acceptance criterion 2, it should be added to this check list once merged."
+    ]
+  }
+}

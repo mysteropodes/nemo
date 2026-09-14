@@ -1,0 +1,414 @@
+{
+  "census_id": "C19al",
+  "issue": 1259,
+  "title": "Timeline.js export modal, last-session restore, right-panel collapse-to-rail and the file's own bootstrap tail — export modal IIFE (`updateScaleVisibility`/`currentExportScale`/`gateDesktopOnlyFormats`), silent `importJSON` autosave restore, `renderPropsPanelRail`/`togglePropsPanelCollapse`/`syncPropsPanelCollapseTitle`, `initPropsPanelCollapse` remainder, the final bootstrap line",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19ak/#1258 — the LAST open timeline.js slice. THREE disjoint ranges because C06's own `preferences`/`bootstrap` scope sits between two of this scope's own packets: the autosave `setInterval` (11796-11809) and the first five lines of `initPropsPanelCollapse` (11884-11888, the IIFE head through `window.SM=window.SM||{}`). Scope is timeline.js:11667-11795 + 11810-11883 + 11889-11907 (222 lines: 155 code, 63 comment, 4 blank, re-derived independently by a Python re-implementation of the validator's own classify() against the frozen blob, matching the issue's own proposed table exactly — no boundary correction needed). It starts at the `// ---- EXPORT MODAL ----` header (11667), immediately after C19ak's own project.js note (11663-11666), and ends at the file's own final bootstrap statement (11907). Cited by name/line only, not re-mapped: `SMExport.isAvailable`/`videoBrowserAvailable` and the per-format exporters the modal dispatches to by name (export.js), `SMLottiePreview.open` (lottie-preview.js:125), the AE-camera/Rive export hints and Kitsu message keys (i18n.js), `state.exportIncludeShadowGuides`/`waIn`/`waOut`/`fps`/`totalFrames`/`canvasW`/`canvasH` (app.js, C21a/C21j), `SMProject.autosaveWrite`/`pushVersionSnapshot`/`refreshActiveTabDirtyDot` and the autosave `setInterval` itself (timeline.js:11796-11809, C06's own `preferences`/`bootstrap` area — see `boundaries` for the exact citation gap found), `window.SM.importJSON` (timeline.js:2354, an earlier C19 slice), `updatePropsContext` and its `show` object (timeline.js:3131, C19j), `window.SM.afterI18n`/`applyI18n` (i18n.js), `window.SM.setTool` (timeline.js:373), `updateUI` (timeline.js:2727), `renderSymbolTabs` (timeline.js:6981, C19v), `state.userProfile.role` (app.js), and the `#export-modal`/`#exp-*`/`#btn-export`/`#export-close`/`#props-panel-collapse-btn`/`.psec` markup (src/index.html), `localStorage['nemo-auto']`/`'nemo-props-panel-collapsed'`. This JSON authoring does not authorize source changes; P30 retains the timeline.js runtime writer.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "0af70a3003a2c24fd476b169827b9e5115e77dfe",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19al-timeline-export-modal-rail-bootstrap-census",
+  "assigned_ranges": [
+    {
+      "start": 11667,
+      "end": 11795
+    },
+    {
+      "start": 11810,
+      "end": 11883
+    },
+    {
+      "start": 11889,
+      "end": 11907
+    }
+  ],
+  "coverage_note": "Exactly 222 assigned lines occur once across three packets (one coverage_range per packet, no gaps, no other-owner exclusions): 155 code, 63 full-line comment, 4 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span) — equal to the issue's own proposed table exactly (129(97/29/3) + 74(49/24/1) + 19(9/10/0) = 222(155/63/4)), no boundary correction needed. Line 11666 is C19ak's own project.js hand-off comment (out of scope); line 11667 opens this scope's own `// ---- EXPORT MODAL ----` header. Lines 11796-11809 (the autosave `setInterval`) sit between packet 1 and packet 2; lines 11884-11888 (the `initPropsPanelCollapse` IIFE head through `window.SM=window.SM||{}`) sit between packet 2 and packet 3 — both attributed to C06's own `preferences`/`bootstrap` scope per the issue's own directive. Direct inspection of C06's own artifact (`C06-preferences-labs-bootstrap.json`) at this candidate finds its `scope_files` explicitly lists `src/js/timeline.js (partial: ... 11884-11888)` — confirming that half of the citation — but does NOT separately enumerate 11796-11809 by exact line anywhere in its own text (checked by grep for 'autosave'/'nemo-auto'/'setInterval'/'pushVersionSnapshot', zero hits); the autosave `setInterval`'s own calls (`SMProject.autosaveWrite`/`pushVersionSnapshot`/`refreshActiveTabDirtyDot`) are conceptually part of C06's own `preferences` domain regardless of whether its own artifact text names the exact line range, so this artifact excludes 11796-11809 from its own assigned_ranges as directed, while flagging the gap in C06's own citation for the record rather than silently asserting it as verified. Line 11907 is the file's own last line (`source_line_count`), confirmed by `wc -l`. A sweep of every C*.json in this directory sharing `source_path: src/js/timeline.js` at the candidate commit confirms this artifact's own three ranges are disjoint from every already-merged sibling (nearest neighbors: C19aa ends at 8996; C19af claims 10217-10392; no merged sibling claims anything in 8997-11666 or 11667+ at this candidate — those intermediate leaves exist only in unmerged sibling worktrees per the issue's own note, and per the validator's own directory-scan design this artifact's own overlap check binds only against whichever C19*.json files are ACTUALLY present at validation time).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (0af70a3003a2c24fd476b169827b9e5115e77dfe at authoring time, HEAD of this branch) has the identical timeline.js blob (git rev-parse 0af70a3...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at that SHA, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean). The issue itself was filed against an earlier main tip (fa7268b); every commit landing between fa7268b and 0af70a3 is itself a census-only docs PR (C19z/C19aa/C19ac/C19af per `git log`), none touching src/js/timeline.js's own content — confirmed by the blob identity above.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for every function symbol this scope defines (updateScaleVisibility, currentExportScale, gateDesktopOnlyFormats, renderPropsPanelRail, togglePropsPanelCollapse, syncPropsPanelCollapseTitle) plus plain-text greps for the module-level IIFEs and the bootstrap line's own calls, each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`. Every claim was cross-checked line-by-line against a direct `sed -n`/`Read` of the same range. External definitions were located directly: `window.SM.importJSON` (timeline.js:2354), `updatePropsContext` (timeline.js:3131), `window.SM.setTool` (timeline.js:373), `updateUI` (timeline.js:2727), `renderSymbolTabs` (timeline.js:6981), `window.SMExport` object literal and its per-format methods (export.js:1257+), `window.SMLottiePreview` (lottie-preview.js:125), `state.exportIncludeShadowGuides`/`waIn`/`waOut`/`totalFrames`/`canvasW`/`canvasH`/`fps`/`userProfile` (app.js).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-08, 'mettre en place le repli du panel droit en icon pour l'ui', echoed verbatim in src/index.html's own comment on `#props-panel-collapse-btn`; 2026-08-30, the status-bar/i18n-placeholder regression note) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json and the three timeline.js packets partitioning lines 11667-11795 + 11810-11883 + 11889-11907.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope covers three unrelated end-of-file constructs, split by which one each packet covers: the export modal's own self-contained IIFE (format/scale/size/alpha row visibility, the desktop-only Rive gate, and the async run handler that dispatches to `window.SMExport[fn]`); the silent last-session restore plus the entire right-panel collapse-to-rail feature (`renderPropsPanelRail`/`togglePropsPanelCollapse`/`syncPropsPanelCollapseTitle`); and the remainder of `initPropsPanelCollapse` (its own `afterI18n` registrations and collapsed-state restore) plus the file's own final bootstrap statement — literally the last executable line of timeline.js, setting the initial tool and rendering the first frame. None of the three constructs calls into either of the others.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19ak (existing owner, immediately before this scope, #1258)",
+      "disposition": "Retains its own body in full — cited by name/line only. Line 11663-11666 is C19ak's own hand-off comment ('Save/Save As/Open/New buttons... wired in project.js'); this scope's own boundary begins at line 11667, the export-modal section header, confirmed against C19ak's own declared range end."
+    },
+    {
+      "owner": "C06 (`preferences`/`bootstrap` area, existing owner of two internal cut points, out of scope)",
+      "disposition": "Owns lines 11796-11809 (the autosave `setInterval`: `saveAllLayerFrames()`, `window.SM.exportJSON()`, `SMProject.autosaveWrite`/`pushVersionSnapshot`/`refreshActiveTabDirtyDot`, the plain `localStorage['nemo-auto']` fallback) sitting between this scope's own packet 1 and packet 2, and lines 11884-11888 (the `initPropsPanelCollapse` IIFE head: `var btn=document.getElementById(...)`, the click listener, `window.SM=window.SM||{}`) sitting between packet 2 and packet 3 — the second half is explicitly confirmed in C06's own `scope_files` list (`src/js/timeline.js (partial: ... 11884-11888)`); the first half is attributed per the issue's own directive but is NOT separately named by exact line anywhere in C06's own artifact text (checked directly, zero hits for 'autosave'/'setInterval'/'pushVersionSnapshot') — recorded as a citation gap in `coverage_note` rather than silently treated as verified, without changing this artifact's own exclusion of those lines."
+    },
+    {
+      "owner": "export.js (`SMExport.*` per-format exporters, `exportTauriAvailable`/`exportVideoBrowserAvailable`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. `window.SMExport={...}` (export.js:1257) is the object this scope's own `runBtn` handler reads by computed key: `svg→exportSVGSequence`, `png→exportPNGSequence`, `tiff→exportTIFFSequence`, `gif→exportGIF`, `mp4→exportMP4`, `prores→exportProRes`, `lottie→exportLottie`, `rive→exportRive`, `ae-camera→exportAECamera` (this scope's own line 11766's lookup object). `isAvailable` (export.js:1258, aliasing `exportTauriAvailable`) gates the 'Tauri only' toast (11740-11742, this scope's own `#btn-export` open handler) alongside `videoBrowserAvailable` (export.js:1338, aliasing `exportVideoBrowserAvailable`) — read together so MP4/WebM's own browser MediaRecorder fallback (2026-08-17) does not trigger a false 'Tauri only' warning. This scope never reproduces any exporter's own body — it only builds the shared `opts` object (11760-11763: `start`,`end`,`scale`,`alpha`,`fps`,`onProgress`,`onFfmpeg`,`onRiveProgress`) and awaits the dispatched function."
+    },
+    {
+      "owner": "lottie-preview.js (`SMLottiePreview.open`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (window.SMLottiePreview, lottie-preview.js:125). Called once, this scope's own line 11782, only when the export format is `lottie` AND `res.json` is truthy — the modal is left open (not auto-closed via the 900ms `setTimeout` every other format uses) so a bad export is inspectable rather than silently indistinguishable from success."
+    },
+    {
+      "owner": "i18n.js (`SM.t`, every `export*` key), app.js (`state.*` fields, C21a/C21j), timeline.js:2354/2727/373/6981 (`importJSON`/`updateUI`/`setTool`/`renderSymbolTabs`, earlier C19 slices)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. Every progress/result string this scope's own export handler shows (`exportPreparing`, `exportRenderingFrame`, `exportDone`, `exportCancelled`, `exportError`/`exportErrorUnknown`, `exportTauriOnly`, `exportAeCamMsg`/`exportAeCamKitsuOk`/`exportAeCamKitsuFail`, `exportRiveDone`, `exportGenericDone`) resolves through `SM.t` (i18n.js) — this scope supplies only the key name and any `{i}`/`{n}`/`{e}`/`{name}` interpolation, never the localized text itself. `window.SM.importJSON(saved,true)` (11814) is this scope's own sole call into a symbol declared elsewhere in timeline.js (line 2354, `importJSON:function(json,silent)` — the second positional argument is literally named `silent` at its own declaration, confirming the restore is deliberately silent, no toast). `window.SM.setTool`/`updateUI`/`renderSymbolTabs` (11907, the file's own final bootstrap line) are each declared earlier in timeline.js (373/2727/6981 respectively) and are called here exactly once each, in that left-to-right order, as the file's own last executable statement."
+    },
+    {
+      "owner": "src/index.html (`#export-modal`/`#exp-*`/`#btn-export`/`#export-close`/`#props-panel-collapse-btn`/`#props-panel-rail`/`.psec` markup)",
+      "disposition": "Retains its own markup in full — cited by name/line only. `#props-panel-collapse-btn`'s own in-markup comment (index.html:388-397) states the rationale this scope's own `renderPropsPanelRail` implements — one clickable rail entry per currently-visible `.psec` section, reusing each section's own translated `.phdr` text, because there is no fixed panel identity to hang a small fixed icon set on (up to 25 different `.psec` ids depending on tool/selection). This scope reads every `#exp-*`/`#export-*` id via `document.getElementById` and never declares any markup itself."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior. It is the LAST open timeline.js census slice by line number, but intermediate ranges (8997-11666) remain open in unmerged sibling branches per the issue's own note and are not addressed here."
+    }
+  ],
+  "boundaries": [
+    "Line 11666 (C19ak's own project.js hand-off comment) is outside coverage; line 11667 (this scope's own `// ---- EXPORT MODAL ----` header) begins this scope, confirmed against C19ak's own declared assigned_ranges end.",
+    "Lines 11796-11809 (the autosave `setInterval`) and 11884-11888 (the `initPropsPanelCollapse` IIFE head through `window.SM=window.SM||{}`) are excluded — both attributed to C06's own `preferences`/`bootstrap` scope per the issue's own directive; see `coverage_note`/`reconciliation` for the citation-gap finding on the first half.",
+    "Line 11907 (the file's own final statement) is the last line of this scope and of the file itself, confirmed by `wc -l src/js/timeline.js` and by `source_line_count`.",
+    "No lines inside the three assigned ranges are excluded for another owner: every line belongs to exactly one of the three packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) Export modal — DOM handle capture (11669-11678: `modal`, `fmtSel`, `rangeSel`, `scaleRow`, `scaleSel`, `sizeRow`, `wInput`/`hInput`, `alphaRow`, `progEl`, `runBtn`). `ALPHA_FORMATS=['png','prores']` (11684, a 5-line comment 11679-11683 explains: PNG sequence and ProRes 4444 both have a real alpha channel at the codec level; MP4/H.264 and GIF do not; TIFF/SVG/Lottie were out of scope rather than guessed). `NO_SCALE_FORMATS=['lottie','rive','ae-camera']` (11685, vector/keyframe-only export targets with no pixel-scale concept). `updateScaleVisibility()` (11686-11695): `scaleRow` hidden for any `NO_SCALE_FORMATS` value; `sizeRow` shown only when scale is NOT a no-scale format AND `scaleSel.value==='custom'`; `alphaRow` shown only for an `ALPHA_FORMATS` value; `#exp-rive-hint`/`#exp-ae-camera-hint` toggled per exact format match, each guarded for the element's own existence.",
+    "(b) Export modal — the desktop-only Rive gate: `gateDesktopOnlyFormats()` (11702-11717, an IIFE called once at module init) returns immediately if `window.__TAURI__!=='undefined'` is truthy (i.e. running inside the desktop app, where the gate is unnecessary); otherwise it disables the `option[value=\"rive\"]` element, resets the select away from `rive` if it was already chosen, and — because this file loads BEFORE i18n.js, so `SM.t` would still return the raw key at this point — defers the label's own translated suffix (`' — '+SM.t('expAppOnly')`) into `window.SM.afterI18n`, i18n.js's documented escape hatch for exactly this ordering problem (11709-11712 comment), so the label re-picks the correct wording on every subsequent language switch too.",
+    "(c) Export modal — sizing math: W/H stay locked to the canvas' own aspect ratio (11723-11726 comment+code) — editing `wInput` recomputes `hInput` as `round(w*canvasH/canvasW)` and vice versa, a uniform scale multiplier rather than a crop/stretch control. `currentExportScale()` (11727-11733): for `scaleSel.value==='custom'`, returns `wInput.value/canvasW` (falling back to `canvasW` itself if the field is empty); otherwise parses `scaleSel.value` directly as a float percentage-style multiplier (e.g. `'0.5'`, `'2'`).",
+    "(d) Export modal — open/close chrome: `#btn-export` click (11735-11746) warns via `exportTauriOnly` only when NEITHER `SMExport.isAvailable()` NOR (if defined) `SMExport.videoBrowserAvailable()` is true, then calls `updateScaleVisibility()`, hides/clears the progress element, and shows the modal (`display:'flex'`). `#export-close` click and a click on the modal's own backdrop (`e.target===modal`) both hide it (11747-11748).",
+    "(e) Export modal — the async run handler (`#exp-run` click, 11750-11793): `saveAllLayerFrames()` first (flush any in-progress edit to persisted frame data); `range` resolves to `{start:0,end:totalFrames-1}` for `'all'` else `{start:waIn,end:waOut}` (work-area bounds); `scale` from `currentExportScale()`; `alpha` true only if the current format is in `ALPHA_FORMATS` AND `#exp-alpha` is checked; `state.exportIncludeShadowGuides=document.getElementById('exp-include-shadow').checked` (11759) is written DIRECTLY into state with no setter, no undo entry and no other mutation guard — the 4-line comment above it (11755-11758) explains this is deliberate: export.js's own `exportBuildFrame`/Lottie stroke filters both read `state.exportIncludeShadowGuides` directly, so this is the simplest way to reach both without threading a new parameter through every `exportXxx` function. `opts` (11760-11763) carries `start`,`end`,`scale`,`alpha`,`fps:state.fps`, plus three progress callbacks (`onProgress`→`exportRenderingFrame` templated with `{i}`/`{n}`; `onFfmpeg`→ raw ffmpeg stderr line truncated to 80 chars; `onRiveProgress`→ raw message). `runBtn.disabled=true` and `exportPreparing` shown before dispatch (11764); `fn` (11766) is looked up by format from a literal object mapping `svg/png/tiff/gif/mp4/prores/lottie/rive/ae-camera` to the corresponding `SMExport` method name; `await window.SMExport[fn](opts)` (11767) is the sole export call. Result branches (11768-11787): `res.cancelled`→`exportCancelled`; `res.ok`→`exportDone`, plus a format-specific `doneMsg` (`rive`→`exportRiveDone` with `{name}`; `ae-camera`→`exportAeCamMsg` with `{n}` PLUS an appended Kitsu-result suffix `exportAeCamKitsuOk`/`exportAeCamKitsuFail`; else→`exportGenericDone`), shown via `showToast`; a `lottie` success with `res.json` and `window.SMLottiePreview` present opens the Lottie preview INSTEAD of auto-closing (11780-11782, deliberately, per the 3-line comment 11777-11779: a bad export would otherwise be silent until opened elsewhere); every other successful format auto-closes the modal after a 900ms `setTimeout` (11784); a non-cancelled non-ok result shows `exportError` with `res.error||exportErrorUnknown` (11787). `catch`/`finally` (11788-11792): any thrown error shows `exportError` with the error's own `.message` or itself; `runBtn.disabled=false` always, regardless of outcome.",
+    "(f) The silent last-session restore (11810-11814): a 4-line lead-in comment explains the UX rationale (restored quietly into memory so the start screen's own 'Resume Last Session' card is instantly ready — a toast here would be confusing alongside the new start screen; state.js decides whether to actually SHOW that card, and surfaces its own confirmation once the user actually chooses it — cited by name only, not re-mapped). The code itself is one guarded statement: `try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}` — `importJSON`'s own second positional parameter is literally named `silent` at its declaration (timeline.js:2354, out of scope), confirming the `true` here means 'do not show the normal import UI/toast'.",
+    "(g) The right-panel collapse-to-rail feature, lead-in (11816-11821, 2026-08, quoting 'mettre en place le repli du panel droit en icon pour l'ui') explains WHY the collapsed state is a vertical label rail rather than a fixed icon set: up to 25 different `.psec` sections can be relevant depending on tool/selection (unlike a fixed panel dock), so a rail entry is built per CURRENTLY VISIBLE section from `updatePropsContext`'s own `show` object (timeline.js:3131, cited by name/line only). `renderPropsPanelRail(show)` (11822-11845): clears `#props-panel-rail`'s own innerHTML; for each `id` in `show` that is truthy, looks up the section element, reads its `.phdr` header text (stripping a leading `☰ ` glyph if present) as the label, skips silently if either the section or a non-empty label is missing, and builds a `<button class=\"rail-item\">` whose click handler expands the panel (`togglePropsPanelCollapse(false)`), re-opens the section's own header if it was closed (`hdr.classList.contains('closed')` → `hdr.click()`), and scrolls it into view on the next animation frame. `window.renderPropsPanelRail=renderPropsPanelRail` (11845) is the cross-file/self-reentrant export (called again internally from `togglePropsPanelCollapse` itself, see (h)).",
+    "(h) `togglePropsPanelCollapse(force)` (11846-11872): `collapsed` resolves from the explicit `force` argument when given (`force!==undefined`), else toggles the panel's own current `.collapsed` class state. A 6-line comment (11850-11856) explains the width-persistence interaction: panel-width persistence (ui.js, out of scope) sets a plain inline `style.width`, which always wins over the `.collapsed` class's own CSS `width:36px` rule (inline beats any selector regardless of specificity) — so collapsing must explicitly clear the inline width first (stashing it on `window._propsExpandedWidth`, not a local var, so ui.js's own startup restore can prime the same value for the 'starts collapsed' case), and expanding must explicitly restore it. The resize handle (`#props-panel-resize`) is hidden while collapsed — dragging a 36px rail wider makes no sense. If collapsing AND a previous `show` object was cached (`window._lastPropsShow`), `renderPropsPanelRail` is invoked immediately so the rail reflects the panel's actual last-known context rather than staying empty until the next selection/tool change. `syncPropsPanelCollapseTitle()` is called unconditionally at the end (title text tracks collapsed state). The collapsed boolean persists to `localStorage['nemo-props-panel-collapsed']` (`'1'`/`'0'`), guarded in a `try`. `window.togglePropsPanelCollapse=togglePropsPanelCollapse` (11872) is the cross-file export the rail's own button (`#props-panel-collapse-btn`) and `initPropsPanelCollapse`'s own restore both reach.",
+    "(i) `syncPropsPanelCollapseTitle()` (11873-11883): an 8-line lead-in comment explains why this can't be a static `data-i18n-title` attribute — the title text is STATE-dependent (collapsed vs not) and i18n.js's own `[data-i18n-title]` sweep would blindly stomp it back to one fixed wording on every language switch, even while already collapsed; it is instead registered into `window.SM.afterI18n` (i18n.js's own documented escape hatch for exactly this class of problem) so a language switch re-picks the correct one of the two strings. The function itself guards on the button/panel/`window.SM`/`SM.t` all existing, then sets `btn.title=SM.t(panel.classList.contains('collapsed')?'expandPanelTitle':'collapsePanelTitle')`.",
+    "(j) `initPropsPanelCollapse`'s own remainder inside packet 3 (11889-11906, the IIFE's own head at 11884-11888 is C06's, see `reconciliation`): a 6-line comment (11889-11894) recounts a 2026-08-30 regression — the status bar and props-context labels are built with raw `innerHTML` from `SM.t` values rather than `data-i18n` attributes, so `applyI18n` cannot repaint them; at boot, before i18n.js has loaded, they are written from the placeholder `t` stub at the top of this file, which used to throw and now (with the placeholder) leaves raw untranslated keys visible ('thDrawDesc BthTool scAltDrag…', explicitly quoted as the measured string) until the next tool change. The fix registers a second `afterI18n` callback (11899-11901) that calls `updatePropsContext()` (if defined) once i18n has actually loaded, at the cost of one extra call of something the app already runs on every tool/selection change. `wasCollapsed` (11902-11903) is read from `localStorage['nemo-props-panel-collapsed']==='1'`, guarded in a `try`; if true, `togglePropsPanelCollapse(true)` runs the full collapse path (including an immediate rail render if `_lastPropsShow` is already set); otherwise `syncPropsPanelCollapseTitle()` alone sets the correct initial title for the already-expanded default state. `})();` (11906) closes the IIFE.",
+    "(k) Line 11907, the file's own final statement and literally its last line: `window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();` — three calls in strict left-to-right order: `SM.setTool` (timeline.js:373, out of scope) picks the initial tool, `'hand'` for a `'producer'`-role user profile (a review-only role with no drawing intent) else `'draw'`; `updateUI()` (timeline.js:2727, out of scope) performs the app's first full UI paint; `renderSymbolTabs()` (timeline.js:6981, out of scope, C19v) builds the initial Component/symbol tab strip. This is, functionally, the timeline module's own 'main()' — the one statement guaranteed to run after every function/IIFE above it has been defined and every earlier IIFE (comment popover, text popover, combine panel, export modal, autosave interval, session restore, collapse-to-rail init) has already executed its own top-level body."
+  ],
+  "areas": [
+    {
+      "area": "export-modal",
+      "packets": [
+        {
+          "id": "C19al.export-modal",
+          "files": [
+            "src/js/timeline.js:11667-11795"
+          ],
+          "coverage_ranges": [
+            [
+              11667,
+              11795
+            ]
+          ],
+          "classification": {
+            "code": 97,
+            "comment": 29,
+            "whitespace": 3
+          },
+          "symbols": [
+            "updateScaleVisibility",
+            "currentExportScale",
+            "gateDesktopOnlyFormats",
+            "ALPHA_FORMATS",
+            "NO_SCALE_FORMATS",
+            "SMExport",
+            "exportIncludeShadowGuides"
+          ],
+          "signature": "(function(){ ... var ALPHA_FORMATS=[...]; var NO_SCALE_FORMATS=[...]; function updateScaleVisibility(); function gateDesktopOnlyFormats(); function currentExportScale(); ... })()",
+          "responsibility": "The export modal's own self-contained IIFE: DOM handle capture, per-format row-visibility matrix (`updateScaleVisibility`), the desktop-only Rive gate (`gateDesktopOnlyFormats`), aspect-locked W/H sizing (`currentExportScale`), the modal's own open/close chrome, and the async `#exp-run` handler that builds `opts` and dispatches to `window.SMExport[fn](opts)`, driving progress text and the success/cancel/error follow-ups (Lottie preview, AE-camera Kitsu message, generic toast).",
+          "callers": [
+            "None of this packet's own function symbols (`updateScaleVisibility`, `gateDesktopOnlyFormats`, `currentExportScale`) are called from outside this IIFE — confirmed by a whole-`src` grep restricted to each symbol name, filtered to exclude declaration lines and `//`-only hits: zero external hits for all three.",
+            "The IIFE itself runs once at module-load time (immediately invoked, no external trigger)."
+          ],
+          "behavior": [
+            "Line 11667 (comment): `// ---- EXPORT MODAL ----` section header.",
+            "Line 11668 (code): `(function(){` — IIFE open.",
+            "Lines 11669-11678 (code, 10 lines): DOM handle capture — `modal`,`fmtSel`,`rangeSel`,`scaleRow`,`scaleSel`,`sizeRow`,`wInput`/`hInput`,`alphaRow`,`progEl`,`runBtn`.",
+            "Lines 11679-11683 (comment, 5 lines): ALPHA_FORMATS rationale — PNG and ProRes 4444 have a real alpha channel; MP4/H.264 and GIF do not; TIFF/SVG/Lottie kept out of scope rather than guessed.",
+            "Line 11684 (code): `var ALPHA_FORMATS=['png','prores'];`.",
+            "Line 11685 (code): `var NO_SCALE_FORMATS=['lottie','rive','ae-camera'];`.",
+            "Lines 11686-11695 (code, 10 lines): `function updateScaleVisibility(){...}` — `scaleRow` hidden for a NO_SCALE_FORMATS value; `sizeRow` shown only for a scaled format with `scaleSel.value==='custom'`; `alphaRow` shown only for an ALPHA_FORMATS value; `#exp-rive-hint`/`#exp-ae-camera-hint` toggled per exact format, each guarded for existence.",
+            "Lines 11696-11701 (comment, 6 lines): Rive-export-is-desktop-only rationale — MCP call to 127.0.0.1:9791 cannot succeed from a browser origin; desktop's Rust HTTP client has no such constraint; the option is greyed out rather than left to fail with a technical error.",
+            "Lines 11702-11717 (code, 16 lines): `(function gateDesktopOnlyFormats(){...})()` — returns immediately if `window.__TAURI__!=='undefined'`; else disables the `rive` option, resets the select away from it if selected, and defers the label's own translated suffix into `window.SM.afterI18n` (i18n.js loads after this file, so `SM.t` would return the raw key if called synchronously here).",
+            "Line 11718 (code): `fmtSel.addEventListener('change',updateScaleVisibility);`.",
+            "Lines 11719-11722 (code, 4 lines): `scaleSel` change listener — for `'custom'`, primes `wInput`/`hInput` from `state.canvasW`/`canvasH`; always calls `updateScaleVisibility()`.",
+            "Lines 11723-11724 (comment, 2 lines): aspect-lock rationale — a uniform render-resolution multiplier, not a crop/stretch/reflow control.",
+            "Line 11725 (code): `wInput` input listener recomputes `hInput.value` from the canvas aspect ratio.",
+            "Line 11726 (code): `hInput` input listener recomputes `wInput.value` symmetrically.",
+            "Lines 11727-11733 (code, 7 lines): `function currentExportScale(){...}` — `'custom'`: `wInput.value/canvasW` (falls back to `canvasW` if empty); else `parseFloat(scaleSel.value)`.",
+            "Line 11734 (blank).",
+            "Lines 11735-11746 (code, 12 lines): `#btn-export` click — warns `exportTauriOnly` only if neither `SMExport.isAvailable()` nor (if present) `SMExport.videoBrowserAvailable()` is true; calls `updateScaleVisibility()`; hides/clears the progress element; shows the modal.",
+            "Line 11747 (code): `#export-close` click hides the modal.",
+            "Line 11748 (code): modal backdrop click (`e.target===modal`) hides the modal.",
+            "Line 11749 (blank).",
+            "Line 11750 (code): `runBtn.addEventListener('click',async function(){` — the run handler opens.",
+            "Line 11751 (code): `saveAllLayerFrames();` — flush any in-progress edit before export.",
+            "Line 11752 (code): `range` — `{start:0,end:totalFrames-1}` for `'all'` else `{start:waIn,end:waOut}`.",
+            "Line 11753 (code): `scale=currentExportScale();`.",
+            "Line 11754 (code): `alpha` — true only if the format is in `ALPHA_FORMATS` AND `#exp-alpha` is checked.",
+            "Lines 11755-11758 (comment, 4 lines): rationale for writing `exportIncludeShadowGuides` straight into `state` rather than threading a new opts param — export.js's own exportBuildFrame/Lottie stroke filters both read it directly.",
+            "Line 11759 (code): `state.exportIncludeShadowGuides=document.getElementById('exp-include-shadow').checked;`.",
+            "Lines 11760-11763 (code, 4 lines): `opts={start,end,scale,alpha,fps:state.fps,onProgress,onFfmpeg,onRiveProgress}` — the three callbacks show progress text via `exportRenderingFrame`/a truncated ffmpeg line/a raw Rive message respectively.",
+            "Line 11764 (code): `runBtn.disabled=true;` + show `exportPreparing`.",
+            "Line 11765 (code): `try{`.",
+            "Line 11766 (code): `fn` looked up from a literal format→SMExport-method-name map covering svg/png/tiff/gif/mp4/prores/lottie/rive/ae-camera.",
+            "Line 11767 (code): `var res=await window.SMExport[fn](opts);` — the sole export dispatch call.",
+            "Line 11768 (code): `res.cancelled` → `exportCancelled`.",
+            "Lines 11769-11776 (code, 8 lines): `res.ok` branch — `exportDone`; `aeCamMsg` built from `exportAeCamMsg`+`{n}` plus a Kitsu-result suffix if present; `doneMsg` selects `exportRiveDone`(`{name}`)/`aeCamMsg`/`exportGenericDone` by format; `showToast(doneMsg)`.",
+            "Lines 11777-11779 (comment, 3 lines): Lottie-gets-its-own-preview rationale — a bad export (empty/misplaced shapes) would otherwise be silent until opened elsewhere.",
+            "Lines 11780-11785 (code, 6 lines): `lottie` success with `res.json` and `SMLottiePreview` present opens the Lottie preview instead of auto-closing; every other successful format schedules a 900ms auto-close.",
+            "Line 11786 (code): closes the `if/else if` result chain.",
+            "Line 11787 (code): non-cancelled non-ok branch — `exportError` with `res.error||exportErrorUnknown`.",
+            "Lines 11788-11789 (code): `catch(err)` — `exportError` with `err.message||err`.",
+            "Lines 11790-11792 (code): `finally{runBtn.disabled=false;}`.",
+            "Line 11793 (code): `});` closes the run handler.",
+            "Line 11794 (code): `})();` closes the export-modal IIFE.",
+            "Line 11795 (blank)."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "last-session-restore-and-panel-rail",
+      "packets": [
+        {
+          "id": "C19al.last-session-restore-and-panel-rail",
+          "files": [
+            "src/js/timeline.js:11810-11883"
+          ],
+          "coverage_ranges": [
+            [
+              11810,
+              11883
+            ]
+          ],
+          "classification": {
+            "code": 49,
+            "comment": 24,
+            "whitespace": 1
+          },
+          "symbols": [
+            "importJSON",
+            "renderPropsPanelRail",
+            "togglePropsPanelCollapse",
+            "syncPropsPanelCollapseTitle",
+            "_lastPropsShow",
+            "_propsExpandedWidth"
+          ],
+          "signature": "try{...window.SM.importJSON(saved,true);}catch(e){} function renderPropsPanelRail(show); function togglePropsPanelCollapse(force); function syncPropsPanelCollapseTitle()",
+          "responsibility": "The silent last-session autosave restore (one guarded statement), and the entire right-panel collapse-to-rail feature: building the rail's own per-section buttons from `updatePropsContext`'s `show` object, the collapse/expand toggle (with its inline-width vs `.collapsed`-class interaction and its own localStorage persistence), and the state-dependent title sync that i18n's own attribute sweep cannot handle.",
+          "callers": [
+            "`renderPropsPanelRail` — timeline.js:3405 (`updatePropsContext`, external to this packet but internal to the file, called only when the panel is already collapsed) plus one internal self-call (11868, inside `togglePropsPanelCollapse` itself, when collapsing with a cached `_lastPropsShow`).",
+            "`togglePropsPanelCollapse` — timeline.js-internal only: 11838 (a rail-item's own click handler, packet 2's own `renderPropsPanelRail`), 11886/11904 (packet 3, `initPropsPanelCollapse`'s own button listener and startup restore). No cross-file caller and no keyboard-shortcut caller found by a whole-`src` grep.",
+            "`syncPropsPanelCollapseTitle` — timeline.js-internal only: 11869 (end of `togglePropsPanelCollapse`), 11905 (packet 3, `initPropsPanelCollapse`'s own else-branch), plus its own registration into `window.SM.afterI18n` (packet 3, line 11876, not a direct call). No cross-file caller found.",
+            "`window.SM.importJSON` — declared timeline.js:2354 (out of scope, an earlier C19 slice); this scope's own line 11814 is one of several call sites project-wide (project.js:197/268/536/574/686/733 are the others, all out of scope, cited by name only)."
+          ],
+          "behavior": [
+            "Lines 11810-11813 (comment, 4 lines): silent-restore rationale — ready the instant the start screen's 'Resume Last Session' card is clicked; a toast here would be confusing alongside the new start screen; state.js decides whether to show that card and surfaces its own confirmation once chosen (cited by name only).",
+            "Line 11814 (code): `try{var saved=localStorage.getItem('nemo-auto');if(saved)window.SM.importJSON(saved,true);}catch(e){}` — the `true` argument matches `importJSON`'s own second parameter name, `silent` (timeline.js:2354, out of scope).",
+            "Line 11815 (blank).",
+            "Lines 11816-11821 (comment, 6 lines): collapse-to-rail feature header (2026-08, quoting 'mettre en place le repli du panel droit en icon pour l'ui') — one rail entry per CURRENTLY VISIBLE `.psec`, from `updatePropsContext`'s own `show` object, rather than a fixed icon set, because up to 25 different sections can be relevant depending on tool/selection.",
+            "Line 11822 (code): `function renderPropsPanelRail(show){`.",
+            "Line 11823 (code): `var rail=document.getElementById('props-panel-rail');`.",
+            "Line 11824 (code): guard — no rail element, return.",
+            "Line 11825 (code): `rail.innerHTML='';`.",
+            "Lines 11826-11843 (code, 18 lines): `Object.keys(show).forEach(...)` — skip falsy entries; look up the section element and its `.phdr` header, skip if either is missing or the label (header text minus a leading `☰ ` glyph) is empty; build a `<button class=\"rail-item\">` with that label as text and title; click handler expands the panel (`togglePropsPanelCollapse(false)`), opens the section's own header if closed (`hdr.click()` when `.closed`), and scrolls it into view on the next animation frame; append the button to the rail.",
+            "Line 11844 (code): `}` closes `renderPropsPanelRail`.",
+            "Line 11845 (code): `window.renderPropsPanelRail=renderPropsPanelRail;` — cross-file export (read by `updatePropsContext`, timeline.js:3405, out of scope).",
+            "Line 11846 (code): `function togglePropsPanelCollapse(force){`.",
+            "Line 11847 (code): `var panel=document.getElementById('props-panel');`.",
+            "Line 11848 (code): guard — no panel, return.",
+            "Line 11849 (code): `var collapsed=force!==undefined?force:!panel.classList.contains('collapsed');`.",
+            "Lines 11850-11856 (comment, 7 lines): inline-width-vs-`.collapsed`-class rationale — ui.js's own width persistence sets a plain inline `style.width` that always wins over the class's own `width:36px` rule; must be cleared before collapsing and restored on expand; stashed on `window` (not a local var) so ui.js's own startup restore can prime it too.",
+            "Lines 11857-11862 (code, 6 lines): if collapsing, stash any existing inline width into `window._propsExpandedWidth` then clear it; else if `window._propsExpandedWidth` exists, restore it.",
+            "Line 11863 (code): `panel.classList.toggle('collapsed',collapsed);`.",
+            "Lines 11864-11865 (comment, 2 lines): resize-handle rationale — dragging a 36px rail wider makes no sense.",
+            "Lines 11866-11867 (code, 2 lines): hide/show `#props-panel-resize` per collapsed state.",
+            "Line 11868 (code): `if(collapsed&&window._lastPropsShow)renderPropsPanelRail(window._lastPropsShow);` — immediate rail render using the last-known `show` context.",
+            "Line 11869 (code): `syncPropsPanelCollapseTitle();` — unconditional, every toggle.",
+            "Line 11870 (code): `try{localStorage.setItem('nemo-props-panel-collapsed',collapsed?'1':'0');}catch(e){}`.",
+            "Line 11871 (code): `}` closes `togglePropsPanelCollapse`.",
+            "Line 11872 (code): `window.togglePropsPanelCollapse=togglePropsPanelCollapse;` — cross-file export.",
+            "Lines 11873-11877 (comment, 5 lines): state-dependent-title rationale — cannot live on `data-i18n-title`, i18n.js's own sweep would stomp it back to one fixed wording on every language switch even while collapsed; registered in `SM.afterI18n` instead so a switch re-picks the right string.",
+            "Line 11878 (code): `function syncPropsPanelCollapseTitle(){`.",
+            "Line 11879 (code): `var btn=document.getElementById('props-panel-collapse-btn');`.",
+            "Line 11880 (code): `var panel=document.getElementById('props-panel');`.",
+            "Line 11881 (code): guard — no btn/panel/`window.SM`/`SM.t`, return.",
+            "Line 11882 (code): `btn.title=SM.t(panel.classList.contains('collapsed')?'expandPanelTitle':'collapsePanelTitle');`.",
+            "Line 11883 (code): `}` closes `syncPropsPanelCollapseTitle`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "props-panel-collapse-init-tail-and-bootstrap",
+      "packets": [
+        {
+          "id": "C19al.props-panel-collapse-init-tail-and-bootstrap",
+          "files": [
+            "src/js/timeline.js:11889-11907"
+          ],
+          "coverage_ranges": [
+            [
+              11889,
+              11907
+            ]
+          ],
+          "classification": {
+            "code": 9,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updatePropsContext",
+            "wasCollapsed",
+            "togglePropsPanelCollapse",
+            "syncPropsPanelCollapseTitle",
+            "setTool",
+            "updateUI",
+            "renderSymbolTabs"
+          ],
+          "signature": "(remainder of the initPropsPanelCollapse IIFE opened at 11884, out of scope) ... })(); window.SM.setTool(...);updateUI();renderSymbolTabs();",
+          "responsibility": "The tail of `initPropsPanelCollapse` (its IIFE head, 11884-11888, is C06's own scope): a second `afterI18n` registration working around a 2026-08-30 untranslated-status-bar regression, restoring the collapsed state from `localStorage` at boot, and closing the IIFE — followed immediately by the file's own final bootstrap statement, which picks the initial tool by user-profile role and performs the app's first UI render.",
+          "callers": [
+            "This packet contains no function DECLARATIONS of its own — only the tail of an IIFE declared in C06's own range (11884) and the file's own top-level bootstrap statement, which is not itself called from anywhere (it is the file's own last executed statement, run once at module-load time)."
+          ],
+          "behavior": [
+            "Lines 11889-11894 (comment, 6 lines): 2026-08-30 regression note — the status bar and props-context labels are built with raw `innerHTML` from `SM.t` values (not `data-i18n` attributes), so `applyI18n` cannot repaint them; at boot, before i18n.js loads, they are written from the placeholder `t` stub and used to throw, now leaving raw untranslated keys visible until the next tool change (measured string quoted verbatim: 'thDrawDesc BthTool scAltDrag…').",
+            "Lines 11895-11898 (comment, 4 lines): the fix costs one extra call of something already run on every tool/selection change.",
+            "Lines 11899-11901 (code, 3 lines): `(window.SM.afterI18n=window.SM.afterI18n||[]).push(function(){if(typeof updatePropsContext==='function')updatePropsContext();});` — second `afterI18n` registration.",
+            "Line 11902 (code): `var wasCollapsed=false;`.",
+            "Line 11903 (code): `try{wasCollapsed=localStorage.getItem('nemo-props-panel-collapsed')==='1';}catch(e){}`.",
+            "Line 11904 (code): `if(wasCollapsed)togglePropsPanelCollapse(true);`.",
+            "Line 11905 (code): `else syncPropsPanelCollapseTitle();`.",
+            "Line 11906 (code): `})();` — closes the `initPropsPanelCollapse` IIFE (opened in C06's own 11884).",
+            "Line 11907 (code): `window.SM.setTool(state.userProfile&&state.userProfile.role==='producer'?'hand':'draw');updateUI();renderSymbolTabs();` — the file's own final statement: initial tool selection (role-gated), first full UI paint, initial symbol-tab render, in that left-to-right order."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "`saveAllLayerFrames()` is called exactly once in this scope's own body, at the top of the export run handler (11751), flushing any in-progress edit before an export reads frame data — this scope's own ONLY document-persistence call. `renderPropsPanelRail`/`togglePropsPanelCollapse`/`syncPropsPanelCollapseTitle` never call any save function; their own persistence is `localStorage['nemo-props-panel-collapsed']` (UI preference, not document data)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "`window.SM.importJSON(saved,true)` (11814) is this scope's own sole load/import call — a silent restore of the last-known autosave snapshot from `localStorage['nemo-auto']`, guarded by a `try` that swallows any parse/import failure. No other function in this scope triggers a document load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "No `pushUndo`/`pushUndoLayers` call exists anywhere in this scope's own three ranges (confirmed by grep) — the export modal only reads frame data (via `saveAllLayerFrames`, not a mutation), the session restore's own `importJSON` establishes a fresh baseline rather than an undoable edit, and the collapse-to-rail feature touches only UI/localStorage state, never document geometry."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "No `selectedPaths` read or write exists anywhere in this scope. `renderPropsPanelRail`'s own click handler affects which `.psec` SECTION is visible/scrolled-to, not which document items are selected."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "This scope performs no per-frame or per-layer rendering itself. The export run handler builds `opts.start`/`opts.end` from either `{0,totalFrames-1}` or the work-area bounds (`waIn`/`waOut`) — mode-agnostic range selection handed to export.js's own exporters (out of scope), which are the ones that actually resolve Motion vs. Animation-2D per-frame content."
+    },
+    {
+      "consumer": "export",
+      "disposition": "This scope IS the export entry point's own UI/dispatch layer — it is the primary export consumer in the codebase, not merely cited by another scope. It builds the shared `opts` object and dispatches to the correct `window.SMExport[fn]` by format, but never itself renders a frame, encodes a file, or writes to disk — all of that is export.js's own body (out of scope, cited by name/line only per format in `reconciliation`)."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.__TAURI__!=='undefined'` (11703) is this scope's own only direct Tauri-presence check, used solely to decide whether the Rive export option needs to be greyed out — desktop vs. browser is otherwise fully delegated to `SMExport.isAvailable()`/`videoBrowserAvailable()` (export.js, out of scope). No `window.SMEngineBridge` reference exists anywhere in this scope (unlike the Motion/image-mesh in-place editors documented in other census leaves) — none of these three constructs touches the Rust render engine directly."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-scale-visibility-matrix-per-format",
+      "proposed": "For each of `svg,png,tiff,gif,mp4,prores,lottie,rive,ae-camera`, set `fmtSel.value` and call `updateScaleVisibility()`; expect `scaleRow` hidden iff the format is in `NO_SCALE_FORMATS`, `sizeRow` shown iff scaled AND `scaleSel.value==='custom'`, `alphaRow` shown iff the format is in `ALPHA_FORMATS`, and the Rive/AE-camera hint elements shown only for their own exact format — verifies (a) — not run."
+    },
+    {
+      "id": "fx-desktop-only-rive-gate-outside-tauri",
+      "proposed": "With `window.__TAURI__` undefined, load the module; expect the `rive` option `disabled=true`, and if it was previously selected expect `fmtSel.value` reset to `'png'`; simulate an `afterI18n` flush and expect the option's own label to end with the resolved `expAppOnly` suffix rather than the raw key — verifies (b) — not run."
+    },
+    {
+      "id": "fx-current-export-scale-custom-vs-preset",
+      "proposed": "With `scaleSel.value='custom'` and `wInput.value` set to twice `state.canvasW`, expect `currentExportScale()===2`; with `scaleSel.value='0.5'`, expect `currentExportScale()===0.5` regardless of W/H field contents — verifies (c) — not run."
+    },
+    {
+      "id": "fx-export-run-opts-shape-and-fn-dispatch",
+      "proposed": "Stub `window.SMExport` with a spy per format key; for `fmtSel.value='mp4'`, trigger `#exp-run`; expect `saveAllLayerFrames` called before the export call, `SMExport.exportMP4` called exactly once with an `opts` object containing all of `start,end,scale,alpha,fps,onProgress,onFfmpeg,onRiveProgress`, and `state.exportIncludeShadowGuides` set to match `#exp-include-shadow`'s own checked state at call time — verifies (e) — not run."
+    },
+    {
+      "id": "fx-export-result-branches",
+      "proposed": "Three sub-cases against the same stubbed dispatch: (1) resolve `{cancelled:true}` → expect `exportCancelled` shown, modal still open. (2) resolve `{ok:true}` for `fmtSel.value='lottie'` with a `json` payload and a stubbed `SMLottiePreview.open` → expect the preview opened and the modal NOT auto-closed. (3) resolve `{ok:false,error:'x'}` → expect `exportError` shown with `'x'` interpolated — verifies (e)'s result-branch table — not run."
+    },
+    {
+      "id": "fx-silent-restore-no-toast",
+      "proposed": "Seed `localStorage['nemo-auto']` with a valid exported project JSON, spy on `showToast`, reload the module's own top-level script; expect `window.SM.importJSON` called once with `(savedJson,true)` and `showToast` NOT called from this code path — verifies (f) — not run."
+    },
+    {
+      "id": "fx-rail-renders-one-entry-per-visible-psec",
+      "proposed": "Call `renderPropsPanelRail({'fill-sec':true,'stroke-sec':false,'layer-sec':true})` with `#fill-sec`/`#layer-sec` present (each with a `.phdr` header) and `#stroke-sec` either absent or its own `show` value false; expect exactly two `.rail-item` buttons in `#props-panel-rail`, each labelled from its own section's header text with any leading `☰ ` stripped — verifies (g) — not run."
+    },
+    {
+      "id": "fx-collapse-clears-inline-width-expand-restores-it",
+      "proposed": "Set `#props-panel`'s own inline `style.width='420px'`; call `togglePropsPanelCollapse(true)`; expect `window._propsExpandedWidth==='420px'` and the panel's own inline width cleared, `.collapsed` class present, resize handle hidden, and (if `window._lastPropsShow` was set) the rail re-rendered; call `togglePropsPanelCollapse(false)`; expect the inline width restored to `'420px'` and the resize handle visible again — verifies (h) — not run."
+    },
+    {
+      "id": "fx-title-sync-tracks-collapsed-state-across-language-switch",
+      "proposed": "With the panel collapsed, call `syncPropsPanelCollapseTitle()`; expect `btn.title===SM.t('expandPanelTitle')`. Switch the active language (triggering `SM.afterI18n`) without changing collapsed state; expect the title recomputed to the SAME `expandPanelTitle` string in the new language, not silently left in the old one nor stomped to `collapsePanelTitle` by i18n's own attribute sweep — verifies (i) — not run."
+    },
+    {
+      "id": "fx-boot-restores-collapsed-state-and-runs-bootstrap-line",
+      "proposed": "Seed `localStorage['nemo-props-panel-collapsed']='1'`, load the module; expect `togglePropsPanelCollapse(true)` to have run (panel collapsed, title synced) rather than the `else` branch. Separately, with `state.userProfile.role==='producer'`, expect the file's own final line to select tool `'hand'`; with any other role (or no profile), expect `'draw'`; in both cases expect `updateUI()` and `renderSymbolTabs()` to have each run exactly once, in that order, after tool selection — verifies (j)/(k) — not run."
+    }
+  ],
+  "future_proposals": [
+    "The export run handler's own result branches (11768-11787) fire `showToast` from FIVE different sub-branches (`exportDone`+doneMsg, `exportError` twice, `exportCancelled`, and implicitly none for the Lottie-preview success path) with no shared helper consolidating the 'pick a message, show a toast, maybe close the modal' shape — not flagged as a defect (no execution performed; the branching is a straightforward format-driven dispatch, not duplicated logic), but noted as a candidate for a small table-driven refactor if a future format needs the same shape again.",
+    "`gateDesktopOnlyFormats` (11702-11717) permanently disables the `rive` option for the lifetime of the page load the first time it runs, with no re-check if `window.__TAURI__` were to become available later in the same session (not a realistic runtime transition today, since Tauri-vs-browser is fixed at process start) — noted for awareness only, not confirmed as a gap by execution.",
+    "`renderPropsPanelRail`'s own label derivation (`hdr.textContent.trim().replace(/^☰\\s*/,'')`, 11831) assumes every `.phdr` header begins with at most one `☰ ` glyph prefix; a header with the glyph repeated or placed elsewhere in the text would not be stripped correctly. Not confirmed as an actual defect (no cross-check of every `.phdr` header's current markup was performed as part of this census), flagged for the eventual i18n/markup audit pass."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of this scope's own six named function symbols (`updateScaleVisibility`, `currentExportScale`, `gateDesktopOnlyFormats`, `renderPropsPanelRail`, `togglePropsPanelCollapse`, `syncPropsPanelCollapseTitle`) plus a plain-text search for `importJSON`'s own call sites, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A separate whole-`src` grep for `window.SMEngineBridge`/`SMEngineBridge.renderNow` restricted to this scope's own three line ranges returned ZERO hits — directly supporting the `native bridges` `source_consumers` entry (unlike the Motion/image-mesh in-place editors documented in sibling C19 census leaves, none of these three constructs talks to the Rust render engine).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 155/63/4 over 222 lines, matching the issue's own proposed union exactly (129(97/29/3) + 74(49/24/1) + 19(9/10/0)) and matching the issue's own proposed per-packet table exactly for all three packets; no boundary correction was needed.",
+    "`window.SMExport`'s own object-literal definition (export.js:1257) and every per-format method this scope's own `fn` lookup table names (`exportSVGSequence`/`exportPNGSequence`/`exportTIFFSequence`/`exportGIF`/`exportMP4`/`exportProRes`/`exportLottie`/`exportRive`/`exportAECamera`) were located directly by `sed -n`/grep against export.js rather than assumed from the issue's own description; `isAvailable`(export.js:1258)/`videoBrowserAvailable`(export.js:1338) were confirmed as the exact keys this scope's own 11740 gate reads.",
+    "`window.SM.importJSON`'s own declaration (timeline.js:2354, `importJSON:function(json,silent)`) was read directly to confirm the second positional parameter's own name, supporting the `silent`-restore claim in `boundaries` (f) without relying on the issue's own description alone.",
+    "C06's own artifact (`C06-preferences-labs-bootstrap.json`) was read directly and its `scope_files`/full text grepped for `autosave`/`setInterval`/`pushVersionSnapshot`/`11796`/`11809` — it explicitly lists `timeline.js (partial: ... 11884-11888)` but has zero hits for the autosave-interval line range, a citation gap recorded in `coverage_note`/`reconciliation` rather than silently treated as independently verified.",
+    "engineering/inventory/census/*.json siblings present at the candidate commit sharing `source_path: src/js/timeline.js` were enumerated directly: C19a through C19aa are merged and contiguous or independently ranged through line 8996; C19af (10217-10392) is merged and disjoint from this scope's own three ranges; no merged sibling claims any line in 8997-11666 or 11667+ at this candidate — those intermediate leaves (the issue's own C19ab through C19ak lineage) exist only in unmerged sibling branches at authoring time, confirmed by `git branch -vv` showing their own worktrees/branches with unmerged commits."
+  ],
+  "validation": {
+    "expected_assigned_lines": 222,
+    "expected_classification": {
+      "code": 155,
+      "comment": 63,
+      "whitespace": 4
+    },
+    "packet_partition": [
+      [
+        11667,
+        11795
+      ],
+      [
+        11810,
+        11883
+      ],
+      [
+        11889,
+        11907
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 11667-11795=(97,29,3); 11810-11883=(49,24,1); 11889-11907=(9,10,0); sums to (155,63,4)=222 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 222 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19al-timeline-export-modal-panel-rail-bootstrap.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19aa-timeline-typography-panels-gradient-button.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json <candidate-sha> still exits 0"
+    ]
+  }
+}

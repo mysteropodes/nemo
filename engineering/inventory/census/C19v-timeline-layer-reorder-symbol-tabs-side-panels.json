@@ -1,0 +1,734 @@
+{
+  "census_id": "C19v",
+  "issue": 1200,
+  "title": "Timeline layer drag-to-reorder, symbol tabs, footage/component-instance/lip-sync panels and the component frame strip",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C19v census only; P30 (timeline.js runtime writer). This scope is ten small functions plus one module-scope state object: `_layerDrag`/`armLayerReorder`/`installLayerReorderGrip`/`ensureLayerDragGhost`/`updateLayerDragGhost`/`clearLayerDropIndicator`/`moveLayerReorder`/`finishLayerReorder`/`renderSymbolTabs`/`updateFootagePanel`/`updateCompInstancePanel`/`renderLipSyncPanel`/`renderCompFrameStrip` (thirteen own symbols across ten packets, one packet — reorder-grip — folding the sticky-grip helper into `installLayerReorderGrip`, and drag-ghost-indicator folding three tiny drag-ghost helpers together, matching the issue's own suggested packet table). Every callee it reaches is owned elsewhere and cited by line only, never re-mapped: `renderLayerList` row wiring that calls `armLayerReorder`/`installLayerReorderGrip` (C19u, timeline.js:6335-6793), folder helpers `folderLayerParentIdx`/`_layerSel` (C19q, timeline.js:5421-5709), `enterSymbol`/`exitToScene`/`exitMontageView`/`closeSymbolTab`/`setSymbolSingleFrame`/`setSymbolPlayMode`/`resolveSymbolFrameIdx` (app.js/window.SM literal, C21 series), `_tlDrag` (C19p, timeline.js:5028-5420, unrelated frame-grid drag machinery, never referenced from this scope), `SMMotion.setLayerParent` (motion.js), `SMLayerInOut.onDown` (layer-inout.js), `SMLayerKind.of` (layer-kind.js), `SMStoryboard.montageById`/`thumbDataUrl` (storyboard.js), `SMLipSync.settingsOf`/`MOUTHS` (lipsync.js), `SMTrackerPanel.render` (tracker-panel.js), `SMCompPreview.isOpen`/`refresh` (comp-preview.js), `SMNativeVideo.invalidate` (native-video-bridge.js), `pushUndoLayers`/`saveAllLayerFrames` (tweens.js), `loadFrame`/`SMEngineBridge.renderNow` (app.js/engine-bridge.js), and the `window.SM={...}` object literal's own `reparentLayersIntoFolder`/`reorderLayersAtGap`/`setSymbolSingleFrame`/`setSymbolPlayMode`/`enterSymbol`/`exitToScene`/`exitMontageView`/`closeSymbolTab` wrapper entries (timeline.js, an earlier uncensused packet, out of scope). None of these bodies are reproduced here. The duplicator config panel `updateDuplicatorPanel` at 7193+ is the next leaf C19w — cited by line only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "24cc3eb466cad6aaf89f4cb24f1dabb19c4e4e35",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19v-timeline-layer-reorder-side-panels",
+  "assigned_ranges": [
+    {
+      "start": 6794,
+      "end": 7192
+    }
+  ],
+  "coverage_note": "Exactly 399 assigned lines occur once across ten packets (one coverage_range per packet, no gaps, no other-owner exclusions): 309 code, 90 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify()), and equal to the issue's proposed table exactly (no boundary correction needed). Line 6793 is C19u's closing brace of renderLayerList (out of scope, confirmed against C19u's own assigned_ranges end=6793, sole sibling in this directory claiming any part of src/js/timeline.js immediately before this scope). Line 6794 opens this scope's lead-in comment for `_layerDrag`/`armLayerReorder`. Line 7192 is the closing brace of `renderCompFrameStrip`; line 7193 opens the next leaf's (C19w) `updateDuplicatorPanel` lead-in comment. A sweep of every C*.json in this directory sharing source_path: src/js/timeline.js (C19d through C19u) confirms the existing coverage is contiguous through line 6793 and this artifact is the immediate next contiguous span.",
+  "source_baselines": {
+    "pinned": "59a5a38c:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (24cc3eb466cad6aaf89f4cb24f1dabb19c4e4e35, the merge of PR #1195/C19u) has the identical timeline.js blob (git rev-parse 24cc3eb:src/js/timeline.js == git rev-parse 59a5a38c:src/js/timeline.js == cc4cfd27...); this artifact branches from origin/main at 24cc3eb.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07, 2026-07-25, 2026-07-29 through -31, 2026-08, 2026-08-29/30, 2026-09/2026-09-01, feedback #137/#755) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json and the ten timeline.js packets partitioning lines 6794-7192.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is two unrelated feature areas that happen to sit contiguously in the file: (1) the manual mouse/pointer-based layer drag-to-reorder state machine (`_layerDrag` plus six functions: arm, install-grip, ghost x2, clear-indicator, move, finish) that C19u's row wiring arms via `mousedown`/`pointerdown` but does not itself define; and (2) four independent 'show/hide/populate from the active layer, no state of its own' side-panel renderers plus the tab strip above the canvas (`renderSymbolTabs`, `updateFootagePanel`, `updateCompInstancePanel`, `renderLipSyncPanel`, `renderCompFrameStrip`) — the same fallback-context convention `updateCompInstancePanel`'s own comment for `updateFootagePanel` (7014-7017) documents explicitly. `renderCompFrameStrip` calls `renderLipSyncPanel` (self-recursive within this scope, 7169) so the lip-sync panel refreshes every time the frame strip does; `updateCompInstancePanel` calls `renderCompFrameStrip` (7103, also self-recursive).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19u (existing owner, timeline.js:6335-6793)",
+      "disposition": "Retains `renderLayerList`, whose row wiring is the only caller of `armLayerReorder`/`installLayerReorderGrip` from timeline.js's own per-row DOM (6665, 4270-region omitted — see below); `renderLayerList` itself is also this scope's own re-render call after every completed reorder (`finishLayerReorder` does NOT call it directly — the two `window` mouseup/pointerup listeners fire `finishLayerReorder`, which mutates layer order/folder membership via `window.SM.*` and lets THAT wrapper's own re-render, out of scope, run; confirmed by reading 6940-6978 — no `renderLayerList()`/`renderTimeline()` call appears in `finishLayerReorder`'s own body)."
+    },
+    {
+      "owner": "timeline.js:4270 (existing owner, uncensused earlier packet)",
+      "disposition": "Calls `installLayerReorderGrip(row,li)` from the frame-grid's own per-row build (out of scope, not yet censused at authoring time) — cited here as caller by line only."
+    },
+    {
+      "owner": "layer-inout.js (existing owner, out of scope, cited by C19v/#1200's own issue body as C19p-adjacent but living in a separate file)",
+      "disposition": "Line 1550 calls `armLayerReorder(e,li,'grid',row)` directly (not through `window.SM`) when a frame-grid row's own in/out-bar drag start is NOT a modified click — the frame grid's alternate entry point into this scope's drag machinery, guarded on `window.armLayerReorder` existing. `installLayerReorderGrip`'s own lead-in comment (6809-6817) confirms this file no longer installs the sticky grip itself (2026-09-01) but still starts a reorder through this direct call."
+    },
+    {
+      "owner": "motion.js (existing owner, out of scope)",
+      "disposition": "Line 7349 calls `armLayerReorder(e,li,'panel',row)` from Motion's own row mousedown/pointerdown wiring — Motion mode reuses this scope's drag state machine even though (per `installLayerReorderGrip`'s 2026-09-01 comment) it no longer installs the sticky grip. Also retains `SMMotion.setLayerParent(li,parentUid)` (3618, called from `finishLayerReorder`'s un-parent branch, 6969) and `toggleLayer3D`/`toggleLayerDuplicator`/`renderLayerListMotion` (unrelated, cited by C19u, not called from this scope)."
+    },
+    {
+      "owner": "C19q (existing owner, timeline.js:5421-5709)",
+      "disposition": "Retains the module-scope `_layerSel` array (read directly in `finishLayerReorder`'s multi-selection block, 6947, to decide whether a drag moves the whole selection or just the dragged row) and `folderLayerParentIdx` (read in `finishLayerReorder`'s un-parent guard, 6966)."
+    },
+    {
+      "owner": "app.js (existing owner, out of scope, C21 series per #1200's own issue body)",
+      "disposition": "Retains `resolveSymbolFrameIdx(sym,ld,mainFrameIdx)` (2600, called from `updateCompInstancePanel` 7099 and `renderCompFrameStrip` 7172 — the SAME resolver both consult so the frame-strip highlight and the props-panel single-frame field can never disagree), `loadFrame` (called from the footage-panel's interp-mode change handler, 7061, and the footage-relink comment's own cited flow) and `enterSymbol`/`exitToScene`/`exitMontageView`/`closeSymbolTab` (app.js function declarations; reached here only through the `window.SM.*` wrapper object literal in timeline.js, an earlier uncensused packet, not app.js directly — `renderSymbolTabs`' own click handlers call `window.SM.exitToScene()`/`exitMontageView()`/`enterSymbol(symId)`/`closeSymbolTab(symId)`)."
+    },
+    {
+      "owner": "window.SM object literal (existing owner, timeline.js, earlier uncensused packet, out of scope)",
+      "disposition": "Retains the wrapper entries `reparentLayersIntoFolder` (928, called from `finishLayerReorder`'s folder-drop branch, 6949), `reorderLayersAtGap` (1614, delegating to app.js:438, called from `finishLayerReorder`'s gap-drop branch, 6971), `setSymbolSingleFrame`/`setSymbolPlayMode` (1660-1662, called together from the frame-strip cell click, 7189, and from `updateCompInstancePanel`'s own read of `ld.symPlayMode`/`ld.symSingleFrame`, not written there) and `exitToScene`/`exitMontageView`/`enterSymbol`/`closeSymbolTab` (1638-1646, delegating to the app.js functions of the same name, called from `renderSymbolTabs`)."
+    },
+    {
+      "owner": "layer-kind.js (existing owner, out of scope)",
+      "disposition": "Retains `SMLayerKind.of(ld)`, read once in `updateFootagePanel` (7022) to decide whether the active layer is footage at all (image/sequence/video) and to supply the label/kind-key every subsequent branch in that function switches on."
+    },
+    {
+      "owner": "storyboard.js (existing owner, out of scope)",
+      "disposition": "Retains `SMStoryboard.montageById(id)` (read in `renderSymbolTabs`, 6994, to label the montage-view tab) and `SMStoryboard.thumbDataUrl(symbolId,frameIdx)` (read in `renderLipSyncPanel`, 7147, to fill each mouth-shape's own thumbnail)."
+    },
+    {
+      "owner": "lipsync.js (existing owner, out of scope)",
+      "disposition": "Retains `SMLipSync.settingsOf(ld)` (7118, returns the per-layer settings object `renderLipSyncPanel`'s own DOM fields read/write in place) and `SMLipSync.MOUTHS` (7141, the fixed mouth-shape list the panel iterates to build one cell per shape)."
+    },
+    {
+      "owner": "tracker-panel.js (existing owner, out of scope)",
+      "disposition": "Retains `SMTrackerPanel.render()`, called unconditionally (guarded on `window.SMTrackerPanel`) at the end of `updateFootagePanel`'s own body (7067) — the motion-tracking panel is treated as a sibling of the footage panel proper, refreshed on the same active-layer-changed cadence rather than owning its own show/hide trigger."
+    },
+    {
+      "owner": "comp-preview.js (existing owner, out of scope)",
+      "disposition": "Retains `SMCompPreview.isOpen()`/`.refresh()`, called from `renderCompFrameStrip` (7170) so an already-open floating component preview stays in sync with whatever frame the strip now resolves to — guarded on the preview actually being open, not opened by this scope."
+    },
+    {
+      "owner": "native-video-bridge.js (existing owner, out of scope)",
+      "disposition": "Retains `SMNativeVideo.invalidate()`, called from the footage panel's own interp-mode `change` listener (7060) after writing `l.nativeVideo.interpMode`/`.frameBlend` directly — the actual video-frame recompute happens there, not in this scope."
+    },
+    {
+      "owner": "tweens.js (existing owner, out of scope)",
+      "disposition": "Retains `pushUndoLayers`/`saveAllLayerFrames`, called together from three separate places in this scope: the footage panel's interp-mode change (7057), `finishLayerReorder`'s un-parent branch (6967, `alreadySaved` semantics not applicable here — both are called unconditionally as an ordinary pre-mutation snapshot pair) and the frame-strip cell click (7188, guarded on the click actually changing `symSingleFrame`/`symPlayMode`)."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, out of scope)",
+      "disposition": "Retains `SMEngineBridge.renderNow()`, called once in this scope, from the footage panel's interp-mode change handler (7062, guarded on `window.SMEngineBridge`) — the only direct native-repaint call anywhere in this scope's own body."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 6793 (C19u's closing brace of renderLayerList) is outside coverage; line 6794 (this scope's `_layerDrag`/`armLayerReorder` lead-in comment) begins this scope, confirmed against C19u's own declared assigned_ranges end (6793).",
+    "Line 7192 (closing brace of renderCompFrameStrip) is the last line of this scope; line 7193 opens the next leaf's (C19w) `updateDuplicatorPanel` lead-in comment — confirmed by reading the frozen blob at 7190-7196 (`updateDuplicatorPanel` itself declares later, past 7193's lead-in).",
+    "No lines inside 6794-7192 are excluded for another owner: every line belongs to exactly one of the ten packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "Packet boundaries follow the issue's own suggested table exactly (ten packets, cut at the functions' own lead-in comments, verified against the frozen blob with sed -n and re-derived classification): `_layerDrag`/`armLayerReorder` (6794-6808) is its own packet since it is the module-scope state object plus the single function that both initializes a drag AND is the shared entry point every caller (C19u row wiring, layer-inout.js's direct call, motion.js's row wiring) reaches; `installLayerReorderGrip` (6809-6851) keeps its own long lead-in comment (the 2026-09-01 'Motion stopped calling this' note) together with the hand-off logic it explains; the three tiny drag-ghost helpers (`ensureLayerDragGhost`/`updateLayerDragGhost`/`clearLayerDropIndicator`, 6852-6880) are one packet since none is independently meaningful without the other two (ensure creates what update positions and clear removes); `moveLayerReorder` (6881-6939) and `finishLayerReorder` (6940-6980) are each their own packet since each is a substantial standalone handler wired to its own pair of `window` listeners; `renderSymbolTabs` (6981-7013), `updateFootagePanel` (7014-7089), `updateCompInstancePanel` (7090-7104), `renderLipSyncPanel` (7105-7165) and `renderCompFrameStrip` (7166-7192) are each one function, one packet, matching the issue's 'one coherent responsibility' guidance."
+  ],
+  "areas": [
+    {
+      "area": "layer-drag-state-and-arm",
+      "packets": [
+        {
+          "id": "C19v.layer-drag-state-arm",
+          "files": [
+            "src/js/timeline.js:6794-6808"
+          ],
+          "coverage_ranges": [
+            [
+              6794,
+              6808
+            ]
+          ],
+          "classification": {
+            "code": 12,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_layerDrag",
+            "armLayerReorder"
+          ],
+          "signature": "var _layerDrag={...}; function armLayerReorder(e,srcIdx,origin,sourceRow)",
+          "responsibility": "Declares the single module-scope object every function in this scope's drag machinery reads and writes, and the one function that initializes a drag gesture from any of its three entry points (C19u's panel row mousedown/pointerdown, layer-inout.js's frame-grid in/out-bar fallback, motion.js's own row mousedown/pointerdown).",
+          "behavior": [
+            "3-line comment (6794-6796): this is a manual mouse/pointer-based drag, deliberately NOT HTML5 `draggable`, because native drag-and-drop 'behaves inconsistently inside the Tauri webview' — the same rationale `installLayerReorderGrip`'s own lead-in (next packet) and this file's frame-grid drag machinery (C19p, out of scope) already establish elsewhere in this file.",
+            "`var _layerDrag={active:false,srcIdx:-1,startX:0,startY:0,moved:false,dropGap:-1,dropFolderTarget:-1,indicator:null,ghost:null,origin:'panel',grabOffsetY:0};` (6797) — the complete field set: `active` (is a drag currently armed/in-progress), `srcIdx` (the layer index being dragged), `startX`/`startY` (pointer-down coordinates, used only by the move threshold below), `moved` (has the drag crossed the vertical-gesture threshold — read by `renderLayerList`'s row-click handler, C19u, via `window._layerDragJustEnded`, not this field directly), `dropGap`/`dropFolderTarget` (mutually exclusive drop targets — a gap-based reorder or a folder-reparent — written by `moveLayerReorder`, consumed by `finishLayerReorder`), `indicator`/`ghost` (the two DOM elements `ensureLayerDragGhost`/the indicator-creation code in `moveLayerReorder` lazily create), `origin` ('panel' or 'grid' — which of the two surfaces the drag started on, read by `ensureLayerDragGhost`'s own source-row lookup), `grabOffsetY` (vertical offset from the grabbed row's own top edge to the pointer, used only to position the ghost under the cursor consistently).",
+            "`function armLayerReorder(e,srcIdx,origin,sourceRow){` (6798) — the shared entry point for all three callers (C19u:6665, layer-inout.js:1550, motion.js:7349), plus this scope's own internal re-arm from `installLayerReorderGrip`'s hand-off-miss fallback (6845).",
+            "`if(e.button!==0||_layerDrag.active)return;` (6799) — left-button-only, and refuses to arm a second drag while one is already active (no re-entrancy).",
+            "`var r=sourceRow&&sourceRow.getBoundingClientRect?sourceRow.getBoundingClientRect():null;` (6800) — defensive: `sourceRow` may be `null`/undefined depending on caller (layer-inout.js passes a real row; a future caller might not).",
+            "Field writes (6801-6807): `active=true`, `srcIdx`, `startX`/`startY` from `e.clientX`/`e.clientY`, `moved=false` (reset even if a stale drag left it true), `origin=origin||'panel'` (defaults to the panel surface if the caller omits it), `grabOffsetY=r?Math.max(0,Math.min(r.height,e.clientY-r.top)):17` (clamped into the row's own height, or a fixed 17px fallback with no row rect at all).",
+            "`}` (6808) — closing brace of `armLayerReorder`."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Writes every field of the module-scope `_layerDrag` object directly (no `pushUndo`/`saveActiveLayerFrame` — arming a drag is not itself a document mutation). Reads `e.button`/`e.clientX`/`e.clientY` and the caller-supplied `sourceRow`'s bounding rect. No `state.*` read or write."
+        }
+      ]
+    },
+    {
+      "area": "sticky-reorder-grip",
+      "packets": [
+        {
+          "id": "C19v.reorder-grip",
+          "files": [
+            "src/js/timeline.js:6809-6851"
+          ],
+          "coverage_ranges": [
+            [
+              6809,
+              6851
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "installLayerReorderGrip",
+            "SMLayerInOut",
+            "armLayerReorder"
+          ],
+          "signature": "function installLayerReorderGrip(row,li)",
+          "responsibility": "Inserts a small always-visible drag handle into a frame-grid row (Animation 2D's frame grid ONLY, per the lead-in comment — Motion stopped calling this 2026-09-01) that either hands off to a real in/out-bar handle physically under it, or arms an ordinary reorder drag.",
+          "behavior": [
+            "10-line comment (6809-6817, dated 2026-09-01): documents WHY this exists only for Animation 2D's frame grid — Motion's own rows no longer have a grip at all (removed to fix a frame-0 handle collision, not by improving the hand-off logic below), and Animation 2D's rows have no in/out bar to grab instead (a few hundred lines up, `renderTimeline`'s own comment: 'the in/out bar is Motion-mode-only visually'), so this stays Animation 2D's only frame-grid reorder entry point. The hand-off branch inside `begin` below is therefore permanently a no-op on an Animation 2D row today (it never has a `.layer-inout-handle` in the first place) — kept for a hypothetical future caller that reuses this same grip somewhere handles also exist, not dead code left by accident.",
+            "`function installLayerReorderGrip(row,li){` (6818) — exported at the end of this packet (`window.installLayerReorderGrip`), called externally only from timeline.js:4270 (an earlier, uncensused per-row frame-grid build, out of scope).",
+            "`if(!row||row.querySelector('.layer-reorder-grip'))return;` (6819) — idempotent: a row that already has a grip element (re-render without a full row rebuild) is left untouched rather than getting a second grip.",
+            "Grip element creation (6820-6822): `div.layer-reorder-grip`, `title` from `SM.t('titleDragReorderLayer')` when available, else a hard-coded English fallback string.",
+            "`function begin(e){` (6823) — the grip's own mousedown/pointerdown handler, declared as a named local closure (not inline) so the SAME function reference can be registered for both event types below (6847-6848) without duplicating the body.",
+            "`if(e.button!==0)return;` (6824) — left-button-only, same convention as `armLayerReorder`'s own guard.",
+            "6-line comment (6825-6831, references feedback #137): the hand-off test below is a RECT-OVERLAP test between the grip and any in/out-bar handle in the same row, not a click-point distance check — the earlier ±6px-distance version was fragile (cited git history, not reproduced here). Explicitly notes Motion no longer installs this grip at all, so this hand-off logic only still matters for a hypothetical future caller.",
+            "Hand-off test (6832-6843): guarded on `window.SMLayerInOut&&window.SMLayerInOut.onDown` existing; computes the grip's own bounding rect, iterates every `.layer-inout-handle` in the row, and on the FIRST rect-overlap (`r.left<=gripRect.right&&r.right>=gripRect.left&&r.top<=gripRect.bottom&&r.bottom>=gripRect.top`) calls `e.preventDefault();e.stopPropagation();window.SMLayerInOut.onDown(li,row,h.classList.contains('left')?'in':'out',e,h);` and returns — deciding 'in' vs 'out' purely from the handle's own `left` CSS class, and returning immediately on the first match without checking for a second overlapping handle.",
+            "Fall-through (6844-6845): `e.preventDefault();e.stopPropagation();armLayerReorder(e,li,'grid',row);` — reached whenever no in/out handle overlaps the grip (the normal case on Animation 2D's own rows, per the lead-in comment), arming an ordinary drag with `origin='grid'`.",
+            "`}` (6846) — closing brace of `begin`.",
+            "Wiring and insertion (6847-6850): `grip.addEventListener('mousedown',begin);grip.addEventListener('pointerdown',begin);row.insertBefore(grip,row.firstChild);` — inserted as the row's FIRST child, ahead of every icon/name/cell already in the row.",
+            "`}` (6850) — closing brace of `installLayerReorderGrip`.",
+            "`window.installLayerReorderGrip=installLayerReorderGrip;` (6851) — the export this scope's sole external caller (timeline.js:4270) reaches through."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Mutates the DOM of the row passed in (inserts one grip element, wires two listeners) — no `state.*`/document write in this packet's own closure. Delegates to `window.SMLayerInOut.onDown` (out of scope, its own document effects not reproduced here) on a hand-off, or to `armLayerReorder` (this artifact's own C19v.layer-drag-state-arm packet) on the fall-through path."
+        }
+      ]
+    },
+    {
+      "area": "drag-ghost-and-drop-indicator",
+      "packets": [
+        {
+          "id": "C19v.drag-ghost-indicator",
+          "files": [
+            "src/js/timeline.js:6852-6880"
+          ],
+          "coverage_ranges": [
+            [
+              6852,
+              6880
+            ]
+          ],
+          "classification": {
+            "code": 29,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "ensureLayerDragGhost",
+            "updateLayerDragGhost",
+            "clearLayerDropIndicator",
+            "_layerDrag"
+          ],
+          "signature": "function ensureLayerDragGhost(e); function updateLayerDragGhost(e); function clearLayerDropIndicator()",
+          "responsibility": "The three small DOM-only helpers that create, reposition and tear down the floating 'ghost' row that follows the pointer during a drag, plus the (unrelated but co-located) drop-line/folder-highlight cleanup shared by every exit path from a drag.",
+          "behavior": [
+            "`function ensureLayerDragGhost(e){` (6852) — idempotent create: `if(_layerDrag.ghost)return;` (6853), so calling it repeatedly during a drag (as `moveLayerReorder` does on its own first-move branch) only builds the element once.",
+            "Ghost sizing (6854-6862): creates `div.layer-drag-ghost`; looks up the ORIGINAL dragged row via a selector built from `_layerDrag.origin` ('grid' → `#frame-grid .frow`, else `#layer-list .lrow`) plus `[data-layer=\"'+_layerDrag.srcIdx+'\"]'`; sizes the ghost to that row's own width (clamped 150-300px) and height (minimum 18px) when the source row is found, else fixed fallbacks (220×34); reads `state.layers[_layerDrag.srcIdx]` to copy the layer's own color onto `--layer-drag-color` if set.",
+            "`document.body.appendChild(ghost);_layerDrag.ghost=ghost;updateLayerDragGhost(e);` (6862-6864) — appended to `document.body` (not the row's own container, so it floats above everything regardless of scroll), stored on `_layerDrag`, and immediately positioned via the next function using the SAME pointer event that triggered creation.",
+            "`}` (6865) — closing brace of `ensureLayerDragGhost`.",
+            "`function updateLayerDragGhost(e){` (6866) — repositions the already-created ghost every pointer move; `if(!_layerDrag.ghost)return;` (6867) no-ops if the ghost was never created (a drag that never crossed the move threshold).",
+            "Position clamp (6868-6871): `left`/`top` computed from `e.clientX`/`e.clientY` minus `_layerDrag.grabOffsetY` (vertical only — horizontal always follows the raw pointer + a fixed 12px offset), each clamped into the viewport (`Math.max(6,Math.min(window.innerWidth/innerHeight-size-6,...))`) so the ghost can never be dragged fully off-screen; applied via `transform:translate3d(...)` rather than `left`/`top` (compositor-friendly positioning, consistent with this file's other drag-ghost/indicator elements).",
+            "`}` (6872) — closing brace of `updateLayerDragGhost`.",
+            "`function clearLayerDropIndicator(){` (6873) — tears down BOTH the blue drop-line indicator and any folder-drop highlight class; called from `moveLayerReorder`'s else-branch (no valid drop target under the pointer) and unconditionally at the top of `finishLayerReorder`'s cleanup.",
+            "Indicator removal (6874-6875): `if(_layerDrag.indicator){_layerDrag.indicator.remove();_layerDrag.indicator=null;}_layerDrag.dropGap=-1;` — removes the DOM element AND resets the gap field together, so a stale gap value can never survive past the indicator that displayed it.",
+            "Folder-highlight removal (6876-6879): `if(_layerDrag.dropFolderTarget>=0){document.querySelectorAll('.lrow.folder-drop-target,#frame-grid .frow.folder-drop-target').forEach(function(r){r.classList.remove('folder-drop-target');});}_layerDrag.dropFolderTarget=-1;` — queries BOTH surfaces (panel and grid) since the dragged row's folder-target highlight may have been applied to either, depending on which surface the pointer is currently over; resets the field unconditionally after.",
+            "`}` (6880) — closing brace of `clearLayerDropIndicator`."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "DOM-only: creates/positions/removes the ghost element and the drop-indicator/folder-highlight classes. Reads `state.layers[_layerDrag.srcIdx]` (color only). Writes `_layerDrag.ghost`/`.indicator`/`.dropGap`/`.dropFolderTarget` fields directly — no `state.*` document field, no `pushUndo`."
+        }
+      ]
+    },
+    {
+      "area": "move-layer-reorder",
+      "packets": [
+        {
+          "id": "C19v.move-layer-reorder",
+          "files": [
+            "src/js/timeline.js:6881-6939"
+          ],
+          "coverage_ranges": [
+            [
+              6881,
+              6939
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 15,
+            "whitespace": 0
+          },
+          "symbols": [
+            "moveLayerReorder",
+            "_layerDrag",
+            "clearLayerDropIndicator",
+            "ensureLayerDragGhost",
+            "updateLayerDragGhost"
+          ],
+          "signature": "function moveLayerReorder(e); window.addEventListener('mousemove'|'pointermove', moveLayerReorder)",
+          "responsibility": "The pointer-move handler registered at module load time for the WHOLE window (not scoped to any row) — computes whether the current gesture has crossed the drag threshold, then, while active, resolves whatever the pointer is currently over into either a folder-reparent target or a gap-based drop position and updates the visual indicator accordingly.",
+          "behavior": [
+            "`function moveLayerReorder(e){` (6881) — `if(!_layerDrag.active)return;` (6882) is the early-return guard EVERY invocation of this window-level listener hits when no drag is in progress — it runs on every mouse/pointer move in the whole application, not just during a drag.",
+            "Move-threshold check (6883-6891, only when `!_layerDrag.moved`): computes `dx`/`dy` from the drag's own `startX`/`startY`; 2-line comment (6885-6886) — reordering is deliberately a VERTICAL gesture, so `if(dy<4||dy<dx*.55)return;` refuses to commit to a drag on a small or mostly-horizontal wobble, leaving the gesture free to still become a click or a horizontal scroll. Once past the threshold: sets `_layerDrag.moved=true`, calls `ensureLayerDragGhost(e)` (this artifact's own packet), and adds the `dragging` CSS class to every DOM instance of the source row (both panel and grid, via the same dual-selector convention as `clearLayerDropIndicator`).",
+            "`updateLayerDragGhost(e);` (6892) — repositions the ghost on every move once created, unconditionally (this artifact's own packet).",
+            "Hit-test (6893-6895): `document.elementFromPoint(e.clientX,e.clientY)` then `.closest('.lrow[data-layer],#frame-grid .frow[data-layer]')` — resolves whatever row (panel OR grid) is physically under the pointer right now, regardless of which surface the drag originated on.",
+            "`if(row&&row.dataset.layer!==undefined){` (6895) branch — the row-found path:",
+            "Folder-reparent detection (6896-6915, 9-line comment 6899-6907): computes `relY` (0..1 position within the target row's own height) and `draggingFolder` (is the SOURCE itself a folder layer); `if(targetLd&&targetLd.isFolderLayer&&targetIdx!==_layerDrag.srcIdx&&!draggingFolder&&relY>0.25&&relY<0.75){` — dropping onto the MIDDLE 50% band of a folder row (not its top/bottom edge, which stays the ordinary gap-based insert) marks it as a folder-reparent target: clears any stale drop-line indicator, sets `_layerDrag.dropFolderTarget=targetIdx`, adds the `folder-drop-target` CSS class, and returns immediately — refused (falls through to gap-based reorder instead) when the target IS the layer being dragged, or when the dragged layer is ITSELF a folder (no nested folders in v1, per the comment's own citation of engine.rs's `is_folder_layer` doc comment and `folderLayerChildMap`'s own comment elsewhere in this file).",
+            "Folder-highlight cleanup on a non-folder-target row (6916-6919): if a PREVIOUS move had set `dropFolderTarget`, clears the highlight class from both surfaces and resets the field — runs only when the current row is NOT itself a valid folder target (the branch above already returned for that case).",
+            "Gap-based position (6920-6935): `after=e.clientY>=rr.top+rr.height/2` (which half of the target row the pointer is in); 4-line comment (6921-6924) — layer rows paint top-to-bottom in REVERSE state-array order, so 'visually before layer i' is array gap i+1 and 'visually after' is gap i; this inversion is kept HERE specifically so the blue line's screen position and `reorderLayersAtGap`'s array-space destination describe the same gap without a second translation elsewhere. `_layerDrag.dropGap=parseInt(row.dataset.layer)+(after?0:1);` applies that inversion; creates the indicator element lazily if absent; positions it via the target's own bounding rect, spanning the full width of whichever surface (`#fg-wrap` for the grid, `#layer-list` for the panel) the target row belongs to.",
+            "`}else clearLayerDropIndicator();` (6936) — no row under the pointer at all (dragged past the edge of either list): clears any indicator/highlight left over from the previous move.",
+            "`}` (6937) — closing brace of `moveLayerReorder`.",
+            "`window.addEventListener('mousemove',moveLayerReorder);window.addEventListener('pointermove',moveLayerReorder);` (6938-6939) — registered ONCE at module load time on `window` itself (not a per-row listener), for both event families — the same Tauri-webview-compatibility reasoning C19u's own row-arm wiring comment (6667-6670) documents: both must be registered since which one actually fires depends on the input device and webview, and the shared `_layerDrag.active` guard at the top of this function makes the redundant second firing harmless."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `state.layers` (target/source `isFolderLayer`). Writes `_layerDrag.moved`/`.dropFolderTarget`/`.dropGap` directly; mutates DOM (`dragging`/`folder-drop-target` classes, the drop-indicator element's position). No `pushUndo`/`saveActiveLayerFrame`/`state.layers` array mutation — this handler only decides WHERE a drop would land, never performs it (that is `finishLayerReorder`, next packet)."
+        }
+      ]
+    },
+    {
+      "area": "finish-layer-reorder",
+      "packets": [
+        {
+          "id": "C19v.finish-layer-reorder",
+          "files": [
+            "src/js/timeline.js:6940-6980"
+          ],
+          "coverage_ranges": [
+            [
+              6940,
+              6980
+            ]
+          ],
+          "classification": {
+            "code": 23,
+            "comment": 18,
+            "whitespace": 0
+          },
+          "symbols": [
+            "finishLayerReorder",
+            "_layerDrag",
+            "_layerSel",
+            "folderLayerParentIdx",
+            "saveAllLayerFrames",
+            "pushUndoLayers",
+            "clearLayerDropIndicator"
+          ],
+          "signature": "function finishLayerReorder(); window.addEventListener('mouseup'|'pointerup', finishLayerReorder)",
+          "responsibility": "The pointer-up handler registered at module load time for the whole window — commits whatever `moveLayerReorder` last computed (a folder-reparent or a gap-based reorder, for the whole active multi-selection if the dragged row is part of one) as the single document write this entire drag gesture produces, with exactly one undo entry regardless of how many layers move or whether any of them also leave a folder.",
+          "behavior": [
+            "`function finishLayerReorder(){` (6940) — `if(!_layerDrag.active)return;` (6941) is the same always-registered-on-window early-return guard `moveLayerReorder` uses.",
+            "`if(_layerDrag.moved){` (6942) branch — only a drag that actually crossed the move threshold produces any document write; a drag that never moved (effectively a click) falls straight through to the cleanup at the bottom with no mutation at all.",
+            "`window._layerDragJustEnded=true;` (6943) — the flag C19u's own row click handler reads and clears on the very next click (6628 in that scope, out of scope here) to stop the browser's trailing synthetic click from collapsing the multi-selection this drag just moved.",
+            "3-line comment (6944-6946): dragging one row of an active multi-selection moves the WHOLE selection together as one contiguous block; dragging a row that is NOT part of the current selection moves only that row.",
+            "`var moving=(_layerSel.length>1&&_layerSel.indexOf(_layerDrag.srcIdx)>=0)?_layerSel.slice():[_layerDrag.srcIdx];` (6947) — C19q's module-scope selection array, read (not written) here; `.slice()` copies it so the subsequent reorder cannot alias the live selection array.",
+            "Folder-reparent commit (6948-6949): `if(_layerDrag.dropFolderTarget>=0){window.SM.reparentLayersIntoFolder(moving,_layerDrag.dropFolderTarget);}` — delegates entirely to the out-of-scope `window.SM` wrapper (its own undo/save behavior is not reproduced here).",
+            "Gap-based commit (6950-6972): `else if(_layerDrag.dropGap>=0){`. 15-line comment (6951-6965, dated 2026-08/2026-09, feedback #755 'quand on réordonne des calques le undo ne marche pas'): un-parenting a currently-folder-child layer via an ordinary gap-drop (dropping it OUTSIDE a folder's middle band) must ALSO clear `ld.parentLayerUid` — folder membership is purely parent-uid-driven (not array position, per `folderLayerChildMap`'s own comment elsewhere), so a position-only reorder would leave the layer re-appearing nested under its old folder on the very next render. The bug this comment documents: `setLayerParent` mutates the parent uid WITHOUT its own undo snapshot, and `reorderLayersAtGap` snapshots only when IT runs — so if both happened as two separate mutations, the ONE snapshot captured a document that had ALREADY left the folder, and a single Cmd+Z restored the old array order while leaving the layer un-parented (two effects, one undo, mismatched). The fix: snapshot HERE, before EITHER mutation, then tell `reorderLayersAtGap` not to add a second snapshot of its own.",
+            "`var unparenting=moving.some(function(mi){return window.SMMotion&&folderLayerParentIdx(mi)>=0;});` (6966) — true if ANY moving layer currently has a folder parent (C19q's `folderLayerParentIdx`, guarded on `window.SMMotion` existing since `setLayerParent` below is a Motion function).",
+            "`if(unparenting){saveAllLayerFrames();pushUndoLayers(true);}` (6967) — the single pre-mutation snapshot the comment above describes, taken ONLY when at least one moving layer will actually be un-parented (a reorder with no folder involvement never pays this cost).",
+            "`moving.forEach(function(mi){if(window.SMMotion&&folderLayerParentIdx(mi)>=0)SMMotion.setLayerParent(mi,null);});` (6968-6970) — clears the parent uid on every moving layer that has one, individually (SMMotion.setLayerParent, out of scope).",
+            "`window.SM.reorderLayersAtGap(moving,_layerDrag.dropGap,unparenting);` (6971) — the actual array-position mutation (app.js:438 via the `window.SM` wrapper), passed `unparenting` as its own `skipUndo`-equivalent third argument so it does NOT take a second snapshot when this function already took one above.",
+            "`}` (6972) — closing brace of the gap-based branch.",
+            "`}` (6973) — closing brace of the `if(_layerDrag.moved)` block.",
+            "Unconditional cleanup (6974-6977): removes `dragging`/`drag-over`/`folder-drop-target` classes from every `.lrow`/`.frow` in the document (not scoped to the dragged row — a full sweep); removes the ghost element if one exists; calls `clearLayerDropIndicator()` (this artifact's own packet); resets `_layerDrag.active=false;_layerDrag.moved=false;` — runs on EVERY pointer-up while a drag was active, whether or not it moved.",
+            "`}` (6978) — closing brace of `finishLayerReorder`.",
+            "`window.addEventListener('mouseup',finishLayerReorder);window.addEventListener('pointerup',finishLayerReorder);` (6979-6980) — same always-on-window, both-event-families registration convention as `moveLayerReorder`'s own listeners."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `_layerSel` (C19q). Writes `window._layerDragJustEnded` directly. The ONE document-mutating path in this whole scope's drag machinery: either `window.SM.reparentLayersIntoFolder` OR (`saveAllLayerFrames()`+`pushUndoLayers(true)` conditionally, then `SMMotion.setLayerParent(mi,null)` per un-parenting layer, then) `window.SM.reorderLayersAtGap` — all delegated to out-of-scope functions whose own undo/save/re-render behavior is not reproduced here; this function's OWN body contains no `renderLayerList`/`renderTimeline` call of its own (the out-of-scope wrappers own that). DOM cleanup (classes, ghost, indicator) is unconditional and DOM-only."
+        }
+      ]
+    },
+    {
+      "area": "symbol-tabs",
+      "packets": [
+        {
+          "id": "C19v.symbol-tabs",
+          "files": [
+            "src/js/timeline.js:6981-7013"
+          ],
+          "coverage_ranges": [
+            [
+              6981,
+              7013
+            ]
+          ],
+          "classification": {
+            "code": 29,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderSymbolTabs",
+            "state",
+            "SMStoryboard"
+          ],
+          "signature": "function renderSymbolTabs()",
+          "responsibility": "Rebuilds the tab strip above the canvas: a permanent 'Scene' tab, an optional montage-view tab (StoryBoard), and one closeable tab per currently open component — the breadcrumb that lets a user navigate back out of a component/montage they entered.",
+          "behavior": [
+            "`function renderSymbolTabs(){` (6981) — `var bar=document.getElementById('symbol-tabs');if(!bar)return;bar.innerHTML='';` — full DOM wipe/rebuild, same convention as `renderLayerList` (C19u), no incremental patch path.",
+            "Scene tab (6983-6988): active class when NEITHER `state.activeSymbolId` NOR `state.activeMontageViewId` is set; click calls `window.SM.exitToScene()` if a symbol is active, else `window.SM.exitMontageView()` if a montage view is active (mutually exclusive by construction — only one of the two branches can ever fire per click, since the tab is only meaningfully clickable when at least one is set, though the handler itself does not guard against a click while both are unset — a no-op in that case since neither condition is true).",
+            "9-line comment (6989-6992, dated 2026-07): StoryBoard's 'entrer dans le montage' feature — a montage view sits BETWEEN Scene and any real component entered from within it (breadcrumb: Scene > Montage > Composant); explicitly not part of the `state.openSymbolTabs` list below since at most one montage view is ever active, so no multi-tab list is needed for it.",
+            "Montage tab (6993-7002, only when `state.activeMontageViewId` is set): resolves `mtg` via `SMStoryboard.montageById(id)` (storyboard.js, out of scope); label falls back to literal 'Montage' if the montage was deleted out from under an open tab; active class when NO symbol is currently entered (i.e. the montage view itself is the current context); a close ('×') sub-element; clicking the tab body (not the ×) calls `exitToScene()` only if a symbol IS active (stepping back ONE level, from component to montage, not exiting the montage itself); clicking × calls `exitToScene()` conditionally THEN `exitMontageView()` unconditionally (fully exits, skipping past the montage level in one click) — `e.stopPropagation()` on the × click prevents the tab body's own listener from also firing.",
+            "Open-component tabs (7003-7012): `state.openSymbolTabs.forEach(function(symId){` — `var sym=state.symbols[symId];if(!sym)return;` (a tab referencing a deleted symbol renders nothing, silently); active class when `state.activeSymbolId===symId`; label is the symbol's own `.name`; a close ('×') sub-element; clicking the tab body calls `window.SM.enterSymbol(symId)` (switches INTO that component, even if another is currently active); clicking × calls `window.SM.closeSymbolTab(symId)` with `e.stopPropagation()` to prevent the tab-body click from also firing.",
+            "`}` (7013) — closing brace of `renderSymbolTabs`."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `state.activeSymbolId`/`.activeMontageViewId`/`.openSymbolTabs`/`.symbols`. Wipes and rebuilds `#symbol-tabs`' DOM unconditionally. Delegates ALL document-shape changes (entering/exiting a component or montage view, closing a tab) to out-of-scope `window.SM.*` wrappers; this function's own closure writes no `state.*` field directly."
+        }
+      ]
+    },
+    {
+      "area": "footage-panel",
+      "packets": [
+        {
+          "id": "C19v.footage-panel",
+          "files": [
+            "src/js/timeline.js:7014-7089"
+          ],
+          "coverage_ranges": [
+            [
+              7014,
+              7089
+            ]
+          ],
+          "classification": {
+            "code": 55,
+            "comment": 21,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updateFootagePanel",
+            "SMLayerKind",
+            "SMTrackerPanel",
+            "SMNativeVideo",
+            "saveAllLayerFrames",
+            "pushUndoLayers",
+            "loadFrame",
+            "SMEngineBridge"
+          ],
+          "signature": "function updateFootagePanel()",
+          "responsibility": "Shows/hides and populates the right-panel section describing the active layer's imported footage (image/sequence/video): dimensions read live off the currently displayed raster, the sequence frame count, and — for a time-remapped native video only — the frame-blend interpolation-mode control.",
+          "behavior": [
+            "3-line comment (7014-7017): mirrors `updateCompInstancePanel`'s own shape (show/hide from the active layer, populate, no state of its own — cited forward even though `updateCompInstancePanel` is the LATER function in this same scope); reads the layer's kind from `layer-kind.js` rather than re-testing flags directly, so this panel can never disagree with the type badge `renderLayerList` (C19u) shows on the same row.",
+            "`function updateFootagePanel(){` (7018) — `var sec=document.getElementById('footage-sec');if(!sec)return;` (7019-7020) DOM-existence guard.",
+            "Kind/visibility gate (7021-7025): `ld=state.layers[state.activeLayerIdx]`; `kind=(ld&&window.SMLayerKind)?SMLayerKind.of(ld):null`; `isFootage=kind&&(kind.key==='image'||kind.key==='sequence'||kind.key==='video')`; `if(!isFootage||!window._layerActiveExplicit){sec.style.display='none';return;}` — hidden both when the active layer isn't footage-kind AND when `window._layerActiveExplicit` is falsy (a UI-global this function reads but never sets, guarding against showing footage controls when nothing has been explicitly activated yet); `sec.style.display='block';` once past the gate.",
+            "Name/label (7026-7031): `footage-kind` textContent from `kind.label`; 2-line comment (7028-7029) — the name shown is whatever metadata said at import time, falling back to the layer's own `.name` for pre-tag projects that predate footage metadata entirely; both `footage-name` textContent and title set from the same fallback chain.",
+            "Live dimensions (7032-7039): 4-line comment (7032-7034) — dimensions are read from the RASTER ACTUALLY ON THE CURRENT FRAME, not from import-time metadata, so a scaled footage layer reports what it IS now rather than what it was imported as, and pre-tag projects (no metadata) still show something correct; scans `ld.frames[state.currentFrame].strokes` for the first `isRaster` entry and reads `.width`/`.height` (rounded), or 0/0 if none found.",
+            "Video frame-blend row (7040-7066): 2-line French comment (7040-7041) — native-video frame blending (native-video-bridge.js) is only offered where it actually applies: a video that is genuinely time-remapped. `showBlend=kind.key==='video'&&!!ld.nativeVideo&&!!ld.timeRemap;` gates the row's visibility. When the `footage-interp-mode` select exists: sets its value from `nv.interpMode||(nv.frameBlend?'blend':'none')` — 2-line comment (7049-7050) documents the legacy-boolean fallback explicitly, for a project saved before the three-mode enum existed. Wires the `change` listener EXACTLY ONCE (`if(!sel._wired){sel._wired=true;...}`, a DOM-node-scoped guard flag, not a module-scope one): on change, re-reads the CURRENT active layer (not the closed-over `ld`, so a stale closure from a previous render can't write to the wrong layer), guards on it still having `.nativeVideo`, then `saveAllLayerFrames();pushUndoLayers(true);` BEFORE writing `l.nativeVideo.interpMode=sel.value;l.nativeVideo.frameBlend=(sel.value!=='none');` (interpMode is now the source of truth, frameBlend kept in sync for the legacy-boolean readers), then `SMNativeVideo.invalidate()` if available, `loadFrame(state.currentFrame)`, and `SMEngineBridge.renderNow()` if available.",
+            "`if(window.SMTrackerPanel)SMTrackerPanel.render();` (7067, trailing comment: 'suivi de mouvement (tracker-panel.js)') — unconditional refresh of the motion-tracking panel as a sibling of this one, regardless of footage kind.",
+            "Sequence frame count (7068-7075): `countRow` visibility gated on `kind.key==='sequence'`; when shown, `n=meta.count`, and if that metadata is absent (`n==null`), counts frames whose `strokes` array contains at least one `isRaster` entry across the ENTIRE `ld.frames` array (an O(frames) scan, only performed when metadata is missing) — sets `footage-count` textContent to the result either way.",
+            "Relink/replace button (7076-7088): 6-line comment (7076-7081, dated 2026-07-31) — a native video's source lives in `ld.nativeVideo`, not a per-frame raster `src`, so it needs its OWN relink flow (`replaceNativeVideoSource`, native-video-bridge.js) rather than `images.js`'s `replaceFootageSource`; previously this button was hidden outright for video with no relink path at all on the default/preferred video-import route — this was the fix. `repBtn.style.display='';repBtn.dataset.kind=kind.key;` sets a data attribute the actual click handler (images.js, out of scope) dispatches on; button text switches between 'Relier / remplacer le fichier…' (video) and 'Remplacer la source…' (image/sequence). 2-line comment (7086-7087) — a web-imported (non-Tauri) video session has no real path to relink at all, so the button is DISABLED (not hidden) for that specific combination, mirroring the same guard `replaceNativeVideoSource` itself applies with a toast.",
+            "`}` (7089) — closing brace of `updateFootagePanel`."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `state.layers`, `state.activeLayerIdx`, `state.currentFrame`, `window._layerActiveExplicit`, `ld.footage`/`.frames`/`.nativeVideo`/`.timeRemap`/`.name`. Writes DOM only for the show/hide and populate paths. The interp-mode `change` handler is this packet's ONE document-mutating path: `saveAllLayerFrames()`+`pushUndoLayers(true)` BEFORE writing `l.nativeVideo.interpMode`/`.frameBlend` directly, followed by `SMNativeVideo.invalidate()`, `loadFrame`, `SMEngineBridge.renderNow()` — save, undo-push, write, reload, repaint, all present around the one write."
+        }
+      ]
+    },
+    {
+      "area": "comp-instance-panel",
+      "packets": [
+        {
+          "id": "C19v.comp-instance-panel",
+          "files": [
+            "src/js/timeline.js:7090-7104"
+          ],
+          "coverage_ranges": [
+            [
+              7090,
+              7104
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 0,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updateCompInstancePanel",
+            "resolveSymbolFrameIdx",
+            "renderCompFrameStrip"
+          ],
+          "signature": "function updateCompInstancePanel()",
+          "responsibility": "Shows/hides and populates the right-panel section for a placed component instance's own controls (play mode, single-frame pick, speed, placement offset), then delegates the visual frame-by-frame strip below those fields to `renderCompFrameStrip`.",
+          "behavior": [
+            "`function updateCompInstancePanel(){` (7090) — `var sec=document.getElementById('comp-instance-sec');` (7091).",
+            "`if(state.activeSymbolId){sec.style.display='none';return;}` (7092) — hidden while INSIDE a component (editing its own timeline), since these controls describe how an instance of a component is PLACED, not the component's own internal state; distinct from the `isFootage` gate in the previous packet, which checked the layer's own kind rather than the current navigation context.",
+            "`var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.symbolId){sec.style.display='none';return;}` (7093-7094) — also hidden for any layer that isn't itself a component instance.",
+            "`sec.style.display='block';` (7095) once past both gates.",
+            "Field population (7096-7102): `comp-playmode` value from `ld.symPlayMode||'loop'`; `comp-singleframe-row` visibility gated on `symPlayMode==='single'`; `resolved=sym?resolveSymbolFrameIdx(sym,ld,state.currentFrame):(ld.symSingleFrame||0)` — the SAME resolver `renderCompFrameStrip` (this artifact's own last packet) uses to decide which cell to highlight, read here to populate the numeric `comp-singleframe` field, so the two can never disagree; `comp-speed` from `ld.symSpeed||1`; `comp-offset` from `ld.symPlacedAt||0`.",
+            "`renderCompFrameStrip(ld);` (7103) — self-recursive within this scope: delegates the entire frame-by-frame strip (and, transitively, the lip-sync panel it also refreshes) to this artifact's own last packet.",
+            "`}` (7104) — closing brace of `updateCompInstancePanel`."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `state.activeSymbolId`, `state.layers`, `state.activeLayerIdx`, `state.currentFrame`, `state.symbols`, `ld.symbolId`/`.symPlayMode`/`.symSingleFrame`/`.symSpeed`/`.symPlacedAt`. Writes DOM only (show/hide, field values) in this packet's own closure — every field here is READ from `ld`, none written; the frame-strip cell click that DOES write `symSingleFrame`/`symPlayMode` lives in the C19v.comp-frame-strip packet, not here."
+        }
+      ]
+    },
+    {
+      "area": "lip-sync-panel",
+      "packets": [
+        {
+          "id": "C19v.lip-sync-panel",
+          "files": [
+            "src/js/timeline.js:7105-7165"
+          ],
+          "coverage_ranges": [
+            [
+              7105,
+              7165
+            ]
+          ],
+          "classification": {
+            "code": 51,
+            "comment": 10,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderLipSyncPanel",
+            "SMLipSync",
+            "SMStoryboard"
+          ],
+          "signature": "function renderLipSyncPanel(ld)",
+          "responsibility": "Rebuilds the lip-sync panel's audio-track picker, timing/sensitivity fields and one mouth-shape cell per phoneme — each cell showing the internal component frame currently mapped to that mouth shape, editable either by clicking through the frame strip (this artifact's next packet) or typing directly into the cell's own numeric field.",
+          "behavior": [
+            "9-line lead-in comment (7105-7113): documents the frame-strip's own intent (repeated here since this function is declared immediately after the comment, ahead of `renderCompFrameStrip` itself, which is declared last in this scope) — one clickable cell per internal frame, click jumps to Single-Frame mode on that frame, the currently-resolved cell is highlighted via the SAME `resolveSymbolFrameIdx` math the renderer uses. Then, specific to THIS function: 3-line French comment — the lip-sync panel is rendered beside the frame strip and reuses its thumbnails; picking a mouth shape for a sound IS picking an internal frame of the component, the identical gesture.",
+            "`function renderLipSyncPanel(ld){` (7114) — `var chart=document.getElementById('lip-chart');if(!chart||!window.SMLipSync)return;` (7115-7116) dual guard: DOM element AND the lipsync.js module must both exist.",
+            "`var sym=state.symbols[ld.symbolId];if(!sym)return;` (7117) — the passed-in `ld` must itself resolve to a real component; `st=SMLipSync.settingsOf(ld)` (lipsync.js, out of scope) returns the live per-layer settings object every field below reads/writes IN PLACE (not copied); `total=Math.max(1,sym.totalFrames)`.",
+            "Audio-track select (7121-7133, guarded on the `lip-track` element existing): rebuilds its `<option>` list from `state.audioTracks`, each option's text showing the track name (or a 'Piste N' fallback) with a trailing ' …' when the track's own audio buffer hasn't finished loading yet (`!t._buffer`); if there are NO tracks at all, a single disabled-by-convention placeholder option reads `SM.t('lipNoAudio')`; the select's own value is set from `st.trackIdx`, clamped into `[0,tracks.length-1]`.",
+            "Timing/sensitivity fields (7134-7139, each individually guarded on its own element existing): `lip-start`/`lip-end` from `st.start||0` and `st.end||Math.max(0,state.totalFrames-1)`; `lip-sens`/`lip-hold` from `st.sensitivity` and `st.hold`, each using an explicit `!=null` check (not `||`) so a legitimately-zero sensitivity/hold value is preserved rather than falling back to the default (1 and 2 respectively).",
+            "Mouth-shape cells (7140-7163): `chart.innerHTML='';SMLipSync.MOUTHS.forEach(function(m){` — full wipe/rebuild of the chart per call, one cell per fixed mouth-shape entry in lipsync.js's own `MOUTHS` list. Per cell: a 46px-wide flex column; a 44×34 thumbnail wrapper bordered in the default border color for an AUTO-detected mouth shape or a distinct amber (`rgba(255,184,108,.5)`) for a manual-only one; `fIdx=Math.min(total-1,Math.max(0,Math.floor(st.map[m.id]||0)))` — the internal frame currently mapped to this mouth, clamped into range; thumbnail image via `SMStoryboard.thumbDataUrl(ld.symbolId,fIdx)` (storyboard.js, out of scope) when available, else the raw frame INDEX as text; a title tooltip (`SM.t('lipManualOnly')`) added ONLY for a manual (non-auto) mouth shape; a label reading the mouth's own translated name, tinted amber for manual shapes matching the thumbnail border convention; a `type=number` input (class `pi scrub` — CLAUDE.md §10's scrub convention, correctly applied here) showing the same `fIdx`, whose `input` listener clamps the typed value into `[0,total-1]` and writes it directly to `st.map[m.id]` THEN calls `renderLipSyncPanel(ld)` again (self-recursive within this scope) to refresh every cell's own highlight/thumbnail state.",
+            "`});` (7163) closes the `MOUTHS.forEach`; `}` (7164) closes `renderLipSyncPanel`.",
+            "`window.renderLipSyncPanel=renderLipSyncPanel;` (7165) — exported, though at the frozen SHA no caller outside this scope's own two self-recursive call sites (7159, 7169, both inside `renderCompFrameStrip` and this function's own input listener) reaches it through `window.renderLipSyncPanel` — confirmed by a whole-src/js grep finding no external reference to the exported name."
+          ],
+          "callers": [
+            "See C19v.comp-frame-strip for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "effects": "Reads `state.symbols`, `state.audioTracks`, `state.totalFrames`, `ld.symbolId`, `SMLipSync.settingsOf(ld)`'s returned object (`st.trackIdx`/`.start`/`.end`/`.sensitivity`/`.hold`/`.map`). Writes `st.map[m.id]` directly from the per-cell numeric input's `input` listener — the ONE document-shaped write in this packet's own closure, with NO `pushUndo`/`saveActiveLayerFrame` call around it (lip-sync mapping is treated as ordinary UI-adjacent settings data here, not a snapshot-guarded document field, unlike the frame-strip's own click handler in the next packet). All other fields in this packet are read-only DOM population."
+        }
+      ]
+    },
+    {
+      "area": "comp-frame-strip",
+      "packets": [
+        {
+          "id": "C19v.comp-frame-strip",
+          "files": [
+            "src/js/timeline.js:7166-7192"
+          ],
+          "coverage_ranges": [
+            [
+              7166,
+              7192
+            ]
+          ],
+          "classification": {
+            "code": 24,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderCompFrameStrip",
+            "resolveSymbolFrameIdx",
+            "SMCompPreview",
+            "saveAllLayerFrames",
+            "pushUndoLayers",
+            "updateCompInstancePanel",
+            "renderLipSyncPanel"
+          ],
+          "signature": "function renderCompFrameStrip(ld)",
+          "responsibility": "Builds one clickable cell per frame of the active component instance's own internal timeline; highlights the cell that actually resolves right now (loop/ping-pong/once-aware, via the same resolver `updateCompInstancePanel` uses) and, separately, the cell an EXPLICIT single-frame pin currently targets; a click commits BOTH the single-frame value and the play-mode switch to 'single' as one undo-guarded gesture.",
+          "behavior": [
+            "`function renderCompFrameStrip(ld){` (7166) — `var strip=document.getElementById('comp-frame-strip');strip.innerHTML='';` full wipe/rebuild, same convention as every other renderer in this scope.",
+            "`var sym=state.symbols[ld.symbolId];if(!sym)return;` (7168) — guard: the passed-in layer must resolve to a real component.",
+            "`renderLipSyncPanel(ld);` (7169) — self-recursive within this scope: the lip-sync panel is refreshed on EVERY frame-strip rebuild, not on a separate trigger, so its thumbnails/highlights never lag the strip they visually sit beside.",
+            "`if(window.SMCompPreview&&SMCompPreview.isOpen())SMCompPreview.refresh();` (7170) — an already-open floating component-preview window (comp-preview.js, out of scope) is kept in sync with whatever this render pass resolves, guarded on it actually being open (never opened from here).",
+            "Cell loop setup (7171-7172): `total=Math.max(1,sym.totalFrames)`; `current=resolveSymbolFrameIdx(sym,ld,state.currentFrame)` — the SAME resolver `updateCompInstancePanel` (this artifact's own earlier packet) already read to populate the numeric field, so the highlighted cell and that field can never disagree.",
+            "Per-cell build (7173-7190): 14×14px square cell, `isCur=i===current` (the frame that actually resolves given the current play mode); `own=ld.frames&&ld.frames[state.currentFrame]` and `isExplicit=!!(own&&own.isKeyframe&&own.componentFrame!=null)` — true only when the CURRENT main-timeline frame itself carries an explicit single-frame pin (a keyframe with `componentFrame` set), distinct from `ld.symPlayMode==='single'` (the layer-wide default mode); `isSingleSel=(isExplicit||ld.symPlayMode==='single')&&i===current` decides the ACCENT-colored fill (a genuinely pinned/single-mode cell), falling back to a dimmer highlight (`rgba(255,255,255,.25)`) for the resolved-but-not-pinned case, and the plain background otherwise; border color follows `isCur` alone (accent vs. a faint white); `title='Frame '+i`.",
+            "Click handler (7183-7189, wrapped in an IIFE closing over `i` per-cell — `function(idx){return function(){...};}(i)` — since the loop variable would otherwise be shared across all cells' closures): 3-line comment (7184-7186, dated 2026-09, measured: '2 entries, one undo left the mode on single') — the click sets BOTH the single-frame value and the play mode together, so if each setter took its own undo snapshot a single Cmd+Z would only undo ONE of the two, leaving the layer in an inconsistent state (confirmed by the comment's own measurement). `_cl=state.layers[state.activeLayerIdx]` (re-read at click time, not the closed-over `ld`, so a stale closure from a previous render can't write to the wrong layer); `if(_cl&&_cl.symbolId&&(_cl.symSingleFrame!==idx||_cl.symPlayMode!=='single')){saveAllLayerFrames();pushUndoLayers(true);}` — the ONE snapshot for the WHOLE gesture, taken only when the click would actually change something (a re-click on the already-selected cell/mode is a no-op, no snapshot); THEN `window.SM.setSymbolSingleFrame(idx,true);window.SM.setSymbolPlayMode('single',true);updateCompInstancePanel();` — both setters called with a truthy second argument (their own `skipUndo`, so neither adds a SECOND snapshot on top of the one just taken here), followed by a full self-recursive re-render through `updateCompInstancePanel` (this artifact's own earlier packet, which in turn calls back into `renderCompFrameStrip` itself).",
+            "`strip.appendChild(cell);` (7190) — appends each cell as it's built, inside the same `for` loop as the cell construction above.",
+            "`}` (7191) closes the `for` loop; `}` (7192) closes `renderCompFrameStrip`."
+          ],
+          "callers": [
+            "Complete external-caller inventory for every symbol this artifact declares, from a whole-repo `git grep -n -E '(^|[^a-zA-Z_.])<name>\\(' 59a5a38c` filtered to lines that syntactically CALL the symbol (excluding `//`-only mentions and each function's own declaration line):",
+            "`armLayerReorder` — 5 total call sites: this scope's own declaration (6798) and its internal re-arm inside `installLayerReorderGrip`'s hand-off-miss fallback (6845, self-recursive within this artifact); C19u's row wiring (timeline.js:6665, `renderLayerList`'s `beginLayerReorder` closure); layer-inout.js:1550 (the frame-grid in/out-bar's own unmodified-click fallback, `window.armLayerReorder` guarded); motion.js:7349 (Motion's own row mousedown/pointerdown wiring).",
+            "`installLayerReorderGrip` — 2 total call sites: this scope's own declaration (6818) and its export assignment's sole external caller, timeline.js:4270 (an earlier, uncensused per-row frame-grid build).",
+            "`ensureLayerDragGhost` — 2 total call sites: declaration (6852) and this artifact's own internal call from `moveLayerReorder`'s move-threshold branch (6889, self-recursive within this artifact) — no external caller found.",
+            "`updateLayerDragGhost` — 3 total call sites: declaration (6866) and two internal calls, from `ensureLayerDragGhost` itself (6864) and from `moveLayerReorder` unconditionally on every move (6892) — both self-recursive within this artifact, no external caller found.",
+            "`clearLayerDropIndicator` — 4 total call sites: declaration (6873) and three internal calls — `moveLayerReorder`'s folder-target-cleared branch (6911), its no-row-under-pointer else-branch (6936), and `finishLayerReorder`'s unconditional cleanup (6976) — all self-recursive within this artifact, no external caller found.",
+            "`moveLayerReorder` — 1 total reference beyond its own declaration (6881): registered as the `mousemove`/`pointermove` window listener on the very next two lines (6938-6939) — no other file references this name (it is never exported to `window`).",
+            "`finishLayerReorder` — 1 total reference beyond its own declaration (6940): registered as the `mouseup`/`pointerup` window listener on the next two lines (6979-6980) — no other file references this name (also never exported).",
+            "`renderSymbolTabs` — 18 total call sites beyond its own declaration (6981): app.js — 11 site(s) (lines 3314, 3468, 3554, 4011, 4038, 4058, 4195, 4251, 4260, 4350, 4371), all through the `if(window.renderSymbolTabs)renderSymbolTabs()` guard, run after a component/symbol-affecting document mutation alongside `loadFrame`/`renderOS`/`renderArcs`/`updateUI`; kitsu.js — 1 site (line 141), same guarded pattern after an import; motion.js — 1 site (line 13246), same guarded pattern; project.js — 1 site (line 90), UNGUARDED direct call during project load; timeline.js — 2 external sites (lines 2688, 11907), both unguarded direct calls, from a scene-reset path and this file's own boot sequence.",
+            "`updateFootagePanel` — 1 total call site beyond its own declaration (7018): timeline.js:2757, inside `updatePropsContext`'s own long chain of panel-update calls (renderLayerList, updateCompInstancePanel, updateDuplicatorPanel, updateFootagePanel, and eight more — an earlier, uncensused packet), run after every properties-context-affecting change.",
+            "`updateCompInstancePanel` — 3 total call sites beyond its own declaration (7090): timeline.js:2757 (the same `updatePropsContext` chain cited above), timeline.js:7189 (this artifact's own frame-strip click handler, self-recursive), timeline.js:11429 (an uncensused later packet's `comp-playmode` select's own `change` listener).",
+            "`renderLipSyncPanel` — 3 total call sites beyond its own declaration (7114): timeline.js:7159 (this artifact's own mouth-cell `input` listener, self-recursive) and timeline.js:7169 (this artifact's own `renderCompFrameStrip`, self-recursive) — a whole-src/js grep of `window.renderLipSyncPanel` (the exported name) finds no reference outside this same file's own declaration/export line (7165) and these two self-recursive calls; no external module reaches the export at the frozen SHA.",
+            "`renderCompFrameStrip` — 1 total call site beyond its own declaration (7166): timeline.js:7103 (this artifact's own `updateCompInstancePanel`, self-recursive) — no external caller found."
+          ],
+          "effects": "Reads `state.symbols`, `state.layers`, `state.activeLayerIdx`, `state.currentFrame`, `ld.symbolId`/`.frames`/`.symPlayMode`/`.symSingleFrame`. Writes DOM (strip cells) unconditionally. The per-cell click handler is this packet's ONE document-mutating path: conditionally `saveAllLayerFrames()`+`pushUndoLayers(true)` (only when the click changes something) THEN `window.SM.setSymbolSingleFrame(idx,true)`+`window.SM.setSymbolPlayMode('single',true)` (both `skipUndo`-guarded against the snapshot just taken) THEN a self-recursive `updateCompInstancePanel()` re-render — one snapshot, two coordinated writes, one re-render, exactly as the 2026-09 comment describes fixing."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Three functions in this scope call `saveAllLayerFrames()` (always paired with `pushUndoLayers(true)` immediately before or after the same guard): the footage panel's interp-mode `change` handler (7057, C19v.footage-panel), `finishLayerReorder`'s un-parent branch (6967, C19v.finish-layer-reorder, conditional on at least one moving layer actually leaving a folder) and the frame-strip cell click (7188, C19v.comp-frame-strip, conditional on the click actually changing `symSingleFrame`/`symPlayMode`). `finishLayerReorder`'s OTHER two mutation paths (`window.SM.reparentLayersIntoFolder`, `window.SM.reorderLayersAtGap`) delegate their own save/undo behavior entirely to those out-of-scope wrappers, not reproduced here. `renderLipSyncPanel`'s `st.map[m.id]` write (7158) calls NEITHER save NOR pushUndo at all — flagged, not confirmed as a defect, in future_proposals below."
+    },
+    {
+      "consumer": "load",
+      "disposition": "`loadFrame` is called exactly once in this scope's own body: the footage panel's interp-mode change handler (7061, C19v.footage-panel), after writing `l.nativeVideo.interpMode`/`.frameBlend` directly — reloads the current frame so the newly-selected blend mode is immediately visible. No function in this scope is itself reachable from `importJSON`'s own code paths (confirmed: none of this scope's declared names appear there at the frozen SHA)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly three `pushUndoLayers`-family calls anywhere in this scope's own body, all `pushUndoLayers(true)`: the footage panel's interp-mode change (7057), `finishLayerReorder`'s conditional un-parent snapshot (6967) and the frame-strip cell click (7188) — each already documented on its own packet above. Every other document-shaped write in this scope either delegates to an out-of-scope function that owns its own undo call (`window.SM.reparentLayersIntoFolder`/`reorderLayersAtGap`/`setSymbolSingleFrame`/`setSymbolPlayMode`, `SMMotion.setLayerParent`) or (the lip-sync mouth-map write, 7158) pushes no undo entry at all."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This scope READS `_layerSel` (C19q's module-scope array) in exactly one place — `finishLayerReorder`'s multi-selection block (6947) — to decide whether a drag moves the whole current selection or just the dragged row; it never writes `_layerSel`/`_layerSelAnchor` itself. `state.activeLayerIdx`/`activeSymbolId`/`activeMontageViewId` are all read-only in this scope; every navigation action (entering/exiting a component or montage) is delegated to out-of-scope `window.SM.*` wrappers."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "The layer drag-to-reorder machinery (`_layerDrag` and its six functions) is armed identically from BOTH Animation 2D's panel row (C19u) and Motion's own row (motion.js:7349) — the same `armLayerReorder`/`moveLayerReorder`/`finishLayerReorder` state machine serves both modes, with no mode branch anywhere in this scope's drag code; only `installLayerReorderGrip`'s own lead-in comment (6809-6817) records that Motion stopped INSTALLING the sticky grip itself (2026-09-01) while still reusing the drag machinery through its direct `armLayerReorder` call. The five panel/tab renderers (`renderSymbolTabs`, `updateFootagePanel`, `updateCompInstancePanel`, `renderLipSyncPanel`, `renderCompFrameStrip`) read `state.currentFrame` in several places (7035, 7099, 7172, 7178, 7187) but ALWAYS as a synchronous read at call time (panel population or a click-handler closure), never cached across a frame boundary — confirmed by grep within 6794-7192 and manual inspection of each site."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's declared functions are called from export.js or rive-export.js at the frozen SHA (confirmed: no match for any of this scope's own symbol names in either file) — every function here is editor-UI-only, reached from user pointer gestures or from `updatePropsContext`'s panel-refresh chain, never from a render/export pass."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called exactly once in this scope's own body: the footage panel's interp-mode change handler (7062, C19v.footage-panel, guarded on `window.SMEngineBridge`), forcing an immediate repaint after the direct `l.nativeVideo.interpMode`/`.frameBlend` write. `SMNativeVideo.invalidate()` (7060, same handler) and `SMTrackerPanel.render()` (7067) are the scope's only other native/bridge-adjacent calls, both delegating their own effects to out-of-scope modules."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-arm-reorder-refuses-reentrant-and-right-click",
+      "proposed": "`_layerDrag.active=false`; call `armLayerReorder({button:0,clientX:10,clientY:20},3,'panel',null)`; expect `_layerDrag.active===true`, `.srcIdx===3`, `.grabOffsetY===17` (no `sourceRow`, fixed fallback); then call `armLayerReorder({button:0,clientX:0,clientY:0},5,'panel',null)` again WITHOUT resetting `.active`; expect `.srcIdx` UNCHANGED at 3 (the re-entrancy guard at 6799 refused the second call) — not run."
+    },
+    {
+      "id": "fx-move-threshold-refuses-horizontal-wobble",
+      "proposed": "`_layerDrag={active:true,moved:false,startX:100,startY:100,...}`; call `moveLayerReorder({clientX:112,clientY:102})` (dx=12,dy=2); expect `_layerDrag.moved` STILL false (dy<4) and no `dragging` class added to any row; then call `moveLayerReorder({clientX:100,clientY:106})` (dx=0,dy=6, past both the dy<4 and dy<dx*.55 checks); expect `_layerDrag.moved===true` — not run."
+    },
+    {
+      "id": "fx-folder-drop-only-in-middle-band-not-self-not-folder-source",
+      "proposed": "A folder-layer row at target index 4, its own bounding rect 0-20px tall; drag a NON-folder source (idx 2) over relY=0.5 (middle); expect `_layerDrag.dropFolderTarget===4` and the `folder-drop-target` class added, `dropGap` untouched; then move to relY=0.1 (top edge); expect `dropFolderTarget` cleared back to -1 and a gap-based `dropGap` computed instead — not run."
+    },
+    {
+      "id": "fx-finish-reorder-unparents-with-one-undo-snapshot",
+      "proposed": "Stub `saveAllLayerFrames`/`pushUndoLayers`/`SMMotion.setLayerParent`/`window.SM.reorderLayersAtGap` as spies; a moving layer currently has `folderLayerParentIdx(mi)>=0`; `_layerDrag={active:true,moved:true,dropGap:3,dropFolderTarget:-1,srcIdx:mi,...}`; call `finishLayerReorder()`; expect `saveAllLayerFrames`/`pushUndoLayers(true)` each called EXACTLY ONCE (before any mutation), `SMMotion.setLayerParent(mi,null)` called once, then `reorderLayersAtGap([mi],3,true)` called once with `unparenting===true` as its third argument (so it takes no second snapshot) — not run."
+    },
+    {
+      "id": "fx-finish-reorder-multiselect-moves-whole-selection",
+      "proposed": "`_layerSel=[1,2,3]`; `_layerDrag={active:true,moved:true,srcIdx:2,dropGap:0,dropFolderTarget:-1,...}`; stub `window.SM.reorderLayersAtGap` as a spy; call `finishLayerReorder()`; expect the spy's first argument to equal `[1,2,3]` (the WHOLE selection, since the dragged index 2 is a member of it) rather than `[2]` alone — not run."
+    },
+    {
+      "id": "fx-symbol-tabs-scene-tab-active-when-nothing-entered",
+      "proposed": "`state.activeSymbolId=null;state.activeMontageViewId=null;state.openSymbolTabs=[]`; call `renderSymbolTabs()`; expect exactly one `.sym-tab` element in `#symbol-tabs`, with class `act`, textContent 'Scene' — not run."
+    },
+    {
+      "id": "fx-footage-panel-hidden-for-non-footage-layer",
+      "proposed": "Active layer has no raster content and `SMLayerKind.of` resolves to `{key:'draw'}`; call `updateFootagePanel()`; expect `#footage-sec`'s `style.display==='none'` and no field inside it populated — not run."
+    },
+    {
+      "id": "fx-comp-instance-panel-hidden-while-inside-the-symbol",
+      "proposed": "`state.activeSymbolId='sym1'`; active layer has `symbolId='sym1'`; call `updateCompInstancePanel()`; expect `#comp-instance-sec`'s `style.display==='none'` (the `state.activeSymbolId` gate at 7092 fires before the `ld.symbolId` check even runs) — not run."
+    },
+    {
+      "id": "fx-lipsync-mouth-input-clamps-and-writes-map-with-no-undo",
+      "proposed": "Stub `pushUndoLayers`/`saveAllLayerFrames` as spies; `sym.totalFrames=10`; type '999' into a mouth cell's numeric input and dispatch `input`; expect `st.map[m.id]===9` (clamped to `total-1`) and NEITHER spy called — documenting the asymmetry with the footage-panel/frame-strip writers above rather than asserting a confirmed defect — not run."
+    },
+    {
+      "id": "fx-frame-strip-click-commits-one-snapshot-for-two-writes",
+      "proposed": "Stub `saveAllLayerFrames`/`pushUndoLayers`/`window.SM.setSymbolSingleFrame`/`window.SM.setSymbolPlayMode` as spies; active layer has `symSingleFrame=0`,`symPlayMode='loop'`; click frame-strip cell index 5; expect `saveAllLayerFrames`/`pushUndoLayers(true)` each called EXACTLY ONCE, THEN `setSymbolSingleFrame(5,true)` and `setSymbolPlayMode('single',true)` each called once (both passed the skip-own-undo flag) — not run."
+    },
+    {
+      "id": "fx-frame-strip-reclick-same-cell-takes-no-snapshot",
+      "proposed": "Active layer already has `symSingleFrame=5`,`symPlayMode='single'`; click frame-strip cell index 5 again; expect NEITHER `saveAllLayerFrames` NOR `pushUndoLayers` called (the 7188 guard's condition is false since nothing would change), while `setSymbolSingleFrame`/`setSymbolPlayMode` are still called (idempotent) — not run."
+    }
+  ],
+  "future_proposals": [
+    "The lip-sync mouth-map write (`st.map[m.id]=...`, 7158, packet C19v.lip-sync-panel) writes a document-shaped field directly with NO `pushUndo`/`saveActiveLayerFrame` call, unlike every OTHER direct-write handler in this scope (the footage panel's interp-mode change, `finishLayerReorder`'s un-parent snapshot, the frame-strip cell click), all three of which pair their write with `saveAllLayerFrames()`+`pushUndoLayers(true)`. Flagged for the eventual runtime-behavior review as a possible missing-undo-entry source for lip-sync mapping edits; not exercised or confirmed as a defect by this census (no execution was performed).",
+    "`installLayerReorderGrip`'s own hand-off branch (6832-6843) is, by its own lead-in comment's admission, permanently dead on Animation 2D's current rows (they never have a `.layer-inout-handle`) since Motion stopped installing this grip at all (2026-09-01). Kept intentionally for a hypothetical future caller, per the comment — noted for awareness, not flagged as a defect, since removing speculative-future code is a product decision outside this census's scope.",
+    "`renderSymbolTabs`' own Scene-tab click handler (6984-6987) has no explicit else-branch for the case where a click somehow occurs while NEITHER `state.activeSymbolId` NOR `state.activeMontageViewId` is set (the tab that CLICK belongs to is already the active/only tab in that state, so the branch is likely unreachable in practice) — noted for awareness only, not exercised or confirmed as a defect.",
+    "`window.renderLipSyncPanel` (7165) is exported to `window` but, at the frozen SHA, has no caller outside this SAME file's own two self-recursive call sites — a whole-src/js grep of the exported name confirms no other module reaches it through `window`. Possibly forward-looking (a planned external caller not yet wired), possibly a leftover export convention matching this file's other `window.*` exports; not flagged as a defect."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-src/js `git grep -n -w` was run once per symbol declared or read in this scope, plus every callee it calls into (all symbols listed in each packet's own `symbols` array, plus `state.currentFrame`, `pushUndoLayers`, `saveAllLayerFrames`, `loadFrame`, `SMEngineBridge`, `_layerSel`, `folderLayerParentIdx`) at the frozen SHA 59a5a38c; results are reproduced verbatim as caller/owner citations above and are re-checkable with `git grep -n -w '<symbol>' 59a5a38c514f5da830dd2f2df4c83c63b1b22fba -- src/js`.",
+    "Each of this scope's ten own declared functions (`armLayerReorder`, `installLayerReorderGrip`, `ensureLayerDragGhost`, `updateLayerDragGhost`, `clearLayerDropIndicator`, `moveLayerReorder`, `finishLayerReorder`, `renderSymbolTabs`, `updateFootagePanel`, `updateCompInstancePanel`, `renderLipSyncPanel`, `renderCompFrameStrip` — twelve names total, thirteen counting `_layerDrag`) was separately grepped for its COMPLETE external caller inventory via `git grep -n -E '(^|[^a-zA-Z_.])<name>\\(' 59a5a38c -- src/js`, filtered to exclude `//`-only mentions and each function's own declaration line; every result is reproduced in full on the last packet (C19v.comp-frame-strip) rather than duplicated on every packet, per the issue's 'complete file:line list' instruction.",
+    "`export.js` and `rive-export.js` were separately grepped for every symbol this scope declares and found to contain no match at the frozen SHA, supporting the export source_consumers entry above.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19d through C19u, forming a contiguous run from line 862 through line 6793 with zero gaps and zero overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency) — this artifact's own range (6794-7192) is the immediate next contiguous span; the validator's cross-sibling overlap check additionally confirms this programmatically against every C*.json in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 399,
+    "expected_classification": {
+      "code": 309,
+      "comment": 90,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        6794,
+        6808
+      ],
+      [
+        6809,
+        6851
+      ],
+      [
+        6852,
+        6880
+      ],
+      [
+        6881,
+        6939
+      ],
+      [
+        6940,
+        6980
+      ],
+      [
+        6981,
+        7013
+      ],
+      [
+        7014,
+        7089
+      ],
+      [
+        7090,
+        7104
+      ],
+      [
+        7105,
+        7165
+      ],
+      [
+        7166,
+        7192
+      ]
+    ],
+    "packet_classification": "Each packet's own classification field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 6794-6808=(12,3,0); 6809-6851=(27,16,0); 6852-6880=(29,0,0); 6881-6939=(44,15,0); 6940-6980=(23,18,0); 6981-7013=(29,4,0); 7014-7089=(55,21,0); 7090-7104=(15,0,0); 7105-7165=(51,10,0); 7166-7192=(24,3,0); sums to (309,90,0)=399 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 399 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json 24cc3eb exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19u-timeline-render-layer-list.json 24cc3eb still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19t-timeline-color-surfaces-index-reconcile.json 24cc3eb still exits 0"
+    ]
+  }
+}

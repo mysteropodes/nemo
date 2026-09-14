@@ -1,0 +1,691 @@
+{
+  "census_id": "C20j",
+  "issue": 1230,
+  "title": "Census motion.js module header and property tables (1-117) plus reveal shortcuts, view filters and easing constants (583-940)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf closing two of the remaining src/js/motion.js open spans in remediation-scope.json rangeCoverage (frozen index at 4bbe332): [1,117] (module header comment, ROW_H, PROPS, PROPS_WITH_3D, PROPS_DUP_EXTRA) and [583,940] (AE-style P/A/R/S/T/U/E/M reveal shortcuts, the Motion view filters and workspace state, the easing-curve constants). The 20-line fragment [561,580] (tail of reloadIfTimeLinkOffset, PROP_DIM_LABELS, the lead-in of the sibling-covered DUP_TARGET_PROPS) is deliberately NOT taken here — it is a mid-construct leftover of the coarse C02 coverage and goes to the P03C small-span reconciliation. Sole artifact: engineering/inventory/census/C20j-motion-header-tables-reveal-shortcuts-view-filters.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: isAnimated/trackFor/valueAtFrame/propsFor and the rest of 118-560 and 941+ (C02 animation-time census and C20a-i), renderLayerList/renderLayerListMotion/renderTimeline (C19/C20 rows), onKeyDown in timeline.js (the caller of the shortcut handlers), applyLayerDuplicator (app.js C21g — the exported consumer of PROPS_DUP_EXTRA's field names), NemoOpacityDomain.defaultCurve (application module), ui.js's curve editor and workspace-preset code, showToast (C19w).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "73ee70feaacb73ecd3083c3a53d2c1930fcf4b5c",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20j-motion-header-tables-reveal-census",
+  "assigned_ranges": [
+    {
+      "start": 1,
+      "end": 117
+    },
+    {
+      "start": 583,
+      "end": 940
+    }
+  ],
+  "coverage_note": "Exactly 475 assigned lines occur once across two ranges and seven complete packets: 187 code, 287 full-line comments, 1 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, and it matches the issue's own proposed union AND per-packet table exactly for all seven packets (verified with a Python re-implementation of classify() against the frozen blob, cross-checked with `sed -n` reads). No boundary correction was needed: range 1 runs from the `// ---- MOTION MODE (v1, 2026-07) ----` file header (line 1) to PROPS_DUP_EXTRA's own declaration line (117); line 118 opens registerEffectorPropMeta, C02's own sibling-covered construct (confirmed by direct read). Range 2 runs from PROP_SHORTCUT's own lead-in comment (line 583, immediately after the sibling-covered DUP_OFFSET_PROP at line 582, confirmed by direct read) to line 940, the last line of isLegacyStepCurve's own lead-in comment (isLegacyStepCurve's function declaration itself starts at line 941, sibling-covered, confirmed by direct read) — those four trailing comment lines (937-940) are included here so no line of the open span is orphaned, and are recorded in packet 7 as the lead-in of a sibling-covered construct, not re-described. The issue's own suggested internal split of the U-shortcut packet at helper lead-ins (733, 763, 775) was evaluated and NOT taken: those three helpers (layerHasAnimatedElements, textAnimatorHasKeys, discreteRowVisible) are mutually dependent building blocks of the single U gesture handleRevealAnimatedShortcut assembles immediately below them, and splitting would scatter one coherent feature's own supporting predicates across multiple packet IDs without a construct boundary comparable to the other packet cuts — the packet stays whole, matching the issue's own suggested table.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's HEAD and the allocated base 73ee70feaacb73ecd3083c3a53d2c1930fcf4b5c (73ee70f, PR #1233, merged) both resolve motion.js to the identical blob 6617bac29042c22399cac202bf054c09e4fdf30e — verified directly (`git rev-parse <pin>:src/js/motion.js` == `git rev-parse 73ee70f:src/js/motion.js`).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -nE '(^|[^a-zA-Z_.])<symbol>\\(' ` and plain-word `grep -n '<symbol>'` over a recursive `find src/js -name \"*.js\"` scan, filtered to exclude each symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit directly with `sed -n`/`grep -n` against this worktree's copy of motion.js — confirmed byte-identical to the frozen blob above, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20j-motion-header-tables-reveal-shortcuts-view-filters.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20j transfers no implementation authority.",
+    "owners": "C02 retains track, key, expression evaluator, active-target, propsFor/transformRowPlan and Time Link/Motion semantics; C01 retains history; C19g retains document codecs. app.js's applyLayerDuplicator, effects-panel.js and ui.js retain their own bodies in full.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02 (existing owner, motion.js:118-560 and 941+, track/key/expression/propsFor machinery)",
+      "disposition": "Retains its own body in full — cited by line only. propsFor(holder) (motion.js:176-, out of scope) reads this scope's own PROPS/PROPS_WITH_3D/PROPS_DUP_EXTRA directly (`var list=(holder&&holder.threeD)?PROPS_WITH_3D:PROPS;` at motion.js:177, `list=list.concat(PROPS_DUP_EXTRA)` at motion.js:178) — confirmed by direct read, the sole external reader of these three arrays anywhere in src. transformRowPlan(holder) (motion.js:415-427, out of scope) is the single row-PLAN builder both panel and grid consult (per its own comment, motion.js:398-401): it reads PROPS_DUP_EXTRA (motion.js:419), isPropFiltered/_hideUnanimated/propHasContent/motionPropMatchesView (motion.js:418, all four this scope's own packet 2/3 symbols) in one gate, then calls propsFor(holder) itself. isLegacyStepCurve (motion.js:941-949, immediately after this scope's own range 2) is the sole consumer of LEGACY_STEP_CURVE and is itself called only internally at motion.js:1161 (migrateLegacyCurves-style key-rewrite pass, out of scope)."
+    },
+    {
+      "owner": "C20f (existing owner, motion.js:8649-9428, PR #1225, merged)",
+      "disposition": "Retains its own body in full — cited by line only. renderTransformProps(holder) (motion.js:8700-, C20f) is transformRowPlan's own panel-side caller (motion.js:8701) and showsGroupHeader's own panel-side caller (motion.js:8661, `if (showsGroupHeader()) renderTransformHeader(list, groupLabel);`)."
+    },
+    {
+      "owner": "C20g/#1218 and C20h/#1224 (existing owners, motion.js:9826-10671, merged)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. Neither references any symbol declared in this scope by grep (confirmed): renderElementsList/renderColorRow/renderTrimScalarRow/renderTrimPathsGroup (C20g) and the text-animator/path/mesh vertex-row builders (C20h) read holder.motion/holder.motionStatic through the generic C02 machinery, never through this scope's view-filter predicates or reveal-shortcut state."
+    },
+    {
+      "owner": "C20i (grid-side row builder, motion.js:10672-11125, not yet filed at authoring time; renderLayerListMotion/renderTimelineMotion themselves at motion.js:7032/11136 are also out of this scope)",
+      "disposition": "Cited by name/line only. renderLayerListMotion (motion.js:7032) and renderTimelineMotion (motion.js:11136) each gate an ENTIRE layer row via `if (!layerMatchesMotionView(ld)) return;` (motion.js:7068 and motion.js:11141 respectively) and read `isLayerExpanded(li)` immediately after (motion.js:7080/11142) — the panel/grid pair the §11 alignment invariant depends on for this scope's own view-narrowing predicates. transformRowPlan's own two remaining call sites (motion.js:11193 layer loop, motion.js:11269 element loop) and showsGroupHeader's own two remaining call sites (motion.js:11177, 11253) live in this same not-yet-filed slice."
+    },
+    {
+      "owner": "timeline.js (existing owner, onKeyDown and the global layer-selection/reveal state, P30/#1032)",
+      "disposition": "Retains its own body in full — cited by line only. onKeyDown (timeline.js:9641-) is the SOLE caller of every exported shortcut handler this scope declares: `SMMotion.handlePropShortcut(k,event.shiftKey)` at timeline.js:9873, `SMMotion.revealAnimated()` at timeline.js:9879, `SMMotion.revealEffects()` at timeline.js:9883, `SMMotion.revealMattes()` at timeline.js:9884 — each guarded by `state.appMode==='motion'&&window.SMMotion`. `_layerSel`/`_layerSelAnchor` (timeline.js:5423/5432, global, read by this scope's own shortcutTargets/handleRevealAnimatedShortcut/revealByLayerPredicate as bare `_layerSel` or `window._layerSel`) and the much larger `window._motionRevealedLayers`/`window._motionExpandedLayer` surface (timeline.js:6252-6289 names it explicitly as 'thirteen different' consumers, reindexed on layer delete/duplicate at timeline.js:1056-1058/1531-1532/1551) are owned here — this scope's own functions write into that surface but do not declare or own it."
+    },
+    {
+      "owner": "app.js (existing owner, applyLayerDuplicator and the global state object)",
+      "disposition": "Retains its own body in full — cited by line only. applyLayerDuplicator (app.js:1616-1688) reads the eight dupOffset* fields as LITERAL string property names passed to M.valueAtFrame (app.js:1666-1688) — it never references the PROPS_DUP_EXTRA array by name (confirmed by grep: PROPS_DUP_EXTRA has no hit in app.js), so the two are kept in sync only by both listing the same eight literal strings, not by a shared reference. app.js's own top-level `var ROW_H=34;` (app.js:77, Animation 2D's row height) is a SEPARATE global from this scope's own motion.js:43 `var ROW_H=22` — see boundaries."
+    },
+    {
+      "owner": "effects-panel.js (existing owner, effect keyframe default curves)",
+      "disposition": "Retains its own body in full — cited by line only. Calls `SMMotion.DEFAULT_CURVE()` at effects-panel.js:490 and effects-panel.js:524 to seed a NEW effect keyframe's default ease curve, with a literal two-point linear fallback `[{x:0,y:0},{x:1,y:1}]` if window.SMMotion is absent — a genuine external consumer of this scope's DEFAULT_CURVE beyond the timeline.js/onKeyDown shortcut-handler pattern the issue's own prompt expected (see boundaries)."
+    },
+    {
+      "owner": "ui.js (existing owner, curve editor and workspace-preset save/restore)",
+      "disposition": "Retains its own body in full — cited by name/line only. Its own curve-editor evaluator is a separate implementation sharing only the waypoint semantics this scope's own file-header comment (lines 1-16) describes, not any symbol in this scope. Its workspace-preset code (ui.js:891/906-925) round-trips the SAME `nemo-motion-columns` localStorage key `_motionColumnPreset` seeds itself from (motion.js:621) — a workspace-preset export/import, not a project-data export; see source_consumers/save."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact authoring permits no source or behavior change."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Range 1: line 117 (PROPS_DUP_EXTRA's declaration) closes this scope; line 118 opens C02's own registerEffectorPropMeta (confirmed by direct read, `function registerEffectorPropMeta(key, label, defaultVal, dim, unit) {`). Range 2: line 582 (DUP_OFFSET_PROP, sibling-covered) precedes this scope; line 583 opens PROP_SHORTCUT's own lead-in comment. Line 940 (the last line of isLegacyStepCurve's own lead-in) closes this scope; line 941 opens `function isLegacyStepCurve(pts) {`, C02's own sibling-covered construct. All four boundary lines confirmed by direct `sed -n`/`nl` read of the frozen blob.",
+    "ROW_H naming collision, confirmed by direct read and script-load-order check (src/index.html:2300/2366/2376): this scope's own `var ROW_H = 22` (motion.js:43) is declared INSIDE motion.js's own top-level `(function () { ... })()` (opens motion.js:27) and is therefore function-scoped — invisible outside this IIFE. app.js declares its OWN, unrelated top-level `var ROW_H = 34;` (app.js:77) OUTSIDE any IIFE, which — because app.js, timeline.js and motion.js all load as classic (non-module) <script> tags sharing one global scope — becomes `window.ROW_H`. timeline.js loads BEFORE motion.js (index.html:2366 before 2376) and itself declares no ROW_H, so its own three unqualified `ROW_H` reads (timeline.js:4278, 4392, 6410, all Animation 2D frame-grid row-height math) resolve to app.js's global 34, NEVER to this scope's own Motion-mode 22. This corrects the issue's own expectation ('timeline.js ROW_H consumers... by line only'): timeline.js has zero readers of THIS scope's own ROW_H — its three ROW_H reads are a same-named but semantically unrelated Animation-2D constant. This scope's own ROW_H=22 is consumed only later in the SAME closure, at motion.js:10689/10709/10731 (SVG track-row sizing, C20i territory, cited by line only).",
+    "A second, independent naming collision of the same shape: src/js/nemo-script.js declares its own `var PROPS = ['position','anchor','scale','rotation','opacity','timeRemap']` (nemo-script.js:43) inside its OWN top-level IIFE (closes at nemo-script.js:695) — a different array (different membership: includes 'timeRemap', omits 'order') used to validate a scripting API's `nemo.layer(...).set(prop,...)` calls. It shares no code path with this scope's own PROPS (motion.js:56); confirmed by grep, the two never reference each other.",
+    "DEFAULT_CURVE is exported (`DEFAULT_CURVE: function () { return JSON.parse(JSON.stringify(DEFAULT_CURVE)); }`, motion.js:13460, a deep-clone accessor, not the live array) and called externally from TWO distinct places, not one: timeline.js does NOT call it at all (grep confirms zero `SMMotion.DEFAULT_CURVE` hits in timeline.js) — the only external callers are effects-panel.js:490 and effects-panel.js:524, seeding a brand-new effect keyframe's default ease curve. This corrects the issue's own 'expect motion.js-internal plus timeline.js onKeyDown' framing for THIS symbol: DEFAULT_CURVE's external consumer is effects-panel.js, unrelated to the onKeyDown shortcut dispatch the other four exports (handlePropShortcut/revealAnimated/revealEffects/revealMattes) share. Those four ARE exactly as expected: their sole external caller is timeline.js's onKeyDown, at timeline.js:9873/9879/9883/9884 respectively, each behind a `state.appMode==='motion'&&window.SMMotion` guard.",
+    "Every other function declared in 583-940 (propHasContent, isPropFiltered, propHasExpression, propHasExpressionError, motionPropMatchesView, layerMatchesMotionView, motionViewIsNarrowed, showsGroupHeader, shortcutTargets, isLayerExpanded, layerHasAnimatedElements, textAnimatorHasKeys, discreteRowVisible, revealByLayerPredicate) has ZERO callers outside motion.js — confirmed by an `(^|[^a-zA-Z_.])name\\(` grep across a recursive `find src/js -name '*.js'` scan for each of the fourteen names; every hit is inside motion.js. This confirms the issue's own expectation for this subset without correction.",
+    "A genuine document write with no undo capture, found by grepping this scope's own range for `pushUndo`/field-assignment patterns (zero pushUndo hits in lines 583-940): handleRevealAnimatedShortcut's own folder-uncollapse step (motion.js:868, `if (fld && fld.isFolderLayer && fld.folderCollapsed && fld.layerUid === ld.parentLayerUid) fld.folderCollapsed = false;`) mutates `fld.folderCollapsed`, a field that IS serialized by exportJSON (timeline.js:2117, listed among the persisted per-layer fields) — so pressing U can flip project data that survives a save, with no pushUndo call anywhere in this scope. This is NOT an isolated oversight: timeline.js's own manual arrow-click toggle for the SAME field (`SM.toggleFolderLayerCollapsed`, timeline.js:914-917) also never calls pushUndo, and its own comment calls it a 'Pure disclosure toggle... never a mode change' — confirming a codebase-wide, deliberate convention that `folderCollapsed` (though technically project data) is treated as UI disclosure state exempt from undo, not a bug unique to this scope. This corrects the issue's own 'expect none' framing for this one branch of handleRevealAnimatedShortcut; every other write this scope performs (module-level UI vars, window._motionRevealed*, localStorage) is confirmed non-persisted/non-undoable UI state.",
+    "The seven module-level UI-state variables the issue names (_propFilter, _hideUnanimated, _scaleLockedHolders, _motionSearch, _motionFilterMode, _motionColumnPreset, _motionSnapEnabled) have EVERY reader and writer confined to motion.js itself — confirmed by a plain-word grep for each name across all of src/js; none appears in any other file. Three of the seven (_motionFilterMode, _motionColumnPreset, _motionSnapEnabled) are seeded from and written back to localStorage (motion.js:620-622 seed, motion.js:7019-7021 write, keys 'nemo-motion-filter'/'nemo-motion-columns'/'nemo-motion-snap') — confirmed NOT reachable from exportJSON (zero hits for any of the seven names in timeline.js). ui.js's own workspace-preset save/restore (ui.js:891, 906-925) independently reads and re-writes the SAME 'nemo-motion-columns' localStorage key as its own 'motionColumns' preset field — a second, unrelated writer of the identical persisted key, confirmed to never touch the in-memory `_motionColumnPreset` variable directly (it only round-trips localStorage and a DOM dataset attribute); the variable itself is only ever refreshed from localStorage at motion.js:621, which runs once at script-load time, so a workspace-preset APPLY while the app is already running updates the DOM/localStorage but not the live `_motionColumnPreset` value until next reload — confirmed by direct read, not exercised at runtime.",
+    "What resets _propFilter/_hideUnanimated/the reveal sets: the ONLY reset sites found anywhere in src/js are (a) each shortcut handler's own toggle-off branch when pressed again (motion.js:687-692 for P/A/R/S/T, motion.js:813-821 for U) and (b) the plain layer-row-arrow click handler (motion.js:7151, `_propFilter = null; // a hand-opened layer shows all its properties`, out of this scope) which resets ONLY `_propFilter`, never `_hideUnanimated` or the window._motionRevealed* sets. No reset was found tied to `state.appMode` changing (leaving Motion mode) or to layer selection changing — confirmed by grep, these five pieces of state persist across a mode switch or a selection change until the next explicit shortcut press or row-arrow click. This corrects the issue's own '(layer expand, mode switch)' framing: layer expand resets `_propFilter` alone; mode switch resets nothing found in this scope."
+  ],
+  "areas": [
+    {
+      "area": "module-header-and-property-tables",
+      "packets": [
+        {
+          "id": "C20j.module-header-and-property-tables",
+          "files": [
+            "src/js/motion.js:1-117"
+          ],
+          "coverage_ranges": [
+            [
+              1,
+              117
+            ]
+          ],
+          "classification": {
+            "code": 5,
+            "comment": 112,
+            "whitespace": 0
+          },
+          "symbols": [
+            "ROW_H",
+            "PROPS",
+            "PROPS_WITH_3D",
+            "PROPS_DUP_EXTRA"
+          ],
+          "signatures": [
+            "var ROW_H = 22 (Motion mode's own row height, px)",
+            "var PROPS = ['position','anchor','rotation','scale','opacity','order']",
+            "var PROPS_WITH_3D = ['position','positionZ','anchor','rotation','rotationX','rotationY','scale','opacity','order']",
+            "var PROPS_DUP_EXTRA = ['dupOffsetPos','dupOffsetRot','dupOffsetScale','dupOffsetOpacity','dupOffsetHue','dupOffsetPosZ','dupOffsetRotX','dupOffsetRotY']"
+          ],
+          "responsibility": "File header (1-26, 26 lines): the module-level design note — Motion is a SECOND paradigm (After-Effects-style property keyframing) reusing the SAME layers as Animation 2D so the two stay two VIEWS of one project ('on doit retrouver nos éléments dedans'); engine model (spatial hOut/hIn position handles generalized from camera.js, timing/velocity via the Tween feature's N-point on-curve-waypoint model scoped per-segment via key.curvePoints, animation/curve.js as the pure evaluator, ui.js retaining its own editor evaluator); the CLAUDE.md 'family of bug #1' save-safety constraint — the motion transform is applied ONLY inside buildSceneJson's own item-serialization pass, never to userLayers[i] itself, so the live Paper.js layer is never corrupted by a motion offset on save. `(function () {` opens the file's own IIFE at line 27. ROW_H (28-43, 16-line lead-in + declaration): 22px, deliberately shorter than Animation 2D's 34px .lrow/.frow default; the header explicitly frames it as the single constant every SVG-positioned element BELOW in this file (connection-bar rect, keyframe-cell centering) must read, so panel and grid can never drift apart — this is the file's own first statement of the §11 alignment invariant, and it is scoped INSIDE this file's own IIFE (see boundaries for the ROW_H naming collision this creates with app.js's own global ROW_H=34). PROPS (44-56, 12-line lead-in + declaration): the six base ordinary Transform properties, including 'order' (2026-08 addition, a plain z-index render-list position — not a paint attribute — placed as a base PROPS entry rather than an opt-in extended one because propsFor/PROP_* already serve both a layer holder and an element holder identically). PROPS_WITH_3D (57-66, 9-line lead-in + declaration): the 3D-layer variant (2026-07-28) adding positionZ/rotationX/rotationY as three independent dim-1 properties reusing rotation/opacity's own track machinery unchanged, rather than extending 'position' to 3 dimensions. PROPS_DUP_EXTRA (67-94, three lead-in comments totaling 27 lines + declaration): the mograph duplicator's (2026-07-29/2026-07-30) eight per-copy stagger deltas — the original four (dupOffsetPos/Rot/Scale/Opacity/Hue, revealed only when ld.duplicator is set) plus the later three 3D channels (dupOffsetPosZ/RotX/RotY) that only visibly do anything once the layer ALSO has threeD on; the lead-in also documents that these are read by applyLayerDuplicator (app.js) only when getEffectiveStrokesRendered runs, fixed centrally in SMEngineBridge.renderNow() rather than patched per call-site. Trailing lead-in comments (95-117, 23 lines): Time Remap's own framing (95-100, an EXTRA row that never feeds computeMotionMat, out of this scope's own tables) and Component exposed properties' own framing (101-117, Figma Component Properties + AE Master Properties synthesis, self-registering PROP_* metadata on every propsFor call) — both lead directly into C02's own registerEffectorPropMeta at line 118, sibling-covered, not re-described here.",
+          "callers": [
+            "PROPS/PROPS_WITH_3D: sole external reader is propsFor(holder) (motion.js:176-186, C02, out of scope) — `var list=(holder&&holder.threeD)?PROPS_WITH_3D:PROPS;` at motion.js:177. No other reader of either array was found in src/js by grep.",
+            "PROPS_DUP_EXTRA: read by propsFor (motion.js:178, `list=list.concat(PROPS_DUP_EXTRA)`) and by transformRowPlan (motion.js:419, `if (PROPS_DUP_EXTRA.indexOf(prop) >= 0) { dupProps.push(prop); return; }`), both C02, out of scope. app.js's applyLayerDuplicator (app.js:1616-1688) reads the SAME eight field names but as literal strings, never referencing this array by name — see reconciliation.",
+            "PROPS: also read internally, later in this SAME file (all out of this packet's own range, cited by line only): motion.js:419/705/708/753/805/864 (packets 3-5 below) and motion.js:177 above.",
+            "ROW_H: read later in this SAME closure at motion.js:10689/10709/10731 (C20i territory, SVG track-row sizing) — no reader outside motion.js exists, since the variable is IIFE-scoped; see boundaries for the unrelated same-named global in app.js/timeline.js."
+          ],
+          "external_calls": []
+        }
+      ]
+    },
+    {
+      "area": "reveal-shortcut-table-and-view-state",
+      "packets": [
+        {
+          "id": "C20j.reveal-shortcut-table-and-view-state",
+          "files": [
+            "src/js/motion.js:583-623"
+          ],
+          "coverage_ranges": [
+            [
+              583,
+              623
+            ]
+          ],
+          "classification": {
+            "code": 13,
+            "comment": 28,
+            "whitespace": 0
+          },
+          "symbols": [
+            "PROP_SHORTCUT",
+            "_propFilter",
+            "_hideUnanimated",
+            "_scaleLockedHolders",
+            "_motionSearch",
+            "_motionFilterMode",
+            "_motionColumnPreset",
+            "_motionSnapEnabled"
+          ],
+          "signatures": [
+            "var PROP_SHORTCUT = {p:'position',a:'anchor',r:'rotation',s:'scale',t:'opacity'}",
+            "var _propFilter = null | string[]",
+            "var _hideUnanimated = boolean",
+            "var _scaleLockedHolders = WeakSet",
+            "var _motionSearch = string",
+            "var _motionFilterMode = 'all'|'animated'|'modified'|'expressions'|'errors'|'effects'",
+            "var _motionColumnPreset = '3d'|'animation'",
+            "var _motionSnapEnabled = boolean"
+          ],
+          "responsibility": "PROP_SHORTCUT (583-586, 3-line lead-in + declaration): AE's own P/A/R/S/T key-to-property lookup table, deliberately a table rather than hardcoded in the keydown handler so the property list and its shortcuts cannot silently drift apart. _propFilter (587-593, 6-line lead-in + declaration): null means show every Transform property (default); a non-null array is the AE-style revealed-properties filter, reset to null whenever a different layer gets expanded (motion.js:7151, out of scope). _hideUnanimated (594-599, 5-line lead-in + declaration): the 'Filter Properties' global toggle — hides a property row only if it has NEITHER a track NOR a non-default static override; a single button affects every layer, not per-layer/per-group. _scaleLockedHolders (600-607, 6-line lead-in + declaration): a WeakSet, per-holder Scale X/Y aspect-lock (feedback #120) — deliberately a WeakSet rather than a persisted field because it is an editing convenience (like _hideUnanimated), not project data, and exportJSON's layer serialization is an explicit field whitelist; garbage-collected automatically with its holder. _motionSearch/_motionFilterMode (608-611, 2-line shared lead-in + two declarations): the Motion timeline workspace filters, explicitly framed as UI-only — project data stays untouched while these follow the workstation. _motionColumnPreset (612-617, 5-line lead-in + declaration): the default column preset (2026-08-29, Cyril: '3D/mograph par default'), default '3d' rather than the prior 'animation' default because the 3D-layer/Duplicator toggle icons only show under '3d' (style.css's [data-motion-columns] rules). _motionSnapEnabled (618, declaration only, no dedicated lead-in — grouped with the preceding constant's own comment). A try/catch block (619-623) immediately re-seeds all three of _motionFilterMode/_motionColumnPreset/_motionSnapEnabled from their respective localStorage keys, silently swallowing any error (e.g. localStorage unavailable).",
+          "callers": [
+            "PROP_SHORTCUT: sole reader is handlePropShortcut (motion.js:676, packet 4, same file, no external caller).",
+            "_propFilter: read/written throughout packets 3-5 (isPropFiltered motion.js:625, showsGroupHeader motion.js:666, handlePropShortcut motion.js:685-710) and reset once more out of scope at motion.js:7151 (layer-arrow click handler, C20g/C19 territory). No reader/writer outside motion.js.",
+            "_hideUnanimated: read/written throughout packets 3, 5, 6 (isPropFiltered's sibling gate at motion.js:418/11081, both out of scope/C02+C20i; showsGroupHeader motion.js:666; handlePropShortcut motion.js:703; handleRevealAnimatedShortcut motion.js:810/818/871; revealByLayerPredicate motion.js:889) and toggled by its own UI button out of scope at motion.js:8668-8673 (C20f territory). No reader/writer outside motion.js.",
+            "_scaleLockedHolders: read/written only out of scope, at motion.js:8881/8913/8915/8920-8921 (C20f territory, the scale-lock button's own row). No reader/writer outside motion.js.",
+            "_motionSearch/_motionFilterMode: read by the view-filter predicates (packet 3) and by their own UI controls out of scope at motion.js:6995-7021 (C20g/renderLayerListMotion territory, the search box and filter-mode <select>, which also writes _motionFilterMode back to localStorage). No reader/writer outside motion.js.",
+            "_motionColumnPreset: read at motion.js:6980/7007 and written at motion.js:7020 (out of scope). ui.js's own workspace-preset code (ui.js:891, 906-925) independently reads/writes the SAME 'nemo-motion-columns' localStorage key without ever touching this in-memory variable directly — see boundaries.",
+            "_motionSnapEnabled: read at motion.js:12919 (out of scope, drag-snap gate) and written at motion.js:7021 (out of scope). No reader/writer outside motion.js."
+          ],
+          "external_calls": []
+        }
+      ]
+    },
+    {
+      "area": "view-filter-predicates",
+      "packets": [
+        {
+          "id": "C20j.view-filter-predicates",
+          "files": [
+            "src/js/motion.js:624-666"
+          ],
+          "coverage_ranges": [
+            [
+              624,
+              666
+            ]
+          ],
+          "classification": {
+            "code": 30,
+            "comment": 13,
+            "whitespace": 0
+          },
+          "symbols": [
+            "propHasContent",
+            "isPropFiltered",
+            "propHasExpression",
+            "propHasExpressionError",
+            "motionPropMatchesView",
+            "layerMatchesMotionView",
+            "motionViewIsNarrowed",
+            "showsGroupHeader"
+          ],
+          "signatures": [
+            "propHasContent(holder, prop) -> boolean",
+            "isPropFiltered(prop) -> boolean",
+            "propHasExpression(holder, prop) -> boolean",
+            "propHasExpressionError(holder, prop) -> boolean",
+            "motionPropMatchesView(holder, prop) -> boolean",
+            "layerMatchesMotionView(ld) -> boolean",
+            "motionViewIsNarrowed() -> boolean",
+            "showsGroupHeader() -> boolean"
+          ],
+          "responsibility": "propHasContent(holder,prop) (624): true if isAnimated(holder,prop) (C02, motion.js:1187) OR holder.motionStatic[prop] is truthy — 'has something to show' means animated-with-a-track OR a non-default static override, not just animated. isPropFiltered(prop) (625): true if a _propFilter array exists and does not contain prop. propHasExpression(holder,prop) (626-628): true if holder.expressions[prop].enabled. propHasExpressionError(holder,prop) (629-631): true if that same expression also carries a lastError. motionPropMatchesView(holder,prop) (632-640): the per-property search+mode predicate — a non-empty _motionSearch must match either the property's own label (PROP_LABEL, C02) or the holder's name (case-insensitive substring); then dispatches on _motionFilterMode ('animated'->isAnimated, 'modified'->propHasContent, 'expressions'->propHasExpression, 'errors'->propHasExpressionError, else true). layerMatchesMotionView(ld) (641-651): the per-LAYER search+mode predicate — a null ld never matches; 'effects' mode checks only for an effects stack/effectsFrom/isEffectLayer AND the name; every other mode ORs the name match with 'any property on this layer matches motionPropMatchesView' (via propsFor, C02) — a search with no mode match on the layer's own name still matches if any of its properties do. motionViewIsNarrowed() (652): true if a search string or a non-'all' filter mode is active — used by isLayerExpanded (packet 5) to auto-expand matching layers. Lead-in (653-665, 13 lines, two feedback items): explains WHY the 'TRANSFORM' group header should disappear once a shortcut has narrowed the view to exactly one property (2026-07-27) and states that U's own narrowing (2026-09, feedback #789) follows the identical rule — ONE predicate serves both the panel's own header row and the grid's own matching blank spacer, so a header that exists on only one side is exactly the alignment bug CLAUDE.md §11 opens with. showsGroupHeader() (666): `return !_propFilter && !_hideUnanimated;`.",
+          "callers": [
+            "propHasContent: read at motion.js:418/11081 (both out of scope, transformRowPlan's own gate) and internally at motion.js:636/753/805/864 (packets 3, 5, same file).",
+            "isPropFiltered: read at motion.js:418/11081 (out of scope) and internally at motion.js:782 (packet 5).",
+            "propHasExpression: read internally only, at motion.js:630/637 (this packet).",
+            "propHasExpressionError: read internally only, at motion.js:638 (this packet).",
+            "motionPropMatchesView: read at motion.js:418 (out of scope) and internally at motion.js:649 (this packet, inside layerMatchesMotionView).",
+            "layerMatchesMotionView: read internally at motion.js:731 (packet 5, isLayerExpanded) and out of scope at motion.js:7068 (renderLayerListMotion, C20g territory) and motion.js:11141 (renderTimelineMotion, C20i territory) — both gate an entire layer row's visibility.",
+            "motionViewIsNarrowed: read internally only, at motion.js:731 (packet 5).",
+            "showsGroupHeader: read out of scope at motion.js:8661 (renderTransformProps, C20f), motion.js:11177 and motion.js:11253 (renderTimelineMotion's layer-level and element-level header rows, C20i) — no reader inside this scope's own two ranges."
+          ],
+          "external_calls": [
+            "isAnimated(ld,prop) — motion.js:1187 (C02).",
+            "propsFor(ld) — motion.js:176 (C02), called from layerMatchesMotionView."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "property-shortcut-targets-and-handler",
+      "packets": [
+        {
+          "id": "C20j.property-shortcut-targets-and-handler",
+          "files": [
+            "src/js/motion.js:667-714"
+          ],
+          "coverage_ranges": [
+            [
+              667,
+              714
+            ]
+          ],
+          "classification": {
+            "code": 31,
+            "comment": 17,
+            "whitespace": 0
+          },
+          "symbols": [
+            "shortcutTargets",
+            "handlePropShortcut"
+          ],
+          "signatures": [
+            "shortcutTargets() -> number[] (layer indices)",
+            "handlePropShortcut(key, shiftKey) -> boolean"
+          ],
+          "responsibility": "Lead-in (667-670, 4 lines, feedback 2026-07-27): a property shortcut acts on the current selection, or on EVERY layer if nothing is selected — AE's own rule. shortcutTargets() (671-674): returns `_layerSel.slice()` (the bare global from timeline.js:5423, out of scope) if non-empty, else every layer index via `state.layers.map`. handlePropShortcut(key,shiftKey) (675-714): resolves `prop` via PROP_SHORTCUT (packet 2), returns false if the key is unmapped; computes `targets=shortcutTargets()`; `alreadyShowing` is true only if NOT shift, the filter is exactly `[prop]`, AND every target is already in window._motionRevealedLayers — in that case the press is a TOGGLE-OFF: clears _propFilter, window._motionRevealedLayers and window._motionExpandedLayer, re-renders both surfaces, returns true. Otherwise: sets window._motionRevealedLayers=targets (a fresh press reveals the targets' Transform group even if it was folded — the lead-in at 678-683 explains this was needed because selecting a layer no longer auto-expands it, so a bare filter used to show nothing); clears window._motionExpandedLayer (comment: 'the reveal set replaces the single-row accordion'); forces `_hideUnanimated=false` (696-703 lead-in, feedback #758: a standing 'hide unanimated' filter would hide the very row P/A/R/S/T just revealed, since a layer with no keys on that one property has nothing to survive the filter — an explicit property request outranks a standing filter); on shiftKey, starts `_propFilter` from a full PROPS.slice() if it was null, then toggles `prop` in/out of it, collapsing back to null once every property has been re-added (704-708); otherwise replaces `_propFilter` outright with `[prop]` (709-711); re-renders both surfaces and returns true.",
+          "callers": [
+            "shortcutTargets: sole caller is handlePropShortcut (motion.js:684, this packet, same file).",
+            "handlePropShortcut: exported at motion.js:13779 as `handlePropShortcut: handlePropShortcut`; sole external caller is timeline.js's onKeyDown at timeline.js:9873, `SMMotion.handlePropShortcut(k,event.shiftKey)`, guarded by `state.appMode==='motion'&&window.SMMotion`. No internal caller within this scope's own two ranges beyond its own definition."
+          ],
+          "external_calls": [
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026, called from every mutating branch."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "reveal-animated-u-shortcut",
+      "packets": [
+        {
+          "id": "C20j.reveal-animated-u-shortcut",
+          "files": [
+            "src/js/motion.js:715-874"
+          ],
+          "coverage_ranges": [
+            [
+              715,
+              874
+            ]
+          ],
+          "classification": {
+            "code": 85,
+            "comment": 75,
+            "whitespace": 0
+          },
+          "symbols": [
+            "isLayerExpanded",
+            "layerHasAnimatedElements",
+            "textAnimatorHasKeys",
+            "discreteRowVisible",
+            "handleRevealAnimatedShortcut"
+          ],
+          "signatures": [
+            "isLayerExpanded(li) -> boolean",
+            "layerHasAnimatedElements(ld) -> boolean",
+            "textAnimatorHasKeys(an) -> boolean",
+            "discreteRowVisible(ld, kind) -> boolean",
+            "handleRevealAnimatedShortcut() -> boolean"
+          ],
+          "responsibility": "Lead-in (715-727, 13 lines): frames AE's 'U' — reveal animated properties on the selected layer(s), or every layer if none selected; reuses _hideUnanimated (packet 2) for the 'only-touched-properties-show' half rather than a second near-identical filter, and adds window._motionRevealedLayers so SEVERAL layers can be open at once (unlike the older single-layer window._motionExpandedLayer accordion); states isLayerExpanded must be the single source of truth both renderLayerListMotion and renderTimelineMotion agree on (CLAUDE.md §3). isLayerExpanded(li) (728-732): true if li is the single accordion layer, OR is in window._motionRevealedLayers, OR (the view is narrowed by search/filter-mode AND layerMatchesMotionView(state.layers[li])) — three independent ways a layer's Transform group can be open. Lead-in (733-748, 16 lines, two feedback items): explains WHY layerHasAnimatedElements exists (per-element animated content in ld.elementMotion[strokeId] is invisible from the layer's own holder) and records a live-discovered gap (Cyril's own question: 'est-ce que U révèle les keyframes de n'importe quelle propriété') — ld.textAnimators, a SEPARATE holder, was never checked, so a text-animator-only layer reported false and U opened Transform but left Text Animators unrevealed, reopening feedback #145. layerHasAnimatedElements(ld) (749-762): true if any ld.elementMotion[k] holder has propHasContent true for any PROPS entry, OR any ld.textAnimators[a] passes textAnimatorHasKeys. Lead-in (763-766, 4 lines): frames textAnimatorHasKeys as shared by the reveal check above and handleRevealAnimatedShortcut below. textAnimatorHasKeys(an) (767-774): true if any field in an.motion has a non-empty keys array. Lead-in (775-780, 6 lines, feedback #764): Parent/Blend live outside PROPS, so _hideUnanimated never reached them — U used to show both rows on every revealed layer regardless of keys. discreteRowVisible(ld,kind) (781-786): false if isPropFiltered(kind); true if !_hideUnanimated; otherwise true only if ld.parentKeys/ld.blendKeys (selected by kind) is non-empty. handleRevealAnimatedShortcut() (787-874, the largest construct in this scope): returns false outside Motion mode; computes `pool` (selection or every layer) and `wanted` (layers with content on any PROPS entry, OR layerHasAnimatedElements, OR non-empty parentKeys/blendKeys/timeRemap.keys — feedback #771, U must not open a bare Transform on a layer with no keys at all); `showing` is true only if _hideUnanimated AND no _propFilter AND the current reveal set exactly equals `wanted` — a TOGGLE-OFF that clears all three reveal sets plus _motionExpandedLayer and _hideUnanimated (813-821); an empty `wanted` shows a toast ('toastNoAnimatedLayer') and returns without changing state (822); otherwise sets window._motionRevealedLayers=wanted, then window._motionRevealedElementLayers to the subset with per-element animated content (825-836, feedback #145, deliberately not every revealed layer), then window._motionRevealedTextAnimators to every keyed animator id across those targets (837-851), then un-collapses (852-870) any parent FOLDER layer of an animated target — a single level only, no nested folders — by writing `fld.folderCollapsed=false` (868, a genuine persisted-field write with no pushUndo, see boundaries); finally sets `_hideUnanimated=true`, re-renders both surfaces, returns true.",
+          "callers": [
+            "isLayerExpanded: read out of scope at motion.js:7080 (renderLayerListMotion, C20g), motion.js:7140 (the layer-arrow click handler that also resets _propFilter, same territory) and motion.js:11142 (renderTimelineMotion, C20i).",
+            "layerHasAnimatedElements: read internally at motion.js:806/835/864 (this packet).",
+            "textAnimatorHasKeys: read internally at motion.js:758/849 (this packet).",
+            "discreteRowVisible: read out of scope at motion.js:7498-7499 (renderParentRow/renderBlendRow gates, C20f/C20g territory) and motion.js:11175-11176 (renderDiscreteKeyGridRow gates, C20h/C20i territory).",
+            "handleRevealAnimatedShortcut: exported at motion.js:13780 as `revealAnimated: handleRevealAnimatedShortcut`; sole external caller is timeline.js's onKeyDown at timeline.js:9879, `SMMotion.revealAnimated()`, guarded by `(k==='u'||k==='U')&&state.appMode==='motion'&&window.SMMotion`."
+          ],
+          "external_calls": [
+            "propHasContent — this scope, packet 3.",
+            "isPropFiltered/motionViewIsNarrowed/layerMatchesMotionView — this scope, packet 3.",
+            "SM.t(key) — i18n.js.",
+            "showToast(m) — timeline.js:7447.",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "reveal-effects-mattes-shortcuts",
+      "packets": [
+        {
+          "id": "C20j.reveal-effects-mattes-shortcuts",
+          "files": [
+            "src/js/motion.js:875-904"
+          ],
+          "coverage_ranges": [
+            [
+              875,
+              904
+            ]
+          ],
+          "classification": {
+            "code": 21,
+            "comment": 8,
+            "whitespace": 1
+          },
+          "symbols": [
+            "revealByLayerPredicate",
+            "handleRevealEffectsShortcut",
+            "handleRevealMattesShortcut"
+          ],
+          "signatures": [
+            "revealByLayerPredicate(pred, emptyMsg) -> boolean",
+            "handleRevealEffectsShortcut() -> boolean",
+            "handleRevealMattesShortcut() -> boolean"
+          ],
+          "responsibility": "Lead-in (875-880, 6 lines): E/M are U's siblings ('e = reveal Effect, m = reveal Masks'), same reveal-set mechanism with only the predicate changed — narrowing the LAYER list, not filtering PROPERTIES, since effects and mattes are per-layer in Nemo. revealByLayerPredicate(pred,emptyMsg) (881-893): returns false outside Motion mode; `pool` is the selection or every layer; `targets` is the pool filtered by `pred(ld)`; an empty result shows `emptyMsg` via showToast and returns true without further state change; otherwise sets window._motionRevealedLayers=targets, explicitly leaves `_hideUnanimated=false` (comment: you want to see the effect-bearing layers' properties, not only the keyed ones), re-renders both surfaces, and shows a '<n> toastLayersRevealedSuffix' toast. handleRevealEffectsShortcut() (894-898): calls revealByLayerPredicate with a predicate matching `(ld.effects&&ld.effects.length)||ld.effectsFrom||ld.isEffectLayer` and the French empty-message 'Aucun calque ne porte d'effet'. handleRevealMattesShortcut() (899-903): calls revealByLayerPredicate with a predicate matching `ld.matteMode&&ld.matteMode!=='none'` and 'Aucun calque n'utilise de matte'. Line 904 is a trailing blank line.",
+          "callers": [
+            "revealByLayerPredicate: internal callers only, motion.js:895/900 (this packet, its own two sibling handlers).",
+            "handleRevealEffectsShortcut: exported at motion.js:13781 as `revealEffects: handleRevealEffectsShortcut`; sole external caller is timeline.js's onKeyDown at timeline.js:9883, guarded by `(k==='e'||k==='E')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&state.appMode==='motion'&&window.SMMotion`.",
+            "handleRevealMattesShortcut: exported at motion.js:13782 as `revealMattes: handleRevealMattesShortcut`; sole external caller is timeline.js's onKeyDown at timeline.js:9884, same modifier-key guard shape as E."
+          ],
+          "external_calls": [
+            "showToast(m) — timeline.js:7447.",
+            "SM.t(key) — i18n.js (toastLayersRevealedSuffix).",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "easing-curve-constants",
+      "packets": [
+        {
+          "id": "C20j.easing-curve-constants",
+          "files": [
+            "src/js/motion.js:905-940"
+          ],
+          "coverage_ranges": [
+            [
+              905,
+              940
+            ]
+          ],
+          "classification": {
+            "code": 2,
+            "comment": 34,
+            "whitespace": 0
+          },
+          "symbols": [
+            "DEFAULT_CURVE",
+            "LEGACY_STEP_CURVE"
+          ],
+          "signatures": [
+            "var DEFAULT_CURVE = NemoOpacityDomain.defaultCurve()  // [{x,y}, ...] on-curve waypoints",
+            "var LEGACY_STEP_CURVE = [{x:0,y:0},{x:0.42,y:0},{x:0.58,y:1},{x:1,y:1}]"
+          ],
+          "responsibility": "Section header (905-934, 30 lines): introduces the N-point on-curve-waypoint easing model shared with ui.js's curve editor (limited tangents -> per-segment cubic Bezier, bounded Newton solve; pure evaluation lives in animation/curve.js) and narrates the 2026-07-25 bug this constant fixes — the OLD default was the four CSS cubic-bezier(.42,0,.58,1) numbers, valid as CONTROL HANDLES but fed to evalCurvePoints as WAYPOINTS the curve is forced THROUGH, producing a measured hold-snap-hold step (sampled: 40 40 40 40 40 40 80 120 120 120 120 120 120 across 12 frames) instead of an ease. The fix keeps the same intent (gentle ease-in-out) expressed correctly: the new waypoints are smoothstep 3t^2-2t^3 sampled at quarter points. DEFAULT_CURVE (935): NOT a literal array in this scope — it delegates to `NemoOpacityDomain.defaultCurve()` (domain/animation/opacity.js:17, loaded before motion.js per index.html:2373 vs 2376), which returns a fresh copy of that module's own `[{x:0,y:0},{x:0.25,y:0.156},{x:0.5,y:0.5},{x:0.75,y:0.844},{x:1,y:1}]` (opacity.js:7) — the same five smoothstep-quarter-point values the header narrates, confirmed numerically (0.25 sampled: 3*.25^2-2*.25^3=.15625≈.156). LEGACY_STEP_CURVE (936): the frozen four-point array of the OLD broken default, kept only so a key can be detected as still carrying it bit-for-bit. Lead-in (937-940, 4 lines): a key matching LEGACY_STEP_CURVE exactly was never hand-tuned (any dragged tangent or moved point fails the equality test), so replacing it restores intended motion without touching a real edit — the lead-in for isLegacyStepCurve (motion.js:941-949, C02, sibling-covered, not re-described here).",
+          "callers": [
+            "DEFAULT_CURVE: exported at motion.js:13460 as a deep-clone accessor (`DEFAULT_CURVE: function () { return JSON.parse(JSON.stringify(DEFAULT_CURVE)); }`). Read internally (out of this packet's own range, cited by line only) at motion.js:989/1122/1161/1267/1286/2679/2778/5676/6604/11877 as the fallback default whenever a key has no own curvePoints. External callers: effects-panel.js:490 and effects-panel.js:524 — see boundaries for why this corrects the issue's own 'timeline.js onKeyDown' expectation for this symbol.",
+            "LEGACY_STEP_CURVE: read only by isLegacyStepCurve (motion.js:942/945-946, C02, immediately following this scope). No caller outside motion.js; isLegacyStepCurve itself has exactly one internal caller, motion.js:1161 (a legacy-curve migration pass, out of scope)."
+          ],
+          "external_calls": [
+            "NemoOpacityDomain.defaultCurve() — src/js/domain/animation/opacity.js:17."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) appears anywhere in this span. This span's own document-adjacent write (handleRevealAnimatedShortcut's folder-uncollapse, motion.js:868, `fld.folderCollapsed=false`) touches a field exportJSON DOES serialize (timeline.js:2117) — see boundaries; every other mutation is confined to module-level UI variables, window._motionRevealed*/window._motionExpandedLayer, or localStorage (three of the seven state vars in packet 2)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. The seven module-level UI-state variables re-seed themselves from localStorage at script-load time (motion.js:620-622); nothing here participates in project-file import."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Zero `pushUndo` calls anywhere in this span (confirmed by grep across both ranges). The single field write that IS project data (fld.folderCollapsed at motion.js:868) is therefore never undo-tracked by this span — corrected in boundaries as a confirmed, codebase-wide convention (timeline.js's own manual folder-collapse toggle shares the same no-pushUndo pattern), not an isolated omission."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This span reads the global layer-selection array (`_layerSel`/`window._layerSel`, timeline.js:5423, owned by timeline.js) to compute shortcut/reveal targets (shortcutTargets, handleRevealAnimatedShortcut, revealByLayerPredicate) but never mutates it. It writes window._motionRevealedLayers/window._motionRevealedElementLayers/window._motionRevealedTextAnimators/window._motionExpandedLayer, a much larger pre-existing global surface (timeline.js:6252 names it 'thirteen different' consumers) this span contributes writers to but does not declare or own."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "propHasContent/isAnimated-based predicates (packet 3) read the C02 track machinery read-only. DEFAULT_CURVE/LEGACY_STEP_CURVE (packet 7) supply/detect default ease waypoints consumed by C02's own key-creation and migration code, cited by line only. No key is created, moved or removed anywhere in this span."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Confirmed by grep: zero hits for any of this span's sixteen declared symbols (ROW_H, PROPS, PROPS_WITH_3D, PROPS_DUP_EXTRA, PROP_SHORTCUT, the seven UI-state vars, the eight functions, DEFAULT_CURVE, LEGACY_STEP_CURVE) inside engine-bridge.js — this span never reaches buildSceneJson or getEffectiveStrokes/getEffectiveStrokesRendered. Every mutating handler ends by calling renderLayerList()/renderTimeline() (a UI re-render, not a scene re-render) and, where present in the exemplar pattern elsewhere in this file, a guarded SMEngineBridge.renderNow — no such call appears inside this span's own two ranges."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted here. DEFAULT_CURVE's underlying value flows into exported key data (curvePoints) only via C02's own key-creation code, cited by line only, not re-derived."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri command, filesystem call or SMEngineBridge call appears anywhere in this span's own two ranges."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "prop-shortcut-toggle-and-shift-accumulate",
+      "status": "proposed, unrun",
+      "matrix": "plain P/A/R/S/T on a fresh timeline, second press of the same key, Shift+key to add/remove from an existing filter, Shift+key removing the last property back to null",
+      "expected": "A fresh press reveals the targets AND sets _propFilter=[prop]; a second identical press clears both the filter and the reveal set; Shift accumulates starting from PROPS.slice() and collapses back to null once every property is re-added."
+    },
+    {
+      "id": "reveal-animated-u-toggle-and-scope",
+      "status": "proposed, unrun",
+      "matrix": "no selection (every layer) vs a selection, layers with only per-element/text-animator content, layers with only parentKeys/blendKeys/timeRemap keys, a fully unanimated layer set",
+      "expected": "wanted excludes any layer with zero animated content of any kind (feedback #771); a second U press with the identical wanted set toggles everything off; an empty wanted set shows toastNoAnimatedLayer and changes no state."
+    },
+    {
+      "id": "reveal-u-folder-uncollapse-write",
+      "status": "proposed, unrun",
+      "matrix": "an animated target nested one level inside a collapsed folder, the same target inside an EXPANDED folder, an animated target with no parentLayerUid",
+      "expected": "Only a collapsed folder whose subtree contains an animated target gets folderCollapsed set to false; this write persists (exportJSON) but is never captured by pushUndo, confirmed against timeline.js's own manual toggle sharing the same convention."
+    },
+    {
+      "id": "reveal-effects-mattes-empty-and-nonempty",
+      "status": "proposed, unrun",
+      "matrix": "zero effect-bearing layers, some effect-bearing layers with/without a selection, zero matte layers, some matte layers",
+      "expected": "An empty result shows the exact French toast string and leaves _hideUnanimated/window._motionRevealedLayers untouched; a non-empty result always sets _hideUnanimated=false (unlike U) and shows the '<n> layer(s) revealed' toast."
+    },
+    {
+      "id": "view-filter-predicate-modes",
+      "status": "proposed, unrun",
+      "matrix": "_motionFilterMode in all/animated/modified/expressions/errors/effects crossed with a matching/non-matching _motionSearch string, a holder with an expression error vs a working expression",
+      "expected": "Exact predicate-per-mode dispatch as declared; 'effects' mode short-circuits at the LAYER level before ever consulting motionPropMatchesView; every other mode ORs a layer-name match with a per-property match."
+    },
+    {
+      "id": "default-curve-clone-independence",
+      "status": "proposed, unrun",
+      "matrix": "two separate SMMotion.DEFAULT_CURVE() calls, mutate the first result, read the second",
+      "expected": "The exported accessor round-trips through JSON.parse(JSON.stringify(...)) — mutating one caller's copy (e.g. effects-panel.js's own keyframe curve) never affects another caller's copy or the module-private DEFAULT_CURVE itself."
+    },
+    {
+      "id": "row-h-scope-isolation",
+      "status": "proposed, unrun",
+      "matrix": "read window.ROW_H from a script loaded after motion.js vs reading ROW_H from inside motion.js's own IIFE",
+      "expected": "window.ROW_H resolves to app.js's global 34 (Animation 2D); a value read from inside motion.js's own closure resolves to 22 (Motion mode) — the two never collide because the Motion-mode constant is never assigned to window."
+    },
+    {
+      "id": "localStorage-vs-live-variable-desync",
+      "status": "proposed, unrun",
+      "matrix": "apply a workspace preset with a different nemo-motion-columns value while the app is already running, then re-render the Motion panel without a full reload",
+      "expected": "The DOM dataset attribute and localStorage update immediately; the live _motionColumnPreset variable does not change until the next full page load, since it is only ever re-seeded once at motion.js:621."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planRevealShortcut(kind, pool, state) -> RevealPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Unifies handlePropShortcut/handleRevealAnimatedShortcut/revealByLayerPredicate's own target-selection and toggle-off decision trees behind one pure function, testable without the live window.* globals or DOM re-render calls."
+    },
+    {
+      "api": "motionViewState() -> {search, filterMode, propFilter, hideUnanimated}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "A single read accessor over this scope's own seven UI-state variables, so a future caller (e.g. a saved-view feature) does not need to know they are separate module-private vars."
+    },
+    {
+      "api": "resolveRowHeight(mode) -> number",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes the Animation-2D-vs-Motion ROW_H naming collision (34 vs 22, two unrelated same-named globals) explicit and queryable rather than relying on script load order and IIFE scoping to keep them apart."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "ROW_H",
+      "PROPS",
+      "PROPS_WITH_3D",
+      "PROPS_DUP_EXTRA",
+      "PROP_SHORTCUT",
+      "_propFilter",
+      "_hideUnanimated",
+      "_scaleLockedHolders",
+      "_motionSearch",
+      "_motionFilterMode",
+      "_motionColumnPreset",
+      "_motionSnapEnabled",
+      "propHasContent",
+      "isPropFiltered",
+      "propHasExpression",
+      "propHasExpressionError",
+      "motionPropMatchesView",
+      "layerMatchesMotionView",
+      "motionViewIsNarrowed",
+      "showsGroupHeader",
+      "shortcutTargets",
+      "handlePropShortcut",
+      "isLayerExpanded",
+      "layerHasAnimatedElements",
+      "textAnimatorHasKeys",
+      "discreteRowVisible",
+      "handleRevealAnimatedShortcut",
+      "revealByLayerPredicate",
+      "handleRevealEffectsShortcut",
+      "handleRevealMattesShortcut",
+      "DEFAULT_CURVE",
+      "LEGACY_STEP_CURVE"
+    ],
+    "caller_anchors": [
+      "propsFor reads PROPS/PROPS_WITH_3D/PROPS_DUP_EXTRA at motion.js:177-178 (C02)",
+      "transformRowPlan reads PROPS_DUP_EXTRA/isPropFiltered/_hideUnanimated/propHasContent/motionPropMatchesView at motion.js:418-419 (C02) and is itself called from motion.js:8701 (C20f), motion.js:11193 and motion.js:11269 (C20i)",
+      "showsGroupHeader read from motion.js:8661 (C20f), motion.js:11177/11253 (C20i)",
+      "layerMatchesMotionView/isLayerExpanded gate whole rows in renderLayerListMotion (motion.js:7068/7080, C20g) and renderTimelineMotion (motion.js:11141-11142, C20i)",
+      "discreteRowVisible gates renderParentRow/renderBlendRow (motion.js:7498-7499) and renderDiscreteKeyGridRow (motion.js:11175-11176, C20h/C20i)",
+      "handlePropShortcut/revealAnimated/revealEffects/revealMattes exported at motion.js:13779-13782, called only from timeline.js's onKeyDown at timeline.js:9873/9879/9883/9884",
+      "DEFAULT_CURVE exported at motion.js:13460, called externally only from effects-panel.js:490/524 (not timeline.js)"
+    ],
+    "helper_anchors": [
+      "isAnimated — motion.js:1187 (C02)",
+      "propsFor — motion.js:176-186 (C02)",
+      "trackFor — motion.js:443 (C02)",
+      "NemoOpacityDomain.defaultCurve — src/js/domain/animation/opacity.js:17",
+      "SM.t / i18n keys (toastNoAnimatedLayer, toastLayersRevealedSuffix, fieldParent, fieldBlend) — src/js/i18n.js",
+      "showToast — timeline.js:7447",
+      "renderLayerList / renderTimeline — timeline.js:6335 / timeline.js:4026",
+      "_layerSel / _layerSelAnchor — timeline.js:5423 / timeline.js:5432",
+      "window._motionRevealedLayers / window._motionExpandedLayer surface — timeline.js:6252-6289 (reindexed at timeline.js:1056-1058/1531-1532/1551), also read by text-animator.js:228-240, motion-graph.js:80-81, tools.js:8433/8462, select-bridge.js:930-945",
+      "app.js's own unrelated global ROW_H=34 — app.js:77",
+      "nemo-script.js's own unrelated IIFE-scoped PROPS — nemo-script.js:43"
+    ],
+    "boundary_assertion": "Range 1: line 117 (PROPS_DUP_EXTRA) closes this scope; line 118 opens C02's own registerEffectorPropMeta. Range 2: line 582 (DUP_OFFSET_PROP, sibling) precedes this scope; line 583 (PROP_SHORTCUT's lead-in) opens it; line 940 (isLegacyStepCurve's own lead-in) closes it; line 941 opens C02's own isLegacyStepCurve."
+  },
+  "validation": {
+    "expected_assigned_lines": 475,
+    "expected_classification": {
+      "code": 187,
+      "comment": 287,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        1,
+        117
+      ],
+      [
+        583,
+        623
+      ],
+      [
+        624,
+        666
+      ],
+      [
+        667,
+        714
+      ],
+      [
+        715,
+        874
+      ],
+      [
+        875,
+        904
+      ],
+      [
+        905,
+        940
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          1,
+          117
+        ],
+        "code": 5,
+        "comment": 112,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          583,
+          623
+        ],
+        "code": 13,
+        "comment": 28,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          624,
+          666
+        ],
+        "code": 30,
+        "comment": 13,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          667,
+          714
+        ],
+        "code": 31,
+        "comment": 17,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          715,
+          874
+        ],
+        "code": 85,
+        "comment": 75,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          875,
+          904
+        ],
+        "code": 21,
+        "comment": 8,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          905,
+          940
+        ],
+        "code": 2,
+        "comment": 34,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges (two disjoint spans, 1-117 and 583-940) and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 583 (or 1) and overlap at line 940 (or 117).",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "seven unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "sibling boundaries at lines 117/118, 582/583 and 940/941",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "the two ROW_H/PROPS naming-collision findings and the DEFAULT_CURVE external-caller correction",
+      "the folderCollapsed undo-exemption finding",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any sibling C2*.json artifact's own assigned_ranges over the same source_path"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}

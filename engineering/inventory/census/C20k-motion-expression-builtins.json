@@ -1,0 +1,755 @@
+{
+  "census_id": "C20k",
+  "issue": 1235,
+  "title": "Motion.js expression built-ins: noise, wiggle, self-sampling, loops, other-layer refs, expression controls, key introspection and markers (1769-2130)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, first slice of the C20k-C20n series closing the open src/js/motion.js span [1769,2932] of remediation-scope.json rangeCoverage (frozen index at 4bbe332). C20l (2131-2347, comp/self views + AE aliases), C20m (2348-2634, expression compilation/evaluation) and C20n (2635-2932, valueAtFrame/key writers/element holders) are the next three slices, cited by name/line only, not re-mapped here. Proposed sole artifact: this file. src/js/motion.js and all callers remain read-only.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "21ce20348fe48e0b6e2b91045954d8ef067d543c",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20k-motion-expression-builtins-census",
+  "assigned_ranges": [
+    {
+      "start": 1769,
+      "end": 2130
+    }
+  ],
+  "coverage_note": "Exactly 362 assigned lines occur once in eight complete packets: 229 code, 125 full-line comments, 8 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, and it matches the issue's own proposed union AND per-packet table exactly for all eight packets (verified with a Python re-implementation of classify() against the frozen blob, cross-checked against `sed -n` reads of every packet boundary: 1769/1779/1780/1812/1813/1851/1852/1921/1922/1991/1992/2055/2056/2096/2097/2130). No boundary correction was needed: line 1768 is the sibling-covered `exprRandomGaussFixed` closing brace (before-1769 bucket, C20a-j/C02); line 1769 opens this scope's own `// Smooth noise...` lead-in comment for `exprNoise`; line 2129 closes this scope's own `_markerApi`; line 2130 is a blank line; line 2131 opens C20l's own `// ---- \\`comp\\` and \\`self\\` views ----` header (confirmed by direct `sed -n` read of the frozen blob, not reproduced here beyond the boundary line itself).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's HEAD and the allocated base 21ce20348fe48e0b6e2b91045954d8ef067d543c both resolve motion.js to the identical blob 6617bac29042c22399cac202bf054c09e4fdf30e — verified directly (`git rev-parse <pin>:src/js/motion.js` == `git rev-parse HEAD:src/js/motion.js` == `git rev-parse 21ce203:src/js/motion.js`). origin/main has since advanced to fa7268b3cb2c7744ab12cd0963c3c9af709a54ff with zero commits touching src/js/motion.js in between (`git log --oneline 21ce203..origin/main -- src/js/motion.js` empty; `git rev-parse origin/main:src/js/motion.js` also resolves to the identical blob).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -nE '(^|[^a-zA-Z_.])<symbol>\\(' ` over a recursive `find src -name \"*.js\"` scan (164 files), filtered to exclude each symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit directly with `awk`/`sed -n` against this worktree's copy of motion.js — confirmed byte-identical to the frozen blob above, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20k-motion-expression-builtins.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20k transfers no implementation authority.",
+    "owners": "C20a-j/C02 (before line 1769) retain `_ectx`'s own module-level scaffolding referenced but not written by this span, `_randomWith`/`exprRandom`/`exprRandomFixed`/`exprRandomGauss`/`exprRandomGaussFixed`/`_rand01`/`_gauss01`/`_rndVary`/`_rndFixed`/`_gaussVary`/`_gaussFixed` (motion.js:1735-1768), `rawValueAtFrame` (1270), `hashNoise1D`/`hashNoise2D` (1569/1576), `_exprTick`/`_exprFps`/`_num`/`_vec` (1397/1371/1591/1590), `trackFor` (443), `findControl`/`controlsOf`/`normalizeControlName` (279/164/278), `PROP_DIM`/`PROP_DIM_LABELS` (506/566), `_exprDepth`/`EXPR_MAX_DEPTH`/`_depthTripped`/`EXPR_BUDGET_MS`/`_exprDeadline`/`_tickCount`/`EXPR_TIMEOUT_TAG`/`ensureExprSeed` (1366/1367/1370/1393/1394/1395/1396/1551), `findLayerIndexByUid` (3564, past C20n but pre-existing helper cited by line only). C20l (2131-2347) retains `_selfResolved`/`_selfLd`/`COMP_VIEW`/`SELF_VIEW`/`_aliasMarkerApi`/the mesh-aware self machinery/AE compatibility aliases. C20m (2348-2634) retains `compiledFnFor`/`evalExpressionFor`/the expression-compilation sandbox array/`_ectx`'s own writer. C20n (2635-2932) retains `valueAtFrame`/`hasExpr`/key writers/`ensureElementHolder`/`meshHolder`. Sibling-covered past 2932: `computeMotionMat`, `layerMotionAt`/`elementMotionAt`. C20f retains the Transform/expression editor panel. C20/C13 retain the `exprControls` declaration UI (`addExprControl`/`genControlKey`, motion.js:286-298). `rig-widget.js` retains `layerControl` (CLAUDE.md §13, the widget-side lean read this span's `exprLayerControl` shares its cost profile with). `image-mesh.js`/`image-mesh-bridge.js` retain mesh holders (CLAUDE.md §12ter). `engine-bridge.js` retains `affineFromMotion`/`buildSceneJson` (the render-time consumer). `app.js` retains `layerInPoint`/`layerOutPoint`/`state.layers`. `markers.js` retains the `state.markers`/`ld.markers` array lifecycle this span's `_markerApi`/`_markerEntry` only read. `src/js/domain/animation/expression-random.js` retains `NemoExpressionRandomDomain.hashUnit` (the deterministic lattice hash `hashNoise1D`/`hashNoise2D` call). `src/js/i18n.js` retains the `SM.t` locale tables this span's three `throw new Error(SM.t(...))` sites read from.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 1769-2932 as one open 1164-line span (frozen index at 4bbe332), which the C20k-C20n series closes in four slices: C20k 1769-2130 (this artifact, expression built-ins), C20l 2131-2347 (comp/self views + AE aliases, not yet filed at authoring time), C20m 2348-2634 (expression compilation/evaluation, not yet filed), C20n 2635-2932 (valueAtFrame/key writers/element holders, not yet filed). This artifact takes only the first 362 lines and does not close the parent span."
+    },
+    {
+      "owner": "C20a-j / C02 (everything before line 1769)",
+      "disposition": "Cited by name/line only, not re-mapped: `_ectx` itself is a bare module-level `var` declared and first written inside C20m (evalExpressionFor, motion.js:2563-2569) — this span only READS it, never declares or writes it. `_randomWith`/`exprRandom`/`exprRandomFixed`/`exprRandomGauss`/`exprRandomGaussFixed` and their `_rand01`/`_gauss01`/`_rndVary`/`_rndFixed`/`_gaussVary`/`_gaussFixed` helpers (motion.js:1739-1768) are the SEEDED-COUNTER random family this span's own noise/wiggle built-ins are deliberately NOT built on (see the `noise-vs-random-determinism` fixture below): they advance `ctx.rngCounter` on every draw (motion.js:1744, `ctx.rngCounter++`), so two calls in the same evaluation give DIFFERENT results, whereas this span's `exprNoise`/`_wiggleAxis` read only `ctx.seed` (never `ctx.rngCounter`) through a pure hash of (seed+offset, coordinate) — confirmed by grep: neither `exprNoise` nor `_wiggleAxis`/`exprWiggle` contains the string `rngCounter` or `rngSeed` anywhere in their bodies. `rawValueAtFrame` (1270-1301, called by `_rawShaped`/`exprSelfVelocity`/`loopRaw` in this span) always returns a FRESH array (`.slice()` or a freshly built `[]`/`[px,py]` on every branch, confirmed by direct read) — so `_withSampler`'s `arr.at = function(){...}` property attachment (this span, other-layers packet) never mutates a document-owned key's `.v` array; the array it decorates is already a private copy. `trackFor` (443-457) already resolves 'blendKeys'/'parentKeys' to `{keys: holder.blendKeys}`/`{keys: holder.parentKeys}` as of the frozen blob, but this span's own `loopRaw`/`exprKeyAt`/`exprNumKeys`/`exprNearestKeyAtFrame` call it generically for whatever `prop` string they are handed — no special-casing of discrete tracks was found in this span. `PROP_DIM` (506) is read once, by `exprWiggle` (motion.js:1807), to decide the 1D-scalar-vs-2D-array return shape; `PROP_DIM_LABELS` is never referenced anywhere in this span. `findControl`/`controlsOf`/`normalizeControlName` (279/164/278) are `_controlValue`'s sole external dependency for control-name resolution — `controlsOf` returns `holder.exprControls` (or `[]`), confirming the source comment's own claim that 'Controls live on the LAYER' (motion.js:2017-2019)."
+    },
+    {
+      "owner": "C20l (proposed, motion.js:2131-2347, comp/self views + AE compatibility aliases, not yet filed at authoring time)",
+      "disposition": "Cited by name/line only. `_selfLd()` (2155, calls `_selfResolved()` which lazily resolves and caches `ctx._resolved` via `resolveHolderLayer(ctx.holder)`) is this span's own `exprSelfControl`'s sole way to find 'this expression's owning layer' — called once, at motion.js:2024, inside this span. `_aliasMarkerApi` (2339-2346, C20l) wraps this span's own `_markerApi` to rename `count`/`at`/`nearest` to the AE-compatible `numKeys`/`key`/`nearestKey` (with `nearestKey` additionally converting its seconds argument to frames via `_exprFps()` before delegating) — a thin renaming layer over this span's own return object, not a reimplementation. `COMP_VIEW.marker`/`SELF_VIEW.marker` (2170/2249, C20l) both call this span's own `_markerApi` directly (with `state.markers`/`ld.markers` respectively) as their getter body. No line of C20l's own body is reproduced here beyond these four cited call sites."
+    },
+    {
+      "owner": "C20m (proposed, motion.js:2348-2634, expression compilation and evaluation, not yet filed at authoring time)",
+      "disposition": "Cited by name/line only. `evalExpressionFor` (2542-2609ish) is the sole writer of the module-level `_ectx` object (2563-2569: `{holder, prop, frame, time, fps, seed, rngSeed, rngTimeless: false, rngCounter: 0, _resolved: undefined}`) this span's every built-in reads through the bare `_ectx` reference (never reassigns it) — `holder`/`prop`/`frame`/`fps`/`seed`/`time` are the six fields this span actually reads (grep-confirmed: no built-in in 1769-2130 reads `rngSeed`/`rngTimeless`/`rngCounter`/`_resolved`, which belong to the sibling random-draw and self-resolution machinery instead). `compiledFnFor` (2388) builds the compiled expression function whose positional-argument list (2572-2591) passes THIRTEEN of this span's own symbols by reference as arguments the compiled user expression can call by its documented name: `exprLayer` (2576), `exprWiggle`/`exprNoise` (2577), `exprLoopAfter`/`exprLoopBefore` (2580, passed TWICE — once under their own names, once again under the identical names in the 'compatibility aliases' block at 2583, confirmed by direct read: both blocks pass the exact same two function references, not two different implementations), `exprSelfControl`/`exprLayerControl` (2581), `aliasKey`/`aliasNearestKey` (2294/2291-2293, C20m's own thin wrappers around this span's `exprKeyAt`/`exprNearestKeyAtFrame`), `exprNumKeys(holder, prop)` (2583 — note this is a CALLED value, not a passed function reference, unlike every neighboring entry in that argument list: the compiled function receives the numeric key-count at COMPILE-BIND time, not a callable `numKeys()` built-in — a naming/shape asymmetry in C20m's own argument list, recorded here because it directly determines how this span's `exprNumKeys` reaches user code, not asserted as a bug in this span's own code), `aliasValueAtTime`/`aliasVelocityAtTime`/`aliasSpeedAtTime` (2287-2289, C20m's own seconds-taking wrappers around this span's `exprSelfAt`/`exprSelfVelocity`/`exprSelfSpeed`), and `exprSelfAt` itself (2586, passed a second time under its own name in the aliases block). `ensureExprSeed` (1551, pre-1769) supplies the `seed` field `_ectx` carries and this span's `exprNoise`/`_wiggleAxis` read as `ctx.seed`."
+    },
+    {
+      "owner": "C20n (proposed, motion.js:2635-2932, valueAtFrame/key writers/element holders, not yet filed at authoring time)",
+      "disposition": "Cited by name/line only. `valueAtFrame` (2639-2646) is this span's sole external dependency for reading an EVALUATED (post-expression) value — called by `_sampleOther`/`layerSnapshot`/`_controlValue` in this span, always on a DIFFERENT holder/prop than the one the current expression is compiled against (a control's own key, or another layer's base property), which combined with `_exprDepth`'s bound (checked inside `evalExpressionFor`, C20m) is what keeps a chain of cross-layer/control reads from recursing forever rather than this span enforcing it directly. `hasExpr` (2641, called from `valueAtFrame`) gates whether `evalExpressionFor` runs at all for that holder/prop. `ensureElementHolder`/`meshHolder` (2879/4747-ish, past this span, cited by name only) are never called by this span; layerSnapshot/exprLayer operate only on `state.layers[i]` (layer-level holders), never on an `ld.elementMotion` per-shape holder."
+    },
+    {
+      "owner": "engine-bridge.js (buildSceneJson) / motion.js sibling-covered render chain (computeMotionMat, layerMotionAt/elementMotionAt, past line 2932)",
+      "disposition": "Confirmed reachable on the render path, not UI-only: `engine-bridge.js`'s `buildSceneJson` calls `SMMotion.layerMotionAt`/`SMMotion.elementMotionAt` (engine-bridge.js:937/1111/1182/1302/1409/2210/2827/2866/3774) which call `computeMotionMat` (motion.js:2933, sibling-covered) which calls `valueAtFrame` (2639, C20n) which calls `evalExpressionFor` (2542, C20m) which invokes the compiled user expression with this span's built-ins as its callable vocabulary (the argument list at motion.js:2572-2591 cited above). Every built-in in this span therefore runs on the render/export hot path once per frame per property that carries an expression using it — the per-frame cost implications this creates: `exprLayer`/`layer(ref).control(name)` pays a full `layerSnapshot` (5 eager `valueAtFrame` calls plus a name-then-uid layer scan) on EVERY evaluation of the property that calls it, even if only `.control()` is read off the result (see the `layer-control-cost-asymmetry` note in the expression-controls packet below) — the documented reason `exprLayerControl`/the rig-widget wiring (CLAUDE.md §13) exist as the lean alternative for exactly this hot path."
+    },
+    {
+      "owner": "C20f (motion-transform-expression-panel, merged) / expression controls UI (`exprControls`, C20/C13, motion.js:279-298)",
+      "disposition": "Retain the expression editor panel and the `addExprControl`/`genControlKey`/`findControl`-adjacent declaration UI in full — cited by name/line only. This span only READS a control's `.key`/`.name` (via `findControl`, pre-1769) inside `_controlValue`; it never creates, renames or deletes a control."
+    },
+    {
+      "owner": "rig-widget.js (`layerControl(uid,name)`, CLAUDE.md §13)",
+      "disposition": "Cited by name/line only, retains its own body in full. `layerControl(uid,name)` (motion.js, exported for rig-widget.js's own on-canvas joystick/slider wiring per CLAUDE.md §13) is the SAME cost-optimized shape as this span's own `exprLayerControl` — both skip `layerSnapshot` and call `_controlValue` directly. `exprLayerControl` (this span) is the EXPRESSION-TEXT-visible name (callable from inside a compiled user expression via the sandbox argument list, C20m); `layerControl` is the internal/rig-widget-facing counterpart CLAUDE.md §13 measured at 0.38 µs vs `layer(uid).control(name)`'s 0.93 µs (2.45×, 20000 reads at 44 layers) — this span's own `exprLayerControl` is the one that measurement's 'lean' side refers to for the expression-language surface."
+    },
+    {
+      "owner": "image-mesh.js / image-mesh-bridge.js (mesh holders, CLAUDE.md §12ter)",
+      "disposition": "Cited by name only, retain their own bodies in full. No `meshId`/`elementMotion`/mesh-holder reference exists anywhere in this span (grep-confirmed) — `layerSnapshot`/`exprLayer` operate only on layer-level holders (`state.layers[i]`), never per-shape or per-vertex mesh holders."
+    },
+    {
+      "owner": "NemoOpacityDomain (application module, unrelated)",
+      "disposition": "Cited by name only per the issue's own exclusion list; grep-confirmed this span references no `NemoOpacityDomain` symbol. `src/js/domain/animation/expression-random.js`'s `NemoExpressionRandomDomain.hashUnit` IS a dependency of this span's `hashNoise1D`/`hashNoise2D` (pre-1769 wrappers this span's own `exprNoise`/`_wiggleAxis` call) — recorded here as the actual application-module dependency this span has, distinct from the unrelated `NemoOpacityDomain` the issue names as an example of what this leaf does NOT touch."
+    },
+    {
+      "owner": "src/js/i18n.js",
+      "disposition": "Retains the locale tables in full — cited by name/line only. `exprErrorUnknownControlPrefix`/`exprErrorUnknownControlSuffix`/`exprErrorControlNoLayer`/`exprErrorUnknownLayerPrefix`/`exprErrorUnknownLayerSuffix` (the five keys this span's `_controlValue`/`exprSelfControl`/`exprLayerControl` throw with) all exist in all four locale blocks (en:1069, fr:2124, ja:3150, es:4176, grep-confirmed) — unlike C20h's `fieldParent` finding, no i18n gap exists for this span's own error strings."
+    },
+    {
+      "owner": "src/js/markers.js",
+      "disposition": "Retains the `state.markers`/`ld.markers` array lifecycle (creation, `state.markers=sym.markers||(sym.markers=[])` and similar at app.js:4186/4301, `ld.markers` lazy-init at markers.js:22) in full — cited by name/line only. This span's `_markerEntry`/`_markerApi` only ever READ a `list` argument handed to them by a caller (`layerSnapshot` passing `ld2.markers`, or C20l's `COMP_VIEW.marker`/`SELF_VIEW.marker`/`_aliasMarkerApi` passing `state.markers`/`ld.markers`) — this span never reads `state.markers`/`ld.markers` directly by name, and never writes either."
+    },
+    {
+      "owner": "app.js (`layerInPoint`/`layerOutPoint`, `state.layers`)",
+      "disposition": "Retains its own body in full (layerInPoint app.js:2838, layerOutPoint app.js:2889) — cited by name/line only. `layerSnapshot` (this span) calls `window.layerInPoint ? layerInPoint(ld2) : 0` / `window.layerOutPoint ? layerOutPoint(ld2) : (state.totalFrames - 1)` — both guarded by a `window.*` truthiness check before the call, so a document/environment where these globals are not yet attached degrades to `0`/`state.totalFrames-1` rather than throwing."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 1768 closes the sibling-covered `exprRandomGaussFixed` (before-1769 bucket); this artifact begins at the `// Smooth noise in -1..1...` lead-in comment on line 1769, immediately preceding `exprNoise`'s declaration at 1771. Line 2129 closes this artifact's own `_markerApi`; line 2130 is a blank line; line 2131 opens C20l's own `// ---- \\`comp\\` and \\`self\\` views ----` header. All four boundary lines confirmed by direct `awk`/`sed -n` read of the frozen blob.",
+    "Every one of the eight packet cuts in the issue's own suggested table lands exactly on a `// ---- ` section header or a function's own lead-in comment in the frozen blob (1769/1780/1813/1852/1922/1992/2056/2097) — re-verified line-by-line with `awk 'NR==<n>'` for all eight cut points before accepting the table; no correction was needed.",
+    "`_ectx` field usage, grep-confirmed exhaustively across this span: `ctx.holder` (exprSelfAt:1827, exprSelfVelocity:1838-1839, loopRaw via exprLoopAfter/exprLoopBefore:1912/1918), `ctx.prop` (same call sites, plus exprWiggle:1807 `PROP_DIM[ctx.prop]`), `ctx.frame` (exprSelfAt:1827, exprLayer:1989 fallback path, exprSelfControl:2026 fallback, exprLayerControl:2053 fallback, exprLoopAfter/exprLoopBefore:1912/1918), `ctx.fps` (exprSelfVelocity:1841, `(b[i]-a[i])*ctx.fps` converting the per-frame central difference to per-second), `ctx.seed` (exprNoise:1776-1777 `ctx.seed+7717`, _wiggleAxis:1797 `ctx.seed+axis*101+o*977`), `ctx.time` (_wiggleAxis:1794, `t=ctx.time`, explicitly commented 'the EVALUATION frame's time, never state.currentFrame'). NEVER read in this span: `ctx.rngSeed`, `ctx.rngTimeless`, `ctx.rngCounter` (the seeded-random-draw fields, sibling C20a-j territory) and `ctx._resolved` (the lazy self-layer-resolution cache, C20l's `_selfResolved`/`_selfLd`).",
+    "Determinism split, grep-confirmed: `exprNoise`/`_wiggleAxis` (and therefore `exprWiggle`) read ONLY `ctx.seed`/`ctx.time`/coordinate arguments through `hashNoise1D`/`hashNoise2D` — a pure function of its inputs, so two calls with identical arguments in the same evaluation (or across different evaluations at the same frame) return the IDENTICAL value; neither function contains the string `rngCounter` anywhere in its body. This is the opposite contract from the sibling `exprRandom`/`exprRandomFixed`/`exprRandomGauss`/`exprRandomGaussFixed` family (before line 1769, C20a-j), which advance `ctx.rngCounter` on every draw (`_rand01`, motion.js:1744) so repeated calls in one evaluation diverge even under 'Fixed' variants (fixed only pins the draw ACROSS frames/evaluations for the same counter position, not across multiple calls within one evaluation). Everything else in this span that reads `_ectx` (self-sampling, looping, other-layers, expression-controls) is a pure function of the RAW keyed track plus the frame argument — no RNG state is consumed by any of them.",
+    "`_exprTick()` (the wall-clock timeout budget check, pre-1769) is called by `exprNoise`, `exprWiggle`, `exprSelfAt`, `loopRaw` (and therefore transitively by both `exprLoopAfter`/`exprLoopBefore`, which do not call it themselves), `exprLayer`, `exprSelfControl` and `exprLayerControl` — seven of this span's twelve public/`expr*`-named built-ins. It is NOT called by `exprSelfVelocity`/`exprSelfSpeed` (grep-confirmed absent from both bodies) — a chain of expressions calling only `self.velocity()`/`self.speed()` in a tight loop would never trip the every-1024th-call deadline check `_exprTick` performs, unlike an equivalent chain built on `self.at()`. Recorded as an asymmetry, not asserted as a bug: `exprSelfVelocity` itself calls `rawValueAtFrame` twice per invocation (cheap, no expression re-entry, since raw reads never recurse into `evalExpressionFor`), so the risk profile differs from the tick-gated built-ins that CAN recurse into further expression evaluation (self-control, layer, layer-control, loop's own `rawValueAtFrame`-only recursion floor).",
+    "`layer(ref)` (exprLayer/findLayerIndexByRef, this span) resolves NAME first, uid-fallback second (`findLayerIndexByRef`, motion.js:1936-1940: a `state.layers` name scan, then `findLayerIndexByUid(ref)`). `layerControl(ref,name,f)` (exprLayerControl, this span) resolves UID first, name-fallback second (motion.js:2050-2051: `findLayerIndexByUid(ref)` then `findLayerIndexByRef(ref)`) — the source's own comment (2040-2042) states this is deliberate: `findLayerIndexByRef` scanning names first is 'the wrong order for the form we emit' from the rig-widget/pickwhip machinery, which always emits a uid. Both still accept either form; only the TRY ORDER differs.",
+    "`layerSnapshot(ref,frame)` (this span) unconditionally executes exactly 5 `valueAtFrame` calls at construction time — position/anchor/rotation/scale/opacity (motion.js:1962-1966) — regardless of which fields the caller actually reads off the returned object; `.at(prop,f)`/`.control(name,f)` are lazy closures that only run if invoked. `exprLayer(ref)` returns `null` (via `layerSnapshot` returning `null`) when `findLayerIndexByRef` resolves to -1 — confirmed as the documented 'what exprLayer returns when the ref does not resolve' contract the issue asks to record.",
+    "A source-comment inaccuracy found and corrected, not a functional bug: `exprLayerControl`'s own lead-in comment (motion.js:2028-2038) states `layer(uid).control(name)` costs 'a name scan over every layer, SIX valueAtFrame calls (position/anchor/rotation/scale/opacity plus the parent lookup)'. Direct read of `layerSnapshot` (1957-1985) shows the parent-lookup closure (1972-1975) calls `findLayerIndexByUid`, NOT `valueAtFrame` — it contributes zero `valueAtFrame` calls. The actual sixth `valueAtFrame` call is `.control(name)`'s own lazy invocation of `_controlValue` (1983, calling `valueAtFrame` at 2014) — i.e. the six calls are the five EAGER snapshot fields (position/anchor/rotation/scale/opacity) plus the ONE LAZY control read that only happens if `.control()` is actually invoked, not 'the parent lookup' as the comment's parenthetical states. `exprLayerControl` itself makes exactly ONE `valueAtFrame` call regardless (via `_controlValue`, skipping `layerSnapshot`'s five eager calls and the name-scan entirely when the uid resolves on the first try) — this is the CLAUDE.md §13-measured 0.38 µs vs 0.93 µs (2.45×) comparison.",
+    "Zero DOCUMENT writes are reachable from this span, confirmed by scanning every non-comment line of motion.js:1769-2130 for an assignment target other than a local `var`/function-parameter/array-literal: the only property assignment onto a non-local object is `arr.at = function(f){...}` (`_withSampler`, motion.js:1949) — `arr` is always a freshly-`.slice()`d or freshly-constructed array returned by `valueAtFrame`/`rawValueAtFrame` (confirmed by reading every return branch of `rawValueAtFrame`, motion.js:1270-1301: `.slice()` or a fresh `[]`/`[px,py]` literal on every path), never a live document key's own `.v` array — so this attachment can never mutate persisted state. No call to `pushUndo`, `saveActiveLayerFrame` or `saveAllLayerFrames` occurs anywhere in this span (grep-verified).",
+    "Render-path reachability confirmed, not 'UI only': `engine-bridge.js`'s `buildSceneJson` → `SMMotion.layerMotionAt`/`elementMotionAt` (sibling-covered, motion.js past 2932) → `computeMotionMat` (2933) → `valueAtFrame` (2639, C20n) → `evalExpressionFor` (2542, C20m) → the compiled user expression, which receives every built-in this span declares as a callable argument (motion.js:2572-2591). Every built-in here therefore executes once per frame per property carrying an expression that calls it, on the same playback/scrub hot path CLAUDE.md §5bis measures — `exprLayer`/`layer(ref).control(name)`'s full-snapshot cost (five eager `valueAtFrame` calls) is the per-frame cost this reachability implies for that specific built-in."
+  ],
+  "areas": [
+    {
+      "area": "expression-noise",
+      "packets": [
+        {
+          "id": "C20k.noise",
+          "files": [
+            "src/js/motion.js:1769-1779"
+          ],
+          "coverage_ranges": [
+            [
+              1769,
+              1779
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 2,
+            "whitespace": 1
+          },
+          "symbols": [
+            "exprNoise"
+          ],
+          "signature": "exprNoise(x, y) -> number in [-1,1]",
+          "responsibility": "Lead-in (1769-1770, 2 lines): 'Smooth noise in -1..1 for a 1D or 2D input — unlike random(), nearby inputs give nearby results, which is what makes it usable as motion.' exprNoise(x,y) (1771-1778): `_exprTick()` (budget check); reads `_ectx`, returns 0 if absent (outside any expression evaluation); if `x` is an array (a caller passed a single `[x,y]` argument instead of two), destructures it (`y=x[1]; x=x[0]`) BEFORE the `y===undefined` branch, so `noise([1,2])` and `noise(1,2)` are equivalent call forms; 1D path when `y` is still undefined after that: `hashNoise1D(ctx.seed+7717, _num(x))*2-1`; 2D path otherwise: `hashNoise2D(ctx.seed+7717, _num(x), _num(y))*2-1`. The `+7717` additive constant on `ctx.seed` is this built-in's own fixed lattice offset, distinct from `_wiggleAxis`'s per-axis/per-octave offset (`axis*101+o*977`) so the two built-ins never sample the same noise lattice by coincidence even when called with the same seed.",
+          "argument_coercion": "x/y coerced via `_num()` (Number(v), NaN/non-finite -> 0) only inside the hashNoise1D/2D calls; the earlier array-destructure check uses raw `Array.isArray(x)` on the UNCOERCED argument.",
+          "return_shape": "Always a bare scalar (1D) — exprNoise has no PROP_DIM-aware 2D return path of its own; a caller wanting per-axis noise must call it twice with different coordinates (unlike exprWiggle, which returns `[wx,wy]` for a 2D property in one call).",
+          "determinism": "Deterministic pure hash of (ctx.seed+7717, x[, y]) via NemoExpressionRandomDomain.hashUnit (through hashNoise1D/hashNoise2D, both pre-1769) — consumes no RNG counter; see boundaries for the full noise-vs-random contrast.",
+          "raw_vs_evaluated": "N/A — exprNoise reads no track; its only external state read is `_ectx.seed`.",
+          "callers": "Zero calls to `exprNoise(` anywhere in src/js outside its own declaration (grep-confirmed across 164 files). Referenced by NAME (not called) exactly once, as a sandbox argument at motion.js:2577 (`exprWiggle, exprNoise, exprRandom, ...`, C20m's compiled-expression argument list) — the only way a user-written expression can reach it is by calling `noise(...)` inside a compiled expression bound to that argument-list position.",
+          "external_calls": [
+            "_exprTick() — motion.js:1397 (pre-1769).",
+            "_num(v) — motion.js:1591 (pre-1769).",
+            "hashNoise1D(seed,x) / hashNoise2D(seed,x,y) — motion.js:1569/1576 (pre-1769), which call NemoExpressionRandomDomain.hashUnit (src/js/domain/animation/expression-random.js)."
+          ],
+          "effects": "None — no assignment to any non-local variable; returns a plain number."
+        }
+      ]
+    },
+    {
+      "area": "expression-wiggle",
+      "packets": [
+        {
+          "id": "C20k.wiggle",
+          "files": [
+            "src/js/motion.js:1780-1812"
+          ],
+          "coverage_ranges": [
+            [
+              1780,
+              1812
+            ]
+          ],
+          "classification": {
+            "code": 19,
+            "comment": 13,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_wiggleAxis",
+            "exprWiggle"
+          ],
+          "signatures": [
+            "_wiggleAxis(ctx, axis, freqPerSec, amp, octaves) -> number",
+            "exprWiggle(freqPerSec, amp, octaves) -> number | [number, number]"
+          ],
+          "responsibility": "Section header + 13-line lead-in (1780-1792) records the design rationale in detail, including a specific regression it fixes (feedback #134: the single-scalar wiggle() this replaced could never produce a valid [x,y] for a 2D property — `value + wiggle(...)` string-concats an array with a number in JS rather than adding per-axis). `_wiggleAxis(ctx,axis,freqPerSec,amp,octaves)` (1793-1801): fractal/turbulence sum over `octaves` layers — `t=ctx.time` (explicitly the EVALUATION frame's time, never `state.currentFrame`); each octave `o` adds `(hashNoise1D(ctx.seed+axis*101+o*977, t*freqPerSec*freq2)-0.5)*2*amp2` where `amp2`/`freq2` start at 1 and halve/double each iteration (classic fBm octave falloff); the running sum is divided by the accumulated `norm` (sum of `amp2` per octave) so total output amplitude stays bounded at `amp` regardless of octave count, then scaled by `amp`. `exprWiggle(freqPerSec,amp,octaves)` (1802-1811): `_exprTick()`; reads `_ectx`, returns 0 if absent; `octaves=Math.max(1,octaves||1)` (floors a falsy/zero/negative octave count to 1, never fewer); branches on `(PROP_DIM[ctx.prop]||1)===2` — for a 2D property (position/anchor/scale) returns `[_wiggleAxis(ctx,0,...), _wiggleAxis(ctx,1,...)]` (axis 0 and axis 1 each get an INDEPENDENT noise stream via the `axis*101` seed offset, so X and Y don't move in lockstep along a diagonal); for a 1D property returns the bare axis-0 result.",
+          "argument_coercion": "freqPerSec/amp passed through to `_wiggleAxis` uncoerced (multiplied directly, JS's implicit Number coercion applies); octaves coerced via `Math.max(1, octaves||1)` (falsy including 0/NaN/undefined floors to 1, not `_num()`).",
+          "return_shape": "Scalar for a 1D property (PROP_DIM[ctx.prop] absent or !==2, defaulting to 1); `[wx,wy]` array for a 2D property — the ONLY built-in in this span whose return shape is driven by `PROP_DIM[ctx.prop]` rather than by an input array's own `.length`.",
+          "determinism": "Deterministic — see the noise-vs-random contrast in boundaries; `_wiggleAxis` never reads/advances `ctx.rngCounter`.",
+          "raw_vs_evaluated": "N/A — reads no track; only `_ectx.time`/`_ectx.seed`/`_ectx.prop`.",
+          "callers": "`_wiggleAxis`: called only from `exprWiggle` (motion.js:1808, twice, once per axis for a 2D property; 1810, once for a 1D property) — zero external callers (grep-confirmed). `exprWiggle`: zero calls to `exprWiggle(` anywhere outside its own declaration; referenced by name (not called) once, as a sandbox argument at motion.js:2577, the compiled-expression `wiggle(...)` binding.",
+          "external_calls": [
+            "hashNoise1D(seed,x) — motion.js:1569 (pre-1769), called by _wiggleAxis.",
+            "_exprTick() — motion.js:1397 (pre-1769), called by exprWiggle only (not by _wiggleAxis).",
+            "PROP_DIM (bare object read, motion.js:506, pre-1769) — read by exprWiggle to select the 1D/2D branch."
+          ],
+          "effects": "None — no assignment to any non-local variable; returns a plain number or a freshly-constructed 2-element array."
+        }
+      ]
+    },
+    {
+      "area": "self-sampling",
+      "packets": [
+        {
+          "id": "C20k.self-sampling",
+          "files": [
+            "src/js/motion.js:1813-1851"
+          ],
+          "coverage_ranges": [
+            [
+              1813,
+              1851
+            ]
+          ],
+          "classification": {
+            "code": 27,
+            "comment": 11,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_rawShaped",
+            "exprSelfAt",
+            "exprSelfVelocity",
+            "exprSelfSpeed"
+          ],
+          "signatures": [
+            "_rawShaped(holder, prop, frame) -> number | number[]",
+            "exprSelfAt(f) -> number | number[]",
+            "exprSelfVelocity(f) -> number | number[]",
+            "exprSelfSpeed(f) -> number"
+          ],
+          "responsibility": "Section header + 5-line lead-in (1813-1818) states the deliberate design invariant: 'self.at() reads the RAW (pre-expression) track deliberately... sampling the post-expression value would feed the expression its own output... what makes infinite self-recursion structurally impossible rather than merely guarded against.' `_rawShaped(holder,prop,frame)` (1819-1822): calls `rawValueAtFrame`, then reshapes the always-array result to a bare scalar when `v.length===1`, else returns a `.slice()` copy — the shared scalar-or-array reshape idiom every built-in in this span uses on its way out. `exprSelfAt(f)` (1823-1828): `_exprTick()`; reads `_ectx`, returns 0 if absent; samples `_rawShaped(ctx.holder, ctx.prop, f===undefined ? ctx.frame : _num(f))` — defaults to the CURRENT evaluation frame when no argument is given, meaning `self.at()` with no argument is a (slower, indirect) way to read the same raw value the expression's own `value` argument already provides. Lead-in for velocity (1829-1833, 5 lines): 'Rate of change in units per SECOND, as a central difference across one frame. Honest about what it is: a numeric derivative of the sampled track, not an analytic one.' `exprSelfVelocity(f)` (1834-1843): NO `_exprTick()` call (see boundaries); `ff=(f===undefined)?ctx.frame:_num(f)`; samples RAW at `ff-0.5` and `ff+0.5` (a symmetric half-frame central difference straddling the target frame); `out[i]=(b[i]-(a[i]||0))*ctx.fps` per axis (the `||0` guards a dimension-count mismatch between the two raw samples, e.g. across a keyframe that changes track dimensionality, though PROP_DIM ties dimension to the PROPERTY not the frame so this is a defensive-only guard in practice); scaled by `ctx.fps` to convert 'units per frame' to 'units per second'; reshaped to scalar-or-array on return. `exprSelfSpeed(f)` (1844-1850): calls `exprSelfVelocity(f)`; if the result is not an array (1D property) returns `Math.abs(v)`; otherwise sums squares and returns `Math.sqrt(s)` — the Euclidean magnitude of the per-axis velocity vector, always a non-negative scalar regardless of the underlying property's dimensionality.",
+          "argument_coercion": "f coerced via `_num(f)` only when explicitly provided (`f !== undefined`); the frame default in all three functions is `ctx.frame` (current evaluation frame), not 0.",
+          "return_shape": "_rawShaped/exprSelfAt/exprSelfVelocity: scalar if the underlying track is 1D, array otherwise (mirrors the property's own PROP_DIM, since rawValueAtFrame always returns an array shaped by the property's own keys). exprSelfSpeed: always a scalar (vector magnitude), regardless of the property's dimensionality.",
+          "determinism": "All four are deterministic pure functions of (holder, prop, frame) via rawValueAtFrame — no RNG, no `_ectx.seed` read at all in this packet.",
+          "raw_vs_evaluated": "All four read the RAW keyed track exclusively (rawValueAtFrame, never valueAtFrame) — this is the structural anti-recursion guarantee the lead-in comment describes; none of the four can trigger `evalExpressionFor` re-entry on the SAME property.",
+          "callers": "`_rawShaped`: called only from `exprSelfAt` (motion.js:1827) — zero external callers. `exprSelfAt`: zero calls to `exprSelfAt(` outside its own declaration; called by name from C20m's `aliasValueAtTime` (motion.js:2287, a seconds-to-frames wrapper: `exprSelfAt(_num(t)*(c?c.fps:_exprFps()))`) and referenced as a sandbox argument at motion.js:2586 (twice in the same argument list — once as `aliasValueAtTime`'s own reference at 2287 reached transitively, once directly as `exprSelfAt` itself at 2586). `exprSelfVelocity`: called by `exprSelfSpeed` (motion.js:1845, internal to this packet) and by C20m's `aliasVelocityAtTime` (2288). `exprSelfSpeed`: called by C20m's `aliasSpeedAtTime` (2289) and referenced as a sandbox argument at 2586 (via `aliasSpeedAtTime`).",
+          "external_calls": [
+            "rawValueAtFrame(holder,prop,frame) — motion.js:1270 (pre-1769), called by _rawShaped and directly by exprSelfVelocity (twice per call).",
+            "_exprTick() — motion.js:1397 (pre-1769), called by exprSelfAt only — NOT by exprSelfVelocity/exprSelfSpeed (see boundaries).",
+            "_num(v) — motion.js:1591 (pre-1769)."
+          ],
+          "effects": "None — no assignment to any non-local variable; every return is a plain number or a freshly-`.slice()`d array."
+        }
+      ]
+    },
+    {
+      "area": "looping",
+      "packets": [
+        {
+          "id": "C20k.looping",
+          "files": [
+            "src/js/motion.js:1852-1921"
+          ],
+          "coverage_ranges": [
+            [
+              1852,
+              1921
+            ]
+          ],
+          "classification": {
+            "code": 53,
+            "comment": 16,
+            "whitespace": 1
+          },
+          "symbols": [
+            "loopRaw",
+            "exprLoopAfter",
+            "exprLoopBefore"
+          ],
+          "signature": "loopRaw(holder, prop, frame, mode, keyframes, forward) -> number[] (always array-shaped, un-reshaped)\nexprLoopAfter(mode, keyframes) -> number | number[]\nexprLoopBefore(mode, keyframes) -> number | number[]",
+          "responsibility": "Section header + 12-line lead-in (1852-1864) states the single-implementation design ('ONE implementation for both directions and all four shapes; loopAfter/loopBefore are thin wrappers over it, so a fix to the wrap maths can never apply to only half of them') and documents all four modes and the `keyframes` argument contract inline: 'cycle' (replay the keyed range over and over), 'pingpong' (forwards then backwards, alternating), 'offset' (each pass starts where the last one ended — cumulative drift), 'continue' (no replay, straight-line extrapolation at the edge slope); `keyframes` (default 0) uses the whole keyed range, or the last/first N segments only. `loopRaw(holder,prop,frame,mode,keyframes,forward)` (1865-1908): `_exprTick()`; `track=trackFor(holder,prop)`; returns `rawValueAtFrame(holder,prop,frame)` UNCHANGED (no looping applied) when the track has fewer than 2 keys, OR when `frame` is already inside the keyed range (`forward ? frame<=lastF : frame>=firstF` — 'the real keyframes win'); otherwise lowercases `mode` (default 'cycle' when null/undefined) and floors `keyframes` to a non-negative integer `n`; computes `segStart`/`segEnd` as either the FULL keyed range or, when `0<n<keys.length`, the last/first `n` SEGMENTS (partial loop — e.g. `keyframes=2` loops only the last two segments' worth of keys, not the last two keys' worth); 'continue' mode short-circuits entirely: extrapolates linearly off the outermost keyframe using the slope between it and its immediate neighbor (`edge`/`inner`), scaled by `dist` (frames past the edge); every other mode computes `span=segEnd-segStart` (returns unlooped raw value if `span<=0`), `d` (distance from the segment's own start, direction-aware), `cycles=Math.floor(d/span)`, `r=d-cycles*span` (position within the current cycle); 'pingpong' reverses `r` (`r=span-r`) on every ODD cycle; the resulting `base` is `rawValueAtFrame` at the wrapped-around frame; 'offset' mode alone ADDS `(to[k]-from[k])*cycles` per dimension on top of `base` — the cumulative drift that makes 'offset' looping continue climbing/falling across cycles instead of snapping back. `exprLoopAfter(mode,keyframes)` (1909-1914) / `exprLoopBefore(mode,keyframes)` (1915-1920): both read `_ectx` (return 0 if absent, no `_exprTick()` of their own — see boundaries), call `loopRaw` with `forward=true`/`false` respectively and the CURRENT `ctx.holder`/`ctx.prop`/`ctx.frame`, then reshape the array result to scalar-or-array.",
+          "argument_coercion": "`keyframes` coerced via `Math.max(0, Math.floor(_num(keyframes)))` inside loopRaw itself — a negative or fractional argument floors to a non-negative integer; `mode` coerced via `String(mode==null?'cycle':mode).toLowerCase()` (case-insensitive, null/undefined default to 'cycle', any other falsy-but-defined value like `0`/`''` is NOT treated as the default — it is stringified and lowercased, so `loopAfter(0)` means mode `'0'`, which matches none of the four known modes and falls through to the plain cycle/pingpong branch as an unrecognized string, behaving like an unknown-mode 'cycle').",
+          "return_shape": "loopRaw itself always returns an array (never reshaped) — the two public wrappers each reshape to scalar-or-array on their own return.",
+          "determinism": "Deterministic — pure function of (holder, prop, frame, mode, keyframes, forward) via rawValueAtFrame reads plus arithmetic; no RNG.",
+          "raw_vs_evaluated": "loopRaw reads the RAW track exclusively (rawValueAtFrame, five separate call sites across its branches) — same anti-recursion guarantee as the self-sampling packet.",
+          "boundary_cases": [
+            "Fewer than 2 keyframes on the track (or no track at all): loopRaw returns the plain rawValueAtFrame at `frame` — no loop shape is applied, regardless of mode/keyframes/forward.",
+            "`frame` inside the keyed range (forward direction: frame<=lastF; backward: frame>=firstF): returns the plain rawValueAtFrame at `frame` unmodified — looping only ever applies OUTSIDE the keyed range, on the correct side per `forward`.",
+            "`keyframes` <= 0 or >= keys.length: segStart/segEnd fall back to the FULL keyed range (firstF..lastF) — the partial-segment carve-out only engages for `0 < n < keys.length`.",
+            "`span<=0` (segStart===segEnd, a degenerate single-frame segment): loopRaw returns the plain rawValueAtFrame at `frame` rather than dividing by zero."
+          ],
+          "callers": "`loopRaw`: called only from `exprLoopAfter` (motion.js:1912) and `exprLoopBefore` (motion.js:1918) — zero external callers (grep-confirmed). `exprLoopAfter`/`exprLoopBefore`: zero calls to either `(` form outside their own declarations; both are referenced by name (not called) TWICE each in C20m's compiled-expression argument list — once under their own names (motion.js:2580) and once again in the identical form in the 'compatibility aliases' block (motion.js:2583) — confirmed by direct read that both list entries pass the exact same function reference, not two different implementations under aliased names.",
+          "external_calls": [
+            "_exprTick() — motion.js:1397 (pre-1769), called by loopRaw only.",
+            "trackFor(holder,prop) — motion.js:443 (pre-1769).",
+            "rawValueAtFrame(holder,prop,frame) — motion.js:1270 (pre-1769), five call sites inside loopRaw.",
+            "_num(v) — motion.js:1591 (pre-1769)."
+          ],
+          "effects": "None — no assignment to any non-local variable; every return is a freshly-constructed array or (in the two wrappers) a scalar/`.slice()`d copy."
+        }
+      ]
+    },
+    {
+      "area": "other-layers",
+      "packets": [
+        {
+          "id": "C20k.other-layers",
+          "files": [
+            "src/js/motion.js:1922-1991"
+          ],
+          "coverage_ranges": [
+            [
+              1922,
+              1991
+            ]
+          ],
+          "classification": {
+            "code": 44,
+            "comment": 25,
+            "whitespace": 1
+          },
+          "symbols": [
+            "findLayerIndexByRef",
+            "_withSampler",
+            "_sampleOther",
+            "layerSnapshot",
+            "exprLayer"
+          ],
+          "signature": "findLayerIndexByRef(ref) -> number (index or -1)\n_withSampler(arr, ld2, prop) -> arr (same array, .at attached)\n_sampleOther(ld2, prop, frame) -> number | number[]\nlayerSnapshot(ref, frame) -> {position,anchor,rotation,scale,opacity,name,index,inPoint,outPoint,hasParent,parent,at,marker,control} | null\nexprLayer(ref) -> ReturnType<layerSnapshot> | null",
+          "responsibility": "Section header + 11-line lead-in (1922-1935) records the feature's own history in detail: layer() 'ref' originally accepted only the internal uid string (`ly_xxxxx`, never shown in the UI, so unusable by a human writing an expression by hand) until 2026-08-16 feedback from Cyril asked for name-based lookup; layer NAME is now tried FIRST since it is what's actually visible (layer-list row, Motion panel header), with the raw uid still accepted afterward so nothing written before the change breaks; first match wins on a duplicate name ('good enough, not ambiguity-safe', same tradeoff any hand-typed reference has). `findLayerIndexByRef(ref)` (1936-1940): returns -1 immediately for a falsy ref; else a linear `state.layers` scan by exact `.name` match, first hit wins; falls back to `findLayerIndexByUid(ref)` (out-of-span helper, cited by line only) if no name matched. Lead-in for `_withSampler` (1941-1946, 6 lines): explains WHY a 2D property's returned array gets `.at(frame)` attached — 'An array can carry properties without ceasing to be an array' — while 1D properties (bare numbers) cannot carry methods, hence the snapshot ALSO exposing a uniform `at(prop,frame)`. `_withSampler(arr,ld2,prop)` (1947-1952): wraps the attachment in try/catch (a frozen array would throw on the property-set, silently degrading to 'the plain values still work' per the inline comment) and returns `arr` either way. `_sampleOther(ld2,prop,frame)` (1953-1956): calls `valueAtFrame` (the EVALUATED value, not raw — cross-layer reads DO go through the full expression-evaluation path, unlike self-sampling) and reshapes to scalar-or-array. `layerSnapshot(ref,frame)` (1957-1985): resolves `idx` via `findLayerIndexByRef`, returns `null` if unresolved; otherwise builds and returns an object with FIVE eager `valueAtFrame` calls (position/anchor/rotation/scale/opacity, each 2D one wrapped in `_withSampler`, each 1D one taking `[0]` directly) plus `name`/`index`; `inPoint`/`outPoint` guarded by a `window.layerInPoint`/`window.layerOutPoint` truthiness check (app.js-owned, cited by name/line only), defaulting to `0`/`state.totalFrames-1` when the global is absent; `hasParent`/`parent` (an IIFE resolving the parent's own `{name,index}` via `findLayerIndexByUid`, or `null` if no parent or parent unresolved — zero `valueAtFrame` calls in this closure); a uniform `at(prop,f)` closure delegating to `_sampleOther`; `marker: _markerApi(ld2.markers)` (eager, this span's own markers packet); a `control(name,f)` closure delegating to `_controlValue` (this span's expression-controls packet), defaulting its frame argument to the SNAPSHOT's own `frame` (not the control-call-time current frame) when `f` is omitted. `exprLayer(ref)` (1986-1990): `_exprTick()`; reads `_ectx` (frame defaults to `state.currentFrame` if `_ectx` is absent, UNLIKE every sibling built-in in this span that returns 0/null on a missing ctx — `exprLayer` is callable even outside an active expression evaluation, e.g. from a REPL/console context, because `layerSnapshot` itself needs no `_ectx` at all).",
+          "argument_coercion": "frame arguments flow through unmodified except inside `_sampleOther`'s `.at()` closure invocation sites, which apply `_num(f)` before calling `_sampleOther`.",
+          "return_shape": "layerSnapshot/exprLayer: a plain object (never an array) with mixed scalar (rotation, opacity, name, index, inPoint, outPoint, hasParent) and array-with-`.at` (position, anchor, scale) fields, or `null` if the ref does not resolve to a layer index. _sampleOther: scalar-or-array per the sampled property's own dimensionality.",
+          "determinism": "Deterministic in the sense of pure-function-of-inputs; but see raw_vs_evaluated below — an evaluated read CAN itself be non-deterministic if the target property's own expression calls exprRandom/exprNoise.",
+          "raw_vs_evaluated": "_sampleOther/layerSnapshot read the EVALUATED value (valueAtFrame, which runs the target property's own expression if it has one) — the opposite contract from self-sampling's exprSelfAt/exprSelfVelocity. This is what makes a cross-layer reference able to form an evaluation cycle (A reads B, B reads A), bounded by `_exprDepth`/EXPR_MAX_DEPTH (pre-1769/C20m, cited by name/line only) rather than by anything in this packet.",
+          "callers": "`findLayerIndexByRef`: called by `layerSnapshot` (motion.js:1958, this packet) and `exprLayerControl` (motion.js:2051, expression-controls packet, this span, as the name-fallback after the uid-first try) — zero external callers. `_withSampler`: called three times inside `layerSnapshot` (1962/1963/1965, position/anchor/scale) — zero external/other-internal callers. `_sampleOther`: called from `_withSampler`'s own `.at` closure (1949) and `layerSnapshot`'s own uniform `at` closure (1977) — both internal to this packet, zero external callers. `layerSnapshot`: called by `exprLayer` (1989, this packet) and directly by C20l's own `SELF_VIEW.parent` getter (motion.js:2246, `layerSnapshot(state.layers[pi].name, _ectx?_ectx.frame:state.currentFrame)`, cited by line only). `exprLayer`: zero calls to `exprLayer(` outside its own declaration; referenced by name (not called) as a sandbox argument at motion.js:2322 (`layer: exprLayer` — binding the bare identifier `layer` inside compiled expressions to this function) and again at 2576 in the positional compiled-function argument list.",
+          "external_calls": [
+            "findLayerIndexByUid(uid) — motion.js:3564 (past this span, pre-existing helper cited by line only).",
+            "valueAtFrame(ld,prop,frame) — motion.js:2639 (C20n), five direct calls inside layerSnapshot plus one inside _sampleOther.",
+            "_markerApi(list) — this span, markers packet (motion.js:2107).",
+            "_controlValue(ld,name,frame) — this span, expression-controls packet (motion.js:2011), referenced only inside layerSnapshot's own `control` closure, not called eagerly.",
+            "window.layerInPoint/window.layerOutPoint — app.js:2838/2889, guarded by truthiness check.",
+            "_exprTick() — motion.js:1397 (pre-1769), called by exprLayer only.",
+            "_num(v) — motion.js:1591 (pre-1769), used inside the `at`/`control` closures' own invocation sites, not by layerSnapshot's own body directly."
+          ],
+          "effects": "None on document/persisted state — every field of the returned snapshot object is either a fresh scalar or an array/closure built fresh on each call; `_withSampler`'s `.at` property attachment (see boundaries) never touches a live document array."
+        }
+      ]
+    },
+    {
+      "area": "expression-controls",
+      "packets": [
+        {
+          "id": "C20k.expression-controls",
+          "files": [
+            "src/js/motion.js:1992-2055"
+          ],
+          "coverage_ranges": [
+            [
+              1992,
+              2055
+            ]
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 41,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_controlValue",
+            "exprSelfControl",
+            "exprLayerControl"
+          ],
+          "signature": "_controlValue(ld, name, frame) -> number | number[] (throws on unknown control name)\nexprSelfControl(name, f) -> number | number[] (throws if no owning layer)\nexprLayerControl(ref, name, f) -> number | number[] (throws on unknown layer or unknown control name)",
+          "responsibility": "Section header + 9-line lead-in (1992-2000) frames the calling convention: `self.control('name')` for a layer's own controls, `layer('Ctrl').control('name')` for another layer's, `control(...)` as the bare-name self shorthand (matching how wiggle/loopAfter are already implicitly about the property they sit on); name matching is trimmed and case-insensitive, the SAME rule `findControl` applies at control-creation time so 'what the panel refuses as a duplicate is exactly what an expression can't ambiguously mean.' Second lead-in block (2001-2010, 10 lines): an unknown control name THROWS rather than returning 0 — 'the engine's own degrade contract then does the right thing with it: the message lands on that one property's row and the property falls back to its raw keyframed/static value... never a silent zero that looks like a working rig gone limp'; reads through `valueAtFrame` (evaluated, not raw) 'so a control can itself carry an expression; `_exprDepth` bounds any chain of those exactly as it does for cross-layer property reads.' `_controlValue(ld,name,frame)` (2011-2016): `findControl(ld,name)` (pre-1769); throws `SM.t('exprErrorUnknownControlPrefix')+String(name)+SM.t('exprErrorUnknownControlSuffix')` if not found; else `valueAtFrame(ld, c.key, frame)` (the control's OWN track, keyed by its generated `xc_...` key, not by its display name) reshaped to scalar-or-array. Lead-in for exprSelfControl (2017-2019, 3 lines): 'Controls live on the LAYER, so a per-shape (element) holder's expression reaches its OWNING layer's controls — which is what makes one slider, every shape inside this layer work without duplicating the control.' `exprSelfControl(name,f)` (2020-2027): `_exprTick()`; reads `_ectx`, returns 0 if absent; `ld=_selfLd()` (C20l, resolves the CURRENT expression's owning layer even when the expression itself lives on a per-shape element holder); throws `SM.t('exprErrorControlNoLayer')` if `_selfLd()` returns null (an expression on a holder that cannot be traced back to any layer); else `_controlValue(ld, name, f===undefined?ctx.frame:_num(f))`. Lead-in for exprLayerControl (2028-2046, 19 lines, the longest comment block in this span) is a full performance case study: `layer(uid).control(name)` returns 'the identical number' but builds a whole `layerSnapshot` first — see the boundaries entry correcting its own 'SIX valueAtFrame calls... plus the parent lookup' parenthetical; states the rig-widget/pickwhip machinery emits `layerControl(...)` instead for exactly this reason ('A rig is MANY reads per scrub tick... on the playback hot path, CLAUDE.md §5bis'); explains the uid-FIRST/name-fallback try order (opposite of `findLayerIndexByRef`'s own name-first order, deliberate per the comment: 'the wrong order for the form we emit'); states the unknown-layer throw contract mirrors `_controlValue`'s own unknown-control throw. `exprLayerControl(ref,name,f)` (2047-2054): `_exprTick()`; `idx=findLayerIndexByUid(ref)`, falls back to `findLayerIndexByRef(ref)` if `idx<0`; throws `SM.t('exprErrorUnknownLayerPrefix')+String(ref)+SM.t('exprErrorUnknownLayerSuffix')` if still unresolved; else `_controlValue(state.layers[idx], name, f===undefined?(ctx?ctx.frame:state.currentFrame):_num(f))` — note the frame-default fallback chain has THREE levels here (explicit f, else ctx.frame if ctx exists, else state.currentFrame) versus `exprSelfControl`'s two levels (explicit f, else ctx.frame, with an early return-0 if ctx is absent at all) — `exprLayerControl` can therefore still resolve a value even when called with no active `_ectx` (same 'callable outside an expression evaluation' shape as `exprLayer`), while `exprSelfControl` cannot (it has no layer to resolve `self` against without `_ectx.holder`).",
+          "argument_coercion": "name passed through unmodified into `findControl`, which itself trims and lowercases (normalizeControlName, pre-1769); frame arguments follow the `_num(f)` pattern common to this whole span.",
+          "return_shape": "Scalar or array per the control's OWN declared dimensionality (a control's `.default`/track values, sized per its `type`, pre-1769 CONTROL_TYPES/CONTROL_DEFAULT) — reshaped identically to every other built-in in this span.",
+          "determinism": "Deterministic given the control's own track state; but see raw_vs_evaluated — a control that itself carries an expression can be as non-deterministic as that expression.",
+          "raw_vs_evaluated": "All three functions read the EVALUATED value (valueAtFrame, never rawValueAtFrame) — explicitly by design, per the lead-in comment, 'so a control can itself carry an expression.' `_exprDepth` (pre-1769, incremented inside `evalExpressionFor`, C20m) is what bounds a chain of self-referential or mutually-referential controls; nothing in this packet enforces that bound directly.",
+          "difference_self_vs_layer_control": "exprSelfControl resolves the OWNING layer via `_selfLd()` (a lazy-cached lookup keyed off `_ectx.holder`, C20l) — it can reach the layer of a per-shape element-holder expression, and it returns 0 silently if there is no active `_ectx` at all (no expression evaluation in progress). exprLayerControl takes an EXPLICIT layer reference (uid or name) and never calls `_selfLd()` — it resolves via `findLayerIndexByUid`/`findLayerIndexByRef` against `state.layers` directly, and it can still resolve a value even with `_ectx` entirely absent (falling back to `state.currentFrame`). Both share the identical unknown-name throw contract via `_controlValue`, and both are the intentionally CHEAP alternative to building a full `layerSnapshot` just to read one control.",
+          "callers": "`_controlValue`: called by `exprSelfControl` (2026), `exprLayerControl` (2053), both this packet, and by `layerSnapshot`'s own `control` closure (motion.js:1983, other-layers packet, this span) — three call sites, all internal to this span; zero external callers. `exprSelfControl`/`exprLayerControl`: zero calls to either `(` form outside their own declarations; both referenced by name (not called) once each, as sandbox arguments at motion.js:2581 (`exprSelfControl, exprLayerControl`).",
+          "external_calls": [
+            "findControl(ld,name) — motion.js:279 (pre-1769), which calls normalizeControlName/controlsOf (278/164, pre-1769).",
+            "valueAtFrame(ld,prop,frame) — motion.js:2639 (C20n).",
+            "SM.t(key) — src/js/i18n.js:4185-ish (all four locale blocks confirmed present for these five keys).",
+            "_exprTick() — motion.js:1397 (pre-1769), called by exprSelfControl/exprLayerControl, NOT by _controlValue itself.",
+            "_selfLd() — motion.js:2155 (C20l), called only by exprSelfControl.",
+            "findLayerIndexByUid(ref) / findLayerIndexByRef(ref) — motion.js:3564 (pre-existing) / this span's other-layers packet (1936), called only by exprLayerControl.",
+            "_num(v) — motion.js:1591 (pre-1769)."
+          ],
+          "effects": "None — no assignment to any non-local variable other than throwing a `new Error(...)` on the two documented failure paths; both throws propagate up through `evalExpressionFor` (C20m) to that consumer's own degrade-to-raw-value contract, not handled locally."
+        }
+      ]
+    },
+    {
+      "area": "keyframe-introspection",
+      "packets": [
+        {
+          "id": "C20k.keyframe-introspection",
+          "files": [
+            "src/js/motion.js:2056-2096"
+          ],
+          "coverage_ranges": [
+            [
+              2056,
+              2096
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 12,
+            "whitespace": 1
+          },
+          "symbols": [
+            "exprKeyAt",
+            "exprNumKeys",
+            "nearestKeyIndex",
+            "exprNearestKeyAtFrame"
+          ],
+          "signature": "exprKeyAt(holder, prop, i) -> {frame,time,value,index} | null\nexprNumKeys(holder, prop) -> number\nnearestKeyIndex(keys, targetFrame) -> number (0-based index into keys)\nexprNearestKeyAtFrame(holder, prop, frame) -> ReturnType<exprKeyAt> | null",
+          "responsibility": "Section header + 7-line lead-in (2056-2063): scoped to the CURRENT property's OWN track ('self.keys.at(1) inside a Position expression means Position's first keyframe'); 1-indexed ('matching how keyframes are counted in the timeline UI rather than the internal 0-based array'); returns `null` (never throws) for an out-of-range index or empty track — 'same fall-through-to-the-safe-value contract as layer() returning null for an unresolved reference.' `exprKeyAt(holder,prop,i)` (2064-2069): `trackFor(holder,prop)`; returns `null` if the track/keys are absent OR `i<1` OR `i>track.keys.length` (bounds-checked BEFORE indexing, no exception path at all in this function); else builds `{frame:k.frame, time:k.frame/_exprFps(), value: k.v.length===1?k.v[0]:k.v.slice(), index:i}` — the ONLY built-in in this span whose return object reports BOTH `frame` (project frame number) and `time` (seconds, via `_exprFps()`) for the same key, and echoes the caller's own 1-based `index` back unchanged. `exprNumKeys(holder,prop)` (2070-2073): `trackFor(holder,prop)`; returns `track.keys.length` if both exist, else `0` — never throws, never returns null (0 is the 'no keys' sentinel here, unlike exprKeyAt's null). `nearestKeyIndex(keys,targetFrame)` (2074-2089): binary search (`lo`/`hi`) for the insertion point of `targetFrame` among `keys` (assumes SORTED-BY-FRAME input, not verified inside this function — callers are expected to hand it a track's own `keys` array, which is maintained sorted by convention elsewhere in the codebase, not re-checked here); clamps to `0` if `targetFrame` is before the first key, to `keys.length-1` if past the last; otherwise compares `prevDistance`/`nextDistance` to the two straddling keys and returns whichever is closer, with an explicit tie-break comment: 'Preserve the historical linear scan's tie behavior: because it only replaced the winner on a strictly smaller distance, the earlier key won when the target sat exactly halfway between two keys' — i.e. `nextDistance < prevDistance` (strict) rather than `<=`, so an exact tie resolves to `lo-1` (the EARLIER key), a deliberately-preserved behavior from a prior linear-scan implementation this binary search replaced. `exprNearestKeyAtFrame(holder,prop,frame)` (2090-2095, preceded by a 1-line comment 'Takes a FRAME (see the frame-native rule at the top of this section)' at 2090): `trackFor(holder,prop)`; returns `null` if the track/keys are absent or empty; else delegates to `exprKeyAt(holder,prop, nearestKeyIndex(track.keys,frame)+1)` — converting the binary search's 0-based result back to `exprKeyAt`'s 1-based index convention, then reusing `exprKeyAt`'s own object-building and bounds logic rather than duplicating it.",
+          "argument_coercion": "`i`/`targetFrame`/`frame` are used as raw numbers with no `_num()` coercion anywhere in this packet — the only packet in this span where none of its four functions calls `_num` at all (bounds comparisons like `i<1`/`i>track.keys.length` work correctly on a non-numeric `i` only by JS's own loose comparison coercion, not by an explicit guard).",
+          "return_shape": "exprKeyAt/exprNearestKeyAtFrame: a plain `{frame,time,value,index}` object or `null`. exprNumKeys: always a non-negative integer scalar, never null/array. nearestKeyIndex: always a valid 0-based array index into whatever `keys` array it was given (never -1, never out of bounds, given at least one key).",
+          "determinism": "Deterministic — pure functions of the track's own current key array plus the numeric arguments; no RNG.",
+          "raw_vs_evaluated": "Reads a key's own `.v` array DIRECTLY off the track object (`k.v`), not through rawValueAtFrame OR valueAtFrame — this is the one packet in the span that bypasses BOTH value-reading paths entirely, since it is reporting the RAW STORED keyframe value at an exact key, not an interpolated/evaluated value at an arbitrary frame.",
+          "callers": "`exprKeyAt`: called by `exprNearestKeyAtFrame` (2094, this packet), and externally by C20m's own `aliasKey` (motion.js:2294, `exprKeyAt(c.holder,c.prop,Math.floor(_num(i)))`) and by C20l's `SELF_KEYS.at` getter-backed closure (motion.js:2173, identical call shape). `exprNumKeys`: externally by C20l's `SELF_KEYS.count` property getter (motion.js:2176) and passed as a CALLED value (not a function reference) in C20m's compiled-argument list (motion.js:2583, `exprNumKeys(holder, prop)` — see the C20m reconciliation entry above for the naming-asymmetry this creates). `nearestKeyIndex`: called only by `exprNearestKeyAtFrame` (2094, this packet) — zero external callers. `exprNearestKeyAtFrame`: externally by C20l's `SELF_KEYS.nearest` closure (motion.js:2174) and by C20l's own `aliasNearestKey` (motion.js:2291-2292, `_num(t)*c.fps` — converts a SECONDS argument to frames before delegating, the AE-compatibility seconds/frame split this whole span otherwise stays frame-native about, per its own 'Takes a FRAME' comment).",
+          "external_calls": [
+            "trackFor(holder,prop) — motion.js:443 (pre-1769), called by all three of exprKeyAt/exprNumKeys/exprNearestKeyAtFrame independently (not shared/cached across the three).",
+            "_exprFps() — motion.js:1371 (pre-1769), called only by exprKeyAt, once per call, to compute the `time` field."
+          ],
+          "effects": "None — no assignment to any non-local variable; every non-null return is a freshly-built object or a `.slice()`d/scalar value copy of a key's own `.v`."
+        }
+      ]
+    },
+    {
+      "area": "markers",
+      "packets": [
+        {
+          "id": "C20k.markers",
+          "files": [
+            "src/js/motion.js:2097-2130"
+          ],
+          "coverage_ranges": [
+            [
+              2097,
+              2130
+            ]
+          ],
+          "classification": {
+            "code": 28,
+            "comment": 5,
+            "whitespace": 1
+          },
+          "symbols": [
+            "_markerEntry",
+            "_markerApi"
+          ],
+          "signature": "_markerEntry(list, i) -> {frame,time,name,color,index} | null\n_markerApi(list) -> {count, at(i), nearest(frame)}",
+          "responsibility": "Section header + 4-line lead-in (2097-2101): 'Both marker scopes are stored as {frame,name,color} (markers.js). Same count/at/nearest shape as keyframes, so learning one teaches the other. at() also accepts a marker's name, which is usually how you mean to find one.' `_markerEntry(list,i)` (2102-2106): bounds-checks `i` (1-based, same convention as `exprKeyAt`) against `list`, returning `null` for a falsy `list` or an out-of-range `i`; else builds `{frame:m.frame, time:m.frame/_exprFps(), name:m.name||'', color:m.color||null, index:i}` — `name`/`color` both default (empty string / null) when the stored marker lacks them, so a marker created without a name or color never surfaces `undefined` to expression code. `_markerApi(list)` (2107-2129): `arr=list||[]` (a null/undefined `list` argument degrades to an empty marker set rather than throwing); returns an object with `count:arr.length` (eager, computed once at `_markerApi` construction time, NOT a live getter — a marker added to `list` AFTER `_markerApi(list)` was called would not be reflected in that already-built `count`, since `arr` and `.length` are captured by value at construction); `at(i)` — a DUAL-MODE lookup: if `i` is a string, linear-scans `arr` for the FIRST marker whose `.name` (defaulting to `''`) equals `i` exactly, returning `null` if none match; otherwise treats `i` as a 1-based numeric index via `_markerEntry(arr, Math.floor(_num(i)))`; `nearest(frame)` — returns `null` for an empty `arr`; else linear-scans for the marker with the smallest `Math.abs(arr[j].frame - _num(frame))`, first-strictly-smaller-distance wins (ties go to the EARLIER marker in the array, since the comparison is `d < bestD` not `<=`, mirroring `nearestKeyIndex`'s own tie-break convention in the sibling keyframe-introspection packet, though implemented as a separate linear scan here rather than a shared binary search — markers are not assumed sorted-by-frame the way a track's keys are).",
+          "argument_coercion": "`i` coerced via `Math.floor(_num(i))` only in the numeric branch of `at()` (the string branch uses `i` as-is for the name comparison, no coercion); `frame` in `nearest()` coerced via `_num(frame)`.",
+          "return_shape": "_markerEntry: a plain `{frame,time,name,color,index}` object or `null`. _markerApi: always a plain object with `count` (number), `at` (function), `nearest` (function) — never null (a `list` of `null`/`undefined` still yields a valid, empty-marker-set API rather than `null` itself, unlike `layerSnapshot`'s own null-on-unresolved contract).",
+          "determinism": "Deterministic — pure functions of the `list` argument and the numeric/string arguments; no RNG.",
+          "raw_vs_evaluated": "N/A — markers have no expression/track concept of their own; `_markerEntry`/`_markerApi` read plain `{frame,name,color}` records directly off whatever array they are handed.",
+          "marker_api_surface": "Exactly `numKeys`/`key`/`nearestKey` per the issue's own naming is NOT what this packet exposes directly — this packet's own names are `count`/`at`/`nearest`; the `numKeys`/`key`/`nearestKey` AE-compatible renaming is C20l's `_aliasMarkerApi` (motion.js:2339-2346, cited by line only), which wraps THIS packet's own `_markerApi` return value and additionally converts `nearestKey`'s argument from seconds to frames before delegating to this packet's own `nearest`.",
+          "comp_vs_layer_marker_lists": "This packet never reads `state.markers`/`ld.markers` by name itself — it only ever receives a `list` argument from a caller. The comp-level list (`state.markers`, layer marker list is `ld.markers`) is passed in by C20l's `COMP_VIEW.marker`/`SELF_VIEW.marker` getters (motion.js:2170/2249, cited by line only: `_markerApi(state.markers)` / `_markerApi(ld&&ld.markers)`) and by THIS SPAN's own `layerSnapshot` (other-layers packet, motion.js:1978: `_markerApi(ld2.markers)`, always a LAYER's own marker list for cross-layer reads, never `state.markers`).",
+          "callers": "`_markerEntry`: called three times inside `_markerApi` itself (2113 name-match branch, 2116 numeric branch, 2126 nearest-match construction) — zero external/other-internal callers. `_markerApi`: called by `layerSnapshot` (motion.js:1978, other-layers packet, this span), and externally by C20l's `COMP_VIEW.marker` getter (2170), `SELF_VIEW.marker` getter (2249), and C20l's own `_aliasMarkerApi` (2340) — four call sites total, one internal to this span, three in C20l.",
+          "external_calls": [
+            "_exprFps() — motion.js:1371 (pre-1769), called once per _markerEntry invocation.",
+            "_num(v) — motion.js:1591 (pre-1769), used inside _markerApi's at()/nearest() closures."
+          ],
+          "effects": "None — no assignment to any non-local variable; every return is a freshly-built object, or the fixed-shape API object itself (whose own `count` field is a plain captured number, not a live binding)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) occurs anywhere in motion.js:1769-2130 (grep-verified). This span performs zero writes to any persisted field — every function is a pure read over `_ectx`, a track's own `.keys`/`.v`, `state.layers`, a control's own track, or a marker list, returning freshly-constructed local values. Nothing here changes what a later save call would serialize."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. C19g (cited by name only, not re-derived here) owns import/export of `holder.motion`/`ld.exprControls`/`ld.markers`/`ld.expressions` — the fields this span reads through `trackFor`/`findControl`/`_markerApi`'s `list` argument."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Zero calls to `pushUndo` anywhere in this span (grep-verified) — consistent with zero document writes. Nothing in this span needs, or performs, history capture."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This span reads/writes no selection state (`_motionKeySel`, `setKeySel`, `isKeySelected` and similar are never referenced) — it operates entirely inside the expression-evaluation call graph, with no UI/DOM/selection surface of its own."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This span is the compiled-expression VOCABULARY for reading animation state, not a writer of it: `exprSelfAt`/`exprSelfVelocity`/`exprSelfSpeed` read a property's own RAW track (bypassing expression recursion by construction); `loopRaw`/`exprLoopAfter`/`exprLoopBefore` synthesize a looped RAW value outside the keyed range without ever writing a key back onto the track; `layerSnapshot`/`exprLayer`/`_sampleOther` read another layer's EVALUATED value (through `valueAtFrame`, which itself may re-enter `evalExpressionFor`, bounded by `_exprDepth`); `_controlValue`/`exprSelfControl`/`exprLayerControl` read a control's own evaluated track; `exprKeyAt`/`exprNumKeys`/`nearestKeyIndex`/`exprNearestKeyAtFrame` read a track's own stored keys directly. No function in this span calls `toggleAnimated`/`setKeyAtCurrentFrame`/`removeKeyAtCurrentFrame` or any other C02/C20n key-writer."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Confirmed reachable on the render path, NOT UI-only (see boundaries): `buildSceneJson` (engine-bridge.js) -> `SMMotion.layerMotionAt`/`elementMotionAt` (sibling-covered) -> `computeMotionMat` -> `valueAtFrame` (C20n) -> `evalExpressionFor` (C20m) -> the compiled expression, which can call any built-in in this span by name. Every built-in therefore runs once per frame per property whose expression calls it, including during export and Tauri-packaged playback, not only inside the Motion timeline editor. `exprLayer`/`layer(ref).control(name)`'s five-eager-valueAtFrame-call cost is the specific per-frame cost implication this reachability creates (see the layer-control-cost-asymmetry finding)."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted directly from this span. Because this span sits on the render path (see 'render' above), a PNG/video export that evaluates a frame containing an expression using any built-in here will execute that built-in's code — but this artifact does not itself verify pixel output or export correctness for any specific expression."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "Zero Tauri command, filesystem call, or `window.__TAURI__` reference anywhere in this span (grep-verified). The only bridge-adjacent surface is the render-path reachability into `engine-bridge.js`'s `buildSceneJson`, which is a pure-JS call graph, not a native IPC boundary — the actual GPU/native rendering happens downstream of the scene JSON this call graph helps produce, outside this span."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "noise-vs-random-determinism",
+      "status": "proposed, unrun",
+      "matrix": "exprNoise/exprWiggle called once vs twice with identical arguments in the same evaluation, vs exprRandom/exprRandomFixed called the same way",
+      "expected": "exprNoise/exprWiggle return IDENTICAL values on repeated calls with identical arguments (pure hash of seed+coordinate, no counter consumed); exprRandom/exprRandomFixed return DIFFERENT values on the second call (ctx.rngCounter advances per draw) even though 'Fixed' pins the draw across frames/evaluations at a given counter position."
+    },
+    {
+      "id": "wiggle-dimension-and-decorrelation",
+      "status": "proposed, unrun",
+      "matrix": "PROP_DIM 1 (rotation/opacity) vs 2 (position/anchor/scale) property, octaves 1/2/4, freqPerSec/amp varied",
+      "expected": "1D property returns a bare scalar (axis-0 stream only); 2D property returns [wx,wy] with wx/wy driven by INDEPENDENT noise lattices (seed offset axis*101) so a plot of (wx,wy) over time does not trace a straight diagonal line; amplitude stays bounded near `amp` regardless of octave count (fBm normalization)."
+    },
+    {
+      "id": "self-at-vs-evaluated-recursion-floor",
+      "status": "proposed, unrun",
+      "matrix": "a property with an expression calling self.at(currentFrame) on itself, vs the same expression calling a hypothetical evaluated self-read",
+      "expected": "self.at() never triggers evalExpressionFor re-entry on the SAME property (reads rawValueAtFrame only) — no stack growth, no _exprDepth increment, regardless of how many times or how deeply nested the call; this is structural, not merely guarded."
+    },
+    {
+      "id": "self-velocity-speed-tick-asymmetry",
+      "status": "proposed, unrun",
+      "matrix": "a tight loop of self.velocity()/self.speed() calls exceeding 1024 iterations within one evaluation's wall-clock budget, vs an equivalent loop of self.at() calls",
+      "expected": "self.at() eventually throws EXPR_TIMEOUT_TAG once the deadline is exceeded and the 1024th _exprTick() fires; self.velocity()/self.speed() never call _exprTick at all and so never trip this specific check on their own (though the outer evalExpressionFor's own deadline, set once per outermost evaluation, still bounds total wall-clock time regardless)."
+    },
+    {
+      "id": "loop-mode-and-keyframes-matrix",
+      "status": "proposed, unrun",
+      "matrix": "mode in {cycle,pingpong,offset,continue,<unrecognized string>}, keyframes in {0, 1, keys.length-1, keys.length, negative, fractional}, frame before firstF vs after lastF vs inside the keyed range, forward vs backward",
+      "expected": "Inside the keyed range: always the plain raw value, mode/keyframes irrelevant. Outside: cycle repeats identically each pass; pingpong alternates direction every full cycle; offset adds (to-from)*cycles cumulative drift per pass; continue extrapolates linearly off the outermost two real frames; an unrecognized mode string behaves like the plain cycle/pingpong branch (falls through, matches neither 'continue' nor 'offset' nor 'pingpong', so behaves as 'cycle'); keyframes<=0 or >=keys.length uses the full keyed range; fewer than 2 total keys or a degenerate zero-length segment never loops at all."
+    },
+    {
+      "id": "layer-ref-resolution-order",
+      "status": "proposed, unrun",
+      "matrix": "layer(ref) vs layerControl(ref,name) with ref matching a layer NAME only, a uid only, both (name string that happens to also be a valid uid of a DIFFERENT layer), and neither",
+      "expected": "layer(ref) tries name first, uid second; layerControl(ref,name) tries uid first, name second — the two can resolve to DIFFERENT layers when ref is simultaneously a valid name for layer A and a valid uid for layer B; both return null/throw (respectively) when ref resolves to neither."
+    },
+    {
+      "id": "layer-control-cost-asymmetry",
+      "status": "proposed, unrun",
+      "matrix": "layer(uid).control(name) vs layerControl(uid,name) vs layerControl(name,name) [name-fallback path], instrumented valueAtFrame call count per read",
+      "expected": "layer(uid).control(name) performs exactly 6 valueAtFrame calls (5 eager inside layerSnapshot for position/anchor/rotation/scale/opacity, plus 1 lazy for the control itself when .control() is invoked) regardless of whether the caller ever touches the other 5 fields; layerControl(uid,name) performs exactly 1 valueAtFrame call when uid resolves on the first try, skipping layerSnapshot and the name scan entirely — matches CLAUDE.md §13's measured 0.38 µs vs 0.93 µs (2.45x) at 44 layers/20000 reads."
+    },
+    {
+      "id": "self-control-vs-layer-control-resolution",
+      "status": "proposed, unrun",
+      "matrix": "exprSelfControl on a layer-level holder vs a per-shape element holder vs a holder with no resolvable owning layer; exprLayerControl with ctx present vs ctx entirely absent",
+      "expected": "exprSelfControl resolves the owning layer via _selfLd() for both layer and per-shape holders, returns 0 if _ectx is absent, throws exprErrorControlNoLayer if _selfLd() itself returns null; exprLayerControl needs no active _ectx at all (falls back to state.currentFrame), and both throw the identical unknown-control-name error shape via the shared _controlValue helper once a layer IS resolved."
+    },
+    {
+      "id": "keyframe-introspection-bounds-and-nearest-tiebreak",
+      "status": "proposed, unrun",
+      "matrix": "exprKeyAt with i<1, i>track.keys.length, i within range; exprNumKeys on an empty/absent/populated track; exprNearestKeyAtFrame/nearestKeyIndex with targetFrame before-first/after-last/exactly-between-two-keys/exactly-on-a-key",
+      "expected": "exprKeyAt returns null (never throws) out of range, else {frame,time,value,index} with time=frame/fps; exprNumKeys returns 0 for an absent/empty track, never null; nearestKeyIndex clamps to the array ends outside the key range and, on an EXACT tie between two keys, resolves to the EARLIER key (strict-less-than tie-break, preserved from a prior linear-scan implementation)."
+    },
+    {
+      "id": "marker-api-lookup-modes-and-list-fallback",
+      "status": "proposed, unrun",
+      "matrix": "_markerApi(list) with list null/undefined/empty/populated; at(i) with i as a matching name string, a non-matching name string, a numeric 1-based index in/out of range; nearest(frame) with an exact-tie distance between two markers; a marker record missing name/color",
+      "expected": "A null/undefined list degrades to a valid empty-marker-set API (count 0, at()/nearest() both null) rather than throwing; at() dispatches on typeof (string = name lookup, first match wins; anything else = 1-based numeric index via _markerEntry); nearest() ties resolve to the EARLIER marker (strict-less-than); a marker missing .name/.color surfaces '' / null rather than undefined."
+    },
+    {
+      "id": "render-path-per-frame-cost",
+      "status": "proposed, unrun",
+      "matrix": "a scene with N layers each carrying a position expression that calls layer(ref).control(name) vs the same scene using layerControl(ref,name), scrubbed across F frames",
+      "expected": "Per CLAUDE.md §5bis's own playback-hot-path framing, total valueAtFrame calls attributable to this span's other-layer/control built-ins scale with N*F*(6 or 1) depending on which form the expressions use — a fixture to quantify, not certify, the per-frame cost implication the render-path reachability finding describes; no browser/Tauri timing is claimed by this artifact."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planNoiseWiggleSample(ctx, kind, args) -> {value, lattice}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates the pure hash/octave-sum math (testable with a plain seed+coordinate fixture, no _ectx/expression machinery needed) from the _ectx-reading/PROP_DIM-branching wrapper each of exprNoise/exprWiggle currently interleaves."
+    },
+    {
+      "api": "planLoopSample(track, frame, mode, keyframes, forward) -> {value, cycle, wasLooped}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes loopRaw's own segment/cycle/tie-break arithmetic explicit and unit-testable against a plain {keys:[...]} fixture, without requiring a live _ectx or holder object; `wasLooped` would make the in-range short-circuit (boundary case 2) directly observable to a test."
+    },
+    {
+      "api": "resolveLayerRef(ref, {uidFirst}) -> {index, ld} | null",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Unifies findLayerIndexByRef's name-first order and exprLayerControl's uid-first order behind one parameterized resolver, so the two call sites' divergent try-order is a documented flag rather than two separately hand-written scan loops that could drift out of sync with each other."
+    },
+    {
+      "api": "readControlLean(ldOrRef, name, frame) -> number | number[]",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Generalizes exprSelfControl/exprLayerControl/rig-widget.js's layerControl (three near-identical thin wrappers over _controlValue with different ways of arriving at `ld`) behind one signature, closing the risk that a future fourth cross-layer-control call site is written against the expensive layerSnapshot path by mistake instead of the lean one."
+    },
+    {
+      "api": "sortedNearestIndex(sortedByFrame, targetFrame, tieBreak) -> number",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Extracts nearestKeyIndex's binary search (currently duplicated conceptually by _markerApi.nearest's own linear scan over an assumed-unsorted marker list) into one shared primitive with an explicit, testable tie-break parameter, rather than two independently-tuned 'earlier wins on a tie' implementations."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "exprNoise",
+      "_wiggleAxis",
+      "exprWiggle",
+      "_rawShaped",
+      "exprSelfAt",
+      "exprSelfVelocity",
+      "exprSelfSpeed",
+      "loopRaw",
+      "exprLoopAfter",
+      "exprLoopBefore",
+      "findLayerIndexByRef",
+      "_withSampler",
+      "_sampleOther",
+      "layerSnapshot",
+      "exprLayer",
+      "_controlValue",
+      "exprSelfControl",
+      "exprLayerControl",
+      "exprKeyAt",
+      "exprNumKeys",
+      "nearestKeyIndex",
+      "exprNearestKeyAtFrame",
+      "_markerEntry",
+      "_markerApi"
+    ],
+    "caller_anchors": [
+      "exprNoise/exprWiggle/exprLoopAfter/exprLoopBefore/exprLayer/exprSelfControl/exprLayerControl: zero `name(` calls anywhere in src/js outside their own declarations (grep-confirmed, 164 files) — reachable from user expressions ONLY via C20m's compiled-function positional argument list (motion.js:2572-2591) and, for exprLayer, also via `layer: exprLayer` in the sandbox object (motion.js:2322).",
+      "exprSelfAt/exprSelfVelocity/exprSelfSpeed: called directly by C20m's aliasValueAtTime/aliasVelocityAtTime/aliasSpeedAtTime (motion.js:2287-2289, seconds-to-frame wrappers) in addition to the sandbox argument list.",
+      "exprKeyAt/exprNumKeys/exprNearestKeyAtFrame: called by C20l's SELF_KEYS.at/.count/.nearest getters (motion.js:2173-2176) and C20m's aliasKey/aliasNearestKey (motion.js:2291-2294).",
+      "_markerApi: called by C20l's COMP_VIEW.marker/SELF_VIEW.marker getters (motion.js:2170/2249) and C20l's _aliasMarkerApi (motion.js:2340), in addition to this span's own layerSnapshot (1978).",
+      "layerSnapshot: called by C20l's SELF_VIEW.parent getter (motion.js:2246) in addition to this span's own exprLayer (1989).",
+      "No caller of any of the 24 symbols was found outside src/js/motion.js — this span is motion.js-internal-plus-compiled-expression-sandbox only, confirmed by the same grep methodology as the exemplar artifacts."
+    ],
+    "helper_anchors": [
+      "_exprTick:1397, _exprFps:1371, _num:1591, _vec:1590, trackFor:443, findControl:279, controlsOf:164, normalizeControlName:278, rawValueAtFrame:1270, hashNoise1D:1569, hashNoise2D:1576, PROP_DIM:506, PROP_DIM_LABELS:566, findLayerIndexByUid:3564 (all pre-1769, cited by name/line only)",
+      "_ectx module var / evalExpressionFor:2542 (writer) / compiledFnFor:2388 / the argument list at 2572-2591 (C20m, cited by line only)",
+      "_selfResolved/_selfLd:2155, COMP_VIEW/SELF_VIEW:2156+, _aliasMarkerApi:2339, aliasValueAtTime/aliasVelocityAtTime/aliasSpeedAtTime:2287-2289, aliasKey/aliasNearestKey:2291-2294 (C20l, cited by line only)",
+      "valueAtFrame:2639, hasExpr (called at 2641) (C20n, cited by line only)",
+      "computeMotionMat:2933, layerMotionAt/elementMotionAt (sibling-covered past 2932, cited by line only)",
+      "SM.t: src/js/i18n.js locale tables (en:1069, fr:2124, ja:3150, es:4176) for the five exprError* keys this span throws with",
+      "NemoExpressionRandomDomain.hashUnit: src/js/domain/animation/expression-random.js (application module, cited by name only)",
+      "layerInPoint:app.js:2838, layerOutPoint:app.js:2889 (cited by name/line only)",
+      "state.markers/ld.markers lifecycle: markers.js:18/22, app.js:4186/4301 (cited by name/line only)"
+    ],
+    "boundary_assertion": "Line 1768 closes the sibling-covered exprRandomGaussFixed; line 1769 starts this artifact's own lead-in comment for exprNoise. Line 2129 closes this artifact's own _markerApi; line 2130 is a blank line; line 2131 starts C20l's own section header. All eight internal packet cuts (1780/1813/1852/1922/1992/2056/2097) land exactly on a `// ---- ` header or a function's own lead-in comment, re-verified line-by-line against the frozen blob."
+  },
+  "validation": {
+    "expected_assigned_lines": 362,
+    "expected_classification": {
+      "code": 229,
+      "comment": 125,
+      "whitespace": 8
+    },
+    "packet_partition": [
+      [
+        1769,
+        1779
+      ],
+      [
+        1780,
+        1812
+      ],
+      [
+        1813,
+        1851
+      ],
+      [
+        1852,
+        1921
+      ],
+      [
+        1922,
+        1991
+      ],
+      [
+        1992,
+        2055
+      ],
+      [
+        2056,
+        2096
+      ],
+      [
+        2097,
+        2130
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          1769,
+          1779
+        ],
+        "code": 8,
+        "comment": 2,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          1780,
+          1812
+        ],
+        "code": 19,
+        "comment": 13,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          1813,
+          1851
+        ],
+        "code": 27,
+        "comment": 11,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          1852,
+          1921
+        ],
+        "code": 53,
+        "comment": 16,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          1922,
+          1991
+        ],
+        "code": 44,
+        "comment": 25,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          1992,
+          2055
+        ],
+        "code": 22,
+        "comment": 41,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          2056,
+          2096
+        ],
+        "code": 28,
+        "comment": 12,
+        "whitespace": 1
+      },
+      {
+        "range": [
+          2097,
+          2130
+        ],
+        "code": 28,
+        "comment": 5,
+        "whitespace": 1
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 1769 and overlap at line 2130.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "eight unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "before-1769 (C20a-j/C02) preceding boundary and C20l following boundary at line 2131",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "_ectx field-read inventory, determinism/RNG-vs-hash split, raw-vs-evaluated citation per built-in, loop-mode boundary cases, layer-ref resolution order, and the layer-control cost-asymmetry citation against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}

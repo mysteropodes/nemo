@@ -59,7 +59,7 @@
           "id": "C06.bootstrap.storage-key-migration",
           "title": "One-time sm-* → nemo-* localStorage key migration",
           "files": [
-            "src/js/app.js:10-20"
+            "src/js/app.js:1-20"
           ],
           "symbols": [
             "migrateStorageKeysToNemo (anonymous IIFE)"

@@ -1,0 +1,535 @@
+{
+  "census_id": "C19h",
+  "issue": 1141,
+  "title": "Timeline UI refresh and property adapters",
+  "status": "draft for independent review; behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19h read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "5a41914ab9796711a219920fb80c4466cfe12866",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 2697,
+      "end": 2947
+    }
+  ],
+  "coverage_note": "Exactly 251 assigned lines are covered once by seven packets: 177 code and 74 full-line comments, no whitespace. Line2947 is updateRevisionPanel closing brace; blank2948 and the unified-properties heading beginning2949 are excluded. C19g ends2694 and the SM object closes2695; those lines and blank2696 are excluded.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed origin/main 5a41914ab9796711a219920fb80c4466cfe12866 has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed for this JSON-only census.",
+    "comments": "Historical comments and performance numbers inside the range are observed source prose, not newly executed evidence."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every dependency/caller remain read-only; C19h owns only this census JSON artifact.",
+    "serialization": "P30/#1032 retains the whole timeline.js runtime writer. Any future extraction or runtime correction must serialize through that reservation.",
+    "reservations": "D01/#1044, T05/Pollen, C01/C02/C03/C04/C05/C06/C07/P20, Motion and other named owners remain separate. Census coverage conveys no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01 document/history",
+      "disposition": "Retains saveActiveLayerFrame/saveActiveLayerFrameOrPromote, pushUndo, snapshots, project codec and undo/redo. C19h records direct adapter calls, including feather history omission and held/synthetic/visibility save guards."
+    },
+    {
+      "owner": "C02 animation/time",
+      "disposition": "Retains effective-frame resolution, frame navigation, keyframe promotion, Motion tracks and playback. C19h records countOnly/frameOnly refresh and that these edits call saveActiveLayerFrame without ensuring/promoting a held frame."
+    },
+    {
+      "owner": "C03 render/export",
+      "disposition": "Retains engine scene construction, mask composition and export filters. Optional renderNow calls and output exclusions are consumer evidence only."
+    },
+    {
+      "owner": "C04a selection/revision/dynamic shapes",
+      "disposition": "Retains selectedPaths, clearSel, apply/convert shape algorithms and accept/reject revision callbacks. C19h owns only the UI adapters and records their live-versus-captured identity behavior."
+    },
+    {
+      "owner": "C05 native/media",
+      "disposition": "Retains Tauri/native media and resource behavior. These adapters issue no native command; optional SMEngineBridge render calls do not establish packaged-desktop acceptance."
+    },
+    {
+      "owner": "C06 preferences/bootstrap",
+      "disposition": "Retains DOM/bootstrap timing and event wiring. This census records which nodes are optional during refresh and which unguarded addEventListener/button/helper lookups require construction order."
+    },
+    {
+      "owner": "P20 folder codec",
+      "disposition": "Retains folder document fields and codec ports. No folder field is read or written in2697-2947."
+    },
+    {
+      "owner": "P30/#1032 runtime writer",
+      "disposition": "Retains timeline.js writer authority. Proposed ports below are future boundaries, not implementation authority."
+    }
+  ],
+  "surface_inventory_cross_check": [
+    {
+      "inventory": "C01-document-history.json",
+      "disposition": "Confirms save/load/history ownership and supports the recorded persistence boundary; C19h adds adapter call ordering only."
+    },
+    {
+      "inventory": "C03-rendering-resource-ownership.json",
+      "disposition": "Confirms engine/export ownership for masks and revision filtering; no renderer behavior transfers."
+    },
+    {
+      "inventory": "C04a-editor-tools-selection.json",
+      "disposition": "Confirms selectedPaths, dynamic-shape generators and revision callbacks belong to C04a; C19h records caller-side guards and identity."
+    },
+    {
+      "inventory": "C05-media-import-export-native.json",
+      "disposition": "Confirms native/media ownership and the lack of native acceptance from browser adapter calls."
+    },
+    {
+      "inventory": "C19a-timeline-foundations.json",
+      "disposition": "Confirms timeline refresh/playhead/layer-list foundations remain outside this range."
+    },
+    {
+      "inventory": "C19g-timeline-document-codec.json",
+      "disposition": "Confirms project serialization fields/defaults and ends at timeline.js2694, before this scope."
+    }
+  ],
+  "boundaries": [
+    "2697-2947 is documentation-only coverage; no source symbol is moved or changed.",
+    "updateUI is a coordinator with observable partial DOM effects if a required later node or callee throws.",
+    "Panel display gates do not generally equal event-handler mutation gates; mask/corner/ellipse/star handlers use live selectedPaths[0], while revision handlers capture the displayed item.",
+    "saveActiveLayerFrame is not saveActiveLayerFrameOrPromote: on held frames and guarded layer types a successful live mutation can remain unsaved or snap back.",
+    "Dynamic shape adapters edit both paramShape intent and baked Paper.js segments through C04a helpers; paramShape.box remains the stable generator frame owned by those helpers."
+  ],
+  "exclusions": [
+    "src/js/timeline.js:2694-2696 and2948 onward",
+    "C04a tools.js dynamic-shape/revision algorithms and select-bridge transforms",
+    "C03 engine mask/revision rendering and output exporter implementation",
+    "C01 save/load/history implementation",
+    "C02 playback/Motion/keyframe algorithms",
+    "P30 runtime changes",
+    "D01/T05 and unrelated application features"
+  ],
+  "areas": [
+    {
+      "area": "ui-refresh-and-property-adapters",
+      "packets": [
+        {
+          "id": "C19h.document-field-sync",
+          "files": [
+            "src/js/timeline.js:2697-2712"
+          ],
+          "coverage_ranges": [
+            [
+              2697,
+              2712
+            ]
+          ],
+          "symbols": [
+            "syncDocFields"
+          ],
+          "responsibility": "Projects canonical document values into duplicate Canvas, Timeline and Project-panel controls, and projects two Boolean flags into icon-button classes.",
+          "display_contract": "Each of p-cw/p-ch/p-cbg/tl-fps/tl-total/proj-fps/proj-frames is optional independently. An existing field is assigned its state value unless it is document.activeElement. btn-clip and btn-safety are optional independently and toggle class active from Boolean canvasClip/safetyZones. No return value is declared.",
+          "behavior_and_ordering": "Pure DOM projection in this packet: no history, model write, save, render, callback or notification. updateUI calls it first; app.js new-project handling also calls it directly.",
+          "field_asymmetries": "Focused editable value fields retain their in-progress DOM value, while icon toggles have no focus guard. canvasBg is assigned through .value without normalization. Falsy numeric values are still assigned because the map is not truthiness-filtered.",
+          "dependencies": [
+            "state.canvasW/canvasH/canvasBg/fps/totalFrames/canvasClip/safetyZones",
+            "document.getElementById",
+            "document.activeElement"
+          ],
+          "identity_and_selection": "No item identity is read. DOM lookup occurs on each call, so newly replaced field nodes are used.",
+          "signatures": [
+            "syncDocFields() -> undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:839 setFps",
+            "src/js/timeline.js:842 setCanvasSize/setCanvasBg",
+            "src/js/timeline.js:2689 importJSON completion",
+            "src/js/timeline.js:2728 updateUI",
+            "src/js/project.js:97 new project"
+          ]
+        },
+        {
+          "id": "C19h.update-ui",
+          "files": [
+            "src/js/timeline.js:2713-2758"
+          ],
+          "coverage_ranges": [
+            [
+              2713,
+              2758
+            ]
+          ],
+          "symbols": [
+            "updateUI"
+          ],
+          "responsibility": "Coordinates the global editor refresh, with a frameOnly branch that skips the full timeline rebuild but still refreshes document fields, info fields, panels, layer-list presentation and optional Motion/effects surfaces.",
+          "display_contract": "Always calls syncDocFields and getEffectiveStrokes(activeLayerIdx,currentFrame,true); writes frame/stroke/selection info, tl-cf/tl-tf, KEY/TWEEN badge, four window mirrors, work-area and onion-marker UI. tl-cf value alone respects focus; tl-cf.max is always assigned. info-sel reports only select-tool selections. The code dereferences the active layer/frame and its required DOM nodes without guards. In Motion it conditionally calls SMMotion.renderMotionPropsPanel. updateEffectsPanel alone is optional among the final panel calls; its neighboring panel functions are direct calls.",
+          "behavior_and_ordering": "Order is syncDocFields; count/elements/badge; mirrors; updateWaBar; updateOmMarkers; updatePlayhead when frameOnly else renderTimeline; optional Motion panel; renderLayerList(frameOnly); then comp, duplicator, footage, selection, FS selection, revision, mask, corners, ellipse, star, text actions, text props, optional effects and props-context panels. No save/history/model mutation is intended, although callees are outside this packet.",
+          "field_asymmetries": "frameOnly affects only updatePlayhead versus renderTimeline and is forwarded to renderLayerList; it does not suppress panel refreshes. Stroke count uses countOnly effective strokes. Badge precedence isKeyframe over isInterpolated. Translation falls back only when SM/SM.t is unavailable; the fallback is French. Required helper or DOM absence throws after any earlier DOM writes.",
+          "dependencies": [
+            "getEffectiveStrokes",
+            "updatePlayhead/renderTimeline",
+            "renderLayerList and panel renderers",
+            "window.updateWaBar/updateOmMarkers",
+            "optional SMMotion and updateEffectsPanel"
+          ],
+          "identity_and_selection": "Uses the current activeLayerIdx/currentFrame and current selectedPaths at call time; it neither snapshots nor clears selection. A failing late callee leaves earlier projection effects applied.",
+          "signatures": [
+            "updateUI(frameOnly?) -> undefined"
+          ],
+          "callers": [
+            "src/js/app.js:5173 goToFrame passes true only when not playing; playing calls updatePlayhead directly",
+            "src/js/image-mesh-bridge.js:491 passes true",
+            "src/js/timeline.js:11907 bootstrap calls full refresh",
+            "src/js/tweens.js:4991,5009,5022 undo/history refreshes",
+            "Direct full-refresh calls also occur across app.js, timeline.js, tools.js, select-bridge.js, import/media/effects/shape/group/labs modules; this coordinator is a shared global surface rather than a feature-owned command"
+          ]
+        },
+        {
+          "id": "C19h.mask-panel",
+          "files": [
+            "src/js/timeline.js:2759-2800"
+          ],
+          "coverage_ranges": [
+            [
+              2759,
+              2800
+            ]
+          ],
+          "symbols": [
+            "updateMaskPanel",
+            "p-mask-mode change listener",
+            "p-mask-feather input listener",
+            "btn-mask-unset click listener"
+          ],
+          "responsibility": "Projects and edits per-item vector-mask mode, the layer-shared effective feather, and mask removal.",
+          "display_contract": "updateMaskPanel returns if mask-sec is absent. It displays only for exactly one selected mask while state.tool is select. Mode defaults visually to add. Feather displays the numeric maximum strictly greater than zero among mask children of the selected path's live layer, or zero if the layer is absent/no positive mask feather exists. Once the section exists, its fields are required.",
+          "behavior_and_ordering": "Mode and unset listeners read selectedPaths[0] live and require only mask data; feather also requires p.layer. They do not reapply the display function's select-tool or single-selection gate. Mode pushes undo, writes this.value, saves, then optionally renders the engine. Feather parses with parseFloat||0, clamps only below at zero, writes every mask child on p.layer, saves, optionally renders, and never pushes undo. Unset pushes undo, deletes isMask/maskMode/maskFeather only on p, saves, calls updateUI, then optionally renders the engine.",
+          "field_asymmetries": "Listener nodes are required at script evaluation because addEventListener is unguarded. Arbitrary mode strings pass through. NaN/empty feather becomes zero; negative becomes zero; positive Infinity remains Infinity. Display ignores zero/negative/NaN and chooses the maximum positive value. Serialization stores maskMode and maskFeather only when truthy; load defaults maskMode to add and restores feather only when truthy, so zero is represented by omission while Infinity is JSON-unsafe downstream.",
+          "dependencies": [
+            "selectedPaths",
+            "pushUndo",
+            "saveActiveLayerFrame",
+            "optional SMEngineBridge.renderNow",
+            "app.js serP/desP",
+            "engine-bridge mask collection",
+            "export.js mask filters"
+          ],
+          "identity_and_selection": "All handlers resolve selectedPaths[0] at event time. Multiple selections still mutate the first item if valid. Feather derives the target layer from that item rather than state.activeLayerIdx, but saveActiveLayerFrame saves the current active layer, so stale/cross-layer selection can mutate one live layer while persisting another. Unset updateUI may change selection/panels before the explicit engine render.",
+          "signatures": [
+            "updateMaskPanel() -> undefined; mask mode change, feather input and unset click listeners return undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:2757 updateUI",
+            "DOM change/input/click listeners at2781,2786,2795 invoke inline handlers"
+          ]
+        },
+        {
+          "id": "C19h.corner-panel",
+          "files": [
+            "src/js/timeline.js:2801-2837"
+          ],
+          "coverage_ranges": [
+            [
+              2801,
+              2837
+            ]
+          ],
+          "symbols": [
+            "updateCornersPanel",
+            "p-corners-link change listener",
+            "commitCornerEdit",
+            "four corner input listeners"
+          ],
+          "responsibility": "Projects and edits a dynamic rectangle paramShape corner model, optionally linking the four stored radii.",
+          "display_contract": "updateCornersPanel returns if corners-sec is absent and otherwise displays only for exactly one selected rect paramShape while tool is select. tl/tr/br/bl use ||0. Row visibility is driven by the current link checkbox, which is UI state rather than paramShape data. Required controls/rows are unguarded once the section exists.",
+          "behavior_and_ordering": "The link listener only hides/shows three rows. Each input handler reads selectedPaths[0] live, validates rect paramShape but not tool/count, pushes undo, parses and clamps below at zero, writes all four radii when the live link checkbox is checked or ps[which] otherwise, calls required window.applyParamShapeRect(p), saves, refreshes this panel and optionally renders the engine.",
+          "field_asymmetries": "Each input event creates a history attempt; there is no equality/no-op guard and no ensureKeyframe/saveActiveLayerFrameOrPromote. Empty/NaN becomes zero; positive Infinity survives here but the shape builder clamps against half the frame size. The stored paramShape retains the requested radius even when the generated geometry clamps its visible radius. Link state is neither written to item data nor captured here.",
+          "dependencies": [
+            "selectedPaths",
+            "pushUndo",
+            "window.applyParamShapeRect",
+            "saveActiveLayerFrame",
+            "optional SMEngineBridge.renderNow",
+            "tools.js paramShape.box generator frame",
+            "app.js serP/desP"
+          ],
+          "identity_and_selection": "Panel display requires current single selection; handlers accept the first valid live selection even under another tool or multiple selection. They mutate that object in place. saveActiveLayerFrame persists only the active layer and has held/synthetic/visibility guards.",
+          "signatures": [
+            "updateCornersPanel() -> undefined; commitCornerEdit(which, val) -> undefined; link and four input listeners return undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:2757 updateUI",
+            "src/js/select-bridge.js:1818 optional direct refresh",
+            "src/js/timeline.js:2833 self-refresh after edit",
+            "four bound input listeners at2835-2837 invoke commitCornerEdit"
+          ]
+        },
+        {
+          "id": "C19h.ellipse-panel",
+          "files": [
+            "src/js/timeline.js:2838-2882"
+          ],
+          "coverage_ranges": [
+            [
+              2838,
+              2882
+            ]
+          ],
+          "symbols": [
+            "looksLikePlainEllipse",
+            "updateEllipseArcPanel",
+            "btn-ellipse-arc-convert click listener",
+            "commitArcEdit",
+            "three arc input listeners"
+          ],
+          "responsibility": "Heuristically exposes conversion for a plain closed Path and projects/edits the dynamic ellipse start angle, sweep and inner-radius ratio.",
+          "display_contract": "looksLikePlainEllipse rejects existing paramShape data and accepts any Path instance that is closed with 4 through 8 segments; it does not verify ellipse geometry. The panel requires a single select-tool item and shows either only conversion rows for an eligible path or parameter rows for kind ellipse. start uses ||0, sweep preserves an explicit zero and otherwise defaults to 359.9, innerRadius uses ||0 and is shown as rounded percent.",
+          "behavior_and_ordering": "Convert resolves selectedPaths[0] live and checks only truthiness, then pushes undo, calls required window.convertToDynamicEllipse(p), saves, refreshes the panel and optionally renders. It does not repeat Path/closed/segment/no-paramShape eligibility checks. Arc edits validate current ellipse paramShape, push undo, parse with ||0, clamp percent input to 0..95 then divide by100, leave angle/sweep unbounded at the adapter, call required applyParamShapeEllipse, save, refresh and optionally render.",
+          "field_asymmetries": "Every conversion/edit invocation pushes history before the required helper, with no equality guard. A stale convert can call the helper on a non-eligible object; the current helper itself returns for missing path/bounds but overwrites any existing paramShape on a bounded object. Infinity angle/sweep survives the adapter; Infinity percent clamps to95%. The builder later clamps sweep to0.1..359.9 and inner ratio0..0.95 for geometry without rewriting stored start/sweep.",
+          "dependencies": [
+            "Path/Paper.js",
+            "selectedPaths",
+            "pushUndo",
+            "window.convertToDynamicEllipse/applyParamShapeEllipse",
+            "saveActiveLayerFrame",
+            "optional SMEngineBridge.renderNow",
+            "tools.js stable paramShape.box",
+            "app.js serP/desP"
+          ],
+          "identity_and_selection": "Display eligibility is a snapshot of current selection, but handlers resolve current selectedPaths[0]. The convert handler has the broadest stale-selection exposure because it omits every display eligibility guard except p truthiness. Edits mutate paramShape and baked segments on the selected live item.",
+          "signatures": [
+            "looksLikePlainEllipse(p) -> boolean; updateEllipseArcPanel() -> undefined; commitArcEdit(field, val, isPercent) -> undefined; convert and three input listeners return undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:2757 updateUI",
+            "src/js/select-bridge.js:1819 optional direct refresh",
+            "src/js/timeline.js:2869,2878 self-refresh after conversion/edit",
+            "convert and three input listeners at2865-2869,2880-2882"
+          ]
+        },
+        {
+          "id": "C19h.star-panel",
+          "files": [
+            "src/js/timeline.js:2883-2915"
+          ],
+          "coverage_ranges": [
+            [
+              2883,
+              2915
+            ]
+          ],
+          "symbols": [
+            "updateStarPanel",
+            "commitStarEdit",
+            "three star input listeners"
+          ],
+          "responsibility": "Projects and edits dynamic star/polygon point count, inner ratio and corner radius, while copying two settings into defaults for the next star tool creation.",
+          "display_contract": "Panel returns if star-sec is absent and otherwise requires one select-tool item with paramShape.kind star. It displays pointCount||5, explicit innerRatio or0.5 as a rounded percent, and cornerRadius||0. Child fields are unguarded after the section exists.",
+          "behavior_and_ordering": "Each input resolves selectedPaths[0] live, validates star paramShape, pushes undo and parses with ||0. pointCount rounds and clamps only to minimum3, then writes state.starPointCount. innerRatio clamps to0.05..1 after percent conversion and writes state.starInnerRatio. cornerRadius clamps below at zero. It calls required applyParamShapeStar, saves, refreshes and optionally renders.",
+          "field_asymmetries": "No equality guard; every input event attempts history. pointCount has no maximum and positive Infinity survives Math.round/Math.max, which can make the downstream builder's loop non-terminating; corner Infinity also survives but is later geometrically limited per edge. state.starPointCount/starInnerRatio are session tool defaults and are not among C19g's document export/import fields. Item paramShape is serialized wholesale.",
+          "dependencies": [
+            "selectedPaths",
+            "pushUndo",
+            "window.applyParamShapeStar",
+            "saveActiveLayerFrame",
+            "optional SMEngineBridge.renderNow",
+            "state next-star defaults",
+            "app.js serP/desP"
+          ],
+          "identity_and_selection": "Handlers accept the first valid selected star without checking tool or single-selection. They mutate both the selected live item and, for point/inner changes, global state defaults; undo snapshots cover document layers but do not establish restoration of those global defaults.",
+          "signatures": [
+            "updateStarPanel() -> undefined; commitStarEdit(field, val, isPercent?) -> undefined; three input listeners return undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:2757 updateUI",
+            "src/js/select-bridge.js:1820 optional direct refresh",
+            "src/js/timeline.js:2911 self-refresh after edit",
+            "three input listeners at2913-2915 invoke commitStarEdit"
+          ]
+        },
+        {
+          "id": "C19h.revision-panel",
+          "files": [
+            "src/js/timeline.js:2916-2947"
+          ],
+          "coverage_ranges": [
+            [
+              2916,
+              2947
+            ]
+          ],
+          "symbols": [
+            "updateRevisionPanel",
+            "btn-revision-accept onclick closure",
+            "btn-revision-reject onclick closure"
+          ],
+          "responsibility": "Projects Accept/Reject actions for a selected active correction or delete-revision ghost and delegates the actual revision transaction to C04a-owned callbacks.",
+          "display_contract": "Returns if revision-sec is absent. Displays only for exactly one select-tool item that is either revisionParentId and not a ghost, or a ghost whose revisionAction is delete. A reshape/move ghost alone is hidden. Optional author row describes the captured item with ownerName fallback. Accept/reject buttons are required once displayed.",
+          "behavior_and_ordering": "Each refresh replaces button onclick properties with closures capturing p and isDeleteGhost. On click both push undo first, then resolve userLayers[state.activeLayerIdx] live. Accept delegates to acceptDeleteRevision(p) or acceptRevision(p,layer); reject delegates to rejectDeleteRevision(p) or rejectRevision(p,layer). Both then clearSel, saveActiveLayerFrame and call updateUI. There is no direct engine render call.",
+          "field_asymmetries": "No click-time validation, no no-op guard and no try/finally: a stale or already-resolved captured item still causes pushUndo and subsequent clear/save/update if the callback returns normally; a thrown callback stops later cleanup. The captured item can belong to a different layer than the click-time active layer. Delete callbacks ignore layer; active callbacks search only the click-time layer for revisionParentId, so layer drift can accept by unlinking the active item without finding/removing its ghost, or reject by removing the active item without restoring its ghost.",
+          "dependencies": [
+            "selectedPaths",
+            "pushUndo",
+            "userLayers/state.activeLayerIdx",
+            "C04a acceptDeleteRevision/rejectDeleteRevision/acceptRevision/rejectRevision",
+            "clearSel",
+            "saveActiveLayerFrame",
+            "updateUI",
+            "app.js revision serialization"
+          ],
+          "identity_and_selection": "Unlike all other edit listeners in this range, identity is captured during updateRevisionPanel. The active layer is not captured and is resolved during the later click. Buttons therefore combine stale item identity with live layer identity. updateUI refreshes after selection clearing only when all prior effects return normally.",
+          "signatures": [
+            "updateRevisionPanel() -> undefined; assigned accept/reject onclick closures return undefined"
+          ],
+          "callers": [
+            "src/js/timeline.js:2757 updateUI",
+            "assigned accept/reject onclick closures at2935-2946 invoke C04a callbacks then updateUI"
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Mask fields, paramShape and revision metadata reach stored frame strokes only through saveActiveLayerFrame. The adapter never calls the held-frame promotion wrapper. The writer increments scene version before later guards and can return for synthetic/effect/guide/widget/LFS/duplicator/rig/path-FX or effectively hidden layers."
+    },
+    {
+      "consumer": "load",
+      "disposition": "app.js desP reconstructs paramShape and revision fields; mask mode defaults to add and mask feather is restored only when truthy. Panel refresh reads the reconstructed live Paper items after loadFrame."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Mode, unset, rectangle, ellipse, star and revision actions call pushUndo before mutation; feather input omits it. There are no equality guards, so valid repeated input attempts history. Item fields/geometry participate through layer snapshots, while link-checkbox state and star next-tool defaults are not shown to be restored."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Display functions require select tool plus exactly one matching item. Mask/shape event handlers instead resolve live selectedPaths[0] and omit tool/single-count gates; revision button closures capture the prior displayed p while resolving active layer on click. updateUI selection text counts any nonempty select-tool selection."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "updateUI counts getEffectiveStrokes(...,true), and frameOnly still refreshes all property panels. Property edits mutate live items then call saveActiveLayerFrame without ensureKeyframe; held-frame and Motion inheritance behavior therefore remains owned by C02 and may not persist these edits. No adapter writes a Motion property track."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Mask/shape edits optionally call SMEngineBridge.renderNow after save; mask unset calls updateUI before render. Revision actions depend on updateUI/callers and issue no explicit renderNow. Engine scene construction consumes mask/revision data and baked dynamic-shape segments, with revision-view filtering and overlays outside this packet."
+    },
+    {
+      "consumer": "export",
+      "disposition": "serP/desP project serialization carries mask/paramShape/revision metadata with noted truthiness asymmetries. Render export filters revision ghosts; Lottie filters both ghosts and masks. Dynamic shapes export their baked segments. These adapters do not implement output encoding."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No direct Tauri/native command occurs in2697-2947. SMEngineBridge is optional and in-process; native/video mask behavior and packaged desktop acceptance remain C03/C05 concerns and were not run."
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "C19h.fixture.doc-sync-focus-and-absence",
+      "status": "proposed, unrun",
+      "initial_state": "Duplicate document controls include focused and unfocused nodes; optional peers are independently absent; state fields include falsy values.",
+      "expected_effects": "For each duplicate field, focus blocks value replacement while unfocused peers update; optional absent fields/buttons do not throw; clip/safety classes follow Boolean state."
+    },
+    {
+      "id": "C19h.fixture.update-ui-frameOnly",
+      "status": "proposed, unrun",
+      "initial_state": "Complete required DOM/callees, valid active layer/frame and fixed selection; run separate fresh cases for frameOnly true and false plus a missing late callee.",
+      "expected_effects": "With complete required DOM/callees, both branches update counters, badge, mirrors and panels; true calls updatePlayhead and renderLayerList(true) without renderTimeline, false calls renderTimeline. Missing a late required callee demonstrates earlier partial DOM writes."
+    },
+    {
+      "id": "C19h.fixture.mask-gates-and-history",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh layer with two masks and one non-mask; reset history/save/render spies for each mode, feather and unset case; separately vary tool and selection cardinality.",
+      "expected_effects": "Panel requires select+single mask, but handlers mutate first valid mask with another tool/multiple selection. Mode/unset add history attempts; feather does not. Feather changes every mask on p.layer and no non-mask, with invalid/negative to0 and Infinity explicitly characterized."
+    },
+    {
+      "id": "C19h.fixture.mask-cross-layer-and-held",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh distinct active and selected layers with known keyframe/interpolated/held/hidden/guarded frame data; reset live items before every case.",
+      "expected_effects": "Change selection/active layer between display and event; record live mutated layer versus active saved layer. Repeat on keyframe, interpolated, held, hidden and guarded synthetic layers to expose saveActiveLayerFrame persistence limits."
+    },
+    {
+      "id": "C19h.fixture.corner-link-and-generator",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh rect paramShape with stable box and known radii; reset checkbox, history and spies for linked/unlinked and numeric-domain cases.",
+      "expected_effects": "Link checkbox changes rows only; linked input writes all radii, unlinked writes one. Each input calls history/helper/save/panel/render in order. Verify stored radius versus generator geometric clamp and held-frame snapback."
+    },
+    {
+      "id": "C19h.fixture.ellipse-heuristic-and-stale-convert",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh independent closed/open Path cases, existing paramShape cases and selection swap cases; reset helper/history/save/render spies.",
+      "expected_effects": "Closed Paths with4..8 segments qualify regardless of geometry; existing paramShape/open/non-Path/out-of-range do not. After displaying conversion, switch selection to bounded non-eligible content and prove click-time guard breadth. Cover0/defaults, invalid, percent clamp and extreme finite inputs."
+    },
+    {
+      "id": "C19h.fixture.star-domain-and-defaults",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh star paramShape, known global next-star defaults and empty history per numeric case.",
+      "expected_effects": "Cover point rounding/min3, percent clamp5..100, corner min0, repeated no-op history, and item paramShape persistence. Separately prove starPointCount/starInnerRatio update next-shape defaults and whether undo/project reload leaves them unchanged."
+    },
+    {
+      "id": "C19h.fixture.revision-captured-item-live-layer",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh active-revision/ghost pairs and delete ghosts on distinct layers; bind buttons anew for every selection/layer-drift case.",
+      "expected_effects": "Display each actionable revision, then change selection and active layer before click. Assert captured p versus live layer behavior, callback choice, ghost/active outcomes, history/save/clear/update ordering, and repeat-click/no-op behavior. Cover missing paired ghost and callback throw partial effects."
+    },
+    {
+      "id": "C19h.fixture.consumer-roundtrip",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh documents containing exactly one mask, one dynamic-shape kind or one revision form per case; reset storage/history/render/export/native harnesses.",
+      "expected_effects": "For mask, each paramShape kind and both revision forms, exercise save/load, undo/redo, selection, frame navigation/animation, engine render, supported exports and native surface independently; preserve known truthiness filters and output exclusions rather than assuming parity."
+    }
+  ],
+  "future_proposals": [
+    {
+      "id": "C19h.proposal.refresh-port",
+      "status": "proposal only; unimplemented",
+      "api": "refreshEditor({frameOnly, reason}) -> {updated, skipped, failures}",
+      "boundary": "Feature-owned panels register refresh adapters; the coordinator preserves current ordering and explicit optional/required dependencies while making partial failure observable."
+    },
+    {
+      "id": "C19h.proposal.selection-adapter-port",
+      "status": "proposal only; unimplemented",
+      "api": "resolvePropertySelection({kind, tool, cardinality, identityPolicy}) -> SelectionToken|null",
+      "boundary": "Makes display and mutation gates explicit and lets event handlers choose live identity or a validated captured token instead of accidentally mixing them."
+    },
+    {
+      "id": "C19h.proposal.property-transaction-port",
+      "status": "proposal only; unimplemented",
+      "api": "editItemProperty(token, mutation, {history, framePersistence, render, refresh}) -> EditResult",
+      "boundary": "Centralizes no-op detection, history timing, keyframe/held-frame policy, active-layer consistency and ordered refresh/render without absorbing C01/C02/C04 implementations."
+    },
+    {
+      "id": "C19h.proposal.mask-port",
+      "status": "proposal only; unimplemented",
+      "api": "MaskProperties.read(item) / setMode(item,mode) / setLayerFeather(layer,value) / unset(item)",
+      "boundary": "Feature port owns validation and layer-shared semantics; serialization and engine mask composition remain C01/C03."
+    },
+    {
+      "id": "C19h.proposal.param-shape-port",
+      "status": "proposal only; unimplemented",
+      "api": "ParamShape.describe(item) / convertEllipse(item) / edit(item,field,value)",
+      "boundary": "Adapter owns UI normalization; C04a remains sole geometry builder and stable-box authority. Numeric-domain validation must prevent non-finite loop hazards."
+    },
+    {
+      "id": "C19h.proposal.revision-command-port",
+      "status": "proposal only; unimplemented",
+      "api": "RevisionCommand.prepare(item) -> token; accept(token) / reject(token) -> result",
+      "boundary": "Token binds item and layer identity and revalidates at execution. C04a retains revision algorithms; C01 retains history/save."
+    }
+  ],
+  "validation": {
+    "static_commands": [
+      "git rev-parse HEAD && git rev-parse origin/main",
+      "git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js && git rev-parse HEAD:src/js/timeline.js",
+      "node /tmp/nemo-c19h-validate.cjs $PWD engineering/inventory/census/C19h-timeline-ui-refresh-adapters.json /tmp/nemo-c19h-validation.json"
+    ],
+    "expected": {
+      "assigned_lines": 251,
+      "code_lines": 177,
+      "comment_lines": 74,
+      "whitespace_lines": 0,
+      "packets": 7,
+      "source_consumers": 8,
+      "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123"
+    },
+    "runtime": "Behavioral fixtures above remain proposed and unrun; static validation does not claim application behavior."
+  }
+}

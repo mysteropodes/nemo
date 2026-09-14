@@ -1,0 +1,268 @@
+{
+  "census_id": "C20a",
+  "issue": "https://github.com/mysteropodes/nemo/issues/1125",
+  "title": "Motion text animator and element style boundaries",
+  "owner": "Ilya/D1; Codexitron / Ilya O integration and validation",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_path": "src/js/motion.js",
+  "source_line_count": 13914,
+  "observed_main_sha": "a3c9e347372415a365f25e0aba8074547429e8c1",
+  "status": "read-only census and bounded proposals only; no runtime writer, migration, behavior pass, or Ready extraction claim",
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 4048,
+      "end": 4264,
+      "lines": 217,
+      "classification": {
+        "code": 139,
+        "comment": 78,
+        "whitespace": 0
+      }
+    },
+    {
+      "start": 4293,
+      "end": 4358,
+      "lines": 66,
+      "classification": {
+        "code": 31,
+        "comment": 35,
+        "whitespace": 0
+      }
+    }
+  ],
+  "coverage_note": "Exactly 283 assigned lines occur once in two complete packets: 170 code and 113 full-line // comments, with no whitespace. The C02-owned bridge between packets and clipped layer-order tail are context only.",
+  "context_boundaries": [
+    {
+      "assigned": "4048-4264",
+      "context": "taSelectorAt is complete preceding C02 context at 4033-4047. This packet starts at the unit-count comment/cache and ends after complete textAnimatorWeights."
+    },
+    {
+      "assigned": "4265-4292",
+      "context": "C02 retains header plus complete elementMotionAt. Its ded641 numeric reference has drifted: pinned source locates method at 4269-4292. Do not duplicate it."
+    },
+    {
+      "assigned": "4293-4358",
+      "context": "Fill-color comment, rgba255, and all three complete readers form one packet."
+    },
+    {
+      "assigned": "4359-4384",
+      "context": "C02 retains layerOrderAt. Header begins 4359 and method completes beyond recorded tail at 4384; no clipping."
+    },
+    {
+      "assigned": "13588-13596",
+      "context": "Public export table is outside all assigned ranges. textAnimatorsOf13591 is an inline related descriptor-list getter, not another C20a-owned implementation."
+    }
+  ],
+  "whole_file_writer_guidance": {
+    "source_access": "motion.js and every consumer are read-only for C20a.",
+    "reservation": "Open historical Motion PR #949 remains unresolved. Reconcile its actual whole-file claim before a future writer; C20a neither releases nor transfers it. Preserve P30 timeline writer and D01/T05-Pollen.",
+    "publication": "Only eventual JSON artifact may integrate, serially after C19c/#1124 checkout release and independent exact-candidate review."
+  },
+  "reconciliation": [
+    {
+      "owner": "C02/#1037",
+      "disposition": "Retains generic holder/track primitives and elementMotionAt/layerOrderAt; C20a maps prior uncovered helpers/readers with numeric drift explicit."
+    },
+    {
+      "owner": "C04b",
+      "disposition": "Retains text-animator-panel presentation and direct panel writes; C20a maps runtime helpers/readers only."
+    },
+    {
+      "owner": "P03/#1005",
+      "disposition": "Parent admission remains open; this artifact does not establish queue completeness or authorize extraction."
+    }
+  ],
+  "areas": [
+    {
+      "area": "text-animator-runtime-and-element-style-readers",
+      "packets": [
+        {
+          "id": "C20a.text-animator-runtime",
+          "title": "Text animator count, pivot, contribution and descriptor helpers",
+          "files": [
+            "src/js/motion.js:4048-4264"
+          ],
+          "coverage_ranges": [
+            [
+              4048,
+              4264
+            ]
+          ],
+          "symbols": [
+            "_taCountCache",
+            "taUnitCount",
+            "_taStrokeRestBounds",
+            "_taPivotCache",
+            "taUnitPivotCenter",
+            "textAnimatorContribution",
+            "addTextAnimator",
+            "removeTextAnimator",
+            "textAnimatorWeights"
+          ],
+          "responsibility": "Counts selector-addressable stored-stroke units, derives shared unit pivots, evaluates enabled layer textAnimators into transform/opacity/color contributions, mutates descriptor membership for add/remove, and exposes panel/render weights.",
+          "writer": "taUnitCount/taUnitPivotCenter write module caches. addTextAnimator initializes/pushes ld.textAnimators but retains supplied props by reference and applies selector overrides shallowly; removeTextAnimator splices it. Contribution and weights evaluators do not persist frame data.",
+          "public_api": "window.SMMotion.{addTextAnimator,removeTextAnimator,textAnimatorWeights}; internal evaluators feed C02-owned elementMotionAt. Related public textAnimatorsOf is an inline export-table getter at13591 outside this assigned range, retained as read-only facade context.",
+          "consumers": [
+            "text-animator-panel.js add/remove/render/live ramp",
+            "C02 elementMotionAt at 4269-4292",
+            "app.js getEffectiveStrokes render path through elementMotionAt",
+            "engine-bridge.js retained renderer through elementMotionAt",
+            "export.js element transform reader through elementMotionAt",
+            "timeline.js project clone/import/export handling of textAnimators"
+          ],
+          "oracle": "Proposed, unrun fixtures: missing layer/strokes; chars/words/lines count; array replacement invalidates identity caches; multi-contour pivot; selector base/static/track inputs; disabled/multiple composition; contribution shape; add unique/remove existing-or-missing; supplied props reference and shallow selector override behavior; public weights match renderer selector inputs.",
+          "depends_on": [
+            "C02 trackFor/valueAtFrame holder primitives",
+            "C04b text-animator-panel",
+            "text-selector.js unitIndexOf/weightAt/weights/defaultSelector",
+            "C02 elementMotionAt bridge"
+          ],
+          "entangled_with": [
+            "stored stroke-array identity",
+            "ld.textAnimators and nested holder fields",
+            "app/engine/export render consumers"
+          ],
+          "proposed_module": "src/js/domain/animation/text-animator-runtime.js",
+          "proposed_api": "evaluateTextAnimator(layer,stroke,frame,{effectiveStrokes,selector}) -> contribution; cache adapter; add/remove remain application commands.",
+          "consumer_matrix": {
+            "save": "add/remove mutate layer textAnimators; panel commit calls saveActiveLayerFrame. C20a changes neither.",
+            "load": "timeline project clone/import carries textAnimators; evaluator reads loaded descriptor and stored/effective strokes.",
+            "history": "add/remove contain no pushUndo. Panel calls pushUndo before add/remove, enable and direct field edits; generic holder changes retain caller-owned history.",
+            "selection": "No canvas/frame selection write. Panel requires active text-layer context; selector unit addressing is not editor selection.",
+            "animation": "Reads selector motion/motionStatic via trackFor/valueAtFrame and combines enabled props per unit without baked per-glyph keys. addTextAnimator retains supplied descriptor props by reference rather than cloning.",
+            "render": "Contribution feeds C02 elementMotionAt. The app.js component-stroke path and export.js apply transform/pivot/opacity; the retained engine bridge also consumes animator color target/blend fields. Those consumer differences are baseline source observations, not parity evidence. Panel preview uses the weights helper.",
+            "export": "Project export/import carries textAnimators; export.js279-290 reads elementMotionAt transform/pivot/opacity without applying animator color target/blend fields there. External-format color parity remains unverified.",
+            "native": "No direct native/system bridge. Engine bridge is browser/WASM rendering, not native acceptance evidence."
+          },
+          "admission": "Characterization/pure evaluation seam only after PR #949 claim reconciliation and whole-file writer release; descriptor command extraction needs separate behavior fixtures.",
+          "construct_boundary": "complete",
+          "notes": "Source limitation: conflicting rotation/scale animator basedOn modes use first pivotBasedOn; source leaves sequential per-animator pivot composition as larger rewrite."
+        },
+        {
+          "id": "C20a.element-style-readers",
+          "title": "Per-element fill, stroke and width resolution",
+          "files": [
+            "src/js/motion.js:4293-4358"
+          ],
+          "coverage_ranges": [
+            [
+              4293,
+              4358
+            ]
+          ],
+          "symbols": [
+            "rgba255",
+            "elementFillColorAt",
+            "elementStrokeColorAt",
+            "elementStrokeWidthAt"
+          ],
+          "responsibility": "For well-formed numeric color arrays, rounds/clamps animated fill/stroke RGBA channels to 0-255 and reads fill, stroke and scalar width only when holder has keyed/static property. It does not enforce four channels or reject non-finite inputs.",
+          "writer": "No document writer. rgba255 maps the supplied array and normalizes numeric channels; it does not validate length or non-finite values. Readers inspect ld.elementMotion holder tracks/static data and return value or null.",
+          "public_api": "window.SMMotion.{elementFillColorAt, elementStrokeColorAt, elementStrokeWidthAt}.",
+          "consumers": [
+            "engine-bridge.js fill/stroke/width retained-render paths",
+            "text-animator-panel.js RGBA contract",
+            "C02 elementMotionAt color contribution handoff",
+            "C02-owned element holder tracks/static data"
+          ],
+          "oracle": "Proposed, unrun fixtures: missing layer/holder/property; static/keyed colors; fractional/negative/>255 numeric normalization; malformed-short and NaN input baseline; null versus scalar width; text animator color handoff; engine fallback receives valid well-formed u8-compatible RGBA.",
+          "depends_on": [
+            "C02 hasKeys/valueAtFrame and holder model",
+            "engine-bridge",
+            "C02 elementMotionAt"
+          ],
+          "entangled_with": [
+            "ld.elementMotion tracks",
+            "textAnimatorContribution color fields",
+            "engine bridge u8 RGBA contract",
+            "malformed RGBA array/non-finite baseline"
+          ],
+          "proposed_module": "src/js/domain/animation/element-style-readers.js",
+          "proposed_api": "readElementStyle(holder,frame,{hasKeys,valueAtFrame}) -> {fillColor,strokeColor,strokeWidth}; render adapter owns bridge application.",
+          "consumer_matrix": {
+            "save": "No save; existing layer/project paths persist holder tracks/static overrides.",
+            "load": "Reads loaded holders; absent holder/property returns null via guards.",
+            "history": "No mutation/pushUndo; C02/panel command callers own undo/redo.",
+            "selection": "No selection read/write; caller provides layer and strokeId.",
+            "animation": "Reads interpolated values; rgba255 normalizes finite numeric channels but leaves malformed shape/non-finite inputs unchecked; width returns channel zero without clamp.",
+            "render": "Engine bridge reads overrides; valid well-formed colors need u8-compatible values. Paper/browser fallback and malformed-input behavior are fixture concerns, not a pass claim.",
+            "export": "No serializer here. Project carries holder values; no external exporter parity claim.",
+            "native": "No direct native bridge. Rust/WASM u8 compatibility is render contract, not native workflow validation."
+          },
+          "admission": "Pure reader characterization only after Motion reservation reconciliation; no behavior repair or migration bundled.",
+          "construct_boundary": "complete",
+          "notes": "Pinned baseline records rgba255 preventing fractional color interpolation WASM serde trap and Paper fallback; not newly tested."
+        }
+      ]
+    }
+  ],
+  "known_defects_and_unavailable_evidence": [
+    {
+      "id": "C20a.BASELINE-1",
+      "evidence": "Source 4057-4064 records prior stale count under scene-version cache invalidation.",
+      "disposition": "Preserve array-identity cache; fixture array replacement."
+    },
+    {
+      "id": "C20a.BASELINE-2",
+      "evidence": "Source 4186-4194 retains first pivot when active scale/rotation animators disagree.",
+      "disposition": "Characterize; no extraction repair."
+    },
+    {
+      "id": "C20a.BASELINE-3",
+      "evidence": "Source 4305-4320 records fractional RGBA engine trap before rgba255.",
+      "disposition": "Fixture normalization/handoff; no runtime pass."
+    },
+    {
+      "id": "C20a.BASELINE-4",
+      "evidence": "rgba255 maps whatever array it receives and Math.round(NaN) remains NaN; it neither enforces four channels nor rejects non-finite values. elementStrokeWidthAt returns channel zero without clamping.",
+      "disposition": "Preserve malformed-input baseline; future fixture distinguishes finite numeric normalization from validation that source does not provide."
+    },
+    {
+      "id": "C20a.EVIDENCE-1",
+      "evidence": "No C20a fixture or runtime run executed for data-only artifact.",
+      "disposition": "All fixtures and browser/engine checks are future independent acceptance."
+    }
+  ],
+  "uncovered_responsibilities": [
+    "taSelectorAt 4033-4047 remains C02 context.",
+    "C02 elementMotionAt 4265-4292 and layerOrderAt 4359-4384 excluded.",
+    "Remaining Motion queue and external/native validation remain outside C20a."
+  ],
+  "validation": {
+    "expected_assigned_lines": 283,
+    "expected_classification": {
+      "code": 170,
+      "comment": 113,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove line 4048 from coverage => omission rejection",
+      "assign line 4293 to both packets => overlap rejection"
+    ],
+    "symbol_checks": [
+      "taUnitCount@4066",
+      "textAnimatorContribution@4133",
+      "addTextAnimator@4227",
+      "removeTextAnimator@4244",
+      "textAnimatorWeights@4255",
+      "rgba255@4321",
+      "elementFillColorAt@4328",
+      "elementStrokeColorAt@4343",
+      "elementStrokeWidthAt@4351"
+    ]
+  }
+}

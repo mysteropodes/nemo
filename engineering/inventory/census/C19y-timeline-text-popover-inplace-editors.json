@@ -1,0 +1,496 @@
+{
+  "census_id": "C19y",
+  "issue": 1228,
+  "title": "Timeline.js text-tool popover and in-place text editors — openTextPopover*/closeTextPopover, startInPlaceTextCreation, openInPlaceTextEditor/closeInPlaceTextEditor, openInPlaceRasterTextEditor/closeInPlaceRasterTextEditor, isInPlaceTextEditing",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19x/#1226 (second open slice of the timeline.js tail; the two leaves target disjoint ranges of the same blob and this authoring did not wait on C19x). Scope is timeline.js:7995-8382 (388 lines: 235 code, 153 comment, 0 blank, re-derived independently and matching the issue's own proposed table exactly, no boundary correction needed). It starts at the `// ---- Outil texte (v20, 2026-07 rework) ----` header (7995), immediately after `initCommentPopover`'s `DOMContentLoaded` registration at 7994 (C19x, merged), and ends at the combined `window.isInPlaceTextEditing` gate (8382); line 8383 opens `computeTextLayout`'s own 'Shared layout pass' lead-in comment (next leaf C19z). Cited by name/line only, not re-mapped: `computeTextLayout`/`lineDrawX`/`commitVectorText`/`commitText`/`initTextPopover`/`splitTextIntoCharacters` (timeline.js:8383-8673, C19z — `commitText` is the sole writer both in-place editors hand their result to, confirmed by direct read: `closeInPlaceRasterTextEditor` calls it verbatim at 8376, `closeInPlaceTextEditor` never calls it at all because the vector path rebuilds glyphs itself via `buildVectorTextGroup`), the Typography panel `updateTextPropsPanel`/`applyTextPropsEdit` (timeline.js:8674+, C19aa), `vector-text-bridge.js` (`SMVectorText.buildVectorTextGroup` at vector-text-bridge.js:208, `vectorTextGroupMembers` at vector-text-bridge.js:350), the Text tool in tools.js (`onViewDoubleClick`, drag-to-box release handler, single-click placement — the callers, read directly at tools.js:8010-8022 and tools.js:8372-8393), `SMMotion.layerMotionPointMap` (motion.js:13477, dispatching to `layerMotionPointMapFor` at motion.js:6491, C20 lineage), `buildTransformBoxItems` (engine-bridge.js:3037, reads `window.isInPlaceTextEditing` at 3049 and `window._inplaceTextBoxBounds` via the sibling `buildTextDragBoxItems`, engine-bridge.js:3000-3010), `pushUndo` (tweens.js:4770, a thin wrapper over `pushUndoLayers`), `saveActiveLayerFrame`/`updateUI` (app.js, C21o), `showToast` (defined timeline.js:7447, C19w, project-wide helper), `serR`/`desR` (app.js, C21e: where `r.data.text/font/size/color/align/fixedWidth` persist for RASTER text; the vector editors persist through `serP`/`desP`'s own vector-text data fields, out of scope), the `#text-popover` markup and its ids (`#text-input`, `#text-size`, `#text-font`, `#text-align`, `#text-color`, src/index.html) and the `Nemo Vector Text` `@font-face` (style.css). This JSON authoring does not authorize source changes; P30/#1032 retains the timeline.js runtime writer.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "9a244778ea96ac6dc33bcce86bed2ddc554f1f76",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19y-timeline-text-popover-inplace-census",
+  "assigned_ranges": [
+    {
+      "start": 7995,
+      "end": 8382
+    }
+  ],
+  "coverage_note": "Exactly 388 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 235 code, 153 full-line comment, 0 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span) — equal to the issue's own proposed table exactly (235/153/0 over 388 lines), no boundary correction needed. Line 7994 is C19x's own `DOMContentLoaded` registration for `initCommentPopover` (out of scope, confirmed against C19x's own assigned_ranges end); line 7995 opens this scope's own text-tool section header. Line 8382 is the combined `window.isInPlaceTextEditing=function(){...}` gate; line 8383 opens `computeTextLayout`'s own 'Shared layout pass' lead-in comment (next leaf C19z, confirmed by direct read of 8383-8388, which explicitly ties `computeTextLayout` to `commitText`'s flattened bake and `splitTextIntoCharacters`' per-character split — neither symbol appears anywhere in 7995-8382 by direct read). A sweep of every C*.json in this directory sharing source_path: src/js/timeline.js confirms coverage is contiguous through line 7994 with zero gaps/overlaps (C19x, in a sibling worktree at authoring time, not yet merged — this artifact's own overlap check therefore only binds against ALREADY-MERGED siblings at validation time, per the validator's own directory scan), and this artifact's own range is the immediate next contiguous span after C19x's own declared 7449-7994.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (9a244778ea96ac6dc33bcce86bed2ddc554f1f76 at authoring time) has the identical timeline.js blob (git rev-parse 9a24477...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at that SHA, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for every function symbol this scope defines (openTextPopover, openTextPopoverForBox, openTextPopoverForEdit, closeTextPopover, positionTextPopover, resetTextPopoverFields, startInPlaceTextCreation, openInPlaceTextEditor, closeInPlaceTextEditor, openInPlaceRasterTextEditor, closeInPlaceRasterTextEditor) plus a plain-text grep for `isInPlaceTextEditing` (a variable/property assignment, not a call), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`. Every claim was cross-checked line-by-line against a direct `sed -n`/`git show <sha>:<path> | nl` read of the same range. External definitions were located directly: `SMVectorText.buildVectorTextGroup` (vector-text-bridge.js:208) and `.vectorTextGroupMembers` (vector-text-bridge.js:350); `SMMotion.layerMotionPointMap` (motion.js:13477, dispatching to `layerMotionPointMapFor`, motion.js:6491); `pushUndo` (tweens.js:4770); `saveActiveLayerFrame` (app.js:4634); `buildTransformBoxItems` (engine-bridge.js:3037) and its sibling `buildTextDragBoxItems` (engine-bridge.js:3000).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-08-16 Cyril, 2026-08-17, feedback #37/#79/#83/#131/#175, 2026-09 feedback #794) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json and the four timeline.js packets partitioning lines 7995-8382.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a single coherent feature (canvas-typed and popover-driven text creation/editing) split across four packets by which construct each covers: the side-popover open/close entry points and their shared field/placement helpers (`openTextPopover`, `openTextPopoverForBox`, `openTextPopoverForEdit`, `closeTextPopover`, `positionTextPopover`, `resetTextPopoverFields`); the in-place-editing module state plus the area-text creation entry point (`startInPlaceTextCreation`, which itself calls `openInPlaceTextEditor` — this artifact's own next packet); the full vector in-place editor open/close lifecycle (`openInPlaceTextEditor`/`closeInPlaceTextEditor`, by far the largest packet — textarea+resize-handle+reposition+listeners all live inside one function body); and the raster in-place editor plus the two-stage `isInPlaceTextEditing` gate that wraps the vector editor's own definition from packet 2. `openInPlaceRasterTextEditor` never rebuilds anything itself — it hands its collected string to `resetTextPopoverFields`+`commitText` (C19z) at 8375-8376, deliberately reusing the popover's own writer rather than duplicating the bake (CLAUDE.md §3's twin-function warning, applied here to two EDITORS sharing one writer instead of two renderer copies).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19x (existing owner, timeline.js:7449-7994, merged as #1226/PR)",
+      "disposition": "Retains `initCommentPopover` and the whole comment-tool popover/in-place-editor scope immediately before this one. This scope's own boundary begins at line 7995, the text-tool section header, immediately after C19x's own `DOMContentLoaded` registration line (7994) — confirmed against C19x's own declared assigned_ranges end."
+    },
+    {
+      "owner": "C19z (next leaf, `computeTextLayout`/`lineDrawX`/`commitVectorText`/`commitText`/`initTextPopover`/`splitTextIntoCharacters`, timeline.js:8383-8673, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:8383+, including the shared bake writer (`commitText`) this scope's own `closeInPlaceRasterTextEditor` calls at line 8376 and the four internal `closeTextPopover()` call sites (8474, 8503, 8554, 8569, confirmed by grep, all inside C19z's own range) that this scope's own `closeTextPopover` (8059) is called FROM. Confirmed call-graph-disjoint the other direction: none of this scope's own eleven function symbols appears past line 8382 in a whole-file grep restricted to declaration/call sites, and the next section's own lead-in comment (8383-8388) begins immediately with no shared lead-in."
+    },
+    {
+      "owner": "tools.js (the Text tool: drag-release handler and `onViewDoubleClick`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. The drag-release handler (tools.js:8010-8021, read directly) is the SOLE external caller of `startInPlaceTextCreation` (guarded `window.startInPlaceTextCreation`, tools.js:8018, for a drag wider than 20/view.zoom world px — area text) and of `openTextPopover` (guarded, tools.js:8019, the point-click fallback for a drag under that threshold). `onViewDoubleClick` (tools.js:8372-8393, read directly) is the sole external caller of `openInPlaceRasterTextEditor` (guarded, tools.js:8378, tried FIRST) falling back to `openTextPopoverForEdit` (guarded, tools.js:8379) for a raster text hit, and separately the sole external caller of `openInPlaceTextEditor` (guarded, tools.js:8393) for a vector-text glyph hit, after resolving the clicked glyph to its own group root via `data.groupId`+`data.isTextRoot` (tools.js:8388-8392) — `openInPlaceTextEditor` itself never does this resolution, it expects an already-resolved root."
+    },
+    {
+      "owner": "engine-bridge.js (`buildTransformBoxItems`, `buildTextDragBoxItems`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. `buildTransformBoxItems` (engine-bridge.js:3037) reads `window.isInPlaceTextEditing()` at line 3049 and returns `[]` (suppressing the Select tool's own transform gizmo) whenever it is true — the sole external reader of this scope's two-stage gate (see `boundaries`). `buildTextDragBoxItems` (engine-bridge.js:3000-3010) reads `window._inplaceTextBoxBounds` (written by both in-place editors' own `reposition()` closures, packets 3-4) to draw the live orange box through the Rust-rendered scene, with no Motion mapping of its own — this scope's own `reposition()` functions must therefore hand it an ALREADY motion-mapped anchor (see `boundaries`)."
+    },
+    {
+      "owner": "vector-text-bridge.js (`SMVectorText.buildVectorTextGroup`, `.vectorTextGroupMembers`, existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (buildVectorTextGroup: vector-text-bridge.js:208; vectorTextGroupMembers: vector-text-bridge.js:350). Called from this scope at: `openTextPopoverForEdit` (8052, groupBounds via `.vectorTextGroupMembers`), `startInPlaceTextCreation` (8097, `.buildVectorTextGroup` to create the throwaway placeholder root), `openInPlaceTextEditor` (8109, `.vectorTextGroupMembers` to collect the glyphs to hide), `closeInPlaceTextEditor` (8274/8277/8279, `.vectorTextGroupMembers` twice — once to recompute groupBounds, once to remove the old glyphs — then `.buildVectorTextGroup` to rebuild). This scope never reproduces either function's body."
+    },
+    {
+      "owner": "motion.js (`SMMotion.layerMotionPointMap`, existing owner, C20 lineage, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only (motion.js:13477, dispatching to `layerMotionPointMapFor`, motion.js:6491). Called identically from both in-place editors' own `reposition()` closures (8201, 8324) to map the text block's own world anchor forward through the layer's current Motion transform BEFORE projecting to screen — the fix for feedback #131 (see `boundaries`)."
+    },
+    {
+      "owner": "tweens.js (`pushUndo`), app.js (`saveActiveLayerFrame`/`updateUI`), timeline.js:7447 (`showToast`, C19w) and i18n.js (`SM.t`)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `pushUndo()` (tweens.js:4770, a thin wrapper over `pushUndoLayers`) is called exactly once in this scope's own body: `closeInPlaceTextEditor` (8276), immediately before removing the old glyphs and rebuilding — the ONLY document-mutating write in this whole 388-line span (see `boundaries`). `saveActiveLayerFrame()`/`updateUI()` (app.js, C21o) are both called exactly once, together, inside `closeInPlaceTextEditor`'s own rebuild `.then()` (8281), after the new glyphs are built. `showToast` is called exactly once, in `closeInPlaceTextEditor`'s own rebuild `.catch()` (8285), with the key `toastTextEditRebuildFailed`. `SM.t()` (i18n.js) supplies that one toast string (8285) — no other translated string is set anywhere in this span (unlike C19w's duplicator panel, this scope's DOM labels/placeholders are all static markup in src/index.html, out of scope)."
+    },
+    {
+      "owner": "app.js:4634 (`serR`/`desR`, C21e) and src/index.html/style.css (`#text-popover` markup, `Nemo Vector Text` @font-face)",
+      "disposition": "Retain their own bodies/markup in full — cited by name/line only. `serR`/`desR` (app.js, C21e) are where `r.data.text/font/size/color/align/fixedWidth` persist for a RASTER text item across save/reload — this scope never calls either directly, it only sets those same `data.*` fields on the live Paper item (`resetTextPopoverFields`'s callers, `openInPlaceRasterTextEditor`'s own `d=raster.data` reads) for the NEXT leaf's `commitText`/`serR` to persist. `#text-popover` and its child ids (`#text-input`, `#text-size`, `#text-font`, `#text-align`, `#text-color`) are read/written exclusively via `document.getElementById` in `positionTextPopover`/`resetTextPopoverFields` — no markup is declared by this scope. The `Nemo Vector Text` `@font-face` (style.css) is the font the in-place `<textarea>` overlay uses so it visually matches the vector glyphs about to replace it (per this scope's own 8076-8079 comment) — not reproduced here."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 7994 (C19x's own `DOMContentLoaded` registration for `initCommentPopover`) is outside coverage; line 7995 (this scope's own text-tool section header) begins this scope, confirmed against C19x's own declared assigned_ranges end.",
+    "Line 8382 (the combined `window.isInPlaceTextEditing` gate) is the last line of this scope; line 8383 opens the next leaf's (C19z) `computeTextLayout` lead-in comment — confirmed by reading the frozen blob at 8379-8388: neither `computeTextLayout` nor `commitText` nor `splitTextIntoCharacters` appears anywhere in 7995-8382 by direct grep.",
+    "No lines inside 7995-8382 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) Three popover entry modes and the module state each sets, all declared on ONE line (8010): `_textPendingPt`/`_textPendingBox`/`_textEditingRaster`, all initialized `null`. Point text: `openTextPopover(worldPt)` (8026-8031) sets `_textPendingPt=worldPt.clone()` (8027) and nulls the other two. Area text: `openTextPopoverForBox(topLeft,widthWorld)` (8036-8041) sets `_textPendingBox={topLeft:topLeft.clone(),width:widthWorld}` (8037) and nulls the other two. Re-edit: `openTextPopoverForEdit(raster)` (8045-8058) sets `_textEditingRaster=raster` (8046, nulling only `_textPendingPt`) and conditionally sets `_textPendingBox` from `raster.data.fixedWidth` (8053) — the ONE mode that does not unconditionally null `_textPendingBox`, because a re-edited AREA-text raster must re-populate the same fixedWidth box, not clear it. `commitText` (C19z, cited by name/line only — its own definition begins at timeline.js:8383+) is the ONLY consumer of these three fields (confirmed: no read of any of the three anywhere in this scope's OWN body outside their own setters/`closeTextPopover`). `closeTextPopover()` (8059, one line) is the only function that resets all three to `null` together — called four times, all from C19z (out of scope, see `reconciliation`), never from within this scope's own 388 lines.",
+    "(b) `positionTextPopover(worldPt)` (8011-8018) placement math: `v=view.projectToView(worldPt)` (8013, Paper.js world-to-screen); `#drawing-canvas`'s own `getBoundingClientRect()` (8014); `pop.style.left=Math.min(window.innerWidth-240,Math.max(4,cr.left+v.x+10))+'px'` (8016) — clamps the popover's own left edge to at least 4px from the viewport's own left edge and at most 240px from the viewport's own right edge (a hardcoded popover-width assumption); `pop.style.top` (8017) is the identical clamp shape with 220 in place of 240 (a hardcoded popover-height assumption) and a +10 offset in both axes from the clicked/dropped point. `resetTextPopoverFields(text,size,font,color,align)` (8019-8025) per-field defaults, each an `||` fallback on the DOM element's own `.value`: text→`''` (8020), size→`48` (8021), font→`'sans-serif'` (8022), align→`'left'` (8023), color→`color||state.strokeColor||'#000000'` (8024, a two-level fallback: the passed color, then the tool's own current stroke color, then black). `openTextPopoverForEdit`'s own `'vector:'+vectorFont` convention (8054): a vector-text root's `fontValue` is prefixed `'vector:'` before being written into `#text-font` so the popover (and, in C19z, `commitText`) can distinguish 'reopen as vector' from an ordinary raster font string by a simple string-prefix check — this scope itself never branches on that prefix, it only produces it.",
+    "(c) The vector in-place editor's full lifecycle in order, with lines: guard against stacking — `if(_inplaceTa)closeInPlaceTextEditor(true);` (8107, a same-line comment explicitly notes 'never stack two'). Glyph hiding by opacity, not `.visible` — `members.forEach(function(p){p.data.__inplacePrevOpacity=p.opacity;p.opacity=0;});` (8134), preceded by a 7-line comment (8125-8131) citing feedback #83 and stating the Rust engine's `buildSceneJson` never reads a Path's `.visible` flag (only layer-level visibility, per CLAUDE.md §5's `view.autoUpdate=false`) but DOES read `.opacity` — the SAME field used for a normal fade; the previous opacity is stashed per-glyph (not forced to 1 on restore) in case a glyph legitimately had non-1 opacity already. Anchor rule — `d.anchorTopLeft` (8112-8123 comment citing feedback #37 and #79; 8124 code: `var bounds=d.anchorTopLeft?new Rectangle(new Point(d.anchorTopLeft.x,d.anchorTopLeft.y),new Size(groupBounds.width,groupBounds.height)):groupBounds;`) — anchored at the STORED anchor point rather than the glyphs' own tight ink bounding box, because `buildVectorTextGroup` places `baselineY` at a nominal ascent approximation that only coincidentally matches ink bounds; using ink bounds instead drifts per-content and was the exact regression reported 2026-08-27. Textarea creation and style mirroring inside `reposition()` (8181-8243): `fontSize` from `d.size` (8206/8209), `fontWeight` `'700':'400'` from `d.bold` (8211), `fontStyle` `'italic':'normal'` from `d.italic` (8212), `textDecoration` built from `d.underline`/`d.strike` joined with a space (8213), `letterSpacing` from `d.letterSpacing` scaled by `view.zoom` (8214), `lineHeight` from `d.lineHeightMult||1.25` (8215), `textAlign` from `d.align||'left'` (8216). Resize handle and the `fixedHeight` write (8147-8180): a real DOM `<div>` pinned to the textarea's bottom-right corner (comment 8142-8146 explains why — the orange box is a Rust-rendered overlay with no hit-testing of its own); `pointerdown` (8152-8161) captures the CURRENT rendered size as the resize start (not an arbitrary default, so the box doesn't jump); `pointermove` (8162-8177) writes `d.fixedWidth` (8166) and, per the 2026-08-30 feedback #175 comment (8167-8173), `d.fixedHeight` (8175) — the first `d.fixedHeight` write introduced anywhere in this codebase per that comment's own account; `endResize`/`pointerup`/`pointercancel` (8178-8180) release pointer capture. `reposition()`'s Motion-aware projection (8181-8243): `SMMotion.layerMotionPointMap(state.activeLayerIdx)` (8201, feedback #131, 19-line comment 8182-8200 explaining the regression: a Motion-keyed layer renders transformed, but this editor used to project raw geometry) maps `bounds.topLeft` forward to `anchorWorld` (8202) before `view.projectToView` (8203); `window._inplaceTextBoxBounds` (8235-8239) is written in WORLD units (dividing the DOM px width/height back by `view.zoom`) using the SAME motion-mapped `anchorWorld`, explicitly because `buildTextDragBoxItems` (engine-bridge.js) does no Motion mapping of its own (comment 8230-8231). The three listeners (8245-8251): `input`→`reposition` (8245); `keydown`, `stopPropagation` always, `Escape`→`closeInPlaceTextEditor(true)` (8248), `Cmd/Ctrl+Enter`→`closeInPlaceTextEditor(false)` (8249); `blur`→`closeInPlaceTextEditor(false)` (8251). `closeInPlaceTextEditor(cancel)`'s decision table (8254-8288): guard `if(!ta)return;` (8256, already closed); remove handle+null all five module vars+clear `_inplaceTextBoxBounds`+`renderNow()` (8257-8260, unconditional, BEFORE reading `newText`); `discardNew` (8267, only used when `isNew`) permanently removes the hidden placeholder glyphs; `restore` (8268) reinstates each hidden glyph's stashed opacity; the combined bail condition (8269) — `cancel` OR no `root`/`root.data` OR empty `newText.trim()` OR (`!isNew` AND unchanged text) — routes to `discardNew()` (isNew) or `restore()`+`renderNow()` (re-edit) and returns, doing NO rebuild; past that guard, `layer=root.parent` vanished (8272-8273, 'layer vanished mid-edit... bail rather than build into nothing') routes to the same discard/restore branch; otherwise `pushUndo()` (8276, the ONLY undo-snapshot call in this whole span) precedes removing the old glyphs (8277) and calling `buildVectorTextGroup` (8279) — success sets `selectedPaths`, calls `saveActiveLayerFrame()`+`updateUI()`, `renderNow()` (8280-8282); failure logs a console warning, calls `showToast(SM.t('toastTextEditRebuildFailed'))`, and `restore()`s the ORIGINAL hidden glyphs (8283-8287, leaving the failed rebuild's own now-detached new content unreferenced — no explicit cleanup of a partial `buildVectorTextGroup` result is visible in this span).",
+    "(d) The raster editor's lifecycle (`openInPlaceRasterTextEditor`, 8303-8357; `closeInPlaceRasterTextEditor`, 8358-8377) and exactly what it does NOT do: it never rebuilds/re-bakes anything itself. `closeInPlaceRasterTextEditor` collects `newText` (8363), restores the raster's own opacity (8365), then — past its own early-return guards (`cancel`/removed/no-data at 8367; unchanged-or-empty text at 8368, 'nothing to re-bake') — sets `_textPendingPt=null;_textEditingRaster=raster;_textPendingBox=...` and calls `resetTextPopoverFields(newText,...)` (8372-8375) before calling `commitText()` (8376, C19z, cited by name/line only — its own `_textEditingRaster` branch performs the actual re-bake) — the lead-in comment (8298-8300) states this explicitly: 're-baked by the EXISTING writer... rather than a second copy of the bake, so the re-edit stays pixel-identical to the popover's' (CLAUDE.md §3). `openInPlaceRasterTextEditor` returns a boolean (`return false` at 8304 for a raster with no `.data`; `return true` at 8356 on successful open) — its ONE external caller, `onViewDoubleClick` (tools.js:8378, cited by line only), reads that boolean to decide whether to fall back to `openTextPopoverForEdit` on failure to open (tools.js:8379).",
+    "(e) The two-stage `window.isInPlaceTextEditing` definition: FIRST defined in packet 2 (8083) as `function(){return !!_inplaceTa;}` — true only while the VECTOR editor is open. Re-defined in packet 4 (8381-8382): `var _wasInPlaceTextEditing=window.isInPlaceTextEditing;` (8381, captures the FIRST definition by reference) then `window.isInPlaceTextEditing=function(){return !!_rasterInplaceTa||(_wasInPlaceTextEditing?_wasInPlaceTextEditing():false);};` (8382) — true while EITHER the raster OR the (wrapped) vector editor is open; the lead-in comment (8379-8380) states the reason explicitly: 'engine-bridge asks \"is text being typed right now\" and must not care which kind it is.' Its sole external reader is `buildTransformBoxItems` (engine-bridge.js:3037), which reads `window.isInPlaceTextEditing()` at line 3049 and returns `[]` (suppressing the Select tool's own transform gizmo) whenever either editor is open — confirmed by a whole-src grep restricted to `engine-bridge.js` (the one hit, 3049) plus a project-wide grep finding no OTHER external reader of the symbol.",
+    "(f) Every `SMEngineBridge.renderNow()` call in the span, all guarded `if(window.SMEngineBridge)`: 8242 (inside the vector editor's own `reposition()`, unconditional per-repaint call after every style mirror); 8260 (`closeInPlaceTextEditor`, unconditional, immediately after nulling all module state — fires on EVERY close including a no-op discard/restore); 8267 (inside `discardNew`, fires again if `isNew` discard is taken); 8269 (inside the combined bail branch's `else` half, fires again for a non-`isNew` restore); 8282 (inside the successful rebuild `.then()`, after `saveActiveLayerFrame`/`updateUI`); 8345 (inside the raster editor's own `reposition()`, same per-repaint shape as 8242); 8366 (`closeInPlaceRasterTextEditor`, unconditional, immediately after restoring the raster's own opacity). Redundant pairs: 8260 and 8267/8269 are NOT redundant with each other in the SAME call (8260 always fires first as the unconditional post-close repaint, hiding the just-removed textarea; 8267/8269's own `renderNow()` is a SECOND repaint reflecting whichever glyph-visibility change `discardNew`/`restore` just made) — but 8260 IS effectively redundant with 8282/rebuild success, since a successful rebuild triggers a THIRD `renderNow()` (8282) after the frame is saved, on top of the one already fired at 8260 before the async `buildVectorTextGroup().then()` resolves; not flagged as a defect (no execution performed), noted in `future_proposals`.",
+    "(g) Every DOM id/class and global written in this span: `document.body.appendChild` at 8140 (the vector editor's own `<textarea id=\"tp-inplace-editor\">`), 8149 (its own `<div id=\"tp-inplace-resize-handle\">`), 8316 (the raster editor's own `<textarea id=\"tp-inplace-editor\">` — the SAME id reused, since the two editors are mutually exclusive by construction: `closeInPlaceRasterTextEditor(true)` is called first if a stray vector editor were somehow still open, and vice versa via the 8107 guard, though no direct cross-guard between the two editor kinds is visible in this span beyond each one's own single-instance guard). Globals: `window._inplaceTextBoxBounds` (written 8235, 8340; nulled 8259, 8362), `window.openInPlaceTextEditor` (8289), `window.openInPlaceRasterTextEditor` (8378), `window.startInPlaceTextCreation` (8104), `window.isInPlaceTextEditing` (8083, 8382, see (e)). `openTextPopover`/`openTextPopoverForBox`/`openTextPopoverForEdit`/`closeTextPopover`/`positionTextPopover`/`resetTextPopoverFields`/`closeInPlaceTextEditor`/`closeInPlaceRasterTextEditor` have NO explicit `window.X=` line anywhere in this span — as classic (non-module) top-level `function` declarations they attach to `window` implicitly, which is how `tools.js`'s own `window.openTextPopover`/`window.openTextPopoverForEdit` guards succeed without an explicit export (matching the pattern the issue itself points at: internal-only functions rely on implicit global attachment, cross-file-called ones ALSO get a redundant explicit `window.X=` line).",
+    "(h) Every external function called from this span, owning module cited by name/line only, bodies not reproduced: `document`/DOM/`Rectangle`/`Point`/`Size` (browser + Paper.js built-ins, not a project module). `window.SMVectorText.buildVectorTextGroup` (vector-text-bridge.js:208) and `.vectorTextGroupMembers` (vector-text-bridge.js:350) — see `reconciliation` for every call site. `SMMotion.layerMotionPointMap` (motion.js:13477) — called 8201, 8324 (both inside a `reposition()` closure). `pushUndo` (tweens.js:4770) — called once, 8276. `saveActiveLayerFrame`/`updateUI` (app.js, C21o) — called together once, 8281. `showToast` (timeline.js:7447, C19w) — called once, 8285. `SM.t` (i18n.js) — called once, 8285, supplying `toastTextEditRebuildFailed`. `view.projectToView` (Paper.js `View`, wrapped by this codebase) — called 8013, 8203, 8326. `commitText` (C19z, timeline.js:8383+) — called once, 8376, from `closeInPlaceRasterTextEditor` only (the vector editor never calls it — it rebuilds its own glyphs). No other external function is called anywhere in lines 7995-8382 — confirmed by reading every statement in the span directly (reproduced in each packet's own `behavior` field below).",
+    "(i) The complete caller list, confirmed by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` (plus a plain-text grep for the `isInPlaceTextEditing` property/variable form), filtered to exclude each symbol's own declaration and any `//`-only hit: `openTextPopover` — tools.js ×1 (8019, drag-release handler, guarded). `openTextPopoverForEdit` — tools.js ×1 (8379, `onViewDoubleClick`'s raster-hit fallback, guarded). `startInPlaceTextCreation` — tools.js ×1 (8018, drag-release handler, guarded). `openInPlaceTextEditor` — tools.js ×1 (8393, `onViewDoubleClick`'s vector-hit branch, guarded) PLUS one self-call inside this scope (8101, `startInPlaceTextCreation`'s own `.then()`, unguarded — internal, not counted as an external caller). `openInPlaceRasterTextEditor` — tools.js ×1 (8378, `onViewDoubleClick`'s raster-hit branch, guarded, tried FIRST before `openTextPopoverForEdit`). `closeTextPopover` — timeline.js-internal ×4, ALL in C19z (8474, 8503, 8554, 8569 — confirmed by line number, all past this scope's own 8382 boundary); zero calls from within this scope's own 388 lines. `isInPlaceTextEditing` — engine-bridge.js ×1 (`buildTransformBoxItems`, line 3049, confirmed the sole cross-file reader by a grep restricted to engine-bridge.js). `positionTextPopover`/`resetTextPopoverFields`/`openTextPopoverForBox`/`closeInPlaceTextEditor`/`closeInPlaceRasterTextEditor` — confirmed internal-only (timeline.js, this scope's own body): `positionTextPopover` ×3 (8029, 8039, 8056); `resetTextPopoverFields` ×4 (8028, 8038, 8055, 8375); `openTextPopoverForBox` — zero call sites found anywhere (reached only via its own implicit `window.` attachment from tools.js — re-checked: the drag-release handler at tools.js:8018 actually calls `startInPlaceTextCreation`, NOT `openTextPopoverForBox`, for the wide-drag case; `openTextPopoverForBox` itself has NO caller anywhere in `src` at the frozen SHA — flagged in `future_proposals` as likely-dead code, not confirmed by execution); `closeInPlaceTextEditor` ×5 (8107 self-guard, 8248, 8249, 8251 — three listeners — plus its own recursive-looking self-reference is NOT present; the count is these four call sites, all inside packet 3's own body); `closeInPlaceRasterTextEditor` ×4 (8305 self-guard, 8351, 8352, 8354 — three listeners — all inside packet 4's own body). None of this scope's eleven declared symbols is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js) or `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a whole-src grep of every symbol name restricted to those two files (zero hits) — popover/overlay UI only; the render side consumes only the two globals in (e)/(g) (`window.isInPlaceTextEditing`, `window._inplaceTextBoxBounds`)."
+  ],
+  "areas": [
+    {
+      "area": "text-tool-popover-open-close",
+      "packets": [
+        {
+          "id": "C19y.text-tool-popover-open-close",
+          "files": [
+            "src/js/timeline.js:7995-8059"
+          ],
+          "coverage_ranges": [
+            [
+              7995,
+              8059
+            ]
+          ],
+          "classification": {
+            "code": 39,
+            "comment": 26,
+            "whitespace": 0
+          },
+          "symbols": [
+            "positionTextPopover",
+            "resetTextPopoverFields",
+            "openTextPopover",
+            "openTextPopoverForBox",
+            "openTextPopoverForEdit",
+            "closeTextPopover",
+            "vectorTextGroupMembers"
+          ],
+          "signature": "function positionTextPopover(worldPt); function resetTextPopoverFields(text,size,font,color,align); function openTextPopover(worldPt); function openTextPopoverForBox(topLeft,widthWorld); function openTextPopoverForEdit(raster); function closeTextPopover()",
+          "responsibility": "15-line section header (7995-8009): raster text via an offscreen 2x-supersampled canvas baked into a Raster (reusing the existing image pipeline for persistence/render/select), point-vs-area text, re-bake-in-place on double-click, popover-owned color/alignment, and the four fields (`text/font/size/color/align/fixedWidth`) that persist on `r.data` via `serR`/`desR` (C21e). Three module-state vars (8010) then six functions: `positionTextPopover` clamps the popover's own screen position near the clicked/dropped point; `resetTextPopoverFields` mirrors five fields into the popover's own DOM inputs with defaults; `openTextPopover`/`openTextPopoverForBox`/`openTextPopoverForEdit` are the three entry modes (point/area/re-edit, see `boundaries` (a)); `closeTextPopover` hides the popover and clears all three module-state vars.",
+          "callers": [
+            "`openTextPopover` — tools.js:8019 (drag-release handler, guarded `window.openTextPopover`), the point-click fallback for a drag under the 20/view.zoom world-px threshold.",
+            "`openTextPopoverForEdit` — tools.js:8379 (`onViewDoubleClick`, guarded), the raster-text re-edit fallback tried AFTER `openInPlaceRasterTextEditor` returns false.",
+            "`openTextPopoverForBox` — no caller found anywhere in `src` at the frozen SHA by whole-src grep; the drag-release handler's own wide-drag branch (tools.js:8018) calls `startInPlaceTextCreation` instead — flagged in `future_proposals` as likely-dead code, not confirmed by execution.",
+            "`closeTextPopover` — timeline.js-internal only, ×4, all in C19z (8474, 8503, 8554, 8569); zero calls from within this scope's own body.",
+            "`positionTextPopover`/`resetTextPopoverFields` — timeline.js-internal only, called from this packet's own other functions (see `boundaries` (b)/(i) for exact counts and lines)."
+          ],
+          "behavior": [
+            "Lines 7995-8009 (comment, 15 lines): section header — raster text via offscreen 2x-supersampled canvas → Raster, reusing serR/desR + registerImagePixels; point vs. drag-to-box area text; double-click re-bakes in place via `.source` swap, same item identity/anchor; color/align are popover fields, not frozen at click time; text/font/size/color/align/fixedWidth persist on `r.data`.",
+            "Line 8010 (code): `var _textPendingPt=null,_textPendingBox=null,_textEditingRaster=null;`.",
+            "Lines 8011-8018 (code): `positionTextPopover(worldPt)` — DOM-existence guard, `view.projectToView`, `#drawing-canvas` rect, clamped `left`/`top` (240/220 popover-size assumptions, +10 offset).",
+            "Lines 8019-8025 (code): `resetTextPopoverFields(text,size,font,color,align)` — five DOM-input mirrors with defaults ('', 48, 'sans-serif', 'left', color||state.strokeColor||'#000000').",
+            "Lines 8026-8031 (code): `openTextPopover(worldPt)` — sets `_textPendingPt`, nulls the other two, resets fields, positions, focuses.",
+            "Lines 8032-8035 (comment, 4 lines): drag-to-place area text lead-in — widthWorld in world units, wrapping deferred to commitText (C19z) once font/size are known.",
+            "Lines 8036-8041 (code): `openTextPopoverForBox(topLeft,widthWorld)` — sets `_textPendingBox={topLeft,width}`, nulls the other two, resets fields, positions, focuses.",
+            "Lines 8042-8044 (comment, 3 lines): re-edit lead-in — prefills from `r.data`, keeps fixedWidth for consistent re-wrap.",
+            "Lines 8045-8046 (code): `openTextPopoverForEdit(raster)` open + sets `_textEditingRaster`, nulls `_textPendingPt`.",
+            "Lines 8047-8050 (comment, 4 lines): vector-root group-bounds rationale — use the WHOLE group's bounds via `vectorTextGroupMembers`, not just the root Path's own.",
+            "Lines 8051-8057 (code, 7 lines): `isVectorRoot` check; `groupBounds` via `vectorTextGroupMembers(raster).reduce(...)` for a vector root, else `raster.bounds`; `_textPendingBox` from `raster.data.fixedWidth`; `fontValue` — `'vector:'+vectorFont` for a vector root, else `raster.data.font`; `resetTextPopoverFields(...)`; `positionTextPopover(groupBounds.topLeft)`.",
+            "Line 8058 (code): focus+select the text input; line 8058 closes the function's own brace on the same physical statement group ending at `}` (8058 covers the focus/select statement, the closing brace is emitted as part of the same line in the minified-style source).",
+            "Line 8059 (code): `function closeTextPopover(){...}` — one-line function body: hides `#text-popover`, nulls all three module-state vars."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "inplace-vector-text-state-and-creation",
+      "packets": [
+        {
+          "id": "C19y.inplace-vector-text-state-and-creation",
+          "files": [
+            "src/js/timeline.js:8060-8104"
+          ],
+          "coverage_ranges": [
+            [
+              8060,
+              8104
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 31,
+            "whitespace": 0
+          },
+          "symbols": [
+            "isInPlaceTextEditing",
+            "startInPlaceTextCreation",
+            "openInPlaceTextEditor",
+            "SMVectorText",
+            "buildVectorTextGroup"
+          ],
+          "signature": "var _inplaceTa,_inplaceRoot,_inplaceHidden,_inplaceIsNew,_inplaceHandle; window.isInPlaceTextEditing=function(); function startInPlaceTextCreation(topLeft,widthWorld)",
+          "responsibility": "20-line in-place-editing header (8060-8079, 2026-08-16, Cyril: 'LE TEXT DEVRAIT POUVOIR S'EDITER DIRECTEMENT... comme figma') — double-click on a VECTOR text block now edits in place instead of opening the side popover; deliberately vector-only (raster text has no live glyph outlines to hide/restore, its own popover-based re-edit stays unchanged); the overlay's font is a real `Nemo Vector Text` `@font-face` so it visually matches the glyphs it is about to become. Five module-state vars (8080). The FIRST definition of `window.isInPlaceTextEditing` (8083, see `boundaries` (e)). A 9-line lead-in (8084-8092, 2026-08-17) for `startInPlaceTextCreation(topLeft,widthWorld)` (8093-8103) — builds a throwaway single-glyph vector-text root purely to get a real root+bounds to hand to `openInPlaceTextEditor` (this artifact's own next packet), then blanks its text so the overlay opens empty.",
+          "callers": [
+            "See C19y.text-tool-popover-open-close and C19y.inplace-raster-text-editor-and-gate for this artifact's own complete external-caller inventory (`startInPlaceTextCreation`: tools.js:8018).",
+            "`isInPlaceTextEditing` (this packet's own first definition) is superseded/wrapped by packet 4's own re-definition (8381-8382) before any external code reads it — see `boundaries` (e)."
+          ],
+          "behavior": [
+            "Lines 8060-8071 (comment, 12 lines): in-place vector editing header — 2026-08-16 Cyril feedback quote; live glyphs hide, a transparent textarea appears at their exact screen position/style; commit (blur or Cmd/Ctrl+Enter) rebuilds via the SAME buildVectorTextGroup path the popover uses; Escape cancels with nothing rebuilt.",
+            "Line 8072 (blank comment line, counted as comment per the frozen `//`-only line): `//`.",
+            "Lines 8073-8079 (comment, 7 lines): deliberately vector-only rationale (raster has no live outlines); font note — a real `Nemo Vector Text` @font-face loads the same bundled Roboto TTFs vector-text-bridge.js parses, so the overlay visually matches the vector result.",
+            "Line 8080 (code): `var _inplaceTa=null,_inplaceRoot=null,_inplaceHidden=null,_inplaceIsNew=false,_inplaceHandle=null;`.",
+            "Lines 8081-8082 (comment, 2 lines): 'readable from the render side... see buildTransformBoxItems'.",
+            "Line 8083 (code): `window.isInPlaceTextEditing=function(){return !!_inplaceTa;};` — FIRST definition, vector-only.",
+            "Lines 8084-8092 (comment, 9 lines): area-text creation lead-in — same 'comme AI ou Figma' ask extended to the INITIAL drag-a-box placement; builds a throwaway single-glyph root (buildVectorTextGroup only tags a root when there's at least one visible glyph) purely to get a real root+bounds; blanks `root.data.text` after; `closeInPlaceTextEditor`'s own `isNew` branch deletes this placeholder outright on cancel/empty.",
+            "Line 8093 (code): `function startInPlaceTextCreation(topLeft,widthWorld){`.",
+            "Line 8094 (code): `var layer=userLayers[state.activeLayerIdx];`.",
+            "Line 8095 (code): guard — no layer or no `window.SMVectorText`, return.",
+            "Line 8096 (code): defaults — `size=48,font='Roboto-Regular',color=state.strokeColor||'#000000',align='left'`.",
+            "Lines 8097-8102 (code, 6 lines): `window.SMVectorText.buildVectorTextGroup('M',font,size,color,align,widthWorld||null,topLeft,layer,{}).then(function(res){` — bails if no paths built; takes `res.paths[0]` as `root`; blanks `root.data.text=''`; calls `openInPlaceTextEditor(root,true)` (this artifact's own next packet, `isNew=true`).",
+            "Line 8103 (code): `}` closing brace of `startInPlaceTextCreation`.",
+            "Line 8104 (code): `window.startInPlaceTextCreation=startInPlaceTextCreation;` — the cross-file export tools.js reaches."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "inplace-vector-text-editor-open-close",
+      "packets": [
+        {
+          "id": "C19y.inplace-vector-text-editor-open-close",
+          "files": [
+            "src/js/timeline.js:8105-8289"
+          ],
+          "coverage_ranges": [
+            [
+              8105,
+              8289
+            ]
+          ],
+          "classification": {
+            "code": 113,
+            "comment": 72,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openInPlaceTextEditor",
+            "closeInPlaceTextEditor",
+            "SMVectorText",
+            "vectorTextGroupMembers",
+            "buildVectorTextGroup",
+            "SMMotion",
+            "layerMotionPointMap",
+            "SMEngineBridge",
+            "pushUndo",
+            "saveActiveLayerFrame",
+            "updateUI",
+            "showToast",
+            "SM"
+          ],
+          "signature": "function openInPlaceTextEditor(root,isNew); function closeInPlaceTextEditor(cancel)",
+          "responsibility": "The full vector in-place editor: `openInPlaceTextEditor(root,isNew)` (8105-8253) hides the root's glyph group by opacity, anchors at `d.anchorTopLeft`, builds an overlay `<textarea>` plus a real DOM resize handle (writing `d.fixedWidth`/`d.fixedHeight`), an inner `reposition()` that Motion-maps the anchor before projecting to screen and publishes `window._inplaceTextBoxBounds`, and three commit/cancel listeners. `closeInPlaceTextEditor(cancel)` (8254-8288) is the full decision table: `isNew`+cancelled/empty discards the placeholder outright, an unchanged/cancelled re-edit restores the original glyphs untouched, and a genuine edit `pushUndo()`s once then rebuilds via `buildVectorTextGroup`, saving/updating the frame on success or toasting+restoring on failure. `window.openInPlaceTextEditor=` (8289) is the cross-file export.",
+          "callers": [
+            "`openInPlaceTextEditor` — tools.js:8393 (`onViewDoubleClick`'s vector-glyph branch, after resolving the clicked glyph to its own group root, guarded `window.openInPlaceTextEditor`); plus one internal call from this artifact's own previous packet (8101, `startInPlaceTextCreation`'s own `.then()`).",
+            "`closeInPlaceTextEditor` — timeline.js-internal only, all within this packet's own body: 8107 (stray-prior-editor self-guard), 8248 (Escape keydown), 8249 (Cmd/Ctrl+Enter keydown), 8251 (blur). No external caller found."
+          ],
+          "behavior": [
+            "Line 8105 (code): `function openInPlaceTextEditor(root,isNew){`.",
+            "Line 8106 (code): guard — no `root`/`root.data`/`window.SMVectorText`, return.",
+            "Line 8107 (code+comment): `if(_inplaceTa)closeInPlaceTextEditor(true);` — stray-prior-editor guard, 'never stack two'.",
+            "Line 8108 (code): `var d=root.data;`.",
+            "Line 8109 (code): `var members=window.SMVectorText.vectorTextGroupMembers(root);`.",
+            "Line 8110 (code): guard — no members, return.",
+            "Line 8111 (code): `_inplaceIsNew=!!isNew;`.",
+            "Lines 8112-8122 (comment, 11 lines): anchor-rule rationale — anchor at `d.anchorTopLeft`, not the group's own ink bounds (feedback #37/#79, same bug the popover editor was already fixed for; ink bounds drift per-content, causing the editor to float away from the real box on re-edit).",
+            "Line 8123 (code): `var groupBounds=members.reduce(function(b,p){return b?b.unite(p.bounds):p.bounds.clone();},null);`.",
+            "Line 8124 (code): `var bounds=d.anchorTopLeft?new Rectangle(new Point(d.anchorTopLeft.x,d.anchorTopLeft.y),new Size(groupBounds.width,groupBounds.height)):groupBounds;`.",
+            "Lines 8125-8133 (comment, 9 lines): opacity-not-.visible rationale (feedback #83) — buildSceneJson never reads `.visible` (only layer-level visibility, CLAUDE.md §5) but DOES read `.opacity`; previous opacity stashed per-glyph, not forced to 1.",
+            "Line 8134 (code): `members.forEach(function(p){p.data.__inplacePrevOpacity=p.opacity;p.opacity=0;});`.",
+            "Line 8135 (code): `_inplaceHidden=members;_inplaceRoot=root;`.",
+            "Lines 8136-8141 (code, 6 lines): create `<textarea id=\"tp-inplace-editor\">`, value from `d.text`, `spellcheck=false`, append to `document.body`, store as `_inplaceTa`.",
+            "Lines 8142-8146 (comment, 5 lines): resize-handle rationale (feedback #83) — the orange box is a Rust-rendered overlay with no hit-testing, so a real DOM handle is pinned to its corner instead.",
+            "Lines 8147-8151 (code, 5 lines): create `<div id=\"tp-inplace-resize-handle\">`, append, store as `_inplaceHandle`; resize-state vars (`resizing`, start X/Y/width/height).",
+            "Lines 8152-8161 (code, 10 lines): handle `pointerdown` — capture start size from CURRENT rendered size (comment 8155-8157: not an arbitrary default, so the box doesn't jump), `setPointerCapture`.",
+            "Lines 8162-8177 (code+comment, 16 lines): handle `pointermove` — writes `d.fixedWidth` (8166); a 7-line comment (8167-8173, feedback #175, 2026-08-30) on the FIRST introduction of `d.fixedHeight`; writes `d.fixedHeight` (8175); calls `reposition()` (8176).",
+            "Line 8178 (code): `function endResize(e){if(!resizing)return;resizing=false;try{handle.releasePointerCapture(e.pointerId);}catch(err){}}`.",
+            "Lines 8179-8180 (code): `pointerup`/`pointercancel` both bound to `endResize`.",
+            "Line 8181 (code): `function reposition(){`.",
+            "Lines 8182-8200 (comment, 19 lines): Motion-transform rationale (feedback #131, 2026-08-29) — this editor used to project raw geometry with no regard for the layer's own Motion transform; Motion applies in EITHER app mode (CLAUDE.md §8); fix pattern: map the point forward through `layerMotionPointMap` before projecting; rotation of the box itself is a known, accepted residual.",
+            "Lines 8201-8203 (code, 3 lines): `motionMap=SMMotion.layerMotionPointMap(state.activeLayerIdx)` (guarded); `anchorWorld=motionMap.fwd(bounds.topLeft.x,bounds.topLeft.y)` or the raw point; `topLeftView=view.projectToView(new Point(anchorWorld[0],anchorWorld[1]))`.",
+            "Lines 8204-8216 (code, 13 lines): `canvasEl`/`cr` rect; `fontPx=(d.size||48)*view.zoom`; style mirrors — left/top from `topLeftView`, `fontSize`, `color`, `fontWeight` (bold→700/400), `fontStyle` (italic), `textDecoration` (underline/strike joined), `letterSpacing` (scaled by zoom), `lineHeight` (from `lineHeightMult||1.25`), `textAlign`.",
+            "Lines 8217-8218 (code, 2 lines): width — `fixedWidth` present: `pre-wrap` + fixed px width; else `pre` + `scrollWidth`-derived auto width.",
+            "Lines 8219-8224 (comment+code, 6 lines): fixed-height-wins-over-content rationale (4-line comment 8219-8222); `fixedHeight` present: fixed px height; else `scrollHeight`.",
+            "Lines 8225-8234 (comment, 10 lines): live-bounding-box rationale — world units back from screen px (÷view.zoom); `buildTextDragBoxItems` draws this with NO Motion mapping of its own, so the anchor handed to it must already be motion-mapped.",
+            "Lines 8235-8239 (code, 5 lines): `window._inplaceTextBoxBounds={left,top,right,bottom}` — all four in world units derived from `anchorWorld` and the textarea's own current width/height.",
+            "Lines 8240-8241 (code, 2 lines): resize handle's own screen position, pinned to the textarea's bottom-right corner.",
+            "Line 8242 (code): `if(window.SMEngineBridge)SMEngineBridge.renderNow();`.",
+            "Line 8243 (code): `}` closes `reposition`.",
+            "Line 8244 (code): `reposition();` — initial call.",
+            "Lines 8245-8251 (code, 7 lines): three listeners — `input`→`reposition`; `keydown` (`stopPropagation` always; Escape→`closeInPlaceTextEditor(true)`; Cmd/Ctrl+Enter→`closeInPlaceTextEditor(false)`); `blur`→`closeInPlaceTextEditor(false)`.",
+            "Line 8252 (code): `ta.focus();ta.select();`.",
+            "Line 8253 (code): `}` closing brace of `openInPlaceTextEditor`.",
+            "Line 8254 (code): `function closeInPlaceTextEditor(cancel){`.",
+            "Line 8255 (code): capture locals from module state (`ta`,`root`,`hidden`,`isNew`,`handle`).",
+            "Line 8256 (code): guard — `!ta`, already closed, return.",
+            "Line 8257 (code): `if(handle)handle.remove();`.",
+            "Line 8258 (code): null all five module-state vars.",
+            "Line 8259 (code): `window._inplaceTextBoxBounds=null;`.",
+            "Line 8260 (code): `if(window.SMEngineBridge)SMEngineBridge.renderNow();` — unconditional, before reading `newText`.",
+            "Line 8261 (code): `var newText=ta.value;`.",
+            "Line 8262 (code): `ta.remove();`.",
+            "Lines 8263-8266 (comment, 4 lines): creation-flow rationale — a discarded NEW block deletes the placeholder outright (never shown), unlike a discarded re-edit which restores the real glyphs.",
+            "Line 8267 (code): `var discardNew=function(){...remove each hidden glyph...renderNow();};`.",
+            "Line 8268 (code): `var restore=function(){...reinstate each hidden glyph's stashed opacity...};`.",
+            "Line 8269 (code): combined bail — cancel OR no root/data OR empty trimmed text OR (not new AND unchanged) → `discardNew()` (isNew) or `restore()`+`renderNow()`, then return.",
+            "Line 8270 (code): `var d=root.data;`.",
+            "Line 8271 (code): `var opts={bold,italic,underline,strike,letterSpacing,wordSpacing,lineHeightMult,textCase}` from `d`.",
+            "Lines 8272-8273 (code+comment): `layer=root.parent`; vanished-layer bail (comment: 'layer vanished mid-edit... bail rather than build into nothing') → discard/restore, return.",
+            "Line 8274 (code): recompute `groupBounds` via `vectorTextGroupMembers(root).reduce(...)`.",
+            "Line 8275 (code): `var topLeft=groupBounds.topLeft.clone();`.",
+            "Line 8276 (code): `pushUndo();` — the ONE undo-snapshot call in this whole 388-line span.",
+            "Line 8277 (code): `window.SMVectorText.vectorTextGroupMembers(root).forEach(function(p){p.remove();});` — removes the old glyphs.",
+            "Line 8278 (code): `opts.fixedHeight=d.fixedHeight||null;`.",
+            "Lines 8279-8282 (code, 4 lines): `buildVectorTextGroup(newText,...,opts).then(function(res){` — sets `selectedPaths` if any paths built, calls `saveActiveLayerFrame();updateUI();`, `renderNow()`.",
+            "Lines 8283-8287 (code, 5 lines): `.catch(function(e){` — `console.warn`, `showToast(SM.t('toastTextEditRebuildFailed'))`, `restore()` (the ORIGINAL hidden glyphs, since the rebuild failed).",
+            "Line 8288 (code): `}` closing brace of `closeInPlaceTextEditor`.",
+            "Line 8289 (code): `window.openInPlaceTextEditor=openInPlaceTextEditor;` — the cross-file export."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "inplace-raster-text-editor-and-gate",
+      "packets": [
+        {
+          "id": "C19y.inplace-raster-text-editor-and-gate",
+          "files": [
+            "src/js/timeline.js:8290-8382"
+          ],
+          "coverage_ranges": [
+            [
+              8290,
+              8382
+            ]
+          ],
+          "classification": {
+            "code": 69,
+            "comment": 24,
+            "whitespace": 0
+          },
+          "symbols": [
+            "openInPlaceRasterTextEditor",
+            "closeInPlaceRasterTextEditor",
+            "isInPlaceTextEditing",
+            "SMMotion",
+            "layerMotionPointMap",
+            "SMEngineBridge",
+            "commitText",
+            "resetTextPopoverFields"
+          ],
+          "signature": "function openInPlaceRasterTextEditor(raster); function closeInPlaceRasterTextEditor(cancel); window.isInPlaceTextEditing=function()",
+          "responsibility": "12-line raster in-place editing header (8290-8301, 2026-09, feedback #794) — extends in-place editing to raster text via the SAME gesture/overlay/commit-key contract, but re-bakes through the EXISTING `commitText` writer (its own `_textEditingRaster` branch, C19z) rather than duplicating the bake (CLAUDE.md §3). `openInPlaceRasterTextEditor(raster)` (8303-8357) mirrors the vector editor's opacity trick and overlay-textarea/reposition/listener shape, returning a boolean. `closeInPlaceRasterTextEditor(cancel)` (8358-8377) restores opacity then, on a genuine edit, hands `_textEditingRaster`/`_textPendingBox`/`resetTextPopoverFields`'s output to `commitText()` — collecting the new string only, never rebuilding itself. The combined `window.isInPlaceTextEditing` gate (8379-8382) wraps packet 2's own first definition so either editor being open reads true.",
+          "callers": [
+            "`openInPlaceRasterTextEditor` — tools.js:8378 (`onViewDoubleClick`'s raster-hit branch, tried FIRST, guarded `window.openInPlaceRasterTextEditor&&openInPlaceRasterTextEditor(...)`) — its boolean return decides whether `onViewDoubleClick` falls back to `openTextPopoverForEdit`.",
+            "`closeInPlaceRasterTextEditor` — timeline.js-internal only, all within this packet's own body: 8305 (stray-prior-editor self-guard), 8351 (Escape keydown), 8352 (Cmd/Ctrl+Enter keydown), 8354 (blur). No external caller found.",
+            "`isInPlaceTextEditing` (this packet's own re-definition) — engine-bridge.js:3049 (`buildTransformBoxItems`), the sole cross-file reader — see `boundaries` (e)."
+          ],
+          "behavior": [
+            "Lines 8290-8301 (comment, 12 lines): raster in-place editing header (2026-09, feedback #794) — same gesture/overlay/commit contract as the vector editor; re-baked by the EXISTING `commitText`'s own `_textEditingRaster` branch rather than a second bake copy (CLAUDE.md §3).",
+            "Line 8302 (code): `var _rasterInplaceTa=null,_rasterInplaceItem=null,_rasterInplacePrevOpacity=1;`.",
+            "Line 8303 (code): `function openInPlaceRasterTextEditor(raster){`.",
+            "Line 8304 (code): guard — no raster/`.data`, `return false`.",
+            "Line 8305 (code): stray-prior-editor guard — `closeInPlaceRasterTextEditor(true)`.",
+            "Line 8306 (code): `var d=raster.data;`.",
+            "Lines 8307-8308 (comment, 2 lines): same opacity-not-visible trick as the vector editor.",
+            "Lines 8309-8311 (code, 3 lines): stash `_rasterInplacePrevOpacity`, set `raster.opacity=0`, store `_rasterInplaceItem`.",
+            "Lines 8312-8317 (code, 6 lines): create `<textarea id=\"tp-inplace-editor\">`, value from `d.text`, `spellcheck=false`, append, store as `_rasterInplaceTa`.",
+            "Line 8318 (code): `var topLeftWorld=raster.bounds.topLeft.clone();`.",
+            "Line 8319 (code): `function reposition(){`.",
+            "Lines 8320-8323 (comment, 4 lines): identical Motion-mapped-anchor treatment to the vector editor's own `reposition` (cross-references feedback #131).",
+            "Lines 8324-8326 (code, 3 lines): `motionMap`/`a`=motion-mapped anchor (or raw point); `v=view.projectToView(new Point(a[0],a[1]))`.",
+            "Lines 8327-8333 (code, 7 lines): `cr` rect; style mirrors — left/top from `v`, `fontSize` from `d.size`, `fontFamily` from `d.font`, `color`, `textAlign`.",
+            "Lines 8334-8336 (comment+code, 3 lines): fixed `lineHeight='1.25'` — matches `computeTextLayout`'s own bake line-height (`size*SS*1.25`) so the overlay wraps where the bake will wrap.",
+            "Lines 8337-8339 (code, 3 lines): width — `fixedWidth` present: `pre-wrap` + fixed px width; else `pre` + `scrollWidth`; `height` always from `scrollHeight` (no fixed-height branch here, unlike the vector editor — raster text has no resize handle in this span).",
+            "Lines 8340-8344 (code, 5 lines): `window._inplaceTextBoxBounds={left,top,right,bottom}` in world units from `a` and the textarea's current width/height.",
+            "Line 8345 (code): `if(window.SMEngineBridge)SMEngineBridge.renderNow();`.",
+            "Line 8346 (code): `}` closes `reposition`.",
+            "Line 8347 (code): `reposition();` — initial call.",
+            "Lines 8348-8354 (code, 7 lines): three listeners — `input`→`reposition`; `keydown` (`stopPropagation`; Escape→`closeInPlaceRasterTextEditor(true)`; Cmd/Ctrl+Enter→`closeInPlaceRasterTextEditor(false)`); `blur`→`closeInPlaceRasterTextEditor(false)`.",
+            "Line 8355 (code): `ta.focus();ta.select();`.",
+            "Line 8356 (code): `return true;`.",
+            "Line 8357 (code): `}` closing brace of `openInPlaceRasterTextEditor`.",
+            "Line 8358 (code): `function closeInPlaceRasterTextEditor(cancel){`.",
+            "Line 8359 (code): capture locals (`ta`,`raster`,`prevOp`) from module state.",
+            "Line 8360 (code): guard — `!ta`, already closed, return.",
+            "Lines 8361-8362 (code, 2 lines): null the two module vars, clear `window._inplaceTextBoxBounds`.",
+            "Line 8363 (code): `var newText=ta.value;`.",
+            "Line 8364 (code): `ta.remove();`.",
+            "Line 8365 (code): `if(raster&&!raster.removed)raster.opacity=prevOp;` — restore original opacity.",
+            "Line 8366 (code): `if(window.SMEngineBridge)SMEngineBridge.renderNow();`.",
+            "Line 8367 (code): guard — cancel OR no raster/removed/no-data, return (no re-bake).",
+            "Line 8368 (code+comment): guard — empty trimmed text or unchanged text, return ('nothing to re-bake').",
+            "Lines 8369-8370 (comment, 2 lines): hands the edit to the popover's own writer — this function only ever collected the new string.",
+            "Line 8371 (code): `var d=raster.data;`.",
+            "Lines 8372-8374 (code, 3 lines): `_textPendingPt=null;_textEditingRaster=raster;_textPendingBox=d.fixedWidth?{topLeft:raster.bounds.topLeft.clone(),width:d.fixedWidth}:null;`.",
+            "Line 8375 (code): `resetTextPopoverFields(newText,d.size,d.font,d.color,d.align);`.",
+            "Line 8376 (code): `commitText();` — the C19z writer, cited by name/line only.",
+            "Line 8377 (code): `}` closing brace of `closeInPlaceRasterTextEditor`.",
+            "Line 8378 (code): `window.openInPlaceRasterTextEditor=openInPlaceRasterTextEditor;` — the cross-file export.",
+            "Lines 8379-8380 (comment, 2 lines): 'one gate for BOTH editors — engine-bridge asks... must not care which kind it is'.",
+            "Line 8381 (code): `var _wasInPlaceTextEditing=window.isInPlaceTextEditing;` — captures packet 2's own first definition by reference.",
+            "Line 8382 (code): `window.isInPlaceTextEditing=function(){return !!_rasterInplaceTa||(_wasInPlaceTextEditing?_wasInPlaceTextEditing():false);};` — the combined gate."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `saveAllLayerFrames()` call exists anywhere in this scope's own 388 lines (confirmed by grep). Exactly one `saveActiveLayerFrame()` call exists, inside `closeInPlaceTextEditor`'s own successful-rebuild `.then()` (8281), immediately alongside `updateUI()` — the vector editor's ONLY persistence point, reached only after a non-empty, changed, successfully-rebuilt edit. The raster editor never calls `saveActiveLayerFrame` itself — it hands the new text to `resetTextPopoverFields`+`commitText()` (8375-8376, C19z), whose own save behavior is out of scope here (cited by name/line only)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import function is called anywhere in this scope's own body. `openTextPopoverForEdit`/`openInPlaceRasterTextEditor`/`openInPlaceTextEditor` all read FROM an already-loaded live item's own `.data`/`.bounds` (raster or vector-glyph Paths already materialized by whatever loaded the frame, out of scope) — none of the three re-triggers a frame load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly one `pushUndo()` call in this scope's own body (tweens.js:4770, a thin wrapper over `pushUndoLayers`): `closeInPlaceTextEditor` (8276), immediately before removing the old vector glyphs and rebuilding — the SOLE undo-snapshot point in this whole 388-line span. Neither `closeInPlaceRasterTextEditor` nor any popover-open function calls `pushUndo` itself; the raster path's own undo is presumably captured by `commitText` (C19z, out of scope, not confirmed by this census). A cancelled/unchanged/discarded edit in EITHER editor never reaches `pushUndo` at all — matching the vector editor's own explicit design ('a cancelled edit costs nothing', 8070-8071)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "`closeInPlaceTextEditor`'s own successful rebuild sets `selectedPaths=res.paths.slice()` (8280) — the ONLY write to `selectedPaths` anywhere in this scope, replacing the selection with the freshly rebuilt glyph Paths. No other function in this scope reads or writes `selectedPaths`/`_layerSel`/`_layerSelAnchor`."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "Both in-place editors' own `reposition()` closures call `SMMotion.layerMotionPointMap(state.activeLayerIdx)` (8201, 8324) to map the text block's own world anchor through the ACTIVE layer's current Motion transform before projecting to screen — with no mode branch of their own (the same call shape works identically whether or not the layer has any Motion keys; `layerMotionPointMap` itself, out of scope, is presumably what differs by mode). `state.activeLayerIdx` is read synchronously at each `reposition()` call, never cached across a frame boundary."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's eleven declared symbols are called from `export.js` or `rive-export.js` at the frozen SHA (confirmed: zero matches for any symbol name in either file) — every function here is editor-UI-only, reached from a Text-tool pointer gesture (tools.js) or from the two editors' own internal listeners, never from a render/export pass. The render side's ONLY visibility into this scope is the two globals in `boundaries` (e)/(g): `window.isInPlaceTextEditing()` (suppresses the Select tool's transform gizmo, engine-bridge.js:3049) and `window._inplaceTextBoxBounds` (draws the live orange box, `buildTextDragBoxItems`, engine-bridge.js:3000-3010) — neither is read by `getEffectiveStrokes`/`buildSceneJson` itself (confirmed: zero matches in either)."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called seven times across this scope's own body (8242, 8260, 8267, 8269, 8282, 8345, 8366 — see `boundaries` (f) for the full list and redundant-pair analysis), always guarded `if(window.SMEngineBridge)`. No Tauri-specific API, no `window.__TAURI__` reference, and no other bridge module is touched anywhere in 7995-8382."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-three-entry-modes-set-and-clear-module-state",
+      "proposed": "Call `openTextPopover(pt)`; expect `_textPendingPt` set, `_textPendingBox`/`_textEditingRaster` null, popover fields reset to defaults. Call `openTextPopoverForBox(topLeft,120)`; expect `_textPendingBox={topLeft,width:120}`, the other two null. Call `openTextPopoverForEdit(raster)` on a raster with `data.fixedWidth=200`; expect `_textEditingRaster=raster` AND `_textPendingBox` populated from the group bounds/fixedWidth (the one mode that does not null it) — verifies (a) — not run."
+    },
+    {
+      "id": "fx-position-text-popover-clamps",
+      "proposed": "Set `window.innerWidth=300`, click near the right edge; expect `pop.style.left` clamped to `window.innerWidth-240` rather than overflowing off-screen; repeat near the top-left corner with a negative-ish projected point and expect the `Math.max(4,...)` floor — verifies the two clamp expressions at 8016-8017 — not run."
+    },
+    {
+      "id": "fx-vector-inplace-open-hides-glyphs-and-anchors",
+      "proposed": "Build a vector-text root with `data.anchorTopLeft={x:100,y:50}` and glyph bounds NOT starting at that point (simulating ink-bounds drift); call `openInPlaceTextEditor(root,false)`; expect every member glyph's `opacity===0` (with `__inplacePrevOpacity` stashed), and the resulting `bounds.topLeft` to equal `d.anchorTopLeft` exactly, NOT the glyphs' own ink-bounds topLeft — verifies the feedback #37/#79 anchor fix (8112-8124) — not run."
+    },
+    {
+      "id": "fx-vector-inplace-resize-handle-writes-fixed-dims",
+      "proposed": "Open the vector editor on a point-text root (no `fixedWidth`/`fixedHeight` yet); simulate a `pointerdown`+`pointermove` sequence on the resize handle with a +50px X delta and +30px Y delta at `view.zoom=1`; expect `d.fixedWidth` and `d.fixedHeight` both newly set (matching the delta, `Math.max`-floored) and `reposition()` invoked — verifies feedback #175 (8162-8177) — not run."
+    },
+    {
+      "id": "fx-vector-inplace-close-decision-table",
+      "proposed": "Four sub-cases against `closeInPlaceTextEditor`: (1) `isNew=true`, `cancel=true` → expect the placeholder glyphs REMOVED (not restored), no `pushUndo`, no rebuild. (2) `isNew=false`, unchanged text → expect glyphs RESTORED to their stashed opacity, no `pushUndo`, no rebuild. (3) `isNew=false`, `root.parent` nulled before close (layer deleted mid-edit) → expect the SAME restore path as (2), confirming the 8272-8273 bail. (4) `isNew=false`, genuinely changed text → expect exactly ONE `pushUndo()` call, the old glyphs removed, `buildVectorTextGroup` invoked, and on success `selectedPaths`/`saveActiveLayerFrame`/`updateUI` called — verifies the full decision table in `boundaries` (c) — not run."
+    },
+    {
+      "id": "fx-raster-inplace-hands-off-to-commitText-never-rebakes-itself",
+      "proposed": "Spy on `commitText` and on any canvas/bake helper reachable from this scope; open `openInPlaceRasterTextEditor(raster)`, type new text, close with `cancel=false`; expect `commitText` called exactly once, `_textEditingRaster===raster`, `_textPendingBox` populated iff `raster.data.fixedWidth` was set, and NO canvas/bake call originating from within `closeInPlaceRasterTextEditor` itself — verifies (d) and CLAUDE.md §3's single-writer contract — not run."
+    },
+    {
+      "id": "fx-combined-isInPlaceTextEditing-gate",
+      "proposed": "With neither editor open, expect `window.isInPlaceTextEditing()===false`. Open the VECTOR editor only; expect `true`. Close it, open the RASTER editor only; expect `true` (via the OR branch, not the wrapped vector definition). With both somehow open (contrived), expect `true` from either half — verifies the two-stage gate in `boundaries` (e) — not run."
+    }
+  ],
+  "future_proposals": [
+    "`openTextPopoverForBox` (timeline.js:8036-8041) has NO caller anywhere in `src` at the frozen SHA — the drag-release handler's own wide-drag branch (tools.js:8018) calls `startInPlaceTextCreation` instead, and no other call site was found by a whole-src grep restricted to the exact call form. It is reachable only via its own implicit `window.` attachment, which nothing currently invokes. Flagged for awareness as likely-dead code since the in-place area-text creation flow appears to have superseded the popover-based box-entry path it was presumably built for; not confirmed as dead by execution (a dynamic call via a string/computed property would not show up in this static grep).",
+    "`closeInPlaceTextEditor`'s own successful-rebuild path fires `SMEngineBridge.renderNow()` THREE times for one close (8260 unconditionally right after nulling module state, then again inside the `.then()` at 8282 after the async rebuild resolves) — plus the vector editor's OWN `reposition()` may have just fired a fourth one moments earlier via `input`. None of this is confirmed wasteful by execution (each call is separately guarded and cheap per CLAUDE.md §5's rAF-coalescing note), but it is a denser sequence of forced repaints than the raster editor's own close path (8366, exactly once, unconditionally, no async follow-up since it never rebuilds itself) — noted for the eventual perf-review pass, not flagged as a defect.",
+    "The vector editor's own resize handle writes both `d.fixedWidth` AND `d.fixedHeight` (8166, 8175), but the RASTER editor's own overlay (packet 4) has no resize handle at all — its own height is always `ta.scrollHeight` (8339), with no `d.fixedHeight` write anywhere in this scope for a raster block. Whether raster area-text can even have a `fixedHeight` field at all is not established by this scope (the field is read in the vector editor only); noted for awareness of an asymmetry between the two editors' own feature sets, not confirmed as a gap requiring a fix."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the eleven function symbols this scope defines, plus a plain-text grep for the `isInPlaceTextEditing` assignment form, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `export.js`/`rive-export.js`/`engine-bridge.js` (for `getEffectiveStrokes`/`buildSceneJson`-adjacent reachability) for all eleven symbol names returned ZERO hits except the one confirmed external reader of `isInPlaceTextEditing` (engine-bridge.js:3049, `buildTransformBoxItems`) — directly supporting the export/render-path `source_consumers` entries above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 235/153/0 over 388 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets; no boundary correction was needed.",
+    "The three call sites in tools.js (drag-release handler, tools.js:8010-8021; `onViewDoubleClick`, tools.js:8372-8393) were read directly via `sed -n`/`git show`, not assumed from the issue's own description — confirming the exact guard shape (`window.<fn>&&...`) and the raster-tried-before-vector, in-place-tried-before-popover ordering at each site.",
+    "The `SMVectorText.buildVectorTextGroup`/`.vectorTextGroupMembers` and `SMMotion.layerMotionPointMap`/`layerMotionPointMapFor` definitions were located directly (vector-text-bridge.js:208/350; motion.js:13477/6491) rather than assumed from their own names, confirming they are the actual functions this scope's calls resolve to.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19w are merged and contiguous through line 7448 (per C19w's own cross-check); C19x (timeline.js:7449-7994, keyboard/shortcut section) exists in a sibling worktree at authoring time, not yet merged, but its own declared range is disjoint from and immediately precedes this artifact's own 7995-8382 — the validator's own cross-sibling overlap check binds against whichever C19*.json files are ACTUALLY present in the directory at validation time."
+  ],
+  "validation": {
+    "expected_assigned_lines": 388,
+    "expected_classification": {
+      "code": 235,
+      "comment": 153,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        7995,
+        8059
+      ],
+      [
+        8060,
+        8104
+      ],
+      [
+        8105,
+        8289
+      ],
+      [
+        8290,
+        8382
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 7995-8059=(39,26,0); 8060-8104=(14,31,0); 8105-8289=(113,72,0); 8290-8382=(69,24,0); sums to (235,153,0)=388 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 388 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json <candidate-sha> still exits 0"
+    ]
+  }
+}

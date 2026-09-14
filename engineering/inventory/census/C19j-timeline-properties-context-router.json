@@ -1,0 +1,628 @@
+{
+  "census_id": "C19j",
+  "issue": 1146,
+  "title": "Timeline Properties context router",
+  "status": "draft for independent review; source-derived behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19j read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "fa00f5856d217e773eb3911e813ace2974968328",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 3131,
+      "end": 3511
+    }
+  ],
+  "coverage_note": "Exactly 381 assigned lines are covered once by one complete-function packet with seven internal responsibility stages: 156 code and 225 full-line comments, no whitespace. Line3130 closes the C19i slot helper; line3512 begins distinct drawing-default comments. Both are excluded.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed origin/main fa00f5856d217e773eb3911e813ace2974968328 has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed for this JSON-only census.",
+    "fixtures": "The matrices and fixture expectations are derived from source branches. Every behavioral fixture remains proposed and unrun.",
+    "comments": "Historical source comments and their performance/behavior claims were not treated as fresh execution evidence."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every dependency/caller remain read-only; C19j owns only this census JSON artifact.",
+    "serialization": "P30/#1032 retains the whole timeline.js runtime writer. Future extraction or correction must serialize through that reservation.",
+    "reservations": "D01/#1044 and PR #1144, T05/Pollen, C01/C02/C03/C04/C05/C06/C07, Motion and all named owners remain separate. Census coverage transfers no runtime authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19i/#1143",
+      "disposition": "Retains FILL_STROKE_TOOLS, TOOL_OPTS_TOOLS, TOOL_LABELS, _propsCtxSig initialization, contextual help and _captureSlotHome/_restoreSlotHome. C19j records reads/calls and direct cache writes without remapping those foundations."
+    },
+    {
+      "owner": "C19h/#1141",
+      "disposition": "Retains updateUI and earlier individual panel adapters. C19j maps only updateUI as a caller and does not duplicate those renderers."
+    },
+    {
+      "owner": "C04a selection",
+      "disposition": "Retains selectedPaths, _fsSel, fsPrimarySel and Path selection semantics. C19j records the router selection predicates."
+    },
+    {
+      "owner": "C04b/#1039 presentation",
+      "disposition": "Retains ui.js, renderShapesPanel, feature-panel renderers, rail and DOM presentation producers. C19j records optional calls, order and direct router projection."
+    },
+    {
+      "owner": "C02/#1037 and Motion",
+      "disposition": "Retains frame/Motion state, mode switching and property tracks. C19j records the Motion visibility post-filter and motion.js caller without claiming those effects."
+    },
+    {
+      "owner": "C01/C03/C05/C06/C07",
+      "disposition": "Retain document/history, render/export, media/native, preferences/bootstrap and application APIs. The router reads state and projects DOM but implements none of those workflows."
+    },
+    {
+      "owner": "historical product PRs",
+      "disposition": "Merged PRs #54, #396, #677, #686 and #820 mention/change this router but are product history, not competing census ownership."
+    },
+    {
+      "owner": "P30/D01/T05 reservations",
+      "disposition": "P30 retains whole timeline.js runtime writing; D01 PR #1144 and T05/Pollen stay in their separate lanes."
+    }
+  ],
+  "boundaries": [
+    "3131-3511 is one complete synchronous function transaction; seven internal ranges are responsibility annotations, not independent extraction claims.",
+    "Direct non-DOM writes are limited to two slot caches, _propsCtxSig and window._lastPropsShow. Optional callbacks can have owner-defined effects and are not classified as DOM-only.",
+    "Context planning precedes Motion filtering; section relocation also precedes Motion filtering, so final visibility and current DOM parentage can reflect different stages.",
+    "DOM/state/callback effects are incremental with no rollback. A thrown required operation leaves prior effects intact.",
+    "Source-derived matrices are proposed fixture oracles, not executed browser evidence."
+  ],
+  "exclusions": [
+    "src/js/timeline.js:3130 and3512 onward",
+    "C19i constants, statusbar help and DOM-slot helper implementations",
+    "C19h updateUI and individual property panel adapters",
+    "C04 selection primitives and presentation renderer bodies",
+    "C02/Motion mode and track implementations",
+    "C01 persistence/history, C03 rendering/export and C05 native/media",
+    "P30 runtime changes",
+    "D01 PR #1144, T05/Pollen and unrelated work"
+  ],
+  "areas": [
+    {
+      "area": "properties-context-routing",
+      "packets": [
+        {
+          "id": "C19j.update-props-context",
+          "files": [
+            "src/js/timeline.js:3131-3511"
+          ],
+          "coverage_ranges": [
+            [
+              3131,
+              3511
+            ]
+          ],
+          "symbols": [
+            "updatePropsContext"
+          ],
+          "signatures": [
+            "updatePropsContext() -> undefined"
+          ],
+          "responsibility": "Runs one ordered, synchronous Properties-panel transaction: plans a context and nine-section visibility map from current state/selections, projects layer metadata and feature panels, relocates two existing section nodes, applies Motion overrides and visibility, projects tool-specific controls, expands newly active sections, refreshes contextual help and delegates final stroke-control enablement.",
+          "direct_reads": {
+            "state": [
+              "state.tool",
+              "state.layers[state.activeLayerIdx]",
+              "state.appMode",
+              "state.fillGapCloseMode",
+              "state.brushAngle",
+              "state.brushAngleFactor",
+              "state.trimStrokeEnds",
+              "state.trimStrokeEndsMax",
+              "state.fillGapCloseSize"
+            ],
+            "selection": [
+              "selectedPaths.length/every and selected item Path/strokeColor/data flags",
+              "_fsSel.length/some",
+              "fsPrimarySel() and its kind/segment/path fields"
+            ],
+            "foundations": [
+              "FILL_STROKE_TOOLS",
+              "TOOL_OPTS_TOOLS",
+              "TOOL_LABELS",
+              "_canvasSecHome",
+              "_combineSecHome",
+              "_propsCtxSig",
+              "_captureSlotHome",
+              "_restoreSlotHome"
+            ],
+            "dom": [
+              "document.getElementById",
+              "document.activeElement",
+              "querySelector",
+              "parentNode/previousSibling/nextSibling",
+              "classList/style/dataset/textContent/value/checked",
+              "insertBefore/appendChild"
+            ],
+            "labels_and_ports": [
+              "optional SM.t",
+              "optional BLEND_MODE_LABELS/matteModeLabel",
+              "optional feature renderers and final synchronizer"
+            ]
+          },
+          "direct_writes": [
+            "_canvasSecHome on the first present canvas section while the cache is falsy",
+            "_combineSecHome on the first present combine section while the cache is falsy",
+            "_propsCtxSig=ctx before changed-context expansion",
+            "window._lastPropsShow=show after section visibility and optional Elements render",
+            "DOM nodes/classes/styles/values/checked/dataset/textContent and parentage"
+          ],
+          "direct_non_writes": "The function directly writes no document layer field, selection collection, animation frame/key/track, undo stack, renderer scene, export payload or native state. Optional callbacks retain their own effects and owners; their effects are not claimed to be DOM-only.",
+          "returns_and_errors": "No explicit success return; normal completion yields undefined. There is no outer catch/finally or rollback. Required helper/DOM operations can throw after earlier direct writes or optional callback effects, leaving a partially projected panel.",
+          "internal_stages": [
+            {
+              "id": "context-plan",
+              "range": [
+                3131,
+                3245
+              ],
+              "behavior": "Initializes hasSel from Select/Subselect plus selectedPaths.length, ctx/header variables and a nine-key all-false show map; sets shapes-sec from truthiness of the active layer; then selects exactly one pre-Motion context in priority rig, nonempty fsselect, canvas selection, listed fill/stroke tool, document fallback.",
+              "guards_and_asymmetries": "selectedPaths and state.layers are unguarded globals. _fsSel is read without typeof guard only after exact fsselect tool. fsPrimarySel is required for a nonempty _fsSel. Rig renderer and Combine panel renderer are optional. Only selection heading uses SM.t keys with English fallback; rig/document have conditional translation; fsselect and tool headings contain fixed French/English fragments.",
+              "effects_order": "Rig may render before heading assignment. Selection may render Rig then Combine before later metadata/DOM work. No show map is applied to DOM yet."
+            },
+            {
+              "id": "metadata-and-feature-projection",
+              "range": [
+                3246,
+                3284
+              ],
+              "behavior": "Independently syncs optional blend and matte controls from the current active layer, calls four optional feature panel renderers, and writes the optional context heading.",
+              "guards_and_asymmetries": "Blend defaults falsy to normal and writes dataset.value plus label from BLEND_MODE_LABELS[bv] or raw bv. Matte defaults falsy to none and writes dataset.value plus matteModeLabel(mv) or raw mv. Each control additionally requires an active layer. Gradient/Image Mesh/Rig Widget/Text Animator callbacks are independently optional.",
+              "effects_order": "Blend projection precedes matte; optional renderers run Gradient, Image Mesh, Rig Widget, Text Animator; heading is last. A callback throw preserves preceding effects and prevents relocation/visibility/final refresh."
+            },
+            {
+              "id": "canvas-document-relocation",
+              "range": [
+                3285,
+                3330
+              ],
+              "behavior": "If canvas-sec exists, resolves optional header/body, captures the C19i slot once, and either presents the same node as document identity after props-panel-rail or restores it to its captured slot.",
+              "guards_and_asymmetries": "Missing canvas-sec skips the stage. Capture/restore helpers are required when reached. In document context, missing rail skips movement but identity class/header/body changes still occur. Movement is skipped only when canvasSec.previousSibling is already rail. Header and body are optional independently. Non-document restoration always runs before removing identity class/showing header.",
+              "identity_and_order": "Uses insertBefore on the existing canvasSec, preserving node/listener identity. Document path: optional move, add psec-identity, hide header, open body, remove header closed. Other path: restore exact C19i slot, remove identity, show header; it does not re-collapse the body."
+            },
+            {
+              "id": "combined-shape-relocation",
+              "range": [
+                3331,
+                3367
+              ],
+              "behavior": "If combine-opts-sec exists, resolves optional header/body/selection body, captures its C19i slot once, and moves the same section into the selection body only when ctx is selection, pre-Motion show combine is true and selBody exists; otherwise restores it.",
+              "guards_and_asymmetries": "sel-props-sec is looked up twice in the short-circuit expression. Missing section skips the stage. Capture/restore and appendChild/classList are required when reached; header/body/mode rows are optional. Missing selBody forces restore even in selection context.",
+              "identity_and_order": "Inline path optionally moves same node, adds psec-inline, hides header, opens body, removes header closed, hides combine-mode-row. Restore path restores slot, removes inline, shows header and mode row; it does not re-collapse body. In Motion with canvas selection this move occurs before the later Motion override hides the section, so it can remain inline while display becomes none."
+            },
+            {
+              "id": "motion-override-and-section-commit",
+              "range": [
+                3368,
+                3405
+              ],
+              "behavior": "Post-processes the planned map for Motion, projects all nine section displays, optionally renders visible Elements, publishes the exact show object, and optionally rebuilds the collapsed Properties rail.",
+              "guards_and_asymmetries": "Motion forces sel/fill/stroke/tool/rig/combine false and forces canvas false unless ctx is document; shapes remains based on active-layer truthiness. layer-sec began false and no branch sets it true, so despite comments describing it as spared, observed code keeps it hidden. Every section DOM node is optional. renderShapesPanel requires show shapes and optional port. Rail renderer requires present collapsed props-panel plus optional port.",
+              "effects_order": "Motion override happens after both relocation stages. Visibility writes happen before optional Elements render, which happens before window._lastPropsShow. A renderShapesPanel throw prevents publishing _lastPropsShow and all later tool/final work; a rail throw happens after publication."
+            },
+            {
+              "id": "tool-control-projection",
+              "range": [
+                3406,
+                3473
+              ],
+              "behavior": "Projects Fill Brush versus draw controls, bucket-only controls, gap size condition, nib/trim values and plain-stroke brush-preset eligibility from current state/selection.",
+              "guards_and_asymmetries": "All row/input nodes are optional. Fill Brush hides draw mode/vector/taper and shows placement/own-size; other tools invert those displays. Fill alone shows propagation and gap mode; gap size additionally requires truthy non-off fillGapCloseMode. Nib row is draw or fillbrush; trim row is draw or pen. nib angle/factor, trim max and gap size protect focused input values; trim checked never focus-guards; gap-close select writes only when unequal.",
+              "eligibility": "eligibleSel requires hasSel and every selected item to be a Path with strokeColor or preTextureStroke/preTextureOpacity defined, excluding isVectorBrush and isFillShape. Empty selection cannot pass because hasSel is false. brush-preset row displays for draw regardless eligibility, or eligible selection under Select/Subselect."
+            },
+            {
+              "id": "context-expansion-and-final-refresh",
+              "range": [
+                3474,
+                3511
+              ],
+              "behavior": "Expands newly active visible sections on context change, then refreshes statusbar help and delegates final vector-brush control synchronization.",
+              "guards_and_asymmetries": "When ctx differs, _propsCtxSig is written before iteration. False show keys and shapes-sec skip expansion. Each other visible section is optional; class removals occur only if both .phdr and .pbdy exist. Unchanged ctx preserves user collapse. updateStatusBarHelp is required; syncStrokePropsForVectorBrush is optional.",
+              "effects_order": "A throw during expansion occurs after signature write, so the same ctx does not automatically retry expansion next call. updateStatusBarHelp always follows expansion and is the final required call; optional syncStrokePropsForVectorBrush runs strictly last and is skipped if help throws."
+            }
+          ],
+          "context_priority": [
+            "rig",
+            "fsselect with _fsSel.length",
+            "Select/Subselect with selectedPaths.length",
+            "state.tool in FILL_STROKE_TOOLS",
+            "document fallback"
+          ],
+          "section_keys": [
+            "sel-props-sec",
+            "fill-sec",
+            "stroke-sec",
+            "tool-opts-sec",
+            "canvas-sec",
+            "layer-sec",
+            "rig-opts-sec",
+            "combine-opts-sec",
+            "shapes-sec"
+          ],
+          "pre_motion_show_matrix": [
+            {
+              "case": "rig",
+              "ctx": "rig",
+              "true": [
+                "rig-opts-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "fill-sec",
+                "stroke-sec",
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "fsselect fill/fillregion only",
+              "ctx": "fsselect",
+              "true": [
+                "fill-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "stroke-sec",
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "fsselect stroke only",
+              "ctx": "fsselect",
+              "true": [
+                "stroke-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "fill-sec",
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "fsselect mixed",
+              "ctx": "fsselect",
+              "true": [
+                "fill-sec",
+                "stroke-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "Select/Subselect canvas selection without active-layer rig bones",
+              "ctx": "selection",
+              "true": [
+                "sel-props-sec",
+                "fill-sec",
+                "stroke-sec",
+                "combine-opts-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec"
+              ]
+            },
+            {
+              "case": "Select/Subselect canvas selection with active-layer rig bones",
+              "ctx": "selection",
+              "true": [
+                "sel-props-sec",
+                "fill-sec",
+                "stroke-sec",
+                "rig-opts-sec",
+                "combine-opts-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec"
+              ]
+            },
+            {
+              "case": "draw/pen/eraser",
+              "ctx": "tool:<tool>",
+              "true": [
+                "fill-sec",
+                "stroke-sec",
+                "tool-opts-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "fillbrush",
+              "ctx": "tool:fillbrush",
+              "true": [
+                "fill-sec",
+                "tool-opts-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "stroke-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "line/rect/ellipse/fill",
+              "ctx": "tool:<tool>",
+              "true": [
+                "fill-sec",
+                "stroke-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "tool-opts-sec",
+                "canvas-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            },
+            {
+              "case": "unknown/unlisted tool, including Select/Subselect with no canvas selection",
+              "ctx": "document",
+              "true": [
+                "canvas-sec",
+                "shapes-sec when active layer exists"
+              ],
+              "false": [
+                "sel-props-sec",
+                "fill-sec",
+                "stroke-sec",
+                "tool-opts-sec",
+                "layer-sec",
+                "rig-opts-sec",
+                "combine-opts-sec"
+              ]
+            }
+          ],
+          "motion_post_filter": "After pre-Motion planning and both relocation stages, Motion sets sel-props-sec, fill-sec, stroke-sec, tool-opts-sec, rig-opts-sec and combine-opts-sec false; it also sets canvas-sec false unless ctx is document. shapes-sec remains active-layer-derived and layer-sec remains false because no earlier branch enabled it.",
+          "callers": [
+            "src/js/timeline.js:457 SM.setTool flow, direct",
+            "src/js/timeline.js:2757 C19h updateUI final panel/context chain, direct",
+            "src/js/timeline.js:6561 matte badge click after activating layer, direct",
+            "src/js/timeline.js:6753 blend context action after setActiveLayer, direct",
+            "src/js/timeline.js:6769 matte context action after setActiveLayer, direct",
+            "src/js/timeline.js:11900 after-i18n callback, typeof-guarded",
+            "src/js/motion.js:13244 Motion mode switch, window-guarded"
+          ],
+          "ownership_boundaries": "One complete function packet. Internal stages describe observable ordering and future seams but are not separate source claims. C19i retains constants/signatures/help/slot helpers; C19h retains global/panel refresh adapters; C04 retains selection/renderers; C02 retains animation/Motion; optional callbacks retain their own effects.",
+          "dependency_ports": {
+            "required_when_reached": [
+              "state, selectedPaths and document globals",
+              "_fsSel and fsPrimarySel for nonempty fsselect",
+              "Path constructor for active brush-eligibility selection",
+              "C19i _captureSlotHome/_restoreSlotHome for present movable sections",
+              "DOM methods/properties on each present node",
+              "updateStatusBarHelp on every normally completed call"
+            ],
+            "optional": [
+              "SM.t",
+              "BLEND_MODE_LABELS",
+              "matteModeLabel",
+              "renderRigModeUI",
+              "updateCombinePanel",
+              "renderGradientPanel",
+              "renderImageMeshPanel",
+              "renderRigWidgetPanel",
+              "renderTextAnimatorPanel",
+              "renderShapesPanel",
+              "renderPropsPanelRail",
+              "syncStrokePropsForVectorBrush",
+              "every getElementById result before its local DOM projection"
+            ],
+            "partial_effect_rule": "Optional means absence is guarded, not effect-free. A present optional callback can mutate its owned surface or throw. Required failures and optional callback throws have no router rollback."
+          }
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Reads active-layer blendMode, matteMode and rig structure plus tool-default state, but writes no document field and calls no save port. Direct cache/DOM writes are session presentation state. Optional callbacks retain their own effects."
+    },
+    {
+      "consumer": "load",
+      "disposition": "After project load, existing callers can recompute the panel from loaded state. The router has no parser/rehydration field; slot caches hold live DOM references and are not document data."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Calls no pushUndo/history port and its direct writes are not undo snapshots. Undo/redo may reach it indirectly through C19h updateUI and then reproject current state."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Consumes Select/Subselect selectedPaths, fsselect _fsSel/fsPrimarySel and active layer rig data in strict priority. It does not mutate selection. Brush eligibility requires every selected item to satisfy the Path/plain-stroke predicate."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Motion mode post-filters the planned show map and motion.js calls the router during mode switch. It writes no frame, keyframe, tween, Motion track or timing field; optional Motion/feature callbacks retain C02/Motion ownership."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Direct effects are DOM projection/relocation and optional presentation-renderer calls. It does not call the scene engine, Paper canvas or GPU renderer; optional renderShapesPanel and feature renderers retain C04b ownership/effects."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No project/media export serializer consumes the show map, caches or DOM. Displayed Blend/Matte values are projections of state and do not change output data."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri/native command occurs. DOM/source validation cannot establish packaged-desktop behavior."
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "C19j.fixture.context-matrix",
+      "status": "proposed, unrun",
+      "initial_state": "Independent reset cases for rig, fill/fillregion/stroke/mixed fsselect, Select/Subselect selection with and without rig bones, every listed tool, unknown tool and missing/present active layer.",
+      "expected_effects": "Assert exact pre-Motion ctx, heading and all nine Boolean show entries from the packet matrix; optional rig/combine callbacks fire only in their source branches."
+    },
+    {
+      "id": "C19j.fixture.motion-post-filter",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh copy of every pre-Motion context case with appMode motion and complete section spies.",
+      "expected_effects": "Relocations use the pre-filter selection/document plan; then six 2D sections become false, canvas remains true only for document, shapes follows active-layer presence and layer remains false. Assert final displays and published _lastPropsShow separately from parentage."
+    },
+    {
+      "id": "C19j.fixture.metadata-and-feature-order",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh active layers with missing/falsy/custom blend/matte values; independently absent controls/label helpers/render callbacks; ordered spies and one throwing optional callback per case.",
+      "expected_effects": "Assert normal/none defaults, raw/label fallbacks, Gradient→Image Mesh→Rig Widget→Text Animator→heading order, independent missing guards and preserved earlier effects on throw."
+    },
+    {
+      "id": "C19j.fixture.canvas-relocation",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh real canvas section with listener/identity marker and captured slot; vary document/other context, rail absence/presence, prior placement, optional header/body and stale slot anchors.",
+      "expected_effects": "Document moves the same node after rail when needed, marks identity, hides header and opens body; missing rail still changes presentation. Other contexts restore through C19i semantics, remove identity/show header and preserve body/listener identity."
+    },
+    {
+      "id": "C19j.fixture.combine-relocation",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh real combine section and selection body; vary selection/nonselection, Motion, missing selBody/header/body/mode row and already-inline/restored placements.",
+      "expected_effects": "Only qualifying pre-Motion selection moves the same node inline, hides header/mode row and opens body; all other cases restore slot/show controls. Motion selection can leave the node inline while final display is none."
+    },
+    {
+      "id": "C19j.fixture.section-visibility-and-rail",
+      "status": "proposed, unrun",
+      "initial_state": "Independent planned maps with some/all section nodes absent, active-layer shapes true/false, collapsed/expanded/missing props panel and renderer spies.",
+      "expected_effects": "Every present section receives block/none from final map; visible shapes render before _lastPropsShow publication; collapsed rail renders after publication. Throws expose the exact last completed effect."
+    },
+    {
+      "id": "C19j.fixture.tool-controls-and-focus",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh DOM/state for draw, pen, fill, fillbrush and other tools; focus each numeric field independently; vary gap modes, values and missing rows.",
+      "expected_effects": "Assert exact row display rules, focused numeric preservation, unconditional trim checkbox projection, inequality-only gap select write and independent missing-node skips."
+    },
+    {
+      "id": "C19j.fixture.brush-eligibility",
+      "status": "proposed, unrun",
+      "initial_state": "Independent Select/Subselect selections containing plain stroked Paths, preTexture-only Paths, mixed invalid/non-Path/vector/fill-shape items, plus draw and empty selection cases.",
+      "expected_effects": "Every selected item must pass the exact predicate; draw shows preset regardless; empty/mixed invalid selections hide it. A missing Path global in an active selection throws after earlier router effects."
+    },
+    {
+      "id": "C19j.fixture.context-signature-and-partial-failure",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh changed/unchanged ctx with visible collapsed sections, missing header/body, Elements, and a DOM method configured to throw after _propsCtxSig assignment.",
+      "expected_effects": "Changed ctx writes signature then expands visible complete non-Elements sections; unchanged ctx preserves collapse. A post-write throw leaves signature changed and same-context retry does not repeat expansion automatically."
+    },
+    {
+      "id": "C19j.fixture.final-callback-order",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh completed projection with required help spy and present/absent vector-brush synchronizer; separate help-throw case.",
+      "expected_effects": "updateStatusBarHelp fires after all expansion work and before optional syncStrokePropsForVectorBrush. Missing optional sync is harmless; help throw prevents sync and preserves all prior effects."
+    },
+    {
+      "id": "C19j.fixture.consumer-boundaries",
+      "status": "proposed, unrun",
+      "initial_state": "Fresh save/load, history, selection, animation, scene-render, export and native harnesses around one router call.",
+      "expected_effects": "Only current-state reads, direct caches and DOM projection occur; no document/history/animation/output/native write is attributed to the router. Optional callback effects are recorded under their owning port."
+    }
+  ],
+  "future_proposals": [
+    {
+      "id": "C19j.proposal.context-planner",
+      "status": "proposal only; unimplemented",
+      "api": "planPropertiesContext({tool, appMode, activeLayer, canvasSelection, fsSelection, translate}) -> {ctx, heading, show, featureRequests}",
+      "boundary": "Pure selection/context and Motion planner; C04/C02 retain selection and Motion state, C19i retains constants."
+    },
+    {
+      "id": "C19j.proposal.dom-projector",
+      "status": "proposal only; unimplemented",
+      "api": "projectPropertiesContext(dom, plan, {featureRenderers, railRenderer, helpRenderer}) -> ProjectionReceipt",
+      "boundary": "Applies visibility/heading and reports ordered partial failures; C04b retains renderer implementations and their effects."
+    },
+    {
+      "id": "C19j.proposal.section-placement",
+      "status": "proposal only; unimplemented",
+      "api": "placePropertySections({canvas, combine, rail, selectionBody}, plan, slotTokens) -> PlacementReceipt",
+      "boundary": "Consumes C19i capture/restore tokens and preserves original node/listener identity; planner decides context, not DOM helper."
+    },
+    {
+      "id": "C19j.proposal.tool-control-sync",
+      "status": "proposal only; unimplemented",
+      "api": "syncToolControlRows(dom, {tool, defaults, focusedElement, selectionSummary}) -> ControlSyncReceipt",
+      "boundary": "Owns row/value projection and exact focus/eligibility rules; tool commands, defaults and selection remain existing owners."
+    }
+  ],
+  "surface_inventory_cross_check": [
+    {
+      "inventory": "C19i-timeline-properties-help-foundations.json",
+      "disposition": "Ends3130 and owns the constants/help/slot foundations consumed here."
+    },
+    {
+      "inventory": "C19h-timeline-ui-refresh-adapters.json",
+      "disposition": "Owns updateUI and individual panel adapter census; maps this router as its final caller."
+    },
+    {
+      "inventory": "C04a-editor-tools-selection.json",
+      "disposition": "Retains selectedPaths/_fsSel/fsPrimarySel and Path semantics."
+    },
+    {
+      "inventory": "C04b-editor-presentation-support.json",
+      "disposition": "Explicitly identifies updatePropsContext as external visibility authority while retaining renderShapesPanel and UI renderers."
+    },
+    {
+      "inventory": "C02-animation-time.json",
+      "disposition": "Identifies updatePropsContext as an out-of-scope visibility consumer and retains Motion behavior."
+    }
+  ],
+  "validation": {
+    "static_commands": [
+      "git rev-parse HEAD && git rev-parse origin/main",
+      "git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js && git rev-parse HEAD:src/js/timeline.js",
+      "node /tmp/nemo-c19j-validate.cjs $PWD engineering/inventory/census/C19j-timeline-properties-context-router.json /tmp/nemo-c19j-validation.json"
+    ],
+    "expected": {
+      "assigned_lines": 381,
+      "code_lines": 156,
+      "comment_lines": 225,
+      "whitespace_lines": 0,
+      "packets": 1,
+      "internal_stages": 7,
+      "source_consumers": 8,
+      "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123"
+    },
+    "runtime": "Matrices are source-derived and behavioral fixtures remain proposed and unrun; static validation does not claim application behavior."
+  }
+}

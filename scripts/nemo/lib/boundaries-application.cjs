@@ -98,4 +98,70 @@ function checkApplicationSize(profile, opts = {}) {
   return checkSourceSizes(profile, opts);
 }
 
-module.exports = { checkApplicationPolicy, checkApplicationSize };
+// P10/#1012 — partition a checkProfile report by the edges policy.
+//
+// Enforced layers are the migrated slice: any finding there fails the gate.
+// Legacy layers are the classic-script files whose relationships the lexical
+// checker cannot resolve (script-tag globals carry no import edge), so their
+// findings are counted, compared with a no-growth ceiling, and reported under
+// `legacy` — explicitly labelled unresolved, never presented as a graph pass.
+// Size warnings/violations are the size gate's business and are excluded here.
+function validateEdgesPolicy(policy) {
+  if (!policy || policy.schemaVersion !== 1 || policy.policyId !== 'nemo.app-js.edges') invalid('unsupported edges policy schema or policyId');
+  if (policy.status !== 'adopted') invalid('edges policy status must be adopted before standard enforcement');
+  for (const key of ['enforcedLayers', 'legacyLayers', 'enforcedRules']) {
+    if (!Array.isArray(policy[key]) || !policy[key].length || policy[key].some((v) => typeof v !== 'string')) invalid(`edges policy ${key} must be a nonempty string array`);
+  }
+  if (policy.enforcedLayers.some((layer) => policy.legacyLayers.includes(layer))) invalid('a layer cannot be both enforced and legacy');
+  if (!Number.isInteger(policy.legacyUnresolvedCeiling) || policy.legacyUnresolvedCeiling < 0) invalid('legacyUnresolvedCeiling must be a non-negative integer');
+}
+
+function checkApplicationEdges(profile, report, policy) {
+  validateEdgesPolicy(policy);
+  const layerOf = new Map(profile.modules.map((m) => [m.id, m.layer]));
+  const declared = new Set([...policy.enforcedLayers, ...policy.legacyLayers]);
+  const unclassified = [...new Set(profile.modules.map((m) => m.layer))].filter((layer) => !declared.has(layer)).sort();
+  const isEdgeRule = (rule) => policy.enforcedRules.includes(rule);
+  const enforced = { modules: 0, violations: [] };
+  const legacy = { modules: 0, byRule: {}, total: 0 };
+  for (const m of profile.modules) {
+    if (policy.enforcedLayers.includes(m.layer)) enforced.modules++;
+    else if (policy.legacyLayers.includes(m.layer)) legacy.modules++;
+  }
+  const other = [];
+  for (const violation of report.violations) {
+    if (!isEdgeRule(violation.rule)) continue;
+    const layer = violation.module ? layerOf.get(violation.module) : null;
+    if (violation.rule === 'expired-exception' || (layer && policy.enforcedLayers.includes(layer))) {
+      enforced.violations.push(violation);
+    } else if (layer && policy.legacyLayers.includes(layer)) {
+      legacy.byRule[violation.rule] = (legacy.byRule[violation.rule] || 0) + 1;
+      legacy.total++;
+    } else other.push(violation);
+  }
+  const legacyOk = legacy.total <= policy.legacyUnresolvedCeiling;
+  const problems = [];
+  const expired = enforced.violations.filter((v) => v.rule === 'expired-exception').length;
+  const inLayers = enforced.violations.length - expired;
+  if (inLayers) problems.push(`${inLayers} boundary finding(s) in enforced layers ${policy.enforcedLayers.join('/')}`);
+  // An expired exception is enforced whatever file it shielded (today: legacy size
+  // waivers) — it must be renewed or retired, and is named as such, not as an edge.
+  if (expired) problems.push(`${expired} expired exception(s) must be renewed or retired`);
+  if (!legacyOk) problems.push(`legacy-unresolved findings grew to ${legacy.total} above the ceiling ${policy.legacyUnresolvedCeiling}`);
+  if (unclassified.length) problems.push(`profile layers not classified by the edges policy: ${unclassified.join(', ')}`);
+  if (other.length) problems.push(`${other.length} finding(s) could not be attributed to a classified layer`);
+  return {
+    ok: problems.length === 0,
+    policyId: policy.policyId,
+    problems,
+    enforced: { layers: policy.enforcedLayers, modules: enforced.modules, violations: enforced.violations,
+      analyzed: 'literal require/import edges, window.SM* globals, import cycles, expired exceptions' },
+    legacy: { layers: policy.legacyLayers, modules: legacy.modules, findings: legacy.total, byRule: legacy.byRule,
+      ceiling: policy.legacyUnresolvedCeiling, ok: legacyOk,
+      unresolved: 'classic-script relationships through document-scope globals are not analyzed; this is a no-growth count, not dependency coverage' },
+    unclassifiedLayers: unclassified,
+    unattributed: other,
+  };
+}
+
+module.exports = { checkApplicationPolicy, checkApplicationSize, checkApplicationEdges, validateEdgesPolicy };

@@ -408,40 +408,11 @@ function applySimilarityTransform(t,x,y){
   var rx=t.wRe*dx-t.wIm*dy,ry=t.wIm*dx+t.wRe*dy;
   return{x:rx+t.cb.x,y:ry+t.cb.y};
 }
-// Hungarian algorithm (Kuhn-Munkres, O(n^3)) — true minimum-cost perfect
-// assignment on a square cost matrix. Replaces the previous greedy
-// "cheapest pair first" assignment, which could lock in a locally-cheap
-// swap (e.g. eye A->eye B) before a better global pairing was considered.
-function hungarian(cost){
-  var n=cost.length;var INF=1e9;
-  var u=new Array(n+1).fill(0),v=new Array(n+1).fill(0);
-  var p=new Array(n+1).fill(0),way=new Array(n+1).fill(0);
-  for(var i=1;i<=n;i++){
-    p[0]=i;var j0=0;
-    var minv=new Array(n+1).fill(INF);
-    var used=new Array(n+1).fill(false);
-    do{
-      used[j0]=true;
-      var i0=p[j0],delta=INF,j1=-1;
-      for(var j=1;j<=n;j++){
-        if(!used[j]){
-          var cur=cost[i0-1][j-1]-u[i0]-v[j];
-          if(cur<minv[j]){minv[j]=cur;way[j]=j0;}
-          if(minv[j]<delta){delta=minv[j];j1=j;}
-        }
-      }
-      for(var j2=0;j2<=n;j2++){
-        if(used[j2]){u[p[j2]]+=delta;v[j2]-=delta;}
-        else minv[j2]-=delta;
-      }
-      j0=j1;
-    }while(p[j0]!==0);
-    do{var j1b=way[j0];p[j0]=p[j1b];j0=j1b;}while(j0);
-  }
-  var assign=new Array(n).fill(-1);
-  for(var j=1;j<=n;j++){if(p[j]>0)assign[p[j]-1]=j-1;}
-  return assign;
-}
+// Minimum-cost perfect assignment: the Hungarian (Kuhn-Munkres, O(n^3))
+// solver lives in domain/tween/assignment.js (P23) — NemoTweenAssignment.solve.
+// It replaced the previous greedy "cheapest pair first" assignment, which
+// could lock in a locally-cheap swap (e.g. eye A->eye B) before a better
+// global pairing was considered.
 // geometry-wasm's tweenmatch.rs ported this exact algorithm (same tuned
 // constants, same two-pass Hungarian + similarity-transform seeding) — see
 // autoMatchJS below for the reference implementation, kept as the fallback
@@ -498,7 +469,7 @@ function autoMatchJS(sA,sB){
     return c;
   }
   var cost=buildCost(null);
-  var assign=hungarian(cost);
+  var assign=NemoTweenAssignment.solve(cost);
   var matches=[];
   for(var a2=0;a2<n;a2++){var b2=assign[a2];if(b2!==undefined&&b2>=0&&b2<m)matches.push({a:a2,b:b2,score:cost[a2][b2]});}
   if(matches.length<2)return matches;
@@ -590,7 +561,7 @@ function autoMatchJS(sA,sB){
       if(rawC<cost2[ra2][rb2])cost2[ra2][rb2]=rawC;
     }
   }
-  var assign2=hungarian(cost2);
+  var assign2=NemoTweenAssignment.solve(cost2);
   var matches2=[];
   for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
   if(TW_MATCH_RELATIONAL)return relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
@@ -656,7 +627,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
       }
       aug.push(row);
     }
-    var assign=hungarian(aug);
+    var assign=NemoTweenAssignment.solve(aug);
     var changed=false,next=new Array(n).fill(-1);
     for(var a2=0;a2<n;a2++){var b2=assign[a2];next[a2]=(b2!==undefined&&b2>=0&&b2<m)?b2:-1;if(next[a2]!==sigma[a2])changed=true;}
     sigma=next;cur=aug;
@@ -1046,7 +1017,7 @@ function _matchLandmarks(pA,lenA,pB,lenB,maxFeatures){
     }
     cost.push(row);
   }
-  var assign=hungarian(cost);
+  var assign=NemoTweenAssignment.solve(cost);
   var pairs=[];
   for(var a2=0;a2<n2;a2++){
     var b2=assign[a2];
@@ -4836,11 +4807,8 @@ function _cloneStrokesForUndo(strokes){
 function pushUndoActiveFrame(){
   if(window._scrubLiveActive)return;
   if(typeof saveActiveLayerFrame==='function')saveActiveLayerFrame();
-  var frame=state.currentFrame;
-  var snap={frame:frame,layers:state.layers.map(function(ld){
-    var f=ld.frames[frame]||{};
-    return{strokes:_cloneStrokesForUndo(f.strokes),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated};
-  })};
+  // Entry kind + capture live in application/history/frame-entry.js (P21).
+  var snap=NemoFrameHistoryEntry.capture(state,state.currentFrame,_cloneStrokesForUndo);
   state.undoStack.push(snap);state.undoLabels.push(_actionLabelNow());
   if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}
   state.redoStack=[];state.redoLabels=[];
@@ -5006,7 +4974,9 @@ if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(t
 }
 var s=state.undoStack.pop();var sl=state.undoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.redoStack.push(cur);state.redoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
+// Frame-only entry (no `type`): apply through the extracted entry kind (P21);
+// its inverse goes on the redo stack, then the same UI refresh as before.
+var applied=NemoFrameHistoryEntry.apply(state,s);state.redoStack.push(applied.inverse);state.redoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
 function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
@@ -5019,7 +4989,8 @@ if(top.type==='layers'&&((top.symbolId||null)!==(state.activeSymbolId||null)||(t
 }
 var s=state.redoStack.pop();var sl=state.redoLabels.pop()||_actionLabelNow();
 if(s.type==='layers'){state.undoStack.push(layersSnapshotNow());state.undoLabels.push(sl);restoreLayersSnapshot(s);if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();return;}
-var cur={frame:state.currentFrame,layers:[]};for(var i=0;i<state.layers.length;i++){var f=state.layers[i].frames[state.currentFrame];cur.layers.push({strokes:JSON.parse(JSON.stringify(f.strokes)),isKeyframe:f.isKeyframe,isInterpolated:f.isInterpolated});}state.undoStack.push(cur);state.undoLabels.push(sl);for(var i2=0;i2<s.layers.length&&i2<state.layers.length;i2++){var tf=state.layers[i2].frames[s.frame];tf.strokes=s.layers[i2].strokes;tf.isKeyframe=s.layers[i2].isKeyframe;tf.isInterpolated=s.layers[i2].isInterpolated;}if(s.frame!==state.currentFrame)state.currentFrame=s.frame;loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
+// Mirror of undo()'s frame-only branch: apply, inverse onto the undo stack, refresh.
+var applied=NemoFrameHistoryEntry.apply(state,s);state.undoStack.push(applied.inverse);state.undoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 
 // ---- MANUAL INBETWEEN REASSIGNMENT (v16) ----
 // autoMatch (top of this file) sometimes misidentifies correspondence when

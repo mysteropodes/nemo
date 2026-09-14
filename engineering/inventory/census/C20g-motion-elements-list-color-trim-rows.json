@@ -1,0 +1,360 @@
+{
+  "census_id": "C20g",
+  "issue": 1218,
+  "title": "Motion Elements list rows: renderElementsList, hex/RGBA helpers, color rows, trim rows",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C20g census only; C02/C20f/C20h/C20i/C19u/P30 and other runtime owners remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a155706476b26b0bd03dc502a7e4168d5e941f20",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    { "start": 9826, "end": 10044 },
+    { "start": 10045, "end": 10134 },
+    { "start": 10135, "end": 10228 }
+  ],
+  "coverage_note": "Exactly 403 assigned lines occur once in three complete packets: 274 code, 129 full-line comments and 0 whitespace. The preceding inline-rename helper closes at line 9825; the next construct's own lead-in comment starts at line 10229 (Text Animators timeline rows, C20h).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Allocated base a155706476b26b0bd03dc502a7e4168d5e941f20 has the identical Motion blob (also ea7ea0c, 6c6d579, eb96451, 4dcdb22 per the issue).",
+    "runtime": "No browser, Tauri, expression runtime, export, native, GPU or application behavior was executed.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20g-motion-elements-list-color-trim-rows.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20g transfers no implementation authority.",
+    "owners": "C02 retains track, key, expression evaluator and selection-vector writers; C20f retains renderTransformGroup/stopwatchTitle/the Transform panel; C20h retains the next Elements construct (text-animator timeline rows, path-as-one-property group, discrete key grid row, mesh vertex rows); C20i retains trackRowHtml/renderTracksFor; C19u retains renderLayerList (timeline.js); C01 retains history; C19g retains document codecs.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 9826-11125 as one open 1300-line span. This leaf takes the first 403 lines (9826-10228); C20h is proposed for 10229-10671 and C20i for 10672-11125. This artifact does not close the parent span."
+    },
+    {
+      "owner": "C20f.motion-transform-expression-panel",
+      "disposition": "Retains renderTransformGroup, renderTransformHeader, renderDupGroupHeader and stopwatchTitle (motion.js:8649-9428), all called by name from this span (renderTransformGroup at line 9945; stopwatchTitle from renderColorRow/renderTrimScalarRow at lines 10073/10147). No overlap: C20f's assigned union ends at 9428, this artifact starts at 9826."
+    },
+    {
+      "owner": "C20h (proposed, unclaimed)",
+      "disposition": "Owns motion.js:10229-10671 (text-animator timeline rows, path-as-one-property group, discrete key grid row, mesh vertex rows, including renderVertexRow/renderMeshVertexGroup at 10607-10670). renderMeshVertexGroup is called from inside this span (line 9964) but defined at 10614, inside C20h's proposed range — cited by name/line only, not re-mapped here. Line 10293's own renderTrimScalarRow call (inside the text-animator loop) is a caller OF this span's function from OUTSIDE it, recorded under callers below, not a boundary conflict."
+    },
+    {
+      "owner": "C20i (proposed, unclaimed)",
+      "disposition": "Owns motion.js:10672-11125 (trackRowHtml, renderTracksFor) — the grid-side (right #frame-grid) counterpart machinery for property rows in general. Cited by name/line only."
+    },
+    {
+      "owner": "C02.motion-advanced.component-shape-tree / C02:10 (historical)",
+      "disposition": "Retains shapeTreeRowPlan (9699-9723), layerElements (9436+), elementMotionAt, buildShapeTree and the element-holder plumbing this span consumes. This artifact records only how renderElementsList reads shapeTreeRowPlan's output; it does not re-map shapeTreeRowPlan itself."
+    },
+    {
+      "owner": "C19u (timeline.js, renderLayerList)",
+      "disposition": "Owns the Animation 2D left-list rendering of the SAME shapeTreeRowPlan enumerator via renderShapeTreeRowsInto (timeline.js ~4302-4320, calling SMMotion.shapeTreeRowPlan), and the general renderLayerList entry point. Grep across src/js found NO call to renderElementsList, renderColorRow, renderFillColorRow, renderStrokeColorRow, renderTrimScalarRow, renderTrimPathsGroup, hexToRgba255 or rgba255ToHex in timeline.js — only two comments naming renderElementsList (timeline.js:4306, 5454) as the Motion-side counterpart of renderTimelineMotion. The issue's expectation of a timeline.js caller for this span's functions is corrected: every caller found is motion.js-internal."
+    },
+    {
+      "owner": "C20g (this span) grid-side counterpart",
+      "disposition": "renderTimelineMotion (motion.js:11136, out of this span's assigned range, cited by name/line only) is the actual #frame-grid counterpart of renderElementsList per its own source comments (timeline.js:4306, 5454: 'Motion's own renderElementsList/renderTimelineMotion pair'). This is the CLAUDE.md §11 panel/grid line-count invariant pairing for the Elements section specifically; auditing its row-for-row agreement with renderElementsList is left to a successor with both functions in scope."
+    },
+    {
+      "owner": "group-bridge.js (SMGroup)",
+      "disposition": "Retains renameGroup, called at line 9864 from commitGroupRename. Not re-mapped here."
+    },
+    {
+      "owner": "C01/#1036",
+      "disposition": "Retains pushUndo/undo-redo semantics (tweens.js:4741, pushUndoLayers). This artifact records only call sites and ordering relative to writes within this span."
+    },
+    {
+      "owner": "C19g/#1136",
+      "disposition": "Retains save/load codecs. This artifact records only which writes reach saveActiveLayerFrame and which do not."
+    },
+    {
+      "owner": "engine-bridge.js (buildSceneJson, cssColorToRgba)",
+      "disposition": "cssColorToRgba (engine-bridge.js:120) produces the same [r,g,b,a] 0-255 shape hexToRgba255 produces for keyed color values, per this span's own lead-in comment (10045-10047). Not re-mapped; confirmed neither function nor any other symbol in this span is called from buildSceneJson or getEffectiveStrokes (grep across src/js found zero such call; every call site is inside motion.js's own layer-panel code)."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 9825 closes the preceding inline-rename helper (startShapeTreeRename's finish/keydown/blur wiring); C20g begins at renderElementsList's declaration on line 9826.",
+    "Line 10228 closes renderTrimPathsGroup; line 10229 starts the excluded '// ---- Text Animators — TIMELINE rows (2026-08-31) ----' comment (C20h).",
+    "Rendering is not pure: every row builder can call ensureElementHolder, which lazily allocates ld.elementMotion[strokeId] and, for a rect/ellipse/star paramShape, seeds motionStatic corner/arc/star fields on first access — a read-only render pass can mutate the layer descriptor.",
+    "Callbacks have no catch or rollback. History, ld.elementMotion, ld.groups, ld.shapeNames, selection, DOM and delegated bridge/render effects before a failure remain."
+  ],
+  "areas": [
+    {
+      "area": "motion-elements-list-color-trim-rows",
+      "packets": [
+        {
+          "id": "C20g.render-elements-list",
+          "files": ["src/js/motion.js:9826-10044"],
+          "coverage_ranges": [[9826, 10044]],
+          "classification": { "code": 121, "comment": 98, "whitespace": 0 },
+          "symbols": ["renderElementsList", "commitGroupRename"],
+          "signature": "renderElementsList(list, li, ld) -> undefined",
+          "responsibility": "Builds the Elements section of one layer's rows in #layer-list from shapeTreeRowPlan(li, ld): a collapsible section header, one row per group or shape entry (with rename/select/delete/ungroup context menus), and, for an expanded shape, its per-element property sub-rows (Transform, Path, Image mesh, Fill, Stroke/width, Brush size, Trim Paths).",
+          "row_plan_contract": [
+            "plan = shapeTreeRowPlan(li, ld) (motion.js:9699-9713, C02-owned, cited by name/line only) returns an array of {kind:'header'}|{kind:'group',node,depth}|{kind:'shape',node,depth} rows plus a labelIdx map; renderElementsList returns early if plan.length is falsy.",
+          "plan.slice(1) drops the leading {kind:'header'} row (already rendered here as the section header) and iterates the rest.",
+            "For a group row it reads node.gid, node.name and node.memberIds (falling back to a fresh layerElements(li, ld) filter by sd.groupId when memberIds is absent).",
+            "For a shape row it reads node.strokeId and node.sd (the per-shape stroke-dict snapshot) into a local entry={strokeId,sd}, and consults plan.labelIdx[entry.strokeId] (falling back to an incrementing shapeIdx) for the stable draw-order label — see buildShapeTree's own comment, C02-owned."
+          ],
+          "holder_shape": "ensureElementHolder(ld, entry.strokeId) (motion.js:2879-2907) returns ld.elementMotion[entry.strokeId] directly — the holder passed to every row renderer below is that bare per-shape record (fields: motion, motionStatic, optionally paramShapeKind), NOT an {ld,strokeId,...} wrapper. The layer holder used elsewhere in Motion is likewise the ld object itself. resolveHolderLayer(holder) (motion.js:2137-2146) recovers {ld,index,strokeId} by identity: state.layers.indexOf(holder) for a layer holder, otherwise an O(layers×shapes) scan of every ld.elementMotion for the matching value. No stored back-reference exists on the holder object.",
+          "grid_counterpart": "The panel/grid line-count invariant (CLAUDE.md §11) pairs renderElementsList with renderTimelineMotion (motion.js:11136, out of this span, cited by name/line only) per that function's own comment at timeline.js:4306 and 5454 ('Motion's own renderElementsList/renderTimelineMotion pair'). This packet does not audit that pairing; it is out of scope for both sides.",
+          "expand_collapse_state": [
+            "window._motionShapesCollapsed (global) hides the whole section body when truthy; toggled by toggleShapesSectionCollapsed() (9724-9731, C02-owned) on header click, which also flips the header arrow.",
+            "window._motionExpandedShapeGroups[node.gid] (global map) expands one group's children; toggled by toggleShapeGroupExpanded(gid) (9718-9723, C02-owned) on the group arrow click.",
+            "window._motionExpandedElement (global, single strokeId) expands one shape's property rows; set/cleared on row click (line 9903) and cleared on that same shape's delete (line 9935). None of these three globals persist into the document; they are transient UI/session state, not part of ld or exportJSON."
+          ],
+          "row_kinds_and_writes": [
+            "Group row: click selects members (selectShapesByStrokeIds, C02-owned); dblclick renames via startShapeTreeRename+commitGroupRename, which calls SMGroup.renameGroup(node.gid, ld, v, memberIds) (group-bridge.js, not re-mapped) then saveActiveLayerFrame()+renderLayerList()+renderTimeline() (no pushUndo — group rename has no local undo). Context menu Rename/Select Members reuse the same handlers; Ungroup calls pushUndo(), deletes data.groupId off every live member item and ld.groups[node.gid], then saveActiveLayerFrame()+renderLayerList()+renderTimeline()+conditional SMEngineBridge.renderNow().",
+            "Shape row: click selects the shape and toggles window._motionExpandedElement, then renderLayerList()+renderTimeline() (no history — expansion is UI state). Dblclick renames via startShapeTreeRename, writing ld.shapeNames[entry.strokeId]=v after pushUndo(), then saveActiveLayerFrame()+renderLayerList()+renderTimeline(). Context menu Rename mirrors dblclick inline; Select reuses selectShapesByStrokeIds; Delete guards a stale item lookup, pushUndo()s, clears window.selectedPaths via clearSel(true) if the deleted item was selected (2026-07-31 stale-selection fix, tools.js-owned clearSel), item.remove(), clears window._motionExpandedElement if it named this shape, saveActiveLayerFrame()+renderLayerList()+renderTimeline()+optional renderArcs()+optional SMEngineBridge.renderNow().",
+            "Expanded shape sub-rows (all gated, all delegate their own writes to their own packets/functions below or in C20f/C20h): renderTransformGroup(list, ensureElementHolder(ld,strokeId), hdrTransformElement) always; renderPathVertexGroup (C20h, gated on !isRaster && pathVertexRowCount(sd)); renderMeshVertexGroup (C20h, gated on isRaster && meshId && meshVertexRowCount(meshId)); renderFillColorRow (this span, gated on fillColor present and (!isVectorBrush || __linkedFillStrokeId)); renderStrokeColorRow + optional strokeWidth renderTrimScalarRow (this span, gated on hasRealStroke-or-isVectorBrush, reading __inkColor when set); brushSize renderTrimScalarRow (this span, gated on isVectorBrush with >=2 centerSegments); renderTrimPathsGroup (this span, gated on !isRaster with nonempty segments)."
+          ],
+          "fill_stroke_gating_rationale": "hasRealStrokeEl prefers entry.sd.hasRealStroke, falling back to !!entry.sd.strokeColor, specifically because serP (app.js) bakes a '#ffffff' fallback into strokeColor for every fill-only shape (CLAUDE.md §1's documented gotcha) — using truthiness alone would show a phantom Stroke row on every plain filled shape. A vector-brush's own ink lives in fillColor (isVectorBrush forces hasRealStroke false above, then re-admits the Stroke row for that ink via the isVectorBrush OR clause) and, when a real linked-fill companion exists, layerElements' merge overwrites sd.fillColor with the companion's color for the Fill row while sd.__inkColor preserves the anchor's own pre-merge ink for the Stroke row's default swatch (feedback #219/#203/#200 fix chain documented inline at 9966-10021).",
+          "callers": "renderElementsList is called once, from the left #layer-list per-layer loop at motion.js:7537 (out of this span, not re-mapped).",
+          "effects": "DOM row construction plus the writes itemized above; ensureElementHolder can lazily allocate/seed ld.elementMotion[strokeId] as a side effect of merely expanding a row (see boundaries)."
+        },
+        {
+          "id": "C20g.color-hex-helpers-and-color-rows",
+          "files": ["src/js/motion.js:10045-10134"],
+          "coverage_ranges": [[10045, 10134]],
+          "classification": { "code": 72, "comment": 18, "whitespace": 0 },
+          "symbols": ["hexToRgba255", "rgba255ToHex", "renderColorRow", "renderFillColorRow", "renderStrokeColorRow", "currentRgba"],
+          "signatures": [
+            "hexToRgba255(hex) -> [r,g,b,a] each 0-255",
+            "rgba255ToHex(v) -> '#rrggbbaa' string",
+            "renderColorRow(list, holder, prop, label, swatchTitle, currentColorHex) -> undefined",
+            "renderFillColorRow(list, holder, currentFillColorHex) -> undefined",
+            "renderStrokeColorRow(list, holder, currentStrokeColorHex) -> undefined"
+          ],
+          "hex_helpers": [
+            "hexToRgba255 strips a leading '#', parses 2-hex-digit r/g/b (defaulting each NaN parse to 0 via ||0) and an optional 8th/7th-9th-digit alpha pair only when the stripped string is >=8 chars, defaulting a NaN alpha parse to 255. The lead-in comment (10045-10047) states this is the SAME [r,g,b,a] 0-255 shape buildSceneJson's cssColorToRgba (engine-bridge.js:120, not re-mapped) already produces for the live render — this artifact does not verify byte-for-byte parity between the two independent implementations, only that both target the same declared shape.",
+            "rgba255ToHex round-trips via an inline h2(n) that clamps to 0..255, rounds and pads to 2 hex digits; alpha defaults to 255 when v[3] is undefined."
+          ],
+          "renderColorRow_contract": [
+            "Builds one non-accordion .motion-prop-row: a stopwatch icon (swOn=isAnimated(holder,prop); hasKeyHere=swOn && !!keyAt(holder.motion[prop], state.currentFrame); title via stopwatchTitle('motionAnimateFill', swOn, hasKeyHere), C20f-owned), a label decorated by decorateMotionPropertyRow(row,holder,prop,nm) (motion.js:11519, out of this span, tags row._smHolder/_smProp for pickwhip and click-to-select), and a clickable color swatch.",
+            "currentRgba() prefers hasKeys(holder,prop) -> valueAtFrame(holder,prop,state.currentFrame) (the live [r,g,b,a] track value), then holder.motionStatic[prop], then hexToRgba255(currentColorHex) (the shape's own current stroke-dict color) as the final fallback — this is the color-value read path for the swatch fill.",
+            "Stopwatch click: pushUndo() always; when turning ON, lazily allocates holder.motionStatic and seeds [prop] from hexToRgba255(currentColorHex) before toggleAnimated(holder,prop) (C02-owned); when a key exists at the current frame with exactly one key total, freezes the current value into a fresh motionStatic[prop] and empties holder.motion[prop].keys (no toggleAnimated call in that branch); with more than one key, removeKeyAtCurrentFrame(holder,prop); when animated with no key here, setKeyAtCurrentFrame(holder,prop,valueAtFrame(...)). Always finishes with renderLayerList()+renderTimeline()+conditional SMEngineBridge.renderNow().",
+            "Swatch click opens window.ColorPicker.open(swatch, rgba255ToHex(currentRgba()), callback) — explicitly NOT openLayerColorSwatches (the 8-fixed-color label palette), per the inline 2026-08-31/#180 feedback comment (10110-10116). The callback pushUndo()s, converts the picked hex via hexToRgba255(hex), prefers setSelectedKeyVector(holder,prop,v) (C02-owned) and falls back to setValue(holder,prop,v) (C02-owned) when no selected key accepted the write, then renderLayerList()+renderTimeline()+conditional SMEngineBridge.renderNow()."
+          ],
+          "color_contract_check": "renderColorRow never reads or writes a native <input type=\"color\">'s .value nor any .dataset.hex8 — its color state lives entirely in the [r,g,b,a] 0-255 array (holder.motion[prop]/motionStatic[prop]) and the hex strings only exist transiently as the ColorPicker's open()/callback argument and return value. CLAUDE.md §2's '.dataset.hex8, not .value' rule therefore does not directly apply inside this packet; it governs colorHex8/native color inputs elsewhere (app.js), which this row never touches.",
+          "wrappers": "renderFillColorRow(list,holder,currentFillColorHex) calls renderColorRow(list,holder,'fillColor',SM.t('propFill'),SM.t('shapeFillColorTitle'),currentFillColorHex); renderStrokeColorRow(list,holder,currentStrokeColorHex) calls renderColorRow(list,holder,'strokeColor',SM.t('propStroke'),SM.t('shapeStrokeColorTitle'),currentStrokeColorHex) — thin wrappers per the lead-in comment (10058-10065), replacing what the comment says was historically two near-duplicate implementations (CLAUDE.md §3 precedent).",
+          "callers": "renderColorRow is called only by its own two wrappers (10130, 10133), both in this packet. renderFillColorRow is called from renderElementsList (this span, line 9979) and from the right-properties panel branch at motion.js:7634 (out of this span, not re-mapped, C20f-adjacent). renderStrokeColorRow is called from renderElementsList (this span, line 10025) and the same right-properties branch at motion.js:7639. hexToRgba255 is additionally called from an unrelated custom-control color-swatch callback at motion.js:8852 (C20f's transform-property-rows packet) and from two ColorPicker callbacks at motion.js:13691/13700 (out of this span). rgba255ToHex is additionally called at motion.js:8852. Grep across src/js found no caller of any of these five symbols outside motion.js.",
+          "effects": "DOM row construction; holder.motion[prop]/holder.motionStatic[prop] writes as itemized above; no ld.elementMotion allocation beyond what ensureElementHolder already performed for the caller-supplied holder."
+        },
+        {
+          "id": "C20g.trim-scalar-row-and-trim-paths-group",
+          "files": ["src/js/motion.js:10135-10228"],
+          "coverage_ranges": [[10135, 10228]],
+          "classification": { "code": 81, "comment": 13, "whitespace": 0 },
+          "symbols": ["renderTrimScalarRow", "renderTrimPathsGroup", "currentVal"],
+          "signatures": [
+            "renderTrimScalarRow(list, holder, prop, label, unit, min, max, defaultVal) -> undefined",
+            "renderTrimPathsGroup(list, holder) -> undefined"
+          ],
+          "trim_row_contract": [
+            "renderTrimScalarRow builds one .motion-prop-row with a stopwatch (same swOn/hasKeyHere/stopwatchTitle('motionAnimateProp',...) shape as renderColorRow, C20f-owned title helper) and a numeric <input type=\"number\" class=\"pi scrub motion-val\"> with dataset.step='1' and min/max attributes — satisfies CLAUDE.md §10's scrub-class convention.",
+            "currentVal() prefers hasKeys(holder,prop) -> valueAtFrame(...)[0] (single-dimension read of the keyed vector), then holder.motionStatic[prop][0], then defaultVal.",
+            "Display value comes from selectedDimensionDisplay(holder,prop,0,currentVal()) (motion.js:6807, C02-owned), which can report a 'mixed' state across a multi-key selection; mixed shows a placeholder dash and a 'Valeurs multiples' title instead of a numeric value.",
+            "Stopwatch click mirrors renderColorRow's exactly: pushUndo() always, OFF->ON seeds motionStatic[prop]=[defaultVal] then toggleAnimated; single-key freeze to motionStatic; multi-key removeKeyAtCurrentFrame; animated-with-no-key setKeyAtCurrentFrame — then renderLayerList()+renderTimeline()+conditional SMEngineBridge.renderNow().",
+            "Input change: guards empty/non-finite input, pushUndo(), clamps to [min,max], then either offsetSelectedKeyDimension(holder,prop,0,delta) (when window._scrubLiveActive, i.e. a relative drag) or setSelectedKeyDimension(holder,prop,0,v) (absolute), both C02-owned selected-key writers; when neither reports a change, falls back to setValue(holder,prop,[v]) (C02-owned). Always finishes with renderLayerList()+renderTimeline()+conditional SMEngineBridge.renderNow(). Unlike renderColorRow, this path has no reloadIfTimeLinkOffset(prop) call (that call exists on the C20f Transform-panel's own numeric scrub, not here) — Trim/strokeWidth/brushSize edits do not resync a Time-Remap-relative playhead."
+          ],
+          "layout_note": "Fields are wrapped in a .motion-fields div (flex-shrink:0) before the optional unit span, and the DOM append order is label, fields, stopwatch (nm, fieldWrap, sw) — the inline 2026-07-29 comment (10197-10204) documents this as the same convention every other Transform row uses and notes this row used to put the stopwatch first, a pure layout-history note with no behavioral effect recorded here.",
+          "trim_paths_group": [
+            "renderTrimPathsGroup builds one accordion header row (.motion-group-row) whose expanded state is window._motionExpandedTrimHolder === holder (a single global holding the last-expanded holder, not a per-holder map) with title SM.t('titleTrimPathGroupHint'); click toggles that global to the clicked holder or null and calls renderLayerList()+renderTimeline() only (no pushUndo/save — pure UI expansion state, same class as _motionExpandedElement/_motionExpandedShapeGroups above).",
+            "When expanded it appends exactly three renderTrimScalarRow calls with prop='trimStart' (0..100, default 0), prop='trimEnd' (0..100, default 100), prop='trimOffset' (-100..100, default 0), each labelled via SM.t(propTrimStart/propTrimEnd/propTrimOffset) with unit '%'."
+          ],
+          "prop_names_and_consumer": "The three keyable props are the literal strings 'trimStart', 'trimEnd', 'trimOffset' (and, from the sibling gated calls in packet 1, 'strokeWidth' and 'brushSize' reusing this same row builder). No consumer of these prop names at render time (buildSceneJson/getEffectiveStrokes/engine-bridge.js or a labs vector-trim module) was found by grep within src/js from this artifact's scope; the issue's own text asks whether 'labs vector-trim' applies them and this artifact records that no such call site exists in src/js as searched — record as an open discrepancy for a runtime-scoped successor to confirm against any code outside src/js (e.g. Rust engine or a separate labs tree) rather than asserting the props are currently inert.",
+          "callers": "renderTrimScalarRow is called from this span at lines 10027 (strokeWidth), 10036 (brushSize), 10225-10227 (trimStart/End/Offset, all inside renderTrimPathsGroup); from the right-properties panel branch at motion.js:7641/7645 (out of this span); and from the text-animator timeline loop at motion.js:10293 (inside C20h's proposed range, calling this span's function from outside it). renderTrimPathsGroup is called from this span at line 10041 and from the right-properties panel branch at motion.js:7648.",
+          "effects": "DOM row/accordion construction; holder.motion[prop]/holder.motionStatic[prop] writes as itemized above; window._motionExpandedTrimHolder global write."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "Group rename, ungroup, shape rename and shape delete all call saveActiveLayerFrame() after their ld.groups/ld.shapeNames/live-item writes. Every stopwatch toggle, color-swatch pick and trim/strokeWidth/brushSize edit writes holder.motion[prop] or holder.motionStatic[prop] with NO local saveActiveLayerFrame call in this span — those are ld.elementMotion (or layer-level motion) fields, not stroke-dict fields, so they ride along with whatever later exportJSON/save path already serializes elementMotion (C19g-owned), not this span's own persistence."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. C19g's exportJSON/import already serializes/restores the whole l.elementMotion object (cited by name only, not re-mapped) which is exactly what ensureElementHolder/renderColorRow/renderTrimScalarRow read and write here."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "pushUndo() precedes every write branch of the color and trim stopwatch/value handlers, and precedes shape rename, shape delete and ungroup. Group rename (commitGroupRename) has NO local pushUndo call — renaming a group is not locally undoable from this span. Row-expansion clicks (_motionExpandedElement, _motionExpandedShapeGroups, _motionShapesCollapsed, _motionExpandedTrimHolder) never call pushUndo — UI state only. ensureElementHolder's lazy paramShape seeding (triggered merely by expanding a row) has no local undo either."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Group/shape row clicks call selectShapesByStrokeIds (C02-owned). Color and trim value writes prefer a live selected-key vector/dimension mutation (setSelectedKeyVector/offsetSelectedKeyDimension/setSelectedKeyDimension, all C02-owned) before falling back to setValue on the row's own holder/prop — so a multi-shape/multi-key selection can be mutated by editing what looks like a single row's field."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Every stopwatch here follows the same three-way contract: OFF->ON seeds a motionStatic default then toggleAnimated; a lone existing key freezes to motionStatic and empties the track; multiple keys just remove the current-frame key; no key while animated inserts one at the current value. Trim/color rows both key [value]/[r,g,b,a] shaped vectors through the shared toggleAnimated/setKeyAtCurrentFrame/removeKeyAtCurrentFrame primitives (C02-owned)."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Every write branch pairs renderLayerList() with renderTimeline() (never one alone), matching CLAUDE.md §11's panel/grid invariant for THIS span's own rows; only a conditional SMEngineBridge.renderNow() follows when that global exists, requesting a canvas refresh but proving no output correctness. A malformed truthy SMEngineBridge without renderNow throws after the prior list/timeline/history effects already committed."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted from this span. Later C19g-owned exportJSON serializes the whole l.elementMotion object (including any motionStatic seeded here) and ld.groups/ld.shapeNames; this artifact does not verify that serialization, only that the writes reaching those fields are as itemized in the packets."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "Multiple callbacks conditionally call SMEngineBridge.renderNow(), testing object truthiness only — a shared render bridge, not proof of native IPC. Ungroup and shape-delete additionally call optional window.renderArcs()/SMEngineBridge.renderNow() together; no Tauri command or filesystem call is reachable from this span."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "elements-list-plan-consumption",
+      "status": "proposed, unrun",
+      "matrix": "empty plan, header-only (collapsed), nested expanded groups, mixed group/shape siblings, labelIdx present/absent",
+      "expected": "Early return on empty plan; header always rendered; shapeIdx fallback only when labelIdx omits an entry."
+    },
+    {
+      "id": "group-row-rename-select-ungroup",
+      "status": "proposed, unrun",
+      "matrix": "memberIds present vs recomputed via layerElements filter, SMGroup present/absent, rename via dblclick vs context menu, ungroup with/without ld.groups entry",
+      "expected": "No local pushUndo on rename; ungroup pushes undo and clears data.groupId on every live member plus ld.groups[gid]; both paths save+rebuild both surfaces."
+    },
+    {
+      "id": "shape-row-delete-stale-selection",
+      "status": "proposed, unrun",
+      "matrix": "deleted item currently selected vs not, deleted item is the expanded element vs not, item lookup missing",
+      "expected": "Missing item returns with no effect; selected+deleted triggers clearSel(true) before item.remove(); expanded-element flag clears only when it named the deleted shape."
+    },
+    {
+      "id": "expanded-shape-subrow-gating",
+      "status": "proposed, unrun",
+      "matrix": "raster vs vector shape, isVectorBrush with/without __linkedFillStrokeId, hasRealStroke explicit vs undefined-with-strokeColor, centerSegments length 0/1/2+, segments empty/present",
+      "expected": "Exact Path/Mesh/Fill/Stroke+width/BrushSize/TrimPaths visibility per the documented gating booleans, matching the inline feedback #200/#203/#219 rationale."
+    },
+    {
+      "id": "holder-lazy-allocation-on-expand",
+      "status": "proposed, unrun",
+      "matrix": "rect/ellipse/star paramShape vs none, ld.elementMotion[strokeId] pre-existing vs first access",
+      "expected": "Merely expanding a row can allocate ld.elementMotion[strokeId] and seed motionStatic corner/arc/star fields with no pushUndo/save, per ensureElementHolder's own documented rationale."
+    },
+    {
+      "id": "hex-rgba-round-trip",
+      "status": "proposed, unrun",
+      "matrix": "hex6 vs hex8 input, out-of-range/NaN components, rgba255ToHex with v[3] undefined",
+      "expected": "hexToRgba255 defaults r/g/b NaN-parse to 0 and a<8-char alpha to 255; rgba255ToHex clamps/rounds/pads and defaults missing alpha to 255; declared shape matches engine-bridge.js cssColorToRgba's target shape without asserting byte-identical parity."
+    },
+    {
+      "id": "color-row-stopwatch-matrix",
+      "status": "proposed, unrun",
+      "matrix": "off/on-no-key/on-one-key/on-many-keys, motionStatic present/absent at seed time",
+      "expected": "Exact seed-then-toggle, freeze-to-static, remove-key and insert-key branches with pushUndo always first."
+    },
+    {
+      "id": "color-picker-selected-key-fallback",
+      "status": "proposed, unrun",
+      "matrix": "ColorPicker present/absent, selected-key vector accepted/rejected, single vs multi-shape selection",
+      "expected": "Missing ColorPicker.open no-ops before any pushUndo; setSelectedKeyVector precedes setValue fallback; the real full-spectrum picker opens, never openLayerColorSwatches."
+    },
+    {
+      "id": "trim-scalar-relative-absolute-scrub",
+      "status": "proposed, unrun",
+      "matrix": "_scrubLiveActive true/false, mixed selectedDimensionDisplay, clamp at min/max, selected-key write accepted/rejected",
+      "expected": "Relative uses offsetSelectedKeyDimension with the delta from lastTrimScrubValue; absolute uses setSelectedKeyDimension; only an unaccepted selected-key write falls back to setValue([v]); no reloadIfTimeLinkOffset call anywhere in this row."
+    },
+    {
+      "id": "trim-paths-group-single-expanded-holder",
+      "status": "proposed, unrun",
+      "matrix": "two different holders expanded in sequence, same holder clicked twice",
+      "expected": "window._motionExpandedTrimHolder holds at most one holder globally (not per-holder), so expanding a second Trim Paths group collapses the first; toggling the same holder twice returns to null."
+    },
+    {
+      "id": "cross-caller-classification",
+      "status": "proposed, unrun",
+      "matrix": "renderFillColorRow/renderStrokeColorRow/renderTrimScalarRow/renderTrimPathsGroup invoked from renderElementsList (this span) vs the right-properties panel branch (motion.js ~7634-7648) vs, for renderTrimScalarRow only, the text-animator loop (motion.js:10293)",
+      "expected": "Identical row behavior regardless of caller (holder/prop/list are the only inputs that vary); confirms these are shared row builders, not per-surface copies."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "matrix": "Separately owned save/load/undo/export flows for ld.elementMotion allocation, ld.groups, ld.shapeNames and the three trim/color prop tracks.",
+      "expected": "Fields follow C19g codecs even without a local frame save on every write path in this span; UI-only expansion globals are never made export fields. Fixtures do not certify browser, native, export or product behavior."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planElementsListRows(li,ld,expandState) -> RowPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure row/gating plan derived from shapeTreeRowPlan and the per-shape gating booleans; C02 selection/group writers and C20h/C20i sub-row renderers remain ports."
+    },
+    {
+      "api": "applyElementRowAction(action,historyPort,trackPort,refreshPort) -> ActionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes rename/delete/ungroup/stopwatch-freeze/selected-key-fallback ordering and the pushUndo-or-not asymmetry explicit."
+    },
+    {
+      "api": "createColorRowAdapter(holder,prop,colorPort,persistencePort) -> RowAdapter",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates the hex<->[r,g,b,a]255 conversion and ColorPicker wiring from the shared stopwatch/keying contract renderTrimScalarRow also uses."
+    },
+    {
+      "api": "createTrimScalarAdapter(holder,prop,scrubPort,persistencePort) -> RowAdapter",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates relative/absolute scrub resolution and selected-key fallback from the row's DOM construction, shareable with strokeWidth/brushSize/trim callers alike."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "renderElementsList",
+      "hexToRgba255",
+      "rgba255ToHex",
+      "renderColorRow",
+      "renderFillColorRow",
+      "renderStrokeColorRow",
+      "renderTrimScalarRow",
+      "renderTrimPathsGroup"
+    ],
+    "caller_anchors": [
+      "renderElementsList called once, from motion.js:7537",
+      "renderFillColorRow/renderStrokeColorRow/renderTrimScalarRow/renderTrimPathsGroup each called both from within this span (renderElementsList) and from the right-properties panel branch at motion.js:7634-7648",
+      "renderTrimScalarRow additionally called from the C20h-proposed text-animator loop at motion.js:10293",
+      "hexToRgba255/rgba255ToHex additionally called from C20f's custom-control color swatch at motion.js:8852; hexToRgba255 additionally called at motion.js:13691/13700",
+      "no caller of any packet symbol found in timeline.js or elsewhere in src/js outside motion.js (grep-verified; only two naming comments at timeline.js:4306,5454)"
+    ],
+    "helper_anchors": [
+      "shapeTreeRowPlan motion.js:9699-9713, layerElements motion.js:9436+, ensureElementHolder motion.js:2879-2907, resolveHolderLayer motion.js:2137-2146 (all cited by name/line only, C02-owned)",
+      "isAnimated/hasKeys/keyAt/valueAtFrame/setKeyAtCurrentFrame/removeKeyAtCurrentFrame/toggleAnimated/setValue motion.js:1186-2805 area (C02-owned)",
+      "selectedDimensionDisplay/setSelectedKeyDimension/offsetSelectedKeyDimension/setSelectedKeyVector motion.js:6807-6826 (C02-owned)",
+      "stopwatchTitle/renderTransformGroup motion.js:8652/8660 (C20f-owned)",
+      "decorateMotionPropertyRow motion.js:11519 (out of this span)",
+      "renderTimelineMotion motion.js:11136 (grid-side counterpart, out of this span), trackRowHtml motion.js:10677 / renderTracksFor motion.js:11077 (C20i-proposed)",
+      "cssColorToRgba engine-bridge.js:120 (declared-shape reference only, not re-mapped)"
+    ],
+    "boundary_assertion": "Line 9825 closes the inline-rename helper; line 9826 starts C20g. Line 10228 closes C20g; the '// ---- Text Animators — TIMELINE rows (2026-08-31) ----' comment at line 10229 is excluded (C20h)."
+  },
+  "validation": {
+    "expected_assigned_lines": 403,
+    "expected_classification": { "code": 274, "comment": 129, "whitespace": 0 },
+    "packet_partition": [[9826,10044],[10045,10134],[10135,10228]],
+    "packet_classification": [
+      { "range": [9826,10044], "code": 121, "comment": 98, "whitespace": 0 },
+      { "range": [10045,10134], "code": 72, "comment": 18, "whitespace": 0 },
+      { "range": [10135,10228], "code": 81, "comment": 13, "whitespace": 0 }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 9826 and overlap at line 10044.",
+    "required_checks": [
+      "frozen/current Motion blob and allocated-base ancestry",
+      "three unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "no overlap with sibling C20*/C21*/C19* artifacts sharing src/js/motion.js",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "holder-shape and expand/collapse-state citations against the actual source lines",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}

@@ -1,0 +1,398 @@
+{
+  "census_id": "C19af",
+  "issue": 1251,
+  "title": "Timeline.js Space tap/hold onKeyUp + the sole onKeyDown/onKeyUp registration, Cmd-hold temporary Select, the shape-tool flyout IIFE, and the brush-size/fill/stroke colour field listeners",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19ae/#1244. Scope is timeline.js:10217-10392 (176 lines: 102 code, 73 comment, 1 blank, re-derived independently and matching the issue's own proposed table exactly, no boundary correction needed). It starts at the `SPACE_TAP_MS` lead-in (10217), immediately after `onKeyDown`'s closing brace at 10216 (C19ae, out of scope), and ends at the `#pm-stroke-c` input listener (10392); line 10393 opens `applyStrokeGradAlongToSelection`'s own lead-in comment (next leaf C19ag, confirmed by direct read: the function itself is declared at 10398 and neither it nor any of this scope's own symbols cross the boundary). timeline.js is NOT indented at top level; the shape-tool-flyout IIFE closes with `})();` at 10372 (confirmed by direct read). Cited by name/line only, not re-mapped, per the issue: `onKeyDown` (C06 9641 / C19ad / C19ae; this span holds its ONE registration, 10251), `togglePlay`/`startPlay`/`stopPlay` (the issue attributes these to app.js; by direct read they are in fact defined in THIS SAME FILE, timeline.js:40/169/177 — recorded as a boundary correction in `reconciliation`, not a re-mapping since they remain outside 10217-10392), `window.SM.setTool/setBrushSize/setFillColor/setFillEnabled/setStrokeColor/setStrokeEnabled` (the `window.SM={…}` block opening at timeline.js:349, bodies at timeline.js:373/520/608/615/647/654), `setTool`'s active-class sync (timeline.js:435, an earlier C19 slice — it calls `window.SMShapeGroup.ensureFront`), `tutorial.js` (`frontShapeToolIfNeeded`, tutorial.js:1464-1468, the other `SMShapeGroup` caller named in the 10313-10326 lead-in), the `.dataset.hex8` alpha-colour convention (CLAUDE.md §2), `state.spaceDown/spaceUsedForPan/isPanning/altDown` readers (found in tools.js and viewtools-bridge.js by direct grep, not select-bridge.js — recorded as a boundary correction below), `applyStrokeGradAlongToSelection` (timeline.js:10398+, next leaf C19ag), `setHex8Input` (app.js:560, called from this scope at 10384/10392), and the `#p-sw`/`#color-fill`/`#pm-fill-c`/`#p-fill-on`/`#fill-enable-toggle-lp`/`#stroke-enable-toggle-lp`/`#color-stroke`/`#pm-stroke-c`/`#shape-tool-stack`/`.tool-btn[data-tool]` markup (src/index.html). This JSON authoring does not authorize source changes; the timeline.js runtime writer is retained by whatever P30/remediation lane already owns it.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "fa7268b3cb2c7744ab12cd0963c3c9af709a54ff",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19af-timeline-keyup-cmdhold-flyout-census",
+  "assigned_ranges": [
+    {
+      "start": 10217,
+      "end": 10392
+    }
+  ],
+  "coverage_note": "Exactly 176 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 102 code, 73 full-line comment, 1 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span) — equal to the issue's own proposed union exactly (176 lines, 102/73/1) and equal to the issue's own proposed per-packet table exactly for all four packets (55:14/40/1, 41:34/7/0, 60:46/14/0, 20:8/12/0); no boundary correction was needed. Line 10216 is C19ae's own closing brace of `onKeyDown` (out of scope, confirmed against C19ae/#1244's own citation in the issue text); line 10217 opens this scope's own `SPACE_TAP_MS` lead-in comment. Line 10392 is the `#pm-stroke-c` input listener; line 10393 opens `applyStrokeGradAlongToSelection`'s own lead-in comment (next leaf C19ag, confirmed by direct read of 10393-10398, and by grep: neither `applyStrokeGradAlongToSelection` nor any other C19ag symbol appears anywhere in 10217-10392).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (fa7268b3cb2c7744ab12cd0963c3c9af709a54ff at authoring time) has the identical timeline.js blob (git rev-parse fa7268b...:src/js/timeline.js == git rev-parse 59a5a38c...:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at that SHA, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n` for every symbol this scope defines or references, restricted to `src/` at the frozen SHA, filtering each symbol's own declaration/definition line."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json and the four timeline.js packets partitioning lines 10217-10392.",
+    "timeline": "The existing timeline.js runtime writer is retained; this census transfers no writer authority.",
+    "function_boundary": "This scope is four self-registering, top-level DOM-listener blocks with no external callers of their own (except `window.SMShapeGroup.ensureFront`, read by `setTool` and `tutorial.js`, both out of scope): the Space tap/hold release handler plus the ONE `keydown`/`keyup` registration for `onKeyDown`/`onKeyUp` (packet 1); the Cmd/Ctrl-hold-to-Select state machine (packet 2); the shape-tool long-press flyout IIFE (packet 3); and the brush-size/fill/stroke colour field listeners (packet 4). None of the four packets calls into any of the others; each is bounded by its own lead-in comment or declaration, exactly as the issue's own suggested table lays out.",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19ae (existing owner, timeline.js through 10216, cited by the issue as #1244)",
+      "disposition": "Retains `onKeyDown` (defined timeline.js:9641) and the whole non-Space keyboard-shortcut dispatch table. This scope's own boundary begins at line 10217, the `SPACE_TAP_MS` lead-in, immediately after `onKeyDown`'s own closing brace (10216) — confirmed by direct read; onKeyDown's own body is not reproduced or re-mapped here."
+    },
+    {
+      "owner": "C19ag (next leaf, `applyStrokeGradAlongToSelection` and its two callers, timeline.js:10398+, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:10393+. Confirmed call-graph-disjoint: `applyStrokeGradAlongToSelection` is declared at 10398 and does not appear anywhere in 10217-10392 by direct grep; this scope's own eleven top-level symbols do not appear past line 10392 in a whole-file grep restricted to declaration/call sites."
+    },
+    {
+      "owner": "app.js (`togglePlay`/`startPlay`/`stopPlay` — boundary correction)",
+      "disposition": "The issue text attributes these three functions to app.js. By direct read they are defined in THIS file: `startPlay` timeline.js:40, `stopPlay` timeline.js:169, `togglePlay` timeline.js:177 (`function togglePlay(){if(state.playing)stopPlay();else startPlay();}`). All three are outside 10217-10392 (an earlier, unrelated timeline.js slice) and are cited here by name/line only, not re-mapped — `onKeyUp` (10233) calls `togglePlay()` on a genuine Space tap. This correction does not change the declared union/classification, only the owner-file attribution in the issue's own prose."
+    },
+    {
+      "owner": "tools.js / viewtools-bridge.js (pan-gesture readers of `state.spaceDown`/`state.isPanning`/`state.altDown` — boundary correction)",
+      "disposition": "The issue names tools.js AND select-bridge.js as readers of these fields. By direct grep, select-bridge.js has ZERO occurrences of any of the four names; the actual readers are tools.js (Paper.js pan/rotate path: tools.js:7160 `state.tool==='hand'||state.spaceDown`, tools.js:7630 pan-drag delta application, tools.js:7878 `isPanning` release) and viewtools-bridge.js (Rust-engine pan/rotate path: `shouldPan()`/`shouldRotate()` at lines 48/77, `state.isPanning` writes at 192/306). Cited by name/line only, not re-mapped; the correction is recorded here because the issue's own file list was inaccurate, not because the underlying claim (both pan implementations read these fields, per this scope's own 10244-10248 comment) was wrong."
+    },
+    {
+      "owner": "setTool / tutorial.js (`window.SMShapeGroup.ensureFront`, existing owners, out of scope)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `setTool` (timeline.js:373-436, an earlier C19 slice) calls `if(window.SMShapeGroup)SMShapeGroup.ensureFront(t);` at line 435, guarded, on every tool switch. `tutorial.js`'s `frontShapeToolIfNeeded` (tutorial.js:1464-1468) calls `window.SMShapeGroup.ensureFront(m[1])` at line 1468, also guarded, before spotlighting a grouped shape-tool step. Both are the ONLY external readers of `window.SMShapeGroup`, confirmed by a whole-`src` grep."
+    },
+    {
+      "owner": "src/index.html (markup for `#p-sw`, `#color-fill`, `#pm-fill-c`, `#p-fill-on`, `#fill-enable-toggle-lp`, `#stroke-enable-toggle-lp`, `#color-stroke`, `#pm-stroke-c`, `#shape-tool-stack`, `.tool-btn[data-tool]`, existing owner, out of scope)",
+      "disposition": "Retains its own markup in full — cited by name/line only. All ten ids/selectors this scope's listeners attach to were confirmed present by direct grep at the frozen SHA: `#p-sw` (index.html:949, `class=\"pi scrub\"`, already CLAUDE.md §10-compliant), `#color-fill`/`#color-stroke` (native `<input type=\"color\">`, index.html:256/252), `#pm-fill-c`/`#pm-stroke-c` (mini popover swatches, index.html:883/926), `#p-fill-on` (hidden checkbox, index.html:884), `#fill-enable-toggle-lp`/`#stroke-enable-toggle-lp` (`.cw-eye` divs, index.html:257/253 — see `boundaries` item (e) for why this matters), `#shape-tool-stack` (index.html:211)."
+    }
+  ],
+  "boundaries": [
+    "Line 10216 (C19ae's own closing brace of `onKeyDown`) is outside coverage; line 10217 (this scope's own `SPACE_TAP_MS` lead-in comment) begins this scope, confirmed against C19ae's own citation in the issue text.",
+    "Line 10392 (the `#pm-stroke-c` input listener) is the last line of this scope; line 10393 opens the next leaf's (C19ag) `applyStrokeGradAlongToSelection` lead-in comment — confirmed by reading the frozen blob at 10393-10398: `applyStrokeGradAlongToSelection` is declared at 10398 and does not appear anywhere in 10217-10392 by direct grep.",
+    "No lines inside 10217-10392 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "(a) The Space gesture is ONE state machine spanning `onKeyDown` (C19ae, out of scope, cited by name only — sets `state.spaceDown=true`/`state._spaceAt=now` on Space keydown when no field has focus and Cmd/Ctrl is not held, per the issue's own citation of C19ae 9992-10000) and `onKeyUp` (this scope, 10221-10234). `onKeyUp` reads `wasDown=state.spaceDown` (10225), computes `held` from `state._spaceAt` (10226, `performance.now()` with a `Date.now()` fallback), and derives `tapped=wasDown&&!state.spaceUsedForPan&&held<SPACE_TAP_MS` (10227, threshold 250ms, 10220) — a tap only counts if the hold was never used to pan. It then unconditionally resets `state.spaceDown`/`state.isPanning`/`state.spaceUsedForPan` to `false` (10228), restores the tool cursor from a per-tool map (10229), and finally calls `togglePlay()` (10233) if `tapped` AND the tool is not `'pen'` with an in-progress `_pen.path` (the one place, per the 10230-10232 comment, the tap gesture is suppressed so a half-drawn Pen path isn't stranded). A separate `else if(event.key==='Alt')` branch (10234) clears `state.altDown` on Alt release, unconditionally, no tap/hold distinction. `window.addEventListener('blur',…)` (10241-10243) is a second-layer safety net: it force-resets `state.spaceDown`/`state.isPanning`/`state.spaceUsedForPan`/`state.altDown` on window blur, per the 10235-10240 comment, to cover any OS shortcut (Spotlight named explicitly) that steals focus before the keyup itself reaches the page. The capture-phase `document.addEventListener('pointerdown',…,true)` at 10249 sets `state.spaceUsedForPan=true` whenever `state.spaceDown` is already true at pointerdown time — per its own 10244-10248 comment, this is a SEPARATE mechanism from either pan implementation (`tools.js` Paper.js path, `viewtools-bridge.js` Rust-engine path, both out of scope) specifically because panning is implemented twice and a single capture-phase flag avoids having to touch both.",
+    "(b) Line 10251 (`document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);`) is confirmed by a whole-file grep to be the ONLY place `onKeyDown` or `onKeyUp` is passed to `addEventListener` for the page-level `keydown`/`keyup` events — every other `addEventListener('keydown'/'keyup',…)` call in timeline.js (lines 5443, 5708, 5939, 7664, 7721, 8246, 8349, 8568, 8917, 10279, 10298, 10488, 10957, 11059) registers its own distinct inline/named handler, none of them `onKeyDown`/`onKeyUp`. This single registration is the extraction seed for the whole keyboard subsystem: cutting it would silently disable both the shortcut table (C19ae) and the entire Space tap/hold machine (packet 1) in one line.",
+    "(c) The Cmd-hold machine (packet 2, 2026-08-27, feedback #64): `_cmdHoldEligible()` (10274-10278) returns false whenever focus is on an INPUT/SELECT/TEXTAREA/contentEditable element, OR `state.playing`, OR `state.tool` is already `'select'`/`'subselect'`, OR the Pen tool has an in-progress path (`_pen&&_pen.path`, `_pen` module-scoped in tools.js:7128), OR `state.spaceDown` is true. The `keydown` listener (10279-10297) only acts on `e.key==='Meta'||e.key==='Control'`: it guards against native modifier auto-repeat via `_cmdHoldDown` (10281), then arms a `setTimeout(…,CMD_HOLD_MS)` (180ms, 10273) ONLY if `_cmdHoldEligible()` passes at press time (10283); the timer body re-checks both `_cmdHoldDown` and `_cmdHoldEligible()` (10286, in case state changed during the wait) before recording `_cmdHoldPrevTool=state.tool` (10287) and calling `window.SM.setTool('select')` (10288). Any OTHER keydown while `_cmdHoldTimer` is pending (10290-10296) clears the timer silently — per the 10291-10294 comment, this is what lets the ~15 existing Cmd+<letter> shortcuts in `onKeyDown` (whose own Cmd/Ctrl+key handlers are gated on `event.metaKey`/`event.ctrlKey`, out of scope) fire normally: the modifier's own keydown fires first and would otherwise flicker the tool before the letter's keydown lands, which the 10259-10264 lead-in comment names explicitly as the hazard this arm-delay avoids. The `keyup` listener (10298-10303) restores `_cmdHoldPrevTool` via `window.SM.setTool(...)` if one was recorded, or simply clears the pending timer if the hold never actually armed. `window.addEventListener('blur',…)` (10307-10311) is the same stuck-modifier safety net shape as packet 1's own blur handler, restoring `_cmdHoldPrevTool` if focus is lost mid-hold. Line 10312 (`document.querySelectorAll('.tool-btn').forEach(…SM.setTool(this.dataset.tool)…)`) is the generic, ALL-tool-buttons click handler; by direct read it does NOT itself reference any `_cmdHold*` variable and does not explicitly cancel the hold — the issue's own suggested table describes it as \".tool-btn click cancelling the hold\", which this census records as an over-statement of the code's own behavior (see `future_proposals`); it is included in packet 2's range because it is the line immediately preceding packet 3's own lead-in and shares no clearer boundary.",
+    "(d) The shape-tool flyout (packet 3, 2026-08, feedback quoted in the 10313-10314 lead-in): `SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star']` (10328); `LPRESS_MS=450` (10329, long-press threshold). `ensureFront(tool)` (10330-10336) is a no-op for a non-shape tool (10331) and otherwise toggles the `.stack-front` class on exactly one `.tool-btn[data-tool=…]` per call, front-ing the picked tool's own button in the shared stack. `window.SMShapeGroup={ensureFront:ensureFront}` (10337) is the sole external-facing surface, read by `setTool` (timeline.js:435) and `tutorial.js` (tutorial.js:1468) — confirmed the two ONLY readers by a whole-`src` grep, matching the 10322-10326 lead-in exactly. `closeFlyout`/`onOutsideDown` (10338-10339) are one-line helpers: the former removes the flyout element and its own outside-click listener, the latter closes on any pointerdown outside the flyout element. `openFlyout(originBtn)` (10340-10360) builds a fresh `<div class=\"shape-tool-flyout\">` positioned relative to `originBtn`'s own `getBoundingClientRect()` (clamped to the viewport via `Math.min`/`Math.max` against `window.innerWidth`/`window.innerHeight`, 10357-10358), with one button per `SHAPE_TOOLS` entry cloning the real button's own `innerHTML` (stripping any `<span class=\"sk\">` shortcut-key badge, 10350) whose click both fronts the tool (`ensureFront(t)`) and switches to it (`window.SM.setTool(t)`, 10352) before closing the flyout. The long-press vs. click distinction lives entirely in the `#shape-tool-stack` element's own three listeners (10361-10371): `pointerdown` arms a `setTimeout(…,LPRESS_MS)` that sets `suppressClick=true` and opens the flyout (10366-10367); `pointerup`/`pointerleave` both clear the pending timer (10369, short press never opens the flyout); a CAPTURE-phase `click` listener on the stack itself (10370) calls `ev.stopImmediatePropagation()` when `suppressClick` is true, preventing the long-press's own trailing click from ALSO reaching the bubble-phase `.tool-btn` click handler (packet 2's own line 10312) that would otherwise fire `SM.setTool` a second time for the ORIGINAL (un-fronted) button.",
+    "(e) The four colour-field pairs (packet 4) all read `this.dataset.hex8||this.value` (10383, 10384, 10391, 10392), the CLAUDE.md §2 alpha-colour convention, on every `input` event — confirmed to never read `.value` alone. `#color-fill`/`#color-stroke` (the native `<input type=\"color\">` wells) and `#pm-fill-c`/`#pm-stroke-c` (the mini popover swatches) additionally call `window.SM.setFillEnabled(true)`/`setStrokeEnabled(true)` (10383-10384, 10391-10392) whenever fill/stroke was OFF, per the 10374-10382 comment (\"Actively picking a fill color also ENABLES fill\", Graphite-style, deliberately keyed to genuine user `input` events only — programmatic `.value` writes on load/selection-sync don't dispatch `input` and so can't silently re-enable). `#pm-fill-c`/`#pm-stroke-c` (10384, 10392) additionally call `setHex8Input(document.getElementById('color-fill'/'color-stroke'), v)` (app.js:560) to mirror the popover's own picked value back into the toolbar's native colour well, keeping both colour surfaces in sync; `#color-fill`/`#color-stroke` themselves do not call `setHex8Input` (their own downstream sync, if any, is inside `SM.setFillColor`/`setStrokeColor`'s own bodies, timeline.js:608/615, out of scope). `#p-fill-on` (10385) and the `-lp` eye-badge clicks (10389-10390) are PURE toggles — `setFillEnabled(this.checked)` / `setFillEnabled(!state.fillEnabled)` / `setStrokeEnabled(!state.strokeEnabled)` — with no colour read at all. The 10386-10388 comment states that the OLD `fill-enable-toggle`/`stroke-enable-toggle` section-header buttons were removed per redesign and that 'every other reference to those old IDs is null-guarded'; by direct grep of src/index.html at the frozen SHA, `#fill-enable-toggle-lp` (index.html:257) and `#stroke-enable-toggle-lp` (index.html:253) BOTH EXIST as `.cw-eye` divs — present, not absent — so lines 10389-10390 resolve to real elements and are not the null-guarded references the comment describes (those, if any, are elsewhere in the codebase, out of scope); neither line itself contains a null guard on the `getElementById` result.",
+    "(f) Every `state.*` field this scope reads or writes, with line: `state.spaceDown` (read 10225/10228→written-false/10242→written-false/10249/10277; written-true only in C19ae's `onKeyDown`, out of scope), `state._spaceAt` (read 10226, written only in C19ae, out of scope), `state.spaceUsedForPan` (read 10227/10249→written-true; written-false 10228/10242), `state.isPanning` (written-false 10228/10242), `state.tool` (read 10229/10233/10276/10287/10349), `state.altDown` (written-false 10234/10242), `state.playing` (read 10276), `state.fillEnabled` (read 10383/10384/10389), `state.strokeEnabled` (read 10390/10391/10392). No `state.*` field is written by packets 3 or 4 beyond what `window.SM.*` setters perform internally (out of scope). Every `window.SM.*` method this scope calls, with owner line (definitions in the `window.SM={…}` block, timeline.js:349+): `setTool` (defined 373; called 10288, 10302, 10310, 10312, 10352), `setBrushSize` (defined 520; called 10373), `setFillColor` (defined 615; called 10383, 10384), `setFillEnabled` (defined 647; called 10383, 10384, 10385, 10389), `setStrokeColor` (defined 608; called 10391, 10392), `setStrokeEnabled` (defined 654; called 10390, 10391, 10392).",
+    "(g) Every DOM id/class this scope touches (src/index.html consumer): ids `p-sw`, `color-fill`, `pm-fill-c`, `p-fill-on`, `fill-enable-toggle-lp`, `stroke-enable-toggle-lp`, `color-stroke`, `pm-stroke-c`, `shape-tool-stack` (all confirmed present by grep, see `reconciliation`); classes/selectors `.tool-btn`, `.tool-btn[data-tool=\"…\"]`, `.stack-front` (toggled, not confirmed present as a CSS rule — out of scope, style.css), `.shape-tool-flyout`/`.shape-tool-flyout-item`/`.active` (created dynamically by `openFlyout`, not present in static markup).",
+    "(h) Callers: everything in this scope is self-registering top-level code (module-load-time `addEventListener` calls, an immediately-invoked function expression, and direct `getElementById(…).addEventListener(…)` chains) — none of the eleven named functions/handlers this scope defines (`onKeyUp`, the anonymous `blur`/`pointerdown`/`keydown`/`keyup` handlers, `_cmdHoldEligible`, `ensureFront`, `closeFlyout`, `onOutsideDown`, `openFlyout`, and the anonymous field-change/input handlers) has an external caller, EXCEPT `window.SMShapeGroup.ensureFront`, read by `setTool` (timeline.js:435) and `tutorial.js` (tutorial.js:1468) — confirmed the only two readers by a whole-`src` grep. None of this scope's own symbols (`onKeyUp`, `SPACE_TAP_MS`, `_cmdHold*`, `CMD_HOLD_MS`, `SHAPE_TOOLS`, `LPRESS_MS`, `ensureFront`, `openFlyout`, `SMShapeGroup`) appears anywhere in engine-bridge.js, export.js, or rive-export.js by a targeted whole-file grep — confirming none of it runs on the render or export path; it is pure input-handling/UI-wiring code."
+  ],
+  "areas": [
+    {
+      "area": "space-tap-hold-keyup-and-key-registration",
+      "packets": [
+        {
+          "id": "C19af.space-tap-hold-keyup-and-key-registration",
+          "files": [
+            "src/js/timeline.js:10217-10271"
+          ],
+          "coverage_ranges": [
+            [
+              10217,
+              10271
+            ]
+          ],
+          "classification": {
+            "code": 14,
+            "comment": 40,
+            "whitespace": 1
+          },
+          "symbols": [
+            "SPACE_TAP_MS",
+            "onKeyUp",
+            "onKeyDown",
+            "togglePlay",
+            "spaceDown",
+            "spaceUsedForPan",
+            "isPanning",
+            "altDown",
+            "_spaceAt"
+          ],
+          "signature": "var SPACE_TAP_MS=250; function onKeyUp(event); document.addEventListener('keydown',onKeyDown); document.addEventListener('keyup',onKeyUp);",
+          "responsibility": "Completes the Space tap/hold gesture (the other half, `onKeyDown`, is C19ae, out of scope): on Space release, decides tap-vs-hold via a 250ms threshold and a spaceUsedForPan flag, resets the four pan/rotate/hold state fields unconditionally, restores the tool cursor, and calls `togglePlay()` for a genuine tap (except mid-Pen-path). Adds a window-blur safety net and a capture-phase pointerdown flag-setter for the pan gesture. Ends with the ONE page-level registration of both `onKeyDown` and `onKeyUp`, the extraction seed for the whole keyboard subsystem (boundary (b)).",
+          "callers": [
+            "None external — `onKeyUp` is registered exactly once, at line 10251 in this same packet, and is never called directly elsewhere (confirmed by a whole-file grep for `onKeyUp(` restricted to call sites, excluding its own declaration).",
+            "The `blur`/`pointerdown` listeners are anonymous and self-registering; browser-invoked only.",
+            "`togglePlay` (timeline.js:177, out of scope) is called from line 10233 — the only call site inside this scope's own body."
+          ],
+          "behavior": [
+            "Lines 10217-10219 (comment, 3 lines): lead-in explaining the 250ms tap threshold's own rationale (survive a slow keypress, but not so generous that abandoning a pan-intent still starts playback).",
+            "Line 10220 (code): `var SPACE_TAP_MS=250;`.",
+            "Lines 10221-10234 (code, with three interleaved comment lines 10222-10224/10230-10232): `function onKeyUp(event){if(event.key===' '){…}else if(event.key==='Alt'){state.altDown=false;}}` — see `boundaries` (a) for the full Space-branch derivation (wasDown/held/tapped, the unconditional four-field reset, cursor restore, the guarded `togglePlay()` call) and the separate unconditional Alt-release branch.",
+            "Lines 10235-10240 (comment, 6 lines): lead-in for the window-blur safety net, naming Spotlight as the concretely reported focus-stealing case.",
+            "Lines 10241-10243 (code): `window.addEventListener('blur',function(){state.spaceDown=false;state.isPanning=false;state.spaceUsedForPan=false;state.altDown=false;});` — unconditional four-field reset, independent of `onKeyUp`'s own reset.",
+            "Lines 10244-10248 (comment, 5 lines): lead-in explaining why the pan-used flag is a capture-phase listener rather than touched inside either pan implementation (Paper.js in tools.js, Rust engine in viewtools-bridge.js).",
+            "Line 10249 (code): `document.addEventListener('pointerdown',function(){if(state.spaceDown)state.spaceUsedForPan=true;},true);` — capture phase (`true` third argument), sets the flag whenever a pointerdown lands while Space is already held.",
+            "Line 10250: blank line (the artifact's own declared 1 whitespace line).",
+            "Line 10251 (code): `document.addEventListener('keydown',onKeyDown);document.addEventListener('keyup',onKeyUp);` — the sole registration of both handlers (boundary (b)).",
+            "Lines 10252-10271 (comment, 20 lines): trailing rationale that actually documents the NEXT packet's own Cmd-hold feature (2026-08-27, feedback #64) — the hazard of ~15 existing Cmd+<letter> shortcuts already in `onKeyDown` firing a bare Meta/Control keydown first, and the arm-delay fix; included in this packet's range because it directly precedes packet 2's own first declaration line (10272) with no other natural cut point, and the issue's own suggested table places it here."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "cmd-hold-temporary-select",
+      "packets": [
+        {
+          "id": "C19af.cmd-hold-temporary-select",
+          "files": [
+            "src/js/timeline.js:10272-10312"
+          ],
+          "coverage_ranges": [
+            [
+              10272,
+              10312
+            ]
+          ],
+          "classification": {
+            "code": 34,
+            "comment": 7,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_cmdHoldTimer",
+            "_cmdHoldPrevTool",
+            "_cmdHoldDown",
+            "CMD_HOLD_MS",
+            "_cmdHoldEligible",
+            "setTool",
+            "tool-btn"
+          ],
+          "signature": "var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false; var CMD_HOLD_MS=180; function _cmdHoldEligible(); document.addEventListener('keydown',function(e){…}); document.addEventListener('keyup',function(e){…}); window.addEventListener('blur',function(){…}); document.querySelectorAll('.tool-btn').forEach(…);",
+          "responsibility": "Implements Cmd/Ctrl-HOLD-to-temporarily-select (feedback #64, Illustrator/Photoshop convention): a 180ms arm-delay distinguishes 'holding the modifier alone' from 'the first keydown of an existing Cmd+<letter> shortcut', switches to Select while armed-and-held, and restores the previous tool on release or window blur. Ends with the generic all-tool-buttons click→setTool wiring (see `boundaries` (c) for why this line's inclusion here does not mean it cancels the hold).",
+          "callers": [
+            "None external — `_cmdHoldEligible`, the three anonymous `keydown`/`keyup`/`blur` listeners, and the `.tool-btn` click handler are all self-registering, browser-invoked only.",
+            "`window.SM.setTool` (timeline.js:373, out of scope) is called from four sites inside this packet: 10288 (arm completes), 10302 (keyup restore), 10310 (blur restore), 10312 (generic per-button click)."
+          ],
+          "behavior": [
+            "Line 10272 (code): `var _cmdHoldTimer=null,_cmdHoldPrevTool=null,_cmdHoldDown=false;` — three module-scoped state vars.",
+            "Line 10273 (code): `var CMD_HOLD_MS=180;`.",
+            "Lines 10274-10278 (code): `function _cmdHoldEligible(){…}` — the five-part eligibility predicate (no field focused, not playing, tool isn't already select/subselect, no in-progress Pen path, Space not held); see `boundaries` (c) for the full derivation.",
+            "Lines 10279-10297 (code, one inline comment at 10281 and a two-line comment 10291-10294): the `keydown` listener — arms the 180ms timer on Meta/Control press if eligible, re-checks eligibility when the timer fires before switching to Select and recording `_cmdHoldPrevTool`, and cancels the pending timer silently on ANY other key.",
+            "Lines 10298-10303 (code, one inline comment at 10301): the `keyup` listener — clears `_cmdHoldDown` on Meta/Control release, either clearing a still-pending timer (never armed) or restoring `_cmdHoldPrevTool` via `SM.setTool`.",
+            "Lines 10304-10306 (comment, 3 lines): lead-in for the blur safety net, naming Cmd+Tab explicitly as a focus-stealing case.",
+            "Lines 10307-10311 (code): `window.addEventListener('blur',…)` — clears the pending timer and `_cmdHoldDown`, restores `_cmdHoldPrevTool` if one was recorded.",
+            "Line 10312 (code): `document.querySelectorAll('.tool-btn').forEach(function(b){b.addEventListener('click',function(){window.SM.setTool(this.dataset.tool);});});` — the generic click→setTool wiring shared by EVERY tool button (including the shape-group's own front button, packet 3); does not itself reference any `_cmdHold*` variable (boundaries (c))."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "shape-tool-flyout-iife",
+      "packets": [
+        {
+          "id": "C19af.shape-tool-flyout-iife",
+          "files": [
+            "src/js/timeline.js:10313-10372"
+          ],
+          "coverage_ranges": [
+            [
+              10313,
+              10372
+            ]
+          ],
+          "classification": {
+            "code": 46,
+            "comment": 14,
+            "whitespace": 0
+          },
+          "symbols": [
+            "SHAPE_TOOLS",
+            "LPRESS_MS",
+            "ensureFront",
+            "SMShapeGroup",
+            "closeFlyout",
+            "onOutsideDown",
+            "openFlyout",
+            "suppressClick",
+            "shape-tool-stack",
+            "shape-tool-flyout"
+          ],
+          "signature": "(function(){ var SHAPE_TOOLS=[…]; var LPRESS_MS=450,…; function ensureFront(tool); window.SMShapeGroup={ensureFront:ensureFront}; function closeFlyout(); function onOutsideDown(e); function openFlyout(originBtn); … })();",
+          "responsibility": "Groups the five shape tools (rect/line/ellipse/speechbubble/star) into one stacked toolbar slot with a long-press flyout for the other four, Illustrator-style 'last used becomes visible'. Exposes `ensureFront` as `window.SMShapeGroup` for `setTool` and `tutorial.js` to front the correct button before a click/spotlight. See `boundaries` (d) for the full long-press/click/outside-click derivation.",
+          "callers": [
+            "`window.SMShapeGroup.ensureFront` — setTool (timeline.js:435, guarded `if(window.SMShapeGroup)`), tutorial.js (tutorial.js:1468, `frontShapeToolIfNeeded`, guarded); confirmed the only two external readers by a whole-`src` grep for `SMShapeGroup`.",
+            "`ensureFront`, `closeFlyout`, `onOutsideDown`, `openFlyout` — all IIFE-internal only, called from this packet's own other functions/listeners (10352 calls `ensureFront`+`closeFlyout` indirectly via `openFlyout`'s own `closeFlyout()` at 10341; 10367 calls `openFlyout`; `onOutsideDown` is passed to `addEventListener` at 10359 and calls `closeFlyout()` internally)."
+          ],
+          "behavior": [
+            "Lines 10313-10326 (comment, 14 lines): lead-in — feedback quote, `#shape-tool-stack`/`.tool-stack`/`.stack-front`/`visibility:hidden` CSS-stacking mechanism (kept real-geometry for tutorial.js's spotlight), and the `ensureFront`/`window.SMShapeGroup` choke-point naming both external callers.",
+            "Line 10327 (code): `(function(){` — IIFE open.",
+            "Line 10328 (code): `var SHAPE_TOOLS=['rect','line','ellipse','speechbubble','star'];`.",
+            "Line 10329 (code): `var LPRESS_MS=450,pressTimer=null,suppressClick=false,flyoutEl=null;`.",
+            "Lines 10330-10336 (code): `function ensureFront(tool){…}` — no-op for a non-shape tool; otherwise toggles `.stack-front` on exactly the matching `.tool-btn[data-tool=…]`.",
+            "Line 10337 (code): `window.SMShapeGroup={ensureFront:ensureFront};` — the external-facing surface.",
+            "Line 10338 (code): `function closeFlyout(){…}` — removes the flyout element and its own outside-pointerdown listener.",
+            "Line 10339 (code): `function onOutsideDown(e){…}` — closes on any pointerdown outside the flyout.",
+            "Lines 10340-10360 (code): `function openFlyout(originBtn){…}` — builds and positions the flyout DOM, one cloned button per `SHAPE_TOOLS` entry wired to `ensureFront`+`SM.setTool`+`closeFlyout`, clamped to the viewport; see `boundaries` (d).",
+            "Lines 10361-10371 (code): `var stack=document.getElementById('shape-tool-stack'); if(stack){…}` — the three listeners implementing long-press-vs-click on the stack element (pointerdown arms `LPRESS_MS` timer, pointerup/pointerleave cancel it, a capture-phase click intercepts the long-press's own trailing click).",
+            "Line 10372 (code): `})();` — IIFE close."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "brush-size-and-fill-stroke-colour-fields",
+      "packets": [
+        {
+          "id": "C19af.brush-size-and-fill-stroke-colour-fields",
+          "files": [
+            "src/js/timeline.js:10373-10392"
+          ],
+          "coverage_ranges": [
+            [
+              10373,
+              10392
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "setBrushSize",
+            "setFillColor",
+            "setFillEnabled",
+            "setStrokeColor",
+            "setStrokeEnabled",
+            "hex8",
+            "p-sw",
+            "color-fill",
+            "pm-fill-c",
+            "p-fill-on",
+            "fill-enable-toggle-lp",
+            "stroke-enable-toggle-lp",
+            "color-stroke",
+            "pm-stroke-c",
+            "setHex8Input"
+          ],
+          "signature": "document.getElementById('p-sw').addEventListener('change',…); document.getElementById('color-fill'/'pm-fill-c'/'p-fill-on'/'fill-enable-toggle-lp'/'stroke-enable-toggle-lp'/'color-stroke'/'pm-stroke-c').addEventListener('input'|'change'|'click',…);",
+          "responsibility": "Wires the eight remaining left-panel/toolbar controls for brush size and fill/stroke colour+enable state to their `window.SM.*` setters, using the CLAUDE.md §2 `dataset.hex8||value` read convention throughout and the Graphite-style 'picking a colour also enables fill/stroke' behavior on genuine user `input` events only. See `boundaries` (e) for the full per-field breakdown, including the null-guard/removed-ID nuance in the 10386-10388 comment.",
+          "callers": [
+            "None external — all eight listeners are anonymous and self-registering; browser-invoked only on user interaction with the corresponding DOM element.",
+            "`window.SM.setBrushSize`/`setFillColor`/`setFillEnabled`/`setStrokeColor`/`setStrokeEnabled` (timeline.js:520/615/647/608/654, out of scope) are each called from this packet's own listeners (see `boundaries` (f) for the exact line-by-line call map).",
+            "`setHex8Input` (app.js:560, out of scope) is called from 10384 and 10392 only, to mirror the popover swatch's own picked value back into the toolbar colour well."
+          ],
+          "behavior": [
+            "Line 10373 (code): `document.getElementById('p-sw').addEventListener('change',function(){window.SM.setBrushSize(parseInt(this.value));});` — brush/stroke-width field, no hex8 convention (numeric, not colour); `#p-sw` already carries `class=\"pi scrub\"` in index.html (CLAUDE.md §10-compliant).",
+            "Lines 10374-10382 (comment, 9 lines): rationale for auto-enabling fill/stroke on a genuine colour pick (Graphite behavior, feedback-driven), and why it's keyed to real `input` events specifically.",
+            "Line 10383 (code): `#color-fill` `input` → `setFillColor(dataset.hex8||value)`, conditionally `setFillEnabled(true)`.",
+            "Line 10384 (code): `#pm-fill-c` `input` → `setFillColor(v)`, `setHex8Input('#color-fill',v)` mirror, conditionally `setFillEnabled(true)`.",
+            "Line 10385 (code): `#p-fill-on` `change` → `setFillEnabled(this.checked)` — pure toggle, no colour read.",
+            "Lines 10386-10388 (comment, 3 lines): notes the OLD `fill-enable-toggle`/`stroke-enable-toggle` section-header buttons were removed per redesign; see `boundaries` (e) for the `-lp` id presence check this comment prompts.",
+            "Line 10389 (code): `#fill-enable-toggle-lp` `click` → `setFillEnabled(!state.fillEnabled)` — pure toggle.",
+            "Line 10390 (code): `#stroke-enable-toggle-lp` `click` → `setStrokeEnabled(!state.strokeEnabled)` — pure toggle.",
+            "Line 10391 (code): `#color-stroke` `input` → `setStrokeColor(dataset.hex8||value)`, conditionally `setStrokeEnabled(true)`.",
+            "Line 10392 (code): `#pm-stroke-c` `input` → `setStrokeColor(v)`, `setHex8Input('#color-stroke',v)` mirror, conditionally `setStrokeEnabled(true)`."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No `saveActiveLayerFrame`/`saveAllLayerFrames` call exists anywhere in this scope's own 176 lines (confirmed by grep). All four packets are DOM-listener wiring; any persistence happens inside the `window.SM.*` setter bodies they call (timeline.js:373-436/520-607/608-660, out of scope)."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No load/import/frame-materialization function is called anywhere in this scope's own body. All four packets read live `state.*`/DOM values at interaction time; none re-triggers a frame load."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "No `pushUndo`/`pushUndoLayers` call exists anywhere in this scope's own 176 lines (confirmed by grep). Any undo-snapshot behavior triggered by a brush-size/colour change or a tool switch happens inside the called `window.SM.*` setter bodies (out of scope), not in this scope's own listeners."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This scope neither reads nor writes `selectedPaths`/`_layerSel`/`_layerSelAnchor`. `_cmdHoldEligible` reads `state.tool` (not selection) to decide whether the current tool is already Select; `setBrushSize`'s own body (timeline.js:520, out of scope) is the one that conditionally touches `selectedPaths` when a draw tool is active with a live selection."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D) and render/export path",
+      "disposition": "None of this scope's eleven top-level symbols (`onKeyUp`, `SPACE_TAP_MS`, `_cmdHold*`, `CMD_HOLD_MS`, `SHAPE_TOOLS`, `LPRESS_MS`, `ensureFront`, `openFlyout`, `SMShapeGroup`) appears anywhere in engine-bridge.js, export.js, or rive-export.js by a targeted whole-file grep at the frozen SHA — confirming none of this scope runs on the render or export path. This is pure input-handling/UI-wiring code (keyboard, pointer, DOM `change`/`input`/`click` listeners)."
+    },
+    {
+      "consumer": "native bridges (Tauri/desktop)",
+      "disposition": "No `window.__TAURI__`/native-bridge call exists anywhere in this scope's own body; all effects are DOM/browser-native (`addEventListener`, `getElementById`, `getBoundingClientRect`, `setTimeout`) or calls into `window.SM.*`/`setHex8Input` (both out of scope)."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-space-tap-vs-hold-vs-pan-used",
+      "proposed": "Simulate `onKeyDown({key:' '})` then immediately `onKeyUp({key:' '})` (well under 250ms, `state.spaceUsedForPan` false); expect `togglePlay()` to fire exactly once. Repeat with `state.spaceUsedForPan=true` set before the keyup; expect `togglePlay()` NOT to fire. Repeat with a >250ms delay between down and up; expect `togglePlay()` NOT to fire (held>=SPACE_TAP_MS) — verifies the `tapped` derivation at 10227 — not run."
+    },
+    {
+      "id": "fx-space-tap-suppressed-mid-pen-path",
+      "proposed": "Set `state.tool='pen'` and `_pen.path` to a truthy stub, then run the tap sequence from fx-space-tap-vs-hold-vs-pan-used; expect `togglePlay()` NOT to fire, per the 10230-10232 guard — not run."
+    },
+    {
+      "id": "fx-window-blur-resets-all-four-fields",
+      "proposed": "Set `state.spaceDown=state.isPanning=state.spaceUsedForPan=state.altDown=true`, dispatch a `blur` event on `window`; expect all four fields `false` — verifies 10241-10243 — not run."
+    },
+    {
+      "id": "fx-cmd-hold-arms-and-restores",
+      "proposed": "With `state.tool='draw'` and no field focused, dispatch `keydown({key:'Meta'})`, advance fake timers by 180ms; expect `window.SM.setTool` called with `'select'` and `_cmdHoldPrevTool==='draw'`. Then dispatch `keyup({key:'Meta'})`; expect `window.SM.setTool` called with `'draw'` and `_cmdHoldPrevTool` cleared — verifies 10279-10303 — not run."
+    },
+    {
+      "id": "fx-cmd-hold-cancelled-by-real-shortcut",
+      "proposed": "Dispatch `keydown({key:'Meta'})` then, before 180ms elapses, `keydown({key:'z'})`; expect the arm timer cleared and `window.SM.setTool` never called with `'select'` — verifies the cancellation branch at 10290-10296 and the hazard described in 10259-10264 — not run."
+    },
+    {
+      "id": "fx-cmd-hold-ineligible-while-field-focused",
+      "proposed": "Focus a real `<input>` element, then run fx-cmd-hold-arms-and-restores; expect `_cmdHoldEligible()` to return false and `window.SM.setTool` never called — verifies the first eligibility clause at 10275 — not run."
+    },
+    {
+      "id": "fx-shape-flyout-long-press-vs-click",
+      "proposed": "Dispatch `pointerdown` on a `.tool-btn` inside `#shape-tool-stack`, advance fake timers by 450ms; expect a `.shape-tool-flyout` element appended to `document.body` with one `.shape-tool-flyout-item` per `SHAPE_TOOLS` entry. Repeat with `pointerup` fired before 450ms elapses; expect no flyout and a normal `.tool-btn` click still reaching `window.SM.setTool` (short press, `suppressClick` never set) — verifies 10361-10371 — not run."
+    },
+    {
+      "id": "fx-ensure-front-toggles-stack-front-class",
+      "proposed": "Call `SMShapeGroup.ensureFront('ellipse')` with all five `.tool-btn[data-tool=…]` buttons present; expect only the ellipse button to carry `.stack-front`. Call `ensureFront('select')` (not a shape tool); expect no class changes — verifies 10330-10336 — not run."
+    },
+    {
+      "id": "fx-colour-field-enables-and-mirrors",
+      "proposed": "With `state.fillEnabled=false`, dispatch an `input` event on `#pm-fill-c` with `dataset.hex8='#ff0000cc'`; expect `window.SM.setFillColor('#ff0000cc')`, `window.SM.setFillEnabled(true)`, and `#color-fill`'s own `.value==='#ff0000'`+`.dataset.hex8==='#ff0000cc'` (via `setHex8Input`) — verifies 10384 and the CLAUDE.md §2 convention end-to-end — not run."
+    }
+  ],
+  "future_proposals": [
+    "The issue's own suggested packet-2 description labels line 10312 (`.tool-btn` click → `SM.setTool`) as \"cancelling the hold\"; by direct read the line does not reference any `_cmdHold*` variable and performs no cancellation of its own — a mouse click on a tool button while the Cmd-hold arm-timer is pending would switch tools via this line WITHOUT clearing `_cmdHoldTimer`, so if the timer later fires it re-checks `_cmdHoldEligible()` (which fails once `state.tool` is `'select'`/`'subselect'`, but would still pass and force a switch back to `'select'` if the user clicked, say, `'draw'`→still-not-select). Not confirmed as a user-visible defect by execution; flagged for awareness since the issue's own prose describes a causal link the code does not literally implement.",
+    "The 10386-10388 comment asserts old removed-ID references are all null-guarded, but lines 10389-10390 (`#fill-enable-toggle-lp`/`#stroke-enable-toggle-lp`) themselves chain `getElementById(...).addEventListener(...)` with NO null guard — currently safe only because both ids are confirmed present in src/index.html (boundaries (e)); a future markup change removing either id without also removing/guarding these two lines would throw at script-load time (`Cannot read properties of null`), taking down the rest of timeline.js's own top-level init code that follows. Not confirmed as a current defect; flagged for awareness given the comment's own (currently inaccurate) claim of blanket null-guarding.",
+    "`openFlyout` (10340-10360) clamps its own position against `window.innerWidth`/`window.innerHeight` but never re-clamps on window resize while the flyout is open — a flyout opened near the right/bottom edge and then followed by a window resize could render partially off-screen. Not confirmed as a reported defect by execution; noted for awareness, not flagged as a required fix."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src` `git grep -n` was run for every symbol this scope defines or references (function/variable names, DOM ids, `window.SM.*`/`state.*` fields), at the frozen SHA, filtering each symbol's own declaration/definition line — results are reproduced verbatim under each packet's own `callers` field and in `boundaries`, and are re-checkable with the same commands.",
+    "A SEPARATE whole-file grep restricted to engine-bridge.js/export.js/rive-export.js for all eleven top-level symbol names this scope defines returned ZERO hits — directly supporting the `source_consumers` render/export-path disposition above.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's own `classify()` algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 102/73/1 over 176 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets (55:14/40/1, 41:34/7/0, 60:46/14/0, 20:8/12/0); no boundary correction to the declared numbers was needed.",
+    "The two `window.SMShapeGroup` reader call sites (setTool timeline.js:435; tutorial.js `frontShapeToolIfNeeded` tutorial.js:1464-1468) were read directly via `git show`, not assumed from the issue's own description — confirming both are guarded (`if(window.SMShapeGroup)`) and confirming the exact call shape.",
+    "`#fill-enable-toggle-lp`/`#stroke-enable-toggle-lp`/`#p-sw`/`#color-fill`/`#pm-fill-c`/`#p-fill-on`/`#color-stroke`/`#pm-stroke-c`/`#shape-tool-stack` were each located directly in src/index.html at the frozen SHA (index.html:257/253/949/256/883/884/252/926/211) rather than assumed present from their own names.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19w and C19x/C19y are merged and cover lines through 8382 (C19y's own declared end); no merged sibling was found covering 8383-10216 or 10393+ at authoring time (a directory scan for all `assigned_ranges` sharing this `source_path` found the nearest merged neighbours ending at 8382 and none beginning before this artifact's own 10217) — this artifact's own overlap check therefore only binds against ALREADY-MERGED siblings at validation time, matching the C19y exemplar's own documented caveat for the same situation.",
+    "Two boundary corrections to the issue's own prose are recorded in `reconciliation` (togglePlay/startPlay/stopPlay's actual owner file; the actual state.spaceDown/isPanning/altDown reader files) — both are attribution-only corrections that do not change the declared assigned_ranges, packet partition, or classification numbers, which match the issue's own proposed table exactly."
+  ],
+  "validation": {
+    "expected_assigned_lines": 176,
+    "expected_classification": {
+      "code": 102,
+      "comment": 73,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        10217,
+        10271
+      ],
+      [
+        10272,
+        10312
+      ],
+      [
+        10313,
+        10372
+      ],
+      [
+        10373,
+        10392
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 10217-10271=(14,40,1); 10272-10312=(34,7,0); 10313-10372=(46,14,0); 10373-10392=(8,12,0); sums to (102,73,1)=176 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 176 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check.py engineering/inventory/census/C19af-timeline-keyup-cmdhold-shape-flyout-colour-fields.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19x-timeline-comment-popover-feedback-capture.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19y-timeline-text-popover-inplace-editors.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check.py engineering/inventory/census/C19l-timeline-fs-ghost-properties-geometry.json <candidate-sha> still exits 0"
+    ]
+  }
+}

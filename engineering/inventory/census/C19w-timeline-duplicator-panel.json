@@ -1,0 +1,416 @@
+{
+  "census_id": "C19w",
+  "issue": 1216,
+  "title": "Timeline.js mograph duplicator config panel — updateDuplicatorPanel, renderDuplicatorSourcePool, renderDuplicatorEffectors, dupRefreshFromPanel (+ adjacent showToast)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf following C19v/#1200 (PR #1201) and preceding the next leaf C19x (`// ---- KEYBOARD ----`, timeline.js:7449+). Scope is four functions across timeline.js:7193-7448: `updateDuplicatorPanel`, `renderDuplicatorSourcePool`, `renderDuplicatorEffectors`, `dupRefreshFromPanel` (four own symbols across four packets, matching the issue's own suggested packet table exactly). The issue's own suggestion to split `duplicator-effectors` at its internal section comments (7339 header row, 7352 step, 7371 offsets, 7388/7401 UX notes) was read against the frozen blob with `sed -n` and NOT taken: each of those comments documents a sub-region of ONE per-effector-row builder inside `renderDuplicatorEffectors`'s own single closure (the `forEach` body building one effector's header, optional angle row, and channel rows — none of those regions is an independently callable unit, a separate function, or separately testable without the enclosing forEach/`eff` closure), so `duplicator-effectors` stays ONE packet over its own 132-line coverage_range, matching the issue's own proposed table exactly — no boundary correction. P30/#1032 retains the timeline.js runtime writer; this JSON authoring does not authorize source changes. Cited by name/line only, not re-mapped: `updateCompInstancePanel`/`renderCompFrameStrip` (C19v, timeline.js:7090-7192, merged, immediately preceding this scope), the static duplicator field wiring IIFE and its own `dupRefresh` (timeline.js:11447 — 'the wiring IIFE further down', this scope's own lead-in comment at 7441-7443 names it explicitly; a later, uncensused C19 slice), the keyboard/shortcut section beginning at timeline.js:7449 (`// ---- KEYBOARD ----`; next leaf C19x; overlaps P30/#1114's shortcut-registry extraction, cite only), `applyLayerDuplicator`/`_duplicatorClonePlacement`/`getEffectiveStrokesRendered`/`_resolveDuplicatorPath`/`convertSelectionToObjectDuplicator`/`effectorChannels` (app.js:1384, 1451-1883, C21g, merged), `PROPS_DUP_EXTRA`/`propsFor`/`DUP_TARGET_PROPS`/`propDim`/`propDimLabels`/`propLabel` (motion.js, C20 lineage), `loadFrame` (app.js) and `SMEngineBridge.renderNow` (engine-bridge.js), `pushUndo` (tweens.js:4770), `SM.t` (i18n.js:4239), and the `#duplicator-sec` markup (src/index.html:1457+).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "6c6d5794360f788eb3091e7d425961d2a26ab470",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "intended_branch": "claude/c19w-timeline-duplicator-panel-census",
+  "assigned_ranges": [
+    {
+      "start": 7193,
+      "end": 7448
+    }
+  ],
+  "coverage_note": "Exactly 256 assigned lines occur once across four packets (one coverage_range per packet, no gaps, no other-owner exclusions): 166 code, 89 full-line comment, 1 blank — independently re-derived by classifying the frozen blob programmatically (a Python re-implementation of the validator's own classify(), run once per packet and once for the whole span, 7193-7448=(166,89,1) both ways) — equal to the issue's own proposed table exactly, no boundary correction needed. Line 7192 is C19v's own closing brace of `renderCompFrameStrip` (out of scope, confirmed against C19v's own assigned_ranges end=7192, sole sibling in this directory claiming any part of src/js/timeline.js immediately before this scope). Line 7193 opens this scope's own lead-in comment for `updateDuplicatorPanel`. Line 7448 is the blank line immediately preceding the `// ---- KEYBOARD ----` header at 7449 (next leaf C19x); the one-line `showToast` (7447) and the `window.updateDuplicatorPanel=...` registration (7446) sit between the duplicator code and that header and are included here so no line is orphaned, matching the issue's own instruction verbatim. A sweep of every C*.json in this directory sharing source_path: src/js/timeline.js (C19a through C19v) confirms the existing coverage is contiguous through line 7192 with zero gaps/overlaps, and this artifact is the immediate next contiguous span.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js resolves to cc4cfd27dc59d797c911d840dc46e2f816942123, 11907 lines.",
+    "current": "origin/main (6c6d5794360f788eb3091e7d425961d2a26ab470, the merge of PR #1215/C21m) has the identical timeline.js blob (git rev-parse 6c6d5794360f788eb3091e7d425961d2a26ab470:src/js/timeline.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js == cc4cfd27dc59d797c911d840dc46e2f816942123); this artifact branches from origin/main at 6c6d5794360f788eb3091e7d425961d2a26ab470, verified directly in the working worktree before authoring (HEAD matches, blob matches, working tree clean).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' 59a5a38c -- src` for the four function symbols this scope defines (updateDuplicatorPanel, renderDuplicatorSourcePool, renderDuplicatorEffectors, dupRefreshFromPanel) plus the adjacent `showToast`, each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`. Field-level read/write claims (ld.duplicator.* field set, DOM ids, pushUndo pairing) were derived by a plain-pattern grep restricted to the frozen blob's own lines 7193-7448, cross-checked line-by-line against a direct `sed -n` read of the same range, and cross-cited against `applyLayerDuplicator`/`_duplicatorClonePlacement` (app.js:1524-1646, C21g, read directly) to confirm the effectors[]/sourcePool shapes agree between writer and reader.",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; dated in-source feedback quotes (2026-07-29, 2026-07-30 ×2 including feedback #168 and the pushUndo QA fix, 2026-08-30, 2026-09-01 ×2) are read as authorial intent, not independently re-verified execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C19w-timeline-duplicator-panel.json and the four timeline.js packets partitioning lines 7193-7448.",
+    "timeline": "P30 retains the timeline.js runtime writer.",
+    "function_boundary": "This scope is a single coherent feature (the mograph Duplicator's config panel) split across four packets purely by which construct each covers: the panel's own show/hide/populate entry point (`updateDuplicatorPanel`, which also decides mode-dependent row visibility and delegates to the other two renderers), the object-mode source-pool sub-list renderer (`renderDuplicatorSourcePool`), the variable-length effector-row renderer (`renderDuplicatorEffectors`), and the shared reload+repaint helper plus two one-line neighbors (`dupRefreshFromPanel`, the `window.updateDuplicatorPanel` export, `showToast`). `updateDuplicatorPanel` calls both `renderDuplicatorSourcePool` (conditionally, object mode only, 7218) and `renderDuplicatorEffectors` (unconditionally, 7262) — both self-contained within this scope. Every dynamically-built field handler in `renderDuplicatorSourcePool`/`renderDuplicatorEffectors` calls `dupRefreshFromPanel()` (this scope's own last packet) after mutating `ld.duplicator.*`, never the IIFE's own `dupRefresh` (timeline.js:11447, out of scope) — the two refresh helpers are NOT interchangeable (see `boundaries`).",
+    "reservations": "D01, T05/Pollen, historical Motion and all named reservations remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C19v (existing owner, timeline.js:6794-7192, merged)",
+      "disposition": "Retains `updateCompInstancePanel`/`renderCompFrameStrip` and the whole layer-drag/symbol-tab/footage/lip-sync scope immediately before this one. This scope's own boundary begins at line 7193, the lead-in comment for `updateDuplicatorPanel`, immediately after C19v's own `renderCompFrameStrip` closing brace at 7192 — confirmed against C19v's own declared assigned_ranges end (7192)."
+    },
+    {
+      "owner": "C19x (next leaf, `// ---- KEYBOARD ----` and the remappable tool-shortcut machinery, not yet filed as an issue at authoring time)",
+      "disposition": "Owns timeline.js:7449+. Confirmed call-graph-disjoint from this scope: none of this scope's four symbols appears past line 7448 in a whole-file grep, and the keyboard section's own header comment begins immediately at 7449-7450 with no shared lead-in. This scope's own boundary ends at line 7448, the blank line preceding that header."
+    },
+    {
+      "owner": "the static duplicator field wiring IIFE and its own `dupRefresh` (timeline.js:11447, existing owner, out of scope, a later uncensused C19 slice)",
+      "disposition": "Wires every STATIC duplicator field (`#dup-mode`, `wireNum`-based `#dup-rows`/`#dup-cols`/`#dup-spacingx`/`#dup-spacingy`/`#dup-count`/`#dup-radius`/`#dup-startangle`/`#dup-seed`/`#dup-anim-offset`, the random/orient/align checkboxes, `#dup-path-layer`, the `#dup-anim-enabled`/`#dup-anim-direction` fields, and the '+ Effector' button that pushes a brand-new `dup.effectors` entry, timeline.js:11493) at module load — cited by line only (11447-11494 read directly to confirm the divergence recorded in `boundaries`, bodies not reproduced). This scope's OWN `dupRefreshFromPanel` (7445) is a DIFFERENT, narrower function than the IIFE's own `dupRefresh` (11447) — see `boundaries` for the exact divergence (invalidateSymbolUnionBounds/updateDuplicatorPanel present only in the IIFE's version). The IIFE's own 'add effector' button (11493-11494) is the ONE external caller of `renderDuplicatorEffectors` found outside this scope's own 7193-7448 span."
+    },
+    {
+      "owner": "app.js:1451-1883 `_resolveDuplicatorPath`/`_duplicatorClonePlacement`/`_duplicatorCount`/`_duplicatorModeOffset`/`applyLayerDuplicator`/`getEffectiveStrokesRendered`/`convertSelectionToObjectDuplicator` (C21g, merged) and app.js:1384 `effectorChannels`",
+      "disposition": "Retains its own body in full — cited by name/line only. `applyLayerDuplicator`/`_duplicatorClonePlacement` (app.js:1524-1646) is the RUNTIME READER of both dynamic shapes this scope's panel writes: `dup.effectors[i]` (`{falloff,radius,strength,angle,channels:[{prop,value}]}`, read app.js:1535-1561, matching field-for-field what `renderDuplicatorEffectors` writes at timeline.js:7358/7361/7363/7369/7383-7434) and `dup.sourceLayerUids` (a plain string array of layer uids, read/resolved app.js:1635-1646 via `SMMotion.findLayerIndexByUid`, matching what `renderDuplicatorSourcePool` writes at timeline.js:7285/7305-7306). `effectorChannels` (app.js:1384, C21g) is the shared per-effector-channel-list accessor both this scope's `renderDuplicatorEffectors` (timeline.js:7383) and `applyLayerDuplicator` (app.js:1550) call — neither reproduces the other's body. `convertSelectionToObjectDuplicator` (app.js:1815-1883) is the ONE app.js call site of `updateDuplicatorPanel` (app.js:1880, guarded on `window.updateDuplicatorPanel`), reached from a UI action (creating a new object-mode duplicator from a selection), never from `getEffectiveStrokes`/`buildSceneJson` — confirmed by direct read of its enclosing function (app.js:1868-1883)."
+    },
+    {
+      "owner": "motion.js (PROPS_DUP_EXTRA/propsFor, C20 lineage; DUP_TARGET_PROPS/propDim/propDimLabels/propLabel; existing owner, out of scope)",
+      "disposition": "Retains its own body in full — cited by name/line only. `DUP_TARGET_PROPS` (motion.js:581, the fixed `['position','positionZ','rotation','rotationX','rotationY','scale','opacity','hue']` list) and `propDim`/`propDimLabels`/`propLabel` (motion.js:13434/13441/13443) are read by this scope's `renderDuplicatorEffectors` (timeline.js:7382,7385-7387,7428) to build the per-channel add-dropdown and value-field layout — this scope never redeclares the property list or its dimensionality, it only consumes motion.js's own single source of truth. `updateDuplicatorPanel` is called twice from motion.js (3275, 3290, both guarded `if(window.updateDuplicatorPanel)`), part of Motion's own row-toggle handling for `toggleLayerDuplicator`, not reproduced here."
+    },
+    {
+      "owner": "engine-bridge.js (SMEngineBridge.renderNow) and app.js (loadFrame)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `SMEngineBridge.renderNow()` is called once in this scope's own body, from `dupRefreshFromPanel` (7445, guarded on `window.SMEngineBridge`). `loadFrame(state.currentFrame)` is likewise called once, from the same line — confirmed neither `updateDuplicatorPanel` nor `renderDuplicatorSourcePool`/`renderDuplicatorEffectors` call either directly; every dynamic-field handler reaches both only through `dupRefreshFromPanel()`."
+    },
+    {
+      "owner": "tweens.js (pushUndo, tweens.js:4770) and i18n.js (SM.t, i18n.js:4239)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. `pushUndo()` (a thin wrapper over `pushUndoLayers`, tweens.js:4770) is called from every one of this scope's own dynamically-built field/button handlers (7285, 7304, 7336, 7358, 7365, 7410, 7432) — see `boundaries` for the complete per-write pairing. `SM.t(key)` (i18n.js:4239) supplies every translated string/title/placeholder this scope's dynamic DOM elements set (dupEditSource/dupEditSourceDone, dupSourceMissingLayer, dupSourceAddPlaceholder, titleRemoveEffectorProp, titleEffectorRadialLinear, dupEffectorStep, hsDeleteEffector, titleEffectorValueHint, titleAddEffectorProp, btnAddPropertyEllipsis), with a hard-coded French fallback string on the one field guarded `window.SM&&SM.t` (7260, `editBtn.textContent`)."
+    },
+    {
+      "owner": "src/index.html:1457+ (`#duplicator-sec` markup and its static child elements)",
+      "disposition": "Retains the static DOM structure in full — cited by line only (`#duplicator-sec` 1457, `#dup-source-sec`/`#dup-source-add`/`#dup-source-list` 1474-1478, `#dup-anim-hdr-row` 1512, `#dup-effectors-list` 1536, `#dup-edit-source-row`/`#btn-dup-edit-source` 1537). This scope only reads/writes these elements' `.value`/`.checked`/`.style.display`/`.innerHTML`/`.textContent` properties and appends dynamic children into `#dup-source-list`/`#dup-effectors-list`/`#dup-source-add`; it declares no markup of its own."
+    },
+    {
+      "owner": "P30/#1032",
+      "disposition": "Retains the whole timeline.js runtime writer; this JSON authoring does not authorize source changes."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 7192 (C19v's own closing brace of `renderCompFrameStrip`) is outside coverage; line 7193 (this scope's `updateDuplicatorPanel` lead-in comment) begins this scope, confirmed against C19v's own declared assigned_ranges end (7192).",
+    "Line 7448 (the blank line before `// ---- KEYBOARD ----`) is the last line of this scope; line 7449 opens the next leaf's (C19x) keyboard-shortcut section — confirmed by reading the frozen blob at 7445-7450.",
+    "No lines inside 7193-7448 are excluded for another owner: every line belongs to exactly one of the four packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "The complete `ld.duplicator.*` field set READ by `updateDuplicatorPanel`, with the DOM id each is mirrored into (all `getElementById` calls, packet 1): `dup.mode` (7207) drives `#dup-mode` value (7219) and the mode-dependent row visibilities `#dup-grid-row`/`#dup-grid-spacing-row` (mode==='grid', 7220-7221), `#dup-count-row` (mode!=='grid', 7222), `#dup-radial-row`/`#dup-radial-orient-row` (mode==='radial', 7223-7224), `#dup-path-row`/`#dup-path-align-row` (mode==='path', 7225-7226). `dup.sourceMode==='objects'` (isObjects, 7214) drives `#dup-source-sec` (7215), `#dup-anim-hdr-row` (7216), `#dup-edit-source-row` (7217) and gates the `renderDuplicatorSourcePool(dup)` call (7218). `dup.rows`→`#dup-rows` (7227), `dup.cols`→`#dup-cols` (7228), `dup.spacingX`→`#dup-spacingx` (7229), `dup.spacingY`→`#dup-spacingy` (7230), `dup.count`→`#dup-count` (7231), `dup.radius`→`#dup-radius` (7232), `dup.startAngle`→`#dup-startangle` (7233), `dup.radialOrient`→`#dup-radial-orient` checked (7234), `dup.pathAlignTangent`→`#dup-path-align` checked (7235), `dup.seed`→`#dup-seed` (7236). `dup.staggerRandom` (sr, 7237): `sr.position`→`#dup-rand-pos` checked (7238), `sr.rotation`→`#dup-rand-rot` checked (7239), `sr.scale`→`#dup-rand-scale` checked (7240), `sr.opacity`→`#dup-rand-op` checked (7241), `sr.hue`→`#dup-rand-hue` checked (7242). `dup.timeOffset` (tOff, 7246): `tOff.enabled`→`#dup-anim-enabled` checked (7247), and `(tOff.enabled&&!isObjects)` drives `#dup-anim-row` display (7248); `tOff.offsetFrames`→`#dup-anim-offset` (7249, `!=null` fallback to 1); `tOff.direction`→`#dup-anim-direction` (7250). `dup.pathLayerUid`→`#dup-path-layer` select value (7251-7258, the select's own `<option>` list is rebuilt each call from `state.layers`, excluding the active layer itself and any OTHER duplicator layer, 7254-7257). `dup.effectors`→passed whole to `renderDuplicatorEffectors(dup)` (7262), which itself drives `#dup-effectors-list` (packet 3). `ld._dupEditSource` (a plain `ld` field, NOT under `ld.duplicator`) drives `#btn-dup-edit-source`'s own textContent/`.ac` class (7259-7261).",
+    "Fields WRITTEN from inside this span's own dynamically-built handlers, each cited with the `pushUndo`/`saveAllLayerFrames` call that precedes it, or its absence (packets 2-3): `dup.sourceLayerUids` (via the closed-over `uids` alias, 7275) is spliced at 7285 (`rm.addEventListener('click', function(){pushUndo();uids.splice(i,1);...})` — `pushUndo()` precedes on the SAME line, no `saveAllLayerFrames` call anywhere in the handler) and pushed at 7305 (`addSel.onchange=function(){...pushUndo();uids.push(addSel.value);...}`, 7303-7306 — `pushUndo()` at 7304 precedes, again no `saveAllLayerFrames`). `eff.falloff` is written at 7358 (`modeSel.addEventListener('change', function(){pushUndo();eff.falloff=modeSel.value;...})` — `pushUndo()` precedes on the same line). `eff.radius` (7361) and `eff.strength` (7363) are both written through the SHARED `num()` builder's own `inp` `change` listener (7336: `inp.addEventListener('change',function(){pushUndo();id(parseFloat(inp.value)||0);dupRefreshFromPanel();})` — `pushUndo()` precedes the `id(...)` callback invocation, where `id` is the per-field setter closure passed to `num()`, e.g. `function(v){eff.radius=v;}` at 7361). `dup.effectors` is spliced (effector delete) at 7365 (`delBtn.addEventListener('click', function(){pushUndo();dup.effectors.splice(i,1);...})` — `pushUndo()` precedes). `eff.angle` (7369, only rendered when `falloff==='linear'`) is written through the SAME shared `num()` listener at 7336. `channels` (the per-effector `ch` list from `effectorChannels(eff)`, 7383) is spliced (property removal) at 7410 (`rmCh.addEventListener('click', function(){pushUndo();channels.splice(ci,1);...})` — `pushUndo()` precedes) and pushed (new property) at 7434 (`addSel.addEventListener('change', function(){...pushUndo();var dim=...;channels.push({...});...})`, 7430-7436 — `pushUndo()` at 7432 precedes `channels.push` at 7434). `ch.value[vd]` (per-value-dimension, 7416) is written through the SAME shared `num()` listener at 7336. EVERY write in this span is therefore preceded by `pushUndo()` (matching the 2026-07-30 QA-fix comment at 7330-7335, which states the effectors panel previously had NONE) and NONE of them call `saveAllLayerFrames()` anywhere in this span — every handler's post-mutation call is `dupRefreshFromPanel()` (loadFrame+renderNow only), never `saveAllLayerFrames`+`pushUndoLayers`. This is a DELIBERATE distinction from C19v's own footage-panel/finish-layer-reorder writes (which DO call `saveAllLayerFrames()`): `ld.duplicator` and its nested `effectors`/`sourceLayerUids` are per-LAYER config mutated through a live object reference (`var dup=ld.duplicator` at 7206 and `var eff=...` from `dup.effectors[i]`, not a copy), so the write lands directly on the document's own live state with no separate per-frame-strokes save step required — `loadFrame` alone is enough to make the mutated config visible, matching the STATIC fields' own convention in the wiring IIFE (`wireNum`, timeline.js:11458, also `pushUndo()` then a direct field write then `dupRefresh()`, no `saveAllLayerFrames` either).",
+    "STATIC fields wired in the bottom-of-file IIFE (timeline.js:11447+, cited by line only, NOT part of this span): `#dup-mode`→`dup.mode` (11448), `wireNum`-based `#dup-rows`→`rows`, `#dup-cols`→`cols`, `#dup-spacingx`→`spacingX`, `#dup-spacingy`→`spacingY`, `#dup-count`→`count`, `#dup-radius`→`radius`, `#dup-startangle`→`startAngle`, `#dup-seed`→`seed`, `#dup-anim-offset`→`timeOffset.offsetFrames` (11449+, `wireNum` defined 11458, cited by line only, body not reproduced), the `#dup-rand-*` checkboxes, `#dup-radial-orient`/`#dup-path-align`, `#dup-path-layer`, `#dup-anim-enabled`/`#dup-anim-direction`, and the '+ Effector' button (11493-11494) which pushes a brand-new `dup.effectors` entry with a default `{pos:{x:pivot.x,y:pivot.y},radius:200,falloff:'radial',angle:0,strength:100,channels:[{prop:'position',value:[0,0]}]}` shape — the SAME shape this scope's own `renderDuplicatorEffectors` reads/writes field-by-field, confirming the two files agree on the effector entry shape without either reproducing the other's body.",
+    "The exact `effectors[i]` entry shape as WRITTEN here: `{falloff:'radial'|'linear'|'step' (7357-7358, a 3-option <select>), radius:number (7361, only rendered/writable when falloff!=='step', 7360-7362), strength:number (7363, always rendered), angle:number (7369, only rendered/writable when falloff==='linear', 7367-7370), channels:[{prop:string, value:number[]}] (7383-7434, prop drawn from `SMMotion.DUP_TARGET_PROPS` filtered to exclude properties already present on this effector, 7382/7425-7429; value's length is `SMMotion.propDim(prop)`, 1 or 2, 7385/7414-7419/7433)}`. `eff.pos` (the effector's own world-space anchor point, an `{x,y}`) is READ by the runtime (app.js:1538) but is NEVER written anywhere in this span — this panel is a numeric/dropdown editor only; `eff.pos` is set once at creation time by the IIFE's own '+ Effector' button (11493, cited by line only) and thereafter only by the on-canvas Motion-mode drag gizmo (out of scope, not part of timeline.js). Cross-cited to the reader `applyLayerDuplicator`/`_duplicatorClonePlacement` (app.js:1524-1563, C21g.clone-placement packet, cited by line only, body not reproduced): reads `eff.falloff` (app.js:1535,1539), `eff.pos` (1538), `eff.angle` (1540), `eff.radius` (1542,1545), `eff.strength` (1548), and `effectorChannels(eff)` (app.js:1384, C21g) → `ch.prop`/`ch.value` in a `switch(ch.prop)` over the SAME `DUP_TARGET_PROPS` name set (1552-1561) — the writer (this scope) and the reader (C21g) agree on every field name with no discrepancy found.",
+    "The exact `sourcePool` entry shape as WRITTEN here: `dup.sourceLayerUids` (lazily initialized to `[]` at 7275 if absent) is a PLAIN ARRAY OF STRINGS — each element is a layer's own `l.layerUid||''` (7295, 7305, the value of an `<option>` in the add-`<select>`), never an object wrapper; add/remove operate purely by array index (`uids.splice(i,1)`, 7285) or `Array.push` (`uids.push(addSel.value)`, 7305) on the string itself. Cross-cited to the reader `applyLayerDuplicator` (app.js:1634-1646, C21g.apply-duplicator-setup packet, cited by line only): reads `dup.sourceLayerUids` directly (1635), `.map(uid=>M.findLayerIndexByUid(uid))` (1636-1637) to resolve each string to a live layer index, then `.filter(...)` (1638-1645) to drop any entry that fails to resolve, points at the host layer itself, or now points at a layer that has ITSELF become a duplicator — matching this panel's own add-`<select>` exclusion logic (7293-7296, which excludes the host, any already-pooled uid, and any other duplicator layer at population time) as a belt-and-suspenders pair: the panel prevents most invalid entries from ever being added, and the runtime reader defensively re-filters in case a pool member became invalid AFTER being added (e.g. deleted, or converted to a duplicator elsewhere).",
+    "Show/hide driver for `#duplicator-sec` and its three sub-rows, and behavior with no/non-duplicator layer active (packet 1, 7201-7217): `var sec=document.getElementById('duplicator-sec');if(!sec)return;` (7201-7202, DOM-existence guard). `var ld=state.layers[state.activeLayerIdx];if(!ld||!ld.duplicator){sec.style.display='none';return;}` (7203-7204) — the section is HIDDEN and the function returns IMMEDIATELY whenever there is no active layer at all (`state.activeLayerIdx` out of range) OR the active layer exists but carries no `.duplicator` object (an ordinary, non-duplicator layer) — none of this scope's own fields are touched in that case, so any DOM values left over from a PREVIOUSLY active duplicator layer simply remain stale/hidden (no explicit field reset on hide). `sec.style.display='block'` (7205) only once past that guard. The three sub-rows are then driven by `isObjects=dup.sourceMode==='objects'` (7214, per the 7208-7213 comment: object mode has no single seed shape and temporal stagger doesn't apply to a pool of OTHER layers' own content): `#dup-source-sec` shown ONLY in object mode (7215); `#dup-anim-hdr-row`/`#dup-edit-source-row` shown ONLY in non-object (shape) mode (7216-7217) — mutually exclusive with `#dup-source-sec`.",
+    "The refresh-sequence divergence between this scope's own `dupRefreshFromPanel` and the IIFE's own `dupRefresh` — cited by line, both bodies read directly: `dupRefreshFromPanel` (timeline.js:7445, this scope's own packet 4) is exactly `function dupRefreshFromPanel(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();}` — TWO calls, `loadFrame` then a guarded `renderNow`. `dupRefresh` (timeline.js:11447, the wiring IIFE, out of scope) is `function dupRefresh(){loadFrame(state.currentFrame);if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();if(window.SMEngineBridge)SMEngineBridge.renderNow();updateDuplicatorPanel();}` — FOUR calls: the same `loadFrame`+guarded `renderNow` pair, PLUS a guarded `SMMotion.invalidateSymbolUnionBounds()` call BEFORE `renderNow`, PLUS an unconditional `updateDuplicatorPanel()` call AFTER `renderNow`. The divergence: every dynamic-field handler in THIS scope (source-pool add/remove, effector add/delete/falloff/radius/strength/angle/step, per-property offset add/remove/edit) calls `dupRefreshFromPanel` — which does NOT invalidate the symbol union-bounds cache and does NOT re-run `updateDuplicatorPanel` itself (each handler already calls `renderDuplicatorSourcePool(dup)`/`renderDuplicatorEffectors(dup)` directly beforehand for its own sub-tree, e.g. 7285-7286, so a full panel re-render is redundant for THOSE fields) — while every STATIC field in the IIFE calls the FULLER `dupRefresh`. Per `updateDuplicatorPanel`'s own lead-in comment (7193-7199, 'listeners wired at the bottom of this file... write into ld.duplicator.* then reload the frame') and the union-bounds-cache comment at 11440-11446 ('a duplicator field changes what a COMPONENT instance's union bounds should be... this cache's key... has no way to know the duplicator config itself just changed'), this divergence means: a dynamic-field edit from THIS scope's own effector/source-pool rows does NOT invalidate the symbol union-bounds cache the way a STATIC field edit does — flagged, not confirmed as a defect (no execution performed), in `future_proposals` below, since a duplicator's own union bounds ARE a function of effector radius/offset/source-pool membership just as much as rows/cols/spacing.",
+    "The complete external function-call inventory from this span (owning module/census cited by name only, bodies not reproduced): `document.getElementById`/DOM APIs (browser built-in, not a project module). `SM.t` (i18n.js:4239) — every translated string. `window.SMMotion` (motion.js) — `M.findLayerIndexByUid` (7278), `M2.DUP_TARGET_PROPS`/`.propDim`/`.propDimLabels`/`.propLabel` (7382,7385-7387,7428,7433). `effectorChannels` (app.js:1384, C21g) — called once, 7383. `pushUndo` (tweens.js:4770) — called at 7285,7304,7336,7358,7365,7410,7432 (seven call sites, all immediately preceding a `dup.*`/`eff.*`/`channels`/`ch.value` mutation). `loadFrame` (app.js) and `window.SMEngineBridge.renderNow` (engine-bridge.js) — both called once, inside `dupRefreshFromPanel` (7445) only. No other external function is called anywhere in lines 7193-7448 — confirmed by reading every statement in the span directly (the dump reproduced verbatim in each packet's own `behavior` field below).",
+    "Render-path confirmation: NONE of this scope's four symbols (`updateDuplicatorPanel`, `renderDuplicatorSourcePool`, `renderDuplicatorEffectors`, `dupRefreshFromPanel`) is ever called from `getEffectiveStrokes`/`getEffectiveStrokesRendered` (app.js, C21g) or from `buildSceneJson`/`scenePayload` (engine-bridge.js) — confirmed by a whole-src grep of all four names restricted to engine-bridge.js (zero hits) and by reading every call site of `updateDuplicatorPanel` in app.js (the sole app.js call site, 1880, sits inside `convertSelectionToObjectDuplicator`, a user-gesture UI action, not the render path) and motion.js (both call sites, 3275/3290, sit inside `toggleLayerDuplicator`'s own row-toggle UI handler, not reproduced here). Every call into this scope is either a panel-refresh chain (`updatePropsContext`, timeline.js:2757, out of scope) or a direct user-gesture handler (button click, select change, number-field change) — panel/UI only, matching the issue's own expectation."
+  ],
+  "areas": [
+    {
+      "area": "duplicator-panel-lead-in-and-update",
+      "packets": [
+        {
+          "id": "C19w.duplicator-panel-lead-in-and-update",
+          "files": [
+            "src/js/timeline.js:7193-7263"
+          ],
+          "coverage_ranges": [
+            [
+              7193,
+              7263
+            ]
+          ],
+          "classification": {
+            "code": 55,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "updateDuplicatorPanel",
+            "renderDuplicatorSourcePool",
+            "renderDuplicatorEffectors"
+          ],
+          "signature": "function updateDuplicatorPanel()",
+          "responsibility": "7-line lead-in (7193-7199): same show/hide-from-the-active-layer shape as C19v's own `updateCompInstancePanel`; states explicitly that only the STATIC config lives here (mode/counts/seed/random toggles) while the animatable per-copy deltas are ordinary Motion properties (`PROPS_DUP_EXTRA`, motion.js, C20); field LISTENERS for the static fields are wired once at startup in the bottom-of-file IIFE, not here. `updateDuplicatorPanel()` (7200-7263): the panel's own show/hide/populate entry point — hides `#duplicator-sec` for no-layer/non-duplicator-layer, otherwise mirrors every `ld.duplicator.*` static field into its DOM element, decides mode-dependent and sourceMode-dependent row visibility, rebuilds the path-layer picker's own option list, and delegates the two variable-length sub-lists to `renderDuplicatorSourcePool`/`renderDuplicatorEffectors` (this artifact's own next two packets).",
+          "callers": [
+            "See C19w.duplicator-refresh-registration-toast for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "behavior": [
+            "Lines 7193-7199 (comment, 7 lines): lead-in — same show/hide-from-active-layer shape as `updateCompInstancePanel`; static-vs-animatable config split; listeners wired at startup.",
+            "Line 7200 (code): `function updateDuplicatorPanel(){`.",
+            "Lines 7201-7202 (code): `#duplicator-sec` DOM-existence guard.",
+            "Lines 7203-7204 (code): `ld=state.layers[state.activeLayerIdx]`; hide+return if no layer or `!ld.duplicator`.",
+            "Line 7205 (code): `sec.style.display='block'`.",
+            "Line 7206 (code): `var dup=ld.duplicator;` — a LIVE reference, every subsequent write in packets 2-3 lands directly on this same object.",
+            "Line 7207 (code): `var mode=dup.mode||'grid';`.",
+            "Lines 7208-7213 (comment, 6 lines): object-mode rationale — a pool of OTHER layers has no single seed shape and temporal stagger (which re-samples the seed's own frame content, per `applyLayerDuplicator`'s own comment on tOffOn) doesn't apply to it, so both the animation-header row and edit-source-shape row hide in object mode.",
+            "Line 7214 (code): `var isObjects=dup.sourceMode==='objects';`.",
+            "Lines 7215-7217 (code): `#dup-source-sec`/`#dup-anim-hdr-row`/`#dup-edit-source-row` display, driven by `isObjects`.",
+            "Line 7218 (code): `if(isObjects)renderDuplicatorSourcePool(dup);` — this artifact's own next packet, called only in object mode.",
+            "Line 7219 (code): `#dup-mode` value from `mode`.",
+            "Lines 7220-7226 (code, 7 lines): mode-dependent row visibility — grid rows (`mode==='grid'`), count row (`mode!=='grid'`), radial rows (`mode==='radial'`), path rows (`mode==='path'`).",
+            "Lines 7227-7236 (code, 10 lines): static field mirror — `#dup-rows`/`#dup-cols`/`#dup-spacingx`/`#dup-spacingy`/`#dup-count`/`#dup-radius`/`#dup-startangle`/`#dup-radial-orient`/`#dup-path-align`/`#dup-seed`, each from its own `dup.*` field with an `||`-style default.",
+            "Lines 7237-7242 (code, 6 lines): `var sr=dup.staggerRandom||{};` then the five `#dup-rand-*` checkbox mirrors (pos/rot/scale/opacity/hue).",
+            "Lines 7243-7245 (comment, 3 lines): path-layer-picker rationale — no chained duplicators in v1, the same refusal `_resolveDuplicatorPath`'s own runtime guard (app.js, C21g) enforces; this is only the UI half.",
+            "Lines 7246-7250 (code, 5 lines): `var tOff=dup.timeOffset||{};` then `#dup-anim-enabled` checked, `#dup-anim-row` display (`tOff.enabled&&!isObjects`), `#dup-anim-offset` (`!=null` fallback to 1), `#dup-anim-direction`.",
+            "Lines 7251-7258 (code, 8 lines): `#dup-path-layer` select rebuild — clears, appends a placeholder `—` option, then one option per OTHER layer that is neither the active layer nor itself a duplicator (7254-7257), sets `.value=dup.pathLayerUid||''`.",
+            "Lines 7259-7261 (code, 3 lines): `#btn-dup-edit-source` textContent/`.ac` class toggle from `ld._dupEditSource` (a plain `ld` field, not under `ld.duplicator`), with a `SM.t`-guarded French fallback string.",
+            "Line 7262 (code): `renderDuplicatorEffectors(dup);` — this artifact's own third packet, called UNCONDITIONALLY (both modes).",
+            "Line 7263 (code): `}` closing brace of `updateDuplicatorPanel`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "duplicator-source-pool",
+      "packets": [
+        {
+          "id": "C19w.duplicator-source-pool",
+          "files": [
+            "src/js/timeline.js:7264-7308"
+          ],
+          "coverage_ranges": [
+            [
+              7264,
+              7308
+            ]
+          ],
+          "classification": {
+            "code": 34,
+            "comment": 11,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderDuplicatorSourcePool",
+            "SMMotion",
+            "pushUndo",
+            "dupRefreshFromPanel"
+          ],
+          "signature": "function renderDuplicatorSourcePool(dup)",
+          "responsibility": "6-line lead-in (7264-7269, dated 2026-09-01): object-mode source pool, rebuilt from scratch every call, same variable-length-list pattern as `renderDuplicatorEffectors`. `renderDuplicatorSourcePool(dup)` (7270-7308): renders one removable row per pooled layer uid plus a header `<select>` that adds any other eligible layer — not the host itself, not already pooled, not itself a duplicator (no chained duplicators, the same refusal `_resolveDuplicatorPath`'s own runtime guard enforces for path mode).",
+          "callers": [
+            "See C19w.duplicator-refresh-registration-toast for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "behavior": [
+            "Lines 7264-7269 (comment, 6 lines): lead-in — object-mode source pool (2026-09-01), rebuilt every call; row = pool member (name + remove); header `<select>` adds any other eligible layer, excluding the host, already-pooled uids, and other duplicators.",
+            "Line 7270 (code): `function renderDuplicatorSourcePool(dup){`.",
+            "Lines 7271-7273 (code): `#dup-source-list`/`#dup-source-add` DOM-existence guard.",
+            "Line 7274 (code): `var M=window.SMMotion;`.",
+            "Line 7275 (code): `var uids=dup.sourceLayerUids||(dup.sourceLayerUids=[]);` — lazy-inits the array in place on the live `dup` object if absent.",
+            "Line 7276 (code): `list.innerHTML='';` — full wipe.",
+            "Lines 7277-7288 (code, 12 lines): per-pool-member row build — resolves the uid to a layer index via `M.findLayerIndexByUid` (7278), shows the layer's own name or a `dupSourceMissingLayer` fallback (dimmed) if unresolved (7280-7283), a remove button (7284) whose `click` handler (7285) does `pushUndo();uids.splice(i,1);renderDuplicatorSourcePool(dup);dupRefreshFromPanel();` — `pushUndo()` precedes the splice, self-recursive re-render, no `saveAllLayerFrames`.",
+            "Line 7289 (code): `addSel.innerHTML='';`.",
+            "Line 7290 (code): placeholder option from `SM.t('dupSourceAddPlaceholder')`.",
+            "Lines 7291-7296 (code, 6 lines): `hostIdx=state.activeLayerIdx`; `already` map from current `uids`; one `<option>` per OTHER layer that is not the host, not itself a duplicator, and not already pooled (7294).",
+            "Lines 7297-7301 (comment, 5 lines): `#dup-source-add` is STATIC markup (unlike the per-effector `<select>`s in packet 3, which are recreated fresh each render) — `.onchange` assignment rather than `addEventListener`, so a repeat call REPLACES the handler instead of stacking a stale `dup` closure on top of it.",
+            "Lines 7302-7307 (code, 6 lines): `addSel.onchange=function(){if(!addSel.value)return;pushUndo();uids.push(addSel.value);renderDuplicatorSourcePool(dup);dupRefreshFromPanel();};` — `pushUndo()` at 7304 precedes the push at 7305, self-recursive re-render, no `saveAllLayerFrames`.",
+            "Line 7308 (code): `}` closing brace of `renderDuplicatorSourcePool`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "duplicator-effectors",
+      "packets": [
+        {
+          "id": "C19w.duplicator-effectors",
+          "files": [
+            "src/js/timeline.js:7309-7440"
+          ],
+          "coverage_ranges": [
+            [
+              7309,
+              7440
+            ]
+          ],
+          "classification": {
+            "code": 74,
+            "comment": 58,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderDuplicatorEffectors",
+            "effectorChannels",
+            "SMMotion",
+            "pushUndo",
+            "dupRefreshFromPanel",
+            "SM"
+          ],
+          "signature": "function renderDuplicatorEffectors(dup)",
+          "responsibility": "4-line lead-in (7309-7313, dated 2026-07-29): effector rows rebuilt from scratch every call, same 'variable-length list, no static markup' pattern as C19v's own `renderCompFrameStrip`; each field writes straight into `ld.duplicator.effectors[i].*` then reloads the frame — the shipped `renderNow()` duplicator guard already covers real-time correctness for any mutation path. `renderDuplicatorEffectors(dup)` (7314-7440): rebuilds `#dup-effectors-list` with one row per `dup.effectors[i]` — a falloff-mode/radius/strength/delete header, a linear-only angle row, and one two-line block per per-property channel offset (add/remove/edit), plus a shared `num()` field-pair builder and a 2026-07-30 UX-audit comment trail explaining every label/layout decision. The issue's own suggestion to split this packet at its internal section comments (7339/7352/7371/7388/7401) was evaluated and rejected — see this artifact's own `owner` field for the evidence.",
+          "callers": [
+            "See C19w.duplicator-refresh-registration-toast for the complete external-caller inventory of every function this artifact declares."
+          ],
+          "behavior": [
+            "Lines 7309-7313 (comment, 5 lines): lead-in — rebuilt every call; each field writes into `ld.duplicator.effectors[i].*` then reloads; shipped renderNow's own duplicator guard covers correctness for any mutation path.",
+            "Line 7314 (code): `function renderDuplicatorEffectors(dup){`.",
+            "Lines 7315-7317 (code): `#dup-effectors-list` DOM-existence guard, `list.innerHTML='';`.",
+            "Line 7318 (code): `(dup.effectors||[]).forEach(function(eff,i){` — the per-effector loop open.",
+            "Lines 7319-7321 (code, 3 lines): row `<div>` (flex column), a local `line()` helper that appends and returns a new `.pr` sub-row.",
+            "Lines 7322-7326 (comment, 5 lines, dated 2026-07-30 UX audit): single-letter labels (R, %) previously had no `title` at all; `num()` now sets `title` on both the label span and the input.",
+            "Lines 7327-7338 (code+comment, 12 lines): `num(l,id,val,step,title)` builder — creates a labeled `.pl` span and a `type=number`/`class=\"pi scrub\"` input (CLAUDE.md §10 scrub convention), a 6-line comment (7330-7335, 2026-07-30 fix) stating this dynamically-rebuilt panel previously had NO `pushUndo` at all (unlike the static `wireNum` fields), the input's own `change` listener (7336) `pushUndo();id(parseFloat(inp.value)||0);dupRefreshFromPanel();`, returns `[label,input]`.",
+            "Lines 7339-7351 (comment+code, 13 lines): header row — a 2-line comment (7339-7340: 'Header: falloff mode, radius, strength, delete') plus an 11-line 2026-08-30 UX-audit comment (feedback #168) explaining WHY the header uses `.dims-row` (68px-fixed `.pl` labels are unreadable for one-character R/% labels at 226px total width); `hdr=line();hdr.classList.add('dims-row');` and the falloff `<select>` element creation begin at the tail of this range.",
+            "Lines 7350-7358 (code, includes the select's own options and listener): `modeSel` title from `SM.t`; a 5-line Step-effector comment (7352-7356, 2026-09-01, C4D Cloner reference) explaining radius/angle are meaningless for Step; the `['radial','linear','step'].forEach` option-builder (7357) with `SM.t('dupEffectorStep')` for the Step label; `modeSel`'s own `change` listener (7358) `pushUndo();eff.falloff=modeSel.value;renderDuplicatorEffectors(dup);dupRefreshFromPanel();` — `pushUndo()` precedes, self-recursive full re-render (not just this row) plus `dupRefreshFromPanel`.",
+            "Line 7359 (code): `hdr.appendChild(modeSel);`.",
+            "Lines 7360-7362 (code, 3 lines): radius field, rendered/writable ONLY when `eff.falloff!=='step'` — `num('R',function(v){eff.radius=v;},eff.radius||200,1,'…')`.",
+            "Line 7363 (code): strength field, always rendered — `num('%',function(v){eff.strength=v;},eff.strength!=null?eff.strength:100,1,'…')`.",
+            "Lines 7364-7366 (code, 3 lines): delete button, `title` from `SM.t('hsDeleteEffector')`, `click` listener `pushUndo();dup.effectors.splice(i,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();` — `pushUndo()` precedes the splice, appended to `hdr`.",
+            "Lines 7367-7370 (code, 4 lines): angle row, rendered/writable ONLY when `(eff.falloff||'radial')==='linear'` — its own `.dims-row`-classed line, `num('°',function(v){eff.angle=v;},eff.angle||0,1,'…')`.",
+            "Lines 7371-7380 (comment, 10 lines, dated 2026-07-30): 'n'importe quel property' — migrated from 4 hardcoded Pos/Rot/Scale/Opacity rows to an arbitrary per-effector channel list (`eff.channels`, via `effectorChannels`, app.js, C21g), any of `SMMotion.DUP_TARGET_PROPS` (adds positionZ/rotationX/rotationY, the '3D aussi' half); one shared row-builder handles both 2-value and 1-value properties via `SMMotion.propDim`/`propDimLabels`, so a future `DUP_TARGET_PROPS` addition needs no new UI code.",
+            "Lines 7381-7383 (code, 3 lines): `M2=window.SMMotion;targetProps=M2.DUP_TARGET_PROPS||[...4 legacy names...];channels=effectorChannels(eff);` — the ONE call into app.js's C21g-owned helper in this whole span.",
+            "Line 7384 (code): `channels.forEach(function(ch,ci){` — per-channel loop open.",
+            "Lines 7385-7387 (code, 3 lines): `dim=M2.propDim(ch.prop)`, `dimLabels=M2.propDimLabels(ch.prop)`, `propLabel=M2.propLabel(ch.prop)`.",
+            "Lines 7388-7398 (comment, 11 lines, dated 2026-07-30 fix): two lines per channel, not one — a single line with name + 2 value fields meant 3 fixed-68px `.pl` labels fighting flex:1 inputs for space; name+delete get their own line, value(s) go on a SEPARATE `.dims-row`-classed line (same class Rows/Cols/spacing already use).",
+            "Line 7399 (code): `nameRow=line();`.",
+            "Lines 7400-7401 (code): name label from `propLabel`.",
+            "Lines 7401-7407 (comment, code interleaved — comment 7401-7406, 6 lines, 2026-07-30 UX audit): the number(s) below are the DELTA applied at 100% strength (the effector's center), not the effector's own position — `nameLbl.title=SM.t('titleEffectorValueHint')` (7407).",
+            "Line 7408 (code): `nameRow.appendChild(nameLbl);`.",
+            "Lines 7409-7411 (code, 3 lines): per-channel remove button, `title` from `SM.t('titleRemoveEffectorProp')`, `click` listener `pushUndo();channels.splice(ci,1);renderDuplicatorEffectors(dup);dupRefreshFromPanel();` — `pushUndo()` precedes.",
+            "Lines 7412-7413 (code): `valRow=line();valRow.classList.add('dims-row');if(!ch.value)ch.value=[];`.",
+            "Lines 7414-7419 (code, 6 lines): per-dimension value field loop (`vd<dim`), IIFE-closed over `vd`, `num(dimLabels?dimLabels[vd]:(dim>1?String(vd+1):''),function(v){ch.value[vd]=v;},ch.value[vd]||0,1)` — the `change` listener that WRITES `ch.value[vd]` is the SAME shared one at line 7336 (`pushUndo()` precedes there).",
+            "Line 7420 (code): `});` closes `channels.forEach`.",
+            "Lines 7421-7424 (code, 4 lines): add-property row — `addRow=line();addSel=<select class=psel>;addSel.title=SM.t('titleAddEffectorProp');` placeholder option from `SM.t('btnAddPropertyEllipsis')`.",
+            "Lines 7425-7429 (code, 5 lines): `already` map from current `channels`; one `<option>` per `targetProps` entry NOT already present (7427: 'one entry per property — edit the existing row instead of stacking duplicates').",
+            "Lines 7430-7436 (code, 7 lines): `addSel`'s own `change` listener — guard on a value being chosen, `pushUndo()` (7432), `dim=M2.propDim(addSel.value)`, `channels.push({prop:addSel.value,value:new Array(dim).fill(0)})` (7434), self-recursive `renderDuplicatorEffectors(dup);dupRefreshFromPanel();` (7435).",
+            "Line 7437 (code): `addRow.appendChild(addSel);`.",
+            "Line 7438 (code): `list.appendChild(row);` — appends the fully-built per-effector row.",
+            "Line 7439 (code): `});` closes the outer `dup.effectors.forEach`.",
+            "Line 7440 (code): `}` closing brace of `renderDuplicatorEffectors`."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "duplicator-refresh-registration-toast",
+      "packets": [
+        {
+          "id": "C19w.duplicator-refresh-registration-toast",
+          "files": [
+            "src/js/timeline.js:7441-7448"
+          ],
+          "coverage_ranges": [
+            [
+              7441,
+              7448
+            ]
+          ],
+          "classification": {
+            "code": 3,
+            "comment": 4,
+            "whitespace": 1
+          },
+          "symbols": [
+            "dupRefreshFromPanel",
+            "updateDuplicatorPanel",
+            "showToast",
+            "loadFrame",
+            "SMEngineBridge"
+          ],
+          "signature": "function dupRefreshFromPanel(); window.updateDuplicatorPanel=updateDuplicatorPanel; function showToast(m)",
+          "responsibility": "4-line lead-in (7441-7444): the shared refresh for every dynamically-built field above — same reload+render sequence the STATIC duplicator fields already use (`dupRefresh`, in the wiring IIFE further down, timeline.js:11447, cited by line only), factored out here since this function lives above that closure. `dupRefreshFromPanel()` (7445): `loadFrame`+guarded `renderNow`, no union-bounds invalidation, no self-refresh — see this artifact's own `boundaries` for the full divergence from the IIFE's `dupRefresh`. `window.updateDuplicatorPanel=updateDuplicatorPanel;` (7446): the export every external caller (app.js, motion.js ×2) reaches through. `showToast(m)` (7447): the shared `#toast` DOM helper, used across ~70 files/~560+ call sites project-wide (this scope's own packets never call it — see `source_consumers`); adjacent here purely by file position, not by any functional relationship to the duplicator panel. Line 7448 is the blank line preceding the `// ---- KEYBOARD ----` header (7449, C19x).",
+          "callers": [
+            "`updateDuplicatorPanel` — 6 total call sites beyond its own declaration (7200), derived by `git grep -n -P '(^|[^a-zA-Z_.])updateDuplicatorPanel\\(' 59a5a38c -- src/js`, filtered to exclude `//`-only mentions and the declaration line: app.js:1880 (inside `convertSelectionToObjectDuplicator`, C21g, guarded `if(window.updateDuplicatorPanel)`); motion.js:3275 and motion.js:3290 (both inside Motion's own `toggleLayerDuplicator` row-toggle handler, both guarded `if (window.updateDuplicatorPanel)`); timeline.js:2757 (inside `updatePropsContext`'s own long panel-refresh chain — renderLayerList, updateCompInstancePanel, updateDuplicatorPanel, updateFootagePanel and eight more, an earlier uncensused packet — called unguarded since it's the same file); timeline.js:11447 (inside the wiring IIFE's own `dupRefresh`, unguarded, same file); the export at 7446 (`window.updateDuplicatorPanel=updateDuplicatorPanel;`) is the route the three cross-file callers (app.js, motion.js ×2) reach it through — matching the issue's own expectation of 'app.js, motion.js, timeline.js ×2 and the window.updateDuplicatorPanel route' exactly.",
+            "`renderDuplicatorSourcePool` — timeline.js-internal, CONFIRMED: 3 total call sites beyond its own declaration (7270), all inside this SAME artifact's own lines — 7218 (`updateDuplicatorPanel`, packet 1, conditional on object mode), 7285 and 7306 (self-recursive, its own remove/add handlers, packet 2). No external caller found by a whole-src grep.",
+            "`renderDuplicatorEffectors` — timeline.js-internal, CONFIRMED (no cross-FILE caller): 6 total call sites beyond its own declaration (7314) — 7262 (`updateDuplicatorPanel`, packet 1, unconditional); 7358, 7365, 7410, 7435 (self-recursive within packet 3's own handlers); and ONE call OUTSIDE this artifact's own 7193-7448 span but still inside timeline.js — 11494, the wiring IIFE's own '+ Effector' button handler (cited by line only, out of scope), immediately after pushing a brand-new `dup.effectors` entry (11493).",
+            "`dupRefreshFromPanel` — timeline.js-internal, CONFIRMED: 7 total call sites beyond its own declaration (7445), ALL inside this artifact's own lines 7193-7448 — 7285, 7306 (packet 2); 7336, 7358, 7365, 7410, 7435 (packet 3). No caller found outside this artifact's own span, and no caller found outside timeline.js.",
+            "`showToast` — declared timeline.js:7447 (this packet). A per-file COUNT across src/js at the frozen SHA via `git grep -c -P '(^|[^a-zA-Z_.])showToast\\(' 59a5a38c -- src/js`: 81 files contain at least one call, summing (via git grep -c's own per-file MATCHING-LINE count, so a line with two calls on it is undercounted by one) to 563 call sites total — in the same order of magnitude as the issue's own '≈ 70 files, ≈ 650 sites' estimate; individual sites are NOT listed per the issue's own instruction. Not called anywhere in this artifact's own four packets (0 hits within 7193-7440 by direct grep) — it is adjacent by file position only. The `#toast` DOM contract it relies on: a single `<div id=\"toast\"></div>` element (src/index.html:2283), whose `.textContent` this function sets, `.show` class it toggles on with a `setTimeout`-driven auto-remove after 2500ms (clearing any PRIOR pending timeout via `window._toastT` first, so two rapid toasts don't race each other's fade-out) — CSS-driven visibility/animation, not reproduced here (style.css, out of scope)."
+          ],
+          "behavior": [
+            "Lines 7441-7444 (comment, 4 lines): lead-in — shared refresh for every dynamically-built field above; same reload+render sequence the static fields' own `dupRefresh` (wiring IIFE, cited by line only) uses; factored out here since this function lives ABOVE that closure in the file.",
+            "Line 7445 (code): `function dupRefreshFromPanel(){loadFrame(state.currentFrame);if(window.SMEngineBridge)SMEngineBridge.renderNow();}` — one statement, two calls (`loadFrame` unconditional, `renderNow` guarded).",
+            "Line 7446 (code): `window.updateDuplicatorPanel=updateDuplicatorPanel;` — the cross-file export.",
+            "Line 7447 (code): `function showToast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window._toastT);window._toastT=setTimeout(function(){el.classList.remove('show');},2500);}` — one line, the shared project-wide toast helper.",
+            "Line 7448 (blank): precedes the `// ---- KEYBOARD ----` header at 7449 (C19x, next leaf)."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "NO `saveAllLayerFrames()`/`saveActiveLayerFrame()` call exists anywhere in this scope's own 256 lines (confirmed by grep restricted to 7193-7448) — every one of the nine document-mutating writes (packets 2-3: source-pool add/remove, effector falloff/radius/strength/delete/angle, channel add/remove/edit) is preceded by `pushUndo()` and followed only by `dupRefreshFromPanel()` (`loadFrame`+guarded `renderNow`). This is intentional, not an omission: `dup=ld.duplicator` (7206) and its nested `effectors[i]`/`sourceLayerUids` are per-LAYER config held on a live object reference, mutated in place — unlike C19v's own footage-panel/finish-layer-reorder writes (which mutate `ld.frames[i]`-adjacent or array-position data and DO call `saveAllLayerFrames`), a duplicator-config write has no separate per-frame `strokes` array to persist; the mutated `ld.duplicator` object IS the persisted state already. The STATIC fields in the wiring IIFE (timeline.js:11447+, cited by line only) follow the identical no-`saveAllLayerFrames` convention."
+    },
+    {
+      "consumer": "load",
+      "disposition": "`loadFrame(state.currentFrame)` is called exactly once in this scope's own body, inside `dupRefreshFromPanel` (7445, packet 4) — every dynamic-field handler across packets 2-3 reaches it only through this one shared helper. No function named `importJSON` exists anywhere in the codebase at the frozen SHA (a whole-src `git grep -n 'function importJSON'` returns zero hits) — the project-load path is named differently and out of scope; none of this scope's four symbols appear in it either way (confirmed: no hit for any of the four names outside timeline.js/app.js/motion.js's own cited call sites)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "Exactly seven `pushUndo()` calls in this scope's own body (a thin wrapper over `pushUndoLayers`, tweens.js:4770), one immediately before each of the nine writes (7285, 7304, 7336 — covering three separate fields: radius/strength/angle/channel-value through the shared `num()` listener — 7358, 7365, 7410, 7432) — see `boundaries` for the complete per-write pairing table. No write in this scope is EVER unguarded by a preceding `pushUndo()` — the 2026-07-30 QA fix comment at 7330-7335 states this panel previously had none at all; this census confirms (by direct read, not execution) that the fix covers every dynamic write path found here."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Reads `state.activeLayerIdx` (7203, populating `ld`; 7291, `hostIdx` for the add-select exclusion list) but never reads or writes `_layerSel`/`_layerSelAnchor` (C19q's own module-scope selection state) — the duplicator panel operates entirely off the single active layer, with no multi-selection behavior of its own."
+    },
+    {
+      "consumer": "animation/render (Motion + Animation 2D)",
+      "disposition": "`updateDuplicatorPanel` is called identically from both modes — Motion's own `toggleLayerDuplicator` row-toggle handler (motion.js:3275, 3290) and Animation 2D's `updatePropsContext` panel-refresh chain (timeline.js:2757) — with no mode branch anywhere in this scope's own four functions. `state.currentFrame` is read exactly once, synchronously, inside `dupRefreshFromPanel`'s own `loadFrame(state.currentFrame)` call (7445) — never cached across a frame boundary, confirmed by grep within 7193-7448 and manual inspection of the sole site."
+    },
+    {
+      "consumer": "export",
+      "disposition": "None of this scope's four declared functions are called from `export.js` or `rive-export.js` at the frozen SHA (confirmed: zero matches for any of the four symbol names in either file) — every function here is editor-UI-only, reached from user pointer/keyboard gestures on the panel or from `updatePropsContext`'s own panel-refresh chain, never from a render/export pass. Separately confirmed (`boundaries`): none of the four appear in `engine-bridge.js` either, and `updateDuplicatorPanel`'s own sole app.js call site (1880, inside `convertSelectionToObjectDuplicator`) is a user-gesture UI action, not part of `getEffectiveStrokes`/`buildSceneJson`."
+    },
+    {
+      "consumer": "native bridges (Tauri/engine)",
+      "disposition": "`window.SMEngineBridge.renderNow()` is called exactly once in this scope's own body: inside `dupRefreshFromPanel` (7445, guarded on `window.SMEngineBridge`), forcing an immediate repaint after any dynamic-field write. This is the scope's ONLY native/bridge call — no Tauri-specific API, no `window.__TAURI__` reference, no other bridge module is touched anywhere in 7193-7448."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-panel-hides-for-no-layer-and-non-duplicator-layer",
+      "proposed": "Set `state.activeLayerIdx=-1` (or any index with `state.layers[idx]` undefined), call `updateDuplicatorPanel()`; expect `#duplicator-sec`'s `style.display==='none'` and no exception. Then set the active layer to an ordinary layer with no `.duplicator` field at all and call again; expect the same hidden result — verifies the combined guard at 7203-7204 covers both cases identically — not run."
+    },
+    {
+      "id": "fx-panel-mirrors-every-static-field",
+      "proposed": "Construct `ld.duplicator={mode:'radial',rows:3,cols:4,spacingX:10,spacingY:20,count:7,radius:150,startAngle:45,radialOrient:true,pathAlignTangent:false,seed:99,staggerRandom:{position:true,rotation:false,scale:true,opacity:false,hue:true},timeOffset:{enabled:true,offsetFrames:3,direction:'backward'},pathLayerUid:'',sourceMode:'shape'}`, set as the active layer, call `updateDuplicatorPanel()`; expect every DOM id cited in `boundaries` (`#dup-mode`, `#dup-rows`, ..., `#dup-anim-direction`) to read back the exact source value, `#dup-radial-row`/`#dup-radial-orient-row` visible (mode==='radial'), `#dup-grid-row` hidden, `#dup-anim-row` visible (`enabled&&!isObjects`) — not run."
+    },
+    {
+      "id": "fx-source-pool-add-remove-round-trip",
+      "proposed": "Object-mode duplicator with `sourceLayerUids=[]`; call `renderDuplicatorSourcePool(dup)`, select an eligible layer via the add-`<select>`'s own `onchange`; expect `pushUndo` called once, `uids` to contain exactly that one uid, and a rendered row with the layer's own name. Then click that row's own remove button; expect `pushUndo` called a SECOND time, `uids` back to `[]`, and the row removed — verifies 7285/7302-7307 — not run."
+    },
+    {
+      "id": "fx-effector-falloff-step-hides-radius-shows-strength",
+      "proposed": "Single effector `{falloff:'step',strength:50}`; call `renderDuplicatorEffectors(dup)`; expect NO radius field rendered in the header (the `if(eff.falloff!=='step')` guard at 7360) and the strength field still present, reading 50 — then change the `<select>`(`modeSel`) to 'linear'; expect `pushUndo` called, `eff.falloff==='linear'`, a self-recursive re-render that NOW shows both the radius field AND the angle row (7367-7370) — not run."
+    },
+    {
+      "id": "fx-effector-channel-add-edit-remove-round-trip",
+      "proposed": "Single effector with `channels:[]`; call `renderDuplicatorEffectors(dup)`, use the add-property `<select>` to add 'scale' (a 2-dimension property per `SMMotion.propDim('scale')`); expect `pushUndo` called, `channels` to contain exactly `{prop:'scale',value:[0,0]}`, two value input fields rendered (X/Y per `propDimLabels('scale')`). Edit the first value field to 25 via its own `change` event; expect a SECOND `pushUndo` call and `channels[0].value[0]===25`. Click the channel's own remove button; expect a THIRD `pushUndo` call and `channels` back to `[]` — verifies 7416/7430-7436/7409-7411 — not run."
+    },
+    {
+      "id": "fx-dupRefreshFromPanel-vs-dupRefresh-divergence",
+      "proposed": "Spy on `SMMotion.invalidateSymbolUnionBounds` and `updateDuplicatorPanel`; trigger a source-pool add (reaches `dupRefreshFromPanel`); expect `loadFrame` and `SMEngineBridge.renderNow` called, `invalidateSymbolUnionBounds` and the outer `updateDuplicatorPanel` NOT called. Then trigger a STATIC field change (e.g. `#dup-rows`, reaches the IIFE's own `dupRefresh`); expect ALL FOUR called — verifies the divergence recorded in `boundaries` — not run."
+    }
+  ],
+  "future_proposals": [
+    "This scope's own `dupRefreshFromPanel` (7445) does NOT call `SMMotion.invalidateSymbolUnionBounds()`, unlike the wiring IIFE's own `dupRefresh` (timeline.js:11447, cited by line only) — see `boundaries` for the full divergence. Per the union-bounds cache's OWN comment (11440-11446), the cache's key is only `symbolId|inPoint|outPoint` and has no way to detect a duplicator-config change on its own; a component instance's gizmo bounds could therefore go stale after an effector radius/offset edit or a source-pool add/remove — the SAME class of bug the IIFE's own comment says this fix already addresses for the STATIC fields, but not (on this reading) for the fields THIS scope's own dynamic handlers write. Flagged for the eventual runtime-behavior review as a possible missing-invalidation source; not exercised or confirmed as a defect by this census (no execution was performed).",
+    "`renderDuplicatorEffectors` has exactly one external caller outside this scope's own line range (timeline.js:11494, the wiring IIFE's own '+ Effector' button) while `renderDuplicatorSourcePool` and `dupRefreshFromPanel` have none — noted for awareness (the effector list's own add-entry-point lives outside this scope, the source-pool's own does not: `renderDuplicatorSourcePool` has no external '+' button of its own, only the in-panel `#dup-source-add` select this scope itself wires at 7302), not flagged as an inconsistency requiring a fix — the two features simply have different UI entry points by design (a persistent header select for the pool vs. a dedicated button for effectors).",
+    "`eff.pos` (the effector's own world-space anchor) is read by the runtime (`_duplicatorClonePlacement`, app.js:1538, C21g) but is never written by ANY code in this scope — it can only be set by the IIFE's own '+ Effector' button (a fixed default at the duplicator's own pivot, 11493, cited by line only) or by an out-of-scope on-canvas Motion-mode drag gizmo. This panel therefore cannot reposition an existing effector numerically at all (no `#dup-effector-x`/`-y` field anywhere in this scope or in the static IIFE fields found by grep) — noted for awareness, not flagged as a defect since the canvas-drag gizmo is presumably the intended interaction for spatial positioning; not confirmed by execution."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the four function symbols this scope defines (updateDuplicatorPanel, renderDuplicatorSourcePool, renderDuplicatorEffectors, dupRefreshFromPanel) plus the adjacent `showToast`, at the frozen SHA, filtering out each symbol's own declaration line and any hit whose trimmed content starts with `//` — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same command.",
+    "A SEPARATE whole-src grep restricted to `engine-bridge.js`/`export.js`/`rive-export.js` for all four symbol names returned ZERO hits, directly supporting the export/render-path source_consumers entries above (none of the four is reachable from getEffectiveStrokes, buildSceneJson/scenePayload, or either export module).",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by a Python re-implementation of the validator's OWN classify() algorithm against a direct `git show 59a5a38c:src/js/timeline.js` dump, run once per packet and once for the whole span — 166/89/1 over 256 lines, matching the issue's own proposed union exactly and matching the issue's own proposed per-packet table exactly for all four packets; no boundary correction was needed (the suggested internal-comment sub-split of `duplicator-effectors` was evaluated and rejected — see `owner`).",
+    "The `effectors[i]`/`sourceLayerUids` shape claims were cross-checked directly against the reader `applyLayerDuplicator`/`_duplicatorClonePlacement` (app.js:1524-1646, C21g, read verbatim via `sed -n`, not assumed from that artifact's own JSON) — every field name this scope writes (`falloff`, `radius`, `strength`, `angle`, `channels[].prop`/`.value`, plain-string `sourceLayerUids` entries) has a matching read in C21g's own body with no discrepancy found.",
+    "The `dupRefreshFromPanel` vs. `dupRefresh` divergence in `boundaries` was confirmed by reading BOTH function bodies verbatim (timeline.js:7445 and timeline.js:11447), not assumed from either function's own name or comment.",
+    "The `showToast` per-file count (81 files, 563 matching-line call sites) was produced by `git grep -c -P '(^|[^a-zA-Z_.])showToast\\(' 59a5a38c -- src/js`, summed programmatically; individual sites are not listed, per the issue's own instruction. The `#toast` DOM element (src/index.html:2283) was located and confirmed to be the sole element with that id in the file.",
+    "engineering/inventory/census/*.json siblings present at authoring time sharing `source_path: src/js/timeline.js`: C19a through C19v, forming a contiguous run from line 862 through line 7192 with zero gaps and zero overlaps (independently confirmed by listing every sibling's own `assigned_ranges` and checking adjacency) — this artifact's own range (7193-7448) is the immediate next contiguous span; the validator's cross-sibling overlap check additionally confirms this programmatically against every C*.json in the directory."
+  ],
+  "validation": {
+    "expected_assigned_lines": 256,
+    "expected_classification": {
+      "code": 166,
+      "comment": 89,
+      "whitespace": 1
+    },
+    "packet_partition": [
+      [
+        7193,
+        7263
+      ],
+      [
+        7264,
+        7308
+      ],
+      [
+        7309,
+        7440
+      ],
+      [
+        7441,
+        7448
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by script against the frozen blob: 7193-7263=(55,16,0); 7264-7308=(34,11,0); 7309-7440=(74,58,0); 7441-7448=(3,4,1); sums to (166,89,1)=256 — identical to the issue's own proposed table.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 256 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c19w.py engineering/inventory/census/C19w-timeline-duplicator-panel.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c19w.py engineering/inventory/census/C19v-timeline-layer-reorder-symbol-tabs-side-panels.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c19w.py engineering/inventory/census/C19u-timeline-render-layer-list.json <candidate-sha> still exits 0"
+    ]
+  }
+}

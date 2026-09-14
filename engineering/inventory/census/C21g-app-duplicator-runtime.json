@@ -1,0 +1,633 @@
+{
+  "census_id": "C21g",
+  "issue": 1199,
+  "title": "app.js duplicator runtime — path source, clone placement, applyLayerDuplicator, getEffectiveStrokesRendered and the object-mode converter",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/C21g census only; app.js:1252-1450 (component-instance matrices, heavy-field stroke cloning, matrix application, the duplicator's pure helpers — symMatrixOf/symMatrixSet/symGestureAccumulate/cloneStrokeForTransform/applyMatrixToStrokeData/_HEAVY_STROKE_FIELDS/effectorChannels/hexHueRotate/dupMatrixFromDescriptor/_boundsCenterOfStrokes, C21f/#1197, PR #1198 merged) remains a separate owner, cited by name/line only — this scope calls cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor and _boundsCenterOfStrokes repeatedly but does not re-map their bodies. The RIG system (app.js:1884+, `ensureLayerRig` and friends) is the next leaf, C21h, out of scope here and cited by line only for the boundary. Motion's valueAtFrame/DUP_TARGET_PROPS/propDim/propLabel/findLayerIndexByUid/ensureLayerUid (motion.js, C20) and the duplicator config panel (`updateDuplicatorPanel`, timeline.js:7200, C19w) are cited by name only, not re-mapped. getEffectiveStrokes itself (app.js:2949) and its ld.symbolId branch (app.js:3088-3141, including its own applyLayerDuplicator(symLayer,...,{resample:...}) call at 3111) are general app.js territory outside this leaf, cited by line only where a packet's own `callers` needed to name a call site living inside it.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a667b7a032854ab49ba083c9e47529fa15012572",
+  "source_path": "src/js/app.js",
+  "source_blob": "0831959f70612721f80717812838d19940d1f7c1",
+  "source_line_count": 5410,
+  "scope_files": [
+    "src/js/app.js"
+  ],
+  "intended_branch": "claude/c21g-app-duplicator-runtime-census",
+  "assigned_ranges": [
+    {
+      "start": 1451,
+      "end": 1883
+    }
+  ],
+  "coverage_note": "Exactly 433 assigned lines occur once across eight packets (one coverage_range per packet, no gaps, no other-owner overlap): 229 code, 204 full-line `//` comments, 0 blank — matches the issue's own proposed union exactly (independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs: 15+54+6+22+36+49+8+39=229 code; 5+43+3+4+56+47+16+30=204 comment; 0 blank in every packet, per-packet totals identical to the issue's own table). Line 1450 (C21f's own `_boundsCenterOfStrokes` closing `}`) is out of scope; line 1451 opens this scope's own lead-in comment for `_resolveDuplicatorPath`. Line 1883 is the closing `}` of `convertSelectionToObjectDuplicator`; line 1884 opens C21h's own `// ---- RIG (2026-07-29)` section header.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js resolves to 0831959f70612721f80717812838d19940d1f7c1, 5410 lines.",
+    "current": "origin/main (a667b7a032854ab49ba083c9e47529fa15012572) has the identical app.js blob (git rev-parse a667b7a032854ab49ba083c9e47529fa15012572:src/js/app.js == git rev-parse 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/app.js == 0831959f70612721f80717812838d19940d1f7c1); this artifact branches from origin/main at a667b7a032854ab49ba083c9e47529fa15012572 after `git fetch origin && git rebase origin/main` in the worktree.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\(' -- src/js` for the seven function symbols (_resolveDuplicatorPath, _duplicatorClonePlacement, _duplicatorCount, _duplicatorModeOffset, applyLayerDuplicator, getEffectiveStrokesRendered, convertSelectionToObjectDuplicator) and plain `git grep -n '<tag>' -- src/js` for the four per-clone data tags (dupCloneId, dup3D, isDuplicatorCopy, dupIndex), each filtered to exclude the symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit's line and enclosing function directly (located by scanning backward for the nearest preceding `function <name>(` declaration).",
+    "fixtures": "Every fixture is source-derived, proposed and unrun; the in-source comments (the RNG-draw-order-must-not-reshuffle warning, the 2026-07-30 opts/nativeVideo fix note, the 2026-09-01 object-mode/hue/Step-effector notes, the getEffectiveStrokesRendered lead-in's own caller claim) are read as authorial intent and prior-session evidence, not fresh execution evidence produced by this census."
+  },
+  "writer_guidance": {
+    "artifact": "The final census scope is only engineering/inventory/census/C21g-app-duplicator-runtime.json and the eight app.js packets partitioning lines 1451-1883.",
+    "app_js": "app.js retains the whole runtime for these seven symbols and four data tags; this JSON authoring does not authorize source changes.",
+    "c21f_boundary": "Lines 1252-1450 (component-instance matrices, heavy-field stroke cloning, matrix application, the duplicator's pure helpers) belong to C21f/#1197 (PR #1198, merged) — cited by name/line only; this artifact does not re-describe their bodies, only their call sites from within this scope (app.js:1503 seededRng-of-dup.seed pattern shared conceptually, 1524 dup.effectors, 1550 effectorChannels(eff), 1718/1763 cloneStrokeForTransform+applyMatrixToStrokeData, 1752 dupMatrixFromDescriptor, 1621/1714 _boundsCenterOfStrokes, 1771-1772 hexHueRotate).",
+    "c21h_boundary": "Line 1884 (`// ---- RIG (2026-07-29)`) and everything after belongs to C21h, the next leaf, not yet filed as an issue at authoring time — cited by line only for the boundary.",
+    "other_consumers_boundary": "engine-bridge.js, export.js, rive-export.js, motion.js, tweens.js, group-bridge.js, select-bridge.js, tools.js, timeline.js and effector-layer.js retain their own bodies in full — cited by call-site only as callers/readers of this scope's seven symbols and four data tags."
+  },
+  "reconciliation": [
+    {
+      "owner": "C21f / #1197 (existing owner, PR #1198 merged)",
+      "disposition": "Retains app.js:1252-1450 (symMatrixOf/symMatrixSet, symGestureAccumulate, cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor, _boundsCenterOfStrokes). This scope's own boundary begins at line 1451 (the lead-in comment for `_resolveDuplicatorPath`, immediately after C21f's closing `}` for `_boundsCenterOfStrokes` at 1450). This scope calls six of C21f's eight symbols repeatedly (cloneStrokeForTransform, applyMatrixToStrokeData, effectorChannels, hexHueRotate, dupMatrixFromDescriptor, _boundsCenterOfStrokes); it never calls symMatrixOf/symMatrixSet/symGestureAccumulate."
+    },
+    {
+      "owner": "C21h (next leaf, not yet filed as an issue at authoring time)",
+      "disposition": "Owns app.js:1884+ (`// ---- RIG (2026-07-29)`, `ensureLayerRig` and the rig system) — out of scope here, cited by line only for the boundary. No symbol from this scope is called from within the rig section by direct grep of `_resolveDuplicatorPath|_duplicatorClonePlacement|_duplicatorCount|_duplicatorModeOffset|applyLayerDuplicator|getEffectiveStrokesRendered|convertSelectionToObjectDuplicator` against app.js:1884-5410 (no hits)."
+    },
+    {
+      "owner": "engine-bridge.js (existing owner, buildSceneJson's nativeVideo/nativeVideo-nested-symbol branches, the retained-path store, viewport-only render staleness note)",
+      "disposition": "Retains its own body in full — cited by line only. buildSceneJson's nativeVideo branch (engine-bridge.js:1143/1148/1158/1159, path.remove at 1162) and its nativeVideo-nested-symbol mirror (1254/1259/1266/1267, path.remove at 1270) call `_duplicatorCount`/`_resolveDuplicatorPath`/`_duplicatorModeOffset`/`_duplicatorClonePlacement` directly — the SAME four functions applyLayerDuplicator itself calls — because getEffectiveStrokes short-circuits to `[]` for a nativeVideo layer (app.js, general territory), so it never reaches applyLayerDuplicator/getEffectiveStrokesRendered at all; a native video layer's Duplicator would otherwise be a no-op (2026-07-30 fix, cited by the source's own comment at engine-bridge.js:1129-1141). The dup3D-projector cache (engine-bridge.js:972-992, 1441-1463, 1681-1707) reads `c.data.dup3D`/`c.data.dupIndex` off the composited Paper items this scope's applyLayerDuplicator tags (app.js:1774/1784). The retained-path store's `layerRetainable` guard (engine-bridge.js:1008, `!state.layers[i].duplicator`) excludes duplicator layers because getEffectiveStrokesRendered allocates fresh clone dicts per call, so dict identity is meaningless for them (CLAUDE.md §5ter). A separate comment (engine-bridge.js:1000-1008) documents that dupOffset* Motion properties are read by applyLayerDuplicator ONLY when getEffectiveStrokesRendered runs, which only happens inside loadFrame — a bare renderNow() not preceded by a loadFrame would re-serialize stale materialized copies (found live, “la duplication n'est pas en temps réel quand on modifie les value”)."
+    },
+    {
+      "owner": "export.js (existing owner, exportBuildFrame and the second frame builder)",
+      "disposition": "Retains its own body in full — cited by line only. Two call sites (export.js:58 inside exportBuildFrame, export.js:1114 inside a second per-frame stroke builder) call getEffectiveStrokesRendered as the sanctioned duplicator-applied+path-fx-applied reader for PNG/video/Lottie export; export.js:58's own comment states this is “identical to getEffectiveStrokes for every other layer” (a documented no-op for non-duplicator layers)."
+    },
+    {
+      "owner": "rive-export.js (existing owner, the Rive/state-machine export path)",
+      "disposition": "Retains its own body in full — cited by line only. One call site (rive-export.js:582) whose own comment explicitly names this a CLAUDE.md §1 family-of-bug fix: reading the bare (non-Rendered) variant used to export a duplicator's seed shape with none of its copies and no deformation from path-fx, silently — export.js already read the correct variant, rive-export.js did not until this fix."
+    },
+    {
+      "owner": "motion.js (existing owner, symbolUnionBounds and toggleLayerDuplicator)",
+      "disposition": "Retains its own body in full — cited by line/name only. `symbolUnionBounds` (motion.js:5789, one call at 5809) reads getEffectiveStrokesRendered specifically — not getEffectiveStrokes — so a Component's cached union-bounds/gizmo-pivot includes every duplicator copy, not just the seed (2026-07-29 fix, its own comment cites “le gizmo se décale par rapport au calque”). `toggleLayerDuplicator` (motion.js:3228, the shape-mode counterpart, cited by name only per the issue's own scope note) establishes the default `duplicator` field shape convertSelectionToObjectDuplicator's object-mode branch (packet 8) explicitly mirrors, adding only sourceMode/sourceLayerUids. A separate isDuplicatorCopy skip-guard (motion.js:5419) excludes synthetic duplicator clones from per-object gizmo hit-testing, alongside isBrushTextureCopy/isLinkedFillCompanion."
+    },
+    {
+      "owner": "tweens.js (existing owner, onion-skin ghost rendering)",
+      "disposition": "Retains its own body in full — cited by line only. Two call sites (tweens.js:4719 previous-frame ghosts, 4720 next-frame ghosts) call getEffectiveStrokesRendered so onion-skin ghosts show a duplicator's full expansion rather than only its seed shape; neither reads any of this scope's four per-clone data tags directly (confirmed empty by grep of dupIndex/isDuplicatorCopy/dupCloneId/dup3D against tweens.js)."
+    },
+    {
+      "owner": "group-bridge.js (existing owner, non-destructive combine-group boolean composition)",
+      "disposition": "Retains its own body in full — cited by line only. `findByStrokeId`/`resolveGroupMembers`/`emit`/`dictOperands` (group-bridge.js:267-798) all take a `dupIndex` parameter threaded through their recursion so a group-combine can resolve which CLONE'S live Paper item or dict a group member reference should match (a duplicator clone keeps the seed's own `strokeId` verbatim — C21f's cloneStrokeForTransform — so `dupIndex` is the only thing telling copies of the same seed apart, group-bridge.js:258-267's own comment). The synthesized group-combine-result dict (group-bridge.js:749) copies `isDuplicatorCopy`/`dupIndex` from its first member dict verbatim."
+    },
+    {
+      "owner": "select-bridge.js / tools.js (existing owners, per-object interactive gizmo/selection/hit-testing)",
+      "disposition": "Retain their own bodies in full — cited by line only. Four independent isDuplicatorCopy skip-guards (select-bridge.js:1464; tools.js:8208 perObjectShapesOf; tools.js:8459 a brush-anchor resolver; tools.js:8510 a fill-isolate double-click handler) exclude synthetic duplicator clones from per-object selection, hit-testing and double-click-to-isolate, alongside the same isBrushTextureCopy/isLinkedFillCompanion exclusions CLAUDE.md §1 documents for other synthetic companions."
+    },
+    {
+      "owner": "effector-layer.js (existing owner, SMEffectorLayer.resolvedEffectorsFor)",
+      "disposition": "Retains its own body in full — cited by name only. Called once from within this scope (app.js:1526, inside _duplicatorClonePlacement, guarded on `ownerLd && window.SMEffectorLayer` at 1525) to append effector-LAYER-sourced effectors alongside `dup.effectors` (1524) before the SAME per-effector weight/channel loop sums both sources together — not a second copy of the falloff/channel math (CLAUDE.md §3's trap, avoided by construction, per the source's own comment at app.js:1520-1523)."
+    },
+    {
+      "owner": "timeline.js (existing owner, the duplicator config panel and the SMMotion facade)",
+      "disposition": "Retains its own body in full — cited by name/line only. `updateDuplicatorPanel` (timeline.js:7200, C19w, cited by name only per the issue's scope note) is the config UI for `ld.duplicator`'s fields; `SMMotion.convertSelectionToObjectDuplicator` (timeline.js:1642) is a one-line facade forwarding to this scope's own app.js:1830 function, the only caller of it outside app.js itself."
+    }
+  ],
+  "boundaries": [
+    "Line 1450 (C21f's own `_boundsCenterOfStrokes` closing `}`) is outside coverage; line 1451 (the lead-in comment for `_resolveDuplicatorPath`) begins this scope — confirmed by reading through line 1456.",
+    "Line 1883 (`convertSelectionToObjectDuplicator`'s own closing `}`) is the last line of this scope; line 1884 opens C21h's own `// ---- RIG (2026-07-29)` section header — confirmed by direct read, and by grepping this scope's own seven symbols against app.js:1884-5410 (zero hits, no rig code calls into this scope).",
+    "No lines inside 1451-1883 are excluded for another owner: every line belongs to exactly one of the eight packets below, confirmed by the validator's packet-partition-equals-assigned-union check.",
+    "Unlike C21f (whose packet 2's tail documented packets 3-4, and packet 5's header documented packet 7), no cross-packet lead-in quirk exists in this scope: each packet's own lead-in comment documents ONLY the function(s) defined within that SAME packet — confirmed by direct read of all eight ranges (packet 5's several inline comments — Object mode, temporal stagger, hue, 3D — are all about applyLayerDuplicator's own body, which packets 5 and 6 jointly comprise).",
+    "The packet 5/6 split point (1694/1695) falls INSIDE applyLayerDuplicator's own body, between its setup code and its per-clone loop: line 1694 (`var out=[];`) is the last line of packet 5; line 1695 (`for(var k=0;k<count;k++){`) opens packet 6 — confirmed by direct read, matches the issue's own proposed boundary exactly (no evidence found to adjust any of the eight proposed packet boundaries; independently re-derived classification below matches the issue's own table for every packet).",
+    "`getEffectiveStrokesRendered`'s own lead-in comment (app.js:1794-1795) states \"Only loadFrame and export.js's two frame builders substitute this in\" — grep-verified as STALE/incomplete against the actual current caller list: seven real call sites across five files (app.js:4783 loadFrame; export.js:58 and export.js:1114, the \"two frame builders\" the comment names; motion.js:5809 symbolUnionBounds; rive-export.js:582; tweens.js:4719 and tweens.js:4720, onion-skin ghost rendering). The comment was not updated when these later call sites were added (2026-07-29 symbolUnionBounds fix, rive-export.js's own 2026-0X gap fix, tweens.js's onion integration) — documented as evidence of drift, not corrected here (read-only scope).",
+    "`dupCloneId` (set at app.js:1783) has ZERO readers anywhere in src/js at this SHA other than app.js's own `desP` (C21c, app.js:871, cited by name only) round-tripping it onto the live Paper item's `.data.dupCloneId` — confirmed by `git grep -n 'dupCloneId' -- src/js` returning only the four app.js hits (865 comment, 871 code, 1781 comment, 1783 code). Every OTHER consumer of duplicator-clone identity (motion.js, engine-bridge.js, group-bridge.js) keys off `dupIndex`+`strokeId` instead — `dupCloneId` is persisted-shaped (a stable, deterministic string) but currently unconsumed beyond its own round-trip.",
+    "The only assignment to an EXISTING `ld.duplicator`/`dup.<field>` inside this scope's own 433 lines is none — confirmed by grepping the whole range for a bare-assignment pattern (`dup\\.[a-zA-Z]+\\s*=[^=]` etc.), which returns zero hits. The sole object-literal assignment in range, `host.duplicator={...}` (app.js:1853-1865, packet 8), creates a WHOLE NEW config on a freshly-created host layer — not a mutation of any pre-existing duplicator. The one WRITE this scope's own code triggers indirectly is C21f's `effectorChannels`' one-time migration side effect (app.js:1384-1393, mutating `eff.channels` in place) via the call at app.js:1550 (packet 2) — reached once per as-yet-unmigrated effector object each time `_duplicatorClonePlacement` runs."
+  ],
+  "areas": [
+    {
+      "area": "resolve-duplicator-path",
+      "packets": [
+        {
+          "id": "C21g.resolve-duplicator-path",
+          "files": [
+            "src/js/app.js:1451-1470"
+          ],
+          "coverage_ranges": [
+            [
+              1451,
+              1470
+            ]
+          ],
+          "classification": {
+            "code": 15,
+            "comment": 5,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_resolveDuplicatorPath"
+          ],
+          "signature": "function _resolveDuplicatorPath(dup,frameIdx){ var idx=window.SMMotion?SMMotion.findLayerIndexByUid(dup.pathLayerUid):-1; if(idx<0)return null; var srcLd=state.layers[idx]; if(!srcLd||srcLd.duplicator)return null; var strokes=getEffectiveStrokes(idx,frameIdx); var sd=null; for(var i=0;i<strokes.length;i++){if(!strokes[i].isRaster&&strokes[i].segments&&strokes[i].segments.length>=2){sd=strokes[i];break;}} if(!sd)return null; var p=new Path({insert:false}); sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));}); if(sd.closed)p.closed=true; if(!p.length){p.remove();return null;} return{path:p,length:p.length,closed:!!sd.closed,start:p.getPointAt(0)}; }",
+          "responsibility": "Resolves path mode's distribution source: another layer referenced by dup.pathLayerUid (stable-uid convention, same mechanism as AE-style parenting/parentLayerUid). Reads that layer's BASE content (getEffectiveStrokes, deliberately NOT getEffectiveStrokesRendered — a duplicator can't reference another duplicator, enforced twice: the panel's own <select> excludes duplicator layers from the choices, and this function's own runtime backstop at line 1460 refuses if the resolved source layer is itself a duplicator). Picks the FIRST non-raster stroke with >=2 segments (ignores rasters and degenerate 0/1-point paths). Builds a DETACHED Paper Path (`{insert:false}` — never added to any layer/the document) by replaying each segment's point/handleIn/handleOut, mirrors the source stroke's own `closed` flag. Returns null for every failure mode (SMMotion absent, uid not found, source layer missing or itself a duplicator, no usable stroke, zero-length path after construction — the last case explicitly disposes the detached Path via `p.remove()` before returning null, since a detached Paper item is still a live object needing cleanup); otherwise returns `{path,length,closed,start}` for `_duplicatorModeOffset` (packet 4) to sample along.",
+          "callers": [
+            "app.js:1692 — applyLayerDuplicator (packet 5): `var pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null;`, the only in-app.js caller.",
+            "engine-bridge.js:1148 — buildSceneJson's nativeVideo branch (inside buildSceneJson, engine-bridge.js:802): `var nvPathInfo = nvMode === 'path' ? _resolveDuplicatorPath(nvDup, renderFrame) : null;`, mirroring applyLayerDuplicator's own path-mode handling for a native-video layer's Duplicator (getEffectiveStrokes short-circuits to `[]` for nativeVideo, so this scope's normal call path never reaches it).",
+            "engine-bridge.js:1259 — buildSceneJson's nativeVideo-nested-symbol branch: `var nvsymPathInfo = nvsymMode === 'path' ? _resolveDuplicatorPath(nvsymDup, nvsymIi) : null;`, the SAME mirroring for a video sub-layer inside a placed Component instance."
+          ],
+          "behavior": [
+            "Lines 1451-1455 (comment, 5 lines): lead-in. States the path-mode source is a stable-layerUid reference (same convention as parentLayerUid), read for its BASE content deliberately, and that duplicator chaining is refused both by the config panel's own <select> and by this function's runtime backstop.",
+            "Lines 1456-1458 (code, 3 lines): function head; `idx` resolved via `SMMotion.findLayerIndexByUid(dup.pathLayerUid)` guarded on `window.SMMotion` (falls back to -1, i.e. \"not found\"); early-return null if `idx<0`.",
+            "Lines 1459-1460 (code, 2 lines): `srcLd` lookup; early-return null if missing OR itself a duplicator (the no-chaining refusal named in the lead-in).",
+            "Line 1461 (code, 1 line): `strokes=getEffectiveStrokes(idx,frameIdx)` — the undecorated seed content of the referenced layer, not its duplicator-applied variant.",
+            "Lines 1462-1464 (code, 3 lines): linear scan for the first stroke that is not a raster and has `segments.length>=2`; early-return null if none found.",
+            "Line 1465 (code, 1 line): `p=new Path({insert:false})` — a Paper Path object that exists but is not attached to any layer/document.",
+            "Line 1466 (code, 1 line): rebuild every segment of `p` from `sd`'s own point/handleIn/handleOut triples.",
+            "Line 1467 (code, 1 line): mirror `sd.closed` onto `p.closed`.",
+            "Line 1468 (code, 1 line): degenerate-path guard — `if(!p.length){p.remove();return null;}`, disposing the detached Path before giving up.",
+            "Line 1469 (code, 1 line): return `{path,length,closed,start}` (`start` sampled via `p.getPointAt(0)`), the descriptor `_duplicatorModeOffset` consumes.",
+            "Line 1470 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "clone-placement",
+      "packets": [
+        {
+          "id": "C21g.clone-placement",
+          "files": [
+            "src/js/app.js:1471-1567"
+          ],
+          "coverage_ranges": [
+            [
+              1471,
+              1567
+            ]
+          ],
+          "classification": {
+            "code": 54,
+            "comment": 43,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_duplicatorClonePlacement"
+          ],
+          "signature": "function _duplicatorClonePlacement(dup,k,count,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dHue,dPosZ,dRotX,dRotY,randMode,is3DLayer,ownerLd,frameIdx){ var rngK=seededRng(((dup.seed||0)+k*7919)>>>0); var rx=rngK(),ry=rngK(),rrr=rngK(),rsx=rngK(),rsy=rngK(),rop=rngK(); var posK=randMode.position?[(2*rx-1)*dPos[0],(2*ry-1)*dPos[1]]:[k*dPos[0],k*dPos[1]]; var rotK=randMode.rotation?(2*rrr-1)*dRot:k*dRot; var scaleK=randMode.scale?[(2*rsx-1)*dScale[0],(2*rsy-1)*dScale[1]]:[k*dScale[0],k*dScale[1]]; var opK=randMode.opacity?(2*rop-1)*dOpacity:k*dOpacity; var rz=rngK(),rrx=rngK(),rry=rngK(); var dzK=randMode.position?(2*rz-1)*dPosZ:k*dPosZ; var drxK=randMode.rotation?(2*rrx-1)*dRotX:k*dRotX; var dryK=randMode.rotation?(2*rry-1)*dRotY:k*dRotY; var rhue=rngK(); var hueK=randMode.hue?(2*rhue-1)*(dHue||0):k*(dHue||0); var instX=pivotK.x+baseDx,instY=pivotK.y+baseDy; var _effList=dup.effectors||[]; if(ownerLd&&window.SMEffectorLayer){ var _fromLayers=SMEffectorLayer.resolvedEffectorsFor(ownerLd,frameIdx!=null?frameIdx:state.currentFrame); if(_fromLayers.length)_effList=_effList.concat(_fromLayers); } _effList.forEach(function(eff){ var w; if(eff.falloff==='step'){ w=count>1?k/(count-1):0; }else{ var ddx=instX-(eff.pos?eff.pos.x:0),ddy=instY-(eff.pos?eff.pos.y:0); if(eff.falloff==='linear'){ var rad=(eff.angle||0)*Math.PI/180; var proj=ddx*Math.cos(rad)+ddy*Math.sin(rad); w=Math.max(0,Math.min(1,1-proj/(eff.radius||1))); }else{ var dist=Math.hypot(ddx,ddy); w=Math.max(0,Math.min(1,1-dist/(eff.radius||1))); } } w*=(eff.strength!=null?eff.strength:100)/100; if(!w)return; effectorChannels(eff).forEach(function(ch){ var v=ch.value||[]; switch(ch.prop){ case 'position':posK[0]+=w*(v[0]||0);posK[1]+=w*(v[1]||0);break; case 'positionZ':dzK+=w*(v[0]||0);break; case 'rotation':rotK+=w*(v[0]||0);break; case 'rotationX':drxK+=w*(v[0]||0);break; case 'rotationY':dryK+=w*(v[0]||0);break; case 'scale':scaleK[0]+=w*(v[0]||0);scaleK[1]+=w*(v[1]||0);break; case 'opacity':opK+=w*(v[0]||0);break; case 'hue':hueK+=w*(v[0]||0);break; } }); }); var opFactor=Math.max(0,Math.min(1,1+opK/100)); var dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz:dzK,drx:drxK,dry:dryK}:null; return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,hueDeg:hueK,dup3D:dup3D}; }",
+          "responsibility": "Computes ONE clone's full placement descriptor (position/rotation/scale delta, opacity factor, hue shift, optional 3D delta) for clone index `k` of `count`, given the mode's own base offset (baseDx/baseDy/baseRot from packet 4), the four/seven Motion-driven per-copy deltas (dPos/dRot/dScale/dOpacity/dHue/dPosZ/dRotX/dRotY), the stagger-vs-random mode flags, and this clone's own pivot (`pivotK`, which can differ per-clone under temporal stagger). Draws exactly 10 seeded-random numbers per call (`seededRng((dup.seed+k*7919)>>>0)`, ORDER-SENSITIVE: rx,ry,rrr,rsx,rsy,rop for position/rotation/scale/opacity, then rz,rrx,rry for the 3D axes, then rhue LAST — appended after the original 9 so every pre-existing duplicator's random pattern stays byte-identical). For each of position/rotation/scale/opacity/hue/3D-axes, picks either the RANDOM form (`(2*r-1)*delta`, symmetric jitter) or the LINEAR form (`k*delta`, an even progression) per `randMode.<prop>`. Then sums in every applicable effector (inline `dup.effectors` plus, when an owning layer descriptor is supplied and `SMEffectorLayer` is loaded, `resolvedEffectorsFor`'s own layer-sourced effectors) through ONE shared falloff/channel loop — Step falloff ramps by clone INDEX (`k/(count-1)`, needs `count`), linear/default falloff ramp by signed/absolute distance from the effector's own position, each weighted by `strength/100` then fanned out across `effectorChannels(eff)`'s channels into the matching accumulator (position/positionZ/rotation/rotationX/rotationY/scale/opacity/hue). Returns `{dx,dy,rot,sx,sy,opacityFactor,hueDeg,dup3D}` — `dup3D` only when the layer is 3D-enabled AND at least one 3D axis actually moved, else null.",
+          "callers": [
+            "app.js:1747 — applyLayerDuplicator's own clone loop (packet 6): the sole in-app.js caller, once per clone `k`.",
+            "engine-bridge.js:1159 — buildSceneJson's nativeVideo branch: called per `nvk` with the SAME positional signature (Motion deltas hardcoded to `[0,0]`/`0` since a native-video layer has no Motion dupOffset* track resolution at that call site, `is3DLayer` hardcoded `false`).",
+            "engine-bridge.js:1267 — buildSceneJson's nativeVideo-nested-symbol branch: the same mirrored call for a video sub-layer inside a placed Component instance."
+          ],
+          "behavior": [
+            "Lines 1471-1501 (comment, 31 lines): lead-in. Names this function as shared by applyLayerDuplicator AND engine-bridge.js's nativeVideo branch (fixing a 2026-07-30 bug where a native-video layer's Duplicator had zero effect, since getEffectiveStrokes short-circuits video layers to `[]`); explains `pivotK` is a parameter (not always `pivot`) because temporal stagger can re-sample the seed at a per-copy shifted frame, each centered on its own bounds; states this MUST stay the only place this math lives (CLAUDE.md §3's render()/render_to_pixels() rule) because the RNG draw order and effector summation would silently diverge if duplicated; documents `count` (Step effector) and `dHue` (Color/Hue channel) as the only two signature additions since the header was written, both append-only.",
+            "Line 1502 (code, 1 line): function head, 18 positional parameters.",
+            "Lines 1503-1508 (code, 6 lines): seeded RNG (`seededRng((dup.seed+k*7919)>>>0)`), the first 6 draws (rx,ry,rrr,rsx,rsy,rop), and the position/rotation/scale/opacity deltas each picking random-vs-linear form per `randMode.<prop>`.",
+            "Lines 1509-1512 (code, 4 lines): the 3 additional 3D draws (rz,rrx,rry) and their own random-vs-linear deltas (dzK/drxK/dryK).",
+            "Lines 1513-1516 (comment, 4 lines): notes the hue draw comes AFTER the original 9 for the same append-only reason (an insertion mid-sequence would reshuffle every duplicator's existing random pattern).",
+            "Lines 1517-1519 (code, 3 lines): the 10th draw (rhue), hueK's own random-vs-linear form, and `instX/instY` (this clone's instance position, the effector distance origin).",
+            "Lines 1520-1523 (comment, 4 lines): comment on summing inline effectors and effector LAYERS through the SAME loop (CLAUDE.md §3, avoided by construction).",
+            "Line 1524 (code, 1 line): `_effList=dup.effectors||[]` — the base effector list.",
+            "Lines 1525-1528 (code, 4 lines): conditionally concatenates `SMEffectorLayer.resolvedEffectorsFor(ownerLd, frameIdx or state.currentFrame)` onto `_effList` when an owner layer descriptor and the effector-layer module are both present.",
+            "Lines 1529-1549 (21 lines, 17 code/4 comment): `_effList.forEach` — Step falloff (`w=count>1?k/(count-1):0`, comment at 1531-1534 explaining it ramps by INDEX not distance so it stays meaningful off-canvas); else linear falloff (projected distance along `eff.angle`, normalized by `eff.radius`) or default radial falloff (`Math.hypot` distance, same radius normalization); `w*=strength/100`; `if(!w)return` short-circuit.",
+            "Lines 1550-1563 (code, 14 lines): `effectorChannels(eff).forEach` — a switch on `ch.prop` accumulating into posK/dzK/rotK/drxK/dryK/scaleK/opK/hueK, closing both forEach calls. This is the ONE call in this scope's own lines (`effectorChannels(eff)` at 1550) that can trigger C21f's `effectorChannels` one-time migration side effect on `eff`.",
+            "Lines 1564-1567 (code, 4 lines): `opFactor=clamp(0,1,1+opK/100)`; `dup3D=(is3DLayer&&(dzK||drxK||dryK))?{dz,drx,dry}:null` (only attached when meaningful); `return{dx:baseDx+posK[0],dy:baseDy+posK[1],rot:baseRot+rotK,sx:1+scaleK[0]/100,sy:1+scaleK[1]/100,opacityFactor:opFactor,hueDeg:hueK,dup3D:dup3D}`; closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "duplicator-count",
+      "packets": [
+        {
+          "id": "C21g.duplicator-count",
+          "files": [
+            "src/js/app.js:1568-1576"
+          ],
+          "coverage_ranges": [
+            [
+              1568,
+              1576
+            ]
+          ],
+          "classification": {
+            "code": 6,
+            "comment": 3,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_duplicatorCount"
+          ],
+          "signature": "function _duplicatorCount(dup){ var mode=dup.mode||'grid'; return mode==='grid' ?Math.min(900,Math.max(1,dup.rows||1)*Math.max(1,dup.cols||1)) :Math.min(500,Math.max(1,dup.count||1)); }",
+          "responsibility": "Hard cap on the clone count for a duplicator config: grid mode caps at 900 (`min(900, max(1,rows)*max(1,cols))`); every other mode (radial/path) caps at 500 (`min(500, max(1,dup.count||1))`). Mirrors `_registerCap`'s (engine-bridge.js, cited by name only) \"never unbounded\" philosophy — a typo'd/pasted-huge count degrades to \"big\", never \"hangs\". Shared with the nativeVideo render path so it can't drift to a different ceiling than the stroke path uses.",
+          "callers": [
+            "app.js:1619 — applyLayerDuplicator (packet 5): `var count=_duplicatorCount(dup);`.",
+            "engine-bridge.js:1143 — buildSceneJson's nativeVideo branch: `var nvCount = nvDup ? _duplicatorCount(nvDup) : 1;`.",
+            "engine-bridge.js:1254 — buildSceneJson's nativeVideo-nested-symbol branch: `var nvsymCount = nvsymDup ? _duplicatorCount(nvsymDup) : 1;`."
+          ],
+          "behavior": [
+            "Lines 1568-1570 (comment, 3 lines): lead-in — cap philosophy and the shared-ceiling rationale.",
+            "Lines 1571-1576 (code, 6 lines): function head; `mode=dup.mode||'grid'`; ternary returning the grid cap or the count cap; closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "mode-offset",
+      "packets": [
+        {
+          "id": "C21g.mode-offset",
+          "files": [
+            "src/js/app.js:1577-1602"
+          ],
+          "coverage_ranges": [
+            [
+              1577,
+              1602
+            ]
+          ],
+          "classification": {
+            "code": 22,
+            "comment": 4,
+            "whitespace": 0
+          },
+          "symbols": [
+            "_duplicatorModeOffset"
+          ],
+          "signature": "function _duplicatorModeOffset(dup,mode,k,count,cols,pathInfo){ var baseDx=0,baseDy=0,baseRot=0; if(mode==='grid'){ baseDx=(k%cols)*(dup.spacingX||0); baseDy=Math.floor(k/cols)*(dup.spacingY||0); }else if(mode==='radial'){ var span=dup.endAngle!=null?(dup.endAngle-dup.startAngle):360; var ang=(dup.startAngle||0)+k*(span/count); var rr=ang*Math.PI/180; baseDx=(dup.radius||0)*Math.cos(rr); baseDy=(dup.radius||0)*Math.sin(rr); if(dup.radialOrient)baseRot=ang; }else{ // path var t=pathInfo.closed?k/count:(count>1?k/(count-1):0); var off=Math.min(pathInfo.length,t*pathInfo.length); var pt=pathInfo.path.getPointAt(off)||pathInfo.start; baseDx=pt.x-pathInfo.start.x; baseDy=pt.y-pathInfo.start.y; if(dup.pathAlignTangent){var tan=pathInfo.path.getTangentAt(off);if(tan)baseRot=tan.angle;} } return{baseDx:baseDx,baseDy:baseDy,baseRot:baseRot}; }",
+          "responsibility": "The mode-specific (grid/radial/path) BASE offset for clone `k`, before any RNG stagger or effector contribution (that layer is packet 2's own job). Grid: `baseDx=(k%cols)*spacingX, baseDy=floor(k/cols)*spacingY`. Radial: spans `startAngle..endAngle` (default a full 360° sweep when `endAngle` is null), `ang=startAngle+k*(span/count)`, `baseDx/baseDy=radius*cos/sin(ang)`, and `baseRot=ang` only when `dup.radialOrient` is set (each clone facing outward along its own radius). Path: parametrizes `t` by `k/count` when the path is closed (wraps back to the start) or `k/(count-1)` when open (clamped to 0 for a single clone), samples the resolved path at `t*length` via `getPointAt` (falling back to the path's own start point if the sample fails), offsets by the DELTA from the path's start point (not the absolute sampled point), and sets `baseRot` to the path's own tangent angle at that offset only when `dup.pathAlignTangent` is set and a tangent is available.",
+          "callers": [
+            "app.js:1741 — applyLayerDuplicator's clone loop (packet 6): `var modeOff=_duplicatorModeOffset(dup,mode,k,count,cols,pathInfo);`.",
+            "engine-bridge.js:1158 — buildSceneJson's nativeVideo branch: `var nvOff = _duplicatorModeOffset(nvDup, nvMode, nvk, nvCount, nvCols, nvPathInfo);`.",
+            "engine-bridge.js:1266 — buildSceneJson's nativeVideo-nested-symbol branch: the same mirrored call for a video sub-layer."
+          ],
+          "behavior": [
+            "Lines 1577-1580 (comment, 4 lines): lead-in — states this is the BASE offset only (before RNG/effectors), shared with nativeVideo, and that `pathInfo` is `_resolveDuplicatorPath`'s own result (null unless `mode==='path'`).",
+            "Lines 1581-1583 (code, 3 lines): function head; `baseDx/baseDy/baseRot` initialized to 0.",
+            "Lines 1584-1586 (code, 3 lines): grid branch.",
+            "Lines 1587-1592 (code, 6 lines): radial branch — span/angle computation, polar-to-cartesian offset, conditional `radialOrient` rotation.",
+            "Lines 1593-1600 (code, 8 lines): path branch (the `else` — comment `// path` on its own opening line) — parametrized `t`, clamped sample offset, `getPointAt` with start-point fallback, delta-from-start offset, conditional `pathAlignTangent` rotation via `getTangentAt`.",
+            "Lines 1601-1602 (code, 2 lines): return `{baseDx,baseDy,baseRot}`; closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "apply-duplicator-setup",
+      "packets": [
+        {
+          "id": "C21g.apply-duplicator-setup",
+          "files": [
+            "src/js/app.js:1603-1694"
+          ],
+          "coverage_ranges": [
+            [
+              1603,
+              1694
+            ]
+          ],
+          "classification": {
+            "code": 36,
+            "comment": 56,
+            "whitespace": 0
+          },
+          "symbols": [
+            "applyLayerDuplicator"
+          ],
+          "signature": "function applyLayerDuplicator(ld,base,frameIdx,layerIdx,opts){ opts=opts||{}; var dup=ld.duplicator,mode=dup.mode||'grid'; var count=_duplicatorCount(dup); if(count<=1)return base; var pivot=_boundsCenterOfStrokes(base); var M=window.SMMotion; var pool=null; if(dup.sourceMode==='objects'&&dup.sourceLayerUids&&dup.sourceLayerUids.length){ pool=dup.sourceLayerUids.map(function(uid){ return M?M.findLayerIndexByUid(uid):-1; }).filter(function(i){ return i>=0&&i!==layerIdx&&!state.layers[i].duplicator; }); if(!pool.length)return base; // every referenced layer is gone — nothing to draw, not a crash } var tOff=dup.timeOffset,tOffOn=tOff&&tOff.enabled&&(opts.resample||layerIdx!=null)&&(tOff.offsetFrames|0)!==0; var tInF,tSpan; if(tOffOn){ tInF=opts.spanStart!=null?opts.spanStart:layerInPoint(ld); tSpan=Math.max(1,opts.spanLen!=null?opts.spanLen:(layerOutPoint(ld)-tInF+1)); } var dPos=M?M.valueAtFrame(ld,'dupOffsetPos',frameIdx):[0,0]; var dRot=M?M.valueAtFrame(ld,'dupOffsetRot',frameIdx)[0]:0; var dScale=M?M.valueAtFrame(ld,'dupOffsetScale',frameIdx):[0,0]; var dOpacity=M?M.valueAtFrame(ld,'dupOffsetOpacity',frameIdx)[0]:0; var dHue=M?M.valueAtFrame(ld,'dupOffsetHue',frameIdx)[0]:0; var dPosZ=M?M.valueAtFrame(ld,'dupOffsetPosZ',frameIdx)[0]:0; var dRotX=M?M.valueAtFrame(ld,'dupOffsetRotX',frameIdx)[0]:0; var dRotY=M?M.valueAtFrame(ld,'dupOffsetRotY',frameIdx)[0]:0; var is3DLayer=!!ld.threeD; var randMode=dup.staggerRandom||{}; var cols=Math.max(1,dup.cols||1); var pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null; if(mode==='path'&&!pathInfo)return base; // unconfigured/broken path ref: show the seed, not nothing var out=[];",
+          "responsibility": "The head/setup half of applyLayerDuplicator (the per-clone loop and tail are packet 6's own territory — same function, split for packeting only). `opts` (2026-07-30 fix) lets a caller substitute its own frame lookup (`opts.resample`) and time-offset span bounds (`opts.spanStart`/`opts.spanLen`) when there is no `layerIdx` into `state.layers` to resample through normally — needed because getEffectiveStrokes's ld.symbolId branch (general app.js territory) reads every symLayer directly and has no such index. Setup: resolve `dup`/`mode`, cap `count` via `_duplicatorCount`, no-op passthrough when `count<=1`; compute the shared `pivot` via `_boundsCenterOfStrokes(base)` (C21f); resolve Object mode's `pool` (an array of layer indices from `dup.sourceLayerUids`, filtered to drop missing/self/chained-duplicator entries, short-circuiting to `base` — empty for Object-mode hosts, see packet 8 — if the whole pool is gone); resolve temporal stagger's `tOffOn`/`tInF`/`tSpan`; resolve all eight `dupOffset*` Motion-driven deltas (`dPos/dRot/dScale/dOpacity/dHue/dPosZ/dRotX/dRotY`) via `M.valueAtFrame(ld,'dupOffset<Prop>',frameIdx)`, each falling back to `[0,0]`/`0` when `window.SMMotion` is absent; resolve `is3DLayer`/`randMode`/`cols`; resolve path mode's `pathInfo` (packet 1), short-circuiting to `base` when path mode is configured but broken; initialize the output accumulator `out=[]`.",
+          "callers": [
+            "app.js:1813 — getEffectiveStrokesRendered (packet 7): `return applyLayerDuplicator(ld,base,frameIdx,layerIdx);` — no `opts`, the ordinary top-level-layer path.",
+            "app.js:3111 — getEffectiveStrokes's ld.symbolId branch (general app.js territory, cited by line only): `layerStrokes=applyLayerDuplicator(symLayer,layerStrokes,ii,null,{spanStart:0,spanLen:symLayer.frames.length,resample:function(shiftedIdx){...}});` — `layerIdx` is `null` (a symLayer has no index into `state.layers`), so `opts.resample`/`opts.spanStart`/`opts.spanLen` substitute a symbol-internal frame lookup; applied AFTER element/Motion transform per that call site's own comment (app.js:3102-3109), so the seed is animated first, then duplicated."
+          ],
+          "behavior": [
+            "Lines 1603-1615 (comment, 13 lines): lead-in — the 2026-07-30 `opts` fix. States a Component's own inner sub-layer's Duplicator rendered correctly only while editing INSIDE the symbol (state.layers aliased to sym.layers there); composited from OUTSIDE, getEffectiveStrokes's ld.symbolId branch never applied the duplicator at all (CLAUDE.md §1's shape); `opts.resample`/`spanStart`/`spanLen` are the fix, omitted this behaves exactly as before.",
+            "Lines 1616-1620 (code, 5 lines): function head; `opts=opts||{}`; `dup`/`mode` resolved; `count=_duplicatorCount(dup)`; no-op passthrough `if(count<=1)return base`.",
+            "Lines 1621-1622 (code, 2 lines): `pivot=_boundsCenterOfStrokes(base)` (C21f); `M=window.SMMotion`.",
+            "Lines 1623-1633 (comment, 11 lines): Object-mode lead-in — 2026-09-01 Cyril request, C4D Cloner's Object mode; `base` is the host's own deliberately-empty content; pool cycles Iterate-order so placement count and pool size are independent; resolved by uid not index (parentLayerUid/pathLayerUid's own stable-reference convention).",
+            "Line 1634 (code, 1 line): `var pool=null`.",
+            "Lines 1635-1638 (code, 4 lines): `if(dup.sourceMode==='objects'&&dup.sourceLayerUids&&dup.sourceLayerUids.length){ pool=dup.sourceLayerUids.map(uid=>M?M.findLayerIndexByUid(uid):-1).filter(...)`.",
+            "Lines 1639-1643 (comment, 5 lines): the filter's own rationale — a deleted or chained-into-duplicator source silently drops out rather than crashing.",
+            "Lines 1644-1647 (code, 4 lines): the filter predicate (`i>=0 && i!==layerIdx && !state.layers[i].duplicator`); `if(!pool.length)return base`; closing brace of the sourceMode-objects block.",
+            "Lines 1648-1659 (comment, 12 lines): temporal-stagger lead-in — 2026-07-29, LottieFiles Duplicator Animation-tab equivalent; re-samples the SEED LAYER'S OWN content at a per-copy time-shifted frame (a separate axis from placement/index stagger); wraps within the seed's own effective span so the wave loops.",
+            "Lines 1660-1665 (code, 6 lines): `tOff=dup.timeOffset`; `tOffOn` computed (enabled AND (opts.resample or layerIdx!=null) AND a non-zero offsetFrames); `tInF`/`tSpan` resolved from `opts.spanStart`/`opts.spanLen` or `layerInPoint`/`layerOutPoint` (general app.js territory, cited by name only) when `tOffOn`.",
+            "Lines 1666-1669 (code, 4 lines): `dPos`/`dRot`/`dScale`/`dOpacity` via `M.valueAtFrame(ld,'dupOffsetPos'|'dupOffsetRot'|'dupOffsetScale'|'dupOffsetOpacity',frameIdx)`, each falling back to `[0,0]`/`0` when `M` is falsy.",
+            "Lines 1670-1675 (comment, 6 lines): Hue lead-in — 2026-09-01, MoGraph's own Color/Random effector equivalent; a degrees-of-hue value applied via hexHueRotate in the stamping loop, not a matrix operation.",
+            "Line 1676 (code, 1 line): `dHue` via `M.valueAtFrame(ld,'dupOffsetHue',frameIdx)[0]`, fallback 0.",
+            "Lines 1677-1685 (comment, 9 lines): 3D-axes lead-in — 2026-07-30; explicitly ADDED alongside the original 4 dupOffset* rather than folded into a generic loop, because that would silently reshuffle every EXISTING project's random-mode scale/opacity RNG draw order (seededRng's stream position is call-order sensitive).",
+            "Lines 1686-1691 (code, 6 lines): `dPosZ`/`dRotX`/`dRotY` via `M.valueAtFrame`; `is3DLayer=!!ld.threeD`; `randMode=dup.staggerRandom||{}`; `cols=Math.max(1,dup.cols||1)`.",
+            "Lines 1692-1694 (code, 3 lines): `pathInfo=mode==='path'?_resolveDuplicatorPath(dup,frameIdx):null`; `if(mode==='path'&&!pathInfo)return base` (unconfigured/broken path ref shows the seed, not nothing); `var out=[]` — the last line of this packet, immediately followed by packet 6's `for` loop."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "apply-duplicator-clone-loop",
+      "packets": [
+        {
+          "id": "C21g.apply-duplicator-clone-loop",
+          "files": [
+            "src/js/app.js:1695-1790"
+          ],
+          "coverage_ranges": [
+            [
+              1695,
+              1790
+            ]
+          ],
+          "classification": {
+            "code": 49,
+            "comment": 47,
+            "whitespace": 0
+          },
+          "symbols": [
+            "dupCloneId",
+            "dup3D",
+            "isDuplicatorCopy",
+            "dupIndex"
+          ],
+          "signature": "for(var k=0;k<count;k++){ var baseK=base,pivotK=pivot; if(pool){ var poolIdx=pool[k%pool.length]; var pooled=getEffectiveStrokes(poolIdx,frameIdx); if(pooled.length){ var memberCenter=_boundsCenterOfStrokes(pooled); var dx0=pivot.x-memberCenter.x,dy0=pivot.y-memberCenter.y; if(dx0||dy0){ var shiftMat=new Matrix(1,0,0,1,dx0,dy0); pooled=pooled.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),shiftMat);}); } baseK=pooled;pivotK=pivot; } else baseK=[]; // this member has nothing at this frame (time range/hold-blank) — an empty slot, not the host's own (empty) content } else if(tOffOn){ var shiftFrames; if(tOff.direction==='backward')shiftFrames=(count-1-k)*tOff.offsetFrames; else if(tOff.direction==='centerOut')shiftFrames=Math.round(Math.abs(k-(count-1)/2)*tOff.offsetFrames); else if(tOff.direction==='random'){ var rngT=seededRng(((dup.seed||0)+k*104729)>>>0); shiftFrames=Math.floor(rngT()*count)*tOff.offsetFrames; } else shiftFrames=k*tOff.offsetFrames; // 'forward' (default): copy 0 = current frame, each next copy lags further behind var shiftedIdx=tInF+(((frameIdx-tInF-shiftFrames)%tSpan)+tSpan)%tSpan; var shifted=opts.resample?opts.resample(shiftedIdx):getEffectiveStrokes(layerIdx,shiftedIdx); if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);} } var modeOff=_duplicatorModeOffset(dup,mode,k,count,cols,pathInfo); var baseDx=modeOff.baseDx,baseDy=modeOff.baseDy,baseRot=modeOff.baseRot; var place=_duplicatorClonePlacement(dup,k,count,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dHue,dPosZ,dRotX,dRotY,randMode,is3DLayer,ld,frameIdx); var mat=dupMatrixFromDescriptor(place,pivotK); var opFactor=place.opacityFactor; var dup3D=place.dup3D; var hueDeg=place.hueDeg; baseK.forEach(function(sd){ var sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat); sd2.opacity=(sd2.opacity!==undefined?sd2.opacity:1)*opFactor; if(hueDeg){ if(sd2.fillColor)sd2.fillColor=hexHueRotate(sd2.fillColor,hueDeg); if(sd2.strokeColor)sd2.strokeColor=hexHueRotate(sd2.strokeColor,hueDeg); } sd2.isDuplicatorCopy=true;sd2.dupIndex=k; sd2.dupCloneId='dup'+(dup.seed||0)+'_'+k; if(dup3D)sd2.dup3D=dup3D; out.push(sd2); }); } if(pathInfo)pathInfo.path.remove(); return out; }",
+          "responsibility": "The per-clone loop and tail of applyLayerDuplicator (packet 5 is the same function's own head/setup — see that packet's callers, identical for this one; this packet's own declared symbols are the four per-clone output tags it is the SOLE writer of — dupCloneId/dup3D/isDuplicatorCopy/dupIndex, CLAUDE.md §1's save-excluded synthetic-copy tags). For each `k` in `0..count`: resolves this clone's own content (`baseK`) and pivot (`pivotK`) — from the Object-mode `pool` (Iterate order, RECENTERED onto the shared `pivot` so the pattern doesn't scatter across each pool member's own original position), OR from a temporally-staggered re-sample of the seed layer's own content (`shiftFrames` per `tOff.direction`: backward/centerOut/random-via-a-SECOND-seeded-RNG-stream/forward-default, wrapped into the seed's own effective span), OR (neither branch) the plain `base`/`pivot` from packet 5. Computes the mode's own base offset (`_duplicatorModeOffset`, packet 4) and this clone's full placement descriptor (`_duplicatorClonePlacement`, packet 2), folds both into ONE matrix (`dupMatrixFromDescriptor`, C21f — rotate/scale around the seed's own bounds-center first, placement translate last). Stamps every stroke of `baseK` through `cloneStrokeForTransform`+`applyMatrixToStrokeData` (C21f) and this matrix, multiplies opacity by the placement's `opacityFactor`, applies the hue shift via `hexHueRotate` (C21f) to whichever of fillColor/strokeColor are actually set, tags the result with `isDuplicatorCopy`/`dupIndex`/`dupCloneId` (deterministic from `dup.seed`+`k`) and, when meaningful, `dup3D`. Cleans up the detached path-mode Path (`pathInfo.path.remove()`, packet 1's own construction) and returns the accumulated `out` array.",
+          "callers": [
+            "Same callers as packet 5 (app.js:1813 getEffectiveStrokesRendered; app.js:3111 getEffectiveStrokes's ld.symbolId branch, with `opts`) — this packet is the tail of the SAME function, not independently callable."
+          ],
+          "behavior": [
+            "Lines 1695-1697 (code, 3 lines): `for(var k=0;k<count;k++){ var baseK=base,pivotK=pivot; if(pool){`.",
+            "Lines 1698-1701 (comment, 4 lines): Iterate-order rationale — slot k always maps to the same pool member, re-ordering the placement pattern never reshuffles which object sits where.",
+            "Lines 1702-1704 (code, 3 lines): `poolIdx=pool[k%pool.length]`; `pooled=getEffectiveStrokes(poolIdx,frameIdx)`; `if(pooled.length){`.",
+            "Lines 1705-1713 (comment, 9 lines): recenter rationale — pool members are ordinary layers at their own original positions; recentering onto the SHARED pivot is what makes the pattern a clean grid/radial/path instead of scattering across wherever each member happened to be drawn.",
+            "Lines 1714-1720 (code, 7 lines): `memberCenter=_boundsCenterOfStrokes(pooled)` (C21f); `dx0/dy0` delta to `pivot`; when non-zero, shift every pooled stroke via a translate-only Matrix through `applyMatrixToStrokeData(cloneStrokeForTransform(sd),shiftMat)` (C21f); `baseK=pooled;pivotK=pivot`.",
+            "Line 1721 (code, 1 line): `} else baseK=[];` — a pool member with nothing drawn at this frame becomes an empty slot, not the host's own (empty) content.",
+            "Lines 1722-1726 (code, 5 lines): `} else if(tOffOn){ var shiftFrames; if(direction==='backward')...; else if('centerOut')...; else if('random'){`.",
+            "Lines 1727-1731 (comment, 5 lines): random-direction rationale — a SECOND seeded RNG stream (different prime multiplier than the placement RNG) so the jitter values aren't reused; never Math.random() at render time or the wave would reshuffle every scrub tick.",
+            "Lines 1732-1734 (code, 3 lines): `rngT=seededRng((dup.seed+k*104729)>>>0)`; `shiftFrames=floor(rngT()*count)*offsetFrames`; `} else shiftFrames=k*tOff.offsetFrames;` (forward, the default — copy 0 stays on the current frame, each next copy lags further behind).",
+            "Lines 1735-1737 (code, 3 lines): `shiftedIdx` wrapped into `[tInF,tInF+tSpan)`; `shifted=opts.resample?opts.resample(shiftedIdx):getEffectiveStrokes(layerIdx,shiftedIdx)`; `if(shifted.length){baseK=shifted;pivotK=_boundsCenterOfStrokes(baseK);}`.",
+            "Lines 1738-1740 (2 comment + 1 code): a hold-blank shifted frame falls back to the CURRENT frame's own content rather than vanishing that copy; closing brace of the tOffOn else-if.",
+            "Lines 1741-1742 (code, 2 lines): `modeOff=_duplicatorModeOffset(dup,mode,k,count,cols,pathInfo)` (packet 4); destructure `baseDx/baseDy/baseRot`.",
+            "Lines 1743-1747 (4 comment + 1 code): per-clone RNG/effector/placement math lives in `_duplicatorClonePlacement` (packet 2), called here as `place=_duplicatorClonePlacement(dup,k,count,pivotK,baseDx,baseDy,baseRot,dPos,dRot,dScale,dOpacity,dHue,dPosZ,dRotX,dRotY,randMode,is3DLayer,ld,frameIdx)` — note `ld` itself passed as `ownerLd`, enabling effector-LAYER resolution.",
+            "Lines 1748-1753 (4 comment + 2 code): stagger folded into ONE matrix with the mode's own placement, same inner-transform-then-outer-placement order as a Component's own camera+symMatrix; `mat=dupMatrixFromDescriptor(place,pivotK)` (C21f); `opFactor=place.opacityFactor`.",
+            "Lines 1754-1761 (6 comment + 2 code): per-clone 3D delta rationale (only attached when the layer is 3D AND an axis moved; buildSceneJson reads `data.dup3D` for a per-dupIndex projector); `dup3D=place.dup3D`; `hueDeg=place.hueDeg`.",
+            "Lines 1762-1764 (code, 3 lines): `baseK.forEach(function(sd){ sd2=applyMatrixToStrokeData(cloneStrokeForTransform(sd),mat); sd2.opacity=(...)*opFactor;`.",
+            "Lines 1765-1769 (comment, 5 lines): hue-shift rationale — a color value, not a matrix operation, applied here; touches only fields actually set; hexHueRotate is a no-op for falsy/non-hex input (C21f).",
+            "Lines 1770-1774 (4 code + 1 code, 5 lines total): `if(hueDeg){ if(fillColor)hexHueRotate(...); if(strokeColor)hexHueRotate(...); }`; `sd2.isDuplicatorCopy=true;sd2.dupIndex=k;`.",
+            "Lines 1775-1782 (comment, 8 lines): stable per-clone identity rationale — deterministic from seed+index, reproducible without a persisted counter, distinct from `strokeId` (which every clone inherits VERBATIM from the seed, C21f's cloneStrokeForTransform) — `dupCloneId` is what tells copies of the SAME seed apart.",
+            "Lines 1783-1787 (code, 5 lines): `sd2.dupCloneId='dup'+(dup.seed||0)+'_'+k`; `if(dup3D)sd2.dup3D=dup3D`; `out.push(sd2)`; closing the forEach; closing the `for(k...)` loop.",
+            "Lines 1788-1790 (code, 3 lines): `if(pathInfo)pathInfo.path.remove()` — disposing packet 1's own detached Path; `return out`; closing brace of applyLayerDuplicator."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "effective-strokes-rendered",
+      "packets": [
+        {
+          "id": "C21g.effective-strokes-rendered",
+          "files": [
+            "src/js/app.js:1791-1814"
+          ],
+          "coverage_ranges": [
+            [
+              1791,
+              1814
+            ]
+          ],
+          "classification": {
+            "code": 8,
+            "comment": 16,
+            "whitespace": 0
+          },
+          "symbols": [
+            "getEffectiveStrokesRendered"
+          ],
+          "signature": "function getEffectiveStrokesRendered(layerIdx,frameIdx){ var base=getEffectiveStrokes(layerIdx,frameIdx); var ld=state.layers[layerIdx]; if(ld&&window.SMPathFx&&SMPathFx.hasAny(ld))base=SMPathFx.apply(base,ld,frameIdx); if(!ld||!ld.duplicator||ld._dupEditSource)return base; if(!base.length&&(!ld.duplicator||ld.duplicator.sourceMode!=='objects'))return base; return applyLayerDuplicator(ld,base,frameIdx,layerIdx); }",
+          "responsibility": "The ONLY sanctioned way to get a layer's content WITH the duplicator (and path-fx) applied. getEffectiveStrokes itself stays untouched by this function — its own many other call sites (tween baking, ensureKeyframe, onion-ghost geometry sampling, status-bar counts…) must keep seeing the single real seed shape, never a duplicator's N-way expansion. Reads the seed via getEffectiveStrokes, then applies path-fx (SMPathFx.hasAny/apply, path-fx.js, cited by name only) — a non-destructive geometry modifier applied through the SAME funnel as the duplicator, right below it. Short-circuits to the (path-fx'd) base when there is no layer, no duplicator config, or the layer is mid-edit-source session (`ld._dupEditSource`). The `!base.length` short-circuit is explicitly NOT applied to Object-mode hosts (whose own base content is deliberately `[]`, packet 8) — only to an ordinary shape-mode duplicator with nothing drawn yet — or an empty Object-mode host would always render nothing. Otherwise delegates to `applyLayerDuplicator` (packets 5-6) with no `opts`.",
+          "callers": [
+            "app.js:4783 — loadFrame (general app.js territory, cited by line only): `var strokes=getEffectiveStrokesRendered(i,idx);`, feeding the retained-materialization reuse check (`_canReuseMaterialized`) and the live Paper layer rebuild.",
+            "export.js:58 — exportBuildFrame's per-layer stroke gather: `var strokes=getEffectiveStrokesRendered(li,frameIdx);`, its own comment (57) states this is \"identical to getEffectiveStrokes for every other layer\" (a documented no-op for non-duplicator layers).",
+            "export.js:1114 — a second per-frame stroke builder (inside a PNG/video/Lottie-adjacent export path): `var fStrokes=getEffectiveStrokesRendered(li,f).filter(...)`.",
+            "motion.js:5809 — symbolUnionBounds (motion.js:5789, cited by name only): calls getEffectiveStrokesRendered SPECIFICALLY rather than getEffectiveStrokes so a Component's own cached union-bounds/gizmo-pivot includes every duplicator copy (2026-07-29 fix, its own comment cites \"le gizmo se décale par rapport au calque\").",
+            "rive-export.js:582 — the Rive/state-machine export path: its own comment explicitly names this a CLAUDE.md §1 family-of-bug fix — the bare (non-Rendered) variant used to export a duplicator's seed with none of its copies and no path-fx deformation, silently.",
+            "tweens.js:4719 and tweens.js:4720 — onion-skin ghost rendering (previous/next-frame loops respectively): both call getEffectiveStrokesRendered so onion ghosts show the duplicator's full expansion, not only its seed."
+          ],
+          "behavior": [
+            "Lines 1791-1795 (comment, 5 lines): lead-in — states this is the ONLY sanctioned duplicator-applied reader, and (per this census's own boundaries finding) UNDER-counts its actual current callers as \"only loadFrame and export.js's two frame builders\" — three more call sites (motion.js, rive-export.js, tweens.js×2) exist at this SHA without the comment having been updated.",
+            "Lines 1796-1798 (code, 3 lines): function head; `base=getEffectiveStrokes(layerIdx,frameIdx)` (the undecorated seed); `ld=state.layers[layerIdx]`.",
+            "Lines 1799-1802 (comment, 4 lines, French): path-fx rationale — applied here so render/export/Motion thumbnails all see the same thing, through the same funnel as the duplicator just below; the common case (an empty SMPathFx stack) costs nothing.",
+            "Line 1803 (code, 1 line): `if(ld&&window.SMPathFx&&SMPathFx.hasAny(ld))base=SMPathFx.apply(base,ld,frameIdx);`.",
+            "Line 1804 (code, 1 line): `if(!ld||!ld.duplicator||ld._dupEditSource)return base;` — the three short-circuits (no layer, no duplicator config, mid-edit-source session).",
+            "Lines 1805-1811 (comment, 7 lines): Object-mode rationale — the host's own base content is deliberately `[]`; the `!base.length` guard below must NOT apply to Object mode or an empty host would always render nothing.",
+            "Line 1812 (code, 1 line): `if(!base.length&&(!ld.duplicator||ld.duplicator.sourceMode!=='objects'))return base;`.",
+            "Line 1813 (code, 1 line): `return applyLayerDuplicator(ld,base,frameIdx,layerIdx);` — no `opts`, the ordinary top-level-layer call.",
+            "Line 1814 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    },
+    {
+      "area": "convert-selection-to-object-duplicator",
+      "packets": [
+        {
+          "id": "C21g.convert-selection-to-object-duplicator",
+          "files": [
+            "src/js/app.js:1815-1883"
+          ],
+          "coverage_ranges": [
+            [
+              1815,
+              1883
+            ]
+          ],
+          "classification": {
+            "code": 39,
+            "comment": 30,
+            "whitespace": 0
+          },
+          "symbols": [
+            "convertSelectionToObjectDuplicator"
+          ],
+          "signature": "function convertSelectionToObjectDuplicator(indices){ var idx=(indices||[]).slice().sort(function(a,b){return a-b;}); idx=idx.filter(function(v,i){return i===0||v!==idx[i-1];}); // de-dup, same guard mergeLayersIntoOne uses var M=window.SMMotion; var pool=[]; for(var a=0;a<idx.length;a++){ var l=state.layers[idx[a]]; if(!l||l.duplicator)continue; pool.push(l); } if(pool.length<2){if(window.showToast)showToast(SM.t('toastSelectAtLeast2LayersCap'));return -1;} saveAllLayerFrames();pushUndo(true); // save already just happened — same reusable-save convention mergeLayersIntoOne follows var uids=pool.map(function(l){return M?M.ensureLayerUid(l):l.layerUid;}); var hostIdx=createUserLayer(uniqueLayerName('Duplicator')); var host=state.layers[hostIdx]; host.duplicator={ mode:'grid', rows:1,cols:pool.length, spacingX:150,spacingY:150, count:pool.length, radius:200,startAngle:0,endAngle:null,radialOrient:false, pathLayerUid:null,pathAlignTangent:true, seed:Math.floor(Math.random()*1e6), staggerRandom:{position:false,rotation:false,scale:false,opacity:false,hue:false}, timeOffset:{enabled:false,offsetFrames:1,direction:'forward'}, sourceMode:'objects', sourceLayerUids:uids, }; host.locked=true; // same \"not a normal drawing surface\" convention as the shape-mode duplicator pool.forEach(function(l){l.visible=false;}); if(typeof activateUL==='function')activateUL(hostIdx); loadFrame(state.currentFrame); if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds(); // same cache-staleness fix toggleLayerDuplicator applies if(window.SMEngineBridge)SMEngineBridge.renderNow(); renderLayerList();renderTimeline(); if(window.updateDuplicatorPanel)updateDuplicatorPanel(); if(window.showToast)showToast(SM.t('toastObjectDuplicatorCreated').replace('{n}',pool.length)); return hostIdx; }",
+          "responsibility": "Object-mode Duplicator converter (2026-09-01, Cyril's explicit request, C4D Cloner's Object mode). Takes a list of layer indices, de-dups/sorts them, drops any that are missing or themselves a duplicator (silently — the rest of the selection is still a good pool), and requires at least 2 survivors (else a toast + `return -1`, no layer created). On success: saves+snapshots undo, resolves each pool member's stable `layerUid` (minting one via `M.ensureLayerUid` if absent), creates a fresh, otherwise-empty CONTAINER layer (`createUserLayer`/`uniqueLayerName('Duplicator')`, general app.js territory), and writes a COMPLETE `duplicator` config onto it — the SAME default field shape as `toggleLayerDuplicator`'s shape-mode counterpart (motion.js:3228, cited by name only), plus `sourceMode:'objects'` and `sourceLayerUids:uids` (the two fields that function doesn't set). Locks the host (`host.locked=true`, \"not a normal drawing surface\") and HIDES every pool member (`visible=false` — not locked, not converted: they stay ordinary, independently editable layers whose own drawn content the duplicator reads every frame). Activates the new host layer, forces a `loadFrame`, invalidates the symbol-union-bounds cache via the `SMMotion` namespace (a bare call here previously threw ReferenceError, 2026-09 QA sweep — AFTER the host was created and the pool hidden, leaving the action half-completed with no toast/panel and the exception swallowing the rest of the click handler), forces a render, refreshes both timeline panels, refreshes the duplicator config panel, toasts success, and returns the new host's layer index.",
+          "callers": [
+            "timeline.js:1642 — `SMMotion.convertSelectionToObjectDuplicator:function(indices){return convertSelectionToObjectDuplicator(indices);}`, a one-line facade forwarding to this function; the only caller of it outside app.js itself."
+          ],
+          "behavior": [
+            "Lines 1815-1829 (comment, 15 lines): lead-in — Cyril's 2026-09-01 request quoted verbatim; states the pool is only HIDDEN, not locked/converted, so editing a pool member updates every clone of it; un-hiding restores the original, the same opt-in/reversible principle as Component conversion (CLAUDE.md §8) and widget layers (§13).",
+            "Line 1830 (code, 1 line): function head.",
+            "Lines 1831-1832 (code, 2 lines): `idx` sorted then de-duped (same guard `mergeLayersIntoOne` uses, cited by name only).",
+            "Lines 1833-1836 (code, 4 lines): `M=window.SMMotion`; `pool=[]`; `for(var a=0;a<idx.length;a++){ var l=state.layers[idx[a]];`.",
+            "Lines 1837-1840 (comment, 4 lines): no-chained-duplicators rationale — a deleted/chained source is silently skipped rather than refusing the whole action.",
+            "Lines 1841-1844 (code, 4 lines): `if(!l||l.duplicator)continue;`; `pool.push(l);`; closing the for loop; `if(pool.length<2){toast;return -1;}`.",
+            "Line 1845 (code, 1 line): `saveAllLayerFrames();pushUndo(true);` — the reusable-save convention `mergeLayersIntoOne` also follows.",
+            "Line 1846 (code, 1 line): `uids=pool.map(l=>M?M.ensureLayerUid(l):l.layerUid)`.",
+            "Lines 1847-1848 (code, 2 lines): `hostIdx=createUserLayer(uniqueLayerName('Duplicator'))`; `host=state.layers[hostIdx]`.",
+            "Lines 1849-1852 (comment, 4 lines): rationale — same default field shape as `toggleLayerDuplicator`'s shape-mode counterpart; sourceMode/sourceLayerUids are the only fields that function doesn't set.",
+            "Lines 1853-1865 (code, 13 lines): `host.duplicator={mode:'grid', rows:1,cols:pool.length, spacingX:150,spacingY:150, count:pool.length, radius:200,startAngle:0,endAngle:null,radialOrient:false, pathLayerUid:null,pathAlignTangent:true, seed:Math.floor(Math.random()*1e6), staggerRandom:{...all false...}, timeOffset:{enabled:false,offsetFrames:1,direction:'forward'}, sourceMode:'objects', sourceLayerUids:uids};` — a fresh object literal, not a mutation of any pre-existing duplicator config.",
+            "Line 1866 (code, 1 line): `host.locked=true;` — \"not a normal drawing surface\", the same convention the shape-mode duplicator uses.",
+            "Lines 1867-1869 (code, 3 lines): `pool.forEach(l=>l.visible=false)`; `if(typeof activateUL==='function')activateUL(hostIdx)`; `loadFrame(state.currentFrame)`.",
+            "Lines 1870-1876 (comment, 7 lines): the ReferenceError-found-live rationale — `invalidateSymbolUnionBounds` lives in motion.js's closure and is only reachable as `SMMotion.invalidateSymbolUnionBounds`; a bare call here used to throw AFTER the host was created and the pool hidden, half-completing the action with no toast/panel.",
+            "Lines 1877-1882 (code, 6 lines): `if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();`; `if(window.SMEngineBridge)SMEngineBridge.renderNow();`; `renderLayerList();renderTimeline();`; `if(window.updateDuplicatorPanel)updateDuplicatorPanel();`; `if(window.showToast)showToast(...)`; `return hostIdx;`.",
+            "Line 1883 (code, 1 line): closing brace."
+          ]
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "engine-bridge.js (buildSceneJson's nativeVideo / nativeVideo-nested-symbol branches, the dup3D-projector cache, the retained-path store's layerRetainable guard)",
+      "disposition": "Retains its own body in full — cited by line only. Calls this scope's four pure/query helpers (_duplicatorCount, _resolveDuplicatorPath, _duplicatorModeOffset, _duplicatorClonePlacement) directly for a native-video layer's Duplicator, since getEffectiveStrokes short-circuits nativeVideo to `[]` and never reaches applyLayerDuplicator/getEffectiveStrokesRendered at all. Reads `c.data.dup3D`/`c.data.dupIndex` off this scope's own tagged output to build a per-dupIndex 3D projector. `layerRetainable` (engine-bridge.js:1008) excludes duplicator layers from path retention because getEffectiveStrokesRendered allocates fresh clone dicts per call. A separate comment (engine-bridge.js:1000-1008, 4300-4308) documents that a bare renderNow() not preceded by loadFrame shows stale materialized duplicator copies — a caching caveat about consuming this scope's output, not a bug in it."
+    },
+    {
+      "consumer": "export.js (exportBuildFrame and a second per-frame stroke builder)",
+      "disposition": "Retains its own body in full — cited by line only. Two call sites read getEffectiveStrokesRendered as the sanctioned duplicator-applied+path-fx-applied variant for PNG/video/Lottie-adjacent export output."
+    },
+    {
+      "consumer": "rive-export.js (the Rive/state-machine export path)",
+      "disposition": "Retains its own body in full — cited by line only. One call site, whose own in-source comment explicitly names adopting getEffectiveStrokesRendered (instead of the bare getEffectiveStrokes it used before) a CLAUDE.md §1 family-of-bug fix — the prior code silently exported a duplicator's seed with none of its copies and no path-fx deformation."
+    },
+    {
+      "consumer": "motion.js (symbolUnionBounds, toggleLayerDuplicator, an isDuplicatorCopy skip-guard)",
+      "disposition": "Retains its own body in full — cited by line/name only. symbolUnionBounds deliberately reads getEffectiveStrokesRendered (not getEffectiveStrokes) so a Component's cached union-bounds/gizmo-pivot tracks every duplicator copy (2026-07-29 fix). toggleLayerDuplicator (cited by name only per the issue's own scope note) is the shape-mode counterpart whose default `duplicator` field shape convertSelectionToObjectDuplicator's object-mode branch (packet 8) explicitly mirrors. One isDuplicatorCopy skip-guard (motion.js:5419) excludes synthetic duplicator clones from per-object gizmo hit-testing."
+    },
+    {
+      "consumer": "tweens.js (onion-skin ghost rendering)",
+      "disposition": "Retains its own body in full — cited by line only. Two call sites (previous/next-frame onion loops) read getEffectiveStrokesRendered so onion ghosts render a duplicator's full expansion; neither reads this scope's own four per-clone data tags directly (confirmed empty by grep)."
+    },
+    {
+      "consumer": "group-bridge.js (non-destructive combine-group boolean composition)",
+      "disposition": "Retains its own body in full — cited by line only. Threads a `dupIndex` parameter through its own recursion (findByStrokeId/resolveGroupMembers/emit/dictOperands) to resolve which CLONE'S live item/dict a group-member reference should match — necessary because a duplicator clone keeps the seed's own `strokeId` verbatim (C21f). Its synthesized group-combine-result dict copies `isDuplicatorCopy`/`dupIndex` from the first member dict verbatim."
+    },
+    {
+      "consumer": "select-bridge.js / tools.js (per-object interactive gizmo/selection/hit-testing)",
+      "disposition": "Retain their own bodies in full — cited by line only. Four independent isDuplicatorCopy skip-guards exclude synthetic duplicator clones from per-object selection, hit-testing and double-click-to-isolate, alongside the isBrushTextureCopy/isLinkedFillCompanion exclusions CLAUDE.md §1 documents for other synthetic companions."
+    },
+    {
+      "consumer": "effector-layer.js (SMEffectorLayer.resolvedEffectorsFor)",
+      "disposition": "Retains its own body in full — cited by name only. Called once from within this scope (app.js:1526, inside _duplicatorClonePlacement) to append effector-LAYER-sourced effectors alongside dup.effectors before the SAME shared falloff/channel loop sums both — never a second copy of the math."
+    },
+    {
+      "consumer": "timeline.js (updateDuplicatorPanel, the SMMotion facade)",
+      "disposition": "Retains its own body in full — cited by name/line only. `updateDuplicatorPanel` (timeline.js:7200, C19w) is the config UI for `ld.duplicator`'s fields, cited by name only per the issue's own scope note. `SMMotion.convertSelectionToObjectDuplicator` (timeline.js:1642) is a one-line facade forwarding to this scope's own app.js:1830 function."
+    },
+    {
+      "consumer": "motion.js (SMMotion.valueAtFrame/DUP_TARGET_PROPS/propDim/propLabel/findLayerIndexByUid/ensureLayerUid, C20)",
+      "disposition": "Retains its own body in full — cited by name only, not re-mapped, per the issue's own scope note. `valueAtFrame` is called eight times from within this scope (packet 5's dupOffset* resolution) for the Motion-driven per-clone deltas; `findLayerIndexByUid` is called from packets 1 and 5 (path-mode source resolution, Object-mode pool resolution); `ensureLayerUid` is called from packet 8."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "fx-resolvepath-refuses-chained-duplicator",
+      "proposed": "Call `_resolveDuplicatorPath({pathLayerUid:'X'},0)` where layer X itself has a `duplicator` config; expect `null` — verifies the no-chaining refusal at app.js:1460 — not run."
+    },
+    {
+      "id": "fx-resolvepath-picks-first-vector-stroke",
+      "proposed": "Call `_resolveDuplicatorPath` against a source layer whose frame has a raster stroke FIRST and a >=2-segment vector stroke SECOND; expect the returned path to reconstruct from the SECOND stroke, not the raster — verifies the isRaster/segments.length>=2 scan at app.js:1463 skips rasters and degenerate paths in order — not run."
+    },
+    {
+      "id": "fx-resolvepath-degenerate-cleanup",
+      "proposed": "Call `_resolveDuplicatorPath` against a source stroke with a single zero-length segment; expect `null` returned AND the constructed detached Path to have been `.remove()`d (no leaked Paper item) — verifies app.js:1468 — not run."
+    },
+    {
+      "id": "fx-clonePlacement-rng-draw-order-stable",
+      "proposed": "Call `_duplicatorClonePlacement` twice with identical arguments except `dHue`=0 vs `dHue`=5; expect posK/rotK/scaleK/opK (the first 9 draws' consumers) to be IDENTICAL between the two calls — verifies the hue draw (10th, app.js:1517) never perturbs the pre-existing 9-draw sequence — not run."
+    },
+    {
+      "id": "fx-clonePlacement-step-falloff-needs-count",
+      "proposed": "Call `_duplicatorClonePlacement` with an effector `{falloff:'step',strength:100,channels:[{prop:'opacity',value:[50]}]}` at k=0,count=5 and k=4,count=5; expect opacityFactor to differ (weight 0 vs weight 1) regardless of the effector's own `pos`/`radius` — verifies the count-based (not distance-based) Step weight at app.js:1535-1536 — not run."
+    },
+    {
+      "id": "fx-clonePlacement-dup3d-only-when-moved",
+      "proposed": "Call `_duplicatorClonePlacement` with `is3DLayer=true` but dPosZ=dRotX=dRotY=0 and no 3D-channel effectors; expect `dup3D` to be `null`, not `{dz:0,drx:0,dry:0}` — verifies the app.js:1565 truthiness guard — not run."
+    },
+    {
+      "id": "fx-duplicatorcount-grid-vs-other-caps",
+      "proposed": "Call `_duplicatorCount({mode:'grid',rows:100,cols:100})` (expect 900, capped) and `_duplicatorCount({mode:'radial',count:99999})` (expect 500, capped) — verifies the two different ceilings at app.js:1574-1575 — not run."
+    },
+    {
+      "id": "fx-modeoffset-radial-default-360",
+      "proposed": "Call `_duplicatorModeOffset({startAngle:0,endAngle:null,radius:100},'radial',2,4,1,null)`; expect `ang=180` (a 360° default span over 4 slots, k=2) — verifies the `endAngle!=null?...:360` fallback at app.js:1587 — not run."
+    },
+    {
+      "id": "fx-modeoffset-path-closed-wraps",
+      "proposed": "Call `_duplicatorModeOffset` with `mode:'path'` and a `pathInfo.closed=true`; expect `t=k/count` (not `k/(count-1)`) so the last clone does NOT land back on the start point — verifies the closed-vs-open parametrization at app.js:1594 — not run."
+    },
+    {
+      "id": "fx-applyduplicator-object-mode-empty-pool-noop",
+      "proposed": "Call `applyLayerDuplicator` on a host with `sourceMode:'objects'` whose every `sourceLayerUids` entry resolves to a deleted layer; expect the return value to equal `base` (`[]` for an Object-mode host) exactly, no clones — verifies app.js:1646 — not run."
+    },
+    {
+      "id": "fx-applyduplicator-pool-iterate-wraps",
+      "proposed": "Call `applyLayerDuplicator` with a 3-member pool and `count=12` (a 12-slot grid); expect `pool[k%3]` to repeat the pool exactly 4 times in index order — verifies the Iterate order at app.js:1702 — not run."
+    },
+    {
+      "id": "fx-applyduplicator-timeoffset-forward-vs-backward",
+      "proposed": "Call `applyLayerDuplicator` with `timeOffset:{enabled:true,offsetFrames:2,direction:'forward'}` vs `'backward'` at the same frame/count; expect clone k's resolved `shiftedIdx` to differ in sign of drift (later copies lag further behind for forward, earlier copies lag further behind for backward) — verifies app.js:1724/1734 — not run."
+    },
+    {
+      "id": "fx-getEffectiveStrokesRendered-editsource-bypass",
+      "proposed": "Call `getEffectiveStrokesRendered` on a layer with a `duplicator` config AND `_dupEditSource:true`; expect the return to equal the bare `getEffectiveStrokes` result (no duplication applied) — verifies the app.js:1804 short-circuit — not run."
+    },
+    {
+      "id": "fx-convertselection-locks-host-hides-pool-not-locked",
+      "proposed": "Call `convertSelectionToObjectDuplicator([i,j])` on two ordinary layers; expect the returned host layer to have `locked:true` and `duplicator.sourceMode==='objects'`, while layers i and j have `visible:false` but `locked` UNCHANGED (still independently editable) — verifies app.js:1866-1867 — not run."
+    },
+    {
+      "id": "fx-convertselection-refuses-under-2",
+      "proposed": "Call `convertSelectionToObjectDuplicator([i])` (a single valid layer) or `[i,j]` where j is itself a duplicator; expect a toast and `return -1`, with NO host layer created and NO saveAllLayerFrames/pushUndo call — verifies app.js:1844 — not run."
+    }
+  ],
+  "future_proposals": [
+    "`getEffectiveStrokesRendered`'s own lead-in comment (app.js:1794-1795) is stale: it claims \"Only loadFrame and export.js's two frame builders substitute this in\", but the grep-verified current caller list is seven call sites across five files (app.js, export.js×2, motion.js, rive-export.js, tweens.js×2) — three call sites (motion.js:5809, rive-export.js:582, tweens.js:4719/4720) postdate the comment and were never folded back into it. Not a correctness bug (every one of these callers legitimately needs the duplicator-applied variant, several with their own explicit CLAUDE.md §1 bug-fix commentary), but a documentation-drift risk: a future reader trusting this comment's own caller count would undercount real consumers of this function's contract. Worth a follow-up doc-only touch-up; not changed here (read-only scope).",
+    "`dupCloneId` (set at app.js:1783, a deterministic per-clone identity string \"ID de chaque cloner\") has ZERO readers anywhere in src/js at this SHA other than app.js's own `desP` (C21c) round-tripping it onto the live Paper item's `.data.dupCloneId` for potential future interactive use — confirmed by a repo-relative grep. Every actual consumer of duplicator-clone identity (group-bridge.js, engine-bridge.js's dup3D-projector cache, the four isDuplicatorCopy skip-guards) keys off `dupIndex`+`strokeId` instead. Not a bug (the field costs one string per clone and does exactly what its own comment says), but worth flagging as a currently-unconsumed persisted-shaped field if a future audit is looking for dead weight.",
+    "`applyLayerDuplicator`'s Object-mode pool resolution (app.js:1636-1637) calls `M.findLayerIndexByUid(uid)` once per pool member EVERY call (i.e. every frame, for every render/export pass) rather than caching the resolved indices — consistent with the rest of this scope's own \"never cache a resolved-index list, layer stack position can change under it\" convention (the same reasoning `pathLayerUid` gives at lines 1451-1455), so this is very likely deliberate rather than an oversight, but it does mean an Object-mode duplicator with a large pool re-does a linear `findLayerIndexByUid` scan per member per frame. Not measured here (no runtime profiling was performed); flagged for a future perf pass only if Object-mode duplicators are ever used with pools large enough to matter.",
+    "`_duplicatorClonePlacement`'s effector loop (app.js:1529-1549) recomputes `eff.falloff==='step'`/`'linear'`/default branching and the trig for EVERY clone × EVERY effector, with no per-effector precomputation hoisted out of the `k` loop (e.g. `Math.cos(rad)`/`Math.sin(rad)` for a linear-falloff effector's own fixed `angle` is recomputed identically for every clone). Consistent with this scope's own general style (favoring simplicity/locality over micro-caching elsewhere in the same function), and the per-effector state is cheap (a handful of trig ops), so this is a minor, unmeasured, non-blocking observation, not a claimed perf regression.",
+    "`convertSelectionToObjectDuplicator` (app.js:1830-1883) has no counterpart that converts an Object-mode host BACK into its constituent visible layers (an inverse operation) — un-hiding each pool member manually gets the ORIGINAL layers back, but the host layer itself must be deleted separately by the user through the ordinary layer-delete path. Not a bug (the function's own docstring only promises the forward conversion, matching its C4D Cloner Object-mode analogue), but worth noting if a future \"un-cloner\" convenience action is ever requested."
+  ],
+  "surface_inventory_cross_check": [
+    "No lint/type/build surface was run for this census (source-read only, per its own runtime baseline note).",
+    "A whole-`src/js` `git grep -n -P '(^|[^a-zA-Z_.])<symbol>\\('` was run once for each of the seven function symbols (_resolveDuplicatorPath, _duplicatorClonePlacement, _duplicatorCount, _duplicatorModeOffset, applyLayerDuplicator, getEffectiveStrokesRendered, convertSelectionToObjectDuplicator) at HEAD (post-rebase onto origin/main, identical app.js blob to the frozen SHA), filtering out each symbol's own declaration line — results are reproduced verbatim under each packet's own `callers` field and are re-checkable with the same commands.",
+    "A plain `git grep -n '<tag>' -- src/js` was run once for each of the four per-clone data tags (dupCloneId, dup3D, isDuplicatorCopy, dupIndex) to build the complete external-reader list reproduced in `reconciliation`/`source_consumers` — confirmed `dupCloneId` has no reader outside app.js itself (see `future_proposals`).",
+    "`getEffectiveStrokesRendered`'s complete caller list was independently re-derived (not assumed from its own in-source comment, which undercounts it — see `boundaries`) by grepping the whole `src/js` tree for the call pattern and confirming each hit's enclosing function by scanning backward from the call site for the nearest preceding `function <name>(` declaration.",
+    "Every packet's `classification` (code/comment/whitespace) was independently re-derived by running the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs against the frozen blob, once for each of the eight proposed packet boundaries — matches the issue's own proposed per-packet and total figures (229/204/0 over 433 lines) exactly; no packet boundary required correction.",
+    "The `dup.<field>`/`ld.duplicator.<field>` read inventory (17 distinct field names, ~22 read sites) was built by grepping the assigned range for the literal substring `dup.` and manually classifying each hit as a field read, a comment mention, or (for the one hit at app.js:1618) the initial `ld.duplicator` assignment to the local `dup` variable — cross-checked against a SEPARATE grep for any bare assignment pattern (`dup\\.[a-zA-Z]+\\s*=[^=]` etc.) across the whole range, which returned zero hits, confirming no field in this scope is WRITTEN except via the wholesale `host.duplicator={...}` object-literal creation in packet 8.",
+    "The eight `M.valueAtFrame(ld,'dupOffset<Prop>',frameIdx)` call sites (packet 5) were confirmed to name exactly the family the issue's own prompt expected (Pos/Rot/Scale/Opacity/Hue/PosZ/RotX/RotY) by grepping the assigned range for `M.valueAtFrame` and reading each hit's own fallback (`[0,0]` for the two-axis properties, `0` for the scalar ones, both guarded on `M?...`) directly."
+  ],
+  "validation": {
+    "expected_assigned_lines": 433,
+    "expected_classification": {
+      "code": 229,
+      "comment": 204,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        1451,
+        1470
+      ],
+      [
+        1471,
+        1567
+      ],
+      [
+        1568,
+        1576
+      ],
+      [
+        1577,
+        1602
+      ],
+      [
+        1603,
+        1694
+      ],
+      [
+        1695,
+        1790
+      ],
+      [
+        1791,
+        1814
+      ],
+      [
+        1815,
+        1883
+      ]
+    ],
+    "packet_classification": "Each packet's own `classification` field equals classify(coverage_ranges), independently re-derived by running the validator's own classify() algorithm against the frozen blob for each of the eight proposed packet boundaries: 1451-1470=(15,5,0); 1471-1567=(54,43,0); 1568-1576=(6,3,0); 1577-1602=(22,4,0); 1603-1694=(36,56,0); 1695-1790=(49,47,0); 1791-1814=(8,16,0); 1815-1883=(39,30,0); sums to (229,204,0)=433 — identical to the issue's own proposed union exactly, no packet boundary required correction.",
+    "coverage_contract": "assigned_ranges union == packet_partition union == 433 lines, disjoint packets, unique packet IDs within this artifact and across every sibling C*.json in the same directory sharing source_path.",
+    "required_checks": [
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21g-app-duplicator-runtime.json <candidate-sha> exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21f-app-symbol-matrix-duplicator-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21e-app-raster-serialisation-image-cache.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21d-app-desp-relink-remote-merge.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21c-app-path-serialisation-serp.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21b-app-layer-stack-view-color-helpers.json <candidate-sha> still exits 0",
+      "python3 /tmp/census_check_c21g.py engineering/inventory/census/C21a-app-canvas-size-row-metrics-state-head.json <candidate-sha> still exits 0"
+    ]
+  }
+}

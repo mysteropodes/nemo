@@ -222,9 +222,66 @@ counts and exception expiry are checked independently of the policy-to-policy ra
 The application profile labels the 140 retained legacy files `app-legacy`. Their current
 architecture-wide global and dependency findings are evidence for R01/R03 classification,
 not accepted exceptions, so the standard gate does not suppress or falsely certify them.
-The adopted gate enforces source coverage and no-growth size ceilings now. Reviewed target
-layers, public APIs, provider/consumer boundaries and parsed bootstrap/runtime readiness remain
-the explicit follow-up before the full graph rules can be enabled for application source.
+The adopted gate enforces source coverage and no-growth size ceilings now.
+
+### Dependency edges for the migrated slice (P10)
+
+[`app-js.edges.json`](./profiles/app-js.edges.json) makes the profile's edge rules part of the
+same `boundaries` lane, split honestly in two. For the **enforced layers** — `domain`,
+`application`, `adapters`, `bootstrap`, i.e. the modules the P0x extractions created — any
+`layer-violation`, `private-import`, `global-state`, `cycle`, unsupported/unprofiled import or
+expired exception fails the gate. For the **legacy layers** (`app-legacy`, `app-domain`,
+`app-presentation-adapter`) the same findings are only counted against
+`legacyUnresolvedCeiling` (449 at adoption) and reported under `application.edges.legacy`
+with an explicit `unresolved` label: the lexical checker resolves literal `require`/`import`
+specifiers, `window.SM*` access and import cycles, and cannot see the relationships classic
+scripts form through document-scope globals, so those files get a no-growth check on what the
+checker does find and no dependency-coverage claim. A profile layer the policy does not
+classify fails rather than passing silently. The ceiling may only be lowered, in the same
+change that migrates or repairs the findings it covers. Negative controls live in
+[`scripts/nemo/boundaries-edges.test.cjs`](../../scripts/nemo/boundaries-edges.test.cjs).
+Reviewed target layers, public APIs, provider/consumer boundaries and parsed
+bootstrap/runtime readiness remain the explicit follow-up before full graph rules can be
+claimed for the legacy files.
+
+### Rust crate module edges (P12)
+
+[`rust.coverage.json`](./profiles/rust.coverage.json) deliberately claims no layer enforcement:
+`checkProfile` is a JavaScript lexer and is never run on Rust. P12 adds a small Rust-aware
+analyzer, [`boundaries-rust.cjs`](../../scripts/nemo/lib/boundaries-rust.cjs), that reads
+`use crate::/super::/self::` statements (brace groups, multi-line), `mod name;` declarations,
+inline `crate::name::` paths and `#[cfg(...)]` gates after stripping comments and string
+literals, and resolves them against the module files [`rust.profile.json`](./profiles/rust.profile.json)
+already declares. A crate policy such as [`geometry-wasm.edges.json`](./profiles/geometry-wasm.edges.json)
+names the crate root and source dir, the permitted layer edges, the exported port (the root's
+`pub use` list, asserted exactly), the declared Cargo features (none for geometry-wasm) and the
+cfg predicates the crate may use — any `cfg(feature = …)` outside the declared set fails. The
+`boundaries` lane runs every adopted crate policy (`ci.rustBoundaries`); a removed policy is a
+failure, not a skip. Module shapes the analyzer does not understand (deeper than one nesting
+level, `super::` inside nested inline modules) are reported as `unsupported`, never accepted.
+Exceptions carry owner/issue/reason/expiry like the JS profile's. At adoption the geometry crate
+carries three recorded-debt exceptions (eraser.rs importing polygon helpers from the API root,
+and the engine.rs ↔ hit.rs / eraser.rs ↔ lib.rs cycles), all expiring 2026-12-05; they are
+visible in the lane report, not repaired here. Negative controls live in
+[`scripts/nemo/boundaries-rust.test.cjs`](../../scripts/nemo/boundaries-rust.test.cjs).
+Integration tests under `geometry-wasm/tests` reach the crate as `geometry_wasm::…`, an
+external path outside the intra-crate graph; they remain under discovery/size coverage only.
+
+B01 adopts a second crate policy, [`nemo-desktop.edges.json`](./profiles/nemo-desktop.edges.json),
+for the native desktop crate (`src-tauri`): five profile modules, `desktop-shell → adapters` as the
+only cross-layer edge (`lib.rs` declares `mod application_mcp;`), an empty exported port (`lib.rs`
+re-exports nothing) and the four cfg predicates the crate uses. Two policy sections are new to the
+analyzer. `externalCratePorts` declares the native application/MCP port: the `nemo_mcp` crate may
+be referenced only from `rust.desktop.mcp.adapter`, and only through the declared items
+(`contract::ApplicationRequest`, `contract::ApplicationResponse`, `registry`, `wire`,
+`BUILD_SOURCE_ID`; an item covers any deeper path under it). Any other module importing
+`nemo_mcp::…` fails `external-crate-violation`; the adapter reaching an undeclared item such as
+`nemo_mcp::server::…` fails `private-port-access`. `unanalyzedModules` names the profile modules
+the policy deliberately leaves out of the graph (`rust.desktop.build`, the Cargo build script, and
+`rust.mcp.transport`, the whole `nemo-mcp` crate); each must exist in the profile and is echoed
+in the lane report as a census entry, never a pass. The analyzer also resolves `super::` from the
+Rust-2018 `x.rs` + `x/y.rs` shape (`task_runtime/tests.rs → task_runtime.rs`), which P12 reported
+as `unsupported`.
 
 The extracted `src/js/animation/curve.js` is a `domain` module with a 300-line hard
 limit and no legacy exception. The normal animation test entry runs the full import,

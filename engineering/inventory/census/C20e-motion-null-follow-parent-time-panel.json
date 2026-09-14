@@ -1,0 +1,564 @@
+{
+  "census_id": "C20e",
+  "issue": 1152,
+  "title": "Motion null, follow-path, parent and time-link panel adapters",
+  "status": "read-only census with source-derived proposed, unrun fixtures; no runtime extraction or behavior pass",
+  "owner": "P03/C20e census only; historical Motion runtime ownership and named consumers remain separate",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "e21218c17046e10b7df4149abae20e52fde20606",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 7996,
+      "end": 8027
+    },
+    {
+      "start": 8028,
+      "end": 8082
+    },
+    {
+      "start": 8083,
+      "end": 8284
+    },
+    {
+      "start": 8285,
+      "end": 8343
+    },
+    {
+      "start": 8344,
+      "end": 8434
+    }
+  ],
+  "coverage_note": "Exactly 439 assigned lines occur once in five adjacent complete-function packets: 321 code, 103 full-line comments and 15 whitespace lines. Line7995 closes C20d matteChanged; line8435 starts the C02-owned timeLinkWouldCycle unit. Both are excluded.",
+  "source_baselines": {
+    "pinned": "59a5a38:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e.",
+    "current": "Observed main e21218c1 has the identical Motion blob.",
+    "runtime": "No browser, Tauri, export, native IPC, GPU or application behavior was executed.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun; comments are not fresh execution evidence."
+  },
+  "writer_guidance": {
+    "artifact": "Only this census JSON is writable.",
+    "motion": "The historical Motion reservation retains the motion.js runtime writer.",
+    "timeline": "P30 independently retains the timeline.js runtime writer.",
+    "reservations": "D01, T05/Pollen, C01/C02/C03/C04/C19/C20c/C20d and all active reservations remain unchanged."
+  },
+  "reconciliation": [
+    {
+      "owner": "C20d/#1150",
+      "disposition": "Ends7995 and retains the top-level panel plus Matte/Widget/Blend adapters. C20e records its calls into these relationship rows without duplicating that renderer."
+    },
+    {
+      "owner": "C02/#1037",
+      "disposition": "Retains parent/time/follow setters, cycle guards, setValue/selectLayerForEdit, key/value evaluation and Motion selection. timeLinkWouldCycle comments/function are8435-8452 and excluded."
+    },
+    {
+      "owner": "C20c/#1137",
+      "disposition": "Retains key-lock menu packets8470-8529 and its C02 time-link drift reconciliation."
+    },
+    {
+      "owner": "C01 document/history",
+      "disposition": "Retains codecs and pushUndo/pushUndoLayers implementation. This census records delegated save/history effects exactly."
+    },
+    {
+      "owner": "C03/export and shared engine bridge",
+      "disposition": "Retain export/render and bridge implementation. SMEngineBridge is a shared render bridge, not native IPC evidence."
+    },
+    {
+      "owner": "C04/C19h presentation and callers",
+      "disposition": "Retain selection/presentation surfaces and timeline updateUI. C20e maps live selection changes delegated through setValue without taking ownership."
+    },
+    {
+      "owner": "historical C02:7 note",
+      "disposition": "Its7576-8453 coordinates remain frozen provenance with known drift. C20d/C20e provide supplemental intact-function mapping; no raw global C02/C20 disjointness claim is made."
+    },
+    {
+      "owner": "P30/D01/T05/Motion",
+      "disposition": "Separate writers and reservations remain untouched; census mapping transfers no runtime authority."
+    }
+  ],
+  "boundaries": [
+    "7996-8434 is five complete comment/function packets; internal closures remain with their enclosing renderer.",
+    "DOM is built synchronously and callbacks capture ld/li plus selected render-time facts, then read other live state at event time.",
+    "All model/selection/history/render effects are incremental. Required or present-but-incomplete optional ports can throw after prior effects; no catch or rollback exists.",
+    "Conditional SMEngineBridge calls check only object truthiness, then call renderNow unguarded. A truthy object lacking a callable method throws.",
+    "Source option.selected assignments describe explicit assignments only; they do not establish browser native-select fallback for truthy unknown Null values."
+  ],
+  "areas": [
+    {
+      "area": "motion-relationship-panels",
+      "packets": [
+        {
+          "id": "C20e.null-shape-row",
+          "files": [
+            "src/js/motion.js:7996-8027"
+          ],
+          "coverage_ranges": [
+            [
+              7996,
+              8027
+            ]
+          ],
+          "classification": {
+            "code": 20,
+            "comment": 12,
+            "whitespace": 0
+          },
+          "symbols": [
+            "renderNullShapeRow"
+          ],
+          "signature": "renderNullShapeRow(body,ld) -> undefined",
+          "responsibility": "Builds the localized Null Shape select and installs an undo-first direct nullShape writer.",
+          "projection": [
+            "No body/ld guard. Creates label and four options cross/square/circle/diamond in fixed order.",
+            "Explicitly sets selected only where (ld.nullShape||cross) equals the option. Falsy values mark Cross; a truthy unknown marks no option explicitly, which does not prove native select has no effective selection."
+          ],
+          "event_effects": [
+            "Reads sel.value at change time.",
+            "pushUndoLayers(true) precedes ld.nullShape assignment. alreadySaved=true skips saveAllLayerFrames in that history call.",
+            "window._sceneVersion++ does not normalize; undefined becomes NaN.",
+            "Truthy SMEngineBridge calls renderNow unguarded, then optional renderLayerList. Missing renderNow throws before list refresh."
+          ],
+          "asymmetries": "No equality guard, timeline/panel refresh, explicit frame save or rollback."
+        },
+        {
+          "id": "C20e.follow-path-row",
+          "files": [
+            "src/js/motion.js:8028-8082"
+          ],
+          "coverage_ranges": [
+            [
+              8028,
+              8082
+            ]
+          ],
+          "classification": {
+            "code": 43,
+            "comment": 9,
+            "whitespace": 3
+          },
+          "symbols": [
+            "renderFollowPathRow"
+          ],
+          "signature": "renderFollowPathRow(body,ld,li) -> undefined",
+          "responsibility": "Builds Follow Path source pill, optional menu, render-time-gated unlink and Align actions.",
+          "captures": "fp and resolved tName are render-time snapshots. tIdx is resolved only for truthy fp by required SMMotion.findLayerIndexByUid; resolved unnamed targets use Layer N.",
+          "menu": "Click stops; both showContextMenu and buildFollowPathMenuItems must exist. Items are built at click with captured ld/li and a required panel/list/timeline callback; menu position uses current captured-pill rect.",
+          "unlink": "Contextmenu prevents/stops and gates on captured tName, then pushUndo, required setLayerFollowPath(li,null), required panel/list/timeline, conditional bridge. The separately owned setter also conditionally bridges, so two render requests are possible.",
+          "align": "Button exists only for captured tName and class uses captured fp.align. Click pushUndo then dereferences live ld.followPath.align; if removed meanwhile it throws after history. Success toggles, refreshes panel/list/timeline and conditionally bridges.",
+          "history": "pushUndo normally saves all live frames before snapshot, unless _scrubLiveActive suppresses the entire history call. No explicit post-write save or equality guard."
+        },
+        {
+          "id": "C20e.parent-row-and-blend-gesture",
+          "files": [
+            "src/js/motion.js:8083-8284"
+          ],
+          "coverage_ranges": [
+            [
+              8083,
+              8284
+            ]
+          ],
+          "classification": {
+            "code": 144,
+            "comment": 49,
+            "whitespace": 9
+          },
+          "symbols": [
+            "renderParentRow",
+            "currentBlend",
+            "scheduleLiveRender",
+            "endDrag"
+          ],
+          "signatures": [
+            "renderParentRow(body,ld,li) -> undefined",
+            "currentBlend() -> number",
+            "scheduleLiveRender() -> undefined",
+            "endDrag(e?) -> undefined"
+          ],
+          "responsibility": "Builds Parent key/menu/pickwhip/extra-parent surfaces and a pointer-captured rAF-coalesced parentBlend scrub transaction.",
+          "stopwatch": [
+            "parentKeyed/parentKeyHere captured at render; currentFrame and arrays read at click. pushUndo first.",
+            "Captured unkeyed creates one key using click-frame and static Parent A or null.",
+            "Captured keyed/here: one current key collapses UID via fv||null to static and deletes parentKeys; multiple uses required removeParentKeyAt.",
+            "Captured keyed/not-here requires upsertParentKeyAt with live resolved Parent A. Then required list/timeline and conditional bridge; no direct panel refresh."
+          ],
+          "parent_resolution": "Parent A name uses layerParentUidAt at render/current frame; Parent B uses static parentLayerUidB. pName/pbName determine class/title/fill/add/extras and remain captured. Pickwhip mousedown always delegates startParentPickwhip.",
+          "gesture_start": [
+            "Pointerdown exits without captured Parent B or when target.closest(.lpick).",
+            "Otherwise resets moved, captures clientX/currentBlend/pointerId, sets pointer capture, prevents default. currentBlend accepts only numeric v[0], else0."
+          ],
+          "gesture_move": [
+            "Requires matching non-null pointer ID. abs(dx)<3 before movement is inert.",
+            "First threshold crossing sets moved, calls pushUndo while scrub flag is still false, then sets _scrubLiveActive=true. Later moves do not repeat history.",
+            "Uses denominator max(1,rect.width), clamps0..100, writes fill width before required setValue(ld,parentBlend,[raw]), then schedules one outstanding rAF.",
+            "Delegated setValue calls selectLayerForEdit first. In Motion, a known ld may replace _layerSel with [li], set _layerSelAnchor, optionally sync bars, call SM.setActiveLayer(li,true), and refresh list/timeline before writing an animated key or cloned motionStatic value. These delegated identity/selection/UI effects are part of baseline, though C02 owns them."
+          ],
+          "raf_end_cancel": [
+            "rAF callback clears liveRaf before conditional bridge call; truthy bridge missing renderNow throws asynchronously.",
+            "pointerup and pointercancel both call endDrag; it rejects mismatched IDs, clears pid, and when moved clears scrub flag before required list/timeline. It does not cancel queued rAF, release capture, save explicitly or bridge directly.",
+            "Failure before end can strand _scrubLiveActive=true. moved remains true after end until a following click suppresses menu and clears it; cancel may yield no click, leaving moved until next valid pointerdown resets it."
+          ],
+          "menu_unparent": [
+            "mousedown stops propagation. Non-drag click uses captured moved, optional menu ports and current pill rect.",
+            "Contextmenu guard uses captured pName/pbName; after pushUndo it calls required setLayerParent, optional setLayerParentB, required list/timeline, conditional bridge and optional toast. Setters retain compensation/cycle and may add bridge effects."
+          ],
+          "add_extra": "Add exists only for captured A+B names. Click computes current first-free candidate; null optionally toasts without history. Success pushUndoLayers(true), lazy parentsMore, stable UID push, required list/timeline and conditional bridge. No direct save/equality guard.",
+          "failure_semantics": "All prior DOM/history/selection/model/scrub effects survive a throw."
+        },
+        {
+          "id": "C20e.extra-parent-stack",
+          "files": [
+            "src/js/motion.js:8285-8343"
+          ],
+          "coverage_ranges": [
+            [
+              8285,
+              8343
+            ]
+          ],
+          "classification": {
+            "code": 54,
+            "comment": 5,
+            "whitespace": 0
+          },
+          "symbols": [
+            "firstFreeParentLayer",
+            "openExtraParentMenu"
+          ],
+          "signatures": [
+            "firstFreeParentLayer(li,ld) -> index|null",
+            "openExtraParentMenu(x,y,li,ld,pi) -> undefined"
+          ],
+          "responsibility": "Finds an unused acyclic extra parent, builds captured menu actions, and removes/reindexes extra parents and their numeric weight containers.",
+          "candidate": "Builds used from current A/B/truthy extras, skips self and used truthy UIDs, and cycle-checks only truthy candidate UIDs. A falsy-UID candidate bypasses used/cycle checks and may be returned then stabilized. For each reached truthy unused candidate UID, cycle checking first calls C02 ensureLayerUid(ld), which can lazily assign the child layer UID before the caller pushes history. That identity remains even if all considered candidates are rejected and the search returns null; no save/history occurs inside the search.",
+          "menu_open": [
+            "Missing showContextMenu or indexed entry returns.",
+            "For each non-self layer, ensureLayerUid(o) runs and then ensureLayerUid(ld) runs for cycle checking. Both candidate and child identities can be assigned before any choice/history action. C02 owns UID generation from time/random sources; existing truthy UIDs are reused.",
+            "UID and cycle bad are captured per item. Existing/duplicate parent UIDs are not rejected. bad actions return before history."
+          ],
+          "choose": "Successful action pushUndoLayers(true), mutates captured entry.uid, requires list/timeline and conditionally bridges. Stale entry identity can outlive array changes.",
+          "remove": [
+            "pushUndoLayers(true), splice current parentsMore at captured numeric pi. A stale pi can remove another current entry.",
+            "After splice, loops i=pi through old final index and shifts parentWeight(i+1) to parentWeight(i), or deletes current when next undefined.",
+            "Runs independently in exactly ld.motion and ld.motionStatic; assignments retain value identity. Missing bags skip. expressions.parentWeightN and every other container remain unshifted.",
+            "Deletes parentsMore only if empty; then required list/timeline and conditional bridge."
+          ],
+          "save_history": "alreadySaved=true skips history saveAllLayerFrames; no direct frame save follows. Candidate discovery and menu construction can assign missing layer UIDs before any action/history call; these identity changes are not covered by a new local undo entry."
+        },
+        {
+          "id": "C20e.time-link-row",
+          "files": [
+            "src/js/motion.js:8344-8434"
+          ],
+          "coverage_ranges": [
+            [
+              8344,
+              8434
+            ]
+          ],
+          "classification": {
+            "code": 60,
+            "comment": 28,
+            "whitespace": 3
+          },
+          "symbols": [
+            "renderTimeLinkRow",
+            "unlinkTime"
+          ],
+          "signatures": [
+            "renderTimeLinkRow(body,ld,li) -> undefined",
+            "unlinkTime() -> undefined"
+          ],
+          "responsibility": "Builds Time Link pickwhip/source/unlink/mode surfaces and delegates range-preserving unlink.",
+          "source_resolution": [
+            "Pickwhip always built; mousedown requires startTimeLinkPickwhip.",
+            "Lookup only for truthy timeLink.uid, excludes o===ld by identity, does not break, so last distinct matching layer wins.",
+            "No link renders dash; existing unresolved/no-UID link renders fixed French source introuvable. Name/srcIdx captured at render."
+          ],
+          "unlink": [
+            "Closure has no internal link guard. pushUndo then unlinkTimeLinkPreserveRange; separately owned helper no-ops if link vanished, else captures effective in/out, deletes link, writes inPoint/outPoint.",
+            "Requires list/timeline, optional loadFrame(currentFrame), conditional bridge, optional translated toast. Delayed menu action after another unlink still attempts history/refresh/toast.",
+            "Contextmenu checks live timeLink before calling. Ordinary click checks live link and optional menu port, then installs one captured unlink action at current rect."
+          ],
+          "mode": [
+            "Select exists only when timeLink existed at render. Fixed both/in/out order and French labels; mode||both marks explicit selection.",
+            "mousedown stops. Change pushUndo before dereferencing live ld.timeLink.mode, so removal meanwhile throws after history.",
+            "Success writes only mode, requires list/timeline, optional loadFrame and conditional bridge. UID/source anchor/offsets/in/out/selection are not directly rewritten."
+          ],
+          "save_history": "pushUndo normally saves all frames before snapshot unless scrub suppression makes history inert; no explicit post-write save.",
+          "errors": "All synchronous bridge calls test only object truthiness; missing renderNow throws after prior effects. No catch/rollback."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "pushUndo normally saves all live frames first; pushUndoLayers(true) paths explicitly skip that save. No handler serializes. Null/Add/Extra paths have no explicit post-write frame save; codecs separately persist fields/tracks."
+    },
+    {
+      "consumer": "load",
+      "disposition": "Time Link unlink/mode optionally call loadFrame after list/timeline. Other rows only reflect live loaded data. Parsers/migrations and time-link offset migration remain separate."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "History timing differs exactly: Null/extra-parent use alreadySaved=true; Follow/Parent/Time and first Parent scrub movement use pushUndo. Invalid/no-free/bad actions can exit before history, while stale callbacks may push then no-op/throw. Replay remains separately owned. C02 ensureLayerUid may assign child/candidate identities during candidate search or menu construction, before any local history action."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "Most rows retain captured ld/li and never directly rewrite selection. Parent scrub delegates setValue/selectLayerForEdit, which may replace _layerSel/_layerSelAnchor, sync bars, activate li and refresh before the value write."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "Parent stopwatch writes discrete parentKeys; scrub writes animated or motionStatic parentBlend; extra removal shifts parentWeight tracks only in motion/motionStatic; Time Link mode controls existing offset-row eligibility. Expressions stay unshifted."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Rows construct DOM and callbacks refresh panels/lists/timeline/loadFrame as specified. Shared bridge calls request rendering but do not prove output correctness; duplicate calls and partial failures are preserved."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted. Downstream codecs/exporters consume nullShape, followPath, parent fields/keys/weights and timeLink under existing ownership."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "No Tauri/filesystem/native IPC call. SMEngineBridge is shared rendering infrastructure; a truthy incomplete object throws at renderNow."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "null-options-and-change",
+      "status": "proposed, unrun",
+      "initial_state": "Falsy, known and truthy unknown nullShape; each select value; sceneVersion undefined/number; bridge/list ports absent/incomplete.",
+      "expected_effects": "Exact explicit selected assignments without native fallback claim; undo-alreadySaved, assignment, NaN/increment, bridge-before-list and partial failure."
+    },
+    {
+      "id": "follow-resolution-menu",
+      "status": "proposed, unrun",
+      "initial_state": "No/resolved/unresolved/unnamed target and missing/present menu ports.",
+      "expected_effects": "Captured names/classes/titles, menu construction/rect and callback refresh order."
+    },
+    {
+      "id": "follow-stale-actions",
+      "status": "proposed, unrun",
+      "initial_state": "Captured target then live followPath removal/change before context or Align clicks.",
+      "expected_effects": "Context uses captured tName and setter effects; Align pushes then can throw; delegated double bridge captured."
+    },
+    {
+      "id": "parent-stopwatch",
+      "status": "proposed, unrun",
+      "initial_state": "All captured keyed/here branches with frame/array mutation after render.",
+      "expected_effects": "Exact captured-branch/live-data writes, undo and refresh/bridge partial order."
+    },
+    {
+      "id": "parent-scrub-threshold-selection",
+      "status": "proposed, unrun",
+      "initial_state": "No B/pickwhip target; below/equal/above threshold; ld initially not selected; animated/static parentBlend.",
+      "expected_effects": "Exact capture, one undo before scrub flag, delegated selection replacement/bar sync/activation/refresh before key/static write."
+    },
+    {
+      "id": "parent-scrub-end-cancel-failure",
+      "status": "proposed, unrun",
+      "initial_state": "Mismatched IDs, pointerup/cancel, queued rAF, missing bridge method, setValue/list failures.",
+      "expected_effects": "Exact pid/moved/liveRaf/scrub states, uncancelled rAF, click suppression and stranded flags after failure."
+    },
+    {
+      "id": "parent-menu-unparent-add",
+      "status": "proposed, unrun",
+      "initial_state": "Captured names then changed live parents; menu ports; setter/bridge/toast variants; no-free/success add.",
+      "expected_effects": "Captured guards, setter delegated effects, possible repeated bridge, history/save differences and lazy stable extra."
+    },
+    {
+      "id": "extra-parent-candidates-menu-open",
+      "status": "proposed, unrun",
+      "initial_state": "Child and candidate layers with missing/existing UIDs; self/used/cyclic/falsy UID candidates; rejected-all search; absent menu/entry; duplicate parents; stale entry. Stub C02 UID generation with deterministic results.",
+      "expected_effects": "Exact first-free rules; reached cycle check can assign child UID before any caller history even when search returns null. Menu opening can assign candidate and child UIDs without selection/history. Existing truthy identities are reused; captured bad/UID and duplicate allowance remain."
+    },
+    {
+      "id": "extra-parent-weight-shift",
+      "status": "proposed, unrun",
+      "initial_state": "Remove first/middle/last with distinct motion, motionStatic and expressions parentWeight values plus stale pi.",
+      "expected_effects": "Splice current index; reference-preserving shifts/deletes only in motion/motionStatic; expressions unchanged; container deletion rules."
+    },
+    {
+      "id": "time-link-resolution",
+      "status": "proposed, unrun",
+      "initial_state": "Absent/no-UID/unresolved/resolved/duplicate UID including same-object match.",
+      "expected_effects": "Last distinct match, exact fixed strings/classes/titles and pickwhip wiring."
+    },
+    {
+      "id": "time-link-unlink-staleness",
+      "status": "proposed, unrun",
+      "initial_state": "Context and delayed menu actions with live link present/removed; distinct effective ranges and optional ports.",
+      "expected_effects": "Guard differences, undo/save, preserved baked range, delayed no-op yet refresh/toast, load/bridge order."
+    },
+    {
+      "id": "time-link-mode-staleness",
+      "status": "proposed, unrun",
+      "initial_state": "Every mode/falsy mode and link removed before change; load/bridge incomplete.",
+      "expected_effects": "Exact explicit selection/labels; only mode write; history-before-dereference throw; partial refresh/load/bridge effects."
+    },
+    {
+      "id": "consumer-round-trips",
+      "status": "proposed, unrun",
+      "initial_state": "Separately owned save/load/undo/export flows around each persistent field/track.",
+      "expected_effects": "Codec/evaluator behavior remains separately asserted; this census makes no runtime acceptance claim."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planMotionRelationshipRows(layer,frame,lookup) -> RelationshipRowsPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure Null/Follow/Parent/Time projection including explicit render-time captured facts."
+    },
+    {
+      "api": "projectRelationshipRows(domPort,plan,eventPorts) -> ProjectionReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "DOM identity/listener construction and required/optional port ordering; no model ownership."
+    },
+    {
+      "api": "planParentStack(layer,layers,index) -> ParentStackPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Pure A/B/extras names, candidates, cycle/duplicate status and indexed weight shift plan."
+    },
+    {
+      "api": "applyParentStackCommand(ports,command) -> MutationReceipt",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Explicit history/save, setter/selection, value-container and refresh effects; does not absorb C02 setters/evaluators."
+    },
+    {
+      "api": "driveParentBlendGesture(captured,pointer,ports) -> GestureState",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Preserves pid/moved/rAF/scrub state machine and delegates selection-aware setValue."
+    },
+    {
+      "api": "planTimeLinkRow(layer,lookup) -> TimeLinkRowPlan; applyTimeLinkCommand(ports,command)",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates render-time source/name from live unlink/mode commands; cycle/setter/pickwhip remain C02."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "symbols": [
+      "renderNullShapeRow",
+      "renderFollowPathRow",
+      "renderParentRow",
+      "currentBlend",
+      "scheduleLiveRender",
+      "endDrag",
+      "firstFreeParentLayer",
+      "openExtraParentMenu",
+      "renderTimeLinkRow",
+      "unlinkTime"
+    ],
+    "callers": [
+      "C20d renderMotionPropsPanel at7575-7578",
+      "renderLayerListMotion Parent row at7498"
+    ],
+    "delegated_effects": [
+      "setLayerFollowPath",
+      "setLayerParent/setLayerParentB",
+      "startParentPickwhip",
+      "setValue/selectLayerForEdit",
+      "wouldCreateParentCycle/ensureLayerUid",
+      "unlinkTimeLinkPreserveRange",
+      "startTimeLinkPickwhip"
+    ],
+    "boundary_assertion": "7995 and8435 excluded; timeLinkWouldCycle8435-8452 remains C02."
+  },
+  "validation": {
+    "expected_assigned_lines": 439,
+    "expected_classification": {
+      "code": 321,
+      "comment": 103,
+      "whitespace": 15
+    },
+    "packet_partition": [
+      [
+        7996,
+        8027
+      ],
+      [
+        8028,
+        8082
+      ],
+      [
+        8083,
+        8284
+      ],
+      [
+        8285,
+        8343
+      ],
+      [
+        8344,
+        8434
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          7996,
+          8027
+        ],
+        "code": 20,
+        "comment": 12,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          8028,
+          8082
+        ],
+        "code": 43,
+        "comment": 9,
+        "whitespace": 3
+      },
+      {
+        "range": [
+          8083,
+          8284
+        ],
+        "code": 144,
+        "comment": 49,
+        "whitespace": 9
+      },
+      {
+        "range": [
+          8285,
+          8343
+        ],
+        "code": 54,
+        "comment": 5,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          8344,
+          8434
+        ],
+        "code": 60,
+        "comment": 28,
+        "whitespace": 3
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently against the same canonical ranges, then pass canonical, omission and overlap inputs through one coverage function.",
+    "negative_controls": [
+      "remove7996 => omission failure",
+      "duplicate8027 => overlap failure"
+    ],
+    "required_checks": [
+      "pinned/current blob and base ancestry",
+      "top-level and packet coverage equality",
+      "exact counts and complete symbol/boundary/caller anchors",
+      "eight consumers and proposed/unrun fixtures",
+      "no private paths, draft markers or trailing whitespace",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No runtime/app suite/GitHub/source mutation; source-derived fixtures remain unrun."
+  }
+}

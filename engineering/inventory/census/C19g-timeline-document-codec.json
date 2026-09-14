@@ -1,0 +1,455 @@
+{
+  "census_id": "C19g",
+  "issue": 1136,
+  "title": "Timeline document codec and direct state facade",
+  "status": "draft for independent review; behavioral fixtures are proposed and unrun",
+  "owner": "P03/C19g read-only census; runtime ownership remains with named source owners",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "16cdcd2d667b02be40bd71654cedf1df47ba1d68",
+  "source_path": "src/js/timeline.js",
+  "source_blob": "cc4cfd27dc59d797c911d840dc46e2f816942123",
+  "source_line_count": 11907,
+  "scope_files": [
+    "src/js/timeline.js"
+  ],
+  "assigned_ranges": [
+    {
+      "start": 2049,
+      "end": 2246
+    },
+    {
+      "start": 2354,
+      "end": 2693
+    },
+    {
+      "start": 2694,
+      "end": 2694
+    }
+  ],
+  "coverage_note": "Exactly 539 assigned lines are covered once by four packets: 257 code and 282 full-line comments, no whitespace. The disjoint union is exportJSON2049-2246, importJSON2354-2693 and getState2694. mergeRemoteSnapshot2247 plus C19f content commands2248-2353 and the enclosing SM close2695 are excluded.",
+  "source_baselines": {
+    "pinned": "git object 59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/timeline.js is cc4cfd27dc59d797c911d840dc46e2f816942123",
+    "current": "observed origin/main 16cdcd2d667b02be40bd71654cedf1df47ba1d68 has the same timeline blob",
+    "runtime": "No browser, Tauri, export, native, media, audio or GPU behavior was executed for this JSON-only census.",
+    "format": "exportJSON stamps version13. SMProjectDocument.parse accepts a JSON object carrying layers or legacy frames, upgrades legacy frames to one layer, and validates nonempty layer/frame/stroke-array structure before import effects begin. importJSON warns on versions above13 but deliberately continues with defaults."
+  },
+  "whole_file_writer_guidance": {
+    "source_access": "timeline.js and every dependency/caller remain read-only; C19g owns only this census JSON artifact.",
+    "serialization": "P30/#1032 PR #1114 remains OPEN at a0f13e7da2f97248e1e8ab6cb44a1fd399e5f454 and retains the exclusive timeline.js runtime writer. Future runtime work waits for that reservation to release.",
+    "reservations": "D01/#1044, T05/Pollen, C01/C02/C03/C05/C06/C07/P20, Motion and all other named owners remain separate. Census range ownership does not transfer source authority."
+  },
+  "reconciliation": [
+    {
+      "owner": "C01 document/history",
+      "disposition": "C01 retains project open/save/autosave/version-history/tab consumers and shared undo/redo ports. Its older prose incorrectly locates this implementation in app.js while explicitly excluding the serialize/normalize body. C19g maps the actual timeline.js implementation without rewriting C01's pin."
+    },
+    {
+      "owner": "C02 animation/time",
+      "disposition": "Retains layer frames, Motion tracks, tween maps, camera tracks, duration/work-area behavior, symbols and animation consumers. C19g records how the codec copies, defaults and migrates those values; it does not own their runtime semantics."
+    },
+    {
+      "owner": "C03 render/export",
+      "disposition": "Retains render and media-export consumers. exportJSON here means project-document serialization, while SVG/image/video export remains C03 and downstream owners."
+    },
+    {
+      "owner": "C05 native/media",
+      "disposition": "Retains audio, reference-media, linked-media, native-video and desktop bridge behavior. C19g records document fields and reload hooks without establishing native resource acceptance."
+    },
+    {
+      "owner": "C06 preferences/bootstrap",
+      "disposition": "C06 named importJSON2354-2374 but has no packet owning it and reports the region uncovered. C19g owns the complete method census; C06 retains Labs/bootstrap consumers."
+    },
+    {
+      "owner": "C07 application/bootstrap",
+      "disposition": "Retains application API/bootstrap consumers, including NemoOpacityApplication.documentChanged. The callback is an import side effect, not codec ownership transfer."
+    },
+    {
+      "owner": "P20 folder codec",
+      "disposition": "Retains src/js/domain/document/folder-codec.js and its accepted export/import/snapshot/restore ports. C19g records calls to NemoFolderCodec.exportFolderId/exportFolderMap and applyFolderId/importFolderMap without proposing a replacement."
+    },
+    {
+      "owner": "P30/#1032 PR #1114",
+      "disposition": "Retains the whole timeline.js runtime writer while open; this census performs no runtime edit."
+    }
+  ],
+  "boundaries": [
+    "exportJSON is the complete SM property2049-2246, beginning after C19f flipVertical and ending at its return/closure.",
+    "mergeRemoteSnapshot2247 is an excluded one-line returning facade into app.js/C01 team-sync.",
+    "C19f repeatSelection and propagateColorAllFrames2248-2353 are excluded content commands.",
+    "importJSON is the complete SM property2354-2693, from parse through the catch that returns false.",
+    "getState2694 is one complete returning direct-state facade.",
+    "The SM closing delimiter2695 belongs to the enclosing C06 namespace context and is excluded."
+  ],
+  "exclusions": [
+    {
+      "range": [
+        2247,
+        2247
+      ],
+      "symbol": "mergeRemoteSnapshot",
+      "owner": "C01.project.team-sync with app.js:897-964 merge implementation",
+      "disposition": "Returning facade only; no duplicate facade leaf."
+    },
+    {
+      "range": [
+        2248,
+        2353
+      ],
+      "symbols": [
+        "repeatSelection",
+        "propagateColorAllFrames"
+      ],
+      "owner": "C19f/#1135 timeline content commands",
+      "disposition": "Accepted neighboring census scope; not reclassified here."
+    },
+    {
+      "range": [
+        2695,
+        2695
+      ],
+      "symbol": "SM object closing delimiter",
+      "owner": "C06 namespace/bootstrap context",
+      "disposition": "Structural context only; not executable responsibility."
+    }
+  ],
+  "areas": [
+    {
+      "area": "document-export",
+      "packets": [
+        {
+          "id": "C19g.export-transaction",
+          "files": [
+            "src/js/timeline.js:2049-2246"
+          ],
+          "coverage_ranges": [
+            [
+              2049,
+              2246
+            ]
+          ],
+          "symbols": [
+            "exportJSON"
+          ],
+          "responsibility": "Synchronizes eligible live Paper layers into stored frame records, selects the real outer-scene snapshot when a component or montage editor is open, removes selected runtime-only identities/resources, captures optional workspace and mesh representations, and returns one version13 project JSON string.",
+          "writer": "Calls saveAllLayerFrames before any serialization. Montage snapshot precedence is intentional: activeMontageViewId plus _montageViewSnapshot wins even when activeSymbolId is also set; otherwise an active symbol uses _sceneSnapshot; otherwise live scene state is used. Only layers/totalFrames/fps/waIn/waOut/cameraKeys come from that scene snapshot. Symbols and all other project-wide fields remain live. Symbols are reused unless any inner layer has rig data, in which case only affected symbols/layers are shallow-copied and cloneRigForSymbol strips their live rig links. The outer layer map copies frames and most dictionaries by reference into the temporary object, whitelists rig binds, maps audio/media records through allowlists, delegates folder and mesh encoding, may synchronously capture workspace, then JSON.stringify performs the actual snapshot and can throw.",
+          "public_api": "window.SM.exportJSON() -> string; throws if a save/capture/serializer/JSON.stringify dependency throws or the constructed graph remains unserializable.",
+          "consumers": [
+            "project.js:100/116/121-203 save, dirty comparison, autosave, browser download, Tauri atomic write and post-open normalized baseline",
+            "project.js:267-268 version restore and project.js:503-576 project-tab snapshot/switch/close",
+            "timeline.js:11796-11801 periodic autosave plus project.js:25 autosaveWrite and project.js:686/733 resume/browser-open normalization workflows",
+            "tweens.js C01 undo/history uses separate snapshots rather than this project string but shares layer/frame/document fields",
+            "tests/animation/browser-acceptance.cjs and tests/browser/opacity-consumers.spec.cjs call the real export for stored-layer preservation",
+            "Dynamic callers can invoke the public window.SM method; no static production caller of getState is a substitute for this snapshot."
+          ],
+          "field_correspondence": {
+            "scene_context": "version is literal13. totalFrames/fps/waIn/waOut/layers/cameraKeys are outer-scene values selected from montage snapshot, symbol snapshot or live state. canvasW/canvasH/canvasBg remain live document globals.",
+            "layer_core": "name, visible, locked and frames pass through. frames retain the complete stored frame dictionaries and stroke data as present after saveAllLayerFrames. symbolId/symPlayMode/symSpeed/symPlacedAt/symSingleFrame/symMatrix, lfsGroup/lfsIds/lfsSettings, blendMode/blendKeys, channel/linkGroupId/color and inPoint/outPoint pass through.",
+            "layer_animation_relationships": "motion, motionStatic, elementMotion, parentLayerUid, parentKeys, parentLayerUidB, parentsMore, followPath, markers, keyLock, timeRemap, motionBlur, effectsFrom, timeLink and threeD pass through. layerUid is the stable identity for parent, matte, tween and application consumers.",
+            "layer_kinds_and_effects": "nativeVideo/videoMeshId, matteMode/matteSourceLayerUid/mattesMore, montageId, expressions/exprControls, text/null/effect/folder/guide/widget/effector flags and descriptors, textAnimators, effects/pathFx/lipSync/footage, duplicator, groups and shapeNames pass through. folderId alone delegates to P20 exportFolderId.",
+            "rig_identity_policy": "Outer layer rig is rebuilt as {bones,ikChains,nextId,binds}; each bind keeps strokeId, meshId, rest, restHandles, weights and rotate. _live and all unlisted bind/rig properties are stripped. Inner symbol rigs delegate to cloneRigForSymbol; unaffected symbols retain their object reference until stringify.",
+            "project_registries": "layerFolders delegates to P20 exportFolderMap. layerLinkGroups, storyboard, symbols, palettes, activePaletteIdx, customBrushPresets, shadowPalette, shadowActiveId, customEffects, trackRoles and exprGlobals pass through.",
+            "media_allowlists": "audioTracks records only name,dataB64,offsetFrames(default0),volume(default1 only when undefined),muted(boolean),audioId,trimStart(default0),trimEnd(null default),motion and motionStatic; runtime _buffer/_peaksCanvas/_srcNode and other fields drop. refMedia keeps type,name,src,frames,opacity,visible,offsetFrames(default0). mediaLibrary keeps id,name,kind,thumb,layerName,layerUid,linked,path,webHandleId,naturalW,naturalH,audioId,sizeBytes,importedAt; linkedBroken/linkedBrokenReason intentionally drop.",
+            "document_animation_and_guides": "perspective*, symmetry*, motionArcs, easingCurve, resamplePts, tweenStep, tweenOverrides, tweenEasing(default {} only when state value is falsy), comments(default []), markers(default []), cameraLayerOn(boolean), shyEnabled(boolean), bpm/bpmOffset/bpmShow, motionBlurOn/motionBlurSamples/motionBlurShutter and guides(default {h:[],v:[]}) serialize.",
+            "optional_ports": "workspace is omitted when SMWorkspace.capture is unavailable and otherwise stores its returned value. imageMeshes delegates to SMImageMesh.serialize when available and otherwise passes state.imageMeshes. mediaMode defaults to embedded in the document."
+          },
+          "asymmetries": [
+            "Export is not pure: saveAllLayerFrames can write ghost proxies, replace eligible frame stroke arrays and promote dirty interpolated frames before JSON construction; it also invalidates the edited-symbol union cache. A later capture/stringify failure does not roll those mutations back.",
+            "saveAllLayerFrames deliberately skips synthetic/component/montage/null/effect/guide/widget/LFS/locked-duplicator/rig-pose/path-FX layers, invisible layers, out-of-range trimmed layers and non-key/non-interpolated frames. Stored data for those branches is serialized as already held rather than read from live Paper items.",
+            "Montage context outranks nested symbol context because only _montageViewSnapshot holds the real outer scene. Symbols themselves remain live project globals rather than coming from either scene snapshot.",
+            "Per-layer rig and audio/media library entries are allowlisted while most other nested dictionaries are copied wholesale. Unknown fields inside allowlisted records drop; unknown fields inside frames, symbols without rig cleanup, storyboard and wholesale dictionaries survive JSON.stringify if serializable.",
+            "NemoFolderCodec project export preserves the live folder map by reference until immediate stringify; its undo port uses a different deep-copy policy and remains P20-owned.",
+            "Workspace capture and image-mesh serialization are behavior-bearing optional ports. Their absence changes the emitted representation; no serializer version handshake is passed to either port."
+          ],
+          "oracle": "Proposed, unrun fixtures: ordinary scene plus symbol, montage and nested montage-symbol editing with distinct layers/total/fps/work-area/camera tracks; live eligible key/interpolated writes and every save skip guard; save mutation followed by forced stringify/capture failure; outer and inner rig binds proving _live stripping and restHandles/meshId survival; typed-array image mesh; absent/present workspace; embedded/linked media allowlists including intentionally dropped runtime/session fields; unknown nested-field preservation versus allowlist loss; stable output/dirty comparison across immediate repeated exports.",
+          "consumer_matrix": {
+            "save": "This is itself the project save encoder and begins with saveAllLayerFrames. project.js also calls saveAllLayerFrames before several save entry points, so those callers perform a redundant leading synchronization before exportJSON repeats it.",
+            "load": "Does not load or navigate. Snapshot selection avoids exiting symbol/montage editors. Its output is later accepted by importJSON/project consumers.",
+            "history": "Does not push undo. Its live-frame synchronization can mutate stored frames without creating a history entry; C01 history uses its own snapshot model.",
+            "selection": "Does not clear or serialize canvas/timeline selection. saveAllLayerFrames can write active ghost proxies before reading layers; activeLayerIdx and selectedPaths are omitted.",
+            "animation": "Serializes complete frame arrays, symbol/montage metadata, Motion/static/element tracks, tween maps, camera tracks and timing fields with the context precedence and allowlists above. It does not evaluate animation.",
+            "render": "No render call. It reads stored scene data and optional workspace/mesh serializers; later render/export consumers interpret the result.",
+            "export": "Project JSON serialization only. C03 SVG/image/video export consumes the same stored layers through its own paths and is not executed here.",
+            "native": "Tauri project.js writes the returned string atomically when possible; browser Save downloads it. exportJSON itself calls no native API and proves neither disk success nor native/media resource validity."
+          },
+          "construct_boundary": "Complete SM property2049-2246, including all context, stripping and field-policy comments.",
+          "proposed_api": "encodeProjectDocument(state,{saveFrames,sceneContext,folderCodec,cloneSymbolRig,serializeMeshes,captureWorkspace}) -> string",
+          "admission": "Future executable work must split live-save/context selection from pure document encoding. Preserve P20 and media/mesh/workspace ports and characterize thrown-after-save behavior before changing it."
+        }
+      ]
+    },
+    {
+      "area": "document-import",
+      "packets": [
+        {
+          "id": "C19g.import-parse-layer-restore",
+          "files": [
+            "src/js/timeline.js:2354-2562"
+          ],
+          "coverage_ranges": [
+            [
+              2354,
+              2562
+            ]
+          ],
+          "symbols": [
+            "importJSON",
+            "migrate componentFrame",
+            "migrate matte source uid"
+          ],
+          "responsibility": "Validates and parses the document before effects, then begins a destructive, ordered restore: resets Labs/renderer caches, warns but accepts newer versions, exits an active symbol, replaces Paper/user/symbol layer stores, reconstructs each layer through createUserLayer plus guarded whitelists, normalizes frames, and migrates legacy component and matte relationships.",
+          "writer": "SMProjectDocument.parse runs inside try before any mutation and may upgrade a legacy top-level frames array. On success, resetAll and clearRetainedPaths run, then the newer-version warning. exitToScene runs only when activeSymbolId is truthy. Scalar document dimensions/timing and global mirrors are assigned; every current user layer and symbol Paper layer is removed; state.layers and _symbolPaperLayers are replaced; symbols/customEffects are replaced and custom effects re-registered. Each parsed layer is recreated, then its frames array is adopted by reference and fields are conditionally copied, filtered or cloned. Frames are normalized in place and padded to totalFrames. After every layer exists, legacy matte adjacency is frozen to uid and the P20 folder map plus link-group map are installed.",
+          "public_api": "window.SM.importJSON(json, silent?) -> boolean. Returns false and shows an error toast for any caught parse, validation, restore, migration, hook or render exception; returns true only after the complete second packet and final application callback finish.",
+          "consumers": [
+            "project.js:197-204 native open and normalized clean baseline",
+            "project.js:265-272 version restore prevalidates independently, captures current export, and records the old version only after import success",
+            "project.js:536-576 tab switch/close refuses activation changes when import returns false",
+            "project.js:686 and733 autosave resume and browser Open",
+            "tests/project-open.test.cjs executes the real sliced method only for malformed/structurally invalid pre-effect rejection",
+            "tests/domain-folder-codec.test.cjs executes the real sliced method for folder metadata with broad no-op dependencies; it is not whole-codec acceptance"
+          ],
+          "field_correspondence": {
+            "parse_and_document_defaults": "totalFrames=d.totalFrames||d.layers[0].frames.length, fps||12, canvasW||1920, canvasH||1080, canvasBg||#ffffff and waIn||0 use truthy fallbacks; waOut alone preserves explicit0 through an undefined test. _waIn/_waOut/_totalF mirror the assigned values.",
+            "layer_core": "createUserLayer supplies fresh defaults; name is passed to it, visible preserves false via !==false, locked uses ||false and frames adopts ld.frames by reference. color uses ld.color||nextLayerColor. Imported frame records remain otherwise wholesale; falsy isInterpolated is normalized to false in place and missing tail frames are appended, while excess frames are not trimmed.",
+            "guarded_relationships": "blendMode/matteMode/matteSourceLayerUid require strings. blendKeys filter to objects with numeric frame/string mode. mattesMore filter to string uid/mode and then retain only those two keys. layerUid/parentLayerUid/parentLayerUidB/followPath use truthy guards. parentKeys filter numeric frame plus null/string uid and retain full accepted objects. parentsMore filter string uid but map each item to {uid}, dropping weights and every other key. Legacy matte migration may generate a Date/random layerUid on the adjacent source.",
+            "layer_kinds": "expressions use a truthy guard. exprControls require a nonempty array, are adopted by reference and register metadata. Text/effect/folder flags restore truthy; folderCollapsed becomes boolean. Null/guide positions are sliced and default from canvas center, shapes/orientation default. Widget requires flag, object and widget.x.key string; textAnimators filter object+selector then deep-clone; effector requires flag/object/string targetLayerUid then deep-clones. effects always becomes ld.effects||[].",
+            "symbol_lfs_and_metadata": "symbol fields restore only when symbolId is truthy; symPlayMode defaults loop and symSpeed defaults1, so explicit0 speed is lost; placedAt/singleFrame use ||0. lfs fields restore only when lfsGroup truthy. P20 applyFolderId controls folderId. channel/linkGroupId, montageId and footage use truthy guards.",
+            "animation_and_resources": "motion, elementMotion, motionStatic, nativeVideo, markers, timeRemap, effectsFrom, timeLink, rig, pathFx, groups and shapeNames use truthy guards. inPoint/outPoint preserve explicit0 via !=null. videoMeshId requires both it and nativeVideo. matte fields are handled earlier. pathFx/lipSync and other descriptors are adopted; lipSync alone requires object shape. duplicator adoption forcibly locks the layer. rig is adopted wholesale; relinkRigBinds is deferred to loadFrame.",
+            "flags_and_boolean_loss": "shy, motionBlur and threeD restore only truthy values as true. keyLock restores only truthy mode. isTextLayer/isNullLayer/isEffectLayer/isFolderLayer/isGuideLayer/isWidgetLayer/isEffectorLayer similarly rely on fresh-layer defaults for absent/false values.",
+            "component_migration": "For a symbol layer in a non-single play mode, a lone frame0 componentFrame===0 with no later componentFrame stamp is deleted as a legacy migration; deliberate single-frame holds and any sequence carrying another stamp remain."
+          },
+          "asymmetries": [
+            "Only parser/structural-validation failures are atomic. Once parse succeeds, every later failure is caught and returns false after any already-completed removals, state writes and external hook effects; there is no rollback snapshot.",
+            "A newer version only produces a warning and continues. Unknown top-level and layer keys are generally dropped because restore is an explicit whitelist, while frame/stroke dictionaries are adopted wholesale.",
+            "Truthy defaults lose valid zero/empty values for totalFrames/fps/canvas sizes/waIn, symSpeed, and several identifiers/metadata. waOut, inPoint/outPoint and motionBlurShutter use explicit null/undefined checks and preserve zero.",
+            "parentsMore exports wholesale but imports only uid, so weights and extra fields are dropped. Rig exports an allowlist but imports the parsed rig wholesale. Audio/media allowlists apply only on export; import later adopts their parsed arrays wholesale.",
+            "Frames and many nested values alias the freshly parsed object rather than a deep clone. Widget/textAnimator/effector use targeted JSON deep copies; filtered arrays vary between retaining accepted objects and rebuilding reduced objects.",
+            "No explicit montage exit occurs before teardown when activeMontageViewId is set without activeSymbolId. This is observed source behavior and needs a fixture before any repair proposal.",
+            "Folder membership and map restoration remain P20 ports with deliberately different falsy/reference behavior; do not fold them into a replacement document codec."
+          ],
+          "oracle": "Proposed, unrun fixtures: malformed JSON/legacy frames/invalid empty or malformed layers proving no pre-effect mutation; newer-version warning then successful degradation; forced failures after Labs reset, engine clear, user-layer teardown, layer N creation, custom-effect registration and folder install proving partial mutation; ordinary scene versus active symbol/montage/nested context; every layer kind and guard with zero/empty/malformed values; full frame dictionaries, short/long frame arrays and alias checks; parentKeys/parentsMore/matte migrations with unique/absent ids; componentFrame migration branches; P20 folder behavior using its existing independent tests.",
+          "consumer_matrix": {
+            "save": "Does not save the outgoing document. Project open callers read/validate and then invoke import; version restore alone explicitly saves/exports the old document first. A direct import can therefore replace unsaved live state.",
+            "load": "This packet reconstructs document stores but final loadFrame occurs in the following packet. frames arrays are adopted and padded here.",
+            "history": "No snapshot is made before destructive restore. History stacks are not cleared in this packet; the final NemoOpacityApplication.documentChanged callback clears them only when that optional application integration is loaded.",
+            "selection": "No clearSel call occurs before removing Paper layers. Selection cleanup is deferred implicitly to final loadFrame re-resolution, which can retain an old selected stroke by matching strokeId in the new active layer; explicit selection-reset behavior is absent.",
+            "animation": "Restores layers/frames/Motion relationships and performs component/matte migrations; later tween/curve/camera migrations and initial frame materialization are in the following packet.",
+            "render": "Clears retained engine paths before teardown and registers custom effects. No scene render occurs until the following packet.",
+            "export": "Reads the version13 project representation and normalizes it into current state. Unknown whitelist fields can be lost on the next export even after the newer-version warning.",
+            "native": "Removing Paper layers and clearing engine-retained paths are local runtime effects. Native video sessions are not reopened here; their descriptor is stored for lazy reload during loadFrame."
+          },
+          "construct_boundary": "First contiguous responsibility segment of importJSON2354-2562: parse through document/layer replacement, layer normalization and relationship migrations, ending after folder/link-group restore.",
+          "proposed_api": "prepareProjectRestore(json,validator) -> normalized plan; applyLayerRestore(plan,{layers,paper,symbols,effects,folderCodec,ids}) -> partial-result",
+          "admission": "Separate a pure parse/default/normalization leaf from the destructive layer restore adapter. Preserve P20 calls and characterize all truthy/shape baselines before choosing repairs."
+        },
+        {
+          "id": "C19g.import-document-finalize",
+          "files": [
+            "src/js/timeline.js:2563-2693"
+          ],
+          "coverage_ranges": [
+            [
+              2563,
+              2693
+            ]
+          ],
+          "symbols": [
+            "importJSON",
+            "migrateTweenSpanKeys",
+            "migrateArcs"
+          ],
+          "responsibility": "Restores and migrates document-wide animation maps and editor/media registries, invokes optional reload/UI/application hooks, resets the initial view/frame/layer context, and converts all success or failure paths into the method's boolean contract.",
+          "writer": "Installs motionArcs/tweenOverrides/tweenEasing then rewrites legacy index-prefixed span keys to layerUid keys, generating missing ids, and migrates old unscoped arc keys only when exactly one layer has nonempty drawing keys at both endpoints; ambiguous/unowned old arcs drop. Replaces the exact old default easing curve while retaining edited curves. Restores comments, markers, roles, meshes, display/timing settings, palettes, brushes, audio/reference/library/media mode, storyboard, perspective/symmetry and selected sampling fields with mixed default/retain semantics. Optional modules reload or repaint as encountered. migrateLegacyCurves runs before currentFrame/activeLayerIdx reset. The final adapter activates layer0, draws and loads frame0, renders overlays/arcs/UI/tabs, syncs document fields, conditionally toasts, calls NemoOpacityApplication.documentChanged, then returns true. The single catch covers both packets, toasts the error and returns false.",
+          "public_api": "Same window.SM.importJSON(json, silent?) -> boolean contract. silent suppresses only the success toast; validation errors, caught errors and newer-version integrity warnings remain visible.",
+          "consumers": [
+            "C02 tween/motion/camera/symbol consumers read migrated maps and generated layerUid identities",
+            "C03 render/export consumers observe the reconstructed frame0 and project settings",
+            "C05 audio/reference/media/linked-media/native-video modules receive reload/sync or lazy-load behavior",
+            "C07 NemoOpacityApplication.documentChanged rotates document identity, clears retry/trace state and, in bootstrap, clears undo/redo stacks",
+            "tests/browser/opacity-consumers.spec.cjs covers one real save/reopen path, layerUid/static+keyed opacity survival, stale application-request rejection, conditional history clearing and stored-layer preservation; it is not the full document matrix",
+            "tests/fixtures/fixtures.test.cjs validates corpus document structure and downstream production helpers; most importJSON contract checks are gated or shape-only rather than executing this full restore"
+          ],
+          "field_correspondence": {
+            "tween_maps": "motionArcs/tweenOverrides/tweenEasing default to {}. Numeric index span prefixes migrate to layerUid when the referenced layer exists; missing indices retain their original key. Old arc fA-fB-i keys become layerUid-prefixed only for one qualifying owner; ambiguous or zero-owner entries drop; already-scoped keys remain.",
+            "easing_and_sampling": "easingCurve is assigned only when present and the exact legacy four-point default without numeric tx is replaced. Missing easingCurve retains the prior live document value. resamplePts and tweenStep assign only when truthy, so absent/0 retain prior values. migrateLegacyCurves may mutate imported Motion keys through C02's port.",
+            "annotations_identity_meshes": "comments and markers default []; trackRoles defaults {}. SMImageMesh.load receives d.imageMeshes when available and owns id-counter reseeding; fallback assigns d.imageMeshes||{}. cameraKeys defaults [], cameraLayerOn boolean and cameraView is always forced false.",
+            "document_ui_timing": "shyEnabled, bpm(default120 with !=null), bpmOffset(default0), bpmShow, exprGlobals(default empty), motionBlurOn, motionBlurSamples(default6 via ||), motionBlurShutter(default0.5 with !=null), guides(default empty h/v) restore. Rulers and feedback avatars repaint through optional hooks.",
+            "palettes_and_brushes": "palettes uses a nonempty modern list, otherwise wraps legacy colorPalette, otherwise installs a hard-coded default. activePaletteIdx uses ||0. shadowPalette requires nonempty input or defaults; shadowActiveId defaults to the first restored shadow. customBrushPresets defaults {} and palette grid optionally rerenders.",
+            "media_and_workspace": "audioTracks/refMedia/storyboard/mediaLibrary are adopted wholesale with []/null defaults and their modules reload. workspace applies only when data and apply port exist; absence deliberately leaves the current workspace unchanged. mediaMode defaults embedded and linked-media UI synchronizes.",
+            "guides_and_drawing_modes": "perspectiveEnabled/mode/density/VPs and symmetryEnabled/mode/axis/radial center/sectors/extend restore. Density and sector count use truthy defaults; symmetryExtend alone distinguishes undefined from false.",
+            "final_context": "currentFrame and activeLayerIdx force0; activateUL(0), drawStage, loadFrame(0), renderOS, renderArcs, updateUI, renderSymbolTabs and syncDocFields run in that order. Success toast depends on !silent; application documentChanged runs after all UI work and before true is returned."
+          },
+          "asymmetries": [
+            "Missing easingCurve/resamplePts/tweenStep retain state from the prior document, while most peer document fields reset to explicit defaults. workspace retention is documented as intentional; the other retain-on-falsy paths need characterization rather than an assumed repair.",
+            "motionBlurSamples/perspectiveDensity/symmetryRadialSectors use || defaults and lose explicit0; bpm and motionBlurShutter preserve0. media export normalizes selected fields, while import adopts whole audioTracks/refMedia/mediaLibrary objects, so unknown fields can enter live state and disappear on the next save.",
+            "Tween key migration may create nondeterministic layerUid values with Date/random and drops ambiguous legacy arcs. It mutates the imported maps rather than retaining an untouched source representation.",
+            "The importer resets current frame, active layer and cameraView but does not explicitly reset activeMontageViewId, selectedPaths or other selection globals. loadFrame owns re-resolution, not a document-boundary clear.",
+            "Undo/redo cleanup depends on optional NemoOpacityApplication bootstrap. Without it, prior-document history stacks remain. With it, documentChanged occurs last, so an earlier exception returns false without rotating identity or clearing history.",
+            "Each reload/render hook can throw after earlier mutation. The catch emits one error and false but cannot distinguish which phase failed or restore the previous document."
+          ],
+          "oracle": "Proposed, unrun fixtures: all tween span/arc migration branches with stable and generated uids; exact old easing versus hand-edited/missing curve; old/missing/zero values across every document default; image mesh module and fallback with id reseed; palette modern/legacy/default; audio/reference/library/linked mode reload order; missing/present workspace; optional hook absence and a throw injected at each hook/final render/application callback proving partial state and false return; active montage and old selection/history before replacement; conditional silent/newer/error toast matrix; browser and packaged Tauri reopen with a real project file.",
+          "consumer_matrix": {
+            "save": "No save or rollback. Normal project consumers re-export after success to establish the normalized baseline; failed imports can still leave partial state that a later save would serialize.",
+            "load": "Calls loadFrame(0) after activating layer0 and drawing the stage. Audio/reference/library reload earlier; native-video onFrameChanged can run from loadFrame through its existing bridge.",
+            "history": "NemoOpacityApplication.documentChanged clears undo/redo stacks and labels only when the optional bootstrap is installed and the method reaches its final callback. Otherwise importJSON has no history cleanup.",
+            "selection": "Forces activeLayerIdx0 but does not explicitly clear row, frame or Paper selection. loadFrame re-resolves selectedPaths by strokeId on the new active layer and rebuilds selectedStrokeIndices, so same-id carryover is possible and must be treated as baseline until tested.",
+            "animation": "Owns document-level restore ordering and legacy normalization, then delegates Motion curve migration and frame materialization. It does not validate every animation descriptor before consumers run.",
+            "render": "Ruler/avatar/palette/media hooks run during restore; final drawStage/loadFrame/renderOS/renderArcs/updateUI/renderSymbolTabs/syncDocFields makes frame0 visible. Engine path clearing occurred in the prior packet.",
+            "export": "Successful callers often export immediately for a normalized dirty baseline. C03 output correctness still requires its own browser/native fixture; this census ran none.",
+            "native": "SMAudio/SMReference/SMMediaLibrary reload and linked-media sync may touch browser/native-backed resources; native-video reopening is lazy via loadFrame. A true return means hooks did not throw, not that every async or native asset is available."
+          },
+          "construct_boundary": "Second contiguous responsibility segment of importJSON2563-2693: document maps/migrations through final view reset, callbacks, boolean return and catch closure.",
+          "proposed_api": "finalizeProjectRestore(plan,{tweenMigration,mesh,audio,reference,media,workspace,linkedMedia,render,applicationIdentity}) -> {ok,phase,warnings}",
+          "admission": "Keep document-map migration, media/workspace reload and final view/application notification as separately testable adapters. A future atomic coordinator needs an independent rollback oracle and cannot be admitted as one giant codec migration leaf."
+        }
+      ]
+    },
+    {
+      "area": "state-exposure",
+      "packets": [
+        {
+          "id": "C19g.get-state-facade",
+          "files": [
+            "src/js/timeline.js:2694"
+          ],
+          "coverage_ranges": [
+            [
+              2694,
+              2694
+            ]
+          ],
+          "symbols": [
+            "getState"
+          ],
+          "responsibility": "Returns the current mutable state object directly as a compatibility/debug facade.",
+          "writer": "No copy, normalization, guard or effect; object identity is exactly state, so a caller can read and mutate the live document through the returned reference.",
+          "public_api": "window.SM.getState() -> state object by reference.",
+          "consumers": [
+            "No static production SM.getState call was found by repository symbol search; the public window.SM facade remains available to dynamic console/plugin callers.",
+            "tests/project-open.test.cjs and tests/domain-folder-codec.test.cjs use the textual getState boundary to slice the preceding real importJSON method but do not call getState."
+          ],
+          "oracle": "Proposed, unrun: strict identity SM.getState()===state; mutations through the returned object are immediately live; repeated calls after successful and failed import return the current state object; no render/history/revision notification occurs.",
+          "consumer_matrix": {
+            "save": "No save; exposed callers can mutate fields without save/history discipline.",
+            "load": "No load; returns whichever state exists at call time.",
+            "history": "No snapshot or revision change.",
+            "selection": "Exposes selection-related fields that live on state, but selectedPaths is a separate global and is not returned as an explicit API field.",
+            "animation": "Exposes all animation maps and layer records by mutable reference without evaluating them.",
+            "render": "No repaint or cache invalidation follows mutations made through the reference.",
+            "export": "A later export observes direct mutations if their fields are in the codec; getState itself returns no serialized value.",
+            "native": "No native bridge or resource operation."
+          },
+          "construct_boundary": "Complete one-line SM property2694; SM closes at excluded line2695.",
+          "notes": "This is a precise exposure disposition, not an independent extraction candidate. Replacing it with a clone or read model would be a public behavior change requiring dynamic-consumer discovery.",
+          "proposed_api": "Retain window.SM.getState as a compatibility facade or route future typed application reads through feature-owned capabilities; do not create a duplicate state module for this line.",
+          "admission": "Attach any deprecation or restriction to a separately accepted application-API outcome with console/plugin compatibility evidence."
+        }
+      ]
+    }
+  ],
+  "source_consumers": {
+    "project_io": "project.js:100-203 save/dirty/browser+Tauri open;265-272 version restore;503-576 tabs;686/733 resume/browser Open; timeline.js:11796-11801 performs the 30-second export and delegates storage to project.js autosaveWrite.",
+    "validation": "project-document.js:3-17 SMProjectDocument.parse validates JSON/layers/frames before importer effects and performs the legacy top-level frames migration.",
+    "save_load": "app.js:4634 saveActiveLayerFrame,4693 saveAllLayerFrames and4746 loadFrame own live Paper/store synchronization, reconstruction, selection re-resolution and native/reference frame hooks.",
+    "history": "tweens.js:4878+ layersSnapshotNow/restoreLayersSnapshot and pushUndoLayers use a separate snapshot schema; C01 retains undo/redo workflows.",
+    "application_identity": "application/opacity-application.js:23-28 rotates document identity; bootstrap/opacity-application.js:57-64 additionally clears undo/redo stacks and labels when import reaches documentChanged.",
+    "folder_codec": "domain/document/folder-codec.js P20 owns by-reference project export/import and deep-copy undo ports; domain-folder-codec.test.cjs covers that bounded behavior.",
+    "render_export": "engine-bridge.js, export.js and animation consumers interpret restored fields; project JSON success is not pixel/export/native acceptance.",
+    "media_native": "audio-bridge, reference-bridge, media-library, linked-media and native-video hooks reload/sync or lazily reopen resources during the import sequence.",
+    "tests": "project-open covers validation-before-effects and surrounding project transitions; domain-folder-codec covers P20 calls; fixture corpus mostly validates structure/downstream helpers; browser opacity covers one application capability save/reopen/history-identity path. None is a complete field/partial-failure/context matrix."
+  },
+  "fixtures": [
+    "scene/symbol/montage/nested context export precedence with live-save effects and camera tracks",
+    "export allowlists and identity/resource stripping for outer and inner rigs, audio and media library",
+    "export serializer/capture failure after live-save mutation",
+    "validation-before-effects and per-phase import failure with observable partial mutation",
+    "all layer kinds, persistent fields, truthy/zero/empty guards and export/import asymmetries",
+    "component-frame, matte-uid, tween-span, motion-arc, easing and Motion-curve migrations",
+    "selection/history/application identity behavior across successful and failed document replacement",
+    "browser and packaged Tauri reopen plus downstream render/export/native resource availability"
+  ],
+  "future_proposals": [
+    {
+      "id": "C19g.proposal-export-preflight",
+      "scope": "Live-frame synchronization and outer-scene context resolution only, returning explicit scene sources and save effects.",
+      "module": "src/js/application/project-export-context.js",
+      "api": "prepareProjectExport(state,ports) -> {scene,saveEffects,warnings}",
+      "admission": "Separate from pure encoding; require ordinary/symbol/montage/nested fixtures and thrown-after-save characterization."
+    },
+    {
+      "id": "C19g.proposal-document-encoder",
+      "scope": "Pure versioned project dictionary construction and JSON encoding with explicit P20, rig, mesh, workspace, audio and media ports.",
+      "module": "src/js/domain/document/project-codec.js",
+      "api": "encodeProjectDocument(model,ports) -> string",
+      "admission": "Do not absorb P20 folder codec or runtime save. Field and unknown-key policies need exact round-trip fixtures."
+    },
+    {
+      "id": "C19g.proposal-import-normalizer",
+      "scope": "Parse, defaults, layer-field shape guards and migration plan without live state or Paper mutations.",
+      "module": "src/js/domain/document/project-normalizer.js",
+      "api": "normalizeProjectDocument(json,{version,ids}) -> {document,warnings,migrations}",
+      "admission": "Independent oracle covers every zero/empty/malformed/asymmetric field and deterministic identity policy."
+    },
+    {
+      "id": "C19g.proposal-layer-restore",
+      "scope": "Destructive Paper/user/symbol layer replacement and layer descriptor application only.",
+      "module": "src/js/application/project-layer-restore.js",
+      "api": "applyProjectLayers(document,{paper,layers,symbols,effects,folderCodec}) -> result",
+      "admission": "Preserve P20 and existing owners; require failure-phase and all-layer-kind fixtures before changing atomicity."
+    },
+    {
+      "id": "C19g.proposal-document-finalize",
+      "scope": "Document-wide stores, media/resource reloads, initial frame/view reset and application document-change notification.",
+      "module": "src/js/application/project-restore-finalize.js",
+      "api": "finalizeProjectRestore(document,ports) -> {ok,phase,warnings}",
+      "admission": "Split further by animation migration, resources and view/application adapters if fixtures cannot remain independently bounded."
+    },
+    {
+      "id": "C19g.proposal-restore-coordinator",
+      "scope": "Transaction orchestration and rollback/error reporting across validated normalize, layer restore and finalize leaves.",
+      "module": "src/js/application/project-restore.js",
+      "api": "restoreProject(json,ports) -> {ok,errorPhase,warnings}",
+      "admission": "Only after component leaves have baselines. Atomic rollback is a behavior change and needs a separate independent oracle; do not migrate the whole codec as one leaf."
+    },
+    {
+      "id": "C19g.proposal-state-facade-disposition",
+      "scope": "Compatibility disposition for the direct mutable getState reference.",
+      "module": "existing window.SM facade and feature-owned application capabilities",
+      "api": "getState() compatibility return plus typed capability reads",
+      "admission": "No duplicate extraction for one returning line; require dynamic consumer discovery before restricting identity or mutability."
+    }
+  ],
+  "validation": {
+    "expected_assigned_lines": 539,
+    "expected_classification": {
+      "code": 257,
+      "comment": 282,
+      "whitespace": 0
+    },
+    "required_consumer_dimensions": [
+      "save",
+      "load",
+      "history",
+      "selection",
+      "animation",
+      "render",
+      "export",
+      "native"
+    ],
+    "negative_controls": [
+      "remove2049 => reject omission",
+      "duplicate2354 => reject overlap"
+    ],
+    "symbol_checks": [
+      "exportJSON2049",
+      "saveAllLayerFrames2068",
+      "NemoFolderCodec.exportFolderId2117 and exportFolderMap2170",
+      "importJSON2354 and SMProjectDocument.parse2355",
+      "NemoFolderCodec.applyFolderId2458 and importFolderMap2562",
+      "migrateTweenSpanKeys2568 and migrateArcs2595",
+      "NemoOpacityApplication.documentChanged2691",
+      "getState2694",
+      "excluded mergeRemoteSnapshot2247, repeatSelection2253, propagateColorAllFrames2324 and SM close2695"
+    ],
+    "behavioral_fixture_status": "proposed and unrun"
+  }
+}

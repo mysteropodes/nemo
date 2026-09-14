@@ -13,7 +13,10 @@ function app() {
     ensureLayerUid(layer) { return layer.layerUid; }
   };
   vm.createContext(context);
-  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js', 'src/js/bootstrap/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
+  // capability-registry.js + opacity-capability.js are load-order dependencies
+  // of the bootstrap since P06: it registers opacity and routes
+  // NemoApplication.handle through the registry.
+  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js', 'src/js/application/capability-registry.js', 'src/js/application/opacity-capability.js', 'src/js/bootstrap/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
   return context;
 }
 function request(ctx, id, operation, payload) { const m = ctx.NemoOpacityApplication.meta(); return { apiVersion: 1, requestId: id, instanceId: m.instanceId, documentId: m.documentId, expectedRevision: m.revision, operation, payload: payload || {} }; }

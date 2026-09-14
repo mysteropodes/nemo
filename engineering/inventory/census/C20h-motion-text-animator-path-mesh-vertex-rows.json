@@ -1,0 +1,436 @@
+{
+  "census_id": "C20h",
+  "issue": 1224,
+  "title": "Motion.js text-animator timeline rows, Path-as-one-property key helpers, path/mesh vertex groups, renderDiscreteKeyGridRow and renderVertexRow",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf, second slice of the queued C20g+ Motion supplement series (P03C Motion queue; remediation-scope.json rangeCoverage lists src/js/motion.js 9826-11125 as one open span of 1300 lines). C20g/#1218 takes 9826-10228 (renderElementsList, renderColorRow, renderTrimScalarRow, renderTrimPathsGroup — cited by name/line only, not re-mapped). This leaf takes the next 443 lines, 10229-10671. C20i (10672-11125: trackRowHtml/renderTracksFor, the grid-side mirror; not yet filed at authoring time) is cited by name/line only. text-animator-panel.js (the Layer Properties side of the same holders), image-mesh.js/image-mesh-bridge.js (mesh holders, CLAUDE.md §12ter) and select-bridge.js's on-canvas vertex drag are cited, not re-mapped.",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "a155706476b26b0bd03dc502a7e4168d5e941f20",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20h-motion-text-animator-path-mesh-rows-census",
+  "assigned_ranges": [
+    { "start": 10229, "end": 10671 }
+  ],
+  "coverage_note": "Exactly 443 assigned lines occur once in six complete packets: 295 code, 147 full-line comments, 1 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs, and it matches the issue's own proposed union AND per-packet table exactly for all six packets (verified with `sed -n`/a Python re-implementation of classify() against the frozen blob). No boundary correction was needed: line 10228 is C20g's own closing `}` of renderTrimPathsGroup (confirmed by direct read of motion.js:10225-10229, which shows the closing brace at 10228 and this scope's own `// ---- Text Animators — TIMELINE rows (2026-08-31) ----` header opening at 10229); line 10670 is this scope's own closing `}` of renderVertexRow and line 10671 is a blank line (confirmed by a raw byte dump of the extracted range: the file ends `...list.appendChild(row);\\n  }\\n\\n`, i.e. code at 10670, blank at 10671); line 10672 opens C20i's own `// ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----` header (confirmed by direct read, not reproduced here). The optional internal 4-space-comment split of `discrete-key-grid-row` (10451-10606) was evaluated and NOT taken: the only 4-space-indented comment inside that range (motion.js:10483-10494, the `.motion-group-row`/`.motion-discrete-row` CSS-class rationale) sits INSIDE `renderDiscreteKeyGridRow`'s own function body at ordinary statement-nesting depth, not at a top-level section boundary comparable to the other packet cuts — splitting there would separate one function's own opening statements from its own body without any construct boundary to justify it, so the packet stays whole as the issue's own suggested table already has it.",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's HEAD, origin/main and the allocated base a155706476b26b0bd03dc502a7e4168d5e941f20 all resolve motion.js to the identical blob 6617bac29042c22399cac202bf054c09e4fdf30e — verified directly (`git rev-parse <pin>:src/js/motion.js` == `git rev-parse HEAD:src/js/motion.js` == `git rev-parse a155706:src/js/motion.js`).",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -nE '(^|[^a-zA-Z_.])<symbol>\\(' ` over a recursive `find src -name \"*.js\"` scan, filtered to exclude each symbol's own declaration line and any hit whose trimmed content starts with `//`, then reading each surviving hit directly with `sed -n`/`grep -n` against this worktree's copy of motion.js — confirmed byte-identical to the frozen blob above, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20h-motion-text-animator-path-mesh-vertex-rows.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20h transfers no implementation authority.",
+    "owners": "C02 retains track, key, expression evaluator, active-target, Time Link and Motion semantics; C01 retains history; C19g retains document codecs. text-animator-panel.js, image-mesh.js/image-mesh-bridge.js and select-bridge.js retain their own bodies in full.",
+    "reservations": "D01, T05/Pollen, C04, historical Motion and every named reservation remain untouched."
+  },
+  "reconciliation": [
+    {
+      "owner": "C20g/#1218 (existing owner, merged as PR referenced by the issue)",
+      "disposition": "Owns motion.js:9826-10228 (renderElementsList, renderColorRow, renderTrimScalarRow, renderTrimPathsGroup). Retains its own body in full — cited by line only. This scope's own boundary begins at line 10229, immediately after C20g's own closing brace of renderTrimPathsGroup at line 10228. renderTrimScalarRow (motion.js:10140, C20g) is this scope's own sole external row-builder dependency, called once per TA_TIMELINE_FIELDS entry (packet 1, motion.js:10292-10294)."
+    },
+    {
+      "owner": "C20i (next slice, motion.js:10672-11125, not yet filed at authoring time)",
+      "disposition": "Cited by name/line only. Owns trackRowHtml/renderTracksFor (the grid-side generic numeric-track row builder) and renderTimelineMotion, the function that: (a) mirrors TA_TIMELINE_FIELDS via `TA_TIMELINE_FIELDS.forEach(function (f) { renderTracksFor(grid, an, f.prop); })` at motion.js:11370, the §11 single-source-of-truth pairing for packet 1's own table; (b) reuses this scope's own isTextAnimatorExpanded at motion.js:11369 as the shared expand gate; (c) reuses isPathGroupExpanded at motion.js:11207/11283/11298 for the layer-level video-mesh row, the per-element Path group row and the per-element mesh group row respectively; (d) calls renderPathGroupTrackRow at motion.js:11282; (e) calls renderDiscreteKeyGridRow twice, for Parent (motion.js:11175, gated by `discreteRowVisible(ld,'parent')`, motion.js:781) and Blend (motion.js:11176, gated by `discreteRowVisible(ld,'blend')`), passing `SM.t('fieldParent') || 'Parent'` and `SM.t('fieldBlend')` respectively as the `label` parameter — see boundaries for the i18n asymmetry this exposes. None of C20i's own body is reproduced here beyond these cited call sites."
+    },
+    {
+      "owner": "C02 (existing owner, motion.js:443 trackFor and the broader track/key/expression machinery)",
+      "disposition": "Retains its own body in full — cited by line only. trackFor(holder,prop) (motion.js:443-457) already resolves 'blendKeys'/'parentKeys' to `{keys: holder.blendKeys}`/`{keys: holder.parentKeys}` (motion.js:454-455) as of the frozen blob — this scope's own lead-in comment (motion.js:10471-10480) describes this as the one piece that lets deleteSelectedKeys (motion.js:1065, calls trackFor at 1071), onDragMove (motion.js:12934, calls trackFor at 12946), the shared window._motionKeyDrag group-drag object, isKeySelected/setKeySel (motion.js:11412/11473, this scope's own packet-5 dependencies) and SMMotion.shiftKeySelection (motion.js:13837, calls trackFor at 13843) all work on Parent/Blend rows unmodified — confirmed by grep that all four consumers reach these rows exclusively through trackFor(...).keys, never a parallel Parent/Blend-specific code path. toggleAnimated (motion.js:2749), setKeyAtCurrentFrame (motion.js:2697), removeKeyAtCurrentFrame (motion.js:2717), isAnimated (motion.js:1187), keyAt (motion.js:1189), valueAtFrame (motion.js:2639) and setValue (motion.js:2805) are this scope's own remaining C02 dependencies for the stopwatch/DOCUMENT-write paths in packets 3, 4 and 6."
+    },
+    {
+      "owner": "C19 (existing owner, renderLayerList/renderTimeline, timeline.js)",
+      "disposition": "Retains its own body in full — cited by line only. renderLayerList(frameOnly) (timeline.js:6335) and renderTimeline() (timeline.js:4026) are the two dual-rebuild calls every mutating handler in this scope invokes, always as a pair, always with no frameOnly argument (a full rebuild, never the frameOnly fast path documented in CLAUDE.md §11) — confirmed at motion.js:10288, 10389, 10397, 10583, 10622, 10662 (paired) and 10442, 10522, 10551, 10573 (renderTimeline alone, inside drag/marquee handlers that only move an existing diamond and do not need the layer list to change)."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact authoring permits no source or behavior change."
+    },
+    {
+      "owner": "text-animator-panel.js (existing owner, Layer Properties side of ld.textAnimators)",
+      "disposition": "Retains its own body in full (486 lines) — cited by name only. It does not reference TA_TIMELINE_FIELDS or any symbol in this scope (confirmed by grep); it is a separate, independently-maintained UI for the same `ld.textAnimators[i]` holders this scope's own renderTextAnimatorsList exposes on the Motion timeline side. No shared code path was found between the two beyond both ultimately reading/writing the same `an.motion`/`an.motionStatic` fields through the generic track machinery (trackFor/toggleAnimated/etc.)."
+    },
+    {
+      "owner": "image-mesh.js / image-mesh-bridge.js (existing owners, mesh sculpt store and on-canvas vertex drag, CLAUDE.md §12ter)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. image-mesh-bridge.js's onMove handler (around image-mesh-bridge.js:249-261) branches on `SMMotion.isMeshVertexAnimated(li, t.meshId, dragIdx)` (motion.js:4774-4777, exported at motion.js:13759) and, when true, calls `SMMotion.setMeshVertexOffset(li, t.meshId, dragIdx, ...)` (motion.js:4768-4773, exported at motion.js:13758) which itself calls `setValue(ensureElementHolder(ld, meshId), 'vtx'+vi, [...])` — the IDENTICAL `'vtx'+vi` prop-naming convention and the identical `ld.elementMotion` map (via ensureElementHolder, motion.js:2879) that this scope's own renderVertexRow/renderMeshVertexGroup read and write from the timeline side. A canvas drag and a timeline stopwatch/key-drag on the same vertex are therefore two front ends over the exact same track, not two competing stores."
+    },
+    {
+      "owner": "select-bridge.js (existing owner, on-canvas selection/handles)",
+      "disposition": "Retains its own body in full — cited by name only. No `vtx`/`meshId`/vertex-drag reference was found in select-bridge.js by grep; the on-canvas vertex drag this scope's own comments allude to (renderVertexRow's own header comment: \"a vertex offset is set by DRAGGING the vertex on canvas, select-bridge, not built here\") is actually implemented in image-mesh-bridge.js for mesh vertices (see above) and, for ordinary path vertices, in the node-edit/vertex-drag machinery elsewhere in select-bridge.js/tools.js that this census did not need to open further since this scope's own code never calls into it directly — a correction of the in-source comment's own attribution, not a functional finding."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 10228 closes C20g's renderTrimPathsGroup; C20h begins at the `// ---- Text Animators — TIMELINE rows (2026-08-31) ----` header on line 10229. Line 10670 closes C20h's renderVertexRow; line 10671 is a trailing blank line; line 10672 opens C20i's `// ---- Motion mode UI: keyframe tracks (mirrors the layer list's rows) ----` header. All four boundary lines confirmed by direct `sed -n` read of the frozen blob.",
+    "`fieldParent` has ZERO entries anywhere in src/js/i18n.js (confirmed by grep across all locale blocks), while `fieldBlend` has four (en/fr/ja/es: 'Blend'/'Fondu'/'ブレンド'/'Mezcla'). This scope's own renderDiscreteKeyGridRow (packet 5) takes `label` as a plain parameter and never itself calls SM.t on it, so the asymmetry is entirely in C20i's own call sites (motion.js:11175-11176, cited by line only): `SM.t('fieldParent') || 'Parent'` silently falls back to the hardcoded English literal in every locale including French, while the neighboring Blend row (`SM.t('fieldBlend')`, no fallback) localizes correctly. Not a bug in this scope's own code — recorded here because the issue's own 'Record explicitly' instruction asks which SM.t keys each row emits, and this is the one place a key that should exist does not.",
+    "`pathVertexRowCount` (motion.js:4598-4600, out of this scope, cited by line only) has NO cap — it returns `sd.centerSegments.length` for a vector-brush ribbon or `sd.segments.length` for an ordinary path, unbounded. `meshVertexRowCount` (motion.js:4796-4802, out of this scope, cited by line only) explicitly caps at `MESH_ROW_CAP=200` (motion.js:4796). This scope's own renderPathVertexGroup/renderPathGroupTrackRow (packet 4) and renderMeshVertexGroup/renderVertexRow (packet 6) both simply loop `for (var vi=0; vi<vertexCount; vi++)` over whatever `vertexCount` their caller passes — neither packet enforces the cap itself; the asymmetry (a path can produce arbitrarily many rows, a mesh cannot exceed 200) lives entirely in the two upstream row-count functions, not in this scope's own rendering loops.",
+    "`ensureElementHolder(ld, key)` (motion.js:2879-2907, out of this scope, cited by line only) and the read-only `meshHolder(li, meshId)` (motion.js:4747-4750, out of this scope, cited by line only) both resolve into the SAME flat `ld.elementMotion` object, keyed by whatever string is passed — a per-shape `strokeId` for an ordinary element holder, or a `meshId` for a mesh holder (video-level or per-element). This scope's own renderPathVertexGroup/renderMeshVertexGroup never construct a holder themselves; they receive an already-resolved holder object from their caller (C20g's renderElementsList at motion.js:9955/9964, this file's own right-panel mirror at motion.js:7628/7631/7509, and C20i's renderTimelineMotion at motion.js:11282/11294) and are agnostic to which key namespace produced it. Nothing in the observed code enforces that a strokeId and a meshId can never collide as object keys of the same `ld.elementMotion` map; no collision was found or is claimed, this is a structural observation about a shared namespace, not a reported bug.",
+    "`ld.textAnimators[i]` entries are holders in their own right — `renderTextAnimatorsList` (packet 1) passes `an` directly wherever this scope's own TA_TIMELINE_FIELDS.forEach hands it to `renderTrimScalarRow(list, an, f.prop, ...)` (motion.js:10292-10294, C20g), and the grid mirror does the same via `TA_TIMELINE_FIELDS.forEach(function (f) { renderTracksFor(grid, an, f.prop); })` (motion.js:11370, C20i). There is no `ensureElementHolder`-style lazy allocator for a text animator's own `.motion`/`.motionStatic` fields visible in this scope; their initial allocation (if any) happens wherever `ld.textAnimators` entries are first created, outside this scope's own read-only line range.",
+    "`keyWholePath`/`unkeyWholePath`/`pathGroupKeysAt` (packet 3) never call `pushUndo` themselves. The ONLY reachable UI path to either is renderPathVertexGroup's own group-stopwatch click handler (packet 4, motion.js:10386: `e.stopPropagation(); pushUndo();` immediately before branching to `unkeyWholePath`/`keyWholePath` at motion.js:10387-10388) and renderPathGroupTrackRow's own diamond mousedown handler (packet 4, motion.js:10428: `pushUndo();` before calling `pathGroupKeysAt` again post-`goToFrame` at motion.js:10430-10431 and setting up the group drag). Both call sites for these three helpers are inside this SAME leaf (packet 4), so no external caller was found or is possible to exist yet (see reconciliation for the confirmed zero-external-caller grep result) — but if a future caller invoked any of the three directly without its own pushUndo, the write would happen without history capture; nothing in the three functions themselves guards against that.",
+    "renderDiscreteKeyGridRow's (packet 5) three DOCUMENT-write paths are: (1) plain click on an unselected key when nothing is selected — `setKeySel([{holder,prop,key:k}])` (motion.js:10548) plus a fresh single-key `window._motionKeyDrag` (motion.js:10560-10562), pushUndo already called at motion.js:10554 just above the branch; (2) plain click on an already-selected key — reuses the WHOLE `_motionKeySel` array for the group drag (motion.js:10567-10570), same pushUndo at 10554; (3) right-click delete — the context menu action (motion.js:10578-10586) calls `pushUndo()` (motion.js:10580) then the caller-supplied `removeAt(frame)` (motion.js:10581, which for Parent/Blend rows resolves to `SMMotion.removeParentKeyAt`/`SMMotion.removeBlendKeyAt`, C20i's own call sites at motion.js:11175-11176, bodies out of this scope), then `setKeySel(...)` to drop the deleted key from the live selection (motion.js:10582) and the paired renderLayerList/renderTimeline plus a guarded SMEngineBridge.renderNow (motion.js:10583-10584). Cmd/Ctrl-click (motion.js:10515-10523) and Shift-click (motion.js:10527-10552) toggle/extend `_motionKeySel` without pushUndo or removeAt — pure selection, no document write.",
+    "Confirmed via grep across app.js and engine-bridge.js: none of the twelve span symbols (TA_TIMELINE_FIELDS, isTextAnimatorExpanded, renderTextAnimatorsList, isPathGroupExpanded, pathGroupFrames, pathGroupKeysAt, keyWholePath, unkeyWholePath, renderPathVertexGroup, renderPathGroupTrackRow, renderDiscreteKeyGridRow, renderMeshVertexGroup, renderVertexRow) are referenced by getEffectiveStrokes/getEffectiveStrokesRendered (app.js:2949/1796) or buildSceneJson (engine-bridge.js:772) — this span is Motion timeline UI only, never on the render/export path.",
+    "Caller-count confirmation: an `(^|[^a-zA-Z_.])name\\(` grep for every one of the twelve symbols across a recursive `find src -name '*.js'` scan returned hits in src/js/motion.js ONLY, for every symbol — no external-to-motion.js caller exists for any of them at this frozen SHA. This corrects nothing in the issue's own prompt text (which already expected \"motion.js-internal only\" for this class of helper) but is recorded per the issue's own explicit instruction to confirm or correct."
+  ],
+  "areas": [
+    {
+      "area": "text-animator-timeline-rows",
+      "packets": [
+        {
+          "id": "C20h.text-animator-timeline-rows",
+          "files": ["src/js/motion.js:10229-10296"],
+          "coverage_ranges": [[10229, 10296]],
+          "classification": { "code": 37, "comment": 31, "whitespace": 0 },
+          "symbols": ["TA_TIMELINE_FIELDS", "isTextAnimatorExpanded", "renderTextAnimatorsList"],
+          "signatures": [
+            "var TA_TIMELINE_FIELDS = [{prop,labelKey,unit,min,max,def}, ...] (7 entries)",
+            "isTextAnimatorExpanded(an) -> boolean",
+            "renderTextAnimatorsList(list, li, ld) -> undefined"
+          ],
+          "responsibility": "Section header (10229-10248, 20 lines): quotes feedback (\"pblm dans la timeline y a pas les propriété d'animation pour le texte\") and states the §11 single-source-of-truth design — renderTimelineMotion's own grid mirror (C20i, motion.js:11370) iterates the SAME TA_TIMELINE_FIELDS array so panel/grid row counts can never drift, even though the two remain separate function calls per this file's convention (no shared DOM). TA_TIMELINE_FIELDS (10249-10257): 7 entries verbatim — start(-500..500,def 0), end(-500..500,def 100), offset(-500..500,def 0), amount(%,-100..100,def 100), easeHigh(-100..100,def 0), easeLow(-100..100,def 0), smooth(%,0..100,def 100). isTextAnimatorExpanded(an) (10263-10266, preceded by a 5-line lead-in 10258-10262): true if `an` is the single globally-expanded animator (window._motionExpandedTextAnimator) OR its `.id` is in the multi-value reveal set (window._motionRevealedTextAnimators). renderTextAnimatorsList(list,li,ld) (10267-10296): no-ops if ld.textAnimators is empty; appends one 'lrow motion-group-row' header (SM.t('hdrTextAnimators')); for each ld.textAnimators[i] entry, appends one 'lrow motion-elem-row' with an arrow ('▾'/'▸'), a transparent 'A'-glyph swatch (dimmed to opacity 0.35 when `an.enabled===false`), and a name label (SM.t('textAnimTitle')+' '+(idx+1)); the row's click toggles window._motionExpandedTextAnimator and rebuilds both panel and grid; when expanded, iterates TA_TIMELINE_FIELDS and calls renderTrimScalarRow(list, an, f.prop, SM.t(f.labelKey), f.unit, f.min, f.max, f.def) once per field (10292-10294).",
+          "callers": [
+            "renderTextAnimatorsList: sole external caller motion.js:7542, inside the same layer-level accordion gate as renderElementsList (window._motionExpandedLayer===li or window._motionRevealedElementLayers), called immediately after it.",
+            "isTextAnimatorExpanded: internal at motion.js:10273 (this packet); external at motion.js:11369 (C20i's renderTimelineMotion, the shared expand gate the §11 row-count contract depends on).",
+            "TA_TIMELINE_FIELDS (read, not called): internal at motion.js:10292 (this packet); external at motion.js:11370 (C20i's renderTimelineMotion, `TA_TIMELINE_FIELDS.forEach(function(f){renderTracksFor(grid,an,f.prop);})` — the exact same-array grid mirror the packet's own lead-in comment names)."
+          ],
+          "external_calls": [
+            "renderTrimScalarRow(list,holder,prop,label,unit,min,max,defaultVal) — C20g, motion.js:10140.",
+            "SM.t(key) — i18n.js:4185.",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026, called from the row-click handler (motion.js:10288)."
+          ],
+          "row_contract": "Panel-side rows this packet adds: 1 group header + 1 row per ld.textAnimators[i] (arrow/swatch/name) + when expanded, 7 renderTrimScalarRow rows (one per TA_TIMELINE_FIELDS entry, delegated to C20g). Grid-side counterpart: C20i's renderTimelineMotion (motion.js:11369-11370, cited by line only) — same isTextAnimatorExpanded gate, same TA_TIMELINE_FIELDS array, so the row COUNT is structurally guaranteed to match even though the DOM is built by two separate calls."
+        }
+      ]
+    },
+    {
+      "area": "path-group-expand-state",
+      "packets": [
+        {
+          "id": "C20h.path-group-expand-state",
+          "files": ["src/js/motion.js:10297-10306"],
+          "coverage_ranges": [[10297, 10306]],
+          "classification": { "code": 1, "comment": 9, "whitespace": 0 },
+          "symbols": ["isPathGroupExpanded"],
+          "signature": "isPathGroupExpanded(holder) -> boolean",
+          "responsibility": "Lead-in (10297-10305, 9 lines): introduces the \"Path\" group as one row per vertex, independently keyable (2026-07 feedback: \"les properties de path dont les vertices peuvent être animé séparément\"), single-accordion PER HOLDER via window._motionExpandedPathHolder — same pattern one level up as window._motionExpandedElement — and warns that renderTimelineMotion's own mirror below MUST stay in exact sync (same expand condition, same vertex count) or panel/grid rows desync. isPathGroupExpanded(holder) (10306): `return window._motionExpandedPathHolder === holder;` — a strict object-identity check, shared verbatim by both the Path group (packet 4) and the image-mesh group (packet 6), since a mesh holder is always a different object from any path holder in the same document, so \"one group open at a time\" holds across both without a second flag.",
+          "callers": [
+            "Internal to this leaf only: motion.js:10374/10396/10400 (renderPathVertexGroup, packet 4) and motion.js:10616/10621/10625 (renderMeshVertexGroup, packet 6).",
+            "External: motion.js:11207 (C20i's renderTimelineMotion, layer-level video-mesh group row), motion.js:11283 (per-element Path group row), motion.js:11298 (per-element mesh group row) — all three are the grid-side gate this packet's own lead-in names as required to stay in sync."
+          ],
+          "external_calls": [],
+          "row_contract": "Not a row itself — the shared boolean gate every group-header row (packets 4 and 6) and their grid-side counterparts (C20i, motion.js:11207/11283/11298) read before deciding whether to render vertex rows underneath."
+        }
+      ]
+    },
+    {
+      "area": "path-as-one-property-key-helpers",
+      "packets": [
+        {
+          "id": "C20h.path-as-one-property-key-helpers",
+          "files": ["src/js/motion.js:10307-10371"],
+          "coverage_ranges": [[10307, 10371]],
+          "classification": { "code": 42, "comment": 23, "whitespace": 0 },
+          "symbols": ["pathGroupFrames", "pathGroupKeysAt", "keyWholePath", "unkeyWholePath"],
+          "signatures": [
+            "pathGroupFrames(holder, vertexCount) -> number[] (sorted, de-duplicated)",
+            "pathGroupKeysAt(holder, vertexCount, frame) -> {holder,prop,key}[]",
+            "keyWholePath(holder, vertexCount) -> undefined",
+            "unkeyWholePath(holder, vertexCount) -> undefined"
+          ],
+          "responsibility": "Section header (10307-10318, 12 lines, feedback #179: \"avant d'ouvrir la section path d'une shape on devrait a[voir] path keyframable... si on keyframe path tous les vertex sont keyframer\"): frames the group header as a VIEW over the per-vertex vtxN tracks, never a track of its own — a \"path key\" is exactly \"a key on every vertex at that frame\", so there is no second source of truth, no migration and no persistence change; a shape keyed vertex-by-vertex before this existed already shows its keys here. Same reasoning as the widget layer owning no values of its own (CLAUDE.md §13). pathGroupFrames(holder,vertexCount) (10319-10329): unions every vtxN track's key frames (0..vertexCount-1) into a de-duplicated, ascending-sorted array; returns [] if `holder.motion` is falsy. pathGroupKeysAt(holder,vertexCount,frame) (preceded by a 3-line lead-in 10330-10333 naming onDragMove's `d.group` branch as the reuse target; body 10334-10344): for each vertex with a track, resolves `keyAt(tr,frame)` and if present pushes `{holder,prop:'vtx'+vi,key}` — the exact `{holder,prop,key}` triple shape the existing group-drag engine already consumes. keyWholePath(holder,vertexCount) (preceded by a 4-line lead-in 10345-10348; body 10349-10355): for every vertex, unconditionally either `toggleAnimated` (if not yet animated) or, if animated but no key at the current frame, `setKeyAtCurrentFrame(...,valueAtFrame(...))` — deliberately unconditional per vertex so the end state is always \"a key on every vertex at this frame\" regardless of prior per-vertex state. unkeyWholePath(holder,vertexCount) (10356-10371): for every animated vertex with a key at the current frame, removes it; if it was the vertex's LAST key, falls back to a static value (freezes `holder.motion[prop]={keys:[]}` and writes `holder.motionStatic[prop]`) instead of leaving the vertex un-animated with no value — the same last-key-freeze branch renderVertexRow's own stopwatch (packet 6) takes.",
+          "callers": [
+            "pathGroupFrames: motion.js:10378 and motion.js:10408 (both renderPathVertexGroup/renderPathGroupTrackRow, packet 4, same leaf). No caller found outside this leaf.",
+            "pathGroupKeysAt: motion.js:10426 and motion.js:10431 (both renderPathGroupTrackRow's diamond mousedown handler, packet 4, same leaf). No caller found outside this leaf.",
+            "keyWholePath/unkeyWholePath: motion.js:10387-10388 (renderPathVertexGroup's own group-stopwatch click handler, packet 4, same leaf, pushUndo already called at motion.js:10386 just above). No caller found outside this leaf."
+          ],
+          "external_calls": [
+            "keyAt(track,frame) — motion.js:1189.",
+            "isAnimated(ld,prop) — motion.js:1187 (delegates to hasKeys, which delegates to trackFor, motion.js:443).",
+            "toggleAnimated(ld,prop) — motion.js:2749.",
+            "setKeyAtCurrentFrame(ld,prop,values) — motion.js:2697.",
+            "removeKeyAtCurrentFrame(ld,prop) — motion.js:2717.",
+            "valueAtFrame(ld,prop,frame) — motion.js:2639."
+          ],
+          "document_writes": "keyWholePath/unkeyWholePath mutate `holder.motion[prop]`/`holder.motionStatic[prop]` directly (via the delegated C02 writers plus unkeyWholePath's own inline last-key freeze at motion.js:10365-10367). Neither function calls pushUndo itself — see boundaries for the confirmation that both reachable call sites (packet 4) push undo immediately before invoking them."
+        }
+      ]
+    },
+    {
+      "area": "path-vertex-group-panel-and-grid-rows",
+      "packets": [
+        {
+          "id": "C20h.path-vertex-group-panel-and-grid-rows",
+          "files": ["src/js/motion.js:10372-10450"],
+          "coverage_ranges": [[10372, 10450]],
+          "classification": { "code": 69, "comment": 10, "whitespace": 0 },
+          "symbols": ["renderPathVertexGroup", "renderPathGroupTrackRow"],
+          "signatures": [
+            "renderPathVertexGroup(list, holder, vertexCount) -> undefined",
+            "renderPathGroupTrackRow(grid, holder, vertexCount) -> undefined"
+          ],
+          "responsibility": "renderPathVertexGroup(list,holder,vertexCount) (10372-10402): builds the 'lrow motion-group-row' header — arrow (via isPathGroupExpanded), a group-level stopwatch (title from stopwatchTitle('motionAnimatePath',anyKeys,keyHere), anyKeys/keyHere derived from pathGroupFrames(holder,vertexCount)) whose click pushes undo then calls unkeyWholePath or keyWholePath depending on `keyHere`, and the SM.t('hdrPath') label; the header's own click (separately, stopPropagation'd from the stopwatch) toggles window._motionExpandedPathHolder and rebuilds both surfaces; when expanded, loops `for(vi=0;vi<vertexCount;vi++) renderVertexRow(list,holder,vi)` (packet 6). renderPathGroupTrackRow(grid,holder,vertexCount) (preceded by a 3-line lead-in 10403-10405 framing it as the grid mirror of the header row, same CSS class as the plain spacer it replaces so the §11 alignment is untouched; body 10406-10450): builds one 'frow motion-group-row' with one 'fc motion-fc' cell per state.totalFrames, marking cells present in pathGroupFrames(holder,vertexCount) with a diamond ('.motion-key', sized via the FC constant when 0<FC<7); a diamond's mousedown stops/prevents, resolves pathGroupKeysAt at that frame, pushes undo, optionally goToFrame(frame) then re-resolves pathGroupKeysAt post-navigation, then calls setKeySel(picked) and arms window._motionKeyDrag as a `group:true` drag over the whole picked set (mirrors the exact shape onDragMove's group branch expects) before calling renderTimeline().",
+          "callers": [
+            "renderPathVertexGroup: motion.js:7628 (this file's own right-panel Layer Properties mirror of the single targeted element, inside `if(elSel)`) and motion.js:9955 (C20g's renderElementsList, the left list's own per-element loop). Two external callers, both cited by line only; zero internal callers.",
+            "renderPathGroupTrackRow: motion.js:11282 (C20i's renderTimelineMotion, the grid's own per-element loop). One external caller, cited by line only; zero internal callers."
+          ],
+          "external_calls": [
+            "isPathGroupExpanded(holder) — this scope, packet 2.",
+            "pathGroupFrames/pathGroupKeysAt — this scope, packet 3.",
+            "unkeyWholePath/keyWholePath — this scope, packet 3.",
+            "stopwatchTitle(offKey,swOn,hasKeyHere) — C20f, motion.js:8652.",
+            "SM.t(key) — i18n.js:4185.",
+            "renderVertexRow(list,holder,vi) — this scope, packet 6.",
+            "pushUndo() — tweens.js:4741.",
+            "goToFrame(frame) — app.js:5112.",
+            "setKeySel(sel) — motion.js:11473 (packet 5's own dependency, defined later in the file).",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026.",
+            "window.SMEngineBridge.renderNow — engine-bridge.js (guarded truthiness check only)."
+          ],
+          "row_contract": "Panel-side: 1 group header + (when expanded) 1 renderVertexRow per vertex. Grid-side counterpart cited by line only: renderPathGroupTrackRow itself IS the grid's header-row mirror (built in this same packet); the per-vertex grid rows underneath it are C20i's renderTracksFor (trackRowHtml, motion.js:10672+), gated by the identical isPathGroupExpanded(holder) and vertexCount passed from the same caller (motion.js:11282's own neighborhood, cited by line only)."
+        }
+      ]
+    },
+    {
+      "area": "discrete-key-grid-row",
+      "packets": [
+        {
+          "id": "C20h.discrete-key-grid-row",
+          "files": ["src/js/motion.js:10451-10606"],
+          "coverage_ranges": [[10451, 10606]],
+          "classification": { "code": 97, "comment": 59, "whitespace": 0 },
+          "symbols": ["renderDiscreteKeyGridRow"],
+          "signature": "renderDiscreteKeyGridRow(grid, holder, prop, label, keys, removeAt) -> undefined",
+          "responsibility": "Lead-in (10451-10481, 31 lines, two feedback items): first (#207/#214) states WHY Blend/Parent need a generic discrete (hold-only) grid row — a plain [{frame,...}] array with no interpolation, so selection/drag/delete reuse setKeySel/_motionKeySel/isKeySelected and the shared window._motionKeyDrag group-drag object rather than trackRowHtml's full numeric-track pipeline (ease boxes, hold/linear menu, skew-drag — none apply to a discrete track); the ONE piece that makes all of that generic machinery work unmodified is trackFor's own extension to resolve 'blendKeys'/'parentKeys' (already present at motion.js:454-455, this scope only relies on it). Second (#221, feedback: \"impossible de select et déplacer des keyframes de parent et blend... touche supp ça fait bug\"): before this, these diamonds only navigated the playhead on click and offered right-click delete, with no way to select at all — _motionKeySel always stayed empty for them so every generic selection-driven feature (drag, Delete, marquee) silently no-op'd. renderDiscreteKeyGridRow(grid,holder,prop,label,keys,removeAt) (10482-10606): builds a 'frow motion-group-row motion-discrete-row' row (both classes kept deliberately — 'motion-group-row' so the selection machinery's row-class queries find it, the extra 'motion-discrete-row' zeroing the group-row's own 2px top margin to fix a measured 2-4px panel/grid misalignment, feedback #788, CLAUDE.md §11), stamps `row._smHolder`/`row._smProp` for pickwhip/selection targeting, then for each of state.totalFrames builds one 'fc motion-fc' cell: a keyed frame gets a 'motion-key hold' diamond (class also carries 'sel' via isKeySelected) whose mousedown handles Cmd/Ctrl-click toggle-in-set, Shift-click range-select via applyMarqueeSelection between the last _keyAnchor cell and this one (or a fresh single selection if no anchor row is found), and plain click either drags the WHOLE current selection (if this key is already selected) or replaces the selection with just this key and drags it alone — each drag arms window._motionKeyDrag as `{group:true,startX,startScrollLeft:motionDragScrollLeft(),keys:[...]}`; a diamond's contextmenu offers one 'Delete this key' entry (SM.t('ctxDeleteThisKey')) that pushes undo, calls the caller-supplied removeAt(frame), drops the key from _motionKeySel, and rebuilds both surfaces plus a guarded SMEngineBridge.renderNow. An UNKEYED cell's mousedown starts a marquee (feedback #221's second half: previously only the diamonds themselves had a listener, so a drag starting in the gaps between them never started a marquee at all).",
+          "callers": [
+            "motion.js:11175 — C20i's renderTimelineMotion, Parent row: `renderDiscreteKeyGridRow(grid, ld, 'parentKeys', SM.t('fieldParent') || 'Parent', ld.parentKeys || [], function(frame){SMMotion.removeParentKeyAt(ld,frame);})`, gated by `discreteRowVisible(ld,'parent')` (motion.js:781).",
+            "motion.js:11176 — C20i's renderTimelineMotion, Blend row: `renderDiscreteKeyGridRow(grid, ld, 'blendKeys', SM.t('fieldBlend'), ld.blendKeys || [], function(frame){SMMotion.removeBlendKeyAt(ld,frame);})`, gated by `discreteRowVisible(ld,'blend')`.",
+            "Both callers are in C20i (cited by line only); zero internal callers within this leaf. renderDiscreteKeyGridRow has no panel-side counterpart of its own — its comment (motion.js:10460-10466) names renderParentRow/renderBlendRow (out of scope, plain '.motion-prop-row' rows) as its panel twin."
+          ],
+          "external_calls": [
+            "isKeySelected(holder,prop,key) — motion.js:11412.",
+            "setKeySel(sel) — motion.js:11473.",
+            "applyMarqueeSelection(x0,y0,x1,y1) — motion.js:11936.",
+            "startMarquee(e) — motion.js:11926.",
+            "motionDragScrollLeft() — motion.js:12832.",
+            "pushUndo() — tweens.js:4741.",
+            "goToFrame(frame) — app.js:5112.",
+            "SM.t(key) — i18n.js:4185.",
+            "window.showContextMenu — global, guarded truthiness check.",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026.",
+            "window.SMEngineBridge.renderNow — engine-bridge.js, guarded."
+          ],
+          "drag_and_selection_dependency_confirmation": "onDragMove (motion.js:12934, calls trackFor at 12946), onDragUp (motion.js:13101, its own drag-commit path reads trackFor at motion.js:13089 just above its definition), deleteSelectedKeys (motion.js:1065, calls trackFor at 1071) and SMMotion.shiftKeySelection (motion.js:13837, calls trackFor at 13843) all reach a discrete row's keys ONLY via trackFor(holder,'parentKeys'|'blendKeys').keys — confirmed by grep that none of the four contains a literal 'parentKeys'/'blendKeys' string of its own; they are generic over whatever trackFor resolves."
+        }
+      ]
+    },
+    {
+      "area": "mesh-vertex-group-and-vertex-row",
+      "packets": [
+        {
+          "id": "C20h.mesh-vertex-group-and-vertex-row",
+          "files": ["src/js/motion.js:10607-10671"],
+          "coverage_ranges": [[10607, 10671]],
+          "classification": { "code": 49, "comment": 15, "whitespace": 1 },
+          "symbols": ["renderMeshVertexGroup", "renderVertexRow"],
+          "signatures": [
+            "renderMeshVertexGroup(list, holder, vertexCount) -> undefined",
+            "renderVertexRow(list, holder, vi) -> undefined"
+          ],
+          "responsibility": "Lead-in (10607-10613, 7 lines): frames the image-mesh accordion (2026-08-30) as identical to renderPathVertexGroup apart from its label, sharing the SAME expand state (window._motionExpandedPathHolder, keyed by holder identity — a mesh holder is a different object from any path holder so one-open-at-a-time still works across both); written as its OWN function rather than a `label` parameter on renderPathVertexGroup so the grid-half mirror has an obviously-paired call to point at. renderMeshVertexGroup(list,holder,vertexCount) (10614-10627): builds the 'lrow motion-group-row' header — arrow via isPathGroupExpanded, SM.t('hdrImageMesh') label, NO group-level stopwatch (unlike renderPathVertexGroup, there is no \"key the whole mesh\" gesture here, only per-vertex stopwatches) — click toggles window._motionExpandedPathHolder and rebuilds both surfaces; when expanded, loops `for(vi=0;vi<vertexCount;vi++) renderVertexRow(list,holder,vi)`. Second lead-in (10628-10635, 8 lines): frames renderVertexRow as a lean version of the base-property row — single stopwatch (same hollow/blue-outline/solid-blue 3-state convention) driving the SAME generic toggleAnimated/setKeyAtCurrentFrame/removeKeyAtCurrentFrame machinery the 5 base Transform properties use, just with `prop='vtx'+vi`; no numeric value fields, since a vertex offset is set by dragging on canvas, not typed. renderVertexRow(list,holder,vi) (10636-10670): `prop='vtx'+vi`; builds a 'lrow motion-prop-row motion-vertex-row' row, stamps `row._smHolder`/`row._smProp`; a stopwatch (title from stopwatchTitle('motionAnimateVertex',swOn,hasKeyHere)) whose click pushes undo then: turns animation on via toggleAnimated if it was off; if on with a key here, either freezes to a static value (last key) or removeKeyAtCurrentFrame (more than one key); if on with no key here, setKeyAtCurrentFrame(...,valueAtFrame(...)); always rebuilds both surfaces plus a guarded SMEngineBridge.renderNow; appends a name label (SM.t('propVertex')+' '+(vi+1)) decorated via decorateMotionPropertyRow. Trailing blank line 10671 closes the leaf.",
+          "callers": [
+            "renderMeshVertexGroup: motion.js:7509 (this file's own layer-level video-mesh row, immediately after the layer's Transform group, gated by videoMeshRowsFor(ld)), motion.js:7631 (this file's own right-panel per-element mirror, inside `if(elSel)`), motion.js:9964 (C20g's renderElementsList, left list's per-element loop). Three external callers, cited by line only; zero internal callers.",
+            "renderVertexRow: motion.js:10401 (renderPathVertexGroup, packet 4, same leaf) and motion.js:10626 (renderMeshVertexGroup, this packet, same leaf). Two internal callers, zero external callers found anywhere else in src."
+          ],
+          "external_calls": [
+            "isPathGroupExpanded(holder) — this scope, packet 2.",
+            "SM.t(key) — i18n.js:4185.",
+            "renderLayerList()/renderTimeline() — timeline.js:6335/4026.",
+            "stopwatchTitle(offKey,swOn,hasKeyHere) — C20f, motion.js:8652.",
+            "isAnimated(ld,prop) — motion.js:1187.",
+            "keyAt(track,frame) — motion.js:1189.",
+            "toggleAnimated(ld,prop) — motion.js:2749.",
+            "setKeyAtCurrentFrame(ld,prop,values) — motion.js:2697.",
+            "removeKeyAtCurrentFrame(ld,prop) — motion.js:2717.",
+            "valueAtFrame(ld,prop,frame) — motion.js:2639.",
+            "pushUndo() — tweens.js:4741.",
+            "decorateMotionPropertyRow(row,holder,prop,labelEl) — motion.js:11519.",
+            "window.SMEngineBridge.renderNow — engine-bridge.js, guarded."
+          ],
+          "vertex_count_source": "videoMeshRowsFor(ld) (motion.js:4792-4795, out of scope) delegates to meshVertexRowCount(ld.videoMeshId) for the layer-level video-mesh call site (motion.js:7509). meshVertexRowCount(meshId) (motion.js:4796-4802, out of scope) caps at MESH_ROW_CAP=200 (motion.js:4796) via `Math.min(m.verts.length, MESH_ROW_CAP)`. The two per-element call sites (motion.js:7631, 9964) pass `meshVertexRowCount(elEntry.sd.meshId)`/`meshVertexRowCount(entry.sd.meshId)` directly. renderMeshVertexGroup/renderVertexRow themselves never re-derive or re-check vertexCount — they trust whatever their caller passed.",
+          "row_contract": "Panel-side: 1 group header + (when expanded) 1 renderVertexRow per vertex, same shape as packet 4's Path group. Grid-side counterpart cited by line only: C20i's renderTimelineMotion (motion.js:11207/11283/11298 reuse isPathGroupExpanded; the per-vertex grid rows are C20i's own renderTracksFor, motion.js:10672+, gated by the SAME meshVertexRowCount-derived vertexCount)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) appears anywhere in this span — every mutation here writes into `holder.motion[prop]`/`holder.motionStatic[prop]` (per-vertex, per-text-animator-field or discrete-key-array fields), which later reaches disk through C19g's own exportJSON serialization of the whole ld.elementMotion/ld.textAnimators/ld.parentKeys/ld.blendKeys objects (cited by name only, not re-derived here) rather than through the Paper-layer frame-stroke save path this file never touches."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. C19g (cited by name only) is the existing owner of import/export for elementMotion, textAnimators, parentKeys and blendKeys."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "pushUndo() is called before every DOCUMENT-mutating handler this span reaches: renderPathVertexGroup's group stopwatch (motion.js:10386), renderPathGroupTrackRow's diamond mousedown (motion.js:10428), renderDiscreteKeyGridRow's plain-click drag setup (motion.js:10554) and its right-click delete (motion.js:10580), and renderVertexRow's own stopwatch (motion.js:10647). Pure selection (Cmd/Ctrl-click, Shift-click, marquee) never calls pushUndo — consistent with it not mutating any track."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "_motionKeySel (via setKeySel/isKeySelected, motion.js:11473/11412, cited by line only) is the single selection store this span's discrete-row and path-group-drag code populates. window._motionKeyDrag is the single shared group-drag object every drag-arming call site in this span builds identically: `{group:true, startX, startScrollLeft:motionDragScrollLeft(), keys:[{holder,prop,key,origFrame}]}`."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This span's stopwatches all delegate to the same three C02 writers (toggleAnimated/setKeyAtCurrentFrame/removeKeyAtCurrentFrame) with the same last-key-freeze-to-static fallback pattern (keyWholePath/unkeyWholePath's per-vertex loop, renderVertexRow's own single-vertex version) — a duplicated but intentionally parallel implementation, not a shared helper, so a future change to one freeze branch would need to be mirrored in the other by hand."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Confirmed (boundaries) that none of this span's twelve symbols are referenced by buildSceneJson or getEffectiveStrokes/getEffectiveStrokesRendered — this is Motion timeline UI only. A guarded `window.SMEngineBridge.renderNow()` call follows every mutating handler, requesting a canvas refresh but proving nothing about output correctness."
+    },
+    {
+      "consumer": "export",
+      "disposition": "No export payload is emitted here. The underlying elementMotion/textAnimators/parentKeys/blendKeys fields this span mutates are later serialized by C19g's exportJSON (cited by name only, not re-derived)."
+    },
+    {
+      "consumer": "native bridges",
+      "disposition": "Only the shared, guarded SMEngineBridge.renderNow() truthiness-checked call — no Tauri command or filesystem call is reachable from this span. image-mesh-bridge.js's own canvas-drag-to-track path (cited by name/line only) is a separate front end over the same 'vtx'+vi tracks, not called FROM this span."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "text-animator-row-count-mirror",
+      "status": "proposed, unrun",
+      "matrix": "0/1/N textAnimators, expanded/collapsed, TA_TIMELINE_FIELDS length changed on one side only",
+      "expected": "Panel and grid row counts derived from the SAME array/expand-gate can never structurally disagree; a hypothetical divergence would require editing one copy and not the other."
+    },
+    {
+      "id": "path-group-key-whole-unkey-whole",
+      "status": "proposed, unrun",
+      "matrix": "0 vertices keyed / some keyed / all keyed at current frame, last-key-per-vertex freeze branch, mixed animated/un-animated vertices",
+      "expected": "keyWholePath always yields a key on every vertex at the current frame regardless of starting state; unkeyWholePath removes only where a key exists at the current frame and freezes a vertex's LAST key to a static value rather than leaving it valueless."
+    },
+    {
+      "id": "path-group-diamond-group-drag",
+      "status": "proposed, unrun",
+      "matrix": "drag on/off current frame, collision with an unselected key, partial vertex coverage at a frame",
+      "expected": "pathGroupKeysAt returns exactly the vertices with a key at that frame; the group drag reuses the generic collision/snap engine unchanged."
+    },
+    {
+      "id": "discrete-row-selection-and-drag",
+      "status": "proposed, unrun",
+      "matrix": "plain click selected/unselected, Cmd/Ctrl-click toggle, Shift-click with/without a resolvable anchor row, right-click delete, empty-cell marquee start",
+      "expected": "Selection state and drag group membership exactly match the click modifier; trackFor's blendKeys/parentKeys wrapper makes the generic engine treat these rows identically to a numeric track's keys."
+    },
+    {
+      "id": "mesh-vs-path-vertex-count-cap",
+      "status": "proposed, unrun",
+      "matrix": "path vertex count far above 200, mesh vertex count at/above MESH_ROW_CAP=200, video-level vs per-element mesh holder",
+      "expected": "Path rows are uncapped (pathVertexRowCount); mesh rows never exceed 200 regardless of the underlying mesh's actual vertex count (meshVertexRowCount's Math.min)."
+    },
+    {
+      "id": "vertex-row-stopwatch-freeze",
+      "status": "proposed, unrun",
+      "matrix": "off, on with no key here, on with a key here and 1 total key, on with a key here and >1 total keys",
+      "expected": "Exact toggleAnimated/setKeyAtCurrentFrame/removeKeyAtCurrentFrame/static-freeze branch per state, matching keyWholePath/unkeyWholePath's own per-vertex logic one level up."
+    },
+    {
+      "id": "canvas-drag-vs-timeline-key-identity",
+      "status": "proposed, unrun",
+      "matrix": "a vertex dragged on canvas via image-mesh-bridge.js while animated vs un-animated, then inspected via renderVertexRow's own stopwatch state",
+      "expected": "Both front ends (canvas drag, timeline stopwatch/key-drag) observe and mutate the identical 'vtx'+vi track through the same holder — no divergent state possible by construction, since both call the same C02 writers."
+    },
+    {
+      "id": "fieldParent-i18n-fallback",
+      "status": "proposed, unrun",
+      "matrix": "en/fr/ja/es locale, Parent row vs Blend row label",
+      "expected": "Blend localizes per-locale; Parent always renders the hardcoded English literal 'Parent' via its caller's own `|| 'Parent'` fallback, in every locale — confirmed by the absence of a fieldParent key anywhere in i18n.js."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "planPathGroupAction(holder,vertexCount,action) -> PathGroupPlan",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Makes keyWholePath/unkeyWholePath's per-vertex branch decisions explicit and testable without the live DOM/undo side effects."
+    },
+    {
+      "api": "planDiscreteKeyRowAction(holder,prop,keys,event) -> DiscreteRowAction",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Separates the click-modifier decision tree (plain/Cmd/Shift/right-click) from the DOM row builder and the shared selection/drag globals."
+    },
+    {
+      "api": "vertexRowCountFor(holder,kind) -> {count,capped}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "Unifies pathVertexRowCount/meshVertexRowCount behind one signature that also reports whether a cap was applied, so a future caller cannot forget to ask."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "TA_TIMELINE_FIELDS",
+      "isTextAnimatorExpanded",
+      "renderTextAnimatorsList",
+      "isPathGroupExpanded",
+      "pathGroupFrames",
+      "pathGroupKeysAt",
+      "keyWholePath",
+      "unkeyWholePath",
+      "renderPathVertexGroup",
+      "renderPathGroupTrackRow",
+      "renderDiscreteKeyGridRow",
+      "renderMeshVertexGroup",
+      "renderVertexRow"
+    ],
+    "caller_anchors": [
+      "renderTextAnimatorsList at motion.js:7542 only",
+      "isTextAnimatorExpanded / TA_TIMELINE_FIELDS mirrored by C20i's renderTimelineMotion at motion.js:11369-11370",
+      "isPathGroupExpanded reused by C20i at motion.js:11207/11283/11298",
+      "renderPathVertexGroup at motion.js:7628 and motion.js:9955",
+      "renderPathGroupTrackRow at motion.js:11282 (C20i)",
+      "renderDiscreteKeyGridRow at motion.js:11175-11176 (C20i, Parent/Blend)",
+      "renderMeshVertexGroup at motion.js:7509, motion.js:7631 and motion.js:9964",
+      "renderVertexRow called only internally, motion.js:10401 and motion.js:10626 — zero external callers anywhere in src"
+    ],
+    "helper_anchors": [
+      "trackFor and its blendKeys/parentKeys extension — motion.js:443-457",
+      "toggleAnimated/setKeyAtCurrentFrame/removeKeyAtCurrentFrame/isAnimated/keyAt/valueAtFrame/setValue — motion.js:2749/2697/2717/1187/1189/2639/2805",
+      "setKeySel/isKeySelected/_motionKeySel — motion.js:11473/11412",
+      "applyMarqueeSelection/startMarquee/motionDragScrollLeft — motion.js:11936/11926/12832",
+      "onDragMove/onDragUp/deleteSelectedKeys/SMMotion.shiftKeySelection — motion.js:12934/13101/1065/13837, all reached only through trackFor",
+      "stopwatchTitle — C20f, motion.js:8652",
+      "renderTrimScalarRow — C20g, motion.js:10140",
+      "renderLayerList/renderTimeline — timeline.js:6335/4026",
+      "pathVertexRowCount/meshVertexRowCount/videoMeshRowsFor/ensureElementHolder/meshHolder — motion.js:4598/4796/4792/2879/4747",
+      "SMMotion.isMeshVertexAnimated/setMeshVertexOffset (image-mesh-bridge.js's own canvas-drag consumer) — motion.js:4774/4768, exported at motion.js:13759/13758"
+    ],
+    "boundary_assertion": "Line 10228 closes C20g's renderTrimPathsGroup; line 10229 starts C20h. Line 10670 closes C20h's renderVertexRow; line 10671 is blank; line 10672 starts C20i's own section header."
+  },
+  "validation": {
+    "expected_assigned_lines": 443,
+    "expected_classification": { "code": 295, "comment": 147, "whitespace": 1 },
+    "packet_partition": [[10229,10296],[10297,10306],[10307,10371],[10372,10450],[10451,10606],[10607,10671]],
+    "packet_classification": [
+      { "range": [10229,10296], "code": 37, "comment": 31, "whitespace": 0 },
+      { "range": [10297,10306], "code": 1, "comment": 9, "whitespace": 0 },
+      { "range": [10307,10371], "code": 42, "comment": 23, "whitespace": 0 },
+      { "range": [10372,10450], "code": 69, "comment": 10, "whitespace": 0 },
+      { "range": [10451,10606], "code": 97, "comment": 59, "whitespace": 0 },
+      { "range": [10607,10671], "code": 49, "comment": 15, "whitespace": 1 }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 10229 and overlap at line 10296.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "six unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "C20g preceding boundary at line 10228 and C20i following boundary at line 10672",
+      "eight consumer dispositions and proposed, unrun fixtures",
+      "row-count contract citations for text-animator, path and mesh groups, and the discrete-key-row selection/drag dependency chain",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}

@@ -64,10 +64,9 @@ async fn compiled_stdio_roundtrip_preserves_identity_and_errors() {
         let discovered = &discover.structured_content.unwrap()["instances"][0];
         assert_eq!(discovered["instanceId"], endpoint.instance_id);
         assert_eq!(discovered["buildId"], "stdio-roundtrip");
-        assert!(serde_json::to_string(discovered)
+        assert!(!serde_json::to_string(discovered)
             .unwrap()
-            .find(&endpoint.secret)
-            .is_none());
+            .contains(&endpoint.secret));
 
         let snapshot = client
             .call_tool(

@@ -1,0 +1,353 @@
+{
+  "census_id": "C20p",
+  "issue": 1246,
+  "title": "Motion.js ease influence model, key ease boxes and selection operations: colour, subdivide, grab-random, invert (11683-11924)",
+  "status": "source census; proposed, unrun behavioral fixtures; no runtime acceptance",
+  "owner": "P03/#1005 executable census leaf on the src/js/motion.js open span [11412,12405] of remediation-scope.json rangeCoverage (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (key/property selection model, row decoration, widget wiring, batch key ops, issue #1245), C20p 11683-11924 (ease influence, ease boxes, selection ops — this leaf, the second slice), C20q 11925-12174 (marquee and the key selection box, issue #1247), C20r 12175-12405 (layer stagger/skew boxes, issue #1248). Sole artifact: engineering/inventory/census/C20p-motion-ease-influence-key-ease-boxes.json; src/js/motion.js and all callers remain read-only. Cited by name/line only, not re-mapped: trackRowHtml/renderTracksFor (C20i, motion.js:10677/11077, the sole caller of every symbol declared in this span except the cross-packet calls internal to this artifact), renderDiscreteKeyGridRow/renderPathGroupTrackRow (C20h, motion.js:10482/10406), the panel rows (C20g/C20f), trackFor/valueAtFrame/setKeyAtFrame/toggleAnimated (C20n/C02, motion.js:443/2639/13817-13824/2760ish), isKeySelected/setKeySel/_groupKeySelByTrack (C20o, motion.js:11412/11473/11640, the immediately-preceding slice this artifact's own writers call into), layer-inout.js (SMLayerInOut.marqueeSelect, group-bar drag — CLAUDE.md §11 \"one gesture, one rectangle\"), ui.js (the document-level `.scrub` pointerdown/pointermove/pointerup delegate at ui.js:1345-1436 that drives buildKeyEaseBox's own input, and the shared curve editor), rig-widget.js (§13 widget wiring menu), timeline-zoom.js, pushUndo*/_scrubLiveActive (tweens.js:4741/4896), showToast (timeline.js:7447, C19w), window.showContextMenu (ui.js), SM.t (i18n.js), NemoOpacityDomain/NemoOpacityApplication (application modules, not called from this span), everything before 11412 and after 12405/13124 (_keyAnchor motion.js:11411, _motionKeySel motion.js:11388, _easeBoxDragging motion.js:11398, _layerSel, enableTimeRemap, setAppMode — sibling-covered).",
+  "source_sha": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba",
+  "observed_main_sha": "f279f73df0e2d9d3133339270eecf8ae5a18a759",
+  "source_path": "src/js/motion.js",
+  "source_blob": "6617bac29042c22399cac202bf054c09e4fdf30e",
+  "source_line_count": 13914,
+  "scope_files": [
+    "src/js/motion.js"
+  ],
+  "intended_branch": "claude/c20p-motion-ease-influence-key-ease-boxes-census",
+  "assigned_ranges": [
+    {
+      "start": 11683,
+      "end": 11924
+    }
+  ],
+  "coverage_note": "Exactly 242 assigned lines in one contiguous range and two complete packets: 174 code, 68 full-line comments, 0 blank — independently re-derived by classifying the frozen blob programmatically per-packet with the SAME blank/`//`-line/`/*...*/`-block algorithm the validator's own classify() runs (a Python re-implementation executed directly against `git show 59a5a38...:src/js/motion.js`), and it matches the issue's own proposed union AND per-packet table exactly for both packets (118=83/35/0, 124=91/33/0) with zero discrepancy. No boundary correction was needed: line 11682 (the closing `}` of selectEveryNthKey, C20o's own last declared function) precedes this scope; line 11683 opens this scope's own misplaced \"Subdivide: insert a key HALFWAY...\" lead-in comment (confirmed by direct `awk 'NR==n'` read against the frozen blob with real line numbers — this lead-in textually documents subdivideKeys at 11860, not EASE_INFLUENCE_MARGIN/easeOutPercent which immediately follow it at 11709-11717; the misplacement is recorded as-is, not corrected, since correcting it would mean moving comment text, which is out of scope for a read-only census). Line 11924 (the closing `}` of invertKeySelection) closes this scope; line 11925 opens `var _motionMarquee = null; // {startX, startY, rectEl, moved, layer}`, C20q's own first declaration (confirmed by direct read).",
+  "source_baselines": {
+    "pinned": "59a5a38c514f5da830dd2f2df4c83c63b1b22fba:src/js/motion.js resolves to 6617bac29042c22399cac202bf054c09e4fdf30e, 13914 lines.",
+    "current": "This worktree's branch was fast-forwarded from the assigned base 697eb53 (origin/main at task start) to f279f73 (origin/main after PR #1275, docs(C19ah), a docs-only change to engineering/inventory/census/ touching timeline.js's own census, zero commits on src/js/motion.js) — verified directly: `git rev-parse 697eb53:src/js/motion.js` == `git rev-parse f279f73:src/js/motion.js` == `git rev-parse 59a5a38...:src/js/motion.js` == 6617bac29042c22399cac202bf054c09e4fdf30e. `git log --oneline 697eb53..origin/main` shows exactly one commit and it touches only engineering/inventory/census/C19ah-timeline-xform-bool-brush-canvas-wiring.json.",
+    "runtime": "No browser, Tauri, export, native, GPU or application behavior was executed. All caller findings were derived by `grep -rnE '(^|[^a-zA-Z_.])<symbol>\\(' --include=\"*.js\" src` over the recursive src/js tree, plus a second bare-identifier pass (`grep -rnE '\\b<symbol>\\b'`) to catch function references passed by name rather than invoked with parentheses — the second pass was necessary: subdivideKeys and invertKeySelection are wired into a context-menu action table as `action: subdivideKeys` / `action: invertKeySelection` (motion.js:11012/11030), which a parens-only grep misses entirely. Every surviving hit was read directly with `sed -n`/`awk` against this worktree's copy of motion.js/ui.js/tweens.js/timeline.js, confirmed byte-identical to the frozen blob above for motion.js, so its line numbers are valid frozen-blob citations.",
+    "fixtures": "Every behavioral fixture is source-derived, proposed and unrun."
+  },
+  "writer_guidance": {
+    "artifact": "Only engineering/inventory/census/C20p-motion-ease-influence-key-ease-boxes.json is writable for this outcome.",
+    "runtime": "Historical Motion ownership retains motion.js runtime writing; P30 retains timeline.js. C20p transfers no implementation authority.",
+    "owners": "C02/C20a-j (before line 1683, cited by line only) retain trackFor (motion.js:443), keyAt (motion.js:1189), sortKeys (motion.js:1188), cloneCurvePts (motion.js:1170), rawValueAtFrame (motion.js:1270), CURVE_LINEAR (motion.js:957), CURVE_EASE/CURVE_EASE_IN/CURVE_EASE_OUT (motion.js:965/969-970), DEFAULT_CURVE (motion.js:935, itself `NemoOpacityDomain.defaultCurve()` — an application-module call, own value re-derived from src/js/domain/animation/opacity.js:7 as `[{0,0},{.25,.156},{.5,.5},{.75,.844},{1,1}]`, the smoothstep 3t^2-2t^3 samples), LEGACY_STEP_CURVE/isLegacyStepCurve (motion.js:936/941). C20n (2635-2932, merged) retains valueAtFrame/hasExpr/setKeyAtCurrentFrame/toggleAnimated in full — this span never calls any of them directly (only rawValueAtFrame, valueAtFrame's own pre-expression helper, which lives pre-1683). C20o (11412-11682, sibling leaf, issue #1245) retains isKeySelected (motion.js:11412), _groupKeySelByTrack (motion.js:11640), setKeySel (motion.js:11473), selectEveryNthKey (motion.js:11676) in full — this span's own writers call isKeySelected (via isPrimarySelectedKey), setKeySel (subdivideKeys/grabRandomKeys) and _groupKeySelByTrack (subdivideKeys) directly, but does not duplicate their bodies. `_motionKeySel` (motion.js:11388), `_keyAnchor` (motion.js:11411) and `_easeBoxDragging` (motion.js:11398) are pre-existing module-scoped vars declared just before C20o's own range starts (11388/11398/11411 are all < 11412) — sibling-covered, read and written by this span but not declared here. This artifact (C20p, 11683-11924) declares and retains EASE_INFLUENCE_MARGIN, easeOutPercent, easeInPercent, editableInfluenceCurve, setSegmentInfluence, keyEaseInfluence, setSelectedEaseInfluence, isPrimarySelectedKey, buildKeyEaseBox, colorSelectedKeys, subdivideKeys, grabRandomKeys, invertKeySelection. C20q (11925-12174, next slice) retains _motionMarquee/startMarquee and the key-selection box in full — cited by name/line only, never called from this span. trackRowHtml (motion.js:10677-11076, C20i) is the SOLE internal caller of every symbol this span exports to the rest of motion.js (isPrimarySelectedKey at 10833; buildKeyEaseBox at 10860-10861; subdivideKeys/colorSelectedKeys/grabRandomKeys/invertKeySelection wired into trackRowHtml's own context-menu builder at 11012/11017-11018/11027/11030) — grep-confirmed zero callers anywhere else in src/js for those 6 symbols. invertKeySelection is additionally exported as SMMotion.invertKeySelection (motion.js:13826) but has zero external callers anywhere in src/js (grep-confirmed) — an exported-but-currently-unused entry point, documented as-is, not treated as dead code to remove (out of scope for a read-only census). ui.js retains the shared `.scrub` pointerdown/pointermove/pointerup delegate (ui.js:1345-1436) that drives buildKeyEaseBox's own `<input class=\"scrub motion-key-ease-input\">` (motion.js:11812) and the shared curve editor (_curveEditor.editMotionSeg, not called from this span). tweens.js retains pushUndo/pushUndoLayers (tweens.js:4741/4896) and the `window._scrubLiveActive` no-op gate (tweens.js:4808/4896) that ui.js's own scrub gesture (ui.js:1391/1395/1424-1425) uses to fold every 'change'-driven pushUndo() inside a single scrub drag — including setSelectedEaseInfluence's own (motion.js:11773) — into the ONE pre-drag snapshot ui.js already took. timeline.js retains renderTimeline (timeline.js:4026), renderLayerList (timeline.js:6335) and showToast (timeline.js:7447, cited as C19w per the issue's own attribution) — called by this span's writers as UI-refresh/feedback side effects, never re-implemented here. engine-bridge.js retains SMEngineBridge.renderNow(), called from setSelectedEaseInfluence/subdivideKeys as a live-repaint kick, cited by name only. i18n.js retains SM.t and every `toast*`/prompt string key this span reads (toastNoKeySelected, toastSelectAtLeast2Keys, toastKeysColoredSuffix, toastColorRemoved, toastKeysInsertedSuffix, toastKeysKeptRandomSuffix, toastKeysSelectedSuffix, promptKeepPercentOfSelection — all grep-confirmed present, e.g. i18n.js:1056), cited by name only."
+  },
+  "reconciliation": [
+    {
+      "owner": "P03/#1005 rangeCoverage",
+      "disposition": "remediation-scope.json lists src/js/motion.js 11412-12405 as one open span (frozen index at 4bbe332), which the C20o-C20r series closes in four slices: C20o 11412-11682 (issue #1245), C20p 11683-11924 (this artifact, the second slice), C20q 11925-12174 (issue #1247), C20r 12175-12405 (issue #1248). This artifact's own 242-line union is disjoint from C20o's declared 271-line range (11412-11682) by construction (11683 > 11682) and from C20q's future 11925-12174 range by construction (11924 < 11925) — the C20o-C20r series will account for all 994 lines of the open span (271+242+250+231=994) once all four merge, though this artifact alone does not certify that closure (P03's own board update does)."
+    },
+    {
+      "owner": "C20o (sibling leaf, issue #1245, motion.js:11412-11682)",
+      "disposition": "Retains its own body in full — cited by name/line only. No C20o artifact/PR existed at authoring time (checked: `gh pr list --head claude/c20o-motion-key-selection-widget-wiring-census --state all` returned no results, and no C20o-*.json file exists under engineering/inventory/census/ in this worktree). This artifact's own callers into C20o's range (isKeySelected at 11412, setKeySel at 11473, _groupKeySelByTrack at 11640, all called from this span's own writers) are documented by line only against the frozen blob, not against any C20o artifact text, so this artifact's own claims do not depend on C20o's artifact having been written or merged yet."
+    },
+    {
+      "owner": "C02/C20a-j (existing owners, motion.js:1-1682)",
+      "disposition": "Retain their own bodies in full — cited by name/line only. This span calls seven pre-1683 helpers directly: trackFor (motion.js:443, keyEaseInfluence/setSelectedEaseInfluence/subdivideKeys/invertKeySelection), keyAt (motion.js:1189, subdivideKeys' pre-existing-key check), sortKeys (motion.js:1188, subdivideKeys' post-insert re-sort), cloneCurvePts (motion.js:1170, editableInfluenceCurve/subdivideKeys), rawValueAtFrame (motion.js:1270, subdivideKeys' pre-insert value sample), plus the curve constants CURVE_LINEAR (motion.js:957, editableInfluenceCurve's fallback base) and DEFAULT_CURVE (motion.js:935, subdivideKeys' own curvePoints fallback when the left neighbor key has none)."
+    },
+    {
+      "owner": "C20n (existing owner, merged, motion.js:2635-2932)",
+      "disposition": "Retains its own body in full — cited by name/line only. Zero calls from this span into C20n's own valueAtFrame/setKeyAtCurrentFrame/toggleAnimated/setValue/ensureElementHolder (grep-confirmed) — this span reaches only the PRE-C20n rawValueAtFrame (motion.js:1270), not the expression-aware public wrapper C20n declares at motion.js:2639."
+    },
+    {
+      "owner": "ui.js (existing owner, the shared `.scrub` drag delegate and curve editor)",
+      "disposition": "Retains its own body in full — cited by line only. buildKeyEaseBox's own input carries `class=\"scrub motion-key-ease-input\"` (motion.js:11812, CLAUDE.md §10's own required convention for any numeric field), so ui.js's document-level pointerdown/pointermove/pointerup listeners (ui.js:1345-1436) drive its drag without this span registering any pointer listener of its own beyond the two piggyback ones documented in buildKeyEaseBox's own responsibility field below. ui.js's own scrub-drag pushUndo (ui.js:1391) and `window._scrubLiveActive` flag (ui.js:1395, cleared at ui.js:1424-1425 after the drag's final synthetic 'change' dispatch) are the mechanism that folds this span's own setSelectedEaseInfluence pushUndo() (motion.js:11773) into a no-op for every 'change' event fired DURING a live scrub, via tweens.js's own gate (tweens.js:4808/4896) — documented by line only, not re-derived."
+    },
+    {
+      "owner": "tweens.js (existing owner, pushUndo*/_scrubLiveActive) and timeline.js (P30, existing owner, renderTimeline/renderLayerList/showToast)",
+      "disposition": "Retain their own bodies in full — cited by line only. pushUndo (tweens.js:4741, a thin wrapper over pushUndoLayers) is called unconditionally at the top of setSelectedEaseInfluence (motion.js:11773), colorSelectedKeys (motion.js:11855) and subdivideKeys (motion.js:11862) — all three checkpoint BEFORE mutating, even on a call that ends up mutating zero keys (setSelectedEaseInfluence's own `n` can end at 0 while pushUndo already fired). grabRandomKeys and invertKeySelection call pushUndo ZERO times (grep-confirmed against both function bodies) — both only ever reassign the module-scoped `_motionKeySel` selection array, never document/key data, so neither needs an undo checkpoint of its own; this matches the general convention that _motionKeySel is transient UI state, not persisted document content (see the selection-operations packet's own effects field). renderTimeline (timeline.js:4026) is called unconditionally by every one of this span's 6 writer functions except buildKeyEaseBox itself (which only builds a DOM node); renderLayerList (timeline.js:6335) is called only from setSelectedEaseInfluence and subdivideKeys (both of which also touch curvePoints/new keys, content the layer-list thumbnails may reflect), not from colorSelectedKeys/grabRandomKeys/invertKeySelection (selection- or paint-only changes with no layer-list-visible effect)."
+    },
+    {
+      "owner": "P30/#1032 and historical Motion ownership",
+      "disposition": "P30 retains timeline.js runtime writing and historical Motion ownership retains motion.js. This artifact's authoring permits no source or behavior change."
+    },
+    {
+      "owner": "P03",
+      "disposition": "This bounded census neither completes P03 nor certifies product behavior."
+    }
+  ],
+  "boundaries": [
+    "Line 11682 (the closing `}` of C20o's own selectEveryNthKey, confirmed by direct `awk`/`sed -n` read with real line numbers) precedes this scope; line 11683 opens this scope's own misplaced \"Subdivide: insert a key HALFWAY...\" lead-in comment. Line 11924 (the closing `}` of invertKeySelection) closes this scope; line 11925 opens `var _motionMarquee = null;`, C20q's own first declaration (confirmed by direct read). Both boundary pairs re-verified with `awk 'NR==<n>'` against the frozen blob.",
+    "Both packet cuts in the issue's own suggested table land exactly on a construct's own lead-in comment or a declaration seam in the frozen blob (11683/11801) — re-verified line-by-line with `awk 'NR==<n>'` for both cut points before accepting the table; no correction was needed. Within each packet, every one of the 8 (packet 1) and 5 (packet 2) named sub-construct boundaries in the issue's own table (11709/11710/11718/11726/11737/11763/11771/11790 and 11801/11853/11860/11888/11903) was independently re-verified the same way and matches exactly.",
+    "The \"Subdivide\" lead-in (11683-11691) textually documents subdivideKeys (declared at 11860, 169 lines later, past EASE_INFLUENCE_MARGIN and all 7 ease-influence functions) rather than the constant it immediately precedes (EASE_INFLUENCE_MARGIN, 11709) — recorded as a misplacement per the issue's own instruction, not corrected (moving comment text is out of scope for a read-only census; the assigned line range and classification are unaffected either way since both comments fall inside this artifact's own union).",
+    "keyEaseInfluence (11763-11770, packet 1) and setSelectedEaseInfluence (11771-11789, packet 1) are called from buildKeyEaseBox (11802/11847, packet 2) — documented as internal cross-packet calls in packet 2's own external_calls/callers fields (never duplicated as a second declaration), the same convention C20n used for opacityLegacy/opacityDomain.",
+    "isPrimarySelectedKey's own read of `_motionKeySel`/`_keyAnchor` (11792-11799) and setSelectedEaseInfluence's own read of `_motionKeySel` (11775) both reach a module-scoped var declared BEFORE 11412 (11388/11411 respectively) — outside both C20o's and this artifact's own declared ranges, sibling-covered per the issue's own exclusion list, cited by line only.",
+    "curvePoints' render-path claim is confirmed rather than merely asserted: rawValueAtFrame (sibling-covered, pre-1683) reads `a.curvePoints || DEFAULT_CURVE` at motion.js:1267 and motion.js:1286 and feeds it to `evalCurvePoints` (= SMAnimationCurve.evalCurvePoints, motion.js:1173, an external application module aliased at load time) — the actual per-frame interpolation this span's setSegmentInfluence/subdivideKeys write into. Neither call site is reached FROM this span; this span only supplies the `curvePoints` values those pre-existing call sites later read, cited by line only, not re-derived."
+  ],
+  "areas": [
+    {
+      "area": "ease-influence-and-key-ease-boxes",
+      "packets": [
+        {
+          "id": "C20p.ease-influence-model",
+          "files": [
+            "src/js/motion.js:11683-11800"
+          ],
+          "coverage_ranges": [
+            [
+              11683,
+              11800
+            ]
+          ],
+          "classification": {
+            "code": 83,
+            "comment": 35,
+            "whitespace": 0
+          },
+          "symbols": [
+            "EASE_INFLUENCE_MARGIN",
+            "easeOutPercent",
+            "easeInPercent",
+            "editableInfluenceCurve",
+            "setSegmentInfluence",
+            "keyEaseInfluence",
+            "setSelectedEaseInfluence",
+            "isPrimarySelectedKey"
+          ],
+          "signature": "EASE_INFLUENCE_MARGIN = 0.02 (module-scoped const, motion.js:11709); easeOutPercent(k) -> number|null (0-100, rounded; null if k.curvePoints is falsy or has <2 points); easeInPercent(k) -> number|null (same contract, mirrored end); editableInfluenceCurve(key) -> curvePoints array (always length>=5 on return); setSegmentInfluence(key, side:'in'|'out', percent:number) -> boolean (false only if key is falsy; true otherwise, unconditionally); keyEaseInfluence(holder, prop, key, side) -> number|null; setSelectedEaseInfluence(side, value) -> number (count of segments actually changed, 0 if _motionKeySel is empty or no selected key owns that side's segment); isPrimarySelectedKey(holder, prop, key) -> boolean.",
+          "responsibility": "Lead-in (11683-11691, MISPLACED — see boundaries) documents subdivideKeys (declared 169 lines later at 11860), not the influence model that follows it. Influence lead-in (11692-11708, 2026-08 rework) frames the semantic flip explicitly quoted from feedback: previously percent only varied a waypoint's Y at a FIXED x=0.25 (0%/100% meant 'linear' vs 'fully held' but the waypoint never moved in time); now percent drives the waypoint's X too — 0% keeps it hugging its OWN key's time (negligible reach), 100% pushes it toward the segment's fixed midpoint at x=0.5 (11703-11705, 'the on-curve waypoint model used everywhere here... has a fixed midpoint at x=0.5 that the out-side waypoint can approach but never cross, and the in-side mirrors it from the other end'). EASE_INFLUENCE_MARGIN=0.02 (11709) keeps a waypoint strictly short of coinciding with x=0 (or x=1) OR with the fixed x=0.5 midpoint, since a zero-width span would degenerate curveSegFor's own segment lookup (11706-11708, cited by name only, not called from this span). easeOutPercent(k) (11710-11717): reads `pts=k.curvePoints`; null if pts has fewer than 2 points; else `p=pts[1]` (the waypoint immediately after the key's own point 0, i.e. the OUT-side waypoint of the OUTGOING segment); `amount=(p.x-MARGIN)/(0.5-2*MARGIN)` maps p.x's clamped range [MARGIN, 0.5-MARGIN] back onto [0,1], then rounds `clamp(amount,0,1)*100` to an integer percent. easeInPercent(k) (11718-11725): mirrors it from the other end — `p=pts[pts.length-2]` (second-to-last waypoint, the IN-side waypoint of the segment this same key's curvePoints array describes) and `amount=(1-p.x-MARGIN)/(0.5-2*MARGIN)`, same rounding. Both are pure reads; neither mutates `k`. editableInfluenceCurve(key) (11726-11736): `cloneCurvePts(key.curvePoints||CURVE_LINEAR)` (CURVE_LINEAR, motion.js:957, C02, a 2-point array); if the cloned array has fewer than 4 points (true only for CURVE_LINEAR itself, since every other curve constant in this file — DEFAULT_CURVE motion.js:935, CURVE_EASE/CURVE_EASE_IN/CURVE_EASE_OUT motion.js:965/969-970 — is already 5 points), it is replaced by a literal 5-point array `[{0,0},{.25,.25},{.5,.5},{.75,.75},{1,1}]` — NOT DEFAULT_CURVE's own smoothstep values (cross-checked against DEFAULT_CURVE's actual value, src/js/domain/animation/opacity.js:7 = `[{0,0},{.25,.156},{.5,.5},{.75,.844},{1,1}]`; the two differ at x=0.25/0.75). This promotion therefore preserves LINEAR's exact identity shape (y=x at every waypoint) while giving each edge its own independently-movable waypoint, per the comment's own stated intent (11728-11730, 'while the untouched edge remains exactly linear') — it is not a promotion toward the ease-in-out default. setSegmentInfluence(key, side, percent) (11737-11762), the EXACT INVERSE of easeOutPercent/easeInPercent: `amount=clamp(percent,0,100)/100`; `reach=MARGIN+amount*(0.5-2*MARGIN)` (the same x-value easeOutPercent/easeInPercent would decode back to `amount`); `pts=editableInfluenceCurve(key)` (promotes/clones first, so the source key object is never mutated in place before this line). If side==='out': `p=pts[1]`; `p.x=reach`; `p.y=p.x*(1-amount)` (11749, deepens toward y=0 as amount/reach grow — 'hold near this key, then catch up'). Else (side==='in'): `p=pts[pts.length-2]`; `p.x=1-reach` (mirrored position); `p.y=1-(1-p.x)*(1-amount)` (mirrored deepening toward y=1). Either branch then `delete p.tx; delete p.ty` (11758, releases any hand-dragged tangent on ONLY that one waypoint — every other point in `pts`, including the untouched x=0.5 midpoint and the opposite edge's waypoint, is left byte-for-byte as `editableInfluenceCurve` produced it); `key.hold=false` (an influence edit always clears hold-interpolation on that key); `key.curvePoints=pts` (11761, the actual document write — the ONLY place in this artifact that writes `key.curvePoints`); returns true. keyEaseInfluence(holder, prop, key, side) (11763-11770) answers 'which key does a side belong to': `track=trackFor(holder,prop)` (motion.js:443, C02); `idx=track.keys.indexOf(key)`; if side==='out', returns `easeOutPercent(key)` directly (key's OWN out-side waypoint) but ONLY if `idx>=0 && idx<track.keys.length-1` (key is not the last — an outgoing segment exists), else null. If side==='in', it does NOT read `key.curvePoints` at all — it looks at `prev=idx>0?track.keys[idx-1]:null` (the PREVIOUS key) and returns `easeInPercent(prev)`, because a segment's curvePoints live on its LEFT (earlier) endpoint key (confirmed at motion.js:964, 'A key's curvePoints govern the segment LEAVING it (valueAtFrame reads the left key's curve)', pre-1683/C02) — so the in-side box drawn NEXT TO key i actually reads and later writes key (i-1)'s own curvePoints[pts.length-2], never key i's. In short: for the segment between key i and key i+1, BOTH its out-side (from key i's perspective) and in-side (from key i+1's perspective) waypoints live in the SAME curvePoints array, owned by key i (the left/earlier key of that segment) — 'side' names which end of THAT one array a caller wants, not which key object the caller passed when asking for 'in'. setSelectedEaseInfluence(side, value) (11771-11789): returns 0 immediately if `_motionKeySel` (motion.js:11388, sibling-covered) is empty (no pushUndo in that case). Otherwise calls `pushUndo()` (tweens.js:4741) UNCONDITIONALLY before the loop, then iterates EVERY selected key `s` in `_motionKeySel` (not just the primary one — see isPrimarySelectedKey below, which governs UI display, not this function's own scope): for each, re-derives which key object actually owns the requested side's segment using the SAME idx/side logic as keyEaseInfluence (side==='out': the key itself if it is not the last on its track; side==='in': the previous key on its track, if any) and, if such a segment exists, calls `setSegmentInfluence(segment, side, value)`, incrementing `n` on success. After the loop, if `n` is nonzero: `renderLayerList()` (timeline.js:6335), `renderTimeline()` (timeline.js:4026), and `window.SMEngineBridge.renderNow()` if the engine bridge global exists — a live repaint. Returns `n`. Net effect: applying an influence percent to a MULTI-key selection changes every selected key's OWN matching-side segment independently (each key's neighbor may differ), not just a single 'primary' key's segment. isPrimarySelectedKey(holder, prop, key) (11790-11800): false immediately if the key is not itself selected (via `isKeySelected`, motion.js:11412, C20o). If a `_keyAnchor` (motion.js:11411, sibling-covered) exists AND the anchor is STILL present in the current `_motionKeySel` (an anchor can go stale after e.g. a subdivide/invert reshuffles the array), the primary key is defined as whichever key exactly matches the anchor's own holder/prop/frame — i.e. the anchor IS the primary while it remains selected. Otherwise (no anchor, or the anchor fell out of the current selection), the primary is simply the LAST entry of `_motionKeySel` (the most recently added/re-ordered selection item). This is a pure predicate — no document or selection write.",
+          "return_shape": "easeOutPercent/easeInPercent/keyEaseInfluence: `number|null`, a rounded integer percent 0-100 or null when no matching segment exists. editableInfluenceCurve: a plain array of `{x,y[,tx,ty]}` waypoint objects, always length>=5, a FRESH clone (never the same array reference as `key.curvePoints`, even when no promotion was needed — `cloneCurvePts`, motion.js:1170, C02, always allocates new point objects). setSegmentInfluence: boolean. setSelectedEaseInfluence: integer count. isPrimarySelectedKey: boolean.",
+          "render_path": "NONE of these 8 symbols is called from the render path (computeMotionMat/buildSceneJson chain, sibling-covered) — grep-confirmed zero hits in engine-bridge.js or export.js for any of them. The DATA this packet writes (`key.curvePoints`, via setSegmentInfluence at motion.js:11761) IS on the render path indirectly: rawValueAtFrame (sibling-covered, pre-1683) reads `a.curvePoints||DEFAULT_CURVE` at motion.js:1267 and motion.js:1286 and feeds it to `evalCurvePoints` (motion.js:1173, `SMAnimationCurve.evalCurvePoints`, an external application module) on every rendered/exported frame that lands inside the segment this packet edited — cited by line only, not re-derived, since rawValueAtFrame itself is outside this artifact's own assigned range.",
+          "callers": "Within this artifact's own span (packet 2, cross-packet internal calls, not external_calls): keyEaseInfluence is called once, from buildKeyEaseBox (motion.js:11802); setSelectedEaseInfluence is called once, from buildKeyEaseBox's own 'change' listener (motion.js:11847). Within this packet itself: easeOutPercent/easeInPercent are each called once, from keyEaseInfluence (11767/11769); editableInfluenceCurve is called once, from setSegmentInfluence (11741); setSegmentInfluence is called once, from setSelectedEaseInfluence (11782); EASE_INFLUENCE_MARGIN is referenced 3 times, all within this packet (11715, 11723, 11740). External to this artifact: isPrimarySelectedKey has exactly ONE caller anywhere in src/js — trackRowHtml (motion.js:10833, C20i, sibling-covered, physically BEFORE this artifact's own range) — grep-confirmed (`grep -rnE '(^|[^a-zA-Z_.])isPrimarySelectedKey\\(' --include=\"*.js\" src` returns only its own declaration at 11790 and the 10833 call site). None of these 8 symbols is exported on `window.SMMotion` (grep-confirmed against the entire export object body, motion.js:13352-13914 — zero matches for any of the 8 names as an object-literal key).",
+          "external_calls": [
+            "cloneCurvePts — motion.js:1170 (C02, editableInfluenceCurve's clone/promote base)",
+            "CURVE_LINEAR — motion.js:957 (C02, referenced not called, editableInfluenceCurve's fallback source)",
+            "trackFor — motion.js:443 (C02, keyEaseInfluence/setSelectedEaseInfluence's track lookup)",
+            "isKeySelected — motion.js:11412 (C20o, sibling leaf #1245, isPrimarySelectedKey's selection gate)",
+            "_motionKeySel — motion.js:11388 (sibling, pre-11412, read in isPrimarySelectedKey/setSelectedEaseInfluence)",
+            "_keyAnchor — motion.js:11411 (sibling, pre-11412, read in isPrimarySelectedKey)",
+            "pushUndo — tweens.js:4741 (setSelectedEaseInfluence's unconditional pre-loop checkpoint)",
+            "renderLayerList — timeline.js:6335 (setSelectedEaseInfluence, only when n>0)",
+            "renderTimeline — timeline.js:4026 (setSelectedEaseInfluence, only when n>0)",
+            "window.SMEngineBridge.renderNow — engine-bridge.js (name only; setSelectedEaseInfluence, only when n>0 and the global exists)"
+          ],
+          "effects": "Document writes: `key.curvePoints` (setSegmentInfluence, motion.js:11761, the ONLY write site for this field in this packet) and `key.hold=false` (motion.js:11759, cleared alongside every influence edit) and `delete p.tx/p.ty` on the one waypoint touched (motion.js:11758). Undo: setSelectedEaseInfluence is the only writer among these 8 symbols and calls pushUndo() unconditionally before mutating (tweens.js:4741) — but see the ui.js scrub-gesture reconciliation entry above: when this call is reached from buildKeyEaseBox's live-scrub 'change' dispatch (packet 2), `window._scrubLiveActive` (set by ui.js:1391/1395 at the start of the same drag) makes tweens.js's own pushUndoLayers (tweens.js:4896, `if(window._scrubLiveActive)return;`) a no-op for every 'change' during that ONE drag except the drag's own pre-gesture snapshot already taken by ui.js itself — so a full click-drag-release ease-box gesture produces exactly one undo entry, not one per intermediate tick. When setSelectedEaseInfluence is reached any other way (none currently, since buildKeyEaseBox's 'change' listener is its only caller), the plain unconditional pushUndo() would apply on its own."
+        },
+        {
+          "id": "C20p.key-ease-box-and-selection-ops",
+          "files": [
+            "src/js/motion.js:11801-11924"
+          ],
+          "coverage_ranges": [
+            [
+              11801,
+              11924
+            ]
+          ],
+          "classification": {
+            "code": 91,
+            "comment": 33,
+            "whitespace": 0
+          },
+          "symbols": [
+            "buildKeyEaseBox",
+            "colorSelectedKeys",
+            "subdivideKeys",
+            "grabRandomKeys",
+            "invertKeySelection"
+          ],
+          "signature": "buildKeyEaseBox(holder, prop, key, side) -> HTMLLabelElement|null (null iff keyEaseInfluence returns null, i.e. no segment on that side); colorSelectedKeys(color:string|falsy) -> undefined; subdivideKeys() -> undefined; grabRandomKeys(percent:number|string) -> undefined; invertKeySelection() -> undefined.",
+          "responsibility": "buildKeyEaseBox(holder, prop, key, side) (11801-11852): `value=keyEaseInfluence(holder,prop,key,side)` (packet 1, cross-packet call); returns null immediately if value is null (no box built for a key with no segment on that side — e.g. the box requested for 'out' at a track's LAST key, or 'in' at its FIRST key). Otherwise builds and returns a DOM `<label class=\"motion-key-ease-box <side>[ dragging]\">` (11804-11805, the 'dragging' modifier reflects the module-scoped `_easeBoxDragging` flag, motion.js:11398, sibling-covered) with a localized French tooltip (11806-11808) that differs by side, a `<span class=\"motion-key-ease-marker\">` glyph ('\\u25c0' for in, '\\u25b6' for out, 11810) and an `<input type=\"number\" class=\"scrub motion-key-ease-input\" min=0 max=100 data-step=1>` seeded to the current `value` (11811-11813) — the `scrub` class is CLAUDE.md §10's required convention, and IS present here, so this input participates in ui.js's shared document-level drag-to-change mechanism (ui.js:1345-1436) without this span registering its own pointermove/pointerup logic. Six listeners on `input`: (1) 'mousedown' -> stopPropagation only (11814); (2) 'pointerdown' (11829-11840, WITHOUT stopPropagation, so ui.js's own document-level pointerdown listener still receives the event and starts the real scrub-drag) sets `_easeBoxDragging=true` and adds the 'dragging' CSS class immediately, then registers a ONE-SHOT `window` 'pointerup' listener that resets both — this exists (per the 2026-08 comment, 11815-11828) because the real drag is driven by a 'pointerdown' that calls preventDefault(), which suppresses the browser's own compatibility 'mousedown' the class-toggle previously lived on, so the box was invisible during a real drag even though it worked in synthetic MouseEvent tests; (3) 'click' -> stopPropagation (11841); (4) 'keydown' -> stopPropagation (11842); (5) 'change' (11843-11848) — the WRITE path: no-ops if the current value is empty or non-finite, else clamps to [0,100], writes the clamped value back onto `input.value`, and calls `setSelectedEaseInfluence(side, v)` (packet 1, cross-packet call) — the ONLY call site anywhere that connects this UI control to the influence-model write path. Children are ordered by side (11849-11850): 'in' puts the input BEFORE the marker (arrow trailing, pointing away from the key toward the input's own text); 'out' puts the marker before the input. buildKeyEaseBox itself performs no document write, no pushUndo, and no render call — every one of those is inside setSelectedEaseInfluence, reached only through the 'change' listener above; see the ui.js/tweens.js reconciliation entries above for how a live scrub-drag of this exact input folds the resulting many 'change' events into one undo checkpoint. colorSelectedKeys(color) (11853-11859): no-ops with a `toastNoKeySelected` toast if `_motionKeySel` is empty (no pushUndo on that path). Otherwise `pushUndo()` (tweens.js:4741), then for every selected key: `if(color) s.key.color=color; else delete s.key.color` (11856) — a single boolean branch handles both 'apply a palette color' and 'remove color' (the caller passes `null` for the latter, per trackRowHtml's own context-menu wiring at motion.js:11018). `renderTimeline()` (timeline.js:4026) only — no renderLayerList, no engine renderNow, since `key.color` is a pure paint annotation (11810-11812's own comment: 'nothing reads k.color at evaluation time') never consumed by anything on the render path. Toast varies: N keys colored, or 'color removed', by SM.t key. subdivideKeys() (11860-11887, documented by the MISPLACED lead-in at 11683-11691 — see boundaries): no-ops with a `toastSelectAtLeast2Keys` toast if `_motionKeySel.length<2` (no pushUndo). Otherwise `pushUndo()` (11862), then groups the current selection by (holder,prop) track via `_groupKeySelByTrack()` (motion.js:11640, C20o); for each group with >=2 items: looks up its `track` via `trackFor` (motion.js:443, C02) and sorts the group's own items by frame (11868, a LOCAL sort — does not touch `track.keys` itself yet); for every consecutive pair (a,b) in that sorted group: `mid=round((a.frame+b.frame)/2)`; SKIPPED (counted in `skipped`, 11872) if `mid<=a.frame || mid>=b.frame` (the pair is exactly 1 frame apart — the ONE-FRAME-APART skip named in the lead-in comment) OR (11873, a SECOND, textually undocumented-by-the-lead-in skip reason) if `keyAt(track,mid)` (motion.js:1189, C02) already finds a key sitting exactly at `mid` — both reasons share the SAME `skipped` counter and the SAME generic toast suffix ('... intervalle(s) trop court(s)', 11886), so the toast text alone cannot distinguish 'pair too close together' from 'a key already exists at the midpoint'. Otherwise: samples `v=rawValueAtFrame(g.holder,g.prop,mid)` (motion.js:1270, C02) BEFORE inserting anything — the comment at 11874-11875 explains why the order matters: rawValueAtFrame walks the SAME `track.keys` array being modified, so inserting first would make the new key interpolate against itself; builds `nk={frame:mid, v:v.slice(), curvePoints:cloneCurvePts(a.curvePoints||DEFAULT_CURVE), hOut:[0,0], hIn:[0,0]}` (11877) — the new key's curvePoints come from the LEFT neighbor `a`'s own curvePoints (or DEFAULT_CURVE, motion.js:935, if `a` has none), matching the 'a key's curvePoints govern the segment leaving it' ownership rule (motion.js:964) since the midpoint key becomes the new left owner of BOTH resulting half-segments; pushes `nk` onto `track.keys` (11878, added++) and onto a local `fresh` array tagged with `{holder,prop,key:nk}` (11879). After all pairs in a group: `sortKeys(track)` (motion.js:1188, C02) ONCE per track (not per insert). After all groups: `setKeySel(_motionKeySel.concat(fresh))` (motion.js:11473, C20o) — appends the newly-created keys to the EXISTING selection rather than replacing it, so a subdivide -> drag -> subdivide loop keeps working without re-selecting (per the lead-in's own stated intent, 11687-11689). `renderLayerList()`+`renderTimeline()` unconditionally, then `SMEngineBridge.renderNow()` if the global exists (11884-11885, unlike setSelectedEaseInfluence this is NOT gated on `added>0`). Toast reports `added` count plus, if `skipped>0`, an appended '— N intervalle(s) trop court(s)' suffix. grabRandomKeys(percent) (11888-11902, own lead-in 11888-11891 — 'Skew Pro's Grab Randomly'): `p=clamp(parseInt(percent,10)||50,1,100)/100` (default 50% on NaN/missing, floor 1%). No-ops with a `toastNoKeySelected` toast if `_motionKeySel` is empty. Otherwise: `pool=_motionKeySel.slice()`; `want=max(1,round(pool.length*p))` (guarantees at least one survivor, per the lead-in's own stated guarantee, 11890-11891); repeatedly `pool.splice(Math.floor(Math.random()*pool.length),1)[0]` (11898) — an UNSEEDED `Math.random()`-driven partial Fisher-Yates-style draw without replacement, picking a uniformly random remaining index each iteration until `want` items are collected or the pool empties; `setKeySel(out)` (motion.js:11473, C20o) REPLACES the selection with just the kept subset (unlike subdivideKeys, which appends). `renderTimeline()` only (no renderLayerList, no engine renderNow — a pure selection change, nothing rendered depends on it). Toast reports the kept count. NO `pushUndo()` call anywhere in this function (grep-confirmed against its full body, 11892-11902) — it only ever mutates `_motionKeySel`, never document/key content, so no checkpoint is needed. invertKeySelection() (11905-11924, own lead-in 11903-11904 — 'within whatever tracks are CURRENTLY RENDERED'): `all=[]`; `prevSel=_motionKeySel` (a REFERENCE to the array as it stood before this function starts reassigning the module var, not a copy — safe because `_motionKeySel` is about to be REASSIGNED, not mutated in place, at 11920). Scans `document.querySelectorAll('.motion-track-row, .motion-group-row')` (11914) — i.e. every property/group row ELEMENT CURRENTLY IN THE DOM, which per the feedback-#221 comment (11907-11913) deliberately widens the universe to `.motion-group-row` (renderDiscreteKeyGridRow's own Blend/Parent rows, C20h, `row._smHolder`/`_smProp` set at motion.js:10496) alongside `.motion-track-row` (trackRowHtml's own row, `rowEl._smHolder`/`_smProp` set at motion.js:10684) — 'currently rendered' therefore means whatever the timeline UI has actually built DOM nodes for right now (e.g. a collapsed layer's property rows are NOT in this universe, since renderTimeline never builds their rows while collapsed), not every property that logically exists on every layer in the project. For each row element: reads its own `_smHolder`/`_smProp` tags, looks up `track=trackFor(holder,prop)` (motion.js:443, C02), and — only if a track exists (an untagged plain divider row safely no-ops here, per the comment at 11909-11913) — pushes `{holder,prop,key:k}` for every `k` in `track.keys` onto `all`. After the scan: `_motionKeySel=all.filter(s=>!prevSel.some(match))` (11920-11922) — a true set inversion WITHIN the 'all' universe just collected: every key that was previously selected is dropped, every key in `all` that was NOT previously selected is kept (a key that was selected but belongs to a track NOT currently rendered is simply absent from `all` and therefore silently dropped from the new selection too, not preserved). `renderTimeline()` only. NO `pushUndo()` call (grep-confirmed) and NO `showToast` call anywhere in this function (grep-confirmed) — unlike every other selection/paint operation in this artifact, inverting the selection gives no toast feedback at all.",
+          "return_shape": "buildKeyEaseBox returns a live (unattached) DOM `HTMLLabelElement` or `null` — the caller (trackRowHtml, C20i, sibling-covered) is responsible for appending it. The other four functions all return `undefined`; their entire effect is via side effects on `_motionKeySel`/`track.keys`/`key.color` plus the render/toast calls documented per-function above.",
+          "render_path": "NONE of these 5 symbols is called from the render path (grep-confirmed zero hits in engine-bridge.js/export.js). subdivideKeys' own NEW keys (with their own `curvePoints`) become render-path INPUT the next time rawValueAtFrame reads that track (motion.js:1267/1286, sibling-covered, cited by line only) — the same indirect relationship documented in packet 1's own render_path field for setSegmentInfluence's writes.",
+          "callers": "Cross-packet internal (this artifact's own packet 1, not external_calls): buildKeyEaseBox calls keyEaseInfluence (11802) and setSelectedEaseInfluence (11847). External to this artifact — ALL FIVE symbols have their only caller(s) inside trackRowHtml (motion.js:10677-11076, C20i, sibling-covered, physically BEFORE this artifact's own range): buildKeyEaseBox at motion.js:10860-10861 (two calls, one per side, both guarded by a pixel-gap 'room' check independent of buildKeyEaseBox's own keyEaseInfluence null-check — a box can be suppressed by EITHER gate); colorSelectedKeys at motion.js:11017 (per-palette-swatch action) and 11018 (the 'remove color' action, called with `null`); grabRandomKeys at motion.js:11027 (after a `prompt(SM.t('promptKeepPercentOfSelection'),'50')`). subdivideKeys and invertKeySelection are each referenced exactly ONCE anywhere in src/js, and in BOTH cases as a BARE FUNCTION REFERENCE passed as a context-menu action (`action: subdivideKeys` at motion.js:11012, `action: invertKeySelection` at motion.js:11030) rather than an invocation with parentheses — a parens-only `grep -E 'name\\('` search finds zero non-declaration hits for either symbol; a second bare-identifier grep (`grep -E '\\bname\\b'`) was required to find these two real call sites, both still inside trackRowHtml's own context-menu builder. invertKeySelection is additionally exported as `SMMotion.invertKeySelection` (motion.js:13826, part of the export object literal `distributeKeys:..., invertKeySelection:invertKeySelection,`) but a full-repo grep for `SMMotion.invertKeySelection` and for the bare identifier `invertKeySelection` outside motion.js itself returns zero hits anywhere else in src/js — this export currently has no external consumer.",
+          "external_calls": [
+            "keyEaseInfluence — motion.js:11763 (this artifact's own packet 1, cross-packet call from buildKeyEaseBox)",
+            "setSelectedEaseInfluence — motion.js:11771 (this artifact's own packet 1, cross-packet call from buildKeyEaseBox's 'change' listener)",
+            "trackFor — motion.js:443 (C02; subdivideKeys, invertKeySelection)",
+            "keyAt — motion.js:1189 (C02; subdivideKeys' pre-existing-key-at-midpoint check)",
+            "rawValueAtFrame — motion.js:1270 (C02; subdivideKeys' pre-insert value sample)",
+            "cloneCurvePts — motion.js:1170 (C02; subdivideKeys' new-key curvePoints clone)",
+            "DEFAULT_CURVE — motion.js:935 (C02; subdivideKeys' curvePoints fallback when the left neighbor has none)",
+            "sortKeys — motion.js:1188 (C02; subdivideKeys' post-insert re-sort, once per track)",
+            "setKeySel — motion.js:11473 (C20o, sibling leaf #1245; subdivideKeys appends, grabRandomKeys replaces)",
+            "_groupKeySelByTrack — motion.js:11640 (C20o, sibling leaf #1245; subdivideKeys' per-track grouping)",
+            "_motionKeySel — motion.js:11388 (sibling, pre-11412; read/written by colorSelectedKeys, subdivideKeys, grabRandomKeys, invertKeySelection)",
+            "pushUndo — tweens.js:4741 (colorSelectedKeys, subdivideKeys; NOT called by buildKeyEaseBox itself, grabRandomKeys, or invertKeySelection)",
+            "renderTimeline — timeline.js:4026 (all 5 writers except buildKeyEaseBox itself, which builds a DOM node only)",
+            "renderLayerList — timeline.js:6335 (subdivideKeys unconditionally; NOT colorSelectedKeys/grabRandomKeys/invertKeySelection)",
+            "window.SMEngineBridge.renderNow — engine-bridge.js (name only; subdivideKeys unconditionally when the global exists; NOT the other 3 writers)",
+            "window.showToast — timeline.js:7447 (C19w per issue attribution; colorSelectedKeys, subdivideKeys, grabRandomKeys; NOT invertKeySelection)",
+            "SM.t — i18n.js (name only; every toast/tooltip string in this packet)",
+            "document.createElement / document.querySelectorAll — DOM API (buildKeyEaseBox, invertKeySelection)",
+            "ui.js's document-level `.scrub` pointerdown/pointermove/pointerup delegate — ui.js:1345-1436 (drives buildKeyEaseBox's own input; cited by line only, not called FROM this span, but the mechanism that makes the input interactive)"
+          ],
+          "effects": "Document writes: `key.color` (colorSelectedKeys, motion.js:11856, set or deleted); new key objects pushed onto `track.keys` (subdivideKeys, motion.js:11878, each carrying `frame`, `v`, `curvePoints`, `hOut`, `hIn`) — both are real, persisted animation-track content (the SAME `track.keys` array that timeline.js's importJSON/exportJSON round-trip, cited by name only). Selection-only writes (transient, NOT persisted, NOT covered by pushUndo): `_motionKeySel` reassigned by subdivideKeys (append), grabRandomKeys (replace with a random subset) and invertKeySelection (replace with the DOM-scanned inverse). Undo: colorSelectedKeys and subdivideKeys each call pushUndo() unconditionally before mutating (document-content writers); grabRandomKeys and invertKeySelection call pushUndo zero times (selection-only, no document content changes to protect). buildKeyEaseBox itself writes nothing and calls no undo function; its own 'change' listener's write goes entirely through setSelectedEaseInfluence (packet 1)."
+        }
+      ]
+    }
+  ],
+  "source_consumers": [
+    {
+      "consumer": "save",
+      "disposition": "No frame-save call (saveActiveLayerFrame/saveAllLayerFrames) occurs anywhere in motion.js:11683-11924 (grep-verified). This span's two document-mutating writers (setSegmentInfluence via setSelectedEaseInfluence writing key.curvePoints/key.hold; colorSelectedKeys writing key.color; subdivideKeys pushing new key objects onto track.keys) all mutate the LIVE track/key objects directly — the same objects a later saveActiveLayerFrame/saveAllLayerFrames call (app.js, cited by name only) will serialize as part of `ld.motion`/`ld.elementMotion`. This span never itself triggers that serialization."
+    },
+    {
+      "consumer": "load",
+      "disposition": "No parser is implemented in this span. timeline.js's importJSON (cited by name only, P30) owns restoring `motion`/`elementMotion`, whose track.keys entries carry the `curvePoints` and `color` fields this span's writers set. `key.color` and `key.curvePoints` are ordinary JSON-serializable fields on a key object (no live object reference, no special-cased load-time relink needed — unlike e.g. `data.brushCompanions` per CLAUDE.md §1)."
+    },
+    {
+      "consumer": "undo/redo",
+      "disposition": "colorSelectedKeys and subdivideKeys each call pushUndo() (tweens.js:4741) unconditionally before mutating; setSelectedEaseInfluence (packet 1) does the same, subject to the ui.js `_scrubLiveActive` gesture-coalescing gate documented in the reconciliation section above when reached via buildKeyEaseBox's live scrub. grabRandomKeys and invertKeySelection call pushUndo zero times (grep-confirmed against both bodies) because both only reassign the transient `_motionKeySel` selection array, never document/key content — the general rule this artifact observes throughout: a pushUndo call tracks with whether a function's own effects touch `track.keys`/`key.*` (persisted) versus only `_motionKeySel` (transient UI state, rides in memory only, never serialized)."
+    },
+    {
+      "consumer": "selection",
+      "disposition": "This span is a primary consumer AND mutator of `_motionKeySel`/`_keyAnchor` (sibling-covered module vars, motion.js:11388/11411): isPrimarySelectedKey (packet 1) is a pure reader that decides which of possibly many selected keys owns the visible ease boxes; setSelectedEaseInfluence (packet 1) iterates the WHOLE selection, not just the primary key; subdivideKeys (packet 2) APPENDS newly-created keys to the existing selection; grabRandomKeys (packet 2) REPLACES the selection with a random subset; invertKeySelection (packet 2) REPLACES the selection with the DOM-scanned inverse within currently-rendered tracks. No key-COLOR selection state is read or written here beyond `_motionKeySel` itself (colorSelectedKeys writes `key.color`, an unrelated per-key display field, not a selection flag)."
+    },
+    {
+      "consumer": "animation",
+      "disposition": "This span is the ease-influence editing surface (packet 1: the percent<->curvePoints math and its multi-key apply path) plus four selection/key-set operators (packet 2: a compact per-key UI control, a paint-only annotation, a midpoint-insertion tool, and two selection-reshaping tools) layered ON TOP of the pre-existing key/track primitives (trackFor, keyAt, sortKeys, rawValueAtFrame, cloneCurvePts — all C02, cited by line only). It does not itself create or delete a TRACK, only individual keys within an existing one (subdivideKeys) or their curvePoints/color/hold fields."
+    },
+    {
+      "consumer": "render",
+      "disposition": "Indirect only, through data: `key.curvePoints` (packet 1's setSegmentInfluence, packet 2's subdivideKeys) is read by rawValueAtFrame's own interpolation (motion.js:1267/1286, sibling-covered, feeding SMAnimationCurve.evalCurvePoints) on every subsequent rendered/exported frame inside the affected segment(s) — cited by line only. `key.color` is NEVER read on the render path (motion.js:11812's own comment confirms this explicitly: 'nothing reads k.color at evaluation time'), only by trackRowHtml's own diamond/mini-strip painting (motion.js:10710, 10813, C20i, cited by line only). No symbol in this artifact is called directly from computeMotionMat/buildSceneJson/export.js (grep-confirmed)."
+    }
+  ],
+  "proposed_behavioral_fixtures": [
+    {
+      "id": "ease-influence-round-trip-and-clamp",
+      "status": "proposed, unrun",
+      "matrix": "setSegmentInfluence(key,'out',p) followed immediately by easeOutPercent(key), for p in {0, 1, 50, 99, 100}, on a key whose curvePoints starts as (a) undefined, (b) CURVE_LINEAR, (c) DEFAULT_CURVE, (d) a hand-tangented custom curve with tx/ty set on pts[1]; mirrored for 'in'/easeInPercent using pts[length-2]. Also percent values outside [0,100] (-10, 150, NaN via a non-numeric string).",
+      "expected": "For every starting curve shape, easeOutPercent(setSegmentInfluence-written key) returns exactly p (integer round-trip, since setSegmentInfluence's reach formula is the algebraic inverse of easeOutPercent's amount formula) for p in [0,100]; out-of-range/NaN percent is clamped to [0,100] before the round-trip. Case (d): pts[1].tx/.ty are deleted by setSegmentInfluence but no OTHER waypoint's tx/ty (e.g. an in-side custom tangent) is touched. Every resulting curvePoints array has length>=5 regardless of the starting length."
+    },
+    {
+      "id": "key-ease-influence-side-ownership",
+      "status": "proposed, unrun",
+      "matrix": "A 3-key track (i=0,1,2). keyEaseInfluence(holder,prop,keys[1],'out') vs keyEaseInfluence(holder,prop,keys[1],'in'), before and after calling setSegmentInfluence(keys[0],'out',X) directly on key 0. Also keyEaseInfluence at the track's first key with side='in' and at its last key with side='out'.",
+      "expected": "keyEaseInfluence(keys[1],'out') reads keys[1].curvePoints (unaffected by key 0's own edit). keyEaseInfluence(keys[1],'in') reads keys[0].curvePoints[length-2] — so editing key 0's out-side via setSegmentInfluence(keys[0],'out',X) changes what keyEaseInfluence(keys[1],'in') reports, confirming the segment/left-key ownership rule. keyEaseInfluence at the first key with side='in' returns null (idx===0, no previous key); at the last key with side='out' returns null (idx===keys.length-1)."
+    },
+    {
+      "id": "set-selected-ease-influence-multi-key-independence",
+      "status": "proposed, unrun",
+      "matrix": "_motionKeySel containing 3 keys from 2 different tracks: one is a track's LAST key (no out-side segment), one is a track's FIRST key (no in-side segment), one is a normal middle key with both. Call setSelectedEaseInfluence('out', 75).",
+      "expected": "Returns 2 (only the last-key-has-no-out-segment case and the middle key are eligible for 'out'; the first-key case is unaffected by an 'out' call). pushUndo() was still called exactly once even though one of the three selected keys contributed nothing. renderLayerList/renderTimeline/renderNow all fire exactly once (not per-key)."
+    },
+    {
+      "id": "primary-selected-key-anchor-precedence",
+      "status": "proposed, unrun",
+      "matrix": "Select keys A, B, C in that order (anchor=A after the first click, per the pre-existing anchor-setting call sites at motion.js:10521 etc., sibling-covered). Call isPrimarySelectedKey for A, B, C. Then remove A from the selection (leaving B, C) without clearing `_keyAnchor`, and repeat.",
+      "expected": "While A remains selected and is the anchor: isPrimarySelectedKey(A) is true, (B) and (C) are false. After A is removed from `_motionKeySel` (anchor now stale — no longer present in the selection): isPrimarySelectedKey falls back to 'last entry of _motionKeySel', so whichever of B/C is last in the array is now primary, not neither."
+    },
+    {
+      "id": "build-key-ease-box-scrub-single-undo",
+      "status": "proposed, unrun",
+      "matrix": "Simulate a real drag on a buildKeyEaseBox input: dispatch pointerdown, then 5 pointermove events each >3px from the last with distinct clientX values, then pointerup — matching ui.js's own scrub state machine (ui.js:1345-1436) rather than calling setSelectedEaseInfluence directly. Compare state.undoStack.length before vs after.",
+      "expected": "Exactly ONE new undo entry is pushed for the whole gesture (ui.js's own pre-drag pushUndo at the first >3px move), even though setSelectedEaseInfluence's own pushUndo() fires again on every coalesced rAF-batched 'change' dispatch during the drag and once more on release — all of those extra calls are no-ops per tweens.js:4896's `_scrubLiveActive` gate. The input's final displayed value matches the last dispatched percent, clamped to [0,100]."
+    },
+    {
+      "id": "subdivide-skip-reasons-share-one-toast",
+      "status": "proposed, unrun",
+      "matrix": "Two selected-key groups on the same track: pair (10,11) — 1 frame apart — and pair (20,30) with an EXISTING unselected key already at frame 25 (the exact midpoint).",
+      "expected": "Pair (10,11): skipped (mid=10 or 11, `mid<=a.frame||mid>=b.frame` true) — 0 keys added, skipped++. Pair (20,30): mid=25, `keyAt(track,25)` finds the existing key -> skipped++, no second key added at 25, the existing key at 25 is left untouched. Toast reads '0 key(s) inserted — 2 intervalle(s) trop court(s)' even though only ONE of the two skips was actually caused by a too-short interval — confirming the toast text conflates the two distinct skip reasons under one counter/message."
+    },
+    {
+      "id": "grab-random-keys-floor-and-determinism-bounds",
+      "status": "proposed, unrun",
+      "matrix": "_motionKeySel with 1, 2, and 100 entries; percent = 1, 50, 100, 0 (below the clamp floor), 'abc' (NaN), undefined.",
+      "expected": "want = max(1, round(pool.length*p)) is never 0 regardless of percent (percent<=0 or NaN falls back to the default 50 via `parseInt(percent,10)||50`, then clamped to >=1 before dividing by 100, so p is always in [0.01,1]) — a 1-key selection always keeps exactly that 1 key for any percent. With 100 entries and percent=50, `out.length` is exactly 50. `_motionKeySel` after the call contains ONLY entries that were also present in the pool before the call (no key is invented)."
+    },
+    {
+      "id": "invert-selection-rendered-universe-boundary",
+      "status": "proposed, unrun",
+      "matrix": "A project with 2 layers, one expanded (rows in the DOM) and one collapsed (no rows in the DOM). Select one key on the expanded layer and, by direct state manipulation (not through the UI, to simulate a stale selection), also mark one key on the COLLAPSED layer as selected. Call invertKeySelection().",
+      "expected": "The collapsed layer's key, absent from `document.querySelectorAll('.motion-track-row, .motion-group-row')`'s scan, never enters `all` and is therefore SILENTLY DROPPED from the post-invert selection (neither re-selected nor explicitly deselected — just absent), confirming 'currently rendered' is a DOM-presence definition, not a project-wide one. Every other key belonging to the EXPANDED layer's rendered tracks that was not previously selected becomes selected; the one key that was previously selected on the expanded layer becomes unselected. No toast is shown."
+    }
+  ],
+  "future_proposals": [
+    {
+      "api": "segmentInfluenceResult(key, side, percent) -> {applied: boolean, x, y, reach}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "setSegmentInfluence today returns a bare boolean, discarding the exact waypoint coordinates it just computed and wrote — a caller that wants to show a live numeric readout (e.g. the waypoint's raw x/y, not just the rounded percent easeOutPercent/easeInPercent would re-derive) has no way to get it without re-reading key.curvePoints itself right afterward."
+    },
+    {
+      "api": "subdivideResult() -> {added: number, skippedTooClose: number, skippedExisting: number}",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "subdivideKeys' own single `skipped` counter and single toast string conflate two distinct, independently-diagnosable causes (a pair one frame apart vs. a pre-existing key already at the midpoint) into one number — separating them costs one more counter and would let a future UI explain the two cases differently instead of always blaming 'too-short intervals'."
+    },
+    {
+      "api": "primarySelectedKeyOf(selectionArray, anchor) -> key | null",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "isPrimarySelectedKey's anchor-vs-last-entry fallback logic is a small, self-contained rule over `_motionKeySel`/`_keyAnchor` that is currently inlined as a per-call boolean predicate re-run once per rendered key diamond; extracting the actual PRIMARY KEY OBJECT once per render pass (rather than asking 'is this specific key the primary' N times) would let a future caller (e.g. a dedicated primary-key inspector panel) reuse the same one-line answer trackRowHtml already effectively computes for its own ease-box gating."
+    },
+    {
+      "api": "invertKeySelectionScope(rowsQuery) -> key[] (explicit universe, not implicit DOM scan)",
+      "status": "bounded proposal, unimplemented",
+      "boundary": "invertKeySelection's own universe is implicitly whatever `.motion-track-row, .motion-group-row` happens to be in the DOM at call time — correct for the current single on-canvas invocation, but not reusable from a script or test context without first forcing a full timeline re-render to populate that DOM. Accepting the row-query (or a pre-collected row list) as a parameter would make the 'currently rendered' universe explicit and testable without a DOM harness."
+    }
+  ],
+  "surface_inventory_cross_check": {
+    "packet_symbols": [
+      "EASE_INFLUENCE_MARGIN",
+      "easeOutPercent",
+      "easeInPercent",
+      "editableInfluenceCurve",
+      "setSegmentInfluence",
+      "keyEaseInfluence",
+      "setSelectedEaseInfluence",
+      "isPrimarySelectedKey",
+      "buildKeyEaseBox",
+      "colorSelectedKeys",
+      "subdivideKeys",
+      "grabRandomKeys",
+      "invertKeySelection"
+    ],
+    "caller_anchors": [
+      "invertKeySelection: the only symbol in this artifact exported on window.SMMotion (motion.js:13826) — yet has zero external callers anywhere in src/js (grep-confirmed); its only real call site is a bare function reference in trackRowHtml's own context-menu action table (motion.js:11030).",
+      "subdivideKeys: also referenced only as a bare function reference (motion.js:11012), never exported on SMMotion — a parens-only caller search misses BOTH of this artifact's own 'no-parens' call sites, which is why a second bare-identifier grep pass was run (see source_baselines.runtime above).",
+      "buildKeyEaseBox/isPrimarySelectedKey: each has exactly one caller anywhere in src/js — trackRowHtml (motion.js:10860-10861 and 10833 respectively) — the narrowest fan-out in this artifact, consistent with both being tightly-scoped rendering helpers for one specific row layout.",
+      "colorSelectedKeys/grabRandomKeys: each called from exactly 2-3 sites, all inside trackRowHtml's own context-menu builder (motion.js:11017-11018 and 11027) — no caller outside motion.js for either.",
+      "easeOutPercent/easeInPercent/editableInfluenceCurve/setSegmentInfluence/keyEaseInfluence/setSelectedEaseInfluence: each has exactly ONE caller, and every one of those callers is ANOTHER symbol declared inside this same artifact (packet 1's own internal chain, or packet 2's buildKeyEaseBox reaching into packet 1) — the tightest, most self-contained cluster in this artifact; none of these 6 symbols is ever called from outside motion.js:11683-11924."
+    ],
+    "helper_anchors": "trackFor:443, keyAt:1189, sortKeys:1188, cloneCurvePts:1170, rawValueAtFrame:1270, CURVE_LINEAR:957, CURVE_EASE:965, CURVE_EASE_IN:969, CURVE_EASE_OUT:970, DEFAULT_CURVE:935 (= NemoOpacityDomain.defaultCurve(), own value at src/js/domain/animation/opacity.js:7), LEGACY_STEP_CURVE:936, isLegacyStepCurve:941, evalCurvePoints:1173 (= SMAnimationCurve.evalCurvePoints alias) — all pre-1683/C02, cited by line only, none re-derived. isKeySelected:11412, setKeySel:11473, _groupKeySelByTrack:11640, selectEveryNthKey:11676 — C20o (sibling leaf #1245, 11412-11682), cited by line only. _motionKeySel:11388, _easeBoxDragging:11398, _keyAnchor:11411 — sibling module vars declared just before C20o's own range, cited by line only. pushUndo/pushUndoLayers:tweens.js 4741/4896, window._scrubLiveActive gate:tweens.js 4808. renderTimeline:timeline.js 4026, renderLayerList:timeline.js 6335, showToast:timeline.js 7447. The `.scrub` drag delegate: ui.js 1345-1436 (pushUndo call at 1391, `_scrubLiveActive` set/cleared at 1395/1424-1425).",
+    "render_path_summary": "No symbol in this artifact is on the render path directly (zero calls from engine-bridge.js/export.js, grep-confirmed). Two fields this artifact writes ARE render-path input, read later by sibling-covered code: `key.curvePoints` (rawValueAtFrame's own interpolation, motion.js:1267/1286) and, in the opposite sense, `key.color` is EXPLICITLY documented in-source as never read on the render path (motion.js:11812), only by trackRowHtml's own editor-chrome painting (motion.js:10710, 10813)."
+  },
+  "validation": {
+    "expected_assigned_lines": 242,
+    "expected_classification": {
+      "code": 174,
+      "comment": 68,
+      "whitespace": 0
+    },
+    "packet_partition": [
+      [
+        11683,
+        11800
+      ],
+      [
+        11801,
+        11924
+      ]
+    ],
+    "packet_classification": [
+      {
+        "range": [
+          11683,
+          11800
+        ],
+        "code": 83,
+        "comment": 35,
+        "whitespace": 0
+      },
+      {
+        "range": [
+          11801,
+          11924
+        ],
+        "code": 91,
+        "comment": 33,
+        "whitespace": 0
+      }
+    ],
+    "coverage_contract": "Validate assigned_ranges and flattened areas[].packets[].coverage_ranges independently with the same function; reject actual artifact omission at line 11683 and overlap at line 11924.",
+    "required_checks": [
+      "frozen/current motion.js blob and allocated-base ancestry",
+      "two unique packet IDs, exact ranges, counts, symbols, helpers, callers and boundaries",
+      "before-11683 (C20o) preceding boundary and after-11924 (C20q) following boundary",
+      "five consumer dispositions and proposed, unrun fixtures",
+      "the ease-influence model's exact math (easeOutPercent/easeInPercent waypoint/index/formula, EASE_INFLUENCE_MARGIN clamp, the fixed x=0.5 midpoint, setSegmentInfluence's exact inverse formula and curvePoints entries written, editableInfluenceCurve's linear-preserving (not DEFAULT_CURVE-matching) promotion, the 2026-08 semantic flip); which key a 'side' refers to (keyEaseInfluence's left-key/segment-ownership rule) and setSelectedEaseInfluence's per-selected-key (not just primary) application; isPrimarySelectedKey's anchor-vs-last-entry rule; buildKeyEaseBox's full DOM/listener/writer/undo chain including the ui.js scrub-gesture single-checkpoint interaction; the four selection operations (colorSelectedKeys' key.color field and its trackRowHtml readers, subdivideKeys' halfway-frame/value-sample-before-insert/two-distinct-skip-reasons/append-to-selection contract, grabRandomKeys' unseeded Math.random draw-without-replacement and floor-of-1 guarantee, invertKeySelection's DOM-rendered-universe definition) each with its pushUndo call or documented absence and renderTimeline/showToast follow-ups; every document write reachable from the span (key.curvePoints, key.hold, key.tx/ty deletion, key.color, new key objects) with undo disposition; the complete external-call list with owning module/census for every call out of the span; the complete caller list (including the two bare-function-reference call sites a parens-only grep would miss) for every symbol declared in the span",
+      "JSON, private-path, secret, placeholder and trailing-whitespace hygiene",
+      "sole untracked artifact or committed-clean mode",
+      "no overlap with any merged C20* sibling artifact in the same census directory"
+    ],
+    "runtime_limit": "No browser/Tauri/app suite, hosted CI, GPU, runtime edit, export or product acceptance claim."
+  }
+}

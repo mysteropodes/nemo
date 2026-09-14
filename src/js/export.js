@@ -350,16 +350,15 @@ function exportFrameDataURL(frameIdx,scale,alpha){
   return url;
 }
 function exportFrameSVGString(frameIdx){
-  var L=exportBuildFrame(frameIdx);
-  // Same rule as rasterize(): exportSVG() skips invisible items too, so the
-  // hidden export layer must be flipped visible for the call itself (see
-  // exportFrameDataURL for why this never flashes on screen).
-  L.visible=true;
-  var inner=L.exportSVG({asString:true,bounds:new Rectangle(0,0,state.canvasW,state.canvasH)});
-  L.visible=false;
-  return '<?xml version="1.0" encoding="UTF-8"?>\n'+
-    '<svg xmlns="http://www.w3.org/2000/svg" width="'+state.canvasW+'" height="'+state.canvasH+'" '+
-    'viewBox="0 0 '+state.canvasW+' '+state.canvasH+'">\n'+inner+'\n</svg>';
+  // The wrapper (visibility flip around exportSVG, XML preamble, root <svg>
+  // sized to the canvas) lives in adapters/export-svg-frame.js (P17); this
+  // function only binds its ports to the live document. The frame builder
+  // itself is still exportBuildFrame above, unchanged.
+  return NemoExportSvgFrame.exportFrameSVGString(frameIdx,{
+    buildFrame:exportBuildFrame,
+    dimensions:function(){return{width:state.canvasW,height:state.canvasH};},
+    Rectangle:Rectangle
+  });
 }
 function exportDataURLToBytes(dataURL){
   var b64=dataURL.split(',')[1];
@@ -1192,15 +1191,19 @@ async function exportTIFFSequenceToDir(outDir,opts){
   await exportRemoveDir(workDir);
   return{ok:true,dir:outDir};
 }
+// ---- SVG sequence job (P18/#1020): bounded begin/status/cancel around the
+// unchanged evaluator (exportFrameSVGString → exportBuildFrame), bound in
+// adapters/export-svg-sequence.js to application/export-job.js ----
+var _svgSequenceJob=null;
+function exportSvgSequenceJob(){
+  if(!_svgSequenceJob)_svgSequenceJob=NemoExportSvgSequence.create({evaluateFrame:exportFrameSVGString,frameName:function(i){return'frame_'+pad4(i)+'.svg';},
+    tauri:exportTauri,mkdir:exportMkdir,removeDir:exportRemoveDir,writeText:exportWriteText,saveAllLayerFrames:saveAllLayerFrames});
+  return _svgSequenceJob;
+}
 async function exportSVGSequenceToDir(dir,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
   var r=exportFrameRange(opts);
-  await exportMkdir(dir);
-  for(var f=r.start,i=1;f<=r.end;f++,i++){
-    await exportWriteText(dir+'/frame_'+pad4(i)+'.svg',exportFrameSVGString(f));
-    if(opts&&opts.onProgress)opts.onProgress(i,r.end-r.start+1);
-  }
-  return{ok:true,dir:dir};
+  return await exportSvgSequenceJob().run({dir:dir,start:r.start,end:r.end,requestId:opts&&opts.requestId,onProgress:opts&&opts.onProgress});
 }
 async function exportGIFToPath(outPath,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportGifBrowser.'};
@@ -1258,6 +1261,7 @@ window.SMExport={
   exportPNGSequenceToDir:exportPNGSequenceToDir,
   exportTIFFSequenceToDir:exportTIFFSequenceToDir,
   exportSVGSequenceToDir:exportSVGSequenceToDir,
+  svgSequenceJob:exportSvgSequenceJob, // P18: begin/status/cancel/done for P19's UI/MCP binding
   exportGIFToPath:exportGIFToPath,
   exportProResToPath:exportProResToPath,
   exportLottieToPath:exportLottieToPath,
@@ -1270,11 +1274,7 @@ window.SMExport={
     if(exportTauriAvailable()){
       var dir=await exportPickDir('Dossier de séquence SVG');
       if(!dir)return{cancelled:true};
-      for(var f=r.start,i=1;f<=r.end;f++,i++){
-        await exportWriteText(dir+'/frame_'+pad4(i)+'.svg',exportFrameSVGString(f));
-        if(opts&&opts.onProgress)opts.onProgress(i,r.end-r.start+1);
-      }
-      return{ok:true,dir:dir};
+      return await exportSVGSequenceToDir(dir,opts); // same P18 job boundary as the render-manager path
     }else{
       // browser fallback: download a single representative frame so the
       // feature is still testable outside Tauri

@@ -1,7 +1,20 @@
 //! Protocol regression against the compiled executable, with isolated discovery.
 //! Installed Codex/Claude acceptance is a separate gate.
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
-use serde_json::json;
+use serde_json::{json, Value};
+
+fn registered_capabilities() -> Value {
+    json!([
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/opacity.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+    ])
+}
 
 #[tokio::test]
 async fn executable_discovers_tools_and_reports_no_running_app() {
@@ -25,7 +38,11 @@ async fn executable_discovers_tools_and_reports_no_running_app() {
         .unwrap();
     assert_eq!(
         discover.structured_content,
-        Some(json!({"apiVersion":1,"instances":[]}))
+        Some(json!({
+            "apiVersion": 1,
+            "registeredCapabilities": registered_capabilities(),
+            "instances": []
+        }))
     );
     let unavailable = client
         .call_tool(
