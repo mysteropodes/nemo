@@ -19,29 +19,29 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a",
-    "sourceRootTree": "9dab996e960cf0c7ffc597c2dabeb5d9c1d9d054",
+    "candidateCommit": "df78e318e561f0617cc33f414bf5e9a9422726a9",
+    "sourceRootTree": "ea488e95ff24e8809c9f7512851a77262858a4f8",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "8bf20141cf6550bf58336815db578f0f9e78e09d",
-      "lastChangedCommit": "35bcb02392bdd44c8d341c94c3ae6b505eb3379a"
+      "gitTree": "20208b5eaa3d6ec4f981de6bef30b6db77f17067",
+      "lastChangedCommit": "df78e318e561f0617cc33f414bf5e9a9422726a9"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "0f928bd885b0acd32acde1d52726f1e42f1370c5",
-      "sha256": "fb5630482512fc4cfc3adbcbdfcda5fd009dacdbde5e0b2e7d8760d78c19f8ac",
-      "lastChangedCommit": "9e5daae92a68799c8ba108064ddac8066af209e9"
+      "gitBlob": "dc8994a66794fe9d589cba3f6c2c7b88f984bbd0",
+      "sha256": "a54ae313549a784f0e385826cf292041119a48058c94356e0370ed704878c6dc",
+      "lastChangedCommit": "df78e318e561f0617cc33f414bf5e9a9422726a9"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "af36874969316b43d576053a2b822c23ad488ef69d51d68176d26c6369467df5"
+      "value": "95b1c32c24a9bb2928ed38f40ddafeca18a1e680cd996a8294755d75e082cb4b"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "dd2c54b90aa2167cebd0eca6cb74730f90109b72",
-        "sha256": "4260bb8673a918194aa312f9c39d89e9dcb4c2505106a0aed37cf8b1138bb0e5",
+        "gitBlob": "ae332f02ff3b6153da5a9b4bf6e3cec0426c5735",
+        "sha256": "d665e654d223004bc9d72338d03aa416380e80060b253b073b88259d100d4086",
         "moduleCount": 149,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
@@ -2674,19 +2674,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 170,
+    "selectedSources": 171,
     "bySourceKind": {
-      ".js": 164,
+      ".js": 165,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 158,
+    "retainedSources": 159,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 143,
+      "document-classic": 144,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1
