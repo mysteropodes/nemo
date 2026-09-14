@@ -115,14 +115,20 @@ test('opacity commands survive real save/reopen and preserve stored layers durin
       expect(sha(Buffer.from(await response.arrayBuffer()))).toBe(sourceHashes[file]);
     }
     let { page, context } = await openProject(browser, runtime.origin, fixture, contexts, errors);
-    const canonicalDescriptor = JSON.parse(fs.readFileSync(
-      path.join(root, 'engineering/application/capabilities/opacity.json'), 'utf8'));
+    // Discovery is sorted by capability id, so export sorts before opacity.
+    // Both descriptors are compared against their canonical JSON: this is the
+    // real browser reading what the repository declares, not a copy of it.
+    const canonical = (name) => JSON.parse(fs.readFileSync(
+      path.join(root, 'engineering/application/capabilities/' + name + '.json'), 'utf8'));
+    const canonicalDescriptor = canonical('opacity');
     const discovery = await command(page, 'capabilities');
     expect(discovery.ok).toBe(true);
+    // `properties` is derived from the descriptors whose lifecycle contains
+    // property.get, so the export job (start/status/cancel) correctly stays out.
     expect(discovery.result.properties).toEqual([
       { id: 'opacity', min: 0, max: 100, unit: 'percent', animated: true },
     ]);
-    expect(discovery.result.descriptors).toEqual([canonicalDescriptor]);
+    expect(discovery.result.descriptors).toEqual([canonical('export-job'), canonicalDescriptor]);
     const layerId = await page.evaluate(() => state.layers[0].layerUid);
     const payload = { layerId, property: 'opacity' };
     expect((await command(page, 'property.set', { ...payload, value: 25 })).ok).toBe(true);
