@@ -230,19 +230,43 @@
     if(label)label.textContent=pct+'%';
   }
   function setToolbarBusy(busy){
-    ['rm-add-current','rm-delete-all','rm-render-all'].forEach(function(id){
+    ['rm-add-current','rm-delete-all'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.disabled=busy;
     });
+    // P19/#1021: Render All doubles as Stop while a batch runs — the one
+    // control that must stay live, since it is what reaches the running export
+    // job. data-i18n moves with the label so a language change mid-render
+    // relabels it instead of reverting it.
+    var run=document.getElementById('rm-render-all');
+    var key=busy?'btnCancel':'rmRenderAllBtn';
+    if(run){run.disabled=false;run.setAttribute('data-i18n',key);run.textContent=t(key);}
+  }
+
+  // Stop cancels the SAME job object the export dialog's Cancel button and an
+  // MCP client's `cancel` stage drive — SMExport.svgSequenceJob(), the one
+  // session export.js memoises. So a stopped batch removes its partial files
+  // through the single cleanup path in application/export-job.js instead of
+  // this file growing a second idea of what "stop exporting" means, and the
+  // queue then stops BEFORE its next item rather than quietly finishing.
+  var _cancelRequested=false;
+  function cancelAll(){
+    if(!_rendering)return false;
+    _cancelRequested=true;
+    var session=(window.SMExport&&window.SMExport.svgSequenceJob)?window.SMExport.svgSequenceJob():null;
+    var jobId=session&&session.meta().running;
+    if(jobId)session.cancel(jobId);
+    return true;
   }
 
   async function runRenderAll(){
     if(_rendering)return;
     var items=_queue.filter(function(it){return it.enabled;});
     if(!items.length){if(window.showToast)showToast(t('rmToastEmptyQueue'));return;}
-    _rendering=true;setToolbarBusy(true);
+    _rendering=true;_cancelRequested=false;setToolbarBusy(true);
     if(window.saveAllLayerFrames){try{saveAllLayerFrames();}catch(e){}}
     var done=0,failed=0;
     for(var i=0;i<items.length;i++){
+      if(_cancelRequested)break;
       var item=items[i];
       item.status='rendering';item.progress=0;item.error=null;item.outPathResolved=null;
       renderQueueList();updateOverallProgress(items);
@@ -256,7 +280,7 @@
       updateOverallProgress(items);
       renderQueueList();
     }
-    _rendering=false;setToolbarBusy(false);
+    _rendering=false;_cancelRequested=false;setToolbarBusy(false);
     if(window.showToast)showToast(t('rmToastBatchDone').replace('{done}',done).replace('{err}',failed));
   }
 
@@ -484,7 +508,10 @@
     modal.addEventListener('click',function(e){if(e.target===modal)close();});
     var addBtn=document.getElementById('rm-add-current');if(addBtn)addBtn.addEventListener('click',addCurrentComposition);
     var delAllBtn=document.getElementById('rm-delete-all');if(delAllBtn)delAllBtn.addEventListener('click',deleteAll);
-    var renderAllBtn=document.getElementById('rm-render-all');if(renderAllBtn)renderAllBtn.addEventListener('click',runRenderAll);
+    var renderAllBtn=document.getElementById('rm-render-all');
+    // Returns what it called (addEventListener ignores it) so the binding is
+    // awaitable from a test without a second entry point.
+    if(renderAllBtn)renderAllBtn.addEventListener('click',function(){return _rendering?cancelAll():runRenderAll();});
     var dynIndexInp=document.getElementById('rm-dyn-index');
     if(dynIndexInp)dynIndexInp.addEventListener('input',function(){_globals.dynamicIndex=parseInt(dynIndexInp.value,10)||0;});
     var dynOffsetInp=document.getElementById('rm-dyn-offset');
@@ -494,6 +521,9 @@
   window.SMRenderManager={
     open:open,
     close:close,
+    // P19: Stop, reachable without the DOM so the binding is testable.
+    cancelAll:cancelAll,
+    isRendering:function(){return _rendering;},
     // exposed for tests/debugging (console) — mirrors other window.SM* modules' habit of exposing internals read-only-ish
     _queue:function(){return _queue;},
     _globals:_globals,

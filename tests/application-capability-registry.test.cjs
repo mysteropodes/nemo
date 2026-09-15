@@ -100,20 +100,30 @@ test('claiming availability "available" with no handler is refused', () => {
     'claims');
 });
 
-test('the real export-job descriptor is honest, and flipping it to "available" is now caught', () => {
-  // export-job.json declares `unavailable` because P17-P19 are unbuilt. That
-  // registers cleanly with no handler.
+test('the real export-job descriptor is honest, and an unbacked "available" claim is still caught', () => {
+  // P19/#1021 bound the handler, so export-job.json now declares `available`
+  // — and the registry only accepts that claim WITH a handler. Registering it
+  // bare is the lie now, and is refused.
   const registry = registryModule.create();
   const exportJob = realDescriptor('export-job');
-  assert.equal(exportJob.availability.state, 'unavailable');
-  assert.equal(registry.register(exportJob), 'export.svg.frame');
+  assert.equal(exportJob.availability.state, 'available');
+  assert.equal(codeOf(() => registry.register(exportJob)), 'availability_unbacked');
+  assert.equal(registryModule.create().register(exportJob, () => ({ ok: true })), 'export.svg.frame');
 
-  // THE regression this leaf closes. Reviewing P04 I mutated this exact field
-  // back to "available" and every schema test still passed 9/9, because it is
-  // a syntactically valid enum value. Registration now rejects it.
+  // THE regression this rule closes, kept independent of whichever state the
+  // real file happens to declare: reviewing P04 I mutated this exact field to
+  // "available" and every schema test still passed 9/9, because it is a
+  // syntactically valid enum value. Registration is where the claim meets
+  // reality, in both directions.
   const lying = realDescriptor('export-job');
+  lying.id = 'export.svg.frame.unbacked';
+  lying.handlerKey = 'application.export.svgFrame.unbacked';
   lying.availability = { state: 'available', reason: null };
   assert.equal(codeOf(() => registryModule.create().register(lying)), 'availability_unbacked');
+  // And a descriptor that admits it has nothing behind it still registers.
+  const honest = realDescriptor('export-job');
+  honest.availability = { state: 'unavailable', reason: 'missing-dependency' };
+  assert.equal(registryModule.create().register(honest), 'export.svg.frame');
 });
 
 test('the real opacity descriptor registers with its handler', () => {

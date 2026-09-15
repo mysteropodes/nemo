@@ -33,6 +33,17 @@
 // directory only if the job created it) unless `keepPartial` was requested.
 // A cancelled or failed job never reports its partial output as an artifact.
 //
+// Sinks (P19/#1021): WHERE the frames land is a per-job choice, not a second
+// job. `begin({sink})` overrides any of `mkdir`/`write`/`remove`/`frameName`
+// for that job only; anything it omits falls back to the instance port. The
+// export dialog and the render queue write a directory of files through the
+// Tauri ports; an MCP client collects the same SVG text in memory. What they
+// must NOT have is a second lifecycle — `running` (the single-tenant Paper
+// scratch layer, H01 census #17), cancellation, the document fingerprint and
+// `evaluateFrame` stay shared, so an MCP `start` during a dialog export is
+// refused `busy` and an MCP `cancel` of the dialog's jobId really stops it.
+// `dir` is required only for a job that has no sink of its own.
+//
 // No globals are read here: identity, fingerprint, evaluation and the
 // filesystem all come in through `ports`, so the same code runs headlessly.
 var NemoExportJob = (function () {
@@ -77,12 +88,25 @@ var NemoExportJob = (function () {
       job.resolve(view(job));
     }
 
+    // A job's sink is the instance ports with the per-job overrides applied.
+    // Resolved once at begin so a later mutation of the input object cannot
+    // change where a running job writes.
+    function resolveSink(sink) {
+      sink = sink || {};
+      return {
+        mkdir: typeof sink.mkdir === 'function' ? sink.mkdir : ports.mkdir,
+        write: typeof sink.write === 'function' ? sink.write : ports.write,
+        remove: typeof sink.remove === 'function' ? sink.remove : ports.remove,
+        frameName: typeof sink.frameName === 'function' ? sink.frameName : ports.frameName,
+      };
+    }
+
     function cleanupThen(job) {
       if (job.keepPartial || !job.written.length && !job.createdDir) { settle(job); return; }
       var paths = job.written.slice();
       // A synchronously throwing port becomes a rejection here, never an
       // unhandled throw out of the caller's catch block.
-      new Promise(function (resolve) { resolve(ports.remove(paths, job.dir, job.createdDir)); }).then(function () {
+      new Promise(function (resolve) { resolve(job.io.remove(paths, job.dir, job.createdDir)); }).then(function () {
         job.cleanup = { removed: paths.length, dir: job.createdDir };
         settle(job);
       }, function (e) {
@@ -121,15 +145,15 @@ var NemoExportJob = (function () {
       var batch = firstBatch;
       try {
         job.phase = 'mkdir';
-        var made = await Promise.resolve(ports.mkdir(job.dir));
+        var made = await Promise.resolve(job.io.mkdir(job.dir));
         job.createdDir = !!(made && made.created);
         for (;;) {
           job.phase = 'write';
           for (var i = 0; i < batch.length; i++) {
             if (job.cancelRequested) { finish(job, 'cancelled'); return cleanupThen(job); }
-            var name = ports.frameName(batch[i].ordinal);
-            var path = job.dir + '/' + name;
-            await Promise.resolve(ports.write(path, batch[i].text));
+            var name = job.io.frameName(batch[i].ordinal);
+            var path = job.dir ? job.dir + '/' + name : name;
+            await Promise.resolve(job.io.write(path, batch[i].text));
             job.written.push(name);
             job.progress = job.written.length / job.total;
             if (job.onProgress) job.onProgress(job.written.length, job.total);
@@ -159,12 +183,13 @@ var NemoExportJob = (function () {
       input = input || {};
       if (input.requestId && byRequest[input.requestId]) return { ok: true, jobId: byRequest[input.requestId], retried: true, job: view(jobs[byRequest[input.requestId]]) };
       if (running) return failure('busy', 'Another export job is running.');
-      if (typeof input.dir !== 'string' || !input.dir) return failure('invalid_input', 'dir is required.');
+      if (!input.sink && (typeof input.dir !== 'string' || !input.dir)) return failure('invalid_input', 'dir is required.');
+      if (input.dir != null && typeof input.dir !== 'string') return failure('invalid_input', 'dir must be a string.');
       var start = input.start, end = input.end;
       if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) return failure('invalid_range', 'start/end must be integers with 0 <= start <= end.');
       var job = {
         jobId: ports.newId(), requestId: input.requestId || null, status: 'running',
-        dir: input.dir, start: start, end: end, next: start, total: end - start + 1,
+        dir: input.dir || '', io: resolveSink(input.sink), start: start, end: end, next: start, total: end - start + 1,
         batchFrames: input.batchFrames > 0 ? input.batchFrames : DEFAULT_BATCH_FRAMES,
         batchBytes: input.batchBytes > 0 ? input.batchBytes : DEFAULT_BATCH_BYTES,
         keepPartial: !!input.keepPartial, onProgress: typeof input.onProgress === 'function' ? input.onProgress : null,

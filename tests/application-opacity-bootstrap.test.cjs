@@ -39,6 +39,8 @@ function application() {
     'application/history/frame-entry.js',
     'tweens.js', 'application/opacity-application.js',
     'application/capability-registry.js', 'application/opacity-capability.js',
+    // P19: the bootstrap also registers the export capability and routes by it.
+    'application/export-job.js', 'adapters/export-svg-sequence.js',
     'bootstrap/opacity-application.js']) {
     const filename = path.resolve(__dirname, '../src/js', file);
     vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });

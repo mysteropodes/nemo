@@ -47,8 +47,37 @@
   // one place that decides which handler serves a request — changing the
   // registration changes dispatch, and no stale reference survives it.
   NemoOpacityCapability.register(registry, app.handle);
+  // P19/#1021: the export job registers the same way — its own descriptor with
+  // its own handler — and drives the ONE session export.js memoises, so the
+  // export dialog, the render queue and an MCP client share a lifecycle instead
+  // of running two exporters. The session is resolved per call, never captured.
+  var exportCapability = NemoExportSvgSequence.capability({
+    session: function () { return (root.SMExport && root.SMExport.svgSequenceJob) ? root.SMExport.svgSequenceJob() : null; },
+    meta: app.meta,
+  });
+  registry.register(exportCapability.descriptor, exportCapability.handler);
+  // Dispatch picks the capability by operation instead of assuming there is
+  // only ever one. Opacity stays the DEFAULT because it also serves the
+  // service-wide operations that belong to no single feature (`capabilities`,
+  // `snapshot`, `history.*`, `diagnostics.*`) and are deliberately absent from
+  // its own effects.lifecycle; every other capability claims exactly the
+  // operations its descriptor declares. Resolved per call from the registry,
+  // for the same reason the handler lookup is (P06): changing a registration
+  // changes dispatch, and no stale table survives it. Two capabilities
+  // claiming one operation is a loud failure, not a silent mis-route.
+  function capabilityFor(operation) {
+    var found = null;
+    registry.list().forEach(function (entry) {
+      if (entry.id === NemoOpacityCapability.DESCRIPTOR.id) return;
+      var lifecycle = (entry.descriptor.effects && entry.descriptor.effects.lifecycle) || [];
+      if (lifecycle.indexOf(operation) < 0) return;
+      if (found) throw new Error('Capabilities "' + found + '" and "' + entry.id + '" both claim the operation "' + operation + '".');
+      found = entry.id;
+    });
+    return found || NemoOpacityCapability.DESCRIPTOR.id;
+  }
   root.NemoApplication = {
-    handle: function (request) { return registry.handlerFor(NemoOpacityCapability.DESCRIPTOR.id)(request); },
+    handle: function (request) { return registry.handlerFor(capabilityFor(request && request.operation))(request); },
     setInstanceId: app.setInstanceId,
     capabilities: function () { return registry.list(); },
   };
