@@ -105,6 +105,8 @@
       "files": ["boundaries.test.cjs"], "publicApi": ["boundaries.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.inventory", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["inventory.test.cjs"], "publicApi": ["inventory.test.cjs"], "sizeProfile": "Test file" },
+    { "id": "nemo.test.inventoryArea", "layer": "tooling-test", "dir": "scripts/nemo",
+      "files": ["inventory-area.test.cjs"], "publicApi": ["inventory-area.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesRatchet", "layer": "tooling-test", "dir": "scripts/nemo",
       "files": ["boundaries-ratchet.test.cjs"], "publicApi": ["boundaries-ratchet.test.cjs"], "sizeProfile": "Test file" },
     { "id": "nemo.test.boundariesApplication", "layer": "tooling-test", "dir": "scripts/nemo",
