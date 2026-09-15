@@ -286,7 +286,11 @@ test('a failed save marks nothing: no recents entry, no clean flag, no autosave'
 
 test('the inline filesystem block did not come back into project.js', () => {
   const fn = slice(projectSource, WRITE_PROJECT_TO[0], WRITE_PROJECT_TO[1], 'writeProjectTo');
-  assert.match(fn, /NemoProjectNativeSave\.writeProjectFile\(path,json,\{/);
+  // window-qualified on purpose: project.js reaches every other cross-module
+  // dependency that way (76 window.* references, the closest precedent being
+  // window.NemoOpacityApplication in this same file), so an unqualified global
+  // here would be the odd one out. Pinned so it does not drift back.
+  assert.match(fn, /window\.NemoProjectNativeSave\.writeProjectFile\(path,json,\{/);
   assert.doesNotMatch(fn, /\.saving/, 'the temp suffix is owned by the adapter now');
   // The fs names still appear — as the three one-line port delegations, which
   // is the binding and is meant to be here. What must NOT come back is the
