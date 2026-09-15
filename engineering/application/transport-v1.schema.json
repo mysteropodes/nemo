@@ -490,6 +490,94 @@
               "progress": "ratio"
             },
             "version": 1
+          },
+          {
+            "availability": {
+              "reason": "missing-dependency",
+              "state": "unavailable"
+            },
+            "effects": {
+              "kind": "job",
+              "lifecycle": [
+                "start",
+                "stop"
+              ],
+              "scope": "none"
+            },
+            "examples": [
+              {
+                "input": {},
+                "label": "start a timelapse recording at the default rate",
+                "output": {
+                  "started": true
+                }
+              },
+              {
+                "input": {
+                  "fps": 15
+                },
+                "label": "start at a custom capture rate",
+                "output": {
+                  "started": true
+                }
+              },
+              {
+                "input": {},
+                "label": "stop and receive the recorded duration and size",
+                "output": {
+                  "bytes": 483920,
+                  "seconds": 12
+                }
+              }
+            ],
+            "fixture": {
+              "input": {},
+              "label": "start a timelapse recording at the default rate",
+              "output": {
+                "started": true
+              }
+            },
+            "handlerKey": "labs.timelapse.recording",
+            "id": "timelapse",
+            "input": {
+              "additionalProperties": false,
+              "properties": {
+                "fps": {
+                  "description": "Capture rate for the \"start\" stage; ignored by \"stop\". Clamped 1-60 by timelapseStart; defaults to 30 when omitted.",
+                  "maximum": 60,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "output": {
+              "additionalProperties": false,
+              "properties": {
+                "bytes": {
+                  "description": "Present on a successful \"stop\": recorded blob size.",
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "seconds": {
+                  "description": "Present on a successful \"stop\": recording duration.",
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "started": {
+                  "description": "Present on a successful \"start\".",
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "schemaVersion": 1,
+            "units": {
+              "bytes": "bytes",
+              "fps": "fps",
+              "seconds": "seconds"
+            },
+            "version": 1
           }
         ]
       },

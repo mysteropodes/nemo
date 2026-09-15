@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "timelapse",
+  "version": 1,
+  "handlerKey": "labs.timelapse.recording",
+  "input": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "fps": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 60,
+        "description": "Capture rate for the \"start\" stage; ignored by \"stop\". Clamped 1-60 by timelapseStart; defaults to 30 when omitted."
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "started": { "type": "boolean", "description": "Present on a successful \"start\"." },
+      "seconds": { "type": "number", "minimum": 0, "description": "Present on a successful \"stop\": recording duration." },
+      "bytes": { "type": "number", "minimum": 0, "description": "Present on a successful \"stop\": recorded blob size." }
+    }
+  },
+  "units": { "fps": "fps", "seconds": "seconds", "bytes": "bytes" },
+  "effects": { "kind": "job", "scope": "none", "lifecycle": ["start", "stop"] },
+  "availability": { "state": "unavailable", "reason": "missing-dependency" },
+  "fixture": {
+    "label": "start a timelapse recording at the default rate",
+    "input": {},
+    "output": { "started": true }
+  },
+  "examples": [
+    { "label": "start a timelapse recording at the default rate", "input": {}, "output": { "started": true } },
+    { "label": "start at a custom capture rate", "input": { "fps": 15 }, "output": { "started": true } },
+    { "label": "stop and receive the recorded duration and size", "input": {}, "output": { "seconds": 12, "bytes": 483920 } }
+  ]
+}

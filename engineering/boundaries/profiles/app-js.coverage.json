@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e",
+    "candidateCommit": "3cfa1e0139054f7e495a371aa23e349cd28ed564",
     "sourceRootTree": "5925f2dd8b5b1d02787272b5897dc074e102b6dc",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "f8aa9cbbf568bbc1ed8d6ad2023a41ae5f9d0157",
-      "lastChangedCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e"
+      "lastChangedCommit": "3cfa1e0139054f7e495a371aa23e349cd28ed564"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "ff7a7b0c84815dbe9284e55a77d51dbfe8155382b2ffa087bf434fa10ed89d00"
+      "value": "b5b90c07e58b9c34df5ddb55b5bbfdf0bb3c610e3df63faa4a9538ccfa2ceb1a"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "f9abffb1ee6080a840b85f2c3e5f4edd76ab1480",
-        "sha256": "fdd8872291f0bc2a160db8fe99f328b685198efe22c9e8d7d52e7c7109226385",
-        "moduleCount": 159,
-        "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
+        "gitBlob": "4582347ac0c68d89fef647a2a35fc881e2086a26",
+        "sha256": "cfa0e13c8230db2292bda71ade7432910e36c8500833eb2a328fd84074cd43d3",
+        "moduleCount": 160,
+        "basedOnCommit": "3cfa1e0139054f7e495a371aa23e349cd28ed564"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -370,6 +370,19 @@
           "path": "src/index.html",
           "line": 2456,
           "scriptOrdinal": 124
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/timelapse-capability.js",
+      "moduleId": "app.timelapse.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/timelapse-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (P31/#1033, bootstrap integration is out of scope; \"do not add it to startup scripts merely to claim coverage\" per the issue)"
         }
       ]
     },
@@ -2674,21 +2687,21 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 171,
+    "selectedSources": 172,
     "bySourceKind": {
-      ".js": 165,
+      ".js": 166,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 159,
+    "retainedSources": 160,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
       "document-classic": 144,
+      "classic-without-load-site": 13,
       "document-module": 2,
-      "classic-without-load-site": 12,
       "module-worker": 1
     }
   },
