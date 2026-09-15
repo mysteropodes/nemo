@@ -10,64 +10,12 @@ const EXPORT_JOB_PATH = path.join(__dirname, '..', 'engineering', 'application',
 
 function load(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
 
-// Minimal, dependency-free validator for exactly the JSON Schema subset
-// capability-v1.schema.json uses (type/const/enum/pattern/minimum/maximum/
-// minLength/minItems/required/properties/additionalProperties/items/$ref/anyOf).
-// Not a general-purpose validator; do not reuse for other schemas without review.
-function validate(schema, value, defs, at) {
-  at = at || '$';
-  // Boolean schemas are valid JSON Schema: `true` accepts anything, `false` accepts nothing.
-  // capability-v1.schema.json's Example.input/output use `true` for "any JSON value".
-  if (schema === true) return [];
-  if (schema === false) return [`${at}: rejected by schema \`false\``];
-  defs = defs || schema.$defs || {};
-  if (schema.$ref) return validate(defs[schema.$ref.replace('#/$defs/', '')], value, defs, at);
-  if (schema.anyOf) {
-    const branches = schema.anyOf.map((s) => validate(s, value, defs, at));
-    return branches.some((e) => e.length === 0) ? [] : [`${at}: matches none of anyOf (${JSON.stringify(branches)})`];
-  }
-  const errors = [];
-  if ('const' in schema) {
-    if (value !== schema.const) errors.push(`${at}: expected const ${JSON.stringify(schema.const)}, got ${JSON.stringify(value)}`);
-    return errors;
-  }
-  if (schema.enum && !schema.enum.includes(value)) {
-    errors.push(`${at}: ${JSON.stringify(value)} is not one of ${JSON.stringify(schema.enum)}`);
-    return errors;
-  }
-  if (schema.type) {
-    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
-    const actual = value === null ? 'null' : Array.isArray(value) ? 'array'
-      : (typeof value === 'number' && Number.isInteger(value)) ? 'integer' : typeof value;
-    if (!types.includes(actual) && !(actual === 'integer' && types.includes('number'))) {
-      errors.push(`${at}: expected type ${types.join('|')}, got ${actual}`);
-      return errors;
-    }
-  }
-  if (typeof value === 'string') {
-    if (schema.pattern && !new RegExp(schema.pattern).test(value)) errors.push(`${at}: ${JSON.stringify(value)} does not match pattern ${schema.pattern}`);
-    if (schema.minLength != null && value.length < schema.minLength) errors.push(`${at}: shorter than minLength ${schema.minLength}`);
-  }
-  if (typeof value === 'number') {
-    if (schema.minimum != null && value < schema.minimum) errors.push(`${at}: ${value} < minimum ${schema.minimum}`);
-    if (schema.maximum != null && value > schema.maximum) errors.push(`${at}: ${value} > maximum ${schema.maximum}`);
-  }
-  if (Array.isArray(value)) {
-    if (schema.minItems != null && value.length < schema.minItems) errors.push(`${at}: fewer than minItems ${schema.minItems}`);
-    if (schema.items) value.forEach((item, i) => errors.push(...validate(schema.items, item, defs, `${at}[${i}]`)));
-  } else if (value && typeof value === 'object') {
-    (schema.required || []).forEach((key) => { if (!(key in value)) errors.push(`${at}: missing required property "${key}"`); });
-    Object.keys(value).forEach((key) => {
-      const propSchema = schema.properties && schema.properties[key];
-      if (propSchema) errors.push(...validate(propSchema, value[key], defs, `${at}.${key}`));
-      else if (schema.additionalProperties === false) errors.push(`${at}: unexpected property "${key}"`);
-      else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
-        errors.push(...validate(schema.additionalProperties, value[key], defs, `${at}.${key}`));
-      }
-    });
-  }
-  return errors;
-}
+// The minimal JSON Schema subset validator used to live here, as the only copy.
+// P09 moved it into the SHIPPED checker (scripts/nemo/lib/capability-drift.cjs),
+// which runs it inside `npm run check` over these same schemas. Keeping a second
+// copy here would be the twin-function divergence CLAUDE.md §3 warns about: the
+// test could keep passing while the gate an author actually runs drifted.
+const { validate } = require('../scripts/nemo/lib/capability-drift.cjs');
 
 test('capability-v1.schema.json is well-formed (root object, expected $defs present)', () => {
   const schema = load(SCHEMA_PATH);
