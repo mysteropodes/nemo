@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "c0cd15da7349556a8101f6a37edac44a9f6ce8ab",
-    "sourceRootTree": "b3d3584895a32d8ee67c7ed340d68e08aaf81e5b",
+    "candidateCommit": "PENDING-RECOMPUTE",
+    "sourceRootTree": "PENDING-RECOMPUTE",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "a8fb496e67a77a3a2b555ac5f91e0cab32da4c48",
-      "lastChangedCommit": "c0cd15da7349556a8101f6a37edac44a9f6ce8ab"
+      "gitTree": "PENDING-RECOMPUTE",
+      "lastChangedCommit": "PENDING-RECOMPUTE"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "683435456ec0ee540c301a11792ac480d9a328fd",
-      "sha256": "7bd753b8aefef7f5e8b22e9cc400cfca92d0407a6563d02459de76e5cf48df3f",
-      "lastChangedCommit": "ee4a4d931c7b8bed02b6db4e3bacfb0d74fe5b4c"
+      "gitBlob": "a3c1c9c2496cbfa0e2a774abba20e561769c51ec",
+      "sha256": "77fe014a42f59d15b94635307ed522fa30da413fb230a9740987d45b4a394de2",
+      "lastChangedCommit": "2d165a87d8ead5cc92226d24c3c227a3fe2cfef6"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "61ee54275b564abd578541366b974b7425655cdc153b770cb8ee430122e8faf4"
+      "value": "PENDING-RECOMPUTE"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "4582347ac0c68d89fef647a2a35fc881e2086a26",
-        "sha256": "cfa0e13c8230db2292bda71ade7432910e36c8500833eb2a328fd84074cd43d3",
-        "moduleCount": 159,
-        "basedOnCommit": "c0cd15da7349556a8101f6a37edac44a9f6ce8ab"
+        "gitBlob": "PENDING-RECOMPUTE",
+        "sha256": "PENDING-RECOMPUTE",
+        "moduleCount": 161,
+        "basedOnCommit": "PENDING-RECOMPUTE"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -370,6 +370,18 @@
           "path": "src/index.html",
           "line": 2456,
           "scriptOrdinal": 124
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/shortcut-registry.js",
+      "moduleId": "app.shortcuts.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2370,
+          "scriptOrdinal": 55
         }
       ]
     },
@@ -2699,7 +2711,7 @@
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 144,
+      "document-classic": 145,
       "classic-without-load-site": 13,
       "document-module": 2,
       "module-worker": 1

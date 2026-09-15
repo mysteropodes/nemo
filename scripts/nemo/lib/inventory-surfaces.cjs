@@ -55,7 +55,21 @@ const AREA_BY_CONTAINER = [
   [/tool|brush|color|fill|stroke|text|shape|palette|p-|dims|align|pen|select|comment|scene/, 'drawing-selection'],
 ];
 const HUB_FILE = /(timeline|app|ui|tools)\.js$/;
-function areaFor(file, container, classes) {
+// The rules above are unanchored substring regexes, so whatever path they are
+// matched against is matched WHOLE. Given an absolute path that includes the
+// checkout directory, a token in the directory name hijacks classification for
+// every file beneath it — a worktree called `…-project-save` sends the whole
+// tree through the `project` rule, `…-editor-tools` through `drawing-selection`
+// (rule 2, which outranks almost everything). The wrong output then passes
+// `--check` on the machine that produced it, because regeneration from the same
+// path reproduces the same misclassification.
+//
+// So classification is done on the REPO-RELATIVE path, which is the only part
+// that actually describes the file. `toRel` is the same `rel` the ids a few
+// lines below already use. Values that are not absolute paths — the `'href'`
+// sentinel, an already-relative path — pass through untouched.
+function areaFor(file, container, classes, toRel) {
+  if (file && toRel && path.isAbsolute(file)) file = toRel(file);
   const byFile = () => { if (file) for (const [re, a] of AREA_BY_FILE) if (re.test(file)) return a; return null; };
   const byContainer = () => { const key = (container || '') + ' ' + (classes || ''); for (const [re, a] of AREA_BY_CONTAINER) if (re.test(key)) return a; return null; };
   if (file && !HUB_FILE.test(file)) return byFile() || byContainer() || 'unclassified';
@@ -208,7 +222,7 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
     rows.push({
       id: r.id ? 'dom:#' + r.id : 'dom:' + r.tag + (r.data.tool ? '[data-tool=' + r.data.tool + ']' : '') + '@' + r.line,
       kind: 'dom', surface: (r.container ? r.container + ' > ' : '') + r.tag + (r.type ? '[' + r.type + ']' : '') + (r.id ? '#' + r.id : ''),
-      capability: label, area: areaFor(file, r.container, r.classes + ' ' + r.id),
+      capability: label, area: areaFor(file, r.container, r.classes + ' ' + r.id, rel),
       handler: recs.length ? uniq(recs.flatMap((x) => x.sites)).slice(0, 4) : placeholder ? placeholder.handler : [],
       events: uniq(recs.flatMap((x) => x.events)),
       exposure, mcp: 'none (R14)', sdk: 'none',
@@ -220,13 +234,15 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
     });
   }
 
-  // 2. Shortcut tables (timeline.js)
-  const tl = byFile.get(path.join(src, 'js', 'timeline.js'));
+  // 2. Shortcut tables (moved off timeline.js to application/shortcut-registry.js by P30/#1032)
+  const tl = byFile.get(path.join(src, 'js', 'application', 'shortcut-registry.js'));
   if (tl) {
     for (const table of ['TOOL_SHORTCUTS', 'COMMAND_SHORTCUTS', 'READONLY_SHORTCUTS']) {
-      const at = tl.code.indexOf('var ' + table + '=[');
+      const declMatch = new RegExp('var\\s+' + table + '\\s*=\\s*\\[').exec(tl.code);
+      const at = declMatch ? declMatch.index : -1;
       if (at < 0) continue;
-      const end = tl.code.indexOf('\n];', at);
+      const endMatch = /\n\s*\];/.exec(tl.code.slice(at));
+      const end = endMatch ? at + endMatch.index : -1;
       const block = tl.code.slice(at, end);
       const re = /\{action:'([^']*)',key:'([^']*)'(?:,cat:'([^']*)')?,label:'([^']*)'|\{keys:'([^']*)',label:'([^']*)',cat:'([^']*)'\}/g;
       let m;
@@ -292,7 +308,7 @@ function createSurfaces({ src, rel, domRows, i18n, idx, fnIndex, bindings, class
       const rr = reach(body, 3);
       const line = lineOf(f.code, m.index);
       rows.push({
-        id: 'menu:' + rel(f.file).replace(/^src\/js\//, '') + ':' + line, kind: 'menu', surface: 'dynamic menu' + (fn ? ' (' + fn.name + ')' : ''), capability: label, area: areaFor(f.file, '', ''),
+        id: 'menu:' + rel(f.file).replace(/^src\/js\//, '') + ':' + line, kind: 'menu', surface: 'dynamic menu' + (fn ? ' (' + fn.name + ')' : ''), capability: label, area: areaFor(f.file, '', '', rel),
         handler: [rel(f.file) + ':' + line + (fn ? ' ' + fn.name + '()' : '')], events: ['click'], exposure: ['contextual menu'], mcp: 'none (R14)', sdk: 'none',
         consumers: rr.consumers, platforms: platformFor([{ body }], rr.consumers), status: body ? 'inventoried' : 'unmapped',
         nextGate: body ? 'R12/R13: characterize against a fixture and diagnostics' : 'R03 follow-up: bind a handler or record unavailable-with-reason', source: rel(f.file) + ':' + line, meta: { i18n: key || null, functionsVisited: rr.functionsVisited },
