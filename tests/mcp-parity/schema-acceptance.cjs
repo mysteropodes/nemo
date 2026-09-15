@@ -128,7 +128,14 @@ function deriveFromTemplates(payloadSchema, operation = OPERATION) {
   return null;
 }
 
-function deriveFromExamples(payloadSchema) {
+function deriveFromExamples(payloadSchema, operation = OPERATION) {
+  // Examples hang off the payload schema as a whole, not off a branch, so
+  // nothing in the advertisement ties any one of them to an operation. Handing
+  // back the first example that happens to satisfy *some* branch would let a
+  // property.set body be sent as the payload of an undo and still be reported
+  // as "derived from the advertisement". Refuse instead of guessing: a loud
+  // NOT CONSTRUCTIBLE is the honest answer, a plausible wrong body is not.
+  if (operation !== OPERATION) return null;
   const examples = payloadSchema?.examples;
   if (!Array.isArray(examples) || !examples.length) return null;
   const branch = (payloadSchema.anyOf || []).find((b) => (b.required || []).length);
@@ -161,10 +168,13 @@ function resolveAgainstSnapshot(body, payloadSchema, snapshot) {
     if (resolved[name] === undefined) continue;
     const match = description.match(/layers\[\]\.(\w+)/);
     if (!match || !layers.length) continue;
-    // Pick the layer whose current value differs from what we are about to
-    // write, so a no-op cannot masquerade as a successful write.
+    // Prefer a layer that none of the body's own scalars already match, so the
+    // write has something to change. Deliberately field-name blind: naming the
+    // value field here would be exactly the prior knowledge this file refuses.
+    // Best effort only — the oracle below is what actually rejects a no-op.
+    const bodyScalars = Object.values(resolved).filter((v) => typeof v !== 'object' || v === null);
     const target =
-      layers.find((l) => resolved.value !== undefined && l.opacity !== resolved.value) || layers[0];
+      layers.find((l) => !Object.values(l).some((v) => bodyScalars.includes(v))) || layers[0];
     const before = resolved[name];
     resolved[name] = target.id ?? target[match[1]];
     notes.push(`${name}: ${JSON.stringify(before)} -> ${JSON.stringify(resolved[name])} (${match[0]})`);
@@ -240,12 +250,23 @@ async function main() {
     );
     console.log(`server said: ${JSON.stringify(write)}`);
     const after = await host.control('inspect');
-    const changed = after.mutations > before.mutations;
+    // The counters are the wrong oracle: the host bumps mutations on every
+    // dispatch and touches the revision with it, so both move even when the
+    // write stores the value that was already there. Compare the document
+    // itself. Field-name blind, and it fails loudly on a no-op instead of
+    // reporting ACCEPTED for a call that changed nothing.
+    const changed = JSON.stringify(before.state) !== JSON.stringify(after.state);
     console.log(
       `host mutations ${before.mutations} -> ${after.mutations}, revision ${before.meta.revision} -> ${after.meta.revision}`,
     );
+    console.log(`document changed: ${changed}`);
     if (write.ok !== true) throw new Error('server rejected a payload built from its own contract');
-    if (!changed) throw new Error('call reported ok but application state did not change');
+    if (!changed) {
+      throw new Error(
+        'call reported ok and bumped mutations/revision, but the document is byte-identical: ' +
+          'this is a no-op masquerading as a successful write',
+      );
+    }
     verdict = 'ACCEPTED';
     console.log('\nACCEPTED: a client with no prior knowledge built this call from the');
     console.log('advertisement alone and it changed application state.');

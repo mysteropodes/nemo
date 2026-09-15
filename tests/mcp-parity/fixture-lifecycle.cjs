@@ -23,6 +23,7 @@ const {
   deriveFromTemplates,
   deriveFromExamples,
   resolveAgainstSnapshot,
+  instanceFieldName,
   binary,
   label,
 } = require('./schema-acceptance.cjs');
@@ -64,8 +65,16 @@ async function main() {
   console.log(`discover: ${discover.instances.length} instance(s)`);
 
   // --- inspect --------------------------------------------------------------
+  // The instance field is named by the advertisement, not by us: the shipped
+  // 66ece06 build requires `instance_id` where current source takes
+  // `instanceId`. Hard-coding it here crashed this file against the one binary
+  // whose NOT CONSTRUCTIBLE verdict below is the point of running it, turning a
+  // clean finding into an indistinguishable harness error.
   const snapshot = structured(
-    await client.callTool('nemo_query', { instanceId, operation: 'snapshot' }),
+    await client.callTool('nemo_query', {
+      [instanceFieldName(tools)]: instanceId,
+      operation: 'snapshot',
+    }),
   );
   console.log(`inspect: ${JSON.stringify(snapshot.result.layers)}`);
 
