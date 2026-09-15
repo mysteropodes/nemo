@@ -1705,6 +1705,18 @@
       ]
     },
     {
+      "id": "app.shortcuts.application",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "shortcut-registry.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "shortcut-registry.js"
+      ]
+    },
+    {
       "id": "app.capability.registry",
       "layer": "application",
       "dir": "src/js/application",
