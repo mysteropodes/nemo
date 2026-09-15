@@ -19,30 +19,30 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "658e4c9245389bd5da4a498ab4368e5310d7087e",
-    "sourceRootTree": "fce6a887500319c75b6636fca98872a6d9ef5052",
+    "candidateCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e",
+    "sourceRootTree": "5925f2dd8b5b1d02787272b5897dc074e102b6dc",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "44b4a5e4e20e624adbc2a4e8457c3c74fc547086",
-      "lastChangedCommit": "658e4c9245389bd5da4a498ab4368e5310d7087e"
+      "gitTree": "f8aa9cbbf568bbc1ed8d6ad2023a41ae5f9d0157",
+      "lastChangedCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "31ce5c18acaf936ffcea35c5dd1af88eb371ef25",
-      "sha256": "66fcfd7eb890ac553347bbd4fbb031518c3ddfe62f6d22a83233ecf8e84ee6c4",
-      "lastChangedCommit": "658e4c9245389bd5da4a498ab4368e5310d7087e"
+      "gitBlob": "a933c03be644e5b997893789a5f836a021e8811a",
+      "sha256": "849e860e6cf852632b31d558213a3a042d076797e1d79ae1b50f017747256834",
+      "lastChangedCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "ae662e6055144e3f1392623e61cc178f7bc7431903661d0ad958a6032444940d"
+      "value": "ff7a7b0c84815dbe9284e55a77d51dbfe8155382b2ffa087bf434fa10ed89d00"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "dd2c54b90aa2167cebd0eca6cb74730f90109b72",
-        "sha256": "4260bb8673a918194aa312f9c39d89e9dcb4c2505106a0aed37cf8b1138bb0e5",
-        "moduleCount": 149,
+        "gitBlob": "f9abffb1ee6080a840b85f2c3e5f4edd76ab1480",
+        "sha256": "fdd8872291f0bc2a160db8fe99f328b685198efe22c9e8d7d52e7c7109226385",
+        "moduleCount": 159,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
       {
@@ -250,6 +250,18 @@
           "path": "src/index.html",
           "line": 2317,
           "scriptOrdinal": 17
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-native-save.js",
+      "moduleId": "app.project.nativesave.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2434,
+          "scriptOrdinal": 103
         }
       ]
     },
@@ -2662,19 +2674,19 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 170,
+    "selectedSources": 171,
     "bySourceKind": {
-      ".js": 164,
+      ".js": 165,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 158,
+    "retainedSources": 159,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
-      "document-classic": 143,
+      "document-classic": 144,
       "document-module": 2,
       "classic-without-load-site": 12,
       "module-worker": 1

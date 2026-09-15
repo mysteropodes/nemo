@@ -101,21 +101,41 @@ function checkArtifacts(b) {
 
 function jobCheck(ctx) {
   const b = ctx.receipt.build;
-  const sub = {
+  // P09 — capability/schema drift. Required lazily for the same reason
+  // test:coverage-rust is below: this registry is loaded by harnesses that copy
+  // a minimal subset of scripts/nemo (build-job.test.cjs), and a top-level
+  // require would make every one of them depend on this leaf's modules.
+  const drift = require('./capability-drift.cjs');
+  const { results: driftResults, catalog } = drift.capabilityChecks();
+  const sub = Object.assign({
     'version-sync': checkVersionSync(b),
     'json-valid': checkJsonValid(),
     'js-syntax': checkJsSyntax(ctx),
     'script-refs': checkScriptRefs(),
     'private-labs-guard': checkPrivateLabs(),
     'artifacts-present': checkArtifacts(b),
-  };
+  }, driftResults);
+  // An omitted checker must not be able to shrink this gate into a smaller
+  // green one. Every sub-check capability-drift.cjs declares has to appear in
+  // the produced set; the absence itself fails the job, so dropping a check is
+  // not a route to an aggregate pass.
+  const absent = drift.CHECKS.filter((n) => !(n in sub));
+  if (absent.length) {
+    return fail(`declared capability check(s) absent from this run: ${absent.join(', ')}`, {
+      details: Object.fromEntries(Object.entries(sub).map(([k, r]) => [k, { status: r.status, reason: r.reason }])),
+      catalog,
+    });
+  }
   const failed = Object.entries(sub).filter(([, r]) => r.status === STATUS.FAIL);
   const blockedOnes = Object.entries(sub).filter(([, r]) => r.status === STATUS.BLOCKED);
   const log = Object.entries(sub).map(([k, r]) => `${r.status.toUpperCase().padEnd(8)} ${k}: ${r.reason}`).join('\n') + '\n';
   const details = Object.fromEntries(Object.entries(sub).map(([k, r]) => [k, { status: r.status, reason: r.reason }]));
-  if (failed.length) return fail(failed.map(([k, r]) => `${k}: ${r.reason}`).join(' | '), { details, log });
-  if (blockedOnes.length) return blocked(blockedOnes.map(([k, r]) => `${k}: ${r.reason}`).join(' | '), { details, log });
-  return pass(`${Object.keys(sub).length} checks pass`, { details, log });
+  // `catalog` rides on the job itself, not in `details`: check.cjs prints every
+  // details entry as "STATUS name reason", so a keyless payload there would
+  // crash the printer. The receipt keeps it either way.
+  if (failed.length) return fail(failed.map(([k, r]) => `${k}: ${r.reason}`).join(' | '), { details, log, catalog });
+  if (blockedOnes.length) return blocked(blockedOnes.map(([k, r]) => `${k}: ${r.reason}`).join(' | '), { details, log, catalog });
+  return pass(`${Object.keys(sub).length} checks pass`, { details, log, catalog });
 }
 
 // ---- tests -------------------------------------------------------------

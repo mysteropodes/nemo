@@ -20,6 +20,8 @@
       "files": ["identity.cjs"], "publicApi": ["identity.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.capabilities", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["capabilities.cjs"], "publicApi": ["capabilities.cjs"], "sizeProfile": "Platform/engine adapter" },
+    { "id": "nemo.lib.capabilityDrift", "layer": "tooling-application", "dir": "scripts/nemo/lib",
+      "files": ["capability-drift.cjs", "capability-schema.cjs"], "publicApi": ["capability-drift.cjs"], "sizeProfile": "Domain/application JS or TS" },
     { "id": "nemo.lib.isolation", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
       "files": ["isolation.cjs"], "publicApi": ["isolation.cjs"], "sizeProfile": "Platform/engine adapter" },
     { "id": "nemo.lib.browserRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
