@@ -72,10 +72,11 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
   // 60 retained tooling sources, P03A's frozen-census checker, P10's edge-gate test,
-  // P03B's three scope libraries, P12's Rust crate checker + test, and P09's
-  // capability drift checker plus its schema half (67 -> 69).
-  assert.equal(result.sourcePathCount, 69);
-  assert.equal(result.declaredPathCount, 69);
+  // P03B's three scope libraries, P12's Rust crate checker + test, P09's
+  // capability drift checker plus its schema half (67 -> 69), and #1307's
+  // area-classification regression (69 -> 70).
+  assert.equal(result.sourcePathCount, 70);
+  assert.equal(result.declaredPathCount, 70);
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
