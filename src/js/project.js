@@ -124,7 +124,7 @@
     // dirty tracking, autosave — stays here. The JSON handed to the adapter is
     // the same string markSaved() records, so a save cannot mark clean against
     // bytes other than the ones written.
-    await NemoProjectNativeSave.writeProjectFile(path,json,{
+    await window.NemoProjectNativeSave.writeProjectFile(path,json,{
       writeTextFile:function(p,text){return window.__TAURI__.fs.writeTextFile(p,text);},
       rename:function(from,to){return window.__TAURI__.fs.rename(from,to);},
       remove:function(p){return window.__TAURI__.fs.remove(p);},
