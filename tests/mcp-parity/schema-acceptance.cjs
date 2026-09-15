@@ -80,12 +80,22 @@ function structured(response) {
 // of them yield a body, the advertisement is insufficient and we say so.
 // ---------------------------------------------------------------------------
 
-function deriveFromRegisteredCapabilities(payloadSchema) {
+// Even the identity field name gets read from the advertisement. The installed
+// build requires `instance_id`, the current one `instanceId` (keeping the old
+// spelling as a serde alias). Writing either into the harness would be exactly
+// the prior knowledge this file exists to refuse.
+function instanceFieldName(tools) {
+  const query = (tools.result?.tools || []).find((t) => t.name === 'nemo_query');
+  const required = query?.inputSchema?.required || [];
+  return required.find((name) => name !== 'operation' && name !== 'payload') || 'instanceId';
+}
+
+function deriveFromRegisteredCapabilities(payloadSchema, operation = OPERATION) {
   const registered = payloadSchema?.['x-nemo-registeredCapabilities'];
   if (!Array.isArray(registered)) return null;
   for (const capability of registered) {
     if (capability?.availability?.state !== 'available') continue;
-    if (!capability?.effects?.lifecycle?.includes(OPERATION)) continue;
+    if (!capability?.effects?.lifecycle?.includes(operation)) continue;
     const example = capability.examples?.[0]?.input ?? capability.fixture?.input;
     if (!example || typeof example !== 'object') continue;
     // The capability id is how the server names the property this body targets.
@@ -101,14 +111,14 @@ function deriveFromRegisteredCapabilities(payloadSchema) {
   return null;
 }
 
-function deriveFromTemplates(payloadSchema) {
+function deriveFromTemplates(payloadSchema, operation = OPERATION) {
   // The description publishes one copyable template per operation, in
   // "<operation> <json>" form. Parse it rather than trusting example order.
   const description = payloadSchema?.description;
   if (typeof description !== 'string') return null;
   for (const line of description.split('\n')) {
     const match = line.match(/^\s*(\S+)\s+(\{.*\})\s*$/);
-    if (!match || match[1] !== OPERATION) continue;
+    if (!match || match[1] !== operation) continue;
     try {
       return { body: JSON.parse(match[2]), source: 'payload.description template' };
     } catch {
@@ -206,7 +216,10 @@ async function main() {
     const instanceId = discover.instances?.[0]?.instanceId;
     if (!instanceId) throw new Error('discovery returned no instances');
     const snapshot = structured(
-      await client.callTool('nemo_query', { instanceId, operation: 'snapshot' }),
+      await client.callTool('nemo_query', {
+        [instanceFieldName(tools)]: instanceId,
+        operation: 'snapshot',
+      }),
     );
 
     const { resolved, notes } = resolveAgainstSnapshot(derivation.body, payloadSchema, snapshot);
@@ -245,7 +258,23 @@ async function main() {
   process.exitCode = verdict === 'ACCEPTED' ? 0 : 2;
 }
 
-main().catch((error) => {
-  console.error('SCHEMA ACCEPTANCE FAILED:', error.message);
-  process.exit(1);
-});
+// The lifecycle check needs the same derivation, and a second copy of it would
+// be a second thing to keep in step (CLAUDE.md section 3).
+module.exports = {
+  startHost,
+  structured,
+  deriveFromRegisteredCapabilities,
+  deriveFromTemplates,
+  deriveFromExamples,
+  resolveAgainstSnapshot,
+  instanceFieldName,
+  binary,
+  label,
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('SCHEMA ACCEPTANCE FAILED:', error.message);
+    process.exit(1);
+  });
+}
