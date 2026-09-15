@@ -328,8 +328,8 @@
           },
           {
             "availability": {
-              "reason": "missing-dependency",
-              "state": "unavailable"
+              "reason": null,
+              "state": "available"
             },
             "effects": {
               "kind": "job",
@@ -382,7 +382,18 @@
                 "input": {
                   "jobId": "job-1"
                 },
-                "label": "cancel before completion",
+                "label": "cancel requested — cancellation takes effect at the next batch boundary, so this response still reports the current state",
+                "output": {
+                  "jobId": "job-1",
+                  "progress": 0.5,
+                  "status": "running"
+                }
+              },
+              {
+                "input": {
+                  "jobId": "job-1"
+                },
+                "label": "status after a cancel, once it has taken effect",
                 "output": {
                   "jobId": "job-1",
                   "progress": 0.5,

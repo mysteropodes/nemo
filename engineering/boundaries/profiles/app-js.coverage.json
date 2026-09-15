@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "a6ec4d372cd175c335c92ec98a5deb0cfae8fbd9",
-    "sourceRootTree": "2764ab10fc45b139c8e00ab4e65269ef77342160",
+    "candidateCommit": "a70be7f1035470711385252ce8566b4dfb30eded",
+    "sourceRootTree": "6ebd44d64a53115729ffa3c0b0ccd700c3f96c51",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "48c4cede41bb8f0798a1ed6f78e731092634161f",
-      "lastChangedCommit": "a6ec4d372cd175c335c92ec98a5deb0cfae8fbd9"
+      "gitTree": "03afc8ab6a55b76a42cd88c4670a656996009b61",
+      "lastChangedCommit": "a70be7f1035470711385252ce8566b4dfb30eded"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "a933c03be644e5b997893789a5f836a021e8811a",
-      "sha256": "849e860e6cf852632b31d558213a3a042d076797e1d79ae1b50f017747256834",
-      "lastChangedCommit": "193d3f33c0e754b5abf9e2c8edd0ac22e4c3655e"
+      "gitBlob": "683435456ec0ee540c301a11792ac480d9a328fd",
+      "sha256": "7bd753b8aefef7f5e8b22e9cc400cfca92d0407a6563d02459de76e5cf48df3f",
+      "lastChangedCommit": "ee4a4d931c7b8bed02b6db4e3bacfb0d74fe5b4c"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "b5b90c07e58b9c34df5ddb55b5bbfdf0bb3c610e3df63faa4a9538ccfa2ceb1a"
+      "value": "7424a649d3e08b4164392a91d0cab394116ee145c58a6be3ecb0849d2c685fca"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "4582347ac0c68d89fef647a2a35fc881e2086a26",
-        "sha256": "cfa0e13c8230db2292bda71ade7432910e36c8500833eb2a328fd84074cd43d3",
-        "moduleCount": 160,
-        "basedOnCommit": "a6ec4d372cd175c335c92ec98a5deb0cfae8fbd9"
+        "gitBlob": "f9abffb1ee6080a840b85f2c3e5f4edd76ab1480",
+        "sha256": "fdd8872291f0bc2a160db8fe99f328b685198efe22c9e8d7d52e7c7109226385",
+        "moduleCount": 159,
+        "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -370,19 +370,6 @@
           "path": "src/index.html",
           "line": 2456,
           "scriptOrdinal": 124
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/timelapse-capability.js",
-      "moduleId": "app.timelapse.capability",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/application/timelapse-capability.js",
-          "line": 1,
-          "role": "capability descriptor/registration helper; not wired into a script tag (P31/#1033, bootstrap integration is out of scope; \"do not add it to startup scripts merely to claim coverage\" per the issue)"
         }
       ]
     },
@@ -2687,21 +2674,21 @@
     }
   ],
   "snapshotCounts": {
-    "selectedSources": 172,
+    "selectedSources": 171,
     "bySourceKind": {
-      ".js": 166,
+      ".js": 165,
       ".mjs": 2,
       ".cjs": 0,
       ".ts": 4
     },
-    "retainedSources": 160,
+    "retainedSources": 159,
     "exclusions": 12,
     "vendorExclusions": 6,
     "generatedExclusions": 6,
     "retainedExecutionClasses": {
       "document-classic": 144,
-      "classic-without-load-site": 13,
       "document-module": 2,
+      "classic-without-load-site": 12,
       "module-worker": 1
     }
   },
