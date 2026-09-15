@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "7db66a2ea6f8ae477279211b483664cb171f6656",
-  "describe": "v0.7.0-alpha.4-415-g7db66a2"
+  "head": "79bade5b0af0448d9d9c8f6a76bf3e953aaa6ead",
+  "describe": "v0.7.0-alpha.4-418-g79bade5"
  },
- "inputsDigest": "a0997eae09d8be778c3d3d1c594594f342f36ced8405d1feb65581a5a131cbf8",
+ "inputsDigest": "f2f9f9c5f8bcb8dce547df2e19c261203a2a8fa8be1e9de1adab727aff32b677",
  "states": [
   "inventoried",
   "characterized",
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 256,
+   "native": 247,
    "export": 4,
-   "render": 548,
-   "persist": 435,
-   "history": 362,
-   "animation": 477,
-   "selection": 397
+   "render": 535,
+   "persist": 422,
+   "history": 356,
+   "animation": 464,
+   "selection": 384
   }
  },
  "fixturesByArea": {
@@ -176,7 +176,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11775,
+   "line": 11778,
    "members": 0
   },
   "SMImageMeshUI": {
@@ -366,7 +366,7 @@
   },
   "SMShapeGroup": {
    "file": "src/js/timeline.js",
-   "line": 10225,
+   "line": 10228,
    "members": 0
   },
   "SMTrackerPanel": {
@@ -444,7 +444,7 @@
    "capability": "Menu",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:9022 initAppMenu()"
+    "src/js/timeline.js:9025 initAppMenu()"
    ],
    "events": [
     "click"
@@ -608,7 +608,7 @@
    "capability": "New layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11300"
+    "src/js/timeline.js:11303"
    ],
    "events": [
     "click"
@@ -653,7 +653,7 @@
    "capability": "Show transparency — preview the canvas background as alpha (checkerboard) instead of its solid color, while editing",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10729"
+    "src/js/timeline.js:10732"
    ],
    "events": [
     "click"
@@ -736,7 +736,7 @@
    "capability": "Forcer le cache de lecture (normalement automatique si la lecture décroche)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11034"
+    "src/js/timeline.js:11037"
    ],
    "events": [
     "click"
@@ -776,7 +776,7 @@
    "capability": "Exclude — keep everything except the overlap (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10651 wireBoolBtn()"
+    "src/js/timeline.js:10654 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -823,7 +823,7 @@
    "capability": "Intersect — keep only the overlapping area (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10651 wireBoolBtn()"
+    "src/js/timeline.js:10654 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -870,7 +870,7 @@
    "capability": "Subtract — cut later shapes out of the first (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10651 wireBoolBtn()"
+    "src/js/timeline.js:10654 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -917,7 +917,7 @@
    "capability": "Union — merge shapes into one (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10651 wireBoolBtn()"
+    "src/js/timeline.js:10654 wireBoolBtn()"
    ],
    "events": [
     "click"
@@ -1157,7 +1157,7 @@
    "capability": "Hide artwork outside the canvas bounds — off by default, so you can see and work with content that spills over the edge",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10709"
+    "src/js/timeline.js:10712"
    ],
    "events": [
     "click"
@@ -1199,7 +1199,7 @@
    "capability": "Exclude — keep everything except the overlap (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11528"
+    "src/js/timeline.js:11531"
    ],
    "events": [
     "click"
@@ -1231,8 +1231,8 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11479 updateCombinePanel()",
-     "src/js/timeline.js:11494 updateCombinePanel()"
+     "src/js/timeline.js:11482 updateCombinePanel()",
+     "src/js/timeline.js:11497 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1251,7 +1251,7 @@
    "capability": "Flatten",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11543"
+    "src/js/timeline.js:11546"
    ],
    "events": [
     "click"
@@ -1298,7 +1298,7 @@
    "capability": "Intersect — keep only the overlapping area (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11528"
+    "src/js/timeline.js:11531"
    ],
    "events": [
     "click"
@@ -1330,8 +1330,8 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11479 updateCombinePanel()",
-     "src/js/timeline.js:11494 updateCombinePanel()"
+     "src/js/timeline.js:11482 updateCombinePanel()",
+     "src/js/timeline.js:11497 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1350,7 +1350,7 @@
    "capability": "Remove from group",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11536"
+    "src/js/timeline.js:11539"
    ],
    "events": [
     "click"
@@ -1397,7 +1397,7 @@
    "capability": "Subtract — cut later shapes out of the first (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11528"
+    "src/js/timeline.js:11531"
    ],
    "events": [
     "click"
@@ -1429,8 +1429,8 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11479 updateCombinePanel()",
-     "src/js/timeline.js:11494 updateCombinePanel()"
+     "src/js/timeline.js:11482 updateCombinePanel()",
+     "src/js/timeline.js:11497 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1449,7 +1449,7 @@
    "capability": "Union — merge shapes into one (Alt+click: non-destructive combine)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11528"
+    "src/js/timeline.js:11531"
    ],
    "events": [
     "click"
@@ -1481,8 +1481,8 @@
     "functionsVisited": 77,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11479 updateCombinePanel()",
-     "src/js/timeline.js:11494 updateCombinePanel()"
+     "src/js/timeline.js:11482 updateCombinePanel()",
+     "src/js/timeline.js:11497 updateCombinePanel()"
     ]
    },
    "fixtures": [
@@ -1501,7 +1501,7 @@
    "capability": "Convert layer to component",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11314"
+    "src/js/timeline.js:11317"
    ],
    "events": [
     "click"
@@ -1543,7 +1543,7 @@
    "capability": "Bake into layer",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11316"
+    "src/js/timeline.js:11319"
    ],
    "events": [
     "click"
@@ -1589,7 +1589,7 @@
    "capability": "Edit component…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11315"
+    "src/js/timeline.js:11318"
    ],
    "events": [
     "click"
@@ -1634,7 +1634,7 @@
    "capability": "Preview window…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11215 initCompPreview()"
+    "src/js/timeline.js:11218 initCompPreview()"
    ],
    "events": [
     "click"
@@ -1721,7 +1721,7 @@
    "capability": "Cycle — repeats the selected frame range N times (walk cycles)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:8865 initCycleAndPropagate()"
+    "src/js/timeline.js:8868 initCycleAndPropagate()"
    ],
    "events": [
     "click"
@@ -1766,7 +1766,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10384"
+    "src/js/timeline.js:10387"
    ],
    "events": [
     "click"
@@ -1807,7 +1807,7 @@
    "capability": "Delete active layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11312"
+    "src/js/timeline.js:11315"
    ],
    "events": [
     "click"
@@ -1852,7 +1852,7 @@
    "capability": "+ Effector",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:11365"
+    "src/js/timeline.js:11368"
    ],
    "events": [
     "click"
@@ -1896,7 +1896,7 @@
    "capability": "Edit source shape…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11386"
+    "src/js/timeline.js:11389"
    ],
    "events": [
     "click"
@@ -1944,7 +1944,7 @@
    "capability": "New random seed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11356"
+    "src/js/timeline.js:11359"
    ],
    "events": [
     "click"
@@ -1990,7 +1990,7 @@
    "capability": "Duplicate active layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11313"
+    "src/js/timeline.js:11316"
    ],
    "events": [
     "click"
@@ -2035,7 +2035,7 @@
    "capability": "Edit the curve…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10700"
+    "src/js/timeline.js:10703"
    ],
    "events": [
     "click"
@@ -2123,7 +2123,7 @@
    "capability": "export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11623"
+    "src/js/timeline.js:11626"
    ],
    "events": [
     "click"
@@ -2149,7 +2149,7 @@
     "functionsVisited": 15,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9078 action()"
+     "src/js/timeline.js:9081 action()"
     ]
    },
    "fixtures": [
@@ -2165,7 +2165,7 @@
    "capability": "Go to first frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11277"
+    "src/js/timeline.js:11280"
    ],
    "events": [
     "click"
@@ -2255,7 +2255,7 @@
    "capability": "Fit — fit the canvas to the viewport",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10959"
+    "src/js/timeline.js:10962"
    ],
    "events": [
     "click"
@@ -2341,7 +2341,7 @@
    "capability": "Ghost all keyframes — shows every keyframe of the active layer at once",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11033"
+    "src/js/timeline.js:11036"
    ],
    "events": [
     "click"
@@ -2387,7 +2387,7 @@
    "capability": "Select all keyframes' content to move/transform together",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11123"
+    "src/js/timeline.js:11126"
    ],
    "events": [
     "click"
@@ -2505,7 +2505,7 @@
     "functionsVisited": 112,
     "via": "variable histBtn",
     "references": [
-     "src/js/timeline.js:9049 action()"
+     "src/js/timeline.js:9052 action()"
     ]
    },
    "fixtures": [
@@ -2599,7 +2599,7 @@
     "functionsVisited": 186,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:9051 action()"
+     "src/js/timeline.js:9054 action()"
     ]
    },
    "fixtures": [
@@ -2639,7 +2639,7 @@
     "functionsVisited": 1,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:9053 action()"
+     "src/js/timeline.js:9056 action()"
     ]
    },
    "fixtures": [
@@ -2687,7 +2687,7 @@
     "via": "chain",
     "references": [
      "src/js/images.js:706",
-     "src/js/timeline.js:9052 action()"
+     "src/js/timeline.js:9055 action()"
     ]
    },
    "fixtures": [
@@ -2727,7 +2727,7 @@
     "functionsVisited": 21,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9038 action()"
+     "src/js/timeline.js:9041 action()"
     ]
    },
    "fixtures": [
@@ -2766,7 +2766,7 @@
     "functionsVisited": 14,
     "via": "helper el()",
     "references": [
-     "src/js/timeline.js:9100 action()"
+     "src/js/timeline.js:9103 action()"
     ]
    },
    "fixtures": [
@@ -2781,7 +2781,7 @@
    "capability": "Go to last frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11281"
+    "src/js/timeline.js:11284"
    ],
    "events": [
     "click"
@@ -2825,7 +2825,7 @@
    "capability": "Analyse and apply",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11238 initLipSync()"
+    "src/js/timeline.js:11241 initLipSync()"
    ],
    "events": [
     "click"
@@ -2871,8 +2871,8 @@
    "capability": "Loop playback (work area) — right-click for ping-pong",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11181",
-    "src/js/timeline.js:11182"
+    "src/js/timeline.js:11184",
+    "src/js/timeline.js:11185"
    ],
    "events": [
     "click",
@@ -2958,8 +2958,8 @@
    "capability": "Flou de mouvement de la composition — clic droit : échantillons et obturateur",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:8976 bindMotionBlur()",
-    "src/js/timeline.js:8977 bindMotionBlur()"
+    "src/js/timeline.js:8979 bindMotionBlur()",
+    "src/js/timeline.js:8980 bindMotionBlur()"
    ],
    "events": [
     "click",
@@ -3388,7 +3388,7 @@
    "capability": "Next frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11280"
+    "src/js/timeline.js:11283"
    ],
    "events": [
     "click"
@@ -3511,9 +3511,9 @@
    "capability": "Onion skin on/off (O)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11032",
-    "src/js/timeline.js:11189 initOnionPopover()",
-    "src/js/timeline.js:11272 initOnionTintShift()"
+    "src/js/timeline.js:11035",
+    "src/js/timeline.js:11192 initOnionPopover()",
+    "src/js/timeline.js:11275 initOnionTintShift()"
    ],
    "events": [
     "click",
@@ -3554,7 +3554,7 @@
    "capability": "Onion skin outlines only",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11137"
+    "src/js/timeline.js:11140"
    ],
    "events": [
     "click"
@@ -3797,7 +3797,7 @@
    "capability": "Previous frame",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11278"
+    "src/js/timeline.js:11281"
    ],
    "events": [
     "click"
@@ -3841,7 +3841,7 @@
    "capability": "Play / Stop (Enter)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11279"
+    "src/js/timeline.js:11282"
    ],
    "events": [
     "click"
@@ -3887,7 +3887,7 @@
    "capability": "Corner",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10644"
+    "src/js/timeline.js:10647"
    ],
    "events": [
     "click"
@@ -3932,7 +3932,7 @@
    "capability": "Smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10645"
+    "src/js/timeline.js:10648"
    ],
    "events": [
     "click"
@@ -3977,7 +3977,7 @@
    "capability": "Symmetric",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10646"
+    "src/js/timeline.js:10649"
    ],
    "events": [
     "click"
@@ -4106,7 +4106,7 @@
    "capability": "Reset View — restore zoom/pan/rotation to default",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10960"
+    "src/js/timeline.js:10963"
    ],
    "events": [
     "click"
@@ -4234,7 +4234,7 @@
    "capability": "All",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11130"
+    "src/js/timeline.js:11133"
    ],
    "events": [
     "click"
@@ -4277,7 +4277,7 @@
    "capability": "Auto-assign",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11425"
+    "src/js/timeline.js:11428"
    ],
    "events": [
     "click"
@@ -4325,7 +4325,7 @@
    "capability": "Commit pose",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11454"
+    "src/js/timeline.js:11457"
    ],
    "events": [
     "click"
@@ -4372,7 +4372,7 @@
    "capability": "2. Auto-assign shapes to bones (by proximity, Shapper-style)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11419"
+    "src/js/timeline.js:11422"
    ],
    "events": [
     "click"
@@ -4401,8 +4401,8 @@
     "functionsVisited": 169,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11407 renderRigModeUI()",
-     "src/js/timeline.js:11412 renderRigModeUI()"
+     "src/js/timeline.js:11410 renderRigModeUI()",
+     "src/js/timeline.js:11415 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4421,7 +4421,7 @@
    "capability": "1. Draw new bones",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11419"
+    "src/js/timeline.js:11422"
    ],
    "events": [
     "click"
@@ -4450,8 +4450,8 @@
     "functionsVisited": 169,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11407 renderRigModeUI()",
-     "src/js/timeline.js:11412 renderRigModeUI()"
+     "src/js/timeline.js:11410 renderRigModeUI()",
+     "src/js/timeline.js:11415 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4470,7 +4470,7 @@
    "capability": "3. Move / pose the bones already drawn",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11419"
+    "src/js/timeline.js:11422"
    ],
    "events": [
     "click"
@@ -4499,8 +4499,8 @@
     "functionsVisited": 169,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11407 renderRigModeUI()",
-     "src/js/timeline.js:11412 renderRigModeUI()"
+     "src/js/timeline.js:11410 renderRigModeUI()",
+     "src/js/timeline.js:11415 renderRigModeUI()"
     ]
    },
    "fixtures": [
@@ -4519,7 +4519,7 @@
    "capability": "Reset",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11458"
+    "src/js/timeline.js:11461"
    ],
    "events": [
     "click"
@@ -4567,7 +4567,7 @@
    "capability": "Rulers — drag out from the top/left bar to place a guide; drag a guide back onto its bar to remove it",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10714"
+    "src/js/timeline.js:10717"
    ],
    "events": [
     "click"
@@ -4593,7 +4593,7 @@
     "functionsVisited": 24,
     "via": "variable _btnRulers",
     "references": [
-     "src/js/timeline.js:10986 action()"
+     "src/js/timeline.js:10989 action()"
     ]
    },
    "fixtures": [
@@ -4609,7 +4609,7 @@
    "capability": "Broadcast-safe overlay guides: 90% action-safe / 80% title-safe margins, standard TV/film safe areas",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10710"
+    "src/js/timeline.js:10713"
    ],
    "events": [
     "click"
@@ -4735,7 +4735,7 @@
    "capability": "settings",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8905 initSettingsModal()"
+    "src/js/timeline.js:8908 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -4763,10 +4763,10 @@
     "functionsVisited": 140,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:9065 action()",
-     "src/js/timeline.js:9081 action()",
-     "src/js/timeline.js:9083 action()",
-     "src/js/timeline.js:9088 action()"
+     "src/js/timeline.js:9068 action()",
+     "src/js/timeline.js:9084 action()",
+     "src/js/timeline.js:9086 action()",
+     "src/js/timeline.js:9091 action()"
     ]
    },
    "fixtures": []
@@ -4778,7 +4778,7 @@
    "capability": "Show/hide Shadow Brush guide lines across all layers and components",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11124"
+    "src/js/timeline.js:11127"
    ],
    "events": [
     "click"
@@ -4820,7 +4820,7 @@
    "capability": "Hide “shy” layers (right-click a layer to mark it)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:8990 bindShy()"
+    "src/js/timeline.js:8993 bindShy()"
    ],
    "events": [
     "click"
@@ -4865,7 +4865,7 @@
    "capability": "Link width/height (keep proportions)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10582"
+    "src/js/timeline.js:10585"
    ],
    "events": [
     "click"
@@ -4906,7 +4906,7 @@
    "capability": "Animate text…",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8587 updateTextActionsPanel()"
+    "src/js/timeline.js:8590 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4951,7 +4951,7 @@
    "capability": "Split by character",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8582 updateTextActionsPanel()"
+    "src/js/timeline.js:8585 updateTextActionsPanel()"
    ],
    "events": [
     "click"
@@ -4996,7 +4996,7 @@
    "capability": "Personnaliser les boutons visibles de la barre",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11068 initToolbarCustomization()"
+    "src/js/timeline.js:11071 initToolbarCustomization()"
    ],
    "events": [
     "click"
@@ -5247,7 +5247,7 @@
    "capability": "Tween (T)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11031"
+    "src/js/timeline.js:11034"
    ],
    "events": [
     "click"
@@ -5333,7 +5333,7 @@
    "capability": "Show/hide easing curves under layers with tweens — click a segment to edit it individually. Inside the editor: click empty space to add a point, double-click a point to remove it",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11122"
+    "src/js/timeline.js:11125"
    ],
    "events": [
     "click"
@@ -5380,7 +5380,7 @@
    "capability": "Fill color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10271"
+    "src/js/timeline.js:10274"
    ],
    "events": [
     "input"
@@ -5410,7 +5410,7 @@
     "functionsVisited": 75,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10272",
+     "src/js/timeline.js:10275",
      "src/js/tools.js:7622 onMouseDown()",
      "src/js/timeline.js:3778 updateFsSelPanel()",
      "src/js/timeline.js:6231 paintFillSwatches()",
@@ -5431,7 +5431,7 @@
    "capability": "Stroke color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10279"
+    "src/js/timeline.js:10282"
    ],
    "events": [
     "input"
@@ -5461,7 +5461,7 @@
     "functionsVisited": 84,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10280",
+     "src/js/timeline.js:10283",
      "src/js/tools.js:7619 onMouseDown()",
      "src/js/tools.js:7621 onMouseDown()",
      "src/js/timeline.js:3790 updateFsSelPanel()",
@@ -5483,7 +5483,7 @@
    "capability": "Delete this comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7861 initCommentPopover()"
+    "src/js/timeline.js:7864 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5514,7 +5514,7 @@
     "functionsVisited": 385,
     "via": "variable delBtn",
     "references": [
-     "src/js/timeline.js:7757 openCommentPopover()"
+     "src/js/timeline.js:7760 openCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5540,7 +5540,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7760 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7763 openCommentPopover())",
    "source": "src/index.html:2073",
    "meta": {
     "data": {},
@@ -5550,8 +5550,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7760 openCommentPopover()",
-     "src/js/timeline.js:7829 initCommentPopover()"
+     "src/js/timeline.js:7763 openCommentPopover()",
+     "src/js/timeline.js:7832 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5575,7 +5575,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7753 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7756 openCommentPopover())",
    "source": "src/index.html:2085",
    "meta": {
     "data": {},
@@ -5585,8 +5585,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7753 openCommentPopover()",
-     "src/js/timeline.js:7834 initCommentPopover()"
+     "src/js/timeline.js:7756 openCommentPopover()",
+     "src/js/timeline.js:7837 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5610,7 +5610,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7753 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7756 openCommentPopover())",
    "source": "src/index.html:2082",
    "meta": {
     "data": {},
@@ -5620,8 +5620,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7753 openCommentPopover()",
-     "src/js/timeline.js:7834 initCommentPopover()"
+     "src/js/timeline.js:7756 openCommentPopover()",
+     "src/js/timeline.js:7837 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5636,7 +5636,7 @@
    "capability": "⏺ Record actions",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7789 initCommentPopover()"
+    "src/js/timeline.js:7792 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5660,7 +5660,7 @@
     "functionsVisited": 15,
     "via": "variable recordBtn",
     "references": [
-     "src/js/timeline.js:7686 updateRecordUI()"
+     "src/js/timeline.js:7689 updateRecordUI()"
     ]
    },
    "fixtures": [
@@ -5686,7 +5686,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7756 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7759 openCommentPopover())",
    "source": "src/index.html:2104",
    "meta": {
     "data": {},
@@ -5696,8 +5696,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7756 openCommentPopover()",
-     "src/js/timeline.js:7851 initCommentPopover()"
+     "src/js/timeline.js:7759 openCommentPopover()",
+     "src/js/timeline.js:7854 initCommentPopover()"
     ]
    },
    "fixtures": [
@@ -5714,7 +5714,7 @@
    "capability": "Save",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7847 initCommentPopover()"
+    "src/js/timeline.js:7850 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5760,7 +5760,7 @@
    "capability": "Save as feedback",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7822 initCommentPopover()"
+    "src/js/timeline.js:7825 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -5800,7 +5800,7 @@
    "capability": "comment shot input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:7806 initCommentPopover()"
+    "src/js/timeline.js:7809 initCommentPopover()"
    ],
    "events": [
     "change"
@@ -5848,7 +5848,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7752 openCommentPopover())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7755 openCommentPopover())",
    "source": "src/index.html:2058",
    "meta": {
     "data": {},
@@ -5858,10 +5858,10 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7752 openCommentPopover()",
-     "src/js/timeline.js:7768 openCommentPopover()",
-     "src/js/timeline.js:7827 initCommentPopover()",
-     "src/js/timeline.js:7850 initCommentPopover()",
+     "src/js/timeline.js:7755 openCommentPopover()",
+     "src/js/timeline.js:7771 openCommentPopover()",
+     "src/js/timeline.js:7830 initCommentPopover()",
+     "src/js/timeline.js:7853 initCommentPopover()",
      "src/js/tutorial.js:1114 measure()"
     ]
    },
@@ -5879,7 +5879,7 @@
    "capability": "Main-timeline frame at which this instance's own timeline starts",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11320"
+    "src/js/timeline.js:11323"
    ],
    "events": [
     "change"
@@ -5929,7 +5929,7 @@
    "capability": "comp playmode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11317"
+    "src/js/timeline.js:11320"
    ],
    "events": [
     "change"
@@ -5977,7 +5977,7 @@
    "capability": "comp singleframe",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11318"
+    "src/js/timeline.js:11321"
    ],
    "events": [
     "change"
@@ -6026,7 +6026,7 @@
    "capability": "comp speed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11319"
+    "src/js/timeline.js:11322"
    ],
    "events": [
     "change"
@@ -6120,7 +6120,7 @@
    "capability": "dup anim direction",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11361"
+    "src/js/timeline.js:11364"
    ],
    "events": [
     "change"
@@ -6168,7 +6168,7 @@
    "capability": "dup anim enabled",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11359"
+    "src/js/timeline.js:11362"
    ],
    "events": [
     "change"
@@ -6216,7 +6216,7 @@
    "capability": "Frames of offset between each copy",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11360"
+    "src/js/timeline.js:11363"
    ],
    "events": [
     "change"
@@ -6266,7 +6266,7 @@
    "capability": "dup cols",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -6316,7 +6316,7 @@
    "capability": "dup count",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -6366,7 +6366,7 @@
    "capability": "dup mode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11347"
+    "src/js/timeline.js:11350"
    ],
    "events": [
     "change"
@@ -6414,7 +6414,7 @@
    "capability": "dup path align",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11354"
+    "src/js/timeline.js:11357"
    ],
    "events": [
     "change"
@@ -6462,7 +6462,7 @@
    "capability": "dup path layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11355"
+    "src/js/timeline.js:11358"
    ],
    "events": [
     "change"
@@ -6509,7 +6509,7 @@
    "capability": "dup radial orient",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11353"
+    "src/js/timeline.js:11356"
    ],
    "events": [
     "change"
@@ -6557,7 +6557,7 @@
    "capability": "dup radius",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -6607,7 +6607,7 @@
    "capability": "dup rand hue",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11384 wireRand()"
+    "src/js/timeline.js:11387 wireRand()"
    ],
    "events": [
     "change"
@@ -6655,7 +6655,7 @@
    "capability": "dup rand op",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11384 wireRand()"
+    "src/js/timeline.js:11387 wireRand()"
    ],
    "events": [
     "change"
@@ -6703,7 +6703,7 @@
    "capability": "dup rand pos",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11384 wireRand()"
+    "src/js/timeline.js:11387 wireRand()"
    ],
    "events": [
     "change"
@@ -6751,7 +6751,7 @@
    "capability": "dup rand rot",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11384 wireRand()"
+    "src/js/timeline.js:11387 wireRand()"
    ],
    "events": [
     "change"
@@ -6799,7 +6799,7 @@
    "capability": "dup rand scale",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11384 wireRand()"
+    "src/js/timeline.js:11387 wireRand()"
    ],
    "events": [
     "change"
@@ -6847,7 +6847,7 @@
    "capability": "dup rows",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -6897,7 +6897,7 @@
    "capability": "dup seed",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -6992,7 +6992,7 @@
    "capability": "Spacing between copies (px)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -7042,7 +7042,7 @@
    "capability": "dup spacingy",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -7092,7 +7092,7 @@
    "capability": "Start angle (degrees)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:11346 wireNum()"
+    "src/js/timeline.js:11349 wireNum()"
    ],
    "events": [
     "change"
@@ -7140,7 +7140,7 @@
    "capability": "alpha",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11636"
+    "src/js/timeline.js:11639"
    ],
    "events": [
     "click"
@@ -7164,7 +7164,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11642"
+     "src/js/timeline.js:11645"
     ]
    },
    "fixtures": [
@@ -7181,7 +7181,7 @@
    "capability": "format",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11606"
+    "src/js/timeline.js:11609"
    ],
    "events": [
     "change"
@@ -7221,7 +7221,7 @@
    "capability": "h",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11614"
+    "src/js/timeline.js:11617"
    ],
    "events": [
     "input"
@@ -7262,7 +7262,7 @@
    "capability": "include shadow",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11636"
+    "src/js/timeline.js:11639"
    ],
    "events": [
     "click"
@@ -7286,7 +7286,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11647"
+     "src/js/timeline.js:11650"
     ]
    },
    "fixtures": [
@@ -7303,7 +7303,7 @@
    "capability": "range",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11636"
+    "src/js/timeline.js:11639"
    ],
    "events": [
     "click"
@@ -7327,7 +7327,7 @@
     "functionsVisited": 0,
     "via": "container delegation #export-modal",
     "references": [
-     "src/js/timeline.js:11559"
+     "src/js/timeline.js:11562"
     ]
    },
    "fixtures": [
@@ -7343,7 +7343,7 @@
    "capability": "Export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11638"
+    "src/js/timeline.js:11641"
    ],
    "events": [
     "click"
@@ -7385,7 +7385,7 @@
    "capability": "Vector content — scaling stays crisp at any factor",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11607"
+    "src/js/timeline.js:11610"
    ],
    "events": [
     "change"
@@ -7424,7 +7424,7 @@
    "capability": "w",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11613"
+    "src/js/timeline.js:11616"
    ],
    "events": [
     "input"
@@ -7465,7 +7465,7 @@
    "capability": "&times;",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11635"
+    "src/js/timeline.js:11638"
    ],
    "events": [
     "click"
@@ -7503,7 +7503,7 @@
    "capability": "↻ Refresh",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9483 initGithubFeedbackUI()"
+    "src/js/timeline.js:9486 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7540,7 +7540,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:9482 initGithubFeedbackUI()"
+    "src/js/timeline.js:9485 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7577,7 +7577,7 @@
    "capability": "📋 Open feedback board",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9481 initGithubFeedbackUI()"
+    "src/js/timeline.js:9484 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7611,7 +7611,7 @@
    "capability": "Pull the team's feedback",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9213 initFeedbackUI()"
+    "src/js/timeline.js:9216 initFeedbackUI()"
    ],
    "events": [
     "click"
@@ -7688,7 +7688,7 @@
    "capability": "figma token",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -7762,7 +7762,7 @@
    "capability": "figma url",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -7843,7 +7843,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10324"
+    "src/js/timeline.js:10327"
    ],
    "events": [
     "click"
@@ -7891,7 +7891,7 @@
    "capability": "Enable/disable fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10277"
+    "src/js/timeline.js:10280"
    ],
    "events": [
     "click"
@@ -8140,7 +8140,7 @@
    "capability": "gh token",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -8164,7 +8164,7 @@
     "functionsVisited": 0,
     "via": "container delegation #settings-modal",
     "references": [
-     "src/js/timeline.js:9473 initGithubFeedbackUI()"
+     "src/js/timeline.js:9476 initGithubFeedbackUI()"
     ]
    },
    "fixtures": []
@@ -8176,7 +8176,7 @@
    "capability": "Save",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9477 initGithubFeedbackUI()"
+    "src/js/timeline.js:9480 initGithubFeedbackUI()"
    ],
    "events": [
     "click"
@@ -8684,7 +8684,7 @@
    "capability": "lip end",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11226 initLipSync()"
+    "src/js/timeline.js:11229 initLipSync()"
    ],
    "events": [
     "input"
@@ -8711,7 +8711,7 @@
     "via": "callback id",
     "references": [
      "src/js/timeline.js:7134 renderLipSyncPanel()",
-     "src/js/timeline.js:11230 initLipSync()"
+     "src/js/timeline.js:11233 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8728,7 +8728,7 @@
    "capability": "lip hold",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11226 initLipSync()"
+    "src/js/timeline.js:11229 initLipSync()"
    ],
    "events": [
     "input"
@@ -8755,7 +8755,7 @@
     "via": "callback id",
     "references": [
      "src/js/timeline.js:7137 renderLipSyncPanel()",
-     "src/js/timeline.js:11232 initLipSync()"
+     "src/js/timeline.js:11235 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8772,7 +8772,7 @@
    "capability": "lip sens",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11226 initLipSync()"
+    "src/js/timeline.js:11229 initLipSync()"
    ],
    "events": [
     "input"
@@ -8799,7 +8799,7 @@
     "via": "callback id",
     "references": [
      "src/js/timeline.js:7137 renderLipSyncPanel()",
-     "src/js/timeline.js:11231 initLipSync()"
+     "src/js/timeline.js:11234 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8816,7 +8816,7 @@
    "capability": "lip start",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:11226 initLipSync()"
+    "src/js/timeline.js:11229 initLipSync()"
    ],
    "events": [
     "input"
@@ -8843,7 +8843,7 @@
     "via": "callback id",
     "references": [
      "src/js/timeline.js:7134 renderLipSyncPanel()",
-     "src/js/timeline.js:11229 initLipSync()"
+     "src/js/timeline.js:11232 initLipSync()"
     ]
    },
    "fixtures": [
@@ -8858,7 +8858,7 @@
    "capability": "lip track",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:11236 initLipSync()"
+    "src/js/timeline.js:11239 initLipSync()"
    ],
    "events": [
     "change"
@@ -9419,7 +9419,7 @@
    "capability": "±1",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11169"
+    "src/js/timeline.js:11172"
    ],
    "events": [
     "click"
@@ -9457,7 +9457,7 @@
    "capability": "±2",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11170"
+    "src/js/timeline.js:11173"
    ],
    "events": [
     "click"
@@ -9495,7 +9495,7 @@
    "capability": "±5",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11171"
+    "src/js/timeline.js:11174"
    ],
    "events": [
     "click"
@@ -9533,7 +9533,7 @@
    "capability": "All",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11172"
+    "src/js/timeline.js:11175"
    ],
    "events": [
     "click"
@@ -9757,7 +9757,7 @@
    "capability": "Normal",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10843 initBlendDropdown()"
+    "src/js/timeline.js:10846 initBlendDropdown()"
    ],
    "events": [
     "click"
@@ -9799,7 +9799,7 @@
    "capability": "brushpreset",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10662"
+    "src/js/timeline.js:10665"
    ],
    "events": [
     "change"
@@ -9885,7 +9885,7 @@
    "capability": "cap grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -9915,8 +9915,8 @@
     "references": [
      "src/js/timeline.js:3538 _restoreDrawingDefaults()",
      "src/js/timeline.js:3678 updateSelPropsPanel()",
-     "src/js/timeline.js:10462",
-     "src/js/timeline.js:10530 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:10465",
+     "src/js/timeline.js:10533 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -9933,7 +9933,7 @@
    "capability": "cbg",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10708"
+    "src/js/timeline.js:10711"
    ],
    "events": [
     "input"
@@ -9972,8 +9972,8 @@
    "capability": "ch",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10404",
-    "src/js/timeline.js:10707"
+    "src/js/timeline.js:10407",
+    "src/js/timeline.js:10710"
    ],
    "events": [
     "input",
@@ -10000,7 +10000,7 @@
     "functionsVisited": 15,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10400"
+     "src/js/timeline.js:10403"
     ]
    },
    "fixtures": [
@@ -10251,7 +10251,7 @@
    "capability": "current outline",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11144"
+    "src/js/timeline.js:11147"
    ],
    "events": [
     "change"
@@ -10294,8 +10294,8 @@
    "capability": "cw",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10396",
-    "src/js/timeline.js:10706"
+    "src/js/timeline.js:10399",
+    "src/js/timeline.js:10709"
    ],
    "events": [
     "input",
@@ -10322,7 +10322,7 @@
     "functionsVisited": 15,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10408"
+     "src/js/timeline.js:10411"
     ]
    },
    "fixtures": [
@@ -10339,7 +10339,7 @@
    "capability": "Shifts the dash pattern along the stroke — only visible when Style is Dashed or Dotted",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10431"
+    "src/js/timeline.js:10434"
    ],
    "events": [
     "change"
@@ -10387,7 +10387,7 @@
    "capability": "Front = new strokes on top, Behind = new strokes under existing artwork",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10696"
+    "src/js/timeline.js:10699"
    ],
    "events": [
     "change"
@@ -10426,7 +10426,7 @@
    "capability": "erasersize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10660"
+    "src/js/timeline.js:10663"
    ],
    "events": [
     "input"
@@ -10469,7 +10469,7 @@
    "capability": "Dégradé de fill — sélectionne une seule forme avec l'outil Sélection",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8831 initFillGradientButton()"
+    "src/js/timeline.js:8834 initFillGradientButton()"
    ],
    "events": [
     "click"
@@ -10493,7 +10493,7 @@
     "functionsVisited": 18,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:8849 syncFillGradientButton()"
+     "src/js/timeline.js:8852 syncFillGradientButton()"
     ]
    },
    "fixtures": [
@@ -10510,8 +10510,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10351",
-    "src/js/timeline.js:10376"
+    "src/js/timeline.js:10354",
+    "src/js/timeline.js:10379"
    ],
    "events": [
     "change",
@@ -10559,7 +10559,7 @@
    "capability": "fill on",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10273"
+    "src/js/timeline.js:10276"
    ],
    "events": [
     "change"
@@ -10608,7 +10608,7 @@
    "capability": "fillbrushmode grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -10636,7 +10636,7 @@
     "functionsVisited": 18,
     "via": "helper wireIconGroup()",
     "references": [
-     "src/js/timeline.js:10465"
+     "src/js/timeline.js:10468"
     ]
    },
    "fixtures": [
@@ -10653,7 +10653,7 @@
    "capability": "fillbrushsize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10661"
+    "src/js/timeline.js:10664"
    ],
    "events": [
     "input"
@@ -10869,8 +10869,8 @@
     "via": "variable onCb",
     "references": [
      "src/js/gradient-bridge.js:63 renderGradientPanel()",
-     "src/js/timeline.js:8828 initFillGradientButton()",
-     "src/js/timeline.js:8850 syncFillGradientButton()",
+     "src/js/timeline.js:8831 initFillGradientButton()",
+     "src/js/timeline.js:8853 syncFillGradientButton()",
      "src/js/tutorial.js:1262 check()"
     ]
    },
@@ -10888,7 +10888,7 @@
    "capability": "harmonize tween",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11030"
+    "src/js/timeline.js:11033"
    ],
    "events": [
     "change"
@@ -11127,8 +11127,8 @@
    "capability": "join grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()",
-    "src/js/timeline.js:10470"
+    "src/js/timeline.js:10449 wireIconGroup()",
+    "src/js/timeline.js:10473"
    ],
    "events": [
     "click"
@@ -11158,10 +11158,10 @@
     "references": [
      "src/js/timeline.js:3538 _restoreDrawingDefaults()",
      "src/js/timeline.js:3678 updateSelPropsPanel()",
-     "src/js/timeline.js:10463",
-     "src/js/timeline.js:10469 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10490 syncJoinEnabledForGradient()",
-     "src/js/timeline.js:10530 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:10466",
+     "src/js/timeline.js:10472 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10493 syncJoinEnabledForGradient()",
+     "src/js/timeline.js:10533 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -11271,7 +11271,7 @@
    "capability": "maskmode",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10704"
+    "src/js/timeline.js:10707"
    ],
    "events": [
     "change"
@@ -11308,7 +11308,7 @@
    "capability": "Add = union with this layer's other masks · Subtract = punches a hole · Intersect = keeps only the overlap",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10705"
+    "src/js/timeline.js:10708"
    ],
    "events": [
     "change"
@@ -11345,7 +11345,7 @@
    "capability": "None",
    "area": "effects-masks",
    "handler": [
-    "src/js/timeline.js:10945 initMatteDropdown()"
+    "src/js/timeline.js:10948 initMatteDropdown()"
    ],
    "events": [
     "click"
@@ -11387,7 +11387,7 @@
    "capability": "Miter limit — how far a sharp Join:Miter corner can extend before falling back to a bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10430"
+    "src/js/timeline.js:10433"
    ],
    "events": [
     "change"
@@ -11419,8 +11419,8 @@
     "references": [
      "src/js/timeline.js:3540 _restoreDrawingDefaults()",
      "src/js/timeline.js:3680 updateSelPropsPanel()",
-     "src/js/timeline.js:10469 syncMiterLimitEnabled()",
-     "src/js/timeline.js:10496 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:10472 syncMiterLimitEnabled()",
+     "src/js/timeline.js:10499 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -11533,7 +11533,7 @@
    "capability": "om follow",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11176"
+    "src/js/timeline.js:11179"
    ],
    "events": [
     "change"
@@ -11571,7 +11571,7 @@
    "capability": "omode",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11249"
+    "src/js/timeline.js:11252"
    ],
    "events": [
     "change"
@@ -11595,7 +11595,7 @@
     "functionsVisited": 16,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:11139"
+     "src/js/timeline.js:11142"
     ]
    },
    "fixtures": [
@@ -11611,7 +11611,7 @@
    "capability": "onion shift next",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11269 initOnionTintShift()"
+    "src/js/timeline.js:11272 initOnionTintShift()"
    ],
    "events": [
     "change"
@@ -11651,7 +11651,7 @@
    "capability": "Zero",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11270 initOnionTintShift()"
+    "src/js/timeline.js:11273 initOnionTintShift()"
    ],
    "events": [
     "click"
@@ -11691,7 +11691,7 @@
    "capability": "Horizontal ghost offset",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11269 initOnionTintShift()"
+    "src/js/timeline.js:11272 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11733,7 +11733,7 @@
    "capability": "Vertical ghost offset",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11269 initOnionTintShift()"
+    "src/js/timeline.js:11272 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11775,7 +11775,7 @@
    "capability": "Tint for next frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11263 initOnionTintShift()"
+    "src/js/timeline.js:11266 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11815,7 +11815,7 @@
    "capability": "Tint for previous frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11262 initOnionTintShift()"
+    "src/js/timeline.js:11265 initOnionTintShift()"
    ],
    "events": [
     "input"
@@ -11855,7 +11855,7 @@
    "capability": "Default",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11264 initOnionTintShift()"
+    "src/js/timeline.js:11267 initOnionTintShift()"
    ],
    "events": [
     "click"
@@ -11898,7 +11898,7 @@
    "capability": "onop",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11276"
+    "src/js/timeline.js:11279"
    ],
    "events": [
     "input"
@@ -11938,7 +11938,7 @@
    "capability": "opacity",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10426"
+    "src/js/timeline.js:10429"
    ],
    "events": [
     "input"
@@ -11987,7 +11987,7 @@
    "capability": "opop",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11275"
+    "src/js/timeline.js:11278"
    ],
    "events": [
     "input"
@@ -12027,7 +12027,7 @@
    "capability": "paintorder grp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -12057,7 +12057,7 @@
     "references": [
      "src/js/timeline.js:3539 _restoreDrawingDefaults()",
      "src/js/timeline.js:3679 updateSelPropsPanel()",
-     "src/js/timeline.js:10464"
+     "src/js/timeline.js:10467"
     ]
    },
    "fixtures": [
@@ -12074,7 +12074,7 @@
    "capability": "Pressure response: sqrt/cbrt = a light touch already widens the line (soft felt-tip), pow2/pow3 = you must press hard to thicken it (hard pencil)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/timeline.js:10699"
+    "src/js/timeline.js:10702"
    ],
    "events": [
     "change"
@@ -12115,7 +12115,7 @@
    "capability": "pinv",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10701"
+    "src/js/timeline.js:10704"
    ],
    "events": [
     "change"
@@ -12154,7 +12154,7 @@
    "capability": "Width at full pressure (% of brush size)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10698"
+    "src/js/timeline.js:10701"
    ],
    "events": [
     "input"
@@ -12195,7 +12195,7 @@
    "capability": "Width at zero pressure (% of brush size)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10697"
+    "src/js/timeline.js:10700"
    ],
    "events": [
     "input"
@@ -12236,7 +12236,7 @@
    "capability": "poststroke smooth",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10438"
+    "src/js/timeline.js:10441"
    ],
    "events": [
     "change"
@@ -12459,7 +12459,7 @@
    "capability": "resamp",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11027"
+    "src/js/timeline.js:11030"
    ],
    "events": [
     "input"
@@ -12500,7 +12500,7 @@
    "capability": "shadowmode",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10703"
+    "src/js/timeline.js:10706"
    ],
    "events": [
     "change"
@@ -12542,7 +12542,7 @@
    "capability": "skipmanual",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11029"
+    "src/js/timeline.js:11032"
    ],
    "events": [
     "change"
@@ -12581,7 +12581,7 @@
    "capability": "Simplifies the curve AFTER the fact (fewer points, more efficient stroke) — has no effect on shakiness while drawing, that's what Stabilizer above handles. At 0: the point count isn't reduced, but the stroke can still look visibly smoothed if Stabilizer is enabled.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10427"
+    "src/js/timeline.js:10430"
    ],
    "events": [
     "input"
@@ -12624,7 +12624,7 @@
    "capability": "Smooths POSITION live while you draw (corrects hand shake) — acts BEFORE the stroke is laid down, independent of Smooth below. Off/Low/Medium/High: classic sliding average. Quill: physical spring-damper model (Google ink-stroke-modeler, like rnote), catches up to the tip on release. Set this to Off if you want a stroke that follows your hand pixel-perfectly.",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10428"
+    "src/js/timeline.js:10431"
    ],
    "events": [
     "change"
@@ -12810,7 +12810,7 @@
    "capability": "step",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:11028"
+    "src/js/timeline.js:11031"
    ],
    "events": [
     "change"
@@ -12849,7 +12849,7 @@
    "capability": "Stroke opacity (color alpha)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10367"
+    "src/js/timeline.js:10370"
    ],
    "events": [
     "input"
@@ -12898,8 +12898,8 @@
    "capability": "Hex code — type to change",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10357",
-    "src/js/timeline.js:10376"
+    "src/js/timeline.js:10360",
+    "src/js/timeline.js:10379"
    ],
    "events": [
     "change",
@@ -12947,8 +12947,8 @@
    "capability": "strokegrad along",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10293",
-    "src/js/timeline.js:10498"
+    "src/js/timeline.js:10296",
+    "src/js/timeline.js:10501"
    ],
    "events": [
     "change"
@@ -12979,7 +12979,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3659 updateSelPropsPanel()",
-     "src/js/timeline.js:10491 syncJoinEnabledForGradient()"
+     "src/js/timeline.js:10494 syncJoinEnabledForGradient()"
     ]
    },
    "fixtures": [
@@ -13016,7 +13016,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/timeline.js:3665 updateSelPropsPanel()",
-     "src/js/timeline.js:10307"
+     "src/js/timeline.js:10310"
     ]
    },
    "fixtures": [
@@ -13033,7 +13033,7 @@
    "capability": "strokegrad from c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10305"
+    "src/js/timeline.js:10308"
    ],
    "events": [
     "input"
@@ -13064,7 +13064,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3664 updateSelPropsPanel()",
-     "src/js/timeline.js:10297"
+     "src/js/timeline.js:10300"
     ]
    },
    "fixtures": [
@@ -13101,7 +13101,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/timeline.js:3667 updateSelPropsPanel()",
-     "src/js/timeline.js:10315"
+     "src/js/timeline.js:10318"
     ]
    },
    "fixtures": [
@@ -13118,7 +13118,7 @@
    "capability": "strokegrad to c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10313"
+    "src/js/timeline.js:10316"
    ],
    "events": [
     "input"
@@ -13149,7 +13149,7 @@
     "via": "chain",
     "references": [
      "src/js/timeline.js:3666 updateSelPropsPanel()",
-     "src/js/timeline.js:10298"
+     "src/js/timeline.js:10301"
     ]
    },
    "fixtures": [
@@ -13166,7 +13166,7 @@
    "capability": "strokestyle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10429"
+    "src/js/timeline.js:10432"
    ],
    "events": [
     "change"
@@ -13196,7 +13196,7 @@
     "functionsVisited": 41,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:10540 syncStrokePropsForVectorBrush()"
+     "src/js/timeline.js:10543 syncStrokePropsForVectorBrush()"
     ]
    },
    "fixtures": [
@@ -13213,7 +13213,7 @@
    "capability": "Stroke width (px) — also drives Bitmap Brush dab size",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10261"
+    "src/js/timeline.js:10264"
    ],
    "events": [
     "change"
@@ -13270,7 +13270,7 @@
    "capability": "taper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10702"
+    "src/js/timeline.js:10705"
    ],
    "events": [
     "change"
@@ -13440,7 +13440,7 @@
    "capability": "vecbrush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10544"
+    "src/js/timeline.js:10547"
    ],
    "events": [
     "change"
@@ -14086,7 +14086,7 @@
    "capability": "p2p my code",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -14256,7 +14256,7 @@
    "capability": "pm fill c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10272"
+    "src/js/timeline.js:10275"
    ],
    "events": [
     "input"
@@ -14351,7 +14351,7 @@
    "capability": "pm stroke c",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10280"
+    "src/js/timeline.js:10283"
    ],
    "events": [
     "input"
@@ -14402,7 +14402,7 @@
    "capability": "profile color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8946 initProfileFields()"
+    "src/js/timeline.js:8949 initProfileFields()"
    ],
    "events": [
     "input"
@@ -14426,7 +14426,7 @@
     "functionsVisited": 4,
     "via": "variable colorEl",
     "references": [
-     "src/js/timeline.js:8923 syncProfileFields()"
+     "src/js/timeline.js:8926 syncProfileFields()"
     ]
    },
    "fixtures": [
@@ -14467,8 +14467,8 @@
     "functionsVisited": 46,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
-     "src/js/timeline.js:8923 syncProfileFields()",
-     "src/js/timeline.js:8949 initProfileFields()"
+     "src/js/timeline.js:8926 syncProfileFields()",
+     "src/js/timeline.js:8952 initProfileFields()"
     ]
    },
    "fixtures": [
@@ -14485,7 +14485,7 @@
    "capability": "profile email",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8942 initProfileFields()"
+    "src/js/timeline.js:8945 initProfileFields()"
    ],
    "events": [
     "input"
@@ -14509,7 +14509,7 @@
     "functionsVisited": 3,
     "via": "variable emailEl",
     "references": [
-     "src/js/timeline.js:8923 syncProfileFields()"
+     "src/js/timeline.js:8926 syncProfileFields()"
     ]
    },
    "fixtures": []
@@ -14521,7 +14521,7 @@
    "capability": "profile name",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8938 initProfileFields()"
+    "src/js/timeline.js:8941 initProfileFields()"
    ],
    "events": [
     "input"
@@ -14545,7 +14545,7 @@
     "functionsVisited": 3,
     "via": "variable nameEl",
     "references": [
-     "src/js/timeline.js:8923 syncProfileFields()",
+     "src/js/timeline.js:8926 syncProfileFields()",
      "src/js/tutorial.js:1088 measure()"
     ]
    },
@@ -14558,7 +14558,7 @@
    "capability": "profile role",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8952 initProfileFields()"
+    "src/js/timeline.js:8955 initProfileFields()"
    ],
    "events": [
     "change"
@@ -14587,7 +14587,7 @@
     "functionsVisited": 142,
     "via": "variable roleEl",
     "references": [
-     "src/js/timeline.js:8923 syncProfileFields()"
+     "src/js/timeline.js:8926 syncProfileFields()"
     ]
    },
    "fixtures": []
@@ -14599,7 +14599,7 @@
    "capability": "proj fps",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10957"
+    "src/js/timeline.js:10960"
    ],
    "events": [
     "change"
@@ -14642,7 +14642,7 @@
    "capability": "proj frames",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10958"
+    "src/js/timeline.js:10961"
    ],
    "events": [
     "change"
@@ -14718,7 +14718,7 @@
     "via": "chain",
     "references": [
      "src/js/project.js:633",
-     "src/js/timeline.js:9034 action()"
+     "src/js/timeline.js:9037 action()"
     ]
    },
    "fixtures": [
@@ -14733,7 +14733,7 @@
    "capability": "Settings",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8907 initSettingsModal()"
+    "src/js/timeline.js:8910 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -14767,7 +14767,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11774 initPropsPanelCollapse()"
+    "src/js/timeline.js:11777 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14791,7 +14791,7 @@
     "functionsVisited": 21,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11767 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11770 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
@@ -14892,7 +14892,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11439)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11442)",
    "source": "src/index.html:1587",
    "meta": {
     "data": {},
@@ -14902,7 +14902,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11439"
+     "src/js/timeline.js:11442"
     ]
    },
    "fixtures": [
@@ -14927,7 +14927,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11438)",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:11441)",
    "source": "src/index.html:1586",
    "meta": {
     "data": {},
@@ -14937,7 +14937,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:11438"
+     "src/js/timeline.js:11441"
     ]
    },
    "fixtures": [
@@ -14975,7 +14975,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/rig-bridge.js:194 panelSoftness()",
-     "src/js/timeline.js:11433"
+     "src/js/timeline.js:11436"
     ]
    },
    "fixtures": [
@@ -15014,7 +15014,7 @@
     "functionsVisited": 0,
     "references": [
      "src/js/rig-bridge.js:193 panelRotate()",
-     "src/js/timeline.js:11432"
+     "src/js/timeline.js:11435"
     ]
    },
    "fixtures": [
@@ -15056,7 +15056,7 @@
     "references": [
      "src/js/engine-bridge.js:3659 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
-     "src/js/timeline.js:11431"
+     "src/js/timeline.js:11434"
     ]
    },
    "fixtures": [
@@ -15319,7 +15319,7 @@
    "capability": "&times;",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8909 initSettingsModal()"
+    "src/js/timeline.js:8912 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -15390,7 +15390,7 @@
    "capability": "Reset all",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8912 initSettingsModal()"
+    "src/js/timeline.js:8915 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -15426,8 +15426,8 @@
    "capability": "Height",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10559 wireLiveXformField()",
-    "src/js/timeline.js:10560 wireLiveXformField()"
+    "src/js/timeline.js:10562 wireLiveXformField()",
+    "src/js/timeline.js:10563 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15455,7 +15455,7 @@
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3755 updateSelPropsPanel()",
-     "src/js/timeline.js:10591"
+     "src/js/timeline.js:10594"
     ]
    },
    "fixtures": [
@@ -15472,8 +15472,8 @@
    "capability": "Rotation relative to selection state (degrees)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10559 wireLiveXformField()",
-    "src/js/timeline.js:10560 wireLiveXformField()"
+    "src/js/timeline.js:10562 wireLiveXformField()",
+    "src/js/timeline.js:10563 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15517,8 +15517,8 @@
    "capability": "Width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10559 wireLiveXformField()",
-    "src/js/timeline.js:10560 wireLiveXformField()"
+    "src/js/timeline.js:10562 wireLiveXformField()",
+    "src/js/timeline.js:10563 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15546,7 +15546,7 @@
     "via": "helper wireLiveXformField()",
     "references": [
      "src/js/timeline.js:3754 updateSelPropsPanel()",
-     "src/js/timeline.js:10602"
+     "src/js/timeline.js:10605"
     ]
    },
    "fixtures": [
@@ -15563,8 +15563,8 @@
    "capability": "X — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10559 wireLiveXformField()",
-    "src/js/timeline.js:10560 wireLiveXformField()"
+    "src/js/timeline.js:10562 wireLiveXformField()",
+    "src/js/timeline.js:10563 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15608,8 +15608,8 @@
    "capability": "Y — drag to scrub, click to type",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10559 wireLiveXformField()",
-    "src/js/timeline.js:10560 wireLiveXformField()"
+    "src/js/timeline.js:10562 wireLiveXformField()",
+    "src/js/timeline.js:10563 wireLiveXformField()"
    ],
    "events": [
     "input",
@@ -15851,7 +15851,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10325"
+    "src/js/timeline.js:10328"
    ],
    "events": [
     "click"
@@ -15899,7 +15899,7 @@
    "capability": "Enable/disable stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10278"
+    "src/js/timeline.js:10281"
    ],
    "events": [
     "click"
@@ -15946,7 +15946,7 @@
    "capability": "Check for updates",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9157 initSyncUI()"
+    "src/js/timeline.js:9160 initSyncUI()"
    ],
    "events": [
     "click"
@@ -15982,7 +15982,7 @@
    "capability": "Choose…",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9153 initSyncUI()"
+    "src/js/timeline.js:9156 initSyncUI()"
    ],
    "events": [
     "click"
@@ -16018,7 +16018,7 @@
    "capability": "sync folder path",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -16042,7 +16042,7 @@
     "functionsVisited": 0,
     "via": "container delegation #settings-modal",
     "references": [
-     "src/js/timeline.js:9117 syncFolderFields()"
+     "src/js/timeline.js:9120 syncFolderFields()"
     ]
    },
    "fixtures": []
@@ -16054,7 +16054,7 @@
    "capability": "Publish",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:9156 initSyncUI()"
+    "src/js/timeline.js:9159 initSyncUI()"
    ],
    "events": [
     "click"
@@ -16101,7 +16101,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7911 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7914 resetTextPopoverFields())",
    "source": "src/index.html:2000",
    "meta": {
     "data": {},
@@ -16111,8 +16111,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7911 resetTextPopoverFields()",
-     "src/js/timeline.js:8394 commitText()"
+     "src/js/timeline.js:7914 resetTextPopoverFields()",
+     "src/js/timeline.js:8397 commitText()"
     ]
    },
    "fixtures": [
@@ -16129,7 +16129,7 @@
    "capability": "Place text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8446 initTextPopover()"
+    "src/js/timeline.js:8449 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16175,7 +16175,7 @@
    "capability": "Cancel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8447 initTextPopover()"
+    "src/js/timeline.js:8450 initTextPopover()"
    ],
    "events": [
     "click"
@@ -16223,7 +16223,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7912 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7915 resetTextPopoverFields())",
    "source": "src/index.html:1997",
    "meta": {
     "data": {},
@@ -16233,8 +16233,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7912 resetTextPopoverFields()",
-     "src/js/timeline.js:8395 commitText()"
+     "src/js/timeline.js:7915 resetTextPopoverFields()",
+     "src/js/timeline.js:8398 commitText()"
     ]
    },
    "fixtures": [
@@ -16260,7 +16260,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7910 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7913 resetTextPopoverFields())",
    "source": "src/index.html:1992",
    "meta": {
     "data": {},
@@ -16270,8 +16270,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7910 resetTextPopoverFields()",
-     "src/js/timeline.js:8393 commitText()"
+     "src/js/timeline.js:7913 resetTextPopoverFields()",
+     "src/js/timeline.js:8396 commitText()"
     ]
    },
    "fixtures": [
@@ -16288,7 +16288,7 @@
    "capability": "text input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8456 initTextPopover()"
+    "src/js/timeline.js:8459 initTextPopover()"
    ],
    "events": [
     "keydown"
@@ -16318,11 +16318,11 @@
     "functionsVisited": 89,
     "via": "chain",
     "references": [
-     "src/js/timeline.js:7908 resetTextPopoverFields()",
-     "src/js/timeline.js:7918 openTextPopover()",
-     "src/js/timeline.js:7928 openTextPopoverForBox()",
-     "src/js/timeline.js:7945 openTextPopoverForEdit()",
-     "src/js/timeline.js:8390 commitText()",
+     "src/js/timeline.js:7911 resetTextPopoverFields()",
+     "src/js/timeline.js:7921 openTextPopover()",
+     "src/js/timeline.js:7931 openTextPopoverForBox()",
+     "src/js/timeline.js:7948 openTextPopoverForEdit()",
+     "src/js/timeline.js:8393 commitText()",
      "src/js/tutorial.js:83 measureTextInputLength()"
     ]
    },
@@ -16349,7 +16349,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7909 resetTextPopoverFields())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/timeline.js:7912 resetTextPopoverFields())",
    "source": "src/index.html:1991",
    "meta": {
     "data": {
@@ -16361,8 +16361,8 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/timeline.js:7909 resetTextPopoverFields()",
-     "src/js/timeline.js:8392 commitText()"
+     "src/js/timeline.js:7912 resetTextPopoverFields()",
+     "src/js/timeline.js:8395 commitText()"
     ]
    },
    "fixtures": [
@@ -16379,7 +16379,7 @@
    "capability": "cf",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11289"
+    "src/js/timeline.js:11292"
    ],
    "events": [
     "change"
@@ -16429,7 +16429,7 @@
    "capability": "fps",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11282"
+    "src/js/timeline.js:11285"
    ],
    "events": [
     "change"
@@ -16472,7 +16472,7 @@
    "capability": "total",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11283"
+    "src/js/timeline.js:11286"
    ],
    "events": [
     "change"
@@ -16561,7 +16561,7 @@
    "capability": "Comment",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -16608,7 +16608,7 @@
    "capability": "Color",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -16639,8 +16639,8 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8643 updateTextPropsPanel()",
-     "src/js/timeline.js:8679 applyTextPropsEdit()"
+     "src/js/timeline.js:8646 updateTextPropsPanel()",
+     "src/js/timeline.js:8682 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16657,7 +16657,7 @@
    "capability": "Text content",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8731"
+    "src/js/timeline.js:8734"
    ],
    "events": [
     "blur"
@@ -16688,8 +16688,8 @@
     "functionsVisited": 436,
     "via": "variable contentEl",
     "references": [
-     "src/js/timeline.js:8632 updateTextPropsPanel()",
-     "src/js/timeline.js:8672 applyTextPropsEdit()"
+     "src/js/timeline.js:8635 updateTextPropsPanel()",
+     "src/js/timeline.js:8675 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16706,7 +16706,7 @@
    "capability": "tp fixed width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -16739,9 +16739,9 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8656 updateTextPropsPanel()",
-     "src/js/timeline.js:8693 applyTextPropsEdit()",
-     "src/js/timeline.js:8753"
+     "src/js/timeline.js:8659 updateTextPropsPanel()",
+     "src/js/timeline.js:8696 applyTextPropsEdit()",
+     "src/js/timeline.js:8756"
     ]
    },
    "fixtures": [
@@ -16758,7 +16758,7 @@
    "capability": "Font",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -16789,9 +16789,9 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8639 updateTextPropsPanel()",
-     "src/js/timeline.js:8677 applyTextPropsEdit()",
-     "src/js/timeline.js:8779 confirmAddGoogleFont()"
+     "src/js/timeline.js:8642 updateTextPropsPanel()",
+     "src/js/timeline.js:8680 applyTextPropsEdit()",
+     "src/js/timeline.js:8782 confirmAddGoogleFont()"
     ]
    },
    "fixtures": [
@@ -16808,7 +16808,7 @@
    "capability": "Add a Google Font by name",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8766"
+    "src/js/timeline.js:8769"
    ],
    "events": [
     "click"
@@ -16847,7 +16847,7 @@
    "capability": "Add",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8804"
+    "src/js/timeline.js:8807"
    ],
    "events": [
     "click"
@@ -16893,7 +16893,7 @@
    "capability": "tp font add input",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8805"
+    "src/js/timeline.js:8808"
    ],
    "events": [
     "keydown"
@@ -16937,7 +16937,7 @@
    "capability": "tp letter spacing",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -16970,8 +16970,8 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8648 updateTextPropsPanel()",
-     "src/js/timeline.js:8687 applyTextPropsEdit()"
+     "src/js/timeline.js:8651 updateTextPropsPanel()",
+     "src/js/timeline.js:8690 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -16988,7 +16988,7 @@
    "capability": "tp line height",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -17021,8 +17021,8 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8650 updateTextPropsPanel()",
-     "src/js/timeline.js:8688 applyTextPropsEdit()"
+     "src/js/timeline.js:8653 updateTextPropsPanel()",
+     "src/js/timeline.js:8691 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17039,7 +17039,7 @@
    "capability": "Size (px)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -17072,8 +17072,8 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8641 updateTextPropsPanel()",
-     "src/js/timeline.js:8678 applyTextPropsEdit()"
+     "src/js/timeline.js:8644 updateTextPropsPanel()",
+     "src/js/timeline.js:8681 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17090,7 +17090,7 @@
    "capability": "tp word spacing",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8733"
+    "src/js/timeline.js:8736"
    ],
    "events": [
     "change"
@@ -17123,8 +17123,8 @@
     "functionsVisited": 436,
     "via": "callback id",
     "references": [
-     "src/js/timeline.js:8652 updateTextPropsPanel()",
-     "src/js/timeline.js:8689 applyTextPropsEdit()"
+     "src/js/timeline.js:8655 updateTextPropsPanel()",
+     "src/js/timeline.js:8692 applyTextPropsEdit()"
     ]
    },
    "fixtures": [
@@ -17486,7 +17486,7 @@
    "capability": "zoom scrub",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10966"
+    "src/js/timeline.js:10969"
    ],
    "events": [
     "input"
@@ -17534,7 +17534,7 @@
    "capability": "mysteropodes/strokemotion-feedback",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -17568,7 +17568,7 @@
    "capability": "github.com/mysteropodes",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -17602,7 +17602,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -17636,7 +17636,7 @@
    "capability": "☕",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -17670,7 +17670,7 @@
    "capability": "Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17717,7 +17717,7 @@
    "capability": "Ellipse",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17764,7 +17764,7 @@
    "capability": "Eraser (E in Animation 2D — Motion mode reserves E to reveal Effects)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17811,7 +17811,7 @@
    "capability": "Eyedropper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17858,7 +17858,7 @@
    "capability": "Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17905,7 +17905,7 @@
    "capability": "Fill Brush",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17952,7 +17952,7 @@
    "capability": "Fill/Stroke Select — click a fill or a stroke segment to select it independently (M in Animation 2D — Motion mode reserves M to reveal Mattes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -17999,7 +17999,7 @@
    "capability": "Hand",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18046,7 +18046,7 @@
    "capability": "Line (U in Animation 2D — Motion mode reserves U to reveal animated properties)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18093,7 +18093,7 @@
    "capability": "Pen",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18140,7 +18140,7 @@
    "capability": "Rectangle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18187,7 +18187,7 @@
    "capability": "Rig — 3 steps in the panel: 1. Draw (click=anchor, drag=curve) 2. Assign (link shapes to bones) 3. Move (drag an anchor to pose) (S in Animation 2D — Motion mode reserves S for Scale)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18234,7 +18234,7 @@
    "capability": "Rotate canvas",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18281,7 +18281,7 @@
    "capability": "Select",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18328,7 +18328,7 @@
    "capability": "Speech bubble — rounded rect with an auto tail, drag to size (D)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18375,7 +18375,7 @@
    "capability": "Star / Polygon — drag to size, adjust point count / inner radius / corner rounding in the panel (K)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18422,7 +18422,7 @@
    "capability": "Subselect (nodes)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18469,7 +18469,7 @@
    "capability": "Text",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18516,7 +18516,7 @@
    "capability": "Zoom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10200"
+    "src/js/timeline.js:10203"
    ],
    "events": [
     "click"
@@ -18563,7 +18563,7 @@
    "capability": "Above — on top of existing fills",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18606,7 +18606,7 @@
    "capability": "Below — behind existing fills (background patch)",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18649,7 +18649,7 @@
    "capability": "Merge — unite with any existing fill it overlaps",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -18839,7 +18839,7 @@
    "capability": "General",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -18875,7 +18875,7 @@
    "capability": "Updates",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -18911,7 +18911,7 @@
    "capability": "Collaboration",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -18947,7 +18947,7 @@
    "capability": "Feedback",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -18983,7 +18983,7 @@
    "capability": "Figma",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -19019,7 +19019,7 @@
    "capability": "Shortcuts",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -19055,7 +19055,7 @@
    "capability": "Labs",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -19091,7 +19091,7 @@
    "capability": "About",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8892 initSettingsTabs()"
+    "src/js/timeline.js:8895 initSettingsTabs()"
    ],
    "events": [
     "click"
@@ -19127,7 +19127,7 @@
    "capability": "🐞",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7781 initCommentPopover()"
+    "src/js/timeline.js:7784 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -19166,7 +19166,7 @@
    "capability": "⚡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7781 initCommentPopover()"
+    "src/js/timeline.js:7784 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -19205,7 +19205,7 @@
    "capability": "💡",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7781 initCommentPopover()"
+    "src/js/timeline.js:7784 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -19244,7 +19244,7 @@
    "capability": "✨",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/timeline.js:7781 initCommentPopover()"
+    "src/js/timeline.js:7784 initCommentPopover()"
    ],
    "events": [
     "click"
@@ -19283,7 +19283,7 @@
    "capability": "Align left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19330,7 +19330,7 @@
    "capability": "Align center horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19377,7 +19377,7 @@
    "capability": "Align right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19424,7 +19424,7 @@
    "capability": "Align top",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19471,7 +19471,7 @@
    "capability": "Align center vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19518,7 +19518,7 @@
    "capability": "Align bottom",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10639"
+    "src/js/timeline.js:10642"
    ],
    "events": [
     "click"
@@ -19565,7 +19565,7 @@
    "capability": "Distribute horizontally",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10642"
+    "src/js/timeline.js:10645"
    ],
    "events": [
     "click"
@@ -19612,7 +19612,7 @@
    "capability": "Distribute vertically",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10642"
+    "src/js/timeline.js:10645"
    ],
    "events": [
     "click"
@@ -19659,7 +19659,7 @@
    "capability": "Top-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19705,7 +19705,7 @@
    "capability": "Top-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19751,7 +19751,7 @@
    "capability": "Top-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19797,7 +19797,7 @@
    "capability": "Middle-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19843,7 +19843,7 @@
    "capability": "Center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19889,7 +19889,7 @@
    "capability": "Middle-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19935,7 +19935,7 @@
    "capability": "Bottom-left",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -19981,7 +19981,7 @@
    "capability": "Bottom-center",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -20027,7 +20027,7 @@
    "capability": "Bottom-right",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10623"
+    "src/js/timeline.js:10626"
    ],
    "events": [
     "click"
@@ -20073,7 +20073,7 @@
    "capability": "Left",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8736"
+    "src/js/timeline.js:8739"
    ],
    "events": [
     "click"
@@ -20120,7 +20120,7 @@
    "capability": "Center",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8736"
+    "src/js/timeline.js:8739"
    ],
    "events": [
     "click"
@@ -20167,7 +20167,7 @@
    "capability": "Right",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8736"
+    "src/js/timeline.js:8739"
    ],
    "events": [
     "click"
@@ -20214,7 +20214,7 @@
    "capability": "B",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8742"
+    "src/js/timeline.js:8745"
    ],
    "events": [
     "click"
@@ -20261,7 +20261,7 @@
    "capability": "I",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8742"
+    "src/js/timeline.js:8745"
    ],
    "events": [
     "click"
@@ -20308,7 +20308,7 @@
    "capability": "U",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8742"
+    "src/js/timeline.js:8745"
    ],
    "events": [
     "click"
@@ -20355,7 +20355,7 @@
    "capability": "S",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8742"
+    "src/js/timeline.js:8745"
    ],
    "events": [
     "click"
@@ -20402,7 +20402,7 @@
    "capability": "Aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8745"
+    "src/js/timeline.js:8748"
    ],
    "events": [
     "click"
@@ -20449,7 +20449,7 @@
    "capability": "AA",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8745"
+    "src/js/timeline.js:8748"
    ],
    "events": [
     "click"
@@ -20496,7 +20496,7 @@
    "capability": "aa",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8745"
+    "src/js/timeline.js:8748"
    ],
    "events": [
     "click"
@@ -20543,7 +20543,7 @@
    "capability": "Ab",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8745"
+    "src/js/timeline.js:8748"
    ],
    "events": [
     "click"
@@ -20590,7 +20590,7 @@
    "capability": "Auto width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8751"
+    "src/js/timeline.js:8754"
    ],
    "events": [
     "click"
@@ -20637,7 +20637,7 @@
    "capability": "Fixed width",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:8751"
+    "src/js/timeline.js:8754"
    ],
    "events": [
     "click"
@@ -20684,7 +20684,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20727,7 +20727,7 @@
    "capability": "Butt",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20770,7 +20770,7 @@
    "capability": "Square",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20813,7 +20813,7 @@
    "capability": "Round",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20856,7 +20856,7 @@
    "capability": "Miter",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20899,7 +20899,7 @@
    "capability": "Bevel",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20942,7 +20942,7 @@
    "capability": "Fill in front of Stroke",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -20985,7 +20985,7 @@
    "capability": "Stroke in front of Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/timeline.js:10446 wireIconGroup()"
+    "src/js/timeline.js:10449 wireIconGroup()"
    ],
    "events": [
     "click"
@@ -21028,7 +21028,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21064,7 +21064,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21100,7 +21100,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21136,7 +21136,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21172,7 +21172,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21208,7 +21208,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21244,7 +21244,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -21280,7 +21280,7 @@
    "capability": "",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/timeline.js:8910 initSettingsModal()"
+    "src/js/timeline.js:8913 initSettingsModal()"
    ],
    "events": [
     "click"
@@ -29085,13 +29085,13 @@
    ]
   },
   {
-   "id": "menu:timeline.js:10981",
+   "id": "menu:timeline.js:10984",
    "kind": "menu",
    "surface": "dynamic menu",
    "capability": "Fit",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10981"
+    "src/js/timeline.js:10984"
    ],
    "events": [
     "click"
@@ -29105,7 +29105,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:10981",
+   "source": "src/js/timeline.js:10984",
    "meta": {
     "i18n": null,
     "functionsVisited": 7
@@ -29117,13 +29117,13 @@
    ]
   },
   {
-   "id": "menu:timeline.js:10982",
+   "id": "menu:timeline.js:10985",
    "kind": "menu",
    "surface": "dynamic menu",
    "capability": "Reset View (100%)",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:10982"
+    "src/js/timeline.js:10985"
    ],
    "events": [
     "click"
@@ -29137,7 +29137,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:10982",
+   "source": "src/js/timeline.js:10985",
    "meta": {
     "i18n": null,
     "functionsVisited": 5
@@ -29149,13 +29149,13 @@
    ]
   },
   {
-   "id": "menu:timeline.js:11303",
+   "id": "menu:timeline.js:11306",
    "kind": "menu",
    "surface": "dynamic menu",
    "capability": "Insert a layer",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11303"
+    "src/js/timeline.js:11306"
    ],
    "events": [
     "click"
@@ -29173,7 +29173,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11303",
+   "source": "src/js/timeline.js:11306",
    "meta": {
     "i18n": "ctxInsertLayer",
     "functionsVisited": 101
@@ -29185,127 +29185,10 @@
    ]
   },
   {
-   "id": "menu:timeline.js:11304",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a Null layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11304"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "animation": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11304",
-   "meta": {
-    "i18n": "ctxInsertLayerNull",
-    "functionsVisited": 91
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:11305",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert a folder",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11305"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "animation": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11305",
-   "meta": {
-    "i18n": "ctxInsertLayerFolder",
-    "functionsVisited": 91
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "menu:timeline.js:11306",
-   "kind": "menu",
-   "surface": "dynamic menu",
-   "capability": "Insert an effect layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/timeline.js:11306"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11306",
-   "meta": {
-    "i18n": "ctxInsertLayerEffect",
-    "functionsVisited": 70
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
    "id": "menu:timeline.js:11307",
    "kind": "menu",
    "surface": "dynamic menu",
-   "capability": "Insert a Guide layer",
+   "capability": "Insert a Null layer",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/timeline.js:11307"
@@ -29321,18 +29204,18 @@
    "consumers": {
     "persist": 2,
     "history": 2,
+    "animation": 2,
     "render": 2,
     "selection": 3,
-    "native": 3,
-    "animation": 3
+    "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:11307",
    "meta": {
-    "i18n": "ctxInsertLayerGuide",
-    "functionsVisited": 70
+    "i18n": "ctxInsertLayerNull",
+    "functionsVisited": 91
    },
    "fixtures": [
     "keyed-props",
@@ -29344,7 +29227,7 @@
    "id": "menu:timeline.js:11308",
    "kind": "menu",
    "surface": "dynamic menu",
-   "capability": "Joystick layer",
+   "capability": "Insert a folder",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/timeline.js:11308"
@@ -29358,17 +29241,20 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "persist": 3,
-    "history": 3,
-    "render": 3
+    "persist": 2,
+    "history": 2,
+    "animation": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:11308",
    "meta": {
-    "i18n": "ctxInsertLayerJoystick",
-    "functionsVisited": 15
+    "i18n": "ctxInsertLayerFolder",
+    "functionsVisited": 91
    },
    "fixtures": [
     "keyed-props",
@@ -29380,10 +29266,88 @@
    "id": "menu:timeline.js:11309",
    "kind": "menu",
    "surface": "dynamic menu",
-   "capability": "Slider layer",
+   "capability": "Insert an effect layer",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/timeline.js:11309"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11309",
+   "meta": {
+    "i18n": "ctxInsertLayerEffect",
+    "functionsVisited": 70
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:11310",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Insert a Guide layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11310"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 2,
+    "history": 2,
+    "render": 2,
+    "selection": 3,
+    "native": 3,
+    "animation": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11310",
+   "meta": {
+    "i18n": "ctxInsertLayerGuide",
+    "functionsVisited": 70
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:11311",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Joystick layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11311"
    ],
    "events": [
     "click"
@@ -29401,7 +29365,43 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/timeline.js:11309",
+   "source": "src/js/timeline.js:11311",
+   "meta": {
+    "i18n": "ctxInsertLayerJoystick",
+    "functionsVisited": 15
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "menu:timeline.js:11312",
+   "kind": "menu",
+   "surface": "dynamic menu",
+   "capability": "Slider layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/timeline.js:11312"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "persist": 3,
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/timeline.js:11312",
    "meta": {
     "i18n": "ctxInsertLayerSlider",
     "functionsVisited": 15
@@ -34219,7 +34219,7 @@
    "capability": "Duplicate keyframe",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:78 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:82 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34230,22 +34230,16 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "animation": 2,
-    "selection": 3,
-    "render": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:78",
+   "source": "src/js/application/shortcut-registry.js:82",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "",
     "cat": "frames",
-    "functionsVisited": 66
+    "functionsVisited": 0
    },
    "fixtures": [
     "keyed-props",
@@ -34258,458 +34252,6 @@
    "kind": "shortcut",
    "surface": "keyboard +",
    "capability": "Extend exposure",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:79 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:79",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "+",
-    "cat": "frames",
-    "functionsVisited": 44
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdFlipPreview",
-   "kind": "shortcut",
-   "surface": "keyboard f",
-   "capability": "Flip preview",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:81 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 2,
-    "persist": 3,
-    "selection": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:81",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "f",
-    "cat": "view",
-    "functionsVisited": 17
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdGoEnd",
-   "kind": "shortcut",
-   "surface": "keyboard End",
-   "capability": "Go to end",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:74 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:74",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "End",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdGoStart",
-   "kind": "shortcut",
-   "surface": "keyboard Home",
-   "capability": "Go to start",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:73 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:73",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "Home",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdInsertBlankKey",
-   "kind": "shortcut",
-   "surface": "keyboard F7",
-   "capability": "Insert blank keyframe",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:77 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:77",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "F7",
-    "cat": "frames",
-    "functionsVisited": 91
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdInsertFrame",
-   "kind": "shortcut",
-   "surface": "keyboard F5",
-   "capability": "Insert frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:75 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 2,
-    "animation": 2,
-    "persist": 3,
-    "selection": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:75",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "F5",
-    "cat": "frames",
-    "functionsVisited": 36
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdInsertKey",
-   "kind": "shortcut",
-   "surface": "keyboard F6",
-   "capability": "Insert keyframe",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:76 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:76",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "F6",
-    "cat": "frames",
-    "functionsVisited": 99
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdNextFrame",
-   "kind": "shortcut",
-   "surface": "keyboard .",
-   "capability": "Next frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:72 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:72",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": ".",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdNextKey",
-   "kind": "shortcut",
-   "surface": "keyboard k",
-   "capability": "Next keyframe",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:70 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:70",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "k",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdPrevFrame",
-   "kind": "shortcut",
-   "surface": "keyboard ,",
-   "capability": "Previous frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:71 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:71",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": ",",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdPrevKey",
-   "kind": "shortcut",
-   "surface": "keyboard j",
-   "capability": "Previous keyframe",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:69 COMMAND_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "render": 2,
-    "persist": 2,
-    "selection": 2,
-    "native": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:69",
-   "meta": {
-    "table": "COMMAND_SHORTCUTS",
-    "key": "j",
-    "cat": "nav",
-    "functionsVisited": 102
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:cmdRenameLayer",
-   "kind": "shortcut",
-   "surface": "keyboard F2",
-   "capability": "Rename layer",
    "area": "timeline-layers-frames",
    "handler": [
     "src/js/application/shortcut-registry.js:83 COMMAND_SHORTCUTS"
@@ -34730,6 +34272,391 @@
    "source": "src/js/application/shortcut-registry.js:83",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
+    "key": "+",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdFlipPreview",
+   "kind": "shortcut",
+   "surface": "keyboard f",
+   "capability": "Flip preview",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:85 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:85",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "f",
+    "cat": "view",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdGoEnd",
+   "kind": "shortcut",
+   "surface": "keyboard End",
+   "capability": "Go to end",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:78 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:78",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "End",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdGoStart",
+   "kind": "shortcut",
+   "surface": "keyboard Home",
+   "capability": "Go to start",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:77 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:77",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "Home",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdInsertBlankKey",
+   "kind": "shortcut",
+   "surface": "keyboard F7",
+   "capability": "Insert blank keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:81 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:81",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "F7",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdInsertFrame",
+   "kind": "shortcut",
+   "surface": "keyboard F5",
+   "capability": "Insert frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:79 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:79",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "F5",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdInsertKey",
+   "kind": "shortcut",
+   "surface": "keyboard F6",
+   "capability": "Insert keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:80 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:80",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "F6",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdNextFrame",
+   "kind": "shortcut",
+   "surface": "keyboard .",
+   "capability": "Next frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:76 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:76",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": ".",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdNextKey",
+   "kind": "shortcut",
+   "surface": "keyboard k",
+   "capability": "Next keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:74 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:74",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "k",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdPrevFrame",
+   "kind": "shortcut",
+   "surface": "keyboard ,",
+   "capability": "Previous frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:75 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:75",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": ",",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdPrevKey",
+   "kind": "shortcut",
+   "surface": "keyboard j",
+   "capability": "Previous keyframe",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:73 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:73",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
+    "key": "j",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:cmdRenameLayer",
+   "kind": "shortcut",
+   "surface": "keyboard F2",
+   "capability": "Rename layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:87 COMMAND_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:87",
+   "meta": {
+    "table": "COMMAND_SHORTCUTS",
     "key": "F2",
     "cat": "layers",
     "functionsVisited": 0
@@ -34747,7 +34674,7 @@
    "capability": "Reset view",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:82 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:86 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34762,12 +34689,12 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:82",
+   "source": "src/js/application/shortcut-registry.js:86",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "/",
     "cat": "view",
-    "functionsVisited": 6
+    "functionsVisited": 0
    },
    "fixtures": [
     "keyed-props",
@@ -34782,7 +34709,7 @@
    "capability": "Generate tweens",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/application/shortcut-registry.js:80 COMMAND_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:84 COMMAND_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34793,23 +34720,16 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "animation": 1,
-    "persist": 2,
-    "history": 2,
-    "render": 2,
-    "selection": 3,
-    "native": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:80",
+   "source": "src/js/application/shortcut-registry.js:84",
    "meta": {
     "table": "COMMAND_SHORTCUTS",
     "key": "t",
     "cat": "frames",
-    "functionsVisited": 205
+    "functionsVisited": 0
    },
    "fixtures": [
     "keyed-props",
@@ -34822,88 +34742,6 @@
    "kind": "shortcut",
    "surface": "keyboard c",
    "capability": "Comment",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:22 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:22",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "c",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:draw",
-   "kind": "shortcut",
-   "surface": "keyboard b",
-   "capability": "Draw",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:18 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:18",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "b",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:ellipse",
-   "kind": "shortcut",
-   "surface": "keyboard l",
-   "capability": "Ellipse",
    "area": "drawing-selection",
    "handler": [
     "src/js/application/shortcut-registry.js:26 TOOL_SHORTCUTS"
@@ -34929,7 +34767,7 @@
    "source": "src/js/application/shortcut-registry.js:26",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "l",
+    "key": "c",
     "cat": null,
     "functionsVisited": 140
    },
@@ -34941,13 +34779,13 @@
    ]
   },
   {
-   "id": "shortcut:eraser",
+   "id": "shortcut:draw",
    "kind": "shortcut",
-   "surface": "keyboard e",
-   "capability": "Eraser",
+   "surface": "keyboard b",
+   "capability": "Draw",
    "area": "drawing-selection",
    "handler": [
-    "src/js/application/shortcut-registry.js:29 TOOL_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:22 TOOL_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -34967,10 +34805,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:29",
+   "source": "src/js/application/shortcut-registry.js:22",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "e",
+    "key": "b",
     "cat": null,
     "functionsVisited": 140
    },
@@ -34982,51 +34820,10 @@
    ]
   },
   {
-   "id": "shortcut:eyedropper",
+   "id": "shortcut:ellipse",
    "kind": "shortcut",
-   "surface": "keyboard i",
-   "capability": "Eyedropper",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:32 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:32",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "i",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:fill",
-   "kind": "shortcut",
-   "surface": "keyboard g",
-   "capability": "Fill",
+   "surface": "keyboard l",
+   "capability": "Ellipse",
    "area": "drawing-selection",
    "handler": [
     "src/js/application/shortcut-registry.js:30 TOOL_SHORTCUTS"
@@ -35052,7 +34849,7 @@
    "source": "src/js/application/shortcut-registry.js:30",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "g",
+    "key": "l",
     "cat": null,
     "functionsVisited": 140
    },
@@ -35064,92 +34861,10 @@
    ]
   },
   {
-   "id": "shortcut:fillbrush",
+   "id": "shortcut:eraser",
    "kind": "shortcut",
-   "surface": "keyboard n",
-   "capability": "Fill Brush",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:31 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:31",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "n",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:fsselect",
-   "kind": "shortcut",
-   "surface": "keyboard m",
-   "capability": "Fill/Stroke Select",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:21 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:21",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "m",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:hand",
-   "kind": "shortcut",
-   "surface": "keyboard h",
-   "capability": "Hand (pan)",
+   "surface": "keyboard e",
+   "capability": "Eraser",
    "area": "drawing-selection",
    "handler": [
     "src/js/application/shortcut-registry.js:33 TOOL_SHORTCUTS"
@@ -35175,7 +34890,7 @@
    "source": "src/js/application/shortcut-registry.js:33",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "h",
+    "key": "e",
     "cat": null,
     "functionsVisited": 140
    },
@@ -35187,13 +34902,13 @@
    ]
   },
   {
-   "id": "shortcut:line",
+   "id": "shortcut:eyedropper",
    "kind": "shortcut",
-   "surface": "keyboard u",
-   "capability": "Line",
+   "surface": "keyboard i",
+   "capability": "Eyedropper",
    "area": "drawing-selection",
    "handler": [
-    "src/js/application/shortcut-registry.js:24 TOOL_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:36 TOOL_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -35213,10 +34928,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:24",
+   "source": "src/js/application/shortcut-registry.js:36",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "u",
+    "key": "i",
     "cat": null,
     "functionsVisited": 140
    },
@@ -35228,13 +34943,13 @@
    ]
   },
   {
-   "id": "shortcut:pen",
+   "id": "shortcut:fill",
    "kind": "shortcut",
-   "surface": "keyboard p",
-   "capability": "Pen",
+   "surface": "keyboard g",
+   "capability": "Fill",
    "area": "drawing-selection",
    "handler": [
-    "src/js/application/shortcut-registry.js:23 TOOL_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:34 TOOL_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -35254,10 +34969,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:23",
+   "source": "src/js/application/shortcut-registry.js:34",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "p",
+    "key": "g",
     "cat": null,
     "functionsVisited": 140
    },
@@ -35269,828 +34984,10 @@
    ]
   },
   {
-   "id": "shortcut:readonly:shortcutRoClipboard",
+   "id": "shortcut:fillbrush",
    "kind": "shortcut",
-   "surface": "keyboard ⌘C / ⌘V / ⌘X",
-   "capability": "Copy / paste / cut",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:92 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:92",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘C / ⌘V / ⌘X",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoDelete",
-   "kind": "shortcut",
-   "surface": "keyboard ⌫",
-   "capability": "Delete selection",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:96 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:96",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌫",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoDuplicate",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘D",
-   "capability": "Duplicate",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:93 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:93",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘D",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoEasyEase",
-   "kind": "shortcut",
-   "surface": "keyboard F9",
-   "capability": "Easy ease",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:98 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:98",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "F9",
-    "cat": "frames",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoEscape",
-   "kind": "shortcut",
-   "surface": "keyboard Échap",
-   "capability": "Cancel / deselect",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:101 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:101",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "Échap",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoGroup",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘G / ⇧⌘G",
-   "capability": "Group / ungroup",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:94 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:94",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘G / ⇧⌘G",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoNudgeKeys",
-   "kind": "shortcut",
-   "surface": "keyboard ⌥ ← →",
-   "capability": "Nudge keys in time",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:99 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:99",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌥ ← →",
-    "cat": "frames",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoPlay",
-   "kind": "shortcut",
-   "surface": "keyboard Espace",
-   "capability": "Play / pause",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:88 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:88",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "Espace",
-    "cat": "nav",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoSelectAll",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘A",
-   "capability": "Select all",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:95 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:95",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘A",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoSplitLayer",
-   "kind": "shortcut",
-   "surface": "keyboard ⇧⌘D",
-   "capability": "Split layer at playhead",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:100 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:100",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⇧⌘D",
-    "cat": "layers",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoStepFrame",
-   "kind": "shortcut",
-   "surface": "keyboard ←  →",
-   "capability": "Step one frame",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:89 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:89",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "←  →",
-    "cat": "nav",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoStepLayer",
-   "kind": "shortcut",
-   "surface": "keyboard ⇧ Page",
-   "capability": "Previous / next layer",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:90 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:90",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⇧ Page",
-    "cat": "layers",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoUndo",
-   "kind": "shortcut",
-   "surface": "keyboard ⌘Z / ⇧⌘Z",
-   "capability": "Undo / redo",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:91 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:91",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "⌘Z / ⇧⌘Z",
-    "cat": "edit",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:readonly:shortcutRoWorkArea",
-   "kind": "shortcut",
-   "surface": "keyboard B / N",
-   "capability": "Work area in / out",
-   "area": "timeline-layers-frames",
-   "handler": [
-    "src/js/application/shortcut-registry.js:97 READONLY_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (read-only)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:97",
-   "meta": {
-    "table": "READONLY_SHORTCUTS",
-    "key": "B / N",
-    "cat": "nav",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "keyed-props",
-    "held-frames",
-    "components"
-   ]
-  },
-  {
-   "id": "shortcut:rect",
-   "kind": "shortcut",
-   "surface": "keyboard r",
-   "capability": "Rectangle",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:25 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:25",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "r",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:rig",
-   "kind": "shortcut",
-   "surface": "keyboard s",
-   "capability": "Rig (Skeleton)",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:46 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:46",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "s",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:rotate",
-   "kind": "shortcut",
-   "surface": "keyboard w",
-   "capability": "Rotation du canevas",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:45 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:45",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "w",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:select",
-   "kind": "shortcut",
-   "surface": "keyboard v",
-   "capability": "Select",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:19 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:19",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "v",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:speechbubble",
-   "kind": "shortcut",
-   "surface": "keyboard d",
-   "capability": "Bulle de dialogue",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:27 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:27",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "d",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:star",
-   "kind": "shortcut",
-   "surface": "keyboard q",
-   "capability": "Étoile / Polygone",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:28 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:28",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "q",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:subselect",
-   "kind": "shortcut",
-   "surface": "keyboard a",
-   "capability": "Subselect (node edit)",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:20 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:20",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "a",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:text",
-   "kind": "shortcut",
-   "surface": "keyboard y",
-   "capability": "Texte",
-   "area": "drawing-selection",
-   "handler": [
-    "src/js/application/shortcut-registry.js:44 TOOL_SHORTCUTS"
-   ],
-   "events": [
-    "keydown"
-   ],
-   "exposure": [
-    "keyboard",
-    "Settings > Shortcuts (remappable)"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "render": 2,
-    "selection": 3,
-    "persist": 3,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:44",
-   "meta": {
-    "table": "TOOL_SHORTCUTS",
-    "key": "y",
-    "cat": null,
-    "functionsVisited": 140
-   },
-   "fixtures": [
-    "static-props",
-    "masks-alpha",
-    "text",
-    "interaction"
-   ]
-  },
-  {
-   "id": "shortcut:toggleOnion",
-   "kind": "shortcut",
-   "surface": "keyboard o",
-   "capability": "Toggle Onion Skin",
+   "surface": "keyboard n",
+   "capability": "Fill Brush",
    "area": "drawing-selection",
    "handler": [
     "src/js/application/shortcut-registry.js:35 TOOL_SHORTCUTS"
@@ -36116,7 +35013,7 @@
    "source": "src/js/application/shortcut-registry.js:35",
    "meta": {
     "table": "TOOL_SHORTCUTS",
-    "key": "o",
+    "key": "n",
     "cat": null,
     "functionsVisited": 140
    },
@@ -36128,13 +35025,13 @@
    ]
   },
   {
-   "id": "shortcut:zoom",
+   "id": "shortcut:fsselect",
    "kind": "shortcut",
-   "surface": "keyboard z",
-   "capability": "Zoom",
+   "surface": "keyboard m",
+   "capability": "Fill/Stroke Select",
    "area": "drawing-selection",
    "handler": [
-    "src/js/application/shortcut-registry.js:34 TOOL_SHORTCUTS"
+    "src/js/application/shortcut-registry.js:25 TOOL_SHORTCUTS"
    ],
    "events": [
     "keydown"
@@ -36154,7 +35051,1030 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/application/shortcut-registry.js:34",
+   "source": "src/js/application/shortcut-registry.js:25",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "m",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:hand",
+   "kind": "shortcut",
+   "surface": "keyboard h",
+   "capability": "Hand (pan)",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:37 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:37",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "h",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:line",
+   "kind": "shortcut",
+   "surface": "keyboard u",
+   "capability": "Line",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:28 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:28",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "u",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:pen",
+   "kind": "shortcut",
+   "surface": "keyboard p",
+   "capability": "Pen",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:27 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:27",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "p",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoClipboard",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘C / ⌘V / ⌘X",
+   "capability": "Copy / paste / cut",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:96 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:96",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘C / ⌘V / ⌘X",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoDelete",
+   "kind": "shortcut",
+   "surface": "keyboard ⌫",
+   "capability": "Delete selection",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:100 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:100",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌫",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoDuplicate",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘D",
+   "capability": "Duplicate",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:97 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:97",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘D",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoEasyEase",
+   "kind": "shortcut",
+   "surface": "keyboard F9",
+   "capability": "Easy ease",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:102 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:102",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "F9",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoEscape",
+   "kind": "shortcut",
+   "surface": "keyboard Échap",
+   "capability": "Cancel / deselect",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:105 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:105",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "Échap",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoGroup",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘G / ⇧⌘G",
+   "capability": "Group / ungroup",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:98 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:98",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘G / ⇧⌘G",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoNudgeKeys",
+   "kind": "shortcut",
+   "surface": "keyboard ⌥ ← →",
+   "capability": "Nudge keys in time",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:103 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:103",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌥ ← →",
+    "cat": "frames",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoPlay",
+   "kind": "shortcut",
+   "surface": "keyboard Espace",
+   "capability": "Play / pause",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:92 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:92",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "Espace",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoSelectAll",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘A",
+   "capability": "Select all",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:99 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:99",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘A",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoSplitLayer",
+   "kind": "shortcut",
+   "surface": "keyboard ⇧⌘D",
+   "capability": "Split layer at playhead",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:104 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:104",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⇧⌘D",
+    "cat": "layers",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoStepFrame",
+   "kind": "shortcut",
+   "surface": "keyboard ←  →",
+   "capability": "Step one frame",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:93 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:93",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "←  →",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoStepLayer",
+   "kind": "shortcut",
+   "surface": "keyboard ⇧ Page",
+   "capability": "Previous / next layer",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:94 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:94",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⇧ Page",
+    "cat": "layers",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoUndo",
+   "kind": "shortcut",
+   "surface": "keyboard ⌘Z / ⇧⌘Z",
+   "capability": "Undo / redo",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:95 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:95",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "⌘Z / ⇧⌘Z",
+    "cat": "edit",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:readonly:shortcutRoWorkArea",
+   "kind": "shortcut",
+   "surface": "keyboard B / N",
+   "capability": "Work area in / out",
+   "area": "timeline-layers-frames",
+   "handler": [
+    "src/js/application/shortcut-registry.js:101 READONLY_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (read-only)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:101",
+   "meta": {
+    "table": "READONLY_SHORTCUTS",
+    "key": "B / N",
+    "cat": "nav",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "keyed-props",
+    "held-frames",
+    "components"
+   ]
+  },
+  {
+   "id": "shortcut:rect",
+   "kind": "shortcut",
+   "surface": "keyboard r",
+   "capability": "Rectangle",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:29 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:29",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "r",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:rig",
+   "kind": "shortcut",
+   "surface": "keyboard s",
+   "capability": "Rig (Skeleton)",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:50 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:50",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "s",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:rotate",
+   "kind": "shortcut",
+   "surface": "keyboard w",
+   "capability": "Rotation du canevas",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:49 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:49",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "w",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:select",
+   "kind": "shortcut",
+   "surface": "keyboard v",
+   "capability": "Select",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:23 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:23",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "v",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:speechbubble",
+   "kind": "shortcut",
+   "surface": "keyboard d",
+   "capability": "Bulle de dialogue",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:31 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:31",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "d",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:star",
+   "kind": "shortcut",
+   "surface": "keyboard q",
+   "capability": "Étoile / Polygone",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:32 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:32",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "q",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:subselect",
+   "kind": "shortcut",
+   "surface": "keyboard a",
+   "capability": "Subselect (node edit)",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:24 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:24",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "a",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:text",
+   "kind": "shortcut",
+   "surface": "keyboard y",
+   "capability": "Texte",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:48 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:48",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "y",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:toggleOnion",
+   "kind": "shortcut",
+   "surface": "keyboard o",
+   "capability": "Toggle Onion Skin",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:39 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:39",
+   "meta": {
+    "table": "TOOL_SHORTCUTS",
+    "key": "o",
+    "cat": null,
+    "functionsVisited": 140
+   },
+   "fixtures": [
+    "static-props",
+    "masks-alpha",
+    "text",
+    "interaction"
+   ]
+  },
+  {
+   "id": "shortcut:zoom",
+   "kind": "shortcut",
+   "surface": "keyboard z",
+   "capability": "Zoom",
+   "area": "drawing-selection",
+   "handler": [
+    "src/js/application/shortcut-registry.js:38 TOOL_SHORTCUTS"
+   ],
+   "events": [
+    "keydown"
+   ],
+   "exposure": [
+    "keyboard",
+    "Settings > Shortcuts (remappable)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "render": 2,
+    "selection": 3,
+    "persist": 3,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/application/shortcut-registry.js:38",
    "meta": {
     "table": "TOOL_SHORTCUTS",
     "key": "z",
