@@ -1849,6 +1849,18 @@
       ]
     },
     {
+      "id": "app.project.nativesave.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "project-native-save.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-native-save.js"
+      ]
+    },
+    {
       "id": "app.history.frameentry.application",
       "layer": "application",
       "dir": "src/js/application/history",

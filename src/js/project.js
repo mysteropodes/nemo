@@ -119,24 +119,16 @@
 
   async function writeProjectTo(path){
     var json=window.SM.exportJSON();
-    // Atomic save: write to a sibling temp file, then rename over the real
-    // one. A crash/power loss/full disk mid-write must never leave PATH
-    // truncated with the previous good version already destroyed — rename
-    // is atomic at the OS level, so the project file is always either the
-    // old complete version or the new complete one, never a torn middle.
-    var tmp=path+'.saving';
-    try{
-      await window.__TAURI__.fs.writeTextFile(tmp,json);
-      await window.__TAURI__.fs.rename(tmp,path);
-    }catch(e){
-      // rename needs fs:allow-rename, added to capabilities 2026-07-13 —
-      // an app built before that (or an exotic FS refusing the rename)
-      // lands here. Fall back to the historical direct write rather than
-      // failing the save outright: a maybe-torn write on crash still beats
-      // guaranteed data loss from refusing to save at all.
-      try{await window.__TAURI__.fs.remove(tmp);}catch(_e){}
-      await window.__TAURI__.fs.writeTextFile(path,json);
-    }
+    // Atomic save (temp sibling + rename) and its historical direct-write
+    // fallback live in the adapter now; everything below — path/name, recents,
+    // dirty tracking, autosave — stays here. The JSON handed to the adapter is
+    // the same string markSaved() records, so a save cannot mark clean against
+    // bytes other than the ones written.
+    await window.NemoProjectNativeSave.writeProjectFile(path,json,{
+      writeTextFile:function(p,text){return window.__TAURI__.fs.writeTextFile(p,text);},
+      rename:function(from,to){return window.__TAURI__.fs.rename(from,to);},
+      remove:function(p){return window.__TAURI__.fs.remove(p);},
+    });
     currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
     touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
     renderRecents();

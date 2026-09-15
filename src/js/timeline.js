@@ -11638,6 +11638,17 @@ window.updateCombinePanel=updateCombinePanel;
   document.getElementById('export-close').addEventListener('click',function(){modal.style.display='none';});
   modal.addEventListener('click',function(e){if(e.target===modal)modal.style.display='none';});
 
+  // P19/#1021 — Cancel calls exactly the method an MCP client's `cancel` stage
+  // calls, on exactly the session export.js memoises. Shown only for the SVG
+  // sequence, the only format behind the bounded job; #exp-cancel is in
+  // index.html. Rationale: adapters/export-svg-sequence.js's header.
+  var cancelBtn=document.getElementById('exp-cancel');
+  cancelBtn.addEventListener('click',function(){
+    var s=window.SMExport.svgSequenceJob(),id=s&&s.meta().running;
+    if(!id)return; // the directory picker is still open — no job exists yet
+    cancelBtn.disabled=true;s.cancel(id);progEl.style.display='block';progEl.textContent=SM.t('exportCancelled');
+  });
+
   runBtn.addEventListener('click',async function(){
     saveAllLayerFrames();
     var range=(rangeSel.value==='all')?{start:0,end:state.totalFrames-1}:{start:state.waIn,end:state.waOut};
@@ -11652,7 +11663,7 @@ window.updateCombinePanel=updateCombinePanel;
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
-    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');
+    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
     try{
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
@@ -11679,7 +11690,7 @@ window.updateCombinePanel=updateCombinePanel;
     }catch(err){
       progEl.textContent=SM.t('exportError').replace('{e}',err&&err.message?err.message:err);
     }finally{
-      runBtn.disabled=false;
+      runBtn.disabled=false;cancelBtn.style.display='none';
     }
   });
 })();

@@ -19,30 +19,30 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "b1486aa17e4722852dc5a4d10e97d8ce8175db72",
-    "sourceRootTree": "220c87e2223c9408831258a236f9c03e67f809d0",
+    "candidateCommit": "a70be7f1035470711385252ce8566b4dfb30eded",
+    "sourceRootTree": "6ebd44d64a53115729ffa3c0b0ccd700c3f96c51",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "401f9ee91c33ea2bcd8bcab8f6bbafc0c03a053d",
-      "lastChangedCommit": "b1486aa17e4722852dc5a4d10e97d8ce8175db72"
+      "gitTree": "03afc8ab6a55b76a42cd88c4670a656996009b61",
+      "lastChangedCommit": "a70be7f1035470711385252ce8566b4dfb30eded"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "dc8994a66794fe9d589cba3f6c2c7b88f984bbd0",
-      "sha256": "a54ae313549a784f0e385826cf292041119a48058c94356e0370ed704878c6dc",
-      "lastChangedCommit": "df78e318e561f0617cc33f414bf5e9a9422726a9"
+      "gitBlob": "683435456ec0ee540c301a11792ac480d9a328fd",
+      "sha256": "7bd753b8aefef7f5e8b22e9cc400cfca92d0407a6563d02459de76e5cf48df3f",
+      "lastChangedCommit": "ee4a4d931c7b8bed02b6db4e3bacfb0d74fe5b4c"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "5f4c60e042984cd679cc1411269e0f737099c5c38422474db823c644de48bf2a"
+      "value": "7424a649d3e08b4164392a91d0cab394116ee145c58a6be3ecb0849d2c685fca"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ae332f02ff3b6153da5a9b4bf6e3cec0426c5735",
-        "sha256": "d665e654d223004bc9d72338d03aa416380e80060b253b073b88259d100d4086",
-        "moduleCount": 149,
+        "gitBlob": "f9abffb1ee6080a840b85f2c3e5f4edd76ab1480",
+        "sha256": "fdd8872291f0bc2a160db8fe99f328b685198efe22c9e8d7d52e7c7109226385",
+        "moduleCount": 159,
         "basedOnCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1"
       },
       {
@@ -254,6 +254,18 @@
       ]
     },
     {
+      "path": "src/js/adapters/project-native-save.js",
+      "moduleId": "app.project.nativesave.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2434,
+          "scriptOrdinal": 103
+        }
+      ]
+    },
+    {
       "path": "src/js/ae-camera-export.js",
       "moduleId": "app.ae.camera.export",
       "executionClass": "document-classic",
@@ -334,18 +346,6 @@
           "path": "src/index.html",
           "line": 2362,
           "scriptOrdinal": 59
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/shortcut-registry.js",
-      "moduleId": "app.shortcuts.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2366,
-          "scriptOrdinal": 55
         }
       ]
     },
