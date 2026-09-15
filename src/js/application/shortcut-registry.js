@@ -4,11 +4,15 @@
 // callers — this module owns only the tables, the override/persistence state,
 // and the pure lookups both dispatch and the modal read through.
 //
-// COMMAND_SHORTCUTS' own `run` closures still reference timeline.js globals
-// (goToFrame, state, window.SM, ...) directly, same as before the move —
-// classic-script globals are shared across files, so this is unaffected by
-// which file defines the table, only by script tag order relative to when a
-// bound key is actually pressed (well after those globals exist).
+// COMMAND_SHORTCUTS entries are pure {action,key,cat,label} data, same shape
+// as TOOL_SHORTCUTS. They originally carried a `run` closure reaching
+// timeline.js globals (window.SM, state, goToFrame, ...) directly — that put
+// the "application" layer this module declares in violation of the
+// application/adapters/bootstrap global-state boundary (app-js.edges.json),
+// which only app-legacy/adapters/bootstrap may cross. Execution moved to
+// runCommandShortcutAction() in timeline.js (app-legacy, already exempt),
+// mirroring runToolShortcut's existing action-keyed dispatch for
+// TOOL_SHORTCUTS. Reviewed 2026-09-15 on #1114.
 var NemoShortcutRegistry = (function () {
   'use strict';
 
@@ -66,21 +70,21 @@ var NemoShortcutRegistry = (function () {
   // dans le panneau (READONLY_SHORTCUTS plus bas) plutôt que d'être passé
   // sous silence — le panneau devient la carte complète du clavier.
   var COMMAND_SHORTCUTS = [
-    {action:'cmdPrevKey',key:'j',cat:'nav',label:'shortcutCmdPrevKey',run:function(){if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
-    {action:'cmdNextKey',key:'k',cat:'nav',label:'shortcutCmdNextKey',run:function(){if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));}},
-    {action:'cmdPrevFrame',key:',',cat:'nav',label:'shortcutCmdPrevFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame-1);}},
-    {action:'cmdNextFrame',key:'.',cat:'nav',label:'shortcutCmdNextFrame',run:function(){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);}},
-    {action:'cmdGoStart',key:'Home',cat:'nav',label:'shortcutCmdGoStart',run:function(){if(state.playing)stopPlay();goToFrame(0);}},
-    {action:'cmdGoEnd',key:'End',cat:'nav',label:'shortcutCmdGoEnd',run:function(){if(state.playing)stopPlay();goToFrame(state.totalFrames-1);}},
-    {action:'cmdInsertFrame',key:'F5',cat:'frames',label:'shortcutCmdInsertFrame',run:function(e){e.preventDefault();insertFrame();}},
-    {action:'cmdInsertKey',key:'F6',cat:'frames',label:'shortcutCmdInsertKey',run:function(e){e.preventDefault();insertKeyframe();}},
-    {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey',run:function(e){e.preventDefault();insertBlankKeyframe();}},
-    {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey',run:function(){window.SM.duplicateKeyframe();}},
-    {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure',run:function(){window.SM.extendExposure(1);}},
-    {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween',run:function(){window.SM.generateTweens();}},
-    {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview',run:function(e){if(!e.shiftKey)window.SM.flipPreview();}},
-    {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView',run:function(e){e.preventDefault();window.SM.resetView();}},
-    {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer',run:function(e){e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);}},
+    {action:'cmdPrevKey',key:'j',cat:'nav',label:'shortcutCmdPrevKey'},
+    {action:'cmdNextKey',key:'k',cat:'nav',label:'shortcutCmdNextKey'},
+    {action:'cmdPrevFrame',key:',',cat:'nav',label:'shortcutCmdPrevFrame'},
+    {action:'cmdNextFrame',key:'.',cat:'nav',label:'shortcutCmdNextFrame'},
+    {action:'cmdGoStart',key:'Home',cat:'nav',label:'shortcutCmdGoStart'},
+    {action:'cmdGoEnd',key:'End',cat:'nav',label:'shortcutCmdGoEnd'},
+    {action:'cmdInsertFrame',key:'F5',cat:'frames',label:'shortcutCmdInsertFrame'},
+    {action:'cmdInsertKey',key:'F6',cat:'frames',label:'shortcutCmdInsertKey'},
+    {action:'cmdInsertBlankKey',key:'F7',cat:'frames',label:'shortcutCmdInsertBlankKey'},
+    {action:'cmdDuplicateKey',key:'',cat:'frames',label:'shortcutCmdDuplicateKey'},
+    {action:'cmdExtendExposure',key:'+',cat:'frames',label:'shortcutCmdExtendExposure'},
+    {action:'cmdTween',key:'t',cat:'frames',label:'shortcutCmdTween'},
+    {action:'cmdFlipPreview',key:'f',cat:'view',label:'shortcutCmdFlipPreview'},
+    {action:'cmdResetView',key:'/',cat:'view',label:'shortcutCmdResetView'},
+    {action:'cmdRenameLayer',key:'F2',cat:'layers',label:'shortcutCmdRenameLayer'},
   ];
   // Touches câblées ailleurs (playback, presse-papier, modes, gestes) : listées
   // pour que le panneau soit exhaustif, marquées non réassignables.

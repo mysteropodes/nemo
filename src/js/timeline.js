@@ -7459,13 +7459,16 @@ function showToast(m){var el=document.getElementById('toast');el.textContent=m;e
 // shortcut-registry.js (P30/#1032) now; onOverrideChanged wires a rebind back
 // to the left-rail badge, exactly what setShortcutKey called directly before.
 var shortcutRegistry=NemoShortcutRegistry.create({storage:window.localStorage,onOverrideChanged:function(action){syncToolButtonShortcutBadge(action);}});
+// COMMAND_SHORTCUTS is pure {action,key,cat,label} data (P30/#1032, review on
+// #1114); dispatch by action lives here, same pattern as runToolShortcut below.
+function runCommandShortcutAction(action,e){switch(action){case'cmdPrevKey':if(state.playing)stopPlay();goToFrame(prevKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdNextKey':if(state.playing)stopPlay();goToFrame(nextKeyframeFrame(state.activeLayerIdx,state.currentFrame));return;case'cmdPrevFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame-1);return;case'cmdNextFrame':if(state.playing)stopPlay();goToFrame(state.currentFrame+1);return;case'cmdGoStart':if(state.playing)stopPlay();goToFrame(0);return;case'cmdGoEnd':if(state.playing)stopPlay();goToFrame(state.totalFrames-1);return;case'cmdInsertFrame':e.preventDefault();insertFrame();return;case'cmdInsertKey':e.preventDefault();insertKeyframe();return;case'cmdInsertBlankKey':e.preventDefault();insertBlankKeyframe();return;case'cmdDuplicateKey':window.SM.duplicateKeyframe();return;case'cmdExtendExposure':window.SM.extendExposure(1);return;case'cmdTween':window.SM.generateTweens();return;case'cmdFlipPreview':if(!e.shiftKey)window.SM.flipPreview();return;case'cmdResetView':e.preventDefault();window.SM.resetView();return;case'cmdRenameLayer':e.preventDefault();if(state.layers[state.activeLayerIdx])startLayerRename(state.activeLayerIdx);return;}}
 function runCommandShortcut(k,event){
   var lk=(k||'').toLowerCase();
   if(!lk)return false;
   var commands=shortcutRegistry.commandShortcuts();
   for(var i=0;i<commands.length;i++){
     var c=commands[i];
-    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){c.run(event);return true;}
+    if((shortcutRegistry.keyFor(c.action)||'').toLowerCase()===lk){runCommandShortcutAction(c.action,event);return true;}
   }
   return false;
 }
