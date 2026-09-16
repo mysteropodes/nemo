@@ -3,21 +3,18 @@
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use serde_json::{json, Value};
 
+/// Expected set, READ from the crate's declaration rather than copied.
+/// A copied list drifts silently: #1310 added one descriptor and four
+/// hand-maintained copies failed at once, in a crate no job ran (#1318).
+/// The assertion is unchanged — the spawned executable must advertise exactly
+/// what the crate declares — but there is no longer a second list to forget.
 fn registered_capabilities() -> Value {
-    json!([
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/opacity.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/export-job.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/timelapse.json"
-        ))
-        .unwrap(),
-    ])
+    Value::Array(
+        nemo_mcp::capabilities::CAPABILITY_SOURCES
+            .iter()
+            .map(|source| serde_json::from_str::<Value>(source).unwrap())
+            .collect(),
+    )
 }
 
 #[tokio::test]

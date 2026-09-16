@@ -11,10 +11,46 @@ const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/boundaries/profiles', name), 'utf8'));
 
 test('adopted application policy composes fresh discovery, exact coverage and provenance pins', () => {
-  const result = checkApplicationPolicy(read('app-js.profile.json'), read('app-js.coverage.json'), { root: ROOT });
+  const policy = read('app-js.coverage.json');
+  const result = checkApplicationPolicy(read('app-js.profile.json'), policy, { root: ROOT });
   assert.equal(result.ok, true);
-  assert.deepEqual({ selected: result.sourcePathCount, retained: result.retainedPathCount, excluded: result.excludedPathCount },
-    { selected: 173, retained: 161, excluded: 12 });
+  // Counted against the policy's own sets, never pinned to `{173, 161, 12}`.
+  // That triple was the merge hazard of #1316 twice over: it lived here AND in
+  // the artifact's `snapshotCounts`, so two branches each adding one module
+  // wrote the same bumped number in both places and git merged them silently.
+  // Every discovered source is either retained or excluded — state that.
+  assert.equal(result.retainedPathCount, policy.retainedSources.length);
+  assert.equal(result.excludedPathCount, policy.exclusions.length);
+  assert.equal(result.sourcePathCount, result.retainedPathCount + result.excludedPathCount);
+  assert.ok(result.sourcePathCount > 0, 'discovery found application sources at all');
+  // The breakdowns are computed too, so they cannot drift from the lists.
+  assert.deepEqual(result.snapshotCounts.byExclusionCategory,
+    policy.exclusions.reduce((out, record) => ({ ...out, [record.category]: (out[record.category] || 0) + 1 }), {}));
+  assert.equal(Object.values(result.snapshotCounts.retainedExecutionClasses).reduce((a, b) => a + b, 0),
+    policy.retainedSources.length);
+});
+
+test('a source accounted for by neither list fails on the identity, not on a stale number', () => {
+  // Removing the equation from the checker must make this test red. Dropping an
+  // exclusion leaves 173 discovered against 161 + 11 accounted for, so the
+  // equation fires before anything else and names both sides. Without it the
+  // call would return ok:false from coverage instead of throwing, which is why
+  // this asserts the throw and its message rather than just a failure.
+  const policy = read('app-js.coverage.json');
+  assert.throws(() => checkApplicationPolicy(read('app-js.profile.json'),
+    { ...policy, exclusions: policy.exclusions.slice(1) }, { root: ROOT }),
+  /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
+test('a stored snapshotCounts block is rejected rather than trusted', () => {
+  // Storing the counts beside the lists is what made them a merge hazard. The
+  // checker computes them, so a reintroduced block is refused outright instead
+  // of quietly becoming a second source of truth again.
+  const policy = read('app-js.coverage.json');
+  assert.equal(policy.snapshotCounts, undefined, 'the committed policy stores no counts');
+  assert.throws(() => checkApplicationPolicy(read('app-js.profile.json'),
+    { ...policy, snapshotCounts: { selectedSources: 173, retainedSources: 161, exclusions: 12 } }, { root: ROOT }),
+  /snapshotCounts is computed/);
 });
 
 test('provisional policy and profile membership drift fail before becoming a standard pass', () => {

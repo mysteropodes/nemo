@@ -2698,25 +2698,6 @@
       "describes": "src/wasm/geometry_wasm_bg.wasm"
     }
   ],
-  "snapshotCounts": {
-    "selectedSources": 173,
-    "bySourceKind": {
-      ".js": 167,
-      ".mjs": 2,
-      ".cjs": 0,
-      ".ts": 4
-    },
-    "retainedSources": 161,
-    "exclusions": 12,
-    "vendorExclusions": 6,
-    "generatedExclusions": 6,
-    "retainedExecutionClasses": {
-      "document-classic": 145,
-      "classic-without-load-site": 13,
-      "document-module": 2,
-      "module-worker": 1
-    }
-  },
   "integration": {
     "coverageHelper": {
       "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",

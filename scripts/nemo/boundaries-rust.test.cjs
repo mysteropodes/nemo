@@ -205,13 +205,22 @@ test('the policy is validated and the module set must match', (t) => {
 // ---- the real crate ----------------------------------------------------------
 
 test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the three recorded-debt exceptions, port matches lib.rs', () => {
-  const r = R.checkRustCrate(read('rust.profile.json'), read('geometry-wasm.edges.json'), { root: ROOT });
+  const policy = read('geometry-wasm.edges.json');
+  const r = R.checkRustCrate(read('rust.profile.json'), policy, { root: ROOT });
   assert.equal(r.ok, true, JSON.stringify(r.violations));
-  assert.equal(r.moduleCount, 4);
+  assert.equal(r.moduleCount, policy.profileModules.length);
   assert.deepEqual(r.exceptionsApplied.map((e) => `${path.basename(e.path)}:${e.rule}`).sort(),
     ['engine.rs:cycle', 'eraser.rs:cycle', 'eraser.rs:layer-violation']);
   assert.deepEqual(r.unsupported, []);
-  assert.equal(r.exportedPort.length, 18);
+  // Named against the declared set, never pinned to a count. `=== 18` meant that
+  // two branches each adding a `pub use` re-export both wrote `19`, and git
+  // merged the line with no conflict — the counter class of #1316. It detected
+  // nothing either: `ok` above already refuses a missing OR an extra re-export
+  // (rule `exported-port`, mutation-covered by 'exported-port drift fails with
+  // the exact missing/extra re-exports'), so the number only ever fired on the
+  // legitimate case of adding an export and declaring it.
+  assert.deepEqual(r.exportedPort.slice().sort(), policy.exportedPort.items.slice().sort());
+  assert.ok(r.exportedPort.length > 0, 'the crate exports a non-empty port');
   assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
     'rust.geometry.api->rust.geometry.animation', 'rust.geometry.api->rust.geometry.engine', 'rust.geometry.api->rust.geometry.shapes',
     'rust.geometry.engine->rust.geometry.shapes', 'rust.geometry.shapes->rust.geometry.api', 'rust.geometry.shapes->rust.geometry.engine']);
@@ -223,7 +232,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, external-
   const policy = read('nemo-desktop.edges.json');
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root: ROOT });
   assert.equal(r.ok, true, JSON.stringify(r.violations));
-  assert.equal(r.moduleCount, 5);
+  assert.equal(r.moduleCount, policy.profileModules.length);
   assert.deepEqual(r.unsupported, []);
   assert.deepEqual(r.exceptionsApplied, []);
   assert.deepEqual(r.exportedPort, []);

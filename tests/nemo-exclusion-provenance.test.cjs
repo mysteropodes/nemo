@@ -59,7 +59,8 @@ function fixture(t) {
     retainedSources: [{ path: 'src/app.js', moduleId: 'app' }],
     exclusions: [{ path: EXCLUDED, category: 'vendor', component: 'fixture',
       reason: 'Synthetic vendor source', evidence: [SUPPORT], provenance: pins(EXCLUDED) }],
-    snapshotCounts: { selectedSources: 2, retainedSources: 1, exclusions: 1 },
+    // No snapshotCounts: #1316 made them computed from retainedSources and
+    // exclusions, and a stored block is now refused rather than trusted.
     provenance: {
       sourceRootTree: git('rev-parse', 'HEAD:src'),
       applicationTree: { path: 'src', gitTree: git('rev-parse', 'HEAD:src') },
