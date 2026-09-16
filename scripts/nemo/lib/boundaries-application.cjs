@@ -46,6 +46,27 @@ function verifyPinnedFile(root, record, label) {
   if (git(root, ['hash-object', '--', record.path]) !== record.gitBlob) invalid(`${label} ${record.path} Git blob changed`);
 }
 
+// #1316 — counts are COMPUTED from the sets they count, never stored beside
+// them. A stored scalar is a silent merge hazard: two branches each adding one
+// member write the same bumped number, git merges the line with no conflict,
+// and the artifact then disagrees with its own lists. Computing it means git
+// merges the lists — which do conflict, visibly — and the totals follow.
+function snapshotCounts(retained, exclusions, sourcePaths) {
+  const tally = (items, key) => items.reduce((out, item) => {
+    const value = key(item);
+    if (value != null) out[value] = (out[value] || 0) + 1;
+    return out;
+  }, {});
+  return {
+    selectedSources: sourcePaths.length,
+    bySourceKind: tally(sourcePaths, (file) => path.extname(file)),
+    retainedSources: retained.length,
+    exclusions: exclusions.length,
+    byExclusionCategory: tally(exclusions, (record) => record.category),
+    retainedExecutionClasses: tally(retained, (record) => record.executionClass),
+  };
+}
+
 function checkApplicationPolicy(profile, policy, opts = {}) {
   const root = path.resolve(opts.root || '.');
   if (!policy || policy.schemaVersion !== 1 || policy.policyId !== 'nemo.app-js.coverage') invalid('unsupported schema or policyId');
@@ -64,10 +85,14 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
   const sourcePaths = discoverSourcePaths({ root, sourceRoots: [policy.scope.sourceRoot], extensions: policy.scope.sourceKinds });
   const exclusions = policy.exclusions.map((record) => record.path);
   const coverage = checkSourceCoverage(profile, { root, sourcePaths, exclusions });
-  const counts = policy.snapshotCounts || {};
-  if (counts.selectedSources !== sourcePaths.length || counts.retainedSources !== retained.length || counts.exclusions !== exclusions.length) {
-    invalid('snapshot counts do not match fresh discovery');
+  // The invariant the stored counts were standing in for: every discovered
+  // source is either retained or excluded, nothing twice and nothing left over.
+  // Stated as an equation over the sets themselves, it cannot go stale, and it
+  // cannot be satisfied by a number somebody forgot to update.
+  if (sourcePaths.length !== retained.length + exclusions.length) {
+    invalid(`fresh discovery found ${sourcePaths.length} source(s), but the policy accounts for ${retained.length} retained + ${exclusions.length} excluded`);
   }
+  if (policy.snapshotCounts) invalid('snapshotCounts is computed from retainedSources/exclusions and must not be stored (#1316)');
 
   const provenance = policy.provenance || {};
   if (git(root, ['rev-parse', `HEAD:${policy.scope.sourceRoot}`]) !== provenance.sourceRootTree) invalid('source root tree pin changed');
@@ -91,7 +116,8 @@ function checkApplicationPolicy(profile, policy, opts = {}) {
   }
 
   return { ok: coverage.ok, policyId: policy.policyId, sourcePathCount: sourcePaths.length,
-    retainedPathCount: retained.length, excludedPathCount: exclusions.length, coverage };
+    retainedPathCount: retained.length, excludedPathCount: exclusions.length,
+    snapshotCounts: snapshotCounts(retained, policy.exclusions, sourcePaths), coverage };
 }
 
 function checkApplicationSize(profile, opts = {}) {
