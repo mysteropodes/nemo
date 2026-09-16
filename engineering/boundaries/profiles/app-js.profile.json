@@ -1741,6 +1741,18 @@
       ]
     },
     {
+      "id": "app.timelapse.capability",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "timelapse-capability.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "timelapse-capability.js"
+      ]
+    },
+    {
       "id": "app.opacity.bootstrap",
       "layer": "bootstrap",
       "dir": "src/js/bootstrap",

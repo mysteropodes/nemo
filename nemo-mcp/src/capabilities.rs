@@ -11,6 +11,7 @@ use std::sync::OnceLock;
 const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/opacity.json"),
     include_str!("../../engineering/application/capabilities/export-job.json"),
+    include_str!("../../engineering/application/capabilities/timelapse.json"),
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

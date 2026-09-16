@@ -11,6 +11,7 @@ const schema = load('engineering', 'application', 'transport-v1.schema.json');
 const descriptors = [
   load('engineering', 'application', 'capabilities', 'opacity.json'),
   load('engineering', 'application', 'capabilities', 'export-job.json'),
+  load('engineering', 'application', 'capabilities', 'timelapse.json'),
 ];
 
 test('generated MCP transport schema embeds every complete registered descriptor', () => {
