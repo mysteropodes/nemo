@@ -207,6 +207,7 @@ test('the availability the direct API reports is the availability MCP advertises
 function fixtureRoot(omit) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'p08-caps-'));
   for (const rel of ['engineering/application/capabilities/opacity.json',
+    'engineering/application/capabilities/timelapse.json',
     DECLARATION,
     'engineering/application/capability-v1.schema.json',
     'engineering/application/transport-v1.schema.json',
@@ -242,7 +243,7 @@ test('the catalog count is NOT what holds completeness, so do not rely on it', (
   // the catalog happily reports a pass over the reduced set.
   const without = fixtureRoot(DECLARATION);
   const reduced = drift.catalog(without);
-  assert.equal(reduced.sources.length, 1);
-  assert.deepEqual(reduced.sources.map((s) => s.id), ['opacity']);
+  assert.equal(reduced.sources.length, 2);
+  assert.deepEqual(reduced.sources.map((s) => s.id), ['opacity', 'timelapse']);
   fs.rmSync(without, { recursive: true, force: true });
 });
