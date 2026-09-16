@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { evaluateCoverageSummary } = require('../scripts/nemo/lib/jobs.cjs');
+const { evaluateCoverageSummary } = require('../scripts/nemo/lib/coverage-js-job.cjs');
 const path = require('node:path');
 
 const root = '/repo';

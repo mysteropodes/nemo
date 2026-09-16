@@ -85,6 +85,16 @@
       "sha256": "67d4c580b6936624441c39ff68657e0cb3444a68069c6aed8bb332ef52481a49",
       "source": "1baf9cd41f76d7585357f27941638f1033db51e8",
       "sourceDirty": false
+    },
+    {
+      "runId": "20260916T125429Z-ee83a2e",
+      "command": "test:rust-vectorize",
+      "profile": null,
+      "finishedAt": "2026-09-16T12:54:29.946Z",
+      "path": "reports/20260916T125429Z-ee83a2e/receipt.json",
+      "sha256": "d5e4715ae8bd5368ef82e5f24bc0c822f2544f2babf2933e97454a309d92c740",
+      "source": "ee83a2e908023d788423c0b93dd9c369cc49bf52",
+      "sourceDirty": false
     }
   ],
   "entries": [
@@ -605,6 +615,32 @@
       "carriedOverNote": null
     },
     {
+      "job": "test:rust-vectorize",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "cargo test vectorize-core: 2 binaries, 1 passed, 0 failed",
+        "exitCode": 0,
+        "limitations": [],
+        "details": null,
+        "caseKey": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260916T125429Z-ee83a2e",
+        "command": "test:rust-vectorize",
+        "profile": null,
+        "finishedAt": "2026-09-16T12:54:29.946Z",
+        "path": "reports/20260916T125429Z-ee83a2e/receipt.json",
+        "sha256": "d5e4715ae8bd5368ef82e5f24bc0c822f2544f2babf2933e97454a309d92c740",
+        "source": "ee83a2e908023d788423c0b93dd9c369cc49bf52",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": true,
+      "carriedOverNote": "Measured at ee83a2e90802, adopted at ded641bd7633. Not re-measured here."
+    },
+    {
       "job": "test:unit",
       "required": true,
       "status": "pass",
@@ -671,14 +707,15 @@
     }
   ],
   "summary": {
-    "total": 13,
+    "total": 14,
     "counts": {
-      "pass": 10,
+      "pass": 11,
       "fail": 1,
       "blocked": 2
     },
     "carriedOver": [
-      "test:rust-mcp"
+      "test:rust-mcp",
+      "test:rust-vectorize"
     ],
     "knownNonPass": [
       {
@@ -698,10 +735,10 @@
       }
     ]
   },
-  "extendedAt": "2026-09-16T11:40:00.234Z",
+  "extendedAt": "2026-09-16T12:54:36.452Z",
   "extended": {
     "added": [
-      "test:rust-mcp"
+      "test:rust-vectorize"
     ],
     "superseded": []
   }
