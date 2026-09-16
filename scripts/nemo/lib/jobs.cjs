@@ -161,7 +161,9 @@ function jobTestRust(ctx, crateDir, label) {
       details: { nativeFixtureSidecar: sidecar },
     });
   }
-  const args = ['test'];
+  // --no-fail-fast: cargo stops at the first failing test BINARY, so the
+  // summary below would sum one binary's result and under-report the crate.
+  const args = ['test', '--no-fail-fast'];
   // The Tauri crate includes wall-clock decoder regression tests. Running
   // those through an unoptimized test binary or beside dozens of other
   // FFmpeg processes measures the harness, not production decoder latency.
@@ -380,6 +382,7 @@ const JOBS = {
   'test:unit': { run: jobTestUnit, required: true },
   'test:rust': { run: (ctx) => jobTestRust(ctx, 'geometry-wasm', 'geometry-wasm'), required: true },
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
+  'test:rust-mcp': { run: (ctx) => jobTestRust(ctx, 'nemo-mcp', 'nemo-mcp'), required: true },
   'test:integration': { run: jobTestIntegration, required: false },
   'test:browser': { run: jobTestBrowser, required: false },
   'test:desktop': { run: jobTestDesktop, required: true },
@@ -401,8 +404,8 @@ const JOBS = {
 };
 
 const PROFILES = {
-  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust'],
-  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
+  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-mcp'],
+  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-mcp', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
 };
 
 function execute(name, ctx) {
