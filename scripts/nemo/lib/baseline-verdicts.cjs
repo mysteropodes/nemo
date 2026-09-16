@@ -87,21 +87,44 @@ function redact(value) {
 // The exact case a non-pass entry is about. Kept verbatim from the receipt
 // (modulo path redaction) so a later run compares against what was actually
 // observed, not a paraphrase.
+//
+// `details` is EVIDENCE — the run record a reader needs to understand what
+// happened. `caseKey` is IDENTITY — the part a job declares as "which failure
+// this is". They are separate fields because they answer different questions
+// and because, in practice, `details` is dominated by per-run facts.
 function exactCase(job) {
   return redact({
     reason: job.reason || null,
     exitCode: job.exitCode ?? null,
     limitations: (job.limitations || []).slice(),
     details: job.details === undefined ? null : job.details,
+    caseKey: job.caseKey === undefined ? null : job.caseKey,
   });
 }
 
-// A stable signature for "is this the same failure?". Reason text is the
-// receipt's own identification of the case; details are included because two
-// runs can share a reason string while failing different specifics.
+// A stable signature for "is this the same failure?".
+//
+// Over `reason` (the receipt's own identification of the case) plus the job's
+// declared `caseKey`, and deliberately NOT over `details`.
+//
+// `details` was the original input, and it made `unchanged-known-failure`
+// unreachable for the one baseline entry that is `fail`: `build:desktop`
+// records `taskId` (`desktop-build-${randomBytes(16)}`, fresh every run), the
+// whole `source` block, artifact digests, `handshake` and `cleanup`. A rerun
+// that failed at exactly the recorded dylib stage, for exactly the recorded
+// reason, still hashed differently, so the job reported `changed-known-failure`
+// unconditionally and the verdict carried no information. Same shape latent
+// elsewhere: `test:unit` puts the whole test-FILE list in `details`, so adding
+// any test file would have made a failing run look like a different failure.
+//
+// A job that needs to distinguish two failures sharing one reason string
+// declares `caseKey` — the specifics themselves, not the run they happened in.
+// No job declares one today; `test:unit` is the first real candidate, since its
+// reason is counts-only (`node --test: N tests, N pass, 2 fail`) and two
+// different failing tests produce the same string.
 function caseSignature(entryCase) {
   if (!entryCase) return null;
-  return sha256Text(JSON.stringify({ reason: entryCase.reason ?? null, details: entryCase.details ?? null }));
+  return sha256Text(JSON.stringify({ reason: entryCase.reason ?? null, caseKey: entryCase.caseKey ?? null }));
 }
 
 function classify(entry, job) {
@@ -118,10 +141,19 @@ function classify(entry, job) {
 
   if (c === 'fail') {
     if (b === 'fail') {
-      const same = entry.caseSignature && entry.caseSignature === caseSignature(exactCase(job));
+      // Both sides are signed HERE, from their own cases, rather than reading
+      // the signature stored at adoption. The stored field stays in the
+      // manifest as provenance of what was adopted; using it as the comparison
+      // input would mean that changing this rule silently invalidates every
+      // committed entry until the manifest is re-adopted.
+      const recorded = caseSignature(entry.case);
+      const same = !!recorded && recorded === caseSignature(exactCase(job));
+      // A match on reason alone is a weaker statement than a match on declared
+      // specifics. Say which one it was instead of letting the reader assume.
+      const basis = (entry.case && entry.case.caseKey != null) || job.caseKey != null ? 'reason+caseKey' : 'reason';
       return same
-        ? { verdict: VERDICT.UNCHANGED_KNOWN_FAILURE, note: entry.case.reason || null }
-        : { verdict: VERDICT.CHANGED_KNOWN_FAILURE, note: `Still failing, but not the recorded case. Baseline: ${entry.case.reason || 'n/a'} — now: ${job.reason || 'n/a'}` };
+        ? { verdict: VERDICT.UNCHANGED_KNOWN_FAILURE, note: entry.case.reason || null, caseBasis: basis }
+        : { verdict: VERDICT.CHANGED_KNOWN_FAILURE, note: `Still failing, but not the recorded case. Baseline: ${entry.case.reason || 'n/a'} — now: ${job.reason || 'n/a'}`, caseBasis: basis };
     }
     if (b === 'pass') return { verdict: VERDICT.NEW_REGRESSION, note: 'Passed in the baseline.' };
     return { verdict: VERDICT.NEWLY_OBSERVED_FAILURE, note: `Baseline was ${b}, so this failure was not previously observed.` };

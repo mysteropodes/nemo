@@ -82,10 +82,37 @@ test('a different failure in the same job does not inherit the known-failure acc
   assert.equal(c.summary.overall, 'blocking');
 });
 
-test('same reason but different details is still a changed failure', () => {
-  const m = adoptOf([job('test:coverage', 'fail', { reason: 'coverage below threshold', details: { file: 'a.js' } })]);
-  const c = compareOf(m, [job('test:coverage', 'fail', { reason: 'coverage below threshold', details: { file: 'b.js' } })]);
+// Two runs can share a reason string while failing on different specifics. The
+// specifics have to be DECLARED (`caseKey`); inferring them from the run record
+// is what the regression below is about.
+test('same reason but different declared specifics is still a changed failure', () => {
+  const m = adoptOf([job('test:coverage', 'fail', { reason: 'coverage below threshold', caseKey: { file: 'a.js' } })]);
+  const c = compareOf(m, [job('test:coverage', 'fail', { reason: 'coverage below threshold', caseKey: { file: 'b.js' } })]);
   assert.equal(c.results[0].verdict, VERDICT.CHANGED_KNOWN_FAILURE);
+  assert.equal(c.results[0].caseBasis, 'reason+caseKey');
+  assert.equal(c.summary.overall, 'blocking');
+});
+
+// The defect this pair exists for: `details` is the RUN RECORD, not the
+// failure. Signing it made `unchanged-known-failure` unreachable for any job
+// whose details carry per-run identity — which is every real one.
+test('a rerun of the same failure is unchanged even though its run record differs', () => {
+  const recorded = { taskId: 'desktop-build-' + 'a'.repeat(32), source: { head: 'a'.repeat(40) }, buildExitCode: 0 };
+  const rerun = { taskId: 'desktop-build-' + 'b'.repeat(32), source: { head: 'c'.repeat(40) }, buildExitCode: 0 };
+  const m = adoptOf([job('build:desktop', 'fail', { reason: 'bundle-ffmpeg-dylibs.py failed (1)', details: recorded })]);
+  const c = compareOf(m, [job('build:desktop', 'fail', { reason: 'bundle-ffmpeg-dylibs.py failed (1)', details: rerun })]);
+  assert.equal(c.results[0].verdict, VERDICT.UNCHANGED_KNOWN_FAILURE);
+  assert.equal(c.summary.overall, 'ok');
+  // ...and the verdict that ACCEPTS a failure states how thin its identity is.
+  assert.equal(c.results[0].caseBasis, 'reason');
+});
+
+test('a declared case key still separates two failures whose run records are identical', () => {
+  const shared = { taskId: 'desktop-build-' + 'a'.repeat(32) };
+  const m = adoptOf([job('test:unit', 'fail', { reason: 'node --test: 900 tests, 898 pass, 2 fail', details: shared, caseKey: ['a.test.cjs > x', 'b.test.cjs > y'] })]);
+  const c = compareOf(m, [job('test:unit', 'fail', { reason: 'node --test: 900 tests, 898 pass, 2 fail', details: shared, caseKey: ['c.test.cjs > z', 'd.test.cjs > w'] })]);
+  assert.equal(c.results[0].verdict, VERDICT.CHANGED_KNOWN_FAILURE);
+  assert.equal(c.summary.overall, 'blocking');
 });
 
 test('pass -> blocked is an environment mismatch, not a pass and not a failure', () => {
@@ -295,6 +322,51 @@ test('the committed manifest is valid, current and self-consistent', () => {
     const merge = spawnSync('git', ['merge-base', '--is-ancestor', m.references.source.head, head.stdout.trim()], { cwd: ROOT, encoding: 'utf8' });
     assert.equal(merge.status, 0, `manifest source ${m.references.source.head.slice(0, 12)} must be an ancestor of HEAD; re-adopt after moving the baseline`);
   }
+});
+
+// --- the observed defect, pinned against the committed data ----------------
+//
+// `build:desktop` is the only entry the committed manifest records as `fail`,
+// so it is the only one whose case signature is ever consulted. Its recorded
+// `details` hold `taskId` (`desktop-build-${randomBytes(16)}`, fresh per run)
+// and the whole `source` block. While `details` was signed, this entry could
+// only match by replaying the manifest against itself: every real rerun,
+// including one failing at exactly the recorded dylib stage, reported
+// `changed-known-failure`. These two drive the committed bytes, not a fixture,
+// because the point is that the shipped baseline is usable.
+
+function committedDesktopCase() {
+  const m = baseline.loadManifest();
+  const entry = m.entries.find((e) => e.job === 'build:desktop');
+  assert.ok(entry && entry.status === 'fail', 'the committed manifest records build:desktop as fail');
+  return { m, entry, of: (over) => baseline.compare(m, receipt([job('build:desktop', 'fail', Object.assign({
+    required: entry.required, reason: entry.case.reason, exitCode: entry.case.exitCode, limitations: entry.case.limitations,
+    details: JSON.parse(JSON.stringify(entry.case.details)),
+  }, over))]), { references: m.references, platform: m.platform, expect: ['build:desktop'], now: '2026-09-16T00:00:00Z' }) };
+}
+
+test('a rerun of the committed desktop failure matches it despite a fresh task id', () => {
+  const { entry, of } = committedDesktopCase();
+  const details = JSON.parse(JSON.stringify(entry.case.details));
+  details.taskId = 'desktop-build-' + 'f'.repeat(32);
+  if (details.source) details.source.head = 'f'.repeat(40);
+  const c = of({ details });
+  const row = c.results.find((r) => r.job === 'build:desktop');
+  assert.equal(row.verdict, VERDICT.UNCHANGED_KNOWN_FAILURE, 'a fresh task id is not a different failure');
+  assert.equal(row.severity, 'ok');
+});
+
+test('a failure at an earlier stage does not inherit the committed desktop acceptance', () => {
+  // The real regression this entry absorbed in September: the crate stopped
+  // compiling, so the build died several stages before the dylib step the
+  // baseline records. Different reason, therefore a different failure.
+  const { of } = committedDesktopCase();
+  const c = of({ reason: 'isolated desktop build failed (exit 1)' });
+  const row = c.results.find((r) => r.job === 'build:desktop');
+  assert.equal(row.verdict, VERDICT.CHANGED_KNOWN_FAILURE);
+  assert.equal(row.severity, 'blocking');
+  assert.equal(c.summary.overall, 'blocking');
+  assert.equal(c.summary.exitCode, 1);
 });
 
 test('the committed manifest quotes no absolute machine path', () => {
