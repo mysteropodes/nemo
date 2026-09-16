@@ -189,6 +189,53 @@ function adopt(inputs, opts = {}) {
   };
 }
 
+// Add or supersede ONE job's entry in an already-adopted manifest, leaving
+// every other entry — and its original evidence reference — untouched.
+//
+// `adopt` rebuilds a manifest from receipts, which only works while those
+// receipts still exist. They do not: `reports/` is gitignored, and the
+// committed manifest's own two receipts (9 September) were cleaned long ago.
+// Without this, adding a single job to a profile would force re-measuring all
+// twelve — including a 75-second `build:desktop` that fails by decision
+// (T09/#1105) — and would silently redefine the baseline for everyone.
+//
+// The new entry is built against the MANIFEST's references, not the current
+// tree's, so a job measured later than the adoption is recorded `carriedOver`
+// with the note saying exactly that. Extending never claims a result was
+// measured where it was not.
+function extend(manifest, inputs, opts = {}) {
+  const platform = opts.platform || identity.platformIdentity();
+  // One manifest carries one platform block for all of its entries, so a
+  // receipt from a different machine cannot be filed under it without lying
+  // about where it was measured.
+  for (const key of ['os', 'arch']) {
+    if (manifest.platform[key] !== platform[key]) {
+      throw new Error(`cannot extend a ${manifest.platform[key]} baseline from ${platform[key]} (platform.${key}); adopt a new baseline instead`);
+    }
+  }
+  const added = adopt(inputs, { ...opts, references: manifest.references, platform: manifest.platform });
+  const byJob = new Map(manifest.entries.map((e) => [e.job, e]));
+  const superseded = added.entries.filter((e) => byJob.has(e.job)).map((e) => e.job);
+  for (const e of added.entries) byJob.set(e.job, e);
+
+  const ordered = Array.from(byJob.values()).sort((a, b) => a.job.localeCompare(b.job));
+  const counts = {};
+  for (const e of ordered) counts[e.status] = (counts[e.status] || 0) + 1;
+  return {
+    ...manifest,
+    extendedAt: opts.now || nowIso(),
+    receipts: manifest.receipts.concat(added.receipts),
+    entries: ordered,
+    summary: {
+      total: ordered.length,
+      counts,
+      carriedOver: ordered.filter((e) => e.carriedOver).map((e) => e.job),
+      knownNonPass: ordered.filter((e) => e.status !== 'pass').map((e) => ({ job: e.job, status: e.status, reason: e.case.reason })),
+    },
+    extended: { added: added.entries.map((e) => e.job).filter((j) => !superseded.includes(j)), superseded },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Comparison
 // ---------------------------------------------------------------------------
@@ -322,5 +369,5 @@ function loadManifest(file) {
 module.exports = {
   SCHEMA, MANIFEST_PATH, VERDICT, BLOCKING, INCONCLUSIVE, REQUIRED_BLOCKING, REQUIRED_INCONCLUSIVE, EXIT,
   currentReferences, diffReferences, diffEnvironment,
-  adopt, classify, severity, compare, caseSignature, exactCase, renderComparison, loadManifest, receiptRef,
+  adopt, extend, classify, severity, compare, caseSignature, exactCase, renderComparison, loadManifest, receiptRef,
 };

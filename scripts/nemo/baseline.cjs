@@ -45,10 +45,11 @@ function latestReceipt() {
 }
 
 function parse(argv) {
-  const out = { adopt: false, check: false, from: null, note: null, json: false, manifest: null, out: null, ignoreWorktree: false };
+  const out = { adopt: false, check: false, extend: false, from: null, note: null, json: false, manifest: null, out: null, ignoreWorktree: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--adopt') out.adopt = true;
+    else if (a === '--extend') out.extend = true;
     else if (a === '--check') out.check = true;
     else if (a === '--json') out.json = true;
     else if (a === '--ignore-worktree') out.ignoreWorktree = true;
@@ -78,14 +79,23 @@ function main() {
       const receiptPath = resolveReceipt(r);
       return { receipt: readJson(receiptPath), receiptPath };
     });
-    const manifest = baseline.adopt(inputs, {
-      note: args.note,
-      references: baseline.currentReferences({ ignoreWorktree: args.ignoreWorktree }),
-    });
+    // --extend adds or supersedes only the jobs this receipt covers, keeping
+    // every other entry and its original evidence. Plain --adopt rebuilds the
+    // whole manifest, which needs every job's receipt to still exist.
+    const manifest = args.extend
+      ? baseline.extend(baseline.loadManifest(args.manifest ? path.resolve(args.manifest) : null), inputs, { note: args.note })
+      : baseline.adopt(inputs, {
+        note: args.note,
+        references: baseline.currentReferences({ ignoreWorktree: args.ignoreWorktree }),
+      });
     const target = args.out ? path.resolve(args.out) : baseline.MANIFEST_PATH;
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, JSON.stringify(manifest, null, 2) + '\n');
     if (args.json) { process.stdout.write(JSON.stringify(manifest, null, 2) + '\n'); return 0; }
+    if (manifest.extended) {
+      const { added, superseded } = manifest.extended;
+      console.log(`extended to ${manifest.entries.length} entries: added [${added.join(', ') || 'none'}], superseded [${superseded.join(', ') || 'none'}]`);
+    }
     console.log(`adopted ${manifest.entries.length} entr${manifest.entries.length === 1 ? 'y' : 'ies'} at ${String(manifest.references.source.head).slice(0, 12)} -> ${path.relative(ROOT, target)}`);
     for (const e of manifest.entries) {
       console.log(`  ${e.status.padEnd(8)} ${e.job.padEnd(18)} ${e.carriedOver ? '[carried over] ' : ''}${e.case.reason || ''}`);

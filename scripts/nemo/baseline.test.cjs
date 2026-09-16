@@ -297,6 +297,57 @@ test('a pass entry carries no case signature, so it can never match a failure', 
   assert.equal(m.entries[0].caseSignature, null);
 });
 
+// --- extending an adopted manifest (#1318) ---------------------------------
+//
+// `adopt` rebuilds from receipts, which only works while those receipts still
+// exist. The committed manifest's own two receipts live under gitignored
+// `reports/` and were cleaned long ago, so adding one job to a profile would
+// otherwise force re-measuring all twelve — including a `build:desktop` that
+// fails by decision. Extending has to leave every other entry exactly as it
+// was, evidence included; that is the whole property.
+
+function extendOf(manifest, jobs, over = {}) {
+  return baseline.extend(manifest, [{ receipt: receipt(jobs, over), receiptPath: null }],
+    { platform: PLATFORM, now: '2026-09-16T00:00:00Z' });
+}
+
+test('extending adds one entry and leaves every other one byte-identical', () => {
+  const m = adoptOf([job('test:unit', 'pass'), job('build:desktop', 'fail', { reason: 'dylibs' })]);
+  const before = new Map(m.entries.map((e) => [e.job, JSON.stringify(e)]));
+  const x = extendOf(m, [job('test:rust-mcp', 'pass', { reason: '12 binaries, 30 passed' })], { runId: 'later' });
+
+  assert.deepEqual(x.entries.filter((e) => before.has(e.job)).filter((e) => before.get(e.job) !== JSON.stringify(e)), [],
+    'no pre-existing entry may change, including its evidence reference');
+  assert.deepEqual(x.extended, { added: ['test:rust-mcp'], superseded: [] });
+  assert.equal(x.entries.length, 3);
+  assert.equal(x.summary.total, 3);
+  assert.equal(x.receipts.length, m.receipts.length + 1, 'the new receipt is recorded alongside the originals');
+  assert.deepEqual(x.references, m.references, 'extending never re-dates the baseline');
+});
+
+test('an entry measured after the adoption is carried over, never claimed as measured here', () => {
+  const m = adoptOf([job('test:unit', 'pass')]);
+  const x = extendOf(m, [job('test:rust-mcp', 'pass')], { runId: 'later', source: { head: 'b'.repeat(40), dirty: false } });
+  const added = x.entries.find((e) => e.job === 'test:rust-mcp');
+  assert.equal(added.carriedOver, true);
+  assert.match(added.carriedOverNote, /Measured at bbbbbbbbbbbb.*adopted at aaaaaaaaaaaa/);
+});
+
+test('extending supersedes a job the receipt covers, and says which', () => {
+  const m = adoptOf([job('test:unit', 'pass'), job('test:rust', 'fail', { reason: 'old' })]);
+  const x = extendOf(m, [job('test:rust', 'pass')], { runId: 'later' });
+  assert.deepEqual(x.extended, { added: [], superseded: ['test:rust'] });
+  assert.equal(x.entries.find((e) => e.job === 'test:rust').status, 'pass');
+  assert.equal(x.entries.length, 2, 'superseding replaces an entry rather than duplicating it');
+});
+
+test('a receipt from another platform cannot be filed under this baseline', () => {
+  const m = adoptOf([job('test:unit', 'pass')]);
+  assert.throws(() => baseline.extend(m, [{ receipt: receipt([job('test:rust-mcp', 'pass')]), receiptPath: null }],
+    { platform: { ...PLATFORM, os: 'linux' }, now: '2026-09-16T00:00:00Z' }),
+  /cannot extend a darwin baseline from linux/);
+});
+
 // --- the committed manifest and the CLI ------------------------------------
 
 test('the committed manifest is valid, current and self-consistent', () => {

@@ -68,7 +68,9 @@ test('explicit hosted FFmpeg is preflighted and inherited by Cargo', t => {
   const cargo = JSON.parse(fs.readFileSync(f.marker));
   assert.equal(cargo.override, ffmpeg);
   assert.deepEqual(cargo.args, [
-    'test', '--release', '--manifest-path', path.resolve('src-tauri/Cargo.toml'),
+    // --no-fail-fast (#1318): cargo otherwise stops at the first failing test
+    // binary, and the job's `test result:` summing then under-reports the crate.
+    'test', '--no-fail-fast', '--release', '--manifest-path', path.resolve('src-tauri/Cargo.toml'),
     '--', '--test-threads=1',
   ]);
 });
