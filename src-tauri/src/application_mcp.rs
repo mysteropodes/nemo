@@ -148,7 +148,7 @@ async fn serve_connection(
     if message.secret != endpoint.secret {
         return Err("unauthorized connection".into());
     }
-    message.request.validate()?;
+    message.request.validate().map_err(|e| e.to_string())?;
     if message.request.instance_id.as_deref() != Some(endpoint.instance_id.as_str()) {
         return Err("request instance mismatch".into());
     }
