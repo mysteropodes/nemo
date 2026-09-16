@@ -102,10 +102,19 @@ test('every tracked Rust source is discovered independently and adopted or exact
   for (const file of rust) for (const prefix of Object.keys(areas)) if (file.startsWith(prefix)) areas[prefix]++;
   for (const [prefix, count] of Object.entries(areas)) assert.ok(count > 0, `no Rust discovered under ${prefix}`);
 
-  assert.equal(rust.length, coverage.snapshotCounts.selectedSources);
-  assert.equal(declared.length, coverage.snapshotCounts.declaredSources);
-  assert.equal(exclusions.length, coverage.snapshotCounts.exclusions);
-  assert.equal(profile.modules.length, coverage.snapshotCounts.modules);
+  // #1316, fourth instance. These four lines read a stored `snapshotCounts`
+  // block — `{selectedSources: 45, declaredSources: 45, exclusions: 0,
+  // modules: 15}` — beside the very lists it counted. Two branches each adding
+  // one Rust source both wrote `46`, git merged the line with no conflict, and
+  // the truth was 47: main then goes red for a defect that does not exist.
+  //
+  // Three of the four compared a length to a copy of itself. The one that
+  // carried anything is the identity: every discovered source is either
+  // declared or excluded. State that instead.
+  assert.equal(coverage.snapshotCounts, undefined, 'the coverage policy stores no counts (#1316)');
+  assert.equal(rust.length, declared.length + exclusions.length,
+    `every discovered .rs is declared or excluded (${rust.length} found, ${declared.length} declared + ${exclusions.length} excluded)`);
+  assert.ok(rust.length > 0, 'discovery found Rust sources at all');
 
   // Check 3, first half: emit the discovered count and the classified/excluded list.
   const byModule = profile.modules.map((module) =>
@@ -126,8 +135,10 @@ test('no declared Rust source exceeds its effective ceiling, and retained ceilin
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
 
   const retained = new Map(coverage.retainedCeilings.map((entry) => [entry.path, entry]));
+  // The line above already ties the waiver count to the list; the stored
+  // `retainedCeilings: 5` that used to follow it was a third copy of the same
+  // length, and nothing but this file ever read it (#1316).
   assert.equal(profile.exceptions.length, retained.size);
-  assert.equal(profile.exceptions.length, coverage.snapshotCounts.retainedCeilings);
   for (const exception of profile.exceptions) {
     const record = retained.get(exception.path);
     assert.ok(record, `retained ceiling for ${exception.path} is missing from the coverage policy`);
