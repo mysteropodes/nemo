@@ -206,7 +206,7 @@ function compare(manifest, receipt, opts = {}) {
 
   for (const job of receipt.jobs || []) {
     const entry = byName.get(job.name);
-    const { verdict, note } = classify(entry, job);
+    const { verdict, note, caseBasis } = classify(entry, job);
     // Required in EITHER the baseline or the run. The two can legitimately
     // disagree (a job's `required` flag changed between them); taking the
     // stricter side is the only direction that cannot silently downgrade a
@@ -220,6 +220,8 @@ function compare(manifest, receipt, opts = {}) {
       verdict,
       severity: severity(verdict, required),
       note,
+      // Only the fail-vs-fail comparison has a basis; null everywhere else.
+      caseBasis: caseBasis ?? null,
       baselineCarriedOver: entry ? !!entry.carriedOver : null,
       baselineEvidence: entry ? entry.evidence : null,
       currentReason: job.reason || null,
@@ -244,6 +246,7 @@ function compare(manifest, receipt, opts = {}) {
       note: inScope
         ? (entry.required ? 'Required baseline entry not covered by this run.' : 'Not covered by this run.')
         : 'Outside this run\'s declared scope; not judged.',
+      caseBasis: null,
       baselineCarriedOver: !!entry.carriedOver, baselineEvidence: entry.evidence, currentReason: null,
     });
   }
@@ -288,7 +291,10 @@ function renderComparison(cmp) {
   lines.push('');
   for (const r of cmp.results) {
     const sev = r.severity && r.severity !== 'ok' ? `[${r.severity}] ` : '';
-    lines.push(`  ${String(r.verdict).padEnd(24)} ${(r.required ? '*' : ' ')}${String(r.job).padEnd(18)} ${String(r.baseline ?? '—').padEnd(8)} -> ${String(r.current ?? '—').padEnd(8)} ${sev}${r.note || ''}`);
+    // Only on the verdict that ACCEPTS a failure: a reader agreeing to carry a
+    // known failure forward should see how thin the identity behind it is.
+    const basis = r.verdict === VERDICT.UNCHANGED_KNOWN_FAILURE && r.caseBasis ? ` (matched on ${r.caseBasis})` : '';
+    lines.push(`  ${String(r.verdict).padEnd(24)} ${(r.required ? '*' : ' ')}${String(r.job).padEnd(18)} ${String(r.baseline ?? '—').padEnd(8)} -> ${String(r.current ?? '—').padEnd(8)} ${sev}${r.note || ''}${basis}`);
   }
   if (cmp.summary.noEvidence && cmp.summary.noEvidence.length) {
     lines.push('');
