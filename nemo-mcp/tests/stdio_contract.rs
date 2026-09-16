@@ -7,6 +7,18 @@ use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceEx
 use serde_json::{json, Map, Value};
 use std::process::Command;
 
+/// Expected set, READ from the crate's declaration rather than copied. This file
+/// held three copies of it and `stdio.rs` a fourth; #1310 added one descriptor
+/// and all four failed at once, inside a crate no job ran (#1318).
+fn registered_capabilities() -> Value {
+    Value::Array(
+        nemo_mcp::capabilities::CAPABILITY_SOURCES
+            .iter()
+            .map(|source| serde_json::from_str::<Value>(source).unwrap())
+            .collect(),
+    )
+}
+
 async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     let root = Box::leak(Box::new(tempfile::tempdir().unwrap()));
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_nemo-mcp"));
@@ -44,20 +56,7 @@ fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
          engineering/application/transport-v1.schema.json"
     );
 
-    let descriptors = json!([
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/opacity.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/export-job.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/timelapse.json"
-        ))
-        .unwrap(),
-    ]);
+    let descriptors = registered_capabilities();
     assert_eq!(
         generated["request"]["properties"]["payload"]["x-nemo-registeredCapabilities"], descriptors,
         "the generated contract embeds the canonical descriptors verbatim"
@@ -86,20 +85,7 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     assert_ne!(payload, &json!(true), "payload must carry a real schema");
     assert_eq!(payload["type"], "object");
     let descriptors = &payload["x-nemo-registeredCapabilities"];
-    let expected = json!([
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/opacity.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/export-job.json"
-        ))
-        .unwrap(),
-        serde_json::from_str::<Value>(include_str!(
-            "../../engineering/application/capabilities/timelapse.json"
-        ))
-        .unwrap(),
-    ]);
+    let expected = registered_capabilities();
     assert_eq!(
         descriptors, &expected,
         "all descriptor fields survive schema projection"
@@ -174,20 +160,7 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
     assert_eq!(body["instances"], json!([]));
     assert_eq!(
         body["registeredCapabilities"],
-        json!([
-            serde_json::from_str::<Value>(include_str!(
-                "../../engineering/application/capabilities/opacity.json"
-            ))
-            .unwrap(),
-            serde_json::from_str::<Value>(include_str!(
-                "../../engineering/application/capabilities/export-job.json"
-            ))
-            .unwrap(),
-            serde_json::from_str::<Value>(include_str!(
-                "../../engineering/application/capabilities/timelapse.json"
-            ))
-            .unwrap(),
-        ])
+        registered_capabilities()
     );
     client.cancel().await.unwrap();
 }

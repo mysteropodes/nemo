@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::OnceLock;
 
-const CAPABILITY_SOURCES: &[&str] = &[
+// Public so the integration tests READ this declaration instead of copying it.
+// Four hand-maintained copies of this list is what made #1310 fail in four
+// places at once, inside a crate no job ran (#1318).
+pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/opacity.json"),
     include_str!("../../engineering/application/capabilities/export-job.json"),
     include_str!("../../engineering/application/capabilities/timelapse.json"),
