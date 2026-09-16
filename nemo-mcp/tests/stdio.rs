@@ -13,6 +13,10 @@ fn registered_capabilities() -> Value {
             "../../engineering/application/capabilities/export-job.json"
         ))
         .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/timelapse.json"
+        ))
+        .unwrap(),
     ])
 }
 

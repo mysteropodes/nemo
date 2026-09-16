@@ -53,6 +53,10 @@ fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
             "../../engineering/application/capabilities/export-job.json"
         ))
         .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/timelapse.json"
+        ))
+        .unwrap(),
     ]);
     assert_eq!(
         generated["request"]["properties"]["payload"]["x-nemo-registeredCapabilities"], descriptors,
@@ -89,6 +93,10 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
         .unwrap(),
         serde_json::from_str::<Value>(include_str!(
             "../../engineering/application/capabilities/export-job.json"
+        ))
+        .unwrap(),
+        serde_json::from_str::<Value>(include_str!(
+            "../../engineering/application/capabilities/timelapse.json"
         ))
         .unwrap(),
     ]);
@@ -173,6 +181,10 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
             .unwrap(),
             serde_json::from_str::<Value>(include_str!(
                 "../../engineering/application/capabilities/export-job.json"
+            ))
+            .unwrap(),
+            serde_json::from_str::<Value>(include_str!(
+                "../../engineering/application/capabilities/timelapse.json"
             ))
             .unwrap(),
         ])
