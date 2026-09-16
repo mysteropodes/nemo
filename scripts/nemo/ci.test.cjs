@@ -71,18 +71,40 @@ test('tooling coverage profiles every current scripts/nemo CommonJS source', () 
   const profile = JSON.parse(fs.readFileSync(path.join(ROOT, ci.PROFILE), 'utf8'));
   const result = ci.toolingCoverage(profile, ROOT);
   assert.equal(result.ok, true);
-  // 60 retained tooling sources, P03A's frozen-census checker, P10's edge-gate test,
-  // P03B's three scope libraries, P12's Rust crate checker + test, P09's
-  // capability drift checker plus its schema half (67 -> 69), and #1307's
-  // area-classification regression (69 -> 70).
-  assert.equal(result.sourcePathCount, 70);
-  assert.equal(result.declaredPathCount, 70);
+  // Counted against each other, never pinned to a literal. The pinned pair used
+  // to read `=== 70`, and every leaf that added a tooling source had to bump it:
+  // two branches then wrote the SAME new number for DIFFERENT members, so git
+  // merged the line with no conflict and `main` got +1 where it owed +2. Four
+  // such collisions in two days (#1114, #1312, #1310, application-feature-
+  // registration).
+  //
+  // Nothing is lost with the literal gone, and that is measured rather than
+  // assumed — both drift directions are asserted below, and each is exactly what
+  // `result.ok` already refuses. The literal only ever fired on a source added
+  // AND declared, which is the legitimate case it kept corrupting.
+  assert.equal(result.sourcePathCount, result.declaredPathCount);
+  // Guard against the vacuous match: a discovery that silently found nothing
+  // (wrong root, changed glob) would satisfy 0 === 0 and report ok.
+  assert.ok(result.sourcePathCount > 0, 'discovery found tooling sources at all');
+
+  // Direction 1 — a source on disk that no module declares.
   const incomplete = structuredClone(profile);
   incomplete.modules = incomplete.modules.filter((module) => module.id !== 'nemo.lib.boundariesApplication');
   const rejected = ci.toolingCoverage(incomplete, ROOT);
   assert.equal(rejected.ok, false);
   assert.equal(rejected.violations.some((violation) => violation.rule === 'coverage-unprofiled-source'
     && violation.file === 'scripts/nemo/lib/boundaries-application.cjs'), true);
+
+  // Direction 2 — a declared path that is not on disk. Never asserted before:
+  // the literal was standing in for it, and standing in badly, since a stale
+  // declaration keeps the count right while the file is gone.
+  const ghost = structuredClone(profile);
+  ghost.modules.push({ id: 'nemo.lib.ghost', layer: 'lib', dir: 'scripts/nemo/lib',
+    files: ['zz-not-on-disk.cjs'], publicApi: ['zz-not-on-disk.cjs'], sizeProfile: 'Domain/application JS or TS' });
+  const absent = ci.toolingCoverage(ghost, ROOT);
+  assert.equal(absent.ok, false);
+  assert.deepEqual([...new Set(absent.violations.map((violation) => violation.rule))].sort(),
+    ['coverage-missing-file', 'coverage-unselected-declaration']);
 });
 
 const benignPaths = ['scripts/nemo/README.md',
