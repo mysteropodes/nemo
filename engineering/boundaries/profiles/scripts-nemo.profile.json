@@ -1,162 +1,874 @@
 {
   "modules": [
-    { "id": "nemo.remediationScope", "layer": "tooling-adapters", "dir": "scripts/nemo",
-      "files": ["remediation-scope.cjs"], "publicApi": ["remediation-scope.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.remediationScopeCensus", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
-      "files": ["remediation-scope-census.cjs"], "publicApi": ["remediation-scope-census.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.remediationScopeVerify", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["remediation-scope-verify.cjs"], "publicApi": ["remediation-scope-verify.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.remediationScopeBuild", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["remediation-scope-build.cjs"], "publicApi": ["remediation-scope-build.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.inventoryLexer", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
-      "files": ["inventory-lexer.cjs"], "publicApi": ["inventory-lexer.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.inventoryRender", "layer": "tooling-shared", "dir": "scripts/nemo/lib",
-      "files": ["inventory-render.cjs"], "publicApi": ["inventory-render.cjs"], "sizeProfile": "Domain/application JS or TS" },
-
-    { "id": "nemo.lib.util", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["util.cjs"], "publicApi": ["util.cjs"], "sizeProfile": "Platform/engine adapter" },
-
-    { "id": "nemo.lib.identity", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["identity.cjs"], "publicApi": ["identity.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.capabilities", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["capabilities.cjs"], "publicApi": ["capabilities.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.capabilityDrift", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["capability-drift.cjs", "capability-schema.cjs"], "publicApi": ["capability-drift.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.isolation", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["isolation.cjs"], "publicApi": ["isolation.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.browserRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["browser-runtime.cjs"], "publicApi": ["browser-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.buildRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["build-runtime.cjs"], "publicApi": ["build-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.buildJob", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["build-job.cjs"], "publicApi": ["build-job.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.nativeProcess", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["native-process.cjs"], "publicApi": ["native-process.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.nativeRuntime", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["native-runtime.cjs"], "publicApi": ["native-runtime.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesChecker", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries.cjs"], "publicApi": ["boundaries.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesResolver", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-resolver.cjs"], "publicApi": ["boundaries-resolver.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesCoverage", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-coverage.cjs"], "publicApi": ["boundaries-coverage.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesRepository", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-repository.cjs"], "publicApi": ["boundaries-repository.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesSize", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-size.cjs"], "publicApi": ["boundaries-size.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.boundariesDiscovery", "layer": "tooling-adapters", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-discovery.cjs"], "publicApi": ["boundaries-discovery.cjs"], "sizeProfile": "Platform/engine adapter" },
-    { "id": "nemo.lib.receipt", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["receipt.cjs"], "publicApi": ["receipt.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.baseline", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["baseline.cjs", "baseline-verdicts.cjs"], "publicApi": ["baseline.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.inventoryBindings", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["inventory-bindings.cjs"], "publicApi": ["inventory-bindings.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.inventoryRecords", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["inventory-records.cjs"], "publicApi": ["inventory-records.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.inventorySurfaces", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["inventory-surfaces.cjs"], "publicApi": ["inventory-surfaces.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.inventory", "layer": "tooling-application", "dir": "scripts/nemo",
-      "files": ["inventory.cjs"], "publicApi": ["inventory.cjs"], "sizeProfile": "Domain/application JS or TS" },
-
-    { "id": "nemo.lib.jobs", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["jobs.cjs"], "publicApi": ["jobs.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.cli", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["cli.cjs"], "publicApi": ["cli.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.boundariesRatchet", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-ratchet.cjs"], "publicApi": ["boundaries-ratchet.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.boundariesApplication", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-application.cjs"], "publicApi": ["boundaries-application.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.boundariesRust", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["boundaries-rust.cjs"], "publicApi": ["boundaries-rust.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.coverageRust", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["coverage-rust.cjs"], "publicApi": ["coverage-rust.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.lib.coverageRustJob", "layer": "tooling-application", "dir": "scripts/nemo/lib",
-      "files": ["coverage-rust-job.cjs"], "publicApi": ["coverage-rust-job.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.ci", "layer": "tooling-application", "dir": "scripts/nemo",
-      "files": ["ci.cjs"], "publicApi": ["ci.cjs"], "sizeProfile": "Domain/application JS or TS" },
-    { "id": "nemo.cli.coverageRust", "layer": "tooling-application", "dir": "scripts/nemo",
-      "files": ["coverage-rust.cjs"], "publicApi": ["coverage-rust.cjs"], "sizeProfile": "Domain/application JS or TS" },
-
-    { "id": "nemo.cli.boundaries", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["boundaries.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.browser", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["browser.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.build", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["build.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.buildJob", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["build-job.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.native", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["native.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.check", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["check.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.doctor", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["doctor.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.isolation", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["isolation.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.job", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["job.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.verify", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["verify.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-    { "id": "nemo.cli.baseline", "layer": "tooling-bootstrap", "dir": "scripts/nemo",
-      "files": ["baseline.cjs"], "publicApi": [], "sizeProfile": "Handwritten config/bootstrap" },
-
-    { "id": "nemo.test.boundaries", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries.test.cjs"], "publicApi": ["boundaries.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.inventory", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["inventory.test.cjs"], "publicApi": ["inventory.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.inventoryArea", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["inventory-area.test.cjs"], "publicApi": ["inventory-area.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesRatchet", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-ratchet.test.cjs"], "publicApi": ["boundaries-ratchet.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesApplication", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-application.test.cjs"], "publicApi": ["boundaries-application.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesEdges", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-edges.test.cjs"], "publicApi": ["boundaries-edges.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesRust", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-rust.test.cjs"], "publicApi": ["boundaries-rust.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesCli", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-cli.test.cjs"], "publicApi": ["boundaries-cli.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesCoverage", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-coverage.test.cjs"], "publicApi": ["boundaries-coverage.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesRepository", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-repository.test.cjs"], "publicApi": ["boundaries-repository.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesSize", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-size.test.cjs"], "publicApi": ["boundaries-size.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.boundariesDiscovery", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["boundaries-discovery.test.cjs"], "publicApi": ["boundaries-discovery.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.browserRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["browser-runtime.test.cjs"], "publicApi": ["browser-runtime.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.buildRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["build-runtime.test.cjs"], "publicApi": ["build-runtime.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.buildJob", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["build-job.test.cjs"], "publicApi": ["build-job.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.nativeRuntime", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["native-runtime.test.cjs"], "publicApi": ["native-runtime.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.isolation", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["isolation.test.cjs"], "publicApi": ["isolation.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.ci", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["ci.test.cjs"], "publicApi": ["ci.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.baseline", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["baseline.test.cjs"], "publicApi": ["baseline.test.cjs"], "sizeProfile": "Test file" },
-    { "id": "nemo.test.coverageRust", "layer": "tooling-test", "dir": "scripts/nemo",
-      "files": ["coverage-rust.test.cjs"], "publicApi": ["coverage-rust.test.cjs"], "sizeProfile": "Test file" }
+    {
+      "id": "nemo.remediationScope",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo",
+      "files": [
+        "remediation-scope.cjs"
+      ],
+      "publicApi": [
+        "remediation-scope.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.remediationScopeCensus",
+      "layer": "tooling-shared",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "remediation-scope-census.cjs"
+      ],
+      "publicApi": [
+        "remediation-scope-census.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.remediationScopeVerify",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "remediation-scope-verify.cjs"
+      ],
+      "publicApi": [
+        "remediation-scope-verify.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.remediationScopeBuild",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "remediation-scope-build.cjs"
+      ],
+      "publicApi": [
+        "remediation-scope-build.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.inventoryLexer",
+      "layer": "tooling-shared",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "inventory-lexer.cjs"
+      ],
+      "publicApi": [
+        "inventory-lexer.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.inventoryRender",
+      "layer": "tooling-shared",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "inventory-render.cjs"
+      ],
+      "publicApi": [
+        "inventory-render.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.util",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "util.cjs"
+      ],
+      "publicApi": [
+        "util.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.identity",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "identity.cjs"
+      ],
+      "publicApi": [
+        "identity.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.capabilities",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "capabilities.cjs"
+      ],
+      "publicApi": [
+        "capabilities.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.capabilityDrift",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "capability-drift.cjs",
+        "capability-schema.cjs"
+      ],
+      "publicApi": [
+        "capability-drift.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.isolation",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "isolation.cjs"
+      ],
+      "publicApi": [
+        "isolation.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.browserRuntime",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "browser-runtime.cjs"
+      ],
+      "publicApi": [
+        "browser-runtime.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.buildRuntime",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "build-runtime.cjs"
+      ],
+      "publicApi": [
+        "build-runtime.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.buildJob",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "build-job.cjs"
+      ],
+      "publicApi": [
+        "build-job.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.nativeProcess",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "native-process.cjs"
+      ],
+      "publicApi": [
+        "native-process.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.nativeRuntime",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "native-runtime.cjs"
+      ],
+      "publicApi": [
+        "native-runtime.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesChecker",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries.cjs"
+      ],
+      "publicApi": [
+        "boundaries.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesResolver",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-resolver.cjs"
+      ],
+      "publicApi": [
+        "boundaries-resolver.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesCoverage",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-coverage.cjs"
+      ],
+      "publicApi": [
+        "boundaries-coverage.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesRepository",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-repository.cjs"
+      ],
+      "publicApi": [
+        "boundaries-repository.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesSize",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-size.cjs"
+      ],
+      "publicApi": [
+        "boundaries-size.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.boundariesDiscovery",
+      "layer": "tooling-adapters",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-discovery.cjs"
+      ],
+      "publicApi": [
+        "boundaries-discovery.cjs"
+      ],
+      "sizeProfile": "Platform/engine adapter"
+    },
+    {
+      "id": "nemo.lib.receipt",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "receipt.cjs"
+      ],
+      "publicApi": [
+        "receipt.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.baseline",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "baseline.cjs",
+        "baseline-verdicts.cjs"
+      ],
+      "publicApi": [
+        "baseline.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.inventoryBindings",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "inventory-bindings.cjs"
+      ],
+      "publicApi": [
+        "inventory-bindings.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.inventoryRecords",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "inventory-records.cjs"
+      ],
+      "publicApi": [
+        "inventory-records.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.inventorySurfaces",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "inventory-surfaces.cjs"
+      ],
+      "publicApi": [
+        "inventory-surfaces.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.inventory",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "inventory.cjs"
+      ],
+      "publicApi": [
+        "inventory.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.jobs",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "jobs.cjs"
+      ],
+      "publicApi": [
+        "jobs.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.cli",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "cli.cjs"
+      ],
+      "publicApi": [
+        "cli.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.boundariesRatchet",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-ratchet.cjs"
+      ],
+      "publicApi": [
+        "boundaries-ratchet.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.boundariesApplication",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-application.cjs"
+      ],
+      "publicApi": [
+        "boundaries-application.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.boundariesRust",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "boundaries-rust.cjs"
+      ],
+      "publicApi": [
+        "boundaries-rust.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.coverageRust",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "coverage-rust.cjs"
+      ],
+      "publicApi": [
+        "coverage-rust.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.coverageJsJob",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "coverage-js-job.cjs"
+      ],
+      "publicApi": [
+        "coverage-js-job.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.lib.coverageRustJob",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "coverage-rust-job.cjs"
+      ],
+      "publicApi": [
+        "coverage-rust-job.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.ci",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "ci.cjs"
+      ],
+      "publicApi": [
+        "ci.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.cli.coverageRust",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo",
+      "files": [
+        "coverage-rust.cjs"
+      ],
+      "publicApi": [
+        "coverage-rust.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
+      "id": "nemo.cli.boundaries",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.browser",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "browser.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.build",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "build.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.buildJob",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "build-job.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.native",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "native.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.check",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "check.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.doctor",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "doctor.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.isolation",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "isolation.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.job",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "job.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.verify",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "verify.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.cli.baseline",
+      "layer": "tooling-bootstrap",
+      "dir": "scripts/nemo",
+      "files": [
+        "baseline.cjs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Handwritten config/bootstrap"
+    },
+    {
+      "id": "nemo.test.boundaries",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.inventory",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "inventory.test.cjs"
+      ],
+      "publicApi": [
+        "inventory.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.inventoryArea",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "inventory-area.test.cjs"
+      ],
+      "publicApi": [
+        "inventory-area.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesRatchet",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-ratchet.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-ratchet.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesApplication",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-application.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-application.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesEdges",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-edges.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-edges.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesRust",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-rust.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-rust.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesCli",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-cli.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-cli.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesCoverage",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-coverage.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-coverage.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesRepository",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-repository.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-repository.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesSize",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-size.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-size.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.boundariesDiscovery",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "boundaries-discovery.test.cjs"
+      ],
+      "publicApi": [
+        "boundaries-discovery.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.browserRuntime",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "browser-runtime.test.cjs"
+      ],
+      "publicApi": [
+        "browser-runtime.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.buildRuntime",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "build-runtime.test.cjs"
+      ],
+      "publicApi": [
+        "build-runtime.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.buildJob",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "build-job.test.cjs"
+      ],
+      "publicApi": [
+        "build-job.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.nativeRuntime",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "native-runtime.test.cjs"
+      ],
+      "publicApi": [
+        "native-runtime.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.isolation",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "isolation.test.cjs"
+      ],
+      "publicApi": [
+        "isolation.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.ci",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "ci.test.cjs"
+      ],
+      "publicApi": [
+        "ci.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.baseline",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "baseline.test.cjs"
+      ],
+      "publicApi": [
+        "baseline.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    },
+    {
+      "id": "nemo.test.coverageRust",
+      "layer": "tooling-test",
+      "dir": "scripts/nemo",
+      "files": [
+        "coverage-rust.test.cjs"
+      ],
+      "publicApi": [
+        "coverage-rust.test.cjs"
+      ],
+      "sizeProfile": "Test file"
+    }
   ],
   "layerRules": {
-    "tooling-shared": { "allowedLayers": [] },
-    "tooling-adapters": { "allowedLayers": ["tooling-shared", "tooling-adapters"] },
-    "tooling-application": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application"] },
-    "tooling-bootstrap": { "allowedLayers": ["*"] },
-    "tooling-test": { "allowedLayers": ["tooling-shared", "tooling-adapters", "tooling-application", "tooling-test"] }
+    "tooling-shared": {
+      "allowedLayers": []
+    },
+    "tooling-adapters": {
+      "allowedLayers": [
+        "tooling-shared",
+        "tooling-adapters"
+      ]
+    },
+    "tooling-application": {
+      "allowedLayers": [
+        "tooling-shared",
+        "tooling-adapters",
+        "tooling-application"
+      ]
+    },
+    "tooling-bootstrap": {
+      "allowedLayers": [
+        "*"
+      ]
+    },
+    "tooling-test": {
+      "allowedLayers": [
+        "tooling-shared",
+        "tooling-adapters",
+        "tooling-application",
+        "tooling-test"
+      ]
+    }
   },
   "sizeProfiles": {
-    "Domain/application JS or TS": { "warn": 300, "hardMax": 400 },
-    "Feature UI JS or TS": { "warn": 350, "hardMax": 500 },
-    "Platform/engine adapter": { "warn": 300, "hardMax": 500 },
-    "Rust production module": { "warn": 350, "hardMax": 500 },
-    "Test file": { "warn": 450, "hardMax": 600 },
-    "Stylesheet": { "warn": 250, "hardMax": 350 },
-    "Handwritten config/bootstrap": { "warn": 150, "hardMax": 250 }
+    "Domain/application JS or TS": {
+      "warn": 300,
+      "hardMax": 400
+    },
+    "Feature UI JS or TS": {
+      "warn": 350,
+      "hardMax": 500
+    },
+    "Platform/engine adapter": {
+      "warn": 300,
+      "hardMax": 500
+    },
+    "Rust production module": {
+      "warn": 350,
+      "hardMax": 500
+    },
+    "Test file": {
+      "warn": 450,
+      "hardMax": 600
+    },
+    "Stylesheet": {
+      "warn": 250,
+      "hardMax": 350
+    },
+    "Handwritten config/bootstrap": {
+      "warn": 150,
+      "hardMax": 250
+    }
   },
   "exceptions": []
 }
