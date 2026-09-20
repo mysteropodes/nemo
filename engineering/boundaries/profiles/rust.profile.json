@@ -4,15 +4,15 @@
       "id": "rust.native.engine",
       "layer": "engine",
       "dir": "native-engine/src",
-      "files": ["codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
-      "publicApi": ["codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
+      "files": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "protocol.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
+      "publicApi": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "protocol.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "history.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },

@@ -1837,6 +1837,18 @@
       ]
     },
     {
+      "id": "app.native.application.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-application.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-application.js"
+      ]
+    },
+    {
       "id": "app.native.viewport.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

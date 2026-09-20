@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-transport-v2.schema.json",
+  "title": "Nemo staged native application transport v2",
+  "description": "N15 machine-readable contract. Host discovery is N16 and authority activation is N20.",
+  "oneOf": [
+    { "$ref": "#/$defs/Request" },
+    { "$ref": "#/$defs/Response" }
+  ],
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "Revision": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "StableTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layerUid"],
+      "properties": { "layerUid": { "$ref": "#/$defs/Identifier" } }
+    },
+    "OpaqueResourceHandle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceId", "resourceVersion"],
+      "properties": {
+        "resourceId": { "$ref": "#/$defs/Identifier" },
+        "resourceVersion": { "$ref": "#/$defs/Identifier" }
+      },
+      "description": "Opaque lease identity only; pixels, canvas, binary data and geometry JSON are forbidden."
+    },
+    "CommandPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "stableTarget", "value"],
+      "properties": {
+        "command": { "const": "layer.opacity.set" },
+        "stableTarget": { "$ref": "#/$defs/StableTarget" },
+        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "OpacityQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableTarget"],
+      "properties": {
+        "stableTarget": { "$ref": "#/$defs/StableTarget" },
+        "atRevision": { "$ref": "#/$defs/Revision" }
+      }
+    },
+    "RevisionQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "frame": { "$ref": "#/$defs/Revision" },
+        "contextId": { "$ref": "#/$defs/Identifier" },
+        "viewGeneration": { "$ref": "#/$defs/Revision" }
+      }
+    },
+    "SnapshotQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "atRevision": { "$ref": "#/$defs/Revision" } }
+    },
+    "TransactionBeginPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableTarget"],
+      "properties": { "stableTarget": { "$ref": "#/$defs/StableTarget" } }
+    },
+    "TransactionUpdatePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionId", "value"],
+      "properties": {
+        "transactionId": { "$ref": "#/$defs/Identifier" },
+        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "TransactionIdPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionId"],
+      "properties": { "transactionId": { "$ref": "#/$defs/Identifier" } }
+    },
+    "EmptyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 0
+    },
+    "PngBeginPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contextId", "quality", "outputHandle", "frames"],
+      "properties": {
+        "contextId": { "$ref": "#/$defs/Identifier" },
+        "quality": { "const": "final" },
+        "outputHandle": { "$ref": "#/$defs/Identifier" },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 120,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceFrame", "geometryHandle"],
+            "properties": {
+              "sourceFrame": { "$ref": "#/$defs/Revision" },
+              "geometryHandle": { "$ref": "#/$defs/OpaqueResourceHandle" }
+            }
+          }
+        }
+      }
+    },
+    "JobIdPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobId"],
+      "properties": { "jobId": { "$ref": "#/$defs/Identifier" } }
+    },
+    "RequestBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "operation", "payload"],
+      "properties": {
+        "apiVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/Identifier" },
+        "instanceId": { "$ref": "#/$defs/Identifier" },
+        "documentId": { "$ref": "#/$defs/Identifier" },
+        "expectedRevision": { "$ref": "#/$defs/Revision" },
+        "cancelledBeforeDispatch": { "type": "boolean" },
+        "operation": { "type": "string" },
+        "payload": { "type": "object" }
+      }
+    },
+    "RequiredRevisionRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/RequestBase" },
+        { "required": ["expectedRevision"] }
+      ]
+    },
+    "ForbiddenRevisionRequest": {
+      "allOf": [
+        { "$ref": "#/$defs/RequestBase" },
+        { "not": { "required": ["expectedRevision"] } }
+      ]
+    },
+    "Request": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "command.document.apply" },
+                "payload": { "$ref": "#/$defs/CommandPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "query.document.opacity" },
+                "payload": { "$ref": "#/$defs/OpacityQueryPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "query.document.revision" },
+                "payload": { "$ref": "#/$defs/RevisionQueryPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "query.document.snapshot.acquire" },
+                "payload": { "$ref": "#/$defs/SnapshotQueryPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "transaction.begin" },
+                "payload": { "$ref": "#/$defs/TransactionBeginPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "enum": ["transaction.commit", "transaction.cancel", "transaction.status"] },
+                "payload": { "$ref": "#/$defs/TransactionIdPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "transaction.update" },
+                "payload": { "$ref": "#/$defs/TransactionUpdatePayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "enum": ["history.undo", "history.redo"] },
+                "payload": { "$ref": "#/$defs/EmptyPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/RequiredRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "const": "job.export.png.begin" },
+                "payload": { "$ref": "#/$defs/PngBeginPayload" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            {
+              "properties": {
+                "operation": { "enum": ["job.export.png.status", "job.export.png.cancel"] },
+                "payload": { "$ref": "#/$defs/JobIdPayload" }
+              }
+            }
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "apiVersion": 2,
+          "requestId": "fixture-query",
+          "instanceId": "instance-a",
+          "documentId": "native-document-1",
+          "operation": "query.document.opacity",
+          "payload": { "stableTarget": { "layerUid": "r08_curve_layer" } }
+        },
+        {
+          "apiVersion": 2,
+          "requestId": "fixture-export",
+          "instanceId": "instance-a",
+          "documentId": "native-document-1",
+          "expectedRevision": 0,
+          "operation": "job.export.png.begin",
+          "payload": {
+            "contextId": "scene-root",
+            "quality": "final",
+            "outputHandle": "output/fixture",
+            "frames": [{
+              "sourceFrame": 0,
+              "geometryHandle": { "resourceId": "geometry/r08", "resourceVersion": "v1" }
+            }]
+          }
+        }
+      ]
+    },
+    "CommandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applied", "historyEntriesAdded"],
+      "properties": {
+        "applied": { "type": "boolean" },
+        "historyEntriesAdded": { "type": "integer", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "OpacityQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atRevision", "layerUid", "value"],
+      "properties": {
+        "atRevision": { "$ref": "#/$defs/Revision" },
+        "layerUid": { "$ref": "#/$defs/Identifier" },
+        "value": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "RevisionQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contentRevision", "frame", "contextId", "viewGeneration"],
+      "properties": {
+        "contentRevision": { "$ref": "#/$defs/Revision" },
+        "frame": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] },
+        "contextId": { "oneOf": [{ "$ref": "#/$defs/Identifier" }, { "type": "null" }] },
+        "viewGeneration": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] }
+      }
+    },
+    "SnapshotQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atRevision", "documentSnapshotId"],
+      "properties": {
+        "atRevision": { "$ref": "#/$defs/Revision" },
+        "documentSnapshotId": { "$ref": "#/$defs/Identifier" }
+      }
+    },
+    "TransactionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transactionId", "baseRevision", "workingGeneration", "workingState", "committedRevision", "terminalDisposition", "historyEntriesAdded"],
+      "properties": {
+        "transactionId": { "$ref": "#/$defs/Identifier" },
+        "baseRevision": { "$ref": "#/$defs/Revision" },
+        "workingGeneration": { "$ref": "#/$defs/Revision" },
+        "workingState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stableTarget", "value"],
+          "properties": {
+            "stableTarget": { "$ref": "#/$defs/StableTarget" },
+            "value": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "committedRevision": { "oneOf": [{ "$ref": "#/$defs/Revision" }, { "type": "null" }] },
+        "terminalDisposition": { "enum": [null, "succeeded", "cancelled"] },
+        "historyEntriesAdded": { "type": "integer", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "DispatchError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"]
+        },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    },
+    "JobError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "enum": ["staging_failed", "frame_failed", "write_failed", "publish_failed", "cleanup_failed", "document_replaced"] },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    },
+    "JobReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobId", "status", "pinnedRevision", "documentSnapshotId", "progress", "artifact", "cleanup", "externalEffectDisposition"],
+      "properties": {
+        "jobId": { "$ref": "#/$defs/Identifier" },
+        "status": { "enum": ["running", "succeeded", "failed", "cancelled"] },
+        "pinnedRevision": { "$ref": "#/$defs/Revision" },
+        "documentSnapshotId": { "$ref": "#/$defs/Identifier" },
+        "progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "artifact": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["target", "files"],
+              "properties": {
+                "target": { "$ref": "#/$defs/Identifier" },
+                "files": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          ]
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["not_required", "pending", "complete", "failed"] },
+            "error": { "$ref": "#/$defs/JobError" }
+          }
+        },
+        "externalEffectDisposition": { "enum": ["none", "contained", "committed", "indeterminate"] },
+        "error": { "$ref": "#/$defs/JobError" }
+      }
+    },
+    "ResponseBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "contentRevision", "ok"],
+      "properties": {
+        "apiVersion": { "const": 2 },
+        "requestId": { "$ref": "#/$defs/Identifier" },
+        "instanceId": { "$ref": "#/$defs/Identifier" },
+        "documentId": { "$ref": "#/$defs/Identifier" },
+        "contentRevision": { "$ref": "#/$defs/Revision" },
+        "ok": { "type": "boolean" },
+        "result": {
+          "oneOf": [
+            { "$ref": "#/$defs/CommandResult" },
+            { "$ref": "#/$defs/OpacityQueryResult" },
+            { "$ref": "#/$defs/RevisionQueryResult" },
+            { "$ref": "#/$defs/SnapshotQueryResult" },
+            { "$ref": "#/$defs/TransactionResult" },
+            { "$ref": "#/$defs/JobReceipt" }
+          ]
+        },
+        "error": { "$ref": "#/$defs/DispatchError" }
+      }
+    },
+    "Response": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ResponseBase" },
+            {
+              "type": "object",
+              "required": ["result"],
+              "not": { "required": ["error"] },
+              "properties": { "ok": { "const": true }, "result": true }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ResponseBase" },
+            {
+              "type": "object",
+              "required": ["error"],
+              "not": { "required": ["result"] },
+              "properties": { "ok": { "const": false }, "error": { "$ref": "#/$defs/DispatchError" } }
+            }
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "apiVersion": 2,
+          "requestId": "fixture-query",
+          "instanceId": "instance-a",
+          "documentId": "native-document-1",
+          "contentRevision": 0,
+          "ok": true,
+          "result": { "atRevision": 0, "layerUid": "r08_curve_layer", "value": 25 }
+        }
+      ]
+    }
+  }
+}

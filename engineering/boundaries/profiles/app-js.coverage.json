@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, and the staged N13 native viewport metadata adapter. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, and the staged N15 native application v2 adapter. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -20,10 +20,10 @@
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
     "candidateCommit": "398b0dc649ec4e492403d7c6866eab08e1ac2ac2",
-    "sourceRootTree": "63afe3cf7146d6cd695daf1c26127286bbd04e5f",
+    "sourceRootTree": "7e049b5a4c42a0070cf0524b3b36581052437a96",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "8cf4b2d6b024f117fd9c6443cf85280f10c03f0a",
+      "gitTree": "1b4188c8820e520b5203fa0389f140dbba19825e",
       "lastChangedCommit": "398b0dc649ec4e492403d7c6866eab08e1ac2ac2"
     },
     "bootstrap": {
@@ -35,14 +35,14 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "bda733f30d0ef51636655f47232a373cbfe99c67aa4144a7934e485214d19ff1"
+      "value": "e65ebd4abc0cdd8dcd035b99add762631b3b8c786fb9508164779c281f7b3dda"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "4a75715c5f61971eecfaeb950a50229690a11098",
-        "sha256": "66d761966d3ca680fb9b2cc87352000594250bd0f57df35891f3cc9651b83d4c",
-        "moduleCount": 162,
+        "gitBlob": "8d015fe0aad016729d250ccb7ae8a9b37afc7809",
+        "sha256": "d37ce92d3bf908be7bcf86b9098a858ffa3f41d5e3eb55d624c7720d208d8554",
+        "moduleCount": 163,
         "basedOnCommit": "398b0dc649ec4e492403d7c6866eab08e1ac2ac2"
       },
       {
@@ -226,6 +226,19 @@
           "path": "src/index.html",
           "line": 2460,
           "scriptOrdinal": 139
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-application.js",
+      "moduleId": "app.native.application.adapter",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-application.js",
+          "line": 1,
+          "role": "N15 pure injected v2 transport/validation adapter; no bootstrap or production host binding before N16/N20"
         }
       ]
     },
