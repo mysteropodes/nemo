@@ -6,6 +6,7 @@
 3. **Match agents and effort to the work.** Use the least costly capable model and reasoning effort for each bounded task; delegate independent work when useful and escalate when complexity, uncertainty or risk warrants it.
 4. **Follow the documented process — never propose a bypass.** Even when elevated access makes a shortcut technically possible (e.g., an admin-bypass merge, skipping a required independent approval), surface and follow the plan's compliant path instead; do not offer the non-compliant option as if it were a normal choice.
 5. **Verify before asserting or starting work.** State process, permission, or ownership facts only after checking the live source (git/gh state, the plan text) — label anything unchecked as an assumption. Before claiming or recommending work on an issue/PR/branch, check for an existing claim by another agent to avoid duplicating it.
+6. **Name locally spawned agents with their settings.** For every agent spawned inside the current Codex task, include the selected model and reasoning effort in its local task name. Do not rename Buzz agents; Buzz displays their model separately.
 <!-- nemo-golden-rules:end -->
 
 # Nemo repository agent entry point
@@ -19,7 +20,8 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
 - Start with the single remediation execution checklist:
   [English](engineering/remediation/EXECUTION_PLAN.en.md) /
   [français](engineering/remediation/EXECUTION_PLAN.fr.md). Its human-approved
-  2026-09-07 scope and workflow supersede older plans, phase gates and agent playbooks.
+  2026-09-07 scope and workflow, as amended by the approved 2026-09-20
+  native-engine pivot, supersede older plans, phase gates and agent playbooks.
   The [short entry point](engineering/remediation/README.md) links the four supporting
   references. The archived handbook is historical context, not a required reading list.
 - Read [current and target architecture](engineering/remediation/reference/01_CURRENT_AND_TARGET.md),
@@ -44,6 +46,12 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   feature declarations and their shared application API/bundled Rust MCP integration.
   Existing broken features need explicit availability and isolated ownership, not a
   product fix as a prerequisite to remediation completion.
+- Execute the approved native-engine migration in bounded, dependency-gated slices:
+  keep the Tauri/JavaScript interface, move document revision/evaluation/media/GPU/
+  viewport/export authority into Rust, and retain Paper.js only as a compatibility
+  editor/hit-test adapter until each legacy writer is proven safe to retire. Until a
+  slice is merged and accepted, the observed JavaScript/Paper runtime remains baseline,
+  not evidence that the target architecture is already implemented.
 - R03/R05 and the other broad issues are tracking parents. Only named executable leaf
   dependencies block work; their whole-issue closure is not a global extraction gate.
 - New OpenFX effects, full OCIO/EXR/OTIO implementations, expanded Buzz transport/
