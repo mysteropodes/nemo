@@ -1,8 +1,25 @@
 # Nemo — remediation execution checklist
 
-Approved strategy: **7 September 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
+Approved strategy: **7 September 2026**; native-engine amendment approved **20 September 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
 
 This is the single operating plan for the current remediation. It supersedes the execution order, forecasts, global blocking gates, remote-agent assumptions and reporting requirements in the older R00–R22 plan and local-agent playbooks. Existing architecture and source documentation remain references; this document governs scope and workflow where they conflict. GitHub issues hold live claims and handoffs; the checklist defines outcomes. The [shared hourly progress log #1062](https://github.com/mysteropodes/nemo/issues/1062) is the one central report destination; do not create competing sprint ledgers or report PRs.
+
+## 0. Approved native-engine pivot and ordered admission — 20 September 2026
+
+The approved pivot keeps the Tauri/JavaScript interface while making a native Rust engine the sole authority for document revisions, command/history application, evaluation and scheduling, media/resource/GPU lifetime, viewport frame production and export jobs. Paper.js becomes a compatibility editor, selection and hit-test adapter at the interface edge; it must not remain a concurrent document writer or evaluator. Browser/WASM support remains a separately declared adapter with explicit capability and availability limits. This is a staged migration, not a flag-day claim that the current runtime has already changed.
+
+**Phase 0 is the Project #2 and plan realignment; it precedes engine implementation.** Execute the admitted work in this dependency order:
+
+- [x] **Board first:** create [R23 / #1327](https://github.com/mysteropodes/nemo/issues/1327) and the bounded N00–N05 queue in canonical [Project #2](https://github.com/users/mysteropodes/projects/2), with native sub-issue and blocked-by relations, complete fields and an updated project README. The 20 September readback confirmed R23 and N00 `In progress`, with N01–N05 in `Inbox` / `Planned later` according to their dependencies.
+- [ ] **[N00 / #1329](https://github.com/mysteropodes/nemo/issues/1329):** publish this synchronized English/French amendment and the active repository-entry rules. No engine source work starts before N00 is reviewed, merged and accepted.
+- [ ] **[N01 / #1328](https://github.com/mysteropodes/nemo/issues/1328):** after N00, rebaseline the live remediation queue against current main and map every retained, replaced or newly blocking leaf without erasing accepted receipts or current ownership.
+- [ ] **[N02 / #1331](https://github.com/mysteropodes/nemo/issues/1331):** after N00, freeze the native engine, revision, command/query/job, transition and adapter contracts, including two concrete compatibility/failure examples and explicit authority boundaries.
+- [ ] **[N03 / #1330](https://github.com/mysteropodes/nemo/issues/1330)** and **[N04 / #1332](https://github.com/mysteropodes/nemo/issues/1332):** after N02, independently prove headless Rust evaluation and a native Tauri viewport on representative fixtures. Record measured failure/unsupported outcomes honestly; a compile-only result is not feasibility acceptance.
+- [ ] **[N05 / #1333](https://github.com/mysteropodes/nemo/issues/1333):** only after both feasibility gates, admit the bounded production implementation queue with exact owners, files, predecessor SHAs, parity fixtures, consumer matrices, retirement conditions and local validation commands.
+
+The production migration then proceeds one characterized vertical slice at a time through the same versioned application commands, queries and jobs used by the UI and bundled Rust MCP. Start from the accepted opacity fixture and move persistent revision ownership, immutable evaluation, native scheduling/resources, desktop presentation and fixed-revision export behind the frozen contracts. Retire a legacy writer only after applicable save/load, undo/redo, selection, animation, render, export, native bridge, browser and installed-desktop evidence passes at the same candidate. Packaged desktop acceptance, browser adapter acceptance and source-level parity remain distinct gates.
+
+This amendment preserves accepted remediation work and existing ownership. In particular, [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005), [P16 / #1018](https://github.com/mysteropodes/nemo/issues/1018), [#1316](https://github.com/mysteropodes/nemo/issues/1316) and its current [PR #1323](https://github.com/mysteropodes/nemo/pull/1323) are not silently reassigned or closed. R23 is a tracking parent; only the named executable leaves and native blocked-by relations gate work.
 
 ## 1. Outcome, starting point and limits
 
@@ -13,15 +30,15 @@ This is the single operating plan for the current remediation. It supersedes the
 - [ ] Keep new OpenFX effects, a full OCIO/EXR/OTIO implementation, new Buzz transport infrastructure, broad performance improvements and product feature additions outside this program. Define their ports, availability and data contracts where needed; do not implement new product breadth to close remediation. The separately authorized Buzz workspace-instruction editor is a current coordination improvement, not a Nemo structural completion gate.
 - [ ] Treat generated, vendor and data catalogs by exact provenance/integrity policy. Handwritten control logic cannot escape modularity checks by being labeled a catalog. Line counts support coherent APIs; arbitrary file splitting is not acceptance.
 
-The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Reuse the honest F0 baseline, merged curve extraction, project parser, opacity application service, existing consumer tests and Rust MCP transport. At the current main source below, P05 has added the deterministic application capability registry; P06 now publishes the complete registered opacity descriptor through application discovery; P07 still has to finish Rust MCP consumption. The application JavaScript profile now contains 152 modules and still classifies 140 as `App JS unclassified (pre-R01)`. These are source observations, not newly executed test results.
+The source audit used `66ece0641708122eb8447e85ad8dd7e3402aaf6c`, not the older local main checkout. Reuse the honest F0 baseline, merged curve extraction, project parser, opacity application service, existing consumer tests and Rust MCP transport. At the audited source in the earlier snapshot below, P05 had added the deterministic application capability registry; P06 published the complete registered opacity descriptor through application discovery; P07 still had to finish Rust MCP consumption. The application JavaScript profile contained 152 modules and classified 140 as `App JS unclassified (pre-R01)`. These are source observations, not newly executed test results; N01 owns the current-main rebaseline.
 
-### Current reconciliation — 12 September 2026
+### Earlier reconciliation — 12 September 2026
 
 This snapshot was checked against `origin/main` `1cad07768b884cf44c0380e2236c2d3133051cf8`, live leaf issues and PRs, and Project 2. Twenty-eight finite leaves in the original checklist have terminal acceptance/Done receipts and are closed: P01, P02, C01–C08, F01, F02, P14, P15, P04, P05, P06, P11, P13, T01–T04, D02, P20, P22, A01 and P28. Their top-level outcome boxes are checked below. The recurring operating checklists in sections 1, 3, 5–7 and 10, and every final program gate in section 9, remain open.
 
 Five supplemental census leaves created from C08 are also accepted and closed: [C09 / #1091](https://github.com/mysteropodes/nemo/issues/1091), [C13 / #1092](https://github.com/mysteropodes/nemo/issues/1092), [C15 / #1093](https://github.com/mysteropodes/nemo/issues/1093), [C17 / #1094](https://github.com/mysteropodes/nemo/issues/1094) and [C18 / #1095](https://github.com/mysteropodes/nemo/issues/1095). [T09 / #1105](https://github.com/mysteropodes/nemo/issues/1105) is closed by a reviewed non-code disposition: native decode remains unavailable on that workstation; no product fix or passing native-decode result is claimed. P03 remains open until it consolidates the accepted census, freezes the source-set digest and admits the complete bounded extraction queue.
 
-D01 remains claimed in its dedicated worktree. P06 is accepted and merged through [PR #1112](https://github.com/mysteropodes/nemo/pull/1112) as `1cad07768b884cf44c0380e2236c2d3133051cf8`: exact candidate `9489214` passed independent technical review and both real Chrome consumer/gesture controls, with zero retries. P07's takeover handoff is reconciled; [PR #1113](https://github.com/mysteropodes/nemo/pull/1113) remains at `5aa8026ef412f70f4caf1e391b6447657d5cd12a` with changes requested. T05 retains its existing owner reservation; its P06 predecessor is now accepted. The remaining execution queue is this plan reconciliation → P07, while D01 proceeds separately.
+D01 remained claimed in its dedicated worktree. P06 was accepted and merged through [PR #1112](https://github.com/mysteropodes/nemo/pull/1112) as `1cad07768b884cf44c0380e2236c2d3133051cf8`: exact candidate `9489214` passed independent technical review and both real Chrome consumer/gesture controls, with zero retries. P07's takeover handoff was reconciled; [PR #1113](https://github.com/mysteropodes/nemo/pull/1113) remained at `5aa8026ef412f70f4caf1e391b6447657d5cd12a` with changes requested. T05 retained its existing owner reservation; its P06 predecessor was accepted. At that snapshot, the queue was plan reconciliation → P07 while D01 proceeded separately; section 0 and live issues now govern current priority.
 
 Project 2's roadmap `Status` reads `Already there` for the closed leaves, but its `Validation` field is not a reliable acceptance tally: only P01 reads `Accepted`; most closed leaves still read `Planned`, and F01/F02 still read `Needs validation`. The checkmarks below rely on the terminal issue/PR acceptance receipt plus containment in current main, not on issue closure or board status alone.
 
@@ -36,6 +53,8 @@ The starting issues below are concrete entry tasks, not a claim that their count
 | **D2 — delegate** | `gpt-5.6-terra`, **medium**. Boundaries, Rust/render adapters and independent implementation. Use high for concurrency/resource ownership. | `sonnet`, **medium**. Coverage/reporting, isolated browser tests, preferences/Labs and diagnostics UI. |
 
 These are recommended session settings, not quota guarantees. Check the actual model and effort at first claim. If a listed model is unavailable, choose an available equivalent and record the substitution; do not silently run a less capable model on an unresolved authority problem. `gpt-5.6-luna` / medium may replace an Ilya delegate for mechanical inventory/link checks; it is not a fourth slot.
+
+For every agent spawned inside the current Codex task, include the selected model and reasoning effort in its local task name. Do not rename Buzz agents; Buzz displays their model separately.
 
 Cyrill starts with **one** Sonnet delegate and activates the second only when it has independent work and sufficient allowance. Opus receives a compact issue packet and milestone receipt, not continuous polling or repeated full-repository reads. Avoid automatic maximum effort and extended-context variants. If quotas run low, push the checkpoint and release or retain the claim explicitly; Ilya can take a leaf only after that handoff. Human issue assignees remain the owners even when agents change.
 
@@ -147,7 +166,7 @@ Primary tool references: [Node test runner](https://nodejs.org/api/test.html), [
 - [ ] Build/launch discovers trusted declarations deterministically, validates them and generates the catalog/schema/docs. Adding a feature does not require hand editing a central MCP operation switch. Missing/duplicate/stale declarations fail the normal gate.
 - [ ] Discover compact summaries first; load detailed contracts on demand. Large media/geometry travels by handles/artifact references. Agents can inspect targeted frames/state; do not expose thousands of widget-level tools or serialize entire buffers into prompts.
 - [ ] Enforce mutation/access policy in application handlers. Tool descriptions are explanatory, not enforcement. Use explicit instances/documents/revisions, reject stale writes and reconcile interrupted requests before retrying.
-- [ ] Keep protocol and feature-schema versions separate, with explicit compatibility and deprecation. Add replaceable adapters for future protocols/backends; no wholesale Rust rewrite, universal plugin framework or distributed scheduler is required now.
+- [ ] Keep protocol and feature-schema versions separate, with explicit compatibility and deprecation. Execute the approved Rust migration behind these contracts in bounded vertical slices; do not attempt a flag-day rewrite. A universal plugin framework and distributed scheduler remain out of scope.
 - [ ] A broken existing feature remains connected to its real implementation and advertises its precise availability/failure. A descriptor alone does not establish working behavior. Internal kernels associate with a useful feature capability instead of becoming meaningless public tools.
 
 ## 6. Board rules and human oversight
@@ -201,7 +220,13 @@ Use the returned project/item/field/option IDs with `gh project item-edit --id <
 
 ## 8. Ordered execution checklist
 
-Dependencies determine readiness, not the numeric order of IDs. Start independent Ready tasks only within the three-slot/two-writer limits. A suggested first allocation is Ilya O=P04/P02 and integration, D1=C02, D2=C03; Cyrill O=F01 and existing lane reconciliation, D1=F02 if that owner is active (otherwise P15), D2=T01 only when quota and the shared package-file slot permit. P14 reserves a separate native runtime slot; it must not interrupt a parity session.
+Dependencies determine readiness, not the numeric order of IDs. The 20 September pivot supersedes the historical first-allocation example: update the canonical board and plan first, then pass the contract and feasibility gates before admitting engine implementation. Existing independently claimed leaves may continue only when their owners and files do not overlap the pivot work.
+
+1. N00 installs and validates Project #2 plus this plan amendment.
+2. After N00 acceptance, N01 reconciles the live queue while N02 freezes native authority and transition contracts.
+3. After N02 acceptance, N03 and N04 run the independent headless-evaluator and native-viewport feasibility gates.
+4. After both gates, N05 creates the bounded production leaves under R23; no broad engine implementation issue is a writable assignment.
+5. Implementation leaves migrate one characterized vertical slice at a time and retire the corresponding legacy writer only after their named parity, consumer and installed-surface checks pass.
 
 C08 split its remaining coverage into the accepted supplemental census leaves C09, C13, C15, C17 and C18. P03 must consolidate C01–C08 plus C09, C13, C15, C17 and C18, then create the remaining small extraction leaves and attach them to the same family parents. Reuse the leaf protocol below: exact symbols/owner/dependencies, three observable checks, known-defect exclusions, same assignee/lane labels and native parent/blocking links. Extend this checklist in the same ordinary change that adopts the census. The fixed source-set digest and zero-unmapped checks prevent silently declaring remediation complete after only the starting tasks.
 
@@ -980,6 +1005,9 @@ The initial board contains **59 leaves: 33 owned by Ilya and 26 by Cyrill**. The
 
 ## 9. Final acceptance — the finish line
 
+- [ ] N00–N05 have exact accepted receipts: board/plan installation, current-main queue reconciliation, frozen authority/transition contracts, headless-evaluation feasibility, native-viewport feasibility and the admitted bounded production queue. A tracking-parent percentage or feasibility prototype alone is not production completion.
+- [ ] The native Rust engine is the sole writable authority for the agreed document revision, command/history, evaluation/scheduling, media/resource/GPU, viewport-production and export paths. Tauri/JavaScript remains the interface; Paper.js and browser/WASM are capability-declared edge adapters, not concurrent authorities.
+- [ ] Every migrated family has a fixed-revision parity oracle and passes its applicable save/load, undo/redo, selection, animation, render, export, native-bridge, real-browser and installed-desktop checks before the corresponding legacy writer is removed. Packaged acceptance, browser acceptance and source-level parity are recorded separately at exact SHAs.
 - [ ] P03's frozen source/consumer census is complete, including subsequently admitted small leaves. No handwritten monolith remains hidden under a legacy exception; legitimate generated/vendor/data files have explicit dispositions.
 - [ ] Each feature has a coherent public API, one state authority, applicable lifecycle/resource contracts and a capability registration. Existing UI/API/MCP consumers use the same implementation; obsolete writers and bypasses are removed.
 - [ ] Relevant unit, regression, browser and native checks protect migrated behavior. Coverage and failure reports are inspectable at the final source SHA. Known defects are explicit product debt, not repair prerequisites or concealed passing tests.
