@@ -1,0 +1,14 @@
+{
+  "name": "N04 representative vector viewport fixture",
+  "artboard": { "width": 1920, "height": 1080 },
+  "shapes": [
+    { "kind": "rect", "x": 150, "y": 140, "width": 520, "height": 330, "color": "#56d5bf" },
+    { "kind": "circle", "x": 1110, "y": 520, "radius": 210, "color": "#875dff" },
+    { "kind": "curve", "color": "#ffbd4a" }
+  ],
+  "expected": {
+    "hitTarget": { "x": 390, "y": 305 },
+    "revision7Accent": "#ffbd4a",
+    "revision8Accent": "#ff5d93"
+  }
+}
