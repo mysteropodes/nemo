@@ -1,0 +1,32 @@
+{
+  "schema": "nemo.n03-headless-oracle/1",
+  "fixture": {
+    "path": "tests/animation/fixtures/curve-workflow.json",
+    "sha256": "dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d"
+  },
+  "baseSha": "c489e5fbb1822f6a816db3a4d8e901d67382b7a2",
+  "snapshot": {
+    "documentId": "n03-proof-doc",
+    "contentRevision": 7,
+    "contextId": "scene-root"
+  },
+  "canonicalEncoding": "manually ordered UTF-8 JSON with integer microunits",
+  "samples": [
+    { "frame": 0, "position": [0, 0], "propertySha256": "9705a15a11178f0abcb1cb56c04945502f05a05dcf0b3d831b619e5234616da8", "sceneSha256": "54679f9cf20422c1bc851a5156d0c039f890dfc19724255fe1d6119f8a99ed86" },
+    { "frame": 5, "position": [20, 0], "propertySha256": "b5b9cd37bff434db09c028db69a5233f21ab138cd23c408cff2166e5415fa8a2", "sceneSha256": "3c9b8bfb05804b24ca7fbec2ba238dc827bd2be1a92f5fedac9fa96771757384" },
+    { "frame": 10, "position": [64, 0], "propertySha256": "52c933ad0ff0d8a9a665dbb384a0011929c1b3fbc09ad5fc29772e56f0caba7e", "sceneSha256": "04e198eb3879cb9c9fb77f9fc306429df958ce4be7ad9f7d1b5db004d0d6401b" },
+    { "frame": 15, "position": [108, 0], "propertySha256": "ad949b92786c17d09bb147ed3ecaf6c77427d04040206c99adb2f71578b2e6cf", "sceneSha256": "5a2e99b7f9b582f55b0c05a26aa76021506a5bf87176d36a12c292e5a8758d75" },
+    { "frame": 20, "position": [128, 0], "propertySha256": "e5f13431b9020c76cb623ff9017ba0908f12874796567ab235b0f17e0a050bc3", "sceneSha256": "7f4e9627bb6f267121bec4fc788715a0576942fd98ddf2865f29e86d10ca5081" }
+  ],
+  "unsupported": [
+    "multiple top-level layers",
+    "symbols or components",
+    "parenting",
+    "raster, media, text, brush, mask, effect, blend, 3D, or duplicator fields",
+    "frame-by-frame or tween content",
+    "all non-Position animation tracks and expressions",
+    "hold keys or spatial Position handles",
+    "Bezier path handles or geometry other than the characterized rectangle",
+    "rendering, GPU submission, UI transfer, save/load/history, commands, and export"
+  ]
+}
