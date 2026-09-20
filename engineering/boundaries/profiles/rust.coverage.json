@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.rust.coverage",
   "status": "adopted",
-  "purpose": "Adopted whole-repository Rust source classification and no-growth size enforcement for every tracked .rs file across the desktop shell, geometry/vectorize engines and the MCP transport crate. Establishes the coverage and ratchet controls that a later extraction packet (for example P28/#1030, which adds src-tauri/src/media_probe.rs) must satisfy before a new Rust module can land.",
+  "purpose": "Adopted whole-repository Rust source classification and no-growth size enforcement across the desktop shell, geometry/vectorize engines, MCP transport, accepted native feasibility proofs and staged native engine. Registration accompanies each new Rust-source candidate; counts are derived by the gate, not stored as current acceptance assertions.",
   "scope": {
     "sourceRoot": ".",
     "profileSourceRoot": "engineering/boundaries/profiles",
@@ -19,11 +19,12 @@
       "ok": true,
       "diagnostics": 0,
       "repositoryCandidates": 657,
-      "repositoryCandidatesNote": "Measured on clean P07 candidate 7b87ccc: 657 tracked repository paths, including the capability catalog, its private descriptor admission/schema helper, and the extracted contract tests. Only the Rust figures below are asserted by the gate; the whole-repository total records this snapshot and does not constrain unrelated repository growth.",
+      "repositoryCandidatesNote": "Historical snapshot measured on clean P07 candidate 7b87ccc. All counts in this provenance block describe that commit only; the gate independently discovers and classifies the current candidate without asserting these historical totals.",
       "rustCandidates": 45,
       "trackedRustCandidates": 45,
       "untrackedRustCandidates": 0
     },
+    "nativeRegistration": "N06/#1338 registers the existing N03/N04 proof sources unchanged from base bdb44fa6e5b3953aea0e6816fa676bdc0e97f0fe and native-engine/src/lib.rs. The frozen baseline is extended only for those existing proof paths, including their measured 655/814-line debt; all earlier baseline entries and ordinary budgets are preserved. The new production scaffold receives the ordinary budget, no exception.",
     "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
     "profiles": {
       "candidate": "engineering/boundaries/profiles/rust.profile.json",
@@ -54,6 +55,8 @@
     ]
   },
   "retainedCeilings": [
+    { "path": "native-feasibility/n03-headless-evaluator/src/lib.rs", "ceiling": 655, "nonblankLinesAtAdoption": 655 },
+    { "path": "native-feasibility/n04-native-viewport/src/native_surface.rs", "ceiling": 814, "nonblankLinesAtAdoption": 814 },
     { "path": "geometry-wasm/src/engine.rs", "ceiling": 4151, "nonblankLinesAtAdoption": 4151 },
     { "path": "geometry-wasm/src/fill.rs", "ceiling": 998, "nonblankLinesAtAdoption": 998 },
     { "path": "geometry-wasm/src/tweenmatch.rs", "ceiling": 1074, "nonblankLinesAtAdoption": 1074 },
@@ -61,7 +64,7 @@
     { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266, "nonblankLinesNow": 2160, "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack." }
   ],
   "exclusions": [],
-  "exclusionsRationale": "Every one of the 45 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
+  "exclusionsRationale": "Every discovered Rust candidate, including feasibility proofs and staged native-engine modules, must be adopted into a module; no source is hidden through exclusions. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "integration": {
     "gate": "tests/nemo-boundaries-rust.test.cjs",
     "runsUnder": "npm test and the test:unit job, which is in both the quick and full verify profiles — normal local validation, not an opt-in CLI.",

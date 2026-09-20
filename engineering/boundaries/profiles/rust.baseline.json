@@ -1,6 +1,22 @@
 {
   "modules": [
     {
+      "id": "rust.feasibility.headless",
+      "layer": "tests",
+      "dir": "native-feasibility/n03-headless-evaluator",
+      "files": ["src/lib.rs", "tests/proof.rs"],
+      "publicApi": ["src/lib.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.feasibility.viewport",
+      "layer": "tests",
+      "dir": "native-feasibility/n04-native-viewport",
+      "files": ["build.rs", "src/main.rs", "src/native_surface.rs"],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
       "id": "rust.mcp.transport",
       "layer": "adapters",
       "dir": "nemo-mcp",
@@ -218,6 +234,24 @@
     }
   },
   "exceptions": [
+    {
+      "path": "native-feasibility/n03-headless-evaluator/src/lib.rs",
+      "rule": "size",
+      "ceiling": 655,
+      "owner": "ivg-design",
+      "issue": "1338",
+      "reason": "N06 adopts the unchanged N03/#1330 feasibility proof already accepted before source registration. Exact nonblank count at bdb44fa6; no growth is permitted. This isolated proof is not a production module; remove the allowance when the proof is retired or split under a separately claimed outcome.",
+      "expires": "2026-12-05"
+    },
+    {
+      "path": "native-feasibility/n04-native-viewport/src/native_surface.rs",
+      "rule": "size",
+      "ceiling": 814,
+      "owner": "ivg-design",
+      "issue": "1338",
+      "reason": "N06 adopts the unchanged N04/#1332 feasibility proof already accepted before source registration. Exact nonblank count at bdb44fa6; no growth is permitted. This isolated macOS proof is not a production module; remove the allowance when the proof is retired or split under a separately claimed outcome.",
+      "expires": "2026-12-05"
+    },
     {
       "path": "geometry-wasm/src/engine.rs",
       "rule": "size",

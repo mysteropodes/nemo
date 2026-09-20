@@ -1,0 +1,84 @@
+[package]
+name = "nemo-native-engine"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+description = "Disabled scaffold for the admitted native opacity slice"
+autotests = false
+
+[features]
+default = []
+codec = ["dep:serde", "dep:serde_json"]
+commands = ["codec"]
+history = ["commands"]
+evaluation = ["commands"]
+scheduler = ["evaluation"]
+compositor = ["scheduler", "dep:vello", "dep:wgpu", "dep:pollster"]
+viewport = ["compositor", "dep:raw-window-handle"]
+export_job = ["history", "compositor", "dep:png"]
+application = ["history", "export_job"]
+# Test harness selectors are separate from production module availability.
+test-codec = ["codec"]
+test-commands = ["commands"]
+test-history = ["history"]
+test-evaluation = ["evaluation"]
+test-scheduler = ["scheduler"]
+test-compositor = ["compositor"]
+test-viewport = ["viewport"]
+test-export_job = ["export_job"]
+test-application = ["application"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+vello = { version = "0.9.0", optional = true }
+wgpu = { version = "29.0.4", optional = true }
+pollster = { version = "0.4.0", optional = true }
+raw-window-handle = { version = "0.6.2", optional = true }
+png = { version = "0.18", optional = true }
+
+[[test]]
+name = "codec"
+path = "src/lib.rs"
+required-features = ["test-codec"]
+
+[[test]]
+name = "commands"
+path = "src/lib.rs"
+required-features = ["test-commands"]
+
+[[test]]
+name = "history"
+path = "src/lib.rs"
+required-features = ["test-history"]
+
+[[test]]
+name = "evaluation"
+path = "src/lib.rs"
+required-features = ["test-evaluation"]
+
+[[test]]
+name = "scheduler"
+path = "src/lib.rs"
+required-features = ["test-scheduler"]
+
+[[test]]
+name = "compositor"
+path = "src/lib.rs"
+required-features = ["test-compositor"]
+
+[[test]]
+name = "viewport"
+path = "src/lib.rs"
+required-features = ["test-viewport"]
+
+[[test]]
+name = "export_job"
+path = "src/lib.rs"
+required-features = ["test-export_job"]
+
+[[test]]
+name = "application"
+path = "src/lib.rs"
+required-features = ["test-application"]
