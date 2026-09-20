@@ -62,6 +62,20 @@ test('provisional policy and profile membership drift fail before becoming a sta
   assert.throws(() => checkApplicationPolicy(profile, changed, { root: ROOT }), /paths and module IDs/);
 });
 
+test('N13 native viewport adapter cannot be omitted from fresh application discovery', () => {
+  const profile = read('app-js.profile.json');
+  const policy = read('app-js.coverage.json');
+  const required = 'src/js/adapters/native-viewport.js';
+  assert.ok(policy.retainedSources.some((entry) => entry.path === required
+    && entry.moduleId === 'app.native.viewport.adapter'
+    && entry.executionClass === 'classic-without-load-site'));
+  const dropped = structuredClone(profile);
+  dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.viewport.adapter');
+  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
+  assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
+    /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
