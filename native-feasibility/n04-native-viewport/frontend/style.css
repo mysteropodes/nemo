@@ -1,0 +1,12 @@
+:root { color-scheme: dark; font-family: ui-monospace, Menlo, monospace; background: #17161b; color: #eee; }
+* { box-sizing: border-box; }
+/* A fixed grid prevents evidence text in the side panel from growing `main`, which
+   would otherwise retrigger ResizeObserver and manufacture a presentation loop. */
+body { margin: 0; height: 100vh; overflow: hidden; display: grid; grid-template-rows: 52px minmax(0, 1fr); }
+header { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid #3a3842; background: #24222a; }
+main { min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(300px, 1fr) 320px; gap: 14px; padding: 14px; }
+#native-host { position: relative; min-width: 0; min-height: 360px; border: 1px solid #5f5a70; border-radius: 10px; overflow: hidden; background: transparent; }
+.label, .hint { position: absolute; z-index: 2; pointer-events: none; background: rgb(23 22 27 / .8); padding: 7px 9px; border-radius: 6px; }
+.label { left: 12px; top: 12px; }.hint { left: 12px; bottom: 12px; max-width: 360px; font-size: 12px; color: #c8c3d5; }
+aside { display: flex; flex-direction: column; gap: 10px; } button { padding: 10px; text-align: left; border: 1px solid #5f5a70; border-radius: 7px; background: #302d3b; color: inherit; cursor: pointer; } button:hover { background: #403c50; } pre { margin: 0; min-height: 0; flex: 1; overflow: auto; white-space: pre-wrap; font-size: 11px; color: #c8e9df; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(300px, 1fr) auto; } aside { max-height: 300px; } }

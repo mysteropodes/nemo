@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>N04 native viewport proof</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header><strong>N04 — native Tauri viewport feasibility</strong><span id="status">starting…</span></header>
+    <main>
+      <section id="native-host" aria-label="Native renderer viewport">
+        <div class="label">Native NSView / Metal surface — fixture only</div>
+        <div class="hint">Move here: HTML input maps to a native Vello overlay. No viewport pixels traverse JavaScript.</div>
+      </section>
+      <aside>
+        <button id="revision">Advance revision</button>
+        <button id="stale">Exercise stale-frame rejection</button>
+        <button id="loss">Exercise surface-loss reconfigure</button>
+        <button id="shutdown">Dispose native surface</button>
+        <pre id="evidence"></pre>
+      </aside>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>
