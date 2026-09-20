@@ -362,6 +362,31 @@ test('N13 registers the staged viewport host and test without exclusions or a fr
     required.map((file) => ['coverage-unprofiled-source', file]));
 });
 
+test('N14 registers pinned native PNG export without exclusions or a frozen-baseline waiver', () => {
+  const required = [
+    'native-engine/src/export_job.rs',
+    'native-engine/src/png_output.rs',
+    'native-engine/tests/export_job.rs',
+  ];
+  const { rust } = discoverRust();
+  const declared = declaredPaths();
+  for (const file of required) {
+    assert.ok(rust.includes(file), `discovery omitted ${file}`);
+    assert.ok(declared.includes(file), `profile omitted ${file}`);
+    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
+    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
+  }
+  const dropped = structuredClone(profile);
+  for (const module of dropped.modules) {
+    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
+    module.publicApi = module.publicApi.filter((file) => !required.includes(path.posix.join(module.dir, file)));
+  }
+  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
+    required.map((file) => ['coverage-unprofiled-source', file]));
+});
+
 test('no declared Rust source exceeds its effective ceiling, and retained ceilings are exact', () => {
   const result = checkSourceSizes(profile, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
