@@ -4,8 +4,16 @@
       "id": "rust.native.engine",
       "layer": "engine",
       "dir": "native-engine/src",
-      "files": ["lib.rs"],
-      "publicApi": ["lib.rs"],
+      "files": ["codec.rs", "document.rs", "lib.rs"],
+      "publicApi": ["codec.rs", "document.rs", "lib.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.tests",
+      "layer": "tests",
+      "dir": "native-engine/tests",
+      "files": ["codec.rs"],
+      "publicApi": [],
       "sizeProfile": "Rust production module"
     },
     {
