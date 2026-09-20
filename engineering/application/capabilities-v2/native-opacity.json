@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.opacity",
+  "version": 1,
+  "status": "staged",
+  "availability": {
+    "state": "unavailable",
+    "reason": "N15 publishes the v2 contract only. N16 owns host discovery and N20 owns authority activation."
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.apply",
+    "query.document.opacity",
+    "query.document.revision",
+    "query.document.snapshot.acquire",
+    "transaction.begin",
+    "transaction.update",
+    "transaction.commit",
+    "transaction.cancel",
+    "transaction.status",
+    "history.undo",
+    "history.redo",
+    "job.export.png.begin",
+    "job.export.png.status",
+    "job.export.png.cancel"
+  ],
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "busy_conflict",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "domainErrorCodes": [
+    "staging_failed",
+    "frame_failed",
+    "write_failed",
+    "publish_failed",
+    "cleanup_failed",
+    "document_replaced"
+  ],
+  "authority": {
+    "document": "native-engine::history::NativeOpacityHistory",
+    "exportJobs": "native-engine::export_job::ExportJobManager",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "accepted": ["opaque geometry resource handle", "opaque output handle"],
+    "forbidden": ["raw pixels", "binary payload", "canvas", "geometry JSON"]
+  },
+  "ports": [
+    { "label": "ui", "state": "fixture-only" },
+    { "label": "mcp", "state": "fixture-only" }
+  ],
+  "examples": [
+    {
+      "label": "UI and MCP use this identical opacity query",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-query",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "operation": "query.document.opacity",
+        "payload": { "stableTarget": { "layerUid": "r08_curve_layer" } }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-query",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": { "atRevision": 0, "layerUid": "r08_curve_layer", "value": 25 }
+      }
+    },
+    {
+      "label": "PNG begin contains only bounded inputs and opaque handles",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "fixture-export",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "expectedRevision": 0,
+        "operation": "job.export.png.begin",
+        "payload": {
+          "contextId": "scene-root",
+          "quality": "final",
+          "outputHandle": "output/fixture",
+          "frames": [{
+            "sourceFrame": 0,
+            "geometryHandle": { "resourceId": "geometry/r08", "resourceVersion": "v1" }
+          }]
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "fixture-export",
+        "instanceId": "instance-a",
+        "documentId": "native-document-1",
+        "contentRevision": 0,
+        "ok": true,
+        "result": {
+          "jobId": "native-export-job-1",
+          "status": "running",
+          "pinnedRevision": 0,
+          "documentSnapshotId": "native-opacity:native-document-1:0",
+          "progress": 0,
+          "artifact": null,
+          "cleanup": { "status": "pending" },
+          "externalEffectDisposition": "none"
+        }
+      }
+    }
+  ]
+}
