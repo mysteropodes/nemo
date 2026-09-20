@@ -76,7 +76,8 @@ test('committed Rust policy is a valid profile and its recorded budget matches t
   validateProfile(profile);
   validateProfile(baseline);
   // The baseline is deliberately NOT required to equal the candidate. It is
-  // frozen at adoption; if every profile change had to change it too, the
+  // frozen at adoption (extended for pre-existing N03/N04 proof debt in N06);
+  // if every profile change had to change it too, the
   // ratchet would only ever compare a file to itself. The invariant is the
   // compareSizeBaseline result below, not equality.
   assert.equal(LIMITS.warn, coverage.sizePolicy.warn);
@@ -97,8 +98,13 @@ test('every tracked Rust source is discovered independently and adopted or exact
   assert.equal(result.excludedPathCount, exclusions.length);
 
   // Guard against a discovery regression that silently returns one crate: the
-  // packet names native, geometry and nemo-mcp explicitly.
-  const areas = { 'src-tauri/': 0, 'geometry-wasm/': 0, 'nemo-mcp/': 0, 'vectorize-core/': 0, 'vectorize-wasm/': 0 };
+  // packet names native, geometry, MCP, feasibility and the staged engine.
+  const areas = {
+    'src-tauri/': 0, 'geometry-wasm/': 0, 'nemo-mcp/': 0,
+    'vectorize-core/': 0, 'vectorize-wasm/': 0,
+    'native-feasibility/n03-headless-evaluator/': 0,
+    'native-feasibility/n04-native-viewport/': 0, 'native-engine/': 0,
+  };
   for (const file of rust) for (const prefix of Object.keys(areas)) if (file.startsWith(prefix)) areas[prefix]++;
   for (const [prefix, count] of Object.entries(areas)) assert.ok(count > 0, `no Rust discovered under ${prefix}`);
 
@@ -123,11 +129,33 @@ test('every tracked Rust source is discovered independently and adopted or exact
     `  Rust discovery at HEAD ${report.head}:`,
     `    ${report.entries.length} repository candidate(s), ${rust.length} .rs, ${areas['src-tauri/']} native / `
       + `${areas['geometry-wasm/']} geometry / ${areas['nemo-mcp/']} mcp / `
-      + `${areas['vectorize-core/'] + areas['vectorize-wasm/']} vectorize`,
+      + `${areas['vectorize-core/'] + areas['vectorize-wasm/']} vectorize / `
+      + `${areas['native-feasibility/n03-headless-evaluator/'] + areas['native-feasibility/n04-native-viewport/']} feasibility / `
+      + `${areas['native-engine/']} staged engine`,
     `  Classified into ${profile.modules.length} module(s):`,
     ...byModule,
     `  Excluded (${exclusions.length}): ${exclusions.length ? exclusions.join(', ') : '(none — every discovered path is adopted)'}`,
   ].join('\n'));
+});
+
+test('N06 registers each accepted feasibility source and the scaffold without exclusions', () => {
+  const required = [
+    'native-feasibility/n03-headless-evaluator/src/lib.rs',
+    'native-feasibility/n03-headless-evaluator/tests/proof.rs',
+    'native-feasibility/n04-native-viewport/build.rs',
+    'native-feasibility/n04-native-viewport/src/main.rs',
+    'native-feasibility/n04-native-viewport/src/native_surface.rs',
+    'native-engine/src/lib.rs',
+  ];
+  const { rust } = discoverRust();
+  const declared = declaredPaths();
+  for (const file of required) {
+    assert.ok(rust.includes(file), `discovery omitted ${file}`);
+    assert.ok(declared.includes(file), `profile omitted ${file}`);
+    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
+  }
+  assert.equal(profile.exceptions.some((entry) => entry.path.startsWith('native-engine/')), false,
+    'the new production scaffold receives no proof-debt allowance');
 });
 
 test('no declared Rust source exceeds its effective ceiling, and retained ceilings are exact', () => {
@@ -266,6 +294,29 @@ test('a raised legacy ceiling fails, per path and as a raised ordinary budget', 
   assert.equal(unwaived.ok, false);
   assert.deepEqual(unwaived.violations.map((entry) => [entry.rule, entry.file]),
     [['size', 'geometry-wasm/src/fill.rs']]);
+});
+
+test('newly registered feasibility debt cannot grow or disappear from source coverage', () => {
+  for (const file of [
+    'native-feasibility/n03-headless-evaluator/src/lib.rs',
+    'native-feasibility/n04-native-viewport/src/native_surface.rs',
+  ]) {
+    const raised = structuredClone(profile);
+    raised.exceptions.find((entry) => entry.path === file).ceiling++;
+    const growth = compareSizeBaseline(baseline, raised, { root: ROOT });
+    assert.equal(growth.ok, false);
+    assert.ok(growth.violations.some((entry) => entry.file === file && entry.rule === 'size-baseline-growth'));
+
+    const dropped = structuredClone(profile);
+    for (const module of dropped.modules) {
+      module.files = module.files.filter((entry) => path.posix.join(module.dir, entry) !== file);
+      module.publicApi = module.publicApi.filter((entry) => path.posix.join(module.dir, entry) !== file);
+    }
+    dropped.exceptions = dropped.exceptions.filter((entry) => entry.path !== file);
+    const result = checkSourceCoverage(dropped, { sourcePaths: discoverRust().rust, exclusions: [], root: ROOT });
+    assert.equal(result.ok, false);
+    assert.ok(result.violations.some((entry) => entry.file === file && entry.rule === 'coverage-unprofiled-source'));
+  }
 });
 
 test('generated build output stays outside the selection because it is ignored, not name-matched', (t) => {
