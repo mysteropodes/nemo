@@ -62,13 +62,6 @@
   ],
   "exclusions": [],
   "exclusionsRationale": "Every one of the 45 discovered Rust candidates is adopted into a module, so the reviewed exclusion list is empty. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
-  "snapshotCounts": {
-    "selectedSources": 45,
-    "declaredSources": 45,
-    "exclusions": 0,
-    "modules": 15,
-    "retainedCeilings": 5
-  },
   "integration": {
     "gate": "tests/nemo-boundaries-rust.test.cjs",
     "runsUnder": "npm test and the test:unit job, which is in both the quick and full verify profiles — normal local validation, not an opt-in CLI.",
