@@ -1,0 +1,92 @@
+{
+  "schema": "nemo.native-transition-oracle/1",
+  "oracle": "interrupted-export-job",
+  "status": "specification_not_freshly_executed",
+  "contract": "ADR-001-native-document-and-evaluation",
+  "applicationApiVersion": 2,
+  "purpose": "Required v2 fixed-document-snapshot export behavior during edit, cancellation, cleanup, and replacement. Current live export is not asserted to implement it.",
+  "identities": {
+    "instanceId": "instance-a",
+    "documentId": "doc-a",
+    "contextId": "scene-root",
+    "beginRevision": 7,
+    "editedRevision": 8,
+    "documentSnapshotId": "doc-snapshot-a-r7",
+    "jobId": "job-export-a",
+    "resourceHandles": ["handle-scene-r7", "handle-target-a", "handle-encoder-a"]
+  },
+  "jobInput": {
+    "documentSnapshotId": "doc-snapshot-a-r7",
+    "contextId": "scene-root",
+    "frameRange": { "start": 10, "end": 12 },
+    "quality": "final",
+    "outputSpec": { "kind": "video", "format": "mp4", "dimensions": { "width": 640, "height": 360 }, "colorInterpretation": "current-project-boundary", "alphaMode": "straight" },
+    "declaredResourceVersions": { "scene": "doc-a-r7", "encoder": "native-encoder-v2" }
+  },
+  "invariants": [
+    "documentSnapshotId doc-snapshot-a-r7 equals acquire(doc-a, 7), names document content only, and stays pinned across frames 10 through 12.",
+    "Each evaluation combines the documentSnapshotId with contextId, time/frame, quality, outputSpec, and declaredResourceVersions.",
+    "An edit to contentRevision 8 cannot mix into the revision-7 job.",
+    "Begin requires expectedRevision; status/cancel bind jobId/documentId without expectedRevision.",
+    "Terminal status is succeeded, failed, or cancelled; indeterminate is only a failed/cancelled external-effect disposition.",
+    "Opaque handle leases never reuse IDs after release and stay pinned through GPU/output completion."
+  ],
+  "events": [
+    {
+      "sequence": 1,
+      "request": { "apiVersion": 2, "requestId": "req-export-begin-a", "instanceId": "instance-a", "documentId": "doc-a", "expectedRevision": 7, "operation": "job.begin.export.video", "payload": { "contextId": "scene-root", "frameRange": { "start": 10, "end": 12 }, "quality": "final", "outputSpec": { "kind": "video", "format": "mp4", "dimensions": { "width": 640, "height": 360 }, "colorInterpretation": "current-project-boundary", "alphaMode": "straight" }, "declaredResourceVersions": { "scene": "doc-a-r7", "encoder": "native-encoder-v2" } } },
+      "ownerEffect": { "acquire": { "documentSnapshotId": "doc-snapshot-a-r7", "documentId": "doc-a", "contentRevision": 7 }, "pinJobInput": true, "allocate": ["handle-scene-r7", "handle-target-a", "handle-encoder-a"] },
+      "response": { "apiVersion": 2, "requestId": "req-export-begin-a", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 7, "ok": true, "result": { "jobId": "job-export-a", "status": "running", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0, "artifact": null, "cleanup": { "status": "pending" }, "externalEffectDisposition": "none" } }
+    },
+    {
+      "sequence": 2,
+      "event": "Scheduler evaluates frame 10 from the full pinned job input.",
+      "evaluationKey": { "documentSnapshotId": "doc-snapshot-a-r7", "contextId": "scene-root", "frame": 10, "quality": "final", "outputSpec": "jobInput.outputSpec", "declaredResourceVersions": "jobInput.declaredResourceVersions" },
+      "jobReceipt": { "jobId": "job-export-a", "status": "running", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "pending" }, "externalEffectDisposition": "none" }
+    },
+    {
+      "sequence": 3,
+      "request": { "apiVersion": 2, "requestId": "req-edit-a-r7", "instanceId": "instance-a", "documentId": "doc-a", "expectedRevision": 7, "operation": "command.document.apply", "payload": { "command": "layer.opacity.set", "stableTarget": { "layerUid": "ly_mig_curve" }, "value": 80 } },
+      "response": { "apiVersion": 2, "requestId": "req-edit-a-r7", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 8, "ok": true, "result": { "applied": true, "historyEntriesAdded": 1 } },
+      "requiredConsequence": "The job continues from doc-snapshot-a-r7 and cannot observe revision-8 opacity."
+    },
+    {
+      "sequence": 4,
+      "request": { "apiVersion": 2, "requestId": "req-export-cancel-a", "instanceId": "instance-a", "documentId": "doc-a", "operation": "job.cancel.export", "payload": { "jobId": "job-export-a" } },
+      "response": { "apiVersion": 2, "requestId": "req-export-cancel-a", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 8, "ok": true, "result": { "jobId": "job-export-a", "status": "running", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "pending" }, "externalEffectDisposition": "none" } },
+      "meaning": "Cooperative cancellation acknowledgement is not terminal."
+    },
+    {
+      "sequence": 5,
+      "event": "Encoder observes cancellation at a safe boundary.",
+      "ownerEffect": { "removePartialArtifact": true, "releaseExactlyOnce": ["handle-encoder-a", "handle-target-a", "handle-scene-r7"], "unpinDocumentSnapshotId": "doc-snapshot-a-r7" },
+      "jobReceipt": { "jobId": "job-export-a", "status": "cancelled", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "complete" }, "externalEffectDisposition": "none" }
+    },
+    {
+      "sequence": 6,
+      "request": { "apiVersion": 2, "requestId": "req-export-status-terminal-a", "instanceId": "instance-a", "documentId": "doc-a", "operation": "job.status.export", "payload": { "jobId": "job-export-a" } },
+      "response": { "apiVersion": 2, "requestId": "req-export-status-terminal-a", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 8, "ok": true, "result": { "jobId": "job-export-a", "status": "cancelled", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "complete" }, "externalEffectDisposition": "none" } },
+      "requiredConsequence": "Returns retained terminal receipt; cleanup is not rerun."
+    },
+    {
+      "sequence": 7,
+      "request": { "apiVersion": 2, "requestId": "req-export-cancel-terminal-a", "instanceId": "instance-a", "documentId": "doc-a", "operation": "job.cancel.export", "payload": { "jobId": "job-export-a" } },
+      "response": { "apiVersion": 2, "requestId": "req-export-cancel-terminal-a", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 8, "ok": true, "result": { "jobId": "job-export-a", "status": "cancelled", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "complete" }, "externalEffectDisposition": "none" } },
+      "requiredConsequence": "Terminal cancel retrieves the exact retained JobReceipt and cannot restart/recreate released handles."
+    }
+  ],
+  "cleanupFailureVariant": {
+    "precondition": "Cancellation was observed but temporary output cleanup fails after an external encoder may have written bytes.",
+    "request": { "apiVersion": 2, "requestId": "req-export-status-cleanup-failed-a", "instanceId": "instance-a", "documentId": "doc-a", "operation": "job.status.export", "payload": { "jobId": "job-export-a" } },
+    "response": { "apiVersion": 2, "requestId": "req-export-status-cleanup-failed-a", "instanceId": "instance-a", "documentId": "doc-a", "contentRevision": 8, "ok": true, "result": { "jobId": "job-export-a", "status": "failed", "pinnedRevision": 7, "documentSnapshotId": "doc-snapshot-a-r7", "progress": 0.3333333333, "artifact": null, "cleanup": { "status": "failed", "error": { "code": "cleanup_failed", "message": "Temporary export output could not be removed." } }, "externalEffectDisposition": "indeterminate", "error": { "code": "cleanup_failed", "message": "The export failed while cleaning temporary output.", "details": { "partialArtifactPublished": false } } } },
+    "requiredConsequence": "Receipt retrieval succeeds while failure and possible external effect stay observable; no successful artifact is reported."
+  },
+  "documentReplacementVariant": {
+    "precondition": "job-export-a is running from doc-a revision 7 with snapshot and handles pinned.",
+    "replacement": { "priorDocumentId": "doc-a", "newDocumentId": "doc-b", "newDocumentRevision": 0 },
+    "requiredOwnerEffects": ["Reject new doc-a work.", "Cancel/reconcile job-export-a to one terminal receipt before release.", "Release each handle once and unpin doc-snapshot-a-r7.", "End doc-a retention lifetime and discard doc-a transaction/job references."],
+    "lateCompletion": { "source": "Worker completion arrives after doc-b is active.", "nonTransportWorkerDisposition": { "code": "wrong_document", "message": "Completion belongs to replaced document doc-a.", "details": { "requestedDocumentId": "doc-a", "currentDocumentId": "doc-b", "publishArtifact": false, "mutateDocument": false } }, "meaning": "It cannot attach to doc-b; uncertain external output is separate receipt disposition." },
+    "lateRequest": { "request": { "apiVersion": 2, "requestId": "req-export-status-after-replacement-a", "instanceId": "instance-a", "documentId": "doc-a", "operation": "job.status.export", "payload": { "jobId": "job-export-a" } }, "response": { "apiVersion": 2, "requestId": "req-export-status-after-replacement-a", "instanceId": "instance-a", "documentId": "doc-b", "contentRevision": 0, "ok": false, "error": { "code": "wrong_document", "message": "Request targets replaced document doc-a.", "details": { "requestedDocumentId": "doc-a" } } } }
+  },
+  "nonEvidence": ["This file does not execute or accept current export.", "It does not assert current JS/Paper export has native snapshots, replacement reconciliation, or resource leases.", "Future acceptance separately exercises declared native, browser/WASM, and installed-Tauri surfaces."]
+}

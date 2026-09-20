@@ -1,0 +1,111 @@
+{
+  "schema": "nemo.native-transition-oracle/1",
+  "oracle": "legacy-project-roundtrip",
+  "status": "specification_not_freshly_executed",
+  "contract": "ADR-001-native-document-and-evaluation",
+  "purpose": "Characterize the existing migration fixture before a native document adapter can claim legacy compatibility. This is not byte-for-byte source-to-export equality and not installed-surface acceptance.",
+  "fixture": {
+    "path": "tests/fixtures/migration/project.json",
+    "sha256": "90b6c525a6936a2d635046682ebc5c68148f65969c6af7fd315a1eb77cc2aa31",
+    "expectationsPath": "tests/fixtures/migration/expected.json",
+    "expectationsSha256": "d05b9129c2e7a4283bae5588b156e532243344b299ffcfaa1644a7aedb160db3",
+    "observedSourceSha": "2bd3da7f7e7811b51150bcf95dc669182d2c8f25",
+    "storedProjectVersion": 12,
+    "expectedFirstCanonicalExportVersion": 13,
+    "reopenContext": "fresh-open-document-incarnation"
+  },
+  "identity": {
+    "preserveExistingLayerUids": [
+      "ly_mig_curve",
+      "ly_mig_parent",
+      "ly_mig_timelink",
+      "ly_mig_dup",
+      "ly_mig_matte",
+      "ly_mig_above",
+      "ly_mig_short"
+    ],
+    "preserveExistingStrokeIds": [
+      "s_mig_0",
+      "s_mig_1",
+      "s_mig_2",
+      "s_mig_3",
+      "s_mig_4",
+      "s_mig_5",
+      "s_mig_6"
+    ],
+    "forbidden": [
+      "Use numeric layer index as a persistent reference",
+      "Renumber an existing layerUid or strokeId",
+      "Treat documentId as a persisted project UUID",
+      "Infer a cross-frame shape identity from an ordinary strokeId"
+    ]
+  },
+  "migrationFacts": [
+    {
+      "operation": "legacyCurve",
+      "layerUid": "ly_mig_curve",
+      "expected": {
+        "key0": [{ "x": 0, "y": 0 }, { "x": 0.25, "y": 0.156 }, { "x": 0.5, "y": 0.5 }, { "x": 0.75, "y": 0.844 }, { "x": 1, "y": 1 }],
+        "key1": [{ "x": 0, "y": 0 }, { "x": 0.4, "y": 0.1, "tx": 0.2 }, { "x": 1, "y": 1 }],
+        "migratedCount": 1
+      }
+    },
+    {
+      "operation": "timeLinkOffsets",
+      "layerUid": "ly_mig_timelink",
+      "expected": { "timeLinkInOffset": [3], "timeLinkOutOffset": [-2] }
+    },
+    {
+      "operation": "effectorChannels",
+      "layerUid": "ly_mig_dup",
+      "expected": [{ "prop": "position", "value": [10, 0] }, { "prop": "rotation", "value": [5] }]
+    },
+    {
+      "operation": "matteSourceUid",
+      "layerUid": "ly_mig_matte",
+      "expected": "ly_mig_above",
+      "meaning": "A matte without an explicit source UID binds to the layer directly above."
+    },
+    {
+      "operation": "easingCurveDefault",
+      "expected": [{ "x": 0, "y": 0 }, { "x": 0.3, "y": 0.05 }, { "x": 0.7, "y": 0.95 }, { "x": 1, "y": 1 }]
+    },
+    {
+      "operation": "legacyStrokeFallback",
+      "layerUid": "ly_mig_matte",
+      "strokeId": "s_mig_4",
+      "expected": { "strokeColor": "#fff" },
+      "meaning": "A fill without hasRealStroke retains the historical white fallback."
+    },
+    {
+      "operation": "tweenSpanKey",
+      "expected": "ly_mig_curve:0-6"
+    },
+    {
+      "operation": "framePadding",
+      "layerUid": "ly_mig_short",
+      "expected": { "frames": 24, "isInterpolated": false }
+    }
+  ],
+  "roundtrip": {
+    "firstPass": "Import the v12 fixture through the characterized legacy adapter and export a canonical v13 project.",
+    "secondPass": "Open that v13 canonical export in a fresh document context, then export again.",
+    "expected": "The first and second canonical exports match except for the known workspace panel-order drift below; preserved IDs and every other serialized value remain unchanged.",
+    "knownBaselineDrift": {
+      "path": "/workspace/panelOrder",
+      "change": "canvas-sec and combine-opts-sec move from after shapes-sec to the front, in that order",
+      "scope": "exact observed baseline only; not a waiver for arbitrary workspace or unknown-field loss",
+      "beforeAfterArrays": "not_asserted: the checked migration fixture, expected.json, and reference fixture checks do not encode exact panelOrder arrays; do not invent them"
+    }
+  },
+  "nativeTransitionRequirements": {
+    "documentIdentity": "A fresh open creates a runtime documentId distinct from file path and stored values; a replacement rotates it and invalidates old requests/jobs.",
+    "contentRevision": "Migration/import completion creates an owner-assigned contentRevision; reopening may create a new documentId even when project content is equal.",
+    "contextIdentity": "The selected scene/component/montage contextId is carried into evaluation and must not change persisted layer/stroke identities."
+  },
+  "nonEvidence": [
+    "No native engine implementation was run by this oracle.",
+    "No browser, installed desktop, renderer, or export acceptance is claimed.",
+    "A pure parser result alone is insufficient; the applicable save/import/export path must be exercised by a future acceptance packet."
+  ]
+}
