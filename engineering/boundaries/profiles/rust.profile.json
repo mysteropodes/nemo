@@ -4,15 +4,15 @@
       "id": "rust.native.engine",
       "layer": "engine",
       "dir": "native-engine/src",
-      "files": ["codec.rs", "commands.rs", "document.rs", "lib.rs", "request_receipts.rs", "revision.rs"],
-      "publicApi": ["codec.rs", "commands.rs", "document.rs", "lib.rs", "request_receipts.rs", "revision.rs"],
+      "files": ["codec.rs", "commands.rs", "document.rs", "history.rs", "lib.rs", "request_receipts.rs", "revision.rs", "transaction.rs"],
+      "publicApi": ["codec.rs", "commands.rs", "document.rs", "history.rs", "lib.rs", "request_receipts.rs", "revision.rs", "transaction.rs"],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["codec.rs", "commands.rs"],
+      "files": ["codec.rs", "commands.rs", "history.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
