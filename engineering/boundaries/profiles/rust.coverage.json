@@ -24,7 +24,7 @@
       "trackedRustCandidates": 45,
       "untrackedRustCandidates": 0
     },
-    "nativeRegistration": "N06/#1338 registers the existing N03/N04 proof sources unchanged from base bdb44fa6e5b3953aea0e6816fa676bdc0e97f0fe and native-engine/src/lib.rs. The frozen baseline is extended only for those existing proof paths, including their measured 655/814-line debt; all earlier baseline entries and ordinary budgets are preserved. The new production scaffold receives the ordinary budget, no exception.",
+    "nativeRegistration": "N06/#1338 registered the existing N03/N04 proof sources unchanged from base bdb44fa6e5b3953aea0e6816fa676bdc0e97f0fe and native-engine/src/lib.rs. The frozen baseline was extended only for those existing proof paths, including their measured 655/814-line debt. N07/#1339 registers native-engine/src/document.rs, native-engine/src/codec.rs and native-engine/tests/codec.rs with the ordinary budget and zero exclusions or exceptions. The frozen baseline remains unchanged because these are newly adopted sources, not inherited debt.",
     "lineCounter": "countNonBlankLines (scripts/nemo/lib/boundaries.cjs) — the same counter the size checker uses, so recorded ceilings and enforced ceilings cannot drift.",
     "profiles": {
       "candidate": "engineering/boundaries/profiles/rust.profile.json",

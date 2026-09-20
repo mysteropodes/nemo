@@ -1,0 +1,32 @@
+{
+  "schema": "nemo.native-opacity-codec-expected/1",
+  "sourceOracle": {
+    "path": "tests/animation/fixtures/curve-workflow.json",
+    "sha256": "dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d",
+    "byteLength": 16835,
+    "layerUid": "r08_curve_layer",
+    "strokeId": "r08_curve_rect"
+  },
+  "storageOracle": {
+    "path": "tests/browser/opacity-consumers.spec.cjs",
+    "staticAssertionLine": 137,
+    "keyedAssertionLine": 171
+  },
+  "document": {
+    "formatVersion": 1,
+    "totalFrames": 21,
+    "layerUid": "r08_curve_layer",
+    "staticOpacity": 25,
+    "keys": [
+      { "frame": 0, "value": 20 },
+      { "frame": 20, "value": 80 }
+    ],
+    "curvePoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0.25, "y": 0.156 },
+      { "x": 0.5, "y": 0.5 },
+      { "x": 0.75, "y": 0.844 },
+      { "x": 1, "y": 1 }
+    ]
+  }
+}
