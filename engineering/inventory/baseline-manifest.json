@@ -95,6 +95,26 @@
       "sha256": "d5e4715ae8bd5368ef82e5f24bc0c822f2544f2babf2933e97454a309d92c740",
       "source": "ee83a2e908023d788423c0b93dd9c369cc49bf52",
       "sourceDirty": false
+    },
+    {
+      "runId": "20260921T043303Z-cf70abb-dirty",
+      "command": "test:rust-native-engine",
+      "profile": null,
+      "finishedAt": "2026-09-21T04:33:37.239Z",
+      "path": "reports/20260921T043303Z-cf70abb-dirty/receipt.json",
+      "sha256": "62372c1ea202923f1034601065ba202537fd1d6d42f6851f3bab5c9bb3baacff",
+      "source": "cf70abbbe53d91bf84d083086e45c702ec7e6c7b",
+      "sourceDirty": true
+    },
+    {
+      "runId": "20260921T044902Z-e023189",
+      "command": "test:rust-native-engine",
+      "profile": null,
+      "finishedAt": "2026-09-21T04:49:35.293Z",
+      "path": "reports/20260921T044902Z-e023189/receipt.json",
+      "sha256": "5db4d3a10d7638a39dfc7984ba32a33e394dfaa7b53c0276df893645122c72a9",
+      "source": "e023189a38d5ede94aa5067dcdfb78da9d04e9a0",
+      "sourceDirty": false
     }
   ],
   "entries": [
@@ -579,6 +599,116 @@
       "carriedOverNote": "Measured at 1baf9cd41f76, adopted at ded641bd7633. Not re-measured here."
     },
     {
+      "job": "test:rust-native-engine",
+      "required": true,
+      "status": "pass",
+      "case": {
+        "reason": "9 native-engine targets, 66 tests passed",
+        "exitCode": 0,
+        "limitations": [],
+        "details": {
+          "targets": [
+            {
+              "target": "codec",
+              "feature": "test-codec",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 6,
+              "failed": 0
+            },
+            {
+              "target": "commands",
+              "feature": "test-commands",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 10,
+              "failed": 0
+            },
+            {
+              "target": "history",
+              "feature": "test-history",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 9,
+              "failed": 0
+            },
+            {
+              "target": "evaluation",
+              "feature": "test-evaluation",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 4,
+              "failed": 0
+            },
+            {
+              "target": "scheduler",
+              "feature": "test-scheduler",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 7,
+              "failed": 0
+            },
+            {
+              "target": "compositor",
+              "feature": "test-compositor",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 4,
+              "failed": 0
+            },
+            {
+              "target": "viewport",
+              "feature": "test-viewport",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 10,
+              "failed": 0
+            },
+            {
+              "target": "export_job",
+              "feature": "test-export_job",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 9,
+              "failed": 0
+            },
+            {
+              "target": "application",
+              "feature": "test-application",
+              "status": "pass",
+              "exitCode": 0,
+              "summaries": 1,
+              "passed": 7,
+              "failed": 0
+            }
+          ]
+        },
+        "caseKey": null
+      },
+      "caseSignature": null,
+      "evidence": {
+        "runId": "20260921T044902Z-e023189",
+        "command": "test:rust-native-engine",
+        "profile": null,
+        "finishedAt": "2026-09-21T04:49:35.293Z",
+        "path": "reports/20260921T044902Z-e023189/receipt.json",
+        "sha256": "5db4d3a10d7638a39dfc7984ba32a33e394dfaa7b53c0276df893645122c72a9",
+        "source": "e023189a38d5ede94aa5067dcdfb78da9d04e9a0",
+        "sourceDirty": false
+      },
+      "measuredDirty": false,
+      "carriedOver": true,
+      "carriedOverNote": "Measured at e023189a38d5, adopted at ded641bd7633. Not re-measured here."
+    },
+    {
       "job": "test:rust-tauri",
       "required": false,
       "status": "blocked",
@@ -707,14 +837,15 @@
     }
   ],
   "summary": {
-    "total": 14,
+    "total": 15,
     "counts": {
-      "pass": 11,
+      "pass": 12,
       "fail": 1,
       "blocked": 2
     },
     "carriedOver": [
       "test:rust-mcp",
+      "test:rust-native-engine",
       "test:rust-vectorize"
     ],
     "knownNonPass": [
@@ -735,11 +866,11 @@
       }
     ]
   },
-  "extendedAt": "2026-09-16T12:54:36.452Z",
+  "extendedAt": "2026-09-21T04:49:40.792Z",
   "extended": {
-    "added": [
-      "test:rust-vectorize"
-    ],
-    "superseded": []
+    "added": [],
+    "superseded": [
+      "test:rust-native-engine"
+    ]
   }
 }

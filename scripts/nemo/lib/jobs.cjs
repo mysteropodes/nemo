@@ -178,6 +178,31 @@ function jobTestRust(ctx, crateDir, label) {
   return (r.status === 0 ? pass : fail)(`cargo test ${label}: ${summary}`, { exitCode: r.status, log: logOf(r) });
 }
 
+function jobTestNativeEngine(ctx) {
+  if (!which('cargo')) return blocked('cargo not found');
+  const manifest = path.join(ROOT, 'native-engine', 'Cargo.toml');
+  if (!exists(manifest)) return blocked('native-engine/Cargo.toml missing');
+  const targets = ['codec', 'commands', 'history', 'evaluation', 'scheduler', 'compositor', 'viewport', 'export_job', 'application'];
+  const targetDir = path.join(ctx.reportDir, 'native-engine-target');
+  const results = [], logs = [];
+  for (const target of targets) {
+    const args = ['test', '--locked', '--manifest-path', manifest, '--no-default-features', '--features', `test-${target}`, '--test', target];
+    const r = run('cargo', args, { timeout: 15 * 60 * 1000, env: { CARGO_TARGET_DIR: targetDir } });
+    const summaries = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
+    const passed = summaries.reduce((sum, match) => sum + Number(match[2]), 0);
+    const failed = summaries.reduce((sum, match) => sum + Number(match[3]), 0);
+    const complete = r.status === 0 && summaries.length > 0 && passed > 0 && failed === 0;
+    results.push({ target, feature: `test-${target}`, status: complete ? 'pass' : 'fail', exitCode: r.status, summaries: summaries.length, passed, failed });
+    logs.push(logOf(r));
+  }
+  const bad = results.filter((result) => result.status !== 'pass');
+  const total = results.reduce((sum, result) => sum + result.passed, 0);
+  const extra = { exitCode: bad.length ? 1 : 0, log: logs.join('\n'), details: { targets: results }, artifacts: [{ path: path.relative(ROOT, targetDir) }] };
+  return bad.length
+    ? fail(`native-engine focused targets incomplete: ${bad.map((result) => `${result.target} (exit ${result.exitCode}, summaries ${result.summaries}, ${result.passed} passed/${result.failed} failed)`).join('; ')}`, extra)
+    : pass(`${targets.length} native-engine targets, ${total} tests passed`, extra);
+}
+
 function jobTestIntegration() {
   const dir = path.join(ROOT, 'tests', 'integration');
   if (!exists(dir)) return notRun('no tests/integration suite defined yet (R12/R13 add document, command/history and persistence contracts)');
@@ -327,6 +352,7 @@ const JOBS = {
   inventory: { run: jobInventory, required: true },
   'test:unit': { run: jobTestUnit, required: true },
   'test:rust': { run: (ctx) => jobTestRust(ctx, 'geometry-wasm', 'geometry-wasm'), required: true },
+  'test:rust-native-engine': { run: jobTestNativeEngine, required: true },
   'test:rust-tauri': { run: (ctx) => jobTestRust(ctx, 'src-tauri', 'src-tauri'), required: false },
   'test:rust-mcp': { run: (ctx) => jobTestRust(ctx, 'nemo-mcp', 'nemo-mcp'), required: true },
   'test:rust-vectorize': { run: (ctx) => jobTestRust(ctx, 'vectorize-core', 'vectorize-core'), required: true },
@@ -353,8 +379,8 @@ const JOBS = {
 };
 
 const PROFILES = {
-  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-mcp', 'test:rust-vectorize'],
-  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-mcp', 'test:rust-vectorize', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
+  quick: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-native-engine', 'test:rust-mcp', 'test:rust-vectorize'],
+  full: ['doctor', 'check', 'inventory', 'test:unit', 'test:rust', 'test:rust-native-engine', 'test:rust-mcp', 'test:rust-vectorize', 'test:rust-tauri', 'test:integration', 'build:wasm', 'test:browser', 'bench', 'build:desktop', 'test:desktop'],
 };
 
 function execute(name, ctx) {

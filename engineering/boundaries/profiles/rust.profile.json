@@ -2,10 +2,138 @@
   "modules": [
     {
       "id": "rust.native.engine",
-      "layer": "engine",
+      "layer": "native-root",
       "dir": "native-engine/src",
-      "files": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "protocol.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
-      "publicApi": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "document.rs", "evaluation.rs", "export_job.rs", "history.rs", "lib.rs", "png_output.rs", "protocol.rs", "render_scene.rs", "request_receipts.rs", "resource_leases.rs", "revision.rs", "scheduler.rs", "transaction.rs"],
+      "files": ["lib.rs"],
+      "publicApi": ["lib.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.document",
+      "layer": "native-document",
+      "dir": "native-engine/src",
+      "files": ["document.rs"],
+      "publicApi": ["document.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.codec",
+      "layer": "native-codec",
+      "dir": "native-engine/src",
+      "files": ["codec.rs"],
+      "publicApi": ["codec.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.request-receipts",
+      "layer": "native-request-receipts",
+      "dir": "native-engine/src",
+      "files": ["request_receipts.rs"],
+      "publicApi": ["request_receipts.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.revision",
+      "layer": "native-revision",
+      "dir": "native-engine/src",
+      "files": ["revision.rs"],
+      "publicApi": ["revision.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.commands",
+      "layer": "native-commands",
+      "dir": "native-engine/src",
+      "files": ["commands.rs"],
+      "publicApi": ["commands.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.history",
+      "layer": "native-history",
+      "dir": "native-engine/src",
+      "files": ["history.rs", "transaction.rs"],
+      "publicApi": ["history.rs", "transaction.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.evaluation",
+      "layer": "native-evaluation",
+      "dir": "native-engine/src",
+      "files": ["evaluation.rs"],
+      "publicApi": ["evaluation.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.resource-leases",
+      "layer": "native-resource-leases",
+      "dir": "native-engine/src",
+      "files": ["resource_leases.rs"],
+      "publicApi": ["resource_leases.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.scheduler",
+      "layer": "native-scheduler",
+      "dir": "native-engine/src",
+      "files": ["scheduler.rs"],
+      "publicApi": ["scheduler.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.render-scene",
+      "layer": "native-render-scene",
+      "dir": "native-engine/src",
+      "files": ["render_scene.rs"],
+      "publicApi": ["render_scene.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.compositor",
+      "layer": "native-compositor",
+      "dir": "native-engine/src",
+      "files": ["compositor.rs"],
+      "publicApi": ["compositor.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.desktop-viewport",
+      "layer": "native-desktop-viewport",
+      "dir": "native-engine/src",
+      "files": ["desktop_viewport.rs"],
+      "publicApi": ["desktop_viewport.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.png-output",
+      "layer": "native-png-output",
+      "dir": "native-engine/src",
+      "files": ["png_output.rs"],
+      "publicApi": ["png_output.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.export-job",
+      "layer": "native-export-job",
+      "dir": "native-engine/src",
+      "files": ["export_job.rs"],
+      "publicApi": ["export_job.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.protocol",
+      "layer": "native-protocol",
+      "dir": "native-engine/src",
+      "files": ["protocol.rs"],
+      "publicApi": ["protocol.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.native.engine.application",
+      "layer": "native-application",
+      "dir": "native-engine/src",
+      "files": ["application.rs"],
+      "publicApi": ["application.rs"],
       "sizeProfile": "Rust production module"
     },
     {

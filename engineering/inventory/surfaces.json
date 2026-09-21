@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "88f769003cda73e9a2b16c56240caaa9921630f8",
-  "describe": "v0.7.0-alpha.4-423-g88f7690-dirty"
+  "head": "cf70abbbe53d91bf84d083086e45c702ec7e6c7b",
+  "describe": "v0.7.0-alpha.4-482-gcf70abb-dirty"
  },
- "inputsDigest": "935bfaa34666ec4d602404dcc6dcbac40e6090bf5caef81dd27fa61a518c1358",
+ "inputsDigest": "385c07809ab84c3a31e3c8e37390d4aa4509e5ed496aae785c392637ec49116c",
  "states": [
   "inventoried",
   "characterized",
@@ -54,11 +54,11 @@
   "byConsumer": {
    "native": 246,
    "export": 5,
-   "render": 534,
-   "persist": 422,
-   "history": 356,
-   "animation": 464,
-   "selection": 384
+   "render": 533,
+   "persist": 420,
+   "history": 355,
+   "animation": 463,
+   "selection": 383
   }
  },
  "fixturesByArea": {
@@ -1880,7 +1880,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 150,
+    "functionsVisited": 152,
     "via": "chain",
     "references": []
    },
@@ -5103,7 +5103,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 96,
     "via": "helper el()",
     "references": []
    },
@@ -5146,7 +5146,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 26,
     "via": "helper el()",
     "references": []
    },
@@ -5189,7 +5189,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 59,
+    "functionsVisited": 61,
     "via": "helper el()",
     "references": []
    },
@@ -7205,7 +7205,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 9,
+    "functionsVisited": 13,
     "via": "variable cancelBtn",
     "references": []
    },
@@ -7712,7 +7712,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 66,
+    "functionsVisited": 78,
     "via": "variable importBtn",
     "references": []
    },
@@ -10271,7 +10271,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 13,
+    "functionsVisited": 22,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2819 updateCornersPanel()",
@@ -11989,13 +11989,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "persist": 2,
-    "history": 2,
-    "selection": 2,
-    "render": 2,
-    "animation": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -12008,7 +12002,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 56,
+    "functionsVisited": 12,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6237 paintFillSwatches()"
@@ -14869,7 +14863,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 27,
+    "functionsVisited": 40,
     "via": "variable input",
     "references": []
    },
@@ -15338,7 +15332,7 @@
     "container": "render-manager-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 60,
     "via": "variable renderAllBtn",
     "references": [
      "src/js/render-manager.js:240 setToolbarBusy()"
@@ -21456,7 +21450,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/canvas-grid.js:132",
    "meta": {
-    "functionsVisited": 3
+    "functionsVisited": 7
    },
    "fixtures": []
   },
@@ -22163,7 +22157,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timeline-markers.js:82",
    "meta": {
-    "functionsVisited": 16
+    "functionsVisited": 26
    },
    "fixtures": []
   },
@@ -22295,7 +22289,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/xsheet-panel.js:74",
    "meta": {
-    "functionsVisited": 30
+    "functionsVisited": 38
    },
    "fixtures": []
   },
@@ -23073,7 +23067,7 @@
    "source": "src/js/labs/command-palette.js:35",
    "meta": {
     "i18n": "labsCmdUndo",
-    "functionsVisited": 2
+    "functionsVisited": 5
    },
    "fixtures": []
   },
@@ -23103,7 +23097,7 @@
    "source": "src/js/labs/command-palette.js:36",
    "meta": {
     "i18n": "labsCmdRedo",
-    "functionsVisited": 2
+    "functionsVisited": 5
    },
    "fixtures": []
   },
@@ -29541,16 +29535,14 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "persist": 2
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/timeline.js:5236",
    "meta": {
     "i18n": "btnCopy",
-    "functionsVisited": 25
+    "functionsVisited": 23
    },
    "fixtures": [
     "keyed-props",
@@ -29664,7 +29656,7 @@
    "source": "src/js/timeline.js:5239",
    "meta": {
     "i18n": "ctxDuplicateSelection",
-    "functionsVisited": 23
+    "functionsVisited": 30
    },
    "fixtures": [
     "keyed-props",
