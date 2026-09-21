@@ -1604,7 +1604,7 @@
 
   function stopTutorial() { finishModule(false); }
 
-  function startModule(id) {
+  async function startModule(id) {
     var mod = MODULES.filter(function (m) { return m.id === id; })[0];
     if (!mod) return;
     // The lessons target real toolbar/canvas elements — those are only
@@ -1614,7 +1614,7 @@
     // row must not dead-end there, so spin up a default blank project first.
     var startScreen = document.getElementById('start-screen');
     if (startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
-      window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' });
+      await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' });
     }
     ensureDom();
     closeLauncher();

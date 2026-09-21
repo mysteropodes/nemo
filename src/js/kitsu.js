@@ -128,7 +128,7 @@
   // read-only instead, see openShotResult.previews.
   async function openShot(session, project, sequence, shot) {
     var meta = shotMetadata(shot, project);
-    window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: (project.name || 'Kitsu') + ' — ' + shot.name });
+    await window.SMProject.newProject({ w: meta.w, h: meta.h, fps: meta.fps, name: (project.name || 'Kitsu') + ' — ' + shot.name });
     state.totalFrames = meta.frameCount;
     state.waIn = 0; state.waOut = meta.frameCount - 1;
     window._waIn = 0; window._waOut = meta.frameCount - 1; window._totalF = meta.frameCount;
