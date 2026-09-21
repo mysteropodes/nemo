@@ -118,6 +118,34 @@ test('N17 native opacity selection adapter cannot be omitted from fresh applicat
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
+test('N18 native opacity preview adapter cannot be omitted from fresh application discovery', () => {
+  const profile = read('app-js.profile.json');
+  const policy = read('app-js.coverage.json');
+  const required = 'src/js/adapters/native-opacity-preview.js';
+  assert.ok(policy.retainedSources.some((entry) => entry.path === required
+    && entry.moduleId === 'app.native.opacity.preview.adapter'
+    && entry.executionClass === 'classic-without-load-site'));
+  const dropped = structuredClone(profile);
+  dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.preview.adapter');
+  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
+  assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
+    /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
+test('N18 native opacity export adapter cannot be omitted from fresh application discovery', () => {
+  const profile = read('app-js.profile.json');
+  const policy = read('app-js.coverage.json');
+  const required = 'src/js/adapters/native-opacity-export.js';
+  assert.ok(policy.retainedSources.some((entry) => entry.path === required
+    && entry.moduleId === 'app.native.opacity.export.adapter'
+    && entry.executionClass === 'classic-without-load-site'));
+  const dropped = structuredClone(profile);
+  dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.export.adapter');
+  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
+  assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
+    /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
