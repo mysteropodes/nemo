@@ -109,13 +109,18 @@ function stripRust(source, opts = {}) {
 
 function lineOf(text, index) { let line = 1; for (let i = 0; i < index; i++) if (text[i] === '\n') line++; return line; }
 
+function normalizeRustIdentifier(segment) {
+  const clean = segment.trim();
+  return /^(?:r#)?[A-Za-z_]\w*$/.test(clean) ? clean.replace(/^r#/, '') : clean;
+}
+
 // Expand `a::{b, c::{d, e}, self}` into flat paths.
 function expandUseTree(spec) {
   spec = spec.trim();
   const brace = spec.indexOf('{');
   if (brace === -1) {
-    const clean = spec.replace(/\s+as\s+\w+$/, '').trim();
-    return clean ? [clean.split('::').map((s) => s.trim()).filter(Boolean)] : [];
+    const clean = spec.replace(/\s+as\s+(?:r#)?[A-Za-z_]\w*$/, '').trim();
+    return clean ? [clean.split('::').map(normalizeRustIdentifier).filter(Boolean)] : [];
   }
   const prefix = spec.slice(0, brace).replace(/::\s*$/, '').trim();
   const inner = spec.slice(brace + 1, spec.lastIndexOf('}'));
@@ -129,7 +134,7 @@ function expandUseTree(spec) {
   for (const part of parts) {
     for (const sub of expandUseTree(part)) {
       const segs = (prefix ? prefix.split('::') : []).concat(sub);
-      out.push(segs.map((s) => s.trim()).filter((s) => s && s !== 'self'));
+      out.push(segs.map(normalizeRustIdentifier).filter((s) => s && s !== 'self'));
     }
   }
   return out;
@@ -140,14 +145,14 @@ function expandUseTree(spec) {
 // enclosing FILE module, not the file's parent. Deeper nesting is unsupported.
 function inlineModSpans(text) {
   const spans = [];
-  const re = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_]\w*)\s*\{/g;
+  const re = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+((?:r#)?[A-Za-z_]\w*)\s*\{/g;
   let m;
   while ((m = re.exec(text))) {
     const open = m.index + m[0].length - 1;
     let depth = 0, j = open;
     for (; j < text.length; j++) { if (text[j] === '{') depth++; else if (text[j] === '}' && --depth === 0) break; }
-    const nested = /(?:^|[\s;{}])mod\s+[A-Za-z_]\w*\s*\{/.test(text.slice(open + 1, j));
-    spans.push({ name: m[1], start: open, end: j, nested });
+    const nested = /(?:^|[\s;{}])mod\s+(?:r#)?[A-Za-z_]\w*\s*\{/.test(text.slice(open + 1, j));
+    spans.push({ name: normalizeRustIdentifier(m[1]), start: open, end: j, nested });
     re.lastIndex = j;
   }
   return spans;
@@ -166,23 +171,24 @@ function analyzeRustSource(source, opts = {}) {
     const line = lineOf(text, at);
     for (const segs of expandUseTree(m[1].replace(/\s+/g, ' '))) uses.push({ segments: segs, line, pub: /\bpub\b/.test(m[0]), depth: depthAt(at) });
   }
-  const modRe = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_]\w*)\s*(;|\{)/g;
-  while ((m = modRe.exec(text))) mods.push({ name: m[1], line: lineOf(text, m.index + 1), inlineBody: m[2] === '{' });
+  const modRe = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+((?:r#)?[A-Za-z_]\w*)\s*(;|\{)/g;
+  while ((m = modRe.exec(text))) mods.push({ name: normalizeRustIdentifier(m[1]), line: lineOf(text, m.index + 1), inlineBody: m[2] === '{' });
   const externRe = /(?:^|[\s;{}])extern\s+crate\s+((?:r#)?[A-Za-z_]\w*)(?:\s+as\s+((?:r#)?[A-Za-z_]\w*))?\s*;/g;
   while ((m = externRe.exec(text))) externCrates.push({
-    crate: m[1].replace(/^r#/, ''), alias: m[2]?.replace(/^r#/, '') || null, line: lineOf(text, m.index + 1),
+    crate: normalizeRustIdentifier(m[1]), alias: m[2] ? normalizeRustIdentifier(m[2]) : null, line: lineOf(text, m.index + 1),
   });
   // opts.externalCrates lets a caller widen this to named external crates (e.g. `nemo_mcp::…`)
   // so an external-crate port policy can be enforced without walking the source twice.
   const externalCrates = (opts.externalCrates || []).filter((c) => /^[A-Za-z_]\w*$/.test(c));
   const inlineHeads = ['crate', 'super', 'self', ...externalCrates].join('|');
-  const inlineRe = new RegExp(`\\b(${inlineHeads})::([A-Za-z_]\\w*(?:::[A-Za-z_]\\w*)*)`, 'g');
+  const inlineRe = new RegExp(`(^|[^A-Za-z0-9_#])((?:r#)?(?:${inlineHeads}))::((?:r#)?[A-Za-z_]\\w*(?:::(?:r#)?[A-Za-z_]\\w*)*)`, 'g');
   while ((m = inlineRe.exec(text))) {
+    const at = m.index + m[1].length;
     // Skip the `use` statements already captured (their spans contain the same tokens).
-    const before = text.lastIndexOf('use ', m.index);
+    const before = text.lastIndexOf('use ', at);
     const semi = text.indexOf(';', before === -1 ? 0 : before);
-    if (before !== -1 && semi !== -1 && m.index > before && m.index < semi && /use\s/.test(text.slice(before, before + 5))) continue;
-    inline.push({ segments: [m[1], ...m[2].split('::')], line: lineOf(text, m.index), depth: depthAt(m.index) });
+    if (before !== -1 && semi !== -1 && at > before && at < semi && /use\s/.test(text.slice(before, before + 5))) continue;
+    inline.push({ segments: [m[2], ...m[3].split('::')].map(normalizeRustIdentifier), line: lineOf(text, at), depth: depthAt(at) });
   }
   const cfgRe = /#\s*\[\s*cfg\s*\(([^\]]*)\)\s*\]/g;
   while ((m = cfgRe.exec(withStrings))) cfgs.push({ expr: m[1].replace(/\s+/g, ' ').trim(), line: lineOf(withStrings, m.index) });

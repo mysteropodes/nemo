@@ -29,12 +29,14 @@ pub use engine::VelloEngine;
 use super::*;
 use crate::multi::
     line::Thing;
+use r#native_engine::{r#desktop_viewport::SurfacePort as r#Port, application::NativeApplication};
 `;
   const a = R.analyzeRustSource(src);
   const paths = a.uses.map((u) => u.segments.join('::'));
   assert.deepEqual(paths, ['std::collections::HashMap', 'crate::engine::build_bezpath', 'crate::engine::ItemIn',
     'crate::from_multipolygon', 'crate::to_polygon', 'crate::PolygonIn', 'crate::a', 'crate::a::b::c', 'crate::a::b::d',
-    'engine::VelloEngine', 'super::*', 'crate::multi::line::Thing']);
+    'engine::VelloEngine', 'super::*', 'crate::multi::line::Thing',
+    'native_engine::desktop_viewport::SurfacePort', 'native_engine::application::NativeApplication']);
   assert.deepEqual(a.uses.filter((u) => u.pub).map((u) => u.segments.join('::')), ['engine::VelloEngine']);
   assert.equal(a.uses[1].line, 3);
 });
@@ -48,7 +50,7 @@ mod fill;
 pub mod engine;
 #[cfg(test)]
 mod tests { use super::*; fn t() { let _ = super::helper(); } }
-fn f() { crate::hit::hit_test_scene(1); let c = 'x'; }
+fn f() { crate::r#hit::r#hit_test_scene(1); let c = 'x'; }
 `;
   const a = R.analyzeRustSource(src);
   assert.deepEqual(a.uses.map((u) => u.segments.join('::') + '@' + u.depth), ['super::*@1']);
@@ -432,6 +434,22 @@ test('desktop native-engine grants are module-local: host, host tests and viewpo
   appendSource(root, 'src-tauri/src/native_viewport.rs', 'use native_engine::codec::decode_project;');
   const policy = read('nemo-desktop.edges.json');
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
+    .map((v) => [v.module, v.detail.path]).sort(), [
+    ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.viewport', 'codec::decode_project'],
+  ]);
+});
+
+test('raw identifiers cannot bypass desktop native-engine ports in the host, focused tests or viewport', (t) => {
+  const root = desktopFixture(t);
+  appendSource(root, 'src-tauri/src/native_application.rs', 'use r#native_engine::r#desktop_viewport::SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::r#desktop_viewport::r#SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_viewport.rs',
+    'fn raw_port_probe() { let _ = r#native_engine::r#codec::decode_project; }');
+  const r = R.checkRustCrate(read('rust.profile.json'), read('nemo-desktop.edges.json'), { root });
   assert.equal(r.ok, false);
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
     .map((v) => [v.module, v.detail.path]).sort(), [
