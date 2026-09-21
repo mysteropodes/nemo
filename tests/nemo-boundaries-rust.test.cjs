@@ -158,12 +158,7 @@ test('N06 registers each accepted feasibility source and the scaffold without ex
     'the new production scaffold receives no proof-debt allowance');
 });
 
-test('N07 registers every codec source without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/codec.rs',
-    'native-engine/src/document.rs',
-    'native-engine/tests/codec.rs',
-  ];
+function assertRegisteredLeaf(required) {
   const { rust } = discoverRust();
   const declared = declaredPaths();
   for (const file of required) {
@@ -172,263 +167,6 @@ test('N07 registers every codec source without exclusions or a frozen-baseline w
     assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
     assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
   }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N08 registers every revision and command source without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/commands.rs',
-    'native-engine/src/request_receipts.rs',
-    'native-engine/src/revision.rs',
-    'native-engine/tests/commands.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N09 registers every transaction and history source without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/history.rs',
-    'native-engine/src/transaction.rs',
-    'native-engine/tests/history.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N10 registers immutable evaluation without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/evaluation.rs',
-    'native-engine/tests/evaluation.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N11 registers frame scheduling and resource leases without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/resource_leases.rs',
-    'native-engine/src/scheduler.rs',
-    'native-engine/tests/scheduler.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N12 registers the shared compositor without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/compositor.rs',
-    'native-engine/src/render_scene.rs',
-    'native-engine/tests/compositor.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(
-    result.violations
-      .filter((entry) => required.includes(entry.file))
-      .map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]),
-  );
-});
-
-test('N13 registers the staged viewport host and test without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/desktop_viewport.rs',
-    'native-engine/tests/desktop_viewport.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-    module.publicApi = module.publicApi.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]));
-});
-
-test('N14 registers pinned native PNG export without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/export_job.rs',
-    'native-engine/src/png_output.rs',
-    'native-engine/tests/export_job.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-    module.publicApi = module.publicApi.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]));
-});
-
-test('N15 registers the common v2 application dispatcher without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'native-engine/src/application.rs',
-    'native-engine/src/protocol.rs',
-    'native-engine/tests/application.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-  const dropped = structuredClone(profile);
-  for (const module of dropped.modules) {
-    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-    module.publicApi = module.publicApi.filter((file) => !required.includes(path.posix.join(module.dir, file)));
-  }
-  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
-    required.map((file) => ['coverage-unprofiled-source', file]));
-});
-
-test('N16 registers the native desktop host and focused MCP host test without exclusions or a frozen-baseline waiver', () => {
-  const required = [
-    'src-tauri/src/application_mcp_tests.rs',
-    'src-tauri/src/native_viewport.rs',
-  ];
-  const { rust } = discoverRust();
-  const declared = declaredPaths();
-  for (const file of required) {
-    assert.ok(rust.includes(file), `discovery omitted ${file}`);
-    assert.ok(declared.includes(file), `profile omitted ${file}`);
-    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
-    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
-  }
-  assert.deepEqual(
-    coverage.sizePolicy.warnOnlyAtAdoption.find((entry) => entry.path === 'src-tauri/src/native_viewport.rs'),
-    { path: 'src-tauri/src/native_viewport.rs', nonblankLines: 497 },
-  );
 
   const dropped = structuredClone(profile);
   for (const module of dropped.modules) {
@@ -440,6 +178,41 @@ test('N16 registers the native desktop host and focused MCP host test without ex
   assert.equal(result.ok, false);
   assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
     required.map((file) => ['coverage-unprofiled-source', file]));
+}
+
+const REGISTERED_LEAVES = [
+  ['N07 registers every codec source without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/codec.rs', 'native-engine/src/document.rs', 'native-engine/tests/codec.rs']],
+  ['N08 registers every revision and command source without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/commands.rs', 'native-engine/src/request_receipts.rs', 'native-engine/src/revision.rs', 'native-engine/tests/commands.rs']],
+  ['N09 registers every transaction and history source without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/history.rs', 'native-engine/src/transaction.rs', 'native-engine/tests/history.rs']],
+  ['N10 registers immutable evaluation without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/evaluation.rs', 'native-engine/tests/evaluation.rs']],
+  ['N11 registers frame scheduling and resource leases without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/resource_leases.rs', 'native-engine/src/scheduler.rs', 'native-engine/tests/scheduler.rs']],
+  ['N12 registers the shared compositor without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/compositor.rs', 'native-engine/src/render_scene.rs', 'native-engine/tests/compositor.rs']],
+  ['N13 registers the staged viewport host and test without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/desktop_viewport.rs', 'native-engine/tests/desktop_viewport.rs']],
+  ['N14 registers pinned native PNG export without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/export_job.rs', 'native-engine/src/png_output.rs', 'native-engine/tests/export_job.rs']],
+  ['N15 registers the common v2 application dispatcher without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/application.rs', 'native-engine/src/protocol.rs', 'native-engine/tests/application.rs']],
+  ['N16 registers the native desktop host and focused MCP host test without exclusions or a frozen-baseline waiver', [
+    'src-tauri/src/application_mcp_tests.rs', 'src-tauri/src/native_viewport.rs']],
+  ['N18A registers the dormant native host split without exclusions or a frozen-baseline waiver', [
+    'src-tauri/src/native_application.rs', 'src-tauri/src/native_application_commands.rs',
+    'src-tauri/src/native_application_contract.rs', 'src-tauri/src/native_application_ports.rs',
+    'src-tauri/src/native_application_ports_tests.rs', 'src-tauri/src/native_application_tests.rs',
+    'src-tauri/src/native_application_viewport.rs', 'src-tauri/src/native_dispatch.rs']],
+];
+
+for (const [name, required] of REGISTERED_LEAVES) test(name, () => assertRegisteredLeaf(required));
+
+test('N16 records the accepted viewport warning without a size waiver', () => {
+  assert.deepEqual(coverage.sizePolicy.warnOnlyAtAdoption.find((entry) => entry.path === 'src-tauri/src/native_viewport.rs'),
+    { path: 'src-tauri/src/native_viewport.rs', nonblankLines: 497 });
 });
 
 test('no declared Rust source exceeds its effective ceiling, and retained ceilings are exact', () => {

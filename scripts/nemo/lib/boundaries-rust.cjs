@@ -39,7 +39,23 @@ function validateCratePolicy(policy) {
   if (policy.externalCratePorts !== undefined) {
     if (!policy.externalCratePorts || typeof policy.externalCratePorts !== 'object' || Array.isArray(policy.externalCratePorts)) invalid('externalCratePorts must be an object');
     for (const [name, port] of Object.entries(policy.externalCratePorts)) {
-      if (!port || !Array.isArray(port.allowedModules) || !Array.isArray(port.items)) invalid(`externalCratePorts.${name} must have allowedModules and items arrays`);
+      if (!port || typeof port !== 'object' || Array.isArray(port)) invalid(`externalCratePorts.${name} must be an object`);
+      const hasAllowedModules = Object.hasOwn(port, 'allowedModules');
+      const hasItems = Object.hasOwn(port, 'items');
+      const hasLegacy = hasAllowedModules || hasItems;
+      const hasModuleItems = Object.hasOwn(port, 'moduleItems');
+      if (hasLegacy === hasModuleItems) invalid(`externalCratePorts.${name} must use exactly one of allowedModules/items or moduleItems`);
+      if (hasLegacy && (!Array.isArray(port.allowedModules) || !Array.isArray(port.items))) {
+        invalid(`externalCratePorts.${name} must have allowedModules and items arrays`);
+      }
+      if (hasModuleItems) {
+        if (!port.moduleItems || typeof port.moduleItems !== 'object' || Array.isArray(port.moduleItems)) {
+          invalid(`externalCratePorts.${name}.moduleItems must be an object`);
+        }
+        for (const [moduleId, items] of Object.entries(port.moduleItems)) {
+          if (!moduleId || !Array.isArray(items)) invalid(`externalCratePorts.${name}.moduleItems.${moduleId} must be an array`);
+        }
+      }
     }
   }
   if (policy.unanalyzedModules !== undefined && !Array.isArray(policy.unanalyzedModules)) invalid('unanalyzedModules must be an array');
@@ -142,7 +158,7 @@ function analyzeRustSource(source, opts = {}) {
   const withStrings = stripRust(source, { keepStrings: true });
   const spans = inlineModSpans(text);
   const depthAt = (index) => { const s = spans.find((sp) => index > sp.start && index < sp.end); return s ? (s.nested ? 2 : 1) : 0; };
-  const uses = [], mods = [], inline = [], cfgs = [];
+  const uses = [], mods = [], inline = [], cfgs = [], externCrates = [];
   const useRe = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);/g;
   let m;
   while ((m = useRe.exec(text))) {
@@ -152,21 +168,25 @@ function analyzeRustSource(source, opts = {}) {
   }
   const modRe = /(?:^|[\s;{}])(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_]\w*)\s*(;|\{)/g;
   while ((m = modRe.exec(text))) mods.push({ name: m[1], line: lineOf(text, m.index + 1), inlineBody: m[2] === '{' });
+  const externRe = /(?:^|[\s;{}])extern\s+crate\s+((?:r#)?[A-Za-z_]\w*)(?:\s+as\s+((?:r#)?[A-Za-z_]\w*))?\s*;/g;
+  while ((m = externRe.exec(text))) externCrates.push({
+    crate: m[1].replace(/^r#/, ''), alias: m[2]?.replace(/^r#/, '') || null, line: lineOf(text, m.index + 1),
+  });
   // opts.externalCrates lets a caller widen this to named external crates (e.g. `nemo_mcp::…`)
   // so an external-crate port policy can be enforced without walking the source twice.
   const externalCrates = (opts.externalCrates || []).filter((c) => /^[A-Za-z_]\w*$/.test(c));
   const inlineHeads = ['crate', 'super', 'self', ...externalCrates].join('|');
-  const inlineRe = new RegExp(`\\b(${inlineHeads})::([A-Za-z_]\\w*)`, 'g');
+  const inlineRe = new RegExp(`\\b(${inlineHeads})::([A-Za-z_]\\w*(?:::[A-Za-z_]\\w*)*)`, 'g');
   while ((m = inlineRe.exec(text))) {
     // Skip the `use` statements already captured (their spans contain the same tokens).
     const before = text.lastIndexOf('use ', m.index);
     const semi = text.indexOf(';', before === -1 ? 0 : before);
     if (before !== -1 && semi !== -1 && m.index > before && m.index < semi && /use\s/.test(text.slice(before, before + 5))) continue;
-    inline.push({ segments: [m[1], m[2]], line: lineOf(text, m.index), depth: depthAt(m.index) });
+    inline.push({ segments: [m[1], ...m[2].split('::')], line: lineOf(text, m.index), depth: depthAt(m.index) });
   }
   const cfgRe = /#\s*\[\s*cfg\s*\(([^\]]*)\)\s*\]/g;
   while ((m = cfgRe.exec(withStrings))) cfgs.push({ expr: m[1].replace(/\s+/g, ' ').trim(), line: lineOf(withStrings, m.index) });
-  return { uses, mods, inline, cfgs, inlineMods: spans.map((sp) => ({ name: sp.name, nested: sp.nested })) };
+  return { uses, mods, inline, cfgs, externCrates, inlineMods: spans.map((sp) => ({ name: sp.name, nested: sp.nested })) };
 }
 
 // --- crate graph -------------------------------------------------------------
@@ -224,7 +244,14 @@ function checkRustCrate(profile, policy, opts = {}) {
     if (JSON.stringify(found) !== JSON.stringify(declared)) invalid(`profile modules under ${policy.sourceDir} are ${found.join(', ')}; the policy declares ${declared.join(', ')}`);
   }
   const allModuleIds = new Set(profile.modules.map((m) => m.id));
+  const crateModuleIds = new Set(modules.map((m) => m.id));
   for (const id of policy.unanalyzedModules || []) if (!allModuleIds.has(id)) invalid(`unanalyzedModules references unknown module "${id}"`);
+  for (const [crateName, port] of Object.entries(policy.externalCratePorts || {})) {
+    for (const id of Object.keys(port.moduleItems || {})) {
+      if (!allModuleIds.has(id)) invalid(`externalCratePorts.${crateName}.moduleItems references unknown module "${id}"`);
+      if (!crateModuleIds.has(id)) invalid(`externalCratePorts.${crateName}.moduleItems references module "${id}" outside crate "${policy.crate}"`);
+    }
+  }
   const externalCrateNames = Object.keys(policy.externalCratePorts || {});
   const violations = [], unsupported = [], exceptionsApplied = [];
   const edges = new Map(modules.map((m) => [m.id, new Set()]));
@@ -267,19 +294,30 @@ function checkRustCrate(profile, policy, opts = {}) {
     // External-crate ports: a named crate (e.g. nemo_mcp) may only be referenced from its allowed
     // modules, and only through its declared items (an item name covers itself and any deeper path).
     if (externalCrateNames.length) {
-      const externalRefs = analysis.uses.filter((u) => externalCrateNames.includes(u.segments[0]))
-        .concat(analysis.inline.filter((i) => externalCrateNames.includes(i.segments[0])));
+      const aliases = new Map();
+      for (const declaration of analysis.externCrates) {
+        if (!externalCrateNames.includes(declaration.crate) || !declaration.alias) continue;
+        aliases.set(declaration.alias, declaration.crate);
+        report({ rule: 'external-crate-violation', module: m.id, file, line: declaration.line,
+          message: `External crate "${declaration.crate}" may not be renamed as "${declaration.alias}" because aliases bypass declared port matching`,
+          detail: { crate: declaration.crate, alias: declaration.alias, module: m.id } });
+      }
+      const governedNames = externalCrateNames.concat([...aliases.keys()]);
+      const externalRefs = analysis.uses.filter((u) => governedNames.includes(u.segments[0]))
+        .concat(analysis.inline.filter((i) => governedNames.includes(i.segments[0])));
       for (const ref of externalRefs) {
-        const crateName = ref.segments[0];
+        const crateName = aliases.get(ref.segments[0]) || ref.segments[0];
         const port = policy.externalCratePorts[crateName];
         const restPath = ref.segments.slice(1).join('::');
-        if (!port.allowedModules.includes(m.id)) {
+        const allowedItems = port.moduleItems ? port.moduleItems[m.id] : port.items;
+        const moduleAllowed = port.moduleItems ? Array.isArray(allowedItems) : port.allowedModules.includes(m.id);
+        if (!moduleAllowed) {
           report({ rule: 'external-crate-violation', module: m.id, file, line: ref.line,
             message: `Module "${m.id}" may not depend on external crate "${crateName}" via ${ref.segments.join('::')}`,
             detail: { crate: crateName, path: restPath, module: m.id } });
           continue;
         }
-        if (!port.items.some((item) => restPath === item || restPath.startsWith(`${item}::`))) {
+        if (!allowedItems.some((item) => restPath === item || restPath.startsWith(`${item}::`))) {
           report({ rule: 'private-port-access', module: m.id, file, line: ref.line,
             message: `"${crateName}::${restPath}" is not part of the declared port for "${crateName}"`,
             detail: { crate: crateName, path: restPath, module: m.id } });

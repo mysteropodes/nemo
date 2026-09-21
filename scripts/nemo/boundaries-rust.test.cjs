@@ -53,7 +53,7 @@ fn f() { crate::hit::hit_test_scene(1); let c = 'x'; }
   const a = R.analyzeRustSource(src);
   assert.deepEqual(a.uses.map((u) => u.segments.join('::') + '@' + u.depth), ['super::*@1']);
   assert.deepEqual(a.mods.map((m) => m.name + (m.inlineBody ? '{}' : ';')), ['fill;', 'engine;', 'tests{}']);
-  assert.deepEqual(a.inline.map((i) => i.segments.join('::') + '@' + i.depth), ['super::helper@1', 'crate::hit@0']);
+  assert.deepEqual(a.inline.map((i) => i.segments.join('::') + '@' + i.depth), ['super::helper@1', 'crate::hit::hit_test_scene@0']);
   assert.deepEqual(a.cfgs.map((c) => c.expr), ['test']);
   assert.deepEqual(a.inlineMods, [{ name: 'tests', nested: false }]);
 });
@@ -62,6 +62,15 @@ test('cfg predicates keep their string values (target_arch, feature) and nested 
   const a = R.analyzeRustSource(`#[cfg(target_arch = "wasm32")]\nfn w() {}\n#[cfg(all(feature = "gpu", not(test)))]\nfn g() {}\nmod outer { mod inner { use super::*; } }\n`);
   assert.deepEqual(a.cfgs.map((c) => c.expr), ['target_arch = "wasm32"', 'all(feature = "gpu", not(test))']);
   assert.deepEqual(a.inlineMods, [{ name: 'outer', nested: true }]);
+});
+
+test('extern crate declarations retain canonical name, alias and line for bypass checks', () => {
+  const a = R.analyzeRustSource('extern crate ext;\nextern crate native_engine as hidden;\nextern crate native_engine as r#raw_alias;\n');
+  assert.deepEqual(a.externCrates, [
+    { crate: 'ext', alias: null, line: 1 },
+    { crate: 'native_engine', alias: 'hidden', line: 2 },
+    { crate: 'native_engine', alias: 'raw_alias', line: 3 },
+  ]);
 });
 
 // ---- synthetic crate ----------------------------------------------------------
@@ -159,6 +168,10 @@ test('super:: from a Rust-2018 x/y.rs shape resolves to a declared sibling x.rs,
 });
 
 const EXT_POLICY = { ...POLICY, externalCratePorts: { ext: { allowedModules: ['synth.shapes'], items: ['registry', 'wire'] } } };
+const PER_MODULE_EXT_POLICY = { ...POLICY, externalCratePorts: { ext: { moduleItems: {
+  'synth.shapes': ['registry'],
+  'synth.engine': ['wire'],
+} } } };
 
 test('external-crate ports: allowed module + declared items pass, a disallowed module or undeclared item fails, a declared item covers deeper paths', (t) => {
   const ok = run(scaffold(t, { 'synth/src/shapes.rs': 'use crate::engine::SceneIn;\nuse ext::registry;\nuse ext::registry::Endpoint;\nuse ext::wire;\npub fn rect() -> SceneIn { SceneIn }\n' }), EXT_POLICY);
@@ -174,7 +187,34 @@ test('external-crate ports: allowed module + declared items pass, a disallowed m
 
   const privateInline = run(scaffold(t, { 'synth/src/hit.rs': 'use crate::engine::SceneIn;\npub fn hit(_s: &SceneIn) { let _ = ext::server::run(); }\n' }), EXT_POLICY);
   assert.equal(privateInline.ok, false);
-  assert.deepEqual(privateInline.violations.map((v) => [v.rule, v.detail.path]), [['private-port-access', 'server']]);
+  assert.deepEqual(privateInline.violations.map((v) => [v.rule, v.detail.path]), [['private-port-access', 'server::run']]);
+});
+
+test('per-module external ports reject an absent module and undeclared item without widening another module', (t) => {
+  const ok = run(scaffold(t, {
+    'synth/src/engine.rs': 'use ext::wire;\npub fn render() {}\npub struct SceneIn;\n',
+    'synth/src/shapes.rs': 'use crate::engine::SceneIn;\nuse ext::registry::Endpoint;\npub fn rect() -> SceneIn { SceneIn }\n',
+  }), PER_MODULE_EXT_POLICY);
+  assert.equal(ok.ok, true, JSON.stringify(ok.violations));
+
+  const absent = run(scaffold(t, {
+    'synth/src/lib.rs': 'mod engine;\nmod shapes;\nmod hit;\npub use engine::render;\npub use shapes::rect;\nuse ext::registry;\n',
+  }), PER_MODULE_EXT_POLICY);
+  assert.deepEqual(absent.violations.map((v) => [v.rule, v.module]), [['external-crate-violation', 'synth.api']]);
+
+  const privateUse = run(scaffold(t, {
+    'synth/src/engine.rs': 'use ext::registry;\npub fn render() {}\npub struct SceneIn;\n',
+  }), PER_MODULE_EXT_POLICY);
+  assert.deepEqual(privateUse.violations.map((v) => [v.rule, v.detail.path]), [['private-port-access', 'registry']]);
+});
+
+test('governed extern-crate aliases are rejected instead of bypassing the port', (t) => {
+  const r = run(scaffold(t, {
+    'synth/src/shapes.rs': 'extern crate ext as hidden;\nuse crate::engine::SceneIn;\nuse hidden::registry;\npub fn rect() -> SceneIn { SceneIn }\n',
+  }), PER_MODULE_EXT_POLICY);
+  assert.equal(r.ok, false);
+  assert.ok(r.violations.some((v) => v.rule === 'external-crate-violation'
+    && v.detail.crate === 'ext' && v.detail.alias === 'hidden'));
 });
 
 test('unanalyzedModules must name real profile modules, and the ids are echoed back', (t) => {
@@ -200,9 +240,31 @@ test('the policy is validated and the module set must match', (t) => {
   assert.throws(() => R.validateCratePolicy({ ...POLICY, status: 'draft' }), /adopted/);
   assert.throws(() => R.validateCratePolicy({ ...POLICY, exceptions: [{ path: 'x', rule: 'size', owner: 'o', issue: '1', reason: 'r', expires: '2026-12-05' }] }), /not a crate rule/);
   assert.throws(() => run(scaffold(t, {}), { ...POLICY, profileModules: ['synth.api'] }), /policy declares synth\.api/);
+  assert.throws(() => R.validateCratePolicy({ ...POLICY, externalCratePorts: { ext: {} } }), /exactly one/);
+  assert.throws(() => R.validateCratePolicy({ ...POLICY, externalCratePorts: { ext: {
+    allowedModules: ['synth.shapes'], items: ['registry'], moduleItems: { 'synth.shapes': ['registry'] },
+  } } }), /exactly one/);
+  assert.throws(() => run(scaffold(t, {}), { ...PER_MODULE_EXT_POLICY,
+    externalCratePorts: { ext: { moduleItems: { 'synth.missing': ['registry'] } } },
+  }), /references unknown module "synth\.missing"/);
+  assert.throws(() => run(scaffold(t, {}), { ...PER_MODULE_EXT_POLICY,
+    externalCratePorts: { ext: { moduleItems: { 'synth.other.crate': ['registry'] } } },
+  }), /outside crate "synth"/);
 });
 
 // ---- the real crate ----------------------------------------------------------
+
+function desktopFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-desktop-edges-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'src-tauri'), { recursive: true });
+  fs.cpSync(path.join(ROOT, 'src-tauri/src'), path.join(root, 'src-tauri/src'), { recursive: true });
+  return root;
+}
+
+function appendSource(root, file, source) {
+  fs.appendFileSync(path.join(root, file), `\n${source}\n`);
+}
 
 test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the three recorded-debt exceptions, port matches lib.rs', () => {
   const policy = read('geometry-wasm.edges.json');
@@ -237,8 +299,31 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   assert.deepEqual(r.exceptionsApplied, []);
   assert.deepEqual(r.exportedPort, []);
   assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
+    'rust.desktop.mcp.adapter->rust.desktop.native.dispatch',
     'rust.desktop.mcp.adapter.tests->rust.desktop.mcp.adapter',
+    'rust.desktop.native.application->rust.desktop.native.application.contract',
+    'rust.desktop.native.application->rust.desktop.native.application.ports',
+    'rust.desktop.native.application->rust.desktop.native.dispatch',
+    'rust.desktop.native.application.commands->rust.desktop.mcp.adapter',
+    'rust.desktop.native.application.commands->rust.desktop.native.application',
+    'rust.desktop.native.application.commands->rust.desktop.native.application.contract',
+    'rust.desktop.native.application.commands->rust.desktop.native.application.ports',
+    'rust.desktop.native.application.commands->rust.desktop.native.application.viewport',
+    'rust.desktop.native.application.commands->rust.desktop.native.dispatch',
+    'rust.desktop.native.application.contract->rust.desktop.native.application.ports',
+    'rust.desktop.native.application.ports.tests->rust.desktop.native.application.ports',
+    'rust.desktop.native.application.tests->rust.desktop.native.application',
+    'rust.desktop.native.application.tests->rust.desktop.native.application.contract',
+    'rust.desktop.native.application.tests->rust.desktop.native.application.ports',
+    'rust.desktop.native.application.viewport->rust.desktop.native.application.contract',
+    'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
     'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
+    'rust.desktop.shell->rust.desktop.native.application',
+    'rust.desktop.shell->rust.desktop.native.application.commands',
+    'rust.desktop.shell->rust.desktop.native.application.contract',
+    'rust.desktop.shell->rust.desktop.native.application.ports',
+    'rust.desktop.shell->rust.desktop.native.application.viewport',
+    'rust.desktop.shell->rust.desktop.native.dispatch',
     'rust.desktop.shell->rust.desktop.native.viewport', 'rust.desktop.shell->rust.desktop.tasks',
     'rust.desktop.tasks.tests->rust.desktop.tasks']);
   assert.deepEqual(r.unanalyzedModules.slice().sort(),
@@ -247,6 +332,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   const application = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp.rs'), 'utf8');
   const applicationTests = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp_tests.rs'), 'utf8');
   const viewport = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport.rs'), 'utf8');
+  const ports = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application_ports.rs'), 'utf8');
+  const bootstrap = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application.rs'), 'utf8');
   assert.match(application, /use nemo_mcp::\{/);
   assert.match(application, /registry::\{self, Endpoint, Registration\}/);
   assert.match(application, /\bwire,/);
@@ -260,32 +347,106 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'contract::NativeApplicationResponse', 'contract::NativeHostStatus',
       'contract::NativeStatusRequest', 'contract::NATIVE_API_VERSION', 'contract::Operation',
       'registry', 'wire'].sort());
+  assert.deepEqual(policy.externalCratePorts.nemo_mcp.allowedModules.slice().sort(), [
+    'rust.desktop.mcp.adapter', 'rust.desktop.native.application.commands',
+    'rust.desktop.native.application.contract', 'rust.desktop.native.application.tests',
+  ]);
 
   assert.match(applicationTests, /use crate::application_mcp::\*/);
   assert.match(application, /use native_engine::\{/);
   assert.match(applicationTests, /use native_engine::\{/);
   assert.match(viewport, /use native_engine::compositor::\{/);
   assert.match(viewport, /use native_engine::desktop_viewport::\{/);
-  assert.deepEqual(policy.externalCratePorts.native_engine.allowedModules.slice().sort(), [
-    'rust.desktop.mcp.adapter',
-    'rust.desktop.mcp.adapter.tests',
-    'rust.desktop.native.viewport',
+  assert.match(ports, /use native_engine::application::\{/);
+  assert.match(ports, /use native_engine::png_output::\{/);
+  assert.match(bootstrap, /use native_engine::\{/);
+  assert.equal(policy.externalCratePorts.native_engine.allowedModules, undefined);
+  assert.equal(policy.externalCratePorts.native_engine.items, undefined);
+  assert.deepEqual(policy.externalCratePorts.native_engine.moduleItems, {
+    'rust.desktop.mcp.adapter': [
+      'application::ExportResourceResolver', 'application::NativeApplication',
+      'commands::OpacityRequest', 'document::OpacityDocument',
+      'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
+      'protocol::OP_JOB_EXPORT_PNG_BEGIN'],
+    'rust.desktop.mcp.adapter.tests': [
+      'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
+      'codec::decode_project', 'export_job::ExportArtifact', 'export_job::ExportReadback',
+      'protocol::OpaqueResourceHandle', 'render_scene::GeometryPaintInput', 'render_scene::RenderScene'],
+    'rust.desktop.native.viewport': [
+      'compositor::CompositionResult', 'compositor::Compositor', 'compositor::CompositorError',
+      'compositor::CompositorInstance', 'desktop_viewport::AcquiredSurfaceFrame',
+      'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
+      'desktop_viewport::SettledSurfaceFrame', 'desktop_viewport::SurfaceAttempt',
+      'desktop_viewport::SurfacePort', 'desktop_viewport::SurfacePresentation',
+      'desktop_viewport::SurfaceRecoveryError', 'desktop_viewport::ViewportError',
+      'desktop_viewport::ViewportMapping', 'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId'],
+    'rust.desktop.native.application.ports': [
+      'application::ExportResourceResolver', 'application::ResourceResolutionError',
+      'application::ResourceResolutionErrorKind', 'compositor::CompositionResult', 'compositor::Compositor',
+      'png_output::ExportArtifact', 'png_output::ExportCompositor', 'png_output::ExportReadback',
+      'png_output::StagedArtifactPort', 'protocol::OpaqueResourceHandle',
+      'render_scene::GeometryPaintInput', 'render_scene::RenderScene'],
+    'rust.desktop.native.application.contract': [
+      'codec::decode_project', 'desktop_viewport::CssBounds', 'desktop_viewport::PhysicalExtent',
+      'desktop_viewport::ViewportMapping', 'document::OpacityDocument', 'export_job::CleanupStatus',
+      'export_job::ExternalEffectDisposition', 'export_job::JobReceipt', 'export_job::JobStatus',
+      'render_scene::GeometryPaintInput', 'render_scene::LayerGeometry', 'render_scene::OpaqueSrgbPaint',
+      'resource_leases::WorkId', 'scheduler::OutputSpec'],
+    'rust.desktop.native.application.viewport': [
+      'compositor::CompositionResult', 'compositor::Compositor', 'desktop_viewport::DeferredAction',
+      'desktop_viewport::FatalAction', 'desktop_viewport::ViewportMapping', 'desktop_viewport::ViewportStatus',
+      'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId'],
+    'rust.desktop.native.application': [
+      'application::NativeApplication', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+      'compositor::CompositionResult', 'document::OpacityDocument',
+      'export_job::JobReceipt', 'export_job::PendingFrame', 'render_scene',
+      'resource_leases::FrameFailure', 'resource_leases::FrameFailureKind', 'resource_leases::WorkId',
+      'scheduler::EvaluationKey', 'scheduler::FrameScheduler'],
+    'rust.desktop.native.application.commands': ['compositor::Compositor'],
+    'rust.desktop.native.application.tests': ['compositor::Compositor'],
+    'rust.desktop.native.dispatch': [
+      'application::ExportResourceResolver', 'application::NativeApplication',
+      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',
+      'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::JobStatus',
+      'export_job::PendingFrame', 'export_job::StagedArtifactPort'],
+  });
+  const rustProfile = read('rust.profile.json');
+  for (const [moduleId, items] of Object.entries(policy.externalCratePorts.native_engine.moduleItems)) {
+    const module = rustProfile.modules.find((entry) => entry.id === moduleId);
+    const refs = module.files.flatMap((file) => {
+      const source = fs.readFileSync(path.join(ROOT, module.dir, file), 'utf8');
+      const analysis = R.analyzeRustSource(source, { externalCrates: ['native_engine'] });
+      return analysis.uses.concat(analysis.inline)
+        .filter((entry) => entry.segments[0] === 'native_engine')
+        .map((entry) => entry.segments.slice(1).join('::'));
+    });
+    for (const item of items) assert.ok(refs.some((ref) => ref === item || ref.startsWith(`${item}::`)),
+      `${moduleId} grants unused native_engine item ${item}`);
+  }
+});
+
+test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
+  const root = desktopFixture(t);
+  appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::desktop_viewport::SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_viewport.rs', 'use native_engine::codec::decode_project;');
+  const policy = read('nemo-desktop.edges.json');
+  const r = R.checkRustCrate(read('rust.profile.json'), policy, { root });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
+    .map((v) => [v.module, v.detail.path]).sort(), [
+    ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.viewport', 'codec::decode_project'],
   ]);
-  assert.deepEqual(policy.externalCratePorts.native_engine.items.slice().sort(), [
-    'application::ExportResourceResolver', 'application::NativeApplication',
-    'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
-    'codec::decode_project', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
-    'compositor::CompositionResult', 'compositor::Compositor', 'compositor::CompositorError',
-    'compositor::CompositorInstance', 'desktop_viewport::AcquiredSurfaceFrame',
-    'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
-    'desktop_viewport::SettledSurfaceFrame',
-    'desktop_viewport::SurfaceAttempt', 'desktop_viewport::SurfacePort',
-    'desktop_viewport::SurfacePresentation', 'desktop_viewport::SurfaceRecoveryError',
-    'desktop_viewport::ViewportError',
-    'desktop_viewport::ViewportMapping', 'document::OpacityDocument',
-    'export_job::ExportArtifact', 'export_job::ExportCompositor', 'export_job::ExportReadback',
-    'export_job::StagedArtifactPort', 'protocol::OpaqueResourceHandle',
-    'render_scene::GeometryPaintInput', 'render_scene::RenderScene',
-    'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId',
-  ].sort());
+});
+
+test('desktop policy rejects a native_engine extern-crate alias before it can hide item access', (t) => {
+  const root = desktopFixture(t);
+  appendSource(root, 'src-tauri/src/native_application.rs', 'extern crate native_engine as hidden_engine;');
+  const r = R.checkRustCrate(read('rust.profile.json'), read('nemo-desktop.edges.json'), { root });
+  assert.equal(r.ok, false);
+  assert.ok(r.violations.some((v) => v.rule === 'external-crate-violation'
+    && v.module === 'rust.desktop.native.application'
+    && v.detail.crate === 'native_engine' && v.detail.alias === 'hidden_engine'));
 });
