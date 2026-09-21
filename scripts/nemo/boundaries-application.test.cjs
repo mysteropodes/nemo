@@ -146,6 +146,20 @@ test('N18 native opacity export adapter cannot be omitted from fresh application
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
+test('N19C dormant native edit guard cannot be omitted from fresh application discovery', () => {
+  const profile = read('app-js.profile.json');
+  const policy = read('app-js.coverage.json');
+  const required = 'src/js/application/native-edit-guard.js';
+  assert.ok(policy.retainedSources.some((entry) => entry.path === required
+    && entry.moduleId === 'app.native.edit.guard.application'
+    && entry.executionClass === 'classic-without-load-site'));
+  const dropped = structuredClone(profile);
+  dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.edit.guard.application');
+  const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
+  assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
+    /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');

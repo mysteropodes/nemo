@@ -13,6 +13,11 @@
 // during the drag via suspend()/resume(), matching the other bridges.
 (function () {
   var pointerIsDown = false; // gesture lifecycle (suspend/resume span)
+  function allowLegacyEdit(event) {
+    var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('eraser') === true; } catch (_) {}
+    if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    return false;
+  }
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)
   var lastPenPressure = null; // held across a real-pen gesture — same hold-last-value fix as draw-bridge.js's pressureOf(), for the exact same reason (0/missing samples at lift-off otherwise misread as "max pressure")
   // Alt+drag resize (2026-07, "10 > pourquoi on utilise pas le même
@@ -120,6 +125,7 @@
   }
 
   function eraseAt(pt, radius) {
+    if (!allowLegacyEdit()) return;
     var layer = userLayers[state.activeLayerIdx];
     // Paper.js's hitTest does NOT prioritize a point genuinely INSIDE an
     // item's fill over a merely-within-tolerance proximity match on some
@@ -185,6 +191,7 @@
       window.SMEngineBridge.renderNow();
       return;
     }
+    if (!allowLegacyEdit(e)) return;
     // pushUndo() BEFORE ensureKeyframe(), and unconditionally (not lazily
     // on the first actual hit like before) — see draw-bridge.js's
     // commitStroke comment for why the ordering matters: a single undo must
@@ -231,6 +238,7 @@
       return;
     }
     if (!shouldIntercept()) return;
+    if (pointerIsDown && !allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var rawW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -253,6 +261,7 @@
       return;
     }
     if (!pointerIsDown) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     pointerIsDown = false;

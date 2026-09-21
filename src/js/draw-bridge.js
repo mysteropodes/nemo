@@ -25,7 +25,7 @@
 // work exactly as before — one Paper scene mutation instead of one per
 // mousemove.
 (function () {
-  var dragging = false;
+  var dragging = false; function allowLegacyEdit(event) { var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('draw') === true; } catch (_) {} if (!allowed && event) { event.stopImmediatePropagation(); event.preventDefault(); } return allowed; }
   // Alt+drag brush-resize gesture (feedback #24): horizontal drag scales
   // state.brushSize with a live circle preview at the press point, like
   // every mainstream drawing app. viewtools-bridge.js's global
@@ -587,7 +587,7 @@
       window.SMEngineBridge.renderNow();
       return;
     }
-    dragging = true;
+    if (!allowLegacyEdit(e)) return; dragging = true;
     samples = [];
     _liveDabCache = null; _liveDabCacheAt = 0;
     strokeSeed = (Math.random() * 0xFFFFFFFF) >>> 0;
@@ -701,7 +701,7 @@
       showToast('Taille du pinceau : ' + Math.round(state.brushSize) + 'px');
       return;
     }
-    if (!dragging) return;
+    if (!dragging || !allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     dragging = false;
@@ -770,7 +770,7 @@
     if (window.SMEngineBridge) { window.SMEngineBridge.setPressureCursor(null, 0); window.SMEngineBridge.renderNow(); }
   }
 
-  function commitStroke() {
+  function commitStroke() { if (!allowLegacyEdit()) return;
     if (window.SMBitmapBrush) window.SMBitmapBrush.endLivePreview(); // clear the screen-space preview — the real baked Raster (if any) takes over below
     if (samples.length < 2) return;
     // Map from rendered/world space into the active layer's raw document
