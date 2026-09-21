@@ -211,7 +211,7 @@ test('response validator enforces exact envelopes, closed common errors and JobR
   assert.strictEqual(validateResponse(declaration.examples[1].response, 'fixture-export', 'job.export.png.begin').result.status, 'running');
 });
 
-test('schema and staged declaration carry the same frozen operations, examples and no activation', () => {
+test('schema and active declaration carry the same frozen operations and examples', () => {
   assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.ok(schema.$defs.Request);
   assert.ok(schema.$defs.Response);
@@ -224,13 +224,13 @@ test('schema and staged declaration carry the same frozen operations, examples a
   assert.deepEqual([...schemaOperations].sort(), [...declaration.operations].sort());
   assert.equal(declaration.schemaVersion, 2);
   assert.equal(declaration.apiVersion, 2);
-  assert.equal(declaration.status, 'staged');
-  assert.equal(declaration.availability.state, 'unavailable');
+  assert.equal(declaration.status, 'active');
+  assert.deepEqual(declaration.availability, { state: 'available', reason: null });
   assert.equal(declaration.authority.adapterOwnsWritableMirror, false);
   assert.equal(declaration.authority.fallback, 'none');
   assert.deepEqual(declaration.ports, [
-    { label: 'ui', state: 'fixture-only' },
-    { label: 'mcp', state: 'fixture-only' },
+    { label: 'ui', state: 'active' },
+    { label: 'mcp', state: 'active' },
   ]);
   for (const example of declaration.examples) {
     validateRequest(example.request);

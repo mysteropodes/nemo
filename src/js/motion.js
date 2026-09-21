@@ -2637,6 +2637,12 @@
   // still falls through to the exact keyframed/static value it would have
   // shown before expressions existed (never a blank/NaN/frozen property).
   function valueAtFrame(ld, prop, frame) {
+    var nativeOpacity = window.NemoNativeOpacityCutover;
+    if (prop === 'opacity' && ld && ld.layerUid && nativeOpacity && nativeOpacity.blocksLegacy()) {
+      var selection = nativeOpacity.projectSelection({ activeLayerUid: ld.layerUid,
+        selected: [{ layerUid: ld.layerUid, opacityMode: nativeOpacity.prepared().opacityMode }] }, frame);
+      return [selection.selected[0].value];
+    }
     var raw = rawValueAtFrame(ld, prop, frame);
     if (hasExpr(ld, prop)) {
       var evaluated = evalExpressionFor(ld, prop, frame, raw);

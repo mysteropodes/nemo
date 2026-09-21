@@ -4738,6 +4738,12 @@ function renderOS(){
 // and JS strings are immutable, so sharing the heavy fields by reference is
 // unconditionally safe. Same split the render path already uses
 // (cloneStrokeForTransform, app.js). 2026-07-28.
+function _nativeOpacityHistory(action){
+  var nativeOpacity=window.NemoNativeOpacityCutover;
+  if(!nativeOpacity||!nativeOpacity.blocksLegacy())return false;
+  if(nativeOpacity.isActive())nativeOpacity.history(action).catch(function(){});
+  return true;
+}
 function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}
 // Walks every stroke of a layers tree in a deterministic order. Both the
 // live tree and its clone have identical shape, so two walks stay in lockstep
@@ -4805,6 +4811,7 @@ function _cloneStrokesForUndo(strokes){
 // calls saveAllLayerFrames() rather than saveActiveLayerFrame()) must keep
 // using the full pushUndo() instead.
 function pushUndoActiveFrame(){
+  if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
   if(window._scrubLiveActive)return;
   if(typeof saveActiveLayerFrame==='function')saveActiveLayerFrame();
   // Entry kind + capture live in application/history/frame-entry.js (P21).
@@ -4893,7 +4900,7 @@ function _actionLabelNow(){
 // snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
-function pushUndoLayers(alreadySaved){if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+function pushUndoLayers(alreadySaved){if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
   // Playback bake cache (playback-cache.js): this is the SAME chokepoint
   // SMFeedback.logAction() right above already trusts as "a real content-
   // mutating action happened" — any baked bitmap for the frame(s) this
@@ -4961,7 +4968,7 @@ function restoreLayersSnapshot(s){
 }
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function undo(){if(_nativeOpacityHistory('undo'))return;if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.undoStack.length){showToast(SM.t('toastNothingToUndo'));return;}
 // Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
 // entry stays on the stack untouched so the user can navigate to the right
@@ -4979,7 +4986,7 @@ if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels
 var applied=NemoFrameHistoryEntry.apply(state,s);state.redoStack.push(applied.inverse);state.redoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function redo(){if(_nativeOpacityHistory('redo'))return;if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.redoStack.length){showToast(SM.t('toastNothingToRedo'));return;}
 // Same cross-context guard as undo() above, mirrored for the redo stack.
 var top=state.redoStack[state.redoStack.length-1];

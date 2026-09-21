@@ -146,6 +146,248 @@ var NemoOpacityApplicationCore = (function () {
     return { handle: handle, setInstanceId: setInstanceId, documentChanged: documentChanged,
       historyChanged: touch, changed: touch, meta: function () { return Object.assign({}, identity); } };
   }
-  return { create: create };
+  // N20 native authority controller. Platform calls and accepted N19 adapters
+  // are injected; this owns only atomic authority state and pinned caches.
+  function createNative(ports) {
+    var phase = 'legacy', prepared = null, identity = null, generation = 0;
+    var serializeResponse = null, evaluations = new Map(), persistence = null;
+    var application = null, pending = Promise.resolve(), releasePromise = null, activationPromise = null;
+    var sequence = 0, mutationCount = 0;
+    var output = Object.freeze({ kind: 'frame', format: 'rgba8', width: 320, height: 180,
+      colorInterpretation: 'srgb', alphaMode: 'straight' });
+    function id(prefix) { sequence++; return prefix + '-' + sequence; }
+    function copyIdentity() { return identity && { instanceId: identity.instanceId,
+      documentId: identity.documentId, contentRevision: identity.contentRevision }; }
+    function request(operation, payload) { return { apiVersion: 2, requestId: id('n20-read'),
+      instanceId: identity.instanceId, documentId: identity.documentId, operation: operation, payload: payload }; }
+    function enqueue(work) { var next = pending.then(work); pending = next.catch(function () {}); return next; }
+    function requireNative() {
+      if (phase !== 'native' || !identity || !application) throw new Error('native opacity authority is not active');
+    }
+    function successful(response, label) {
+      if (!response || response.ok !== true) throw new Error(label + ' failed: ' +
+        (response && response.error && response.error.message || 'unknown native error'));
+      return response;
+    }
+    function expectedValue(frame, document) {
+      if (!document.layers[0].motion) return document.layers[0].motionStatic.opacity[0];
+      if (frame === 0) return 20; if (frame === 10) return 50; if (frame === 20) return 80;
+      return null;
+    }
+    async function refresh() {
+      var at = identity.contentRevision;
+      var serialized = successful(await application.dispatch(request('query.document.serialize', { atRevision: at })), 'native serialize');
+      if (serialized.contentRevision !== at || serialized.result.atRevision !== at) throw new Error('native serialize revision mismatch');
+      var reads = [];
+      for (var frame = 0; frame < prepared.totalFrames; frame++) reads.push(application.dispatch(
+        request('query.document.evaluate', { atRevision: at, contextId: 'scene-root', frame: frame })));
+      var received = await Promise.all(reads), next = new Map();
+      received.forEach(function (response, frame) {
+        successful(response, 'native evaluation'); var result = response.result;
+        if (response.contentRevision !== at || result.contentRevision !== at || result.frame !== frame ||
+            result.layers.length !== 1 || result.layers[0].layerUid !== prepared.layerUid) {
+          throw new Error('native evaluation identity mismatch');
+        }
+        var expected = expectedValue(frame, serialized.result.document);
+        if (expected !== null && Math.abs(result.layers[0].value - expected) > 1e-8) {
+          throw new Error('native opacity characterization mismatch');
+        }
+        next.set(frame, result);
+      });
+      var composed = ports.document.composeNativeOpacity(prepared, serialized, identity);
+      serializeResponse = serialized; evaluations = next; persistence = JSON.stringify(composed);
+    }
+    function validateBootstrap(receipt, binding) {
+      var keys = receipt && Object.keys(receipt).sort().join(',');
+      if (keys !== 'apiVersion,contentRevision,documentId,instanceId,resourceCount,viewportAvailable' ||
+          receipt.apiVersion !== 2 || receipt.instanceId !== binding.instanceId ||
+          receipt.documentId !== binding.documentId || receipt.contentRevision !== binding.contentRevision ||
+          receipt.contentRevision !== 0 || receipt.resourceCount !== prepared.resources.length ||
+          receipt.viewportAvailable !== true) throw new Error('native bootstrap receipt is not the N20 viewport contract');
+    }
+    function validateRelease(receipt, current) {
+      if (!receipt || receipt.apiVersion !== 2 || receipt.instanceId !== current.instanceId ||
+          receipt.documentId !== current.documentId || receipt.contentRevision !== current.contentRevision ||
+          receipt.status !== 'succeeded' || receipt.authorityRemovalCompleted !== true ||
+          receipt.reentryAvailable !== true || receipt.error !== null ||
+          !Number.isSafeInteger(receipt.lifecycleGeneration) || receipt.lifecycleGeneration < 1) {
+        throw new Error('native release receipt is not a successful terminal receipt');
+      }
+      return receipt;
+    }
+    async function releaseInstalled(current) {
+      return validateRelease(await ports.release({ apiVersion: 2, requestId: id('n20-release'),
+        instanceId: current.instanceId, documentId: current.documentId,
+        expectedRevision: current.contentRevision, cancelledBeforeDispatch: false }), current);
+    }
+    async function rollbackBootstrap() {
+      if (!identity) { phase = 'legacy'; prepared = null; return; }
+      try { await releaseInstalled(copyIdentity()); ports.disconnect(); phase = 'legacy'; }
+      catch (_) { phase = 'indeterminate'; }
+      identity = null; application = null; serializeResponse = null; evaluations = new Map(); persistence = null;
+      if (phase === 'legacy') prepared = null;
+    }
+    function activate(nextPrepared) {
+      if (phase !== 'legacy') throw new Error('native opacity activation requires legacy ownership');
+      prepared = nextPrepared; phase = 'installing';
+      var work = (async function () {
+        try {
+          var bootstrap = await ports.bootstrap(prepared);
+          identity = Object.freeze({ instanceId: bootstrap.instanceId, documentId: bootstrap.documentId,
+            contentRevision: bootstrap.contentRevision });
+          var binding = await ports.connect();
+          validateBootstrap(bootstrap, binding); application = ports.application(); await refresh();
+          generation++; phase = 'native'; if (ports.afterChange) ports.afterChange(); return true;
+        } catch (error) {
+          await rollbackBootstrap(); if (phase === 'indeterminate') throw error; return false;
+        }
+      })();
+      activationPromise = work;
+      return work.finally(function () { if (activationPromise === work) activationPromise = null; });
+    }
+    function mutate(project) {
+      requireNative(); mutationCount++;
+      return enqueue(async function () {
+        try {
+          requireNative();
+          var response = successful(await application.dispatch(project(copyIdentity())), 'native mutation');
+          identity = Object.freeze({ instanceId: identity.instanceId, documentId: identity.documentId,
+            contentRevision: response.contentRevision });
+          await refresh(); if (ports.afterChange) ports.afterChange(); return response;
+        } catch (error) { phase = 'indeterminate'; throw error; }
+        finally { mutationCount--; }
+      });
+    }
+    function setOpacity(layerUid, value, requestId) {
+      requireNative();
+      if (prepared && prepared.opacityMode === 'keyed') {
+        requestRelease({ kind: 'keyed-opacity-edit', documentId: identity.documentId,
+          generation: generation }).catch(function () {});
+        return Promise.reject(new Error('keyed native opacity is read-only until release completes'));
+      }
+      return mutate(function (current) { return ports.editor.setOpacity(current, requestId || id('n20-set'),
+        { stableTarget: { layerUid: layerUid }, opacityMode: 'static' }, value); });
+    }
+    function history(action, requestId) {
+      return mutate(function (current) { return ports.editor[action](current, requestId || id('n20-' + action)); });
+    }
+    function release(reason) {
+      if (phase === 'legacy') return Promise.resolve(null);
+      if (phase === 'installing' && activationPromise) return activationPromise.then(function () { return release(reason); });
+      if (releasePromise) return releasePromise;
+      releasePromise = pending.then(async function () {
+        requireNative(); phase = 'releasing'; var current = copyIdentity(), legacyBytes = persistence;
+        try {
+          await releaseInstalled(current); ports.disconnect();
+          if (!ports.legacyImport(legacyBytes, true)) throw new Error('composed native document could not re-enter legacy');
+          phase = 'legacy'; identity = null; application = null; prepared = null;
+          serializeResponse = null; evaluations = new Map(); persistence = null;
+          var mapped = Object.freeze({ documentId: current.documentId, generation: generation,
+            owner: 'legacy', status: 'released' });
+          releasePromise = null; return mapped;
+        } catch (error) { phase = 'indeterminate'; throw error; }
+      });
+      pending = releasePromise.catch(function () {}); return releasePromise;
+    }
+    function requestRelease(reason) { return release(reason); }
+    function getNativeIdentity() {
+      if (phase === 'legacy') return null;
+      if (phase === 'native' || phase === 'releasing') return { documentId: identity.documentId, generation: generation };
+      throw new Error('native opacity ownership is not safely observable');
+    }
+    function valueAtFrame(layerUid, frame) {
+      if (!identity || !evaluations.has(frame)) throw new Error('native opacity evaluation is unavailable');
+      var layers = evaluations.get(frame).layers.filter(function (layer) { return layer.layerUid === layerUid; });
+      if (layers.length !== 1) throw new Error('native opacity layer identity is unavailable');
+      return [layers[0].value];
+    }
+    function projectSelection(descriptor, frame) { return ports.selection.projectSelection(evaluations.get(frame), descriptor); }
+    function renderPreview(frame) {
+      if (phase === 'legacy') return false; if (phase !== 'native') return true;
+      enqueue(async function () {
+        requireNative();
+        var snapshot = serializeResponse.result.documentSnapshotId, geometry = prepared.frames[frame].geometryHandle;
+        var metadata = { documentSnapshotId: snapshot, documentId: identity.documentId,
+          contentRevision: identity.contentRevision, contextId: 'scene-root', frame: frame,
+          quality: 'final', outputSpec: output, geometryHandle: geometry };
+        var receipt = await ports.previewHost({ apiVersion: 2, instanceId: identity.instanceId,
+          documentId: identity.documentId, contentRevision: identity.contentRevision,
+          documentSnapshotId: snapshot, contextId: 'scene-root', frame: frame,
+          quality: 'final', outputSpec: output, geometryHandle: geometry });
+        ports.preview.register(metadata, { workId: receipt.workId,
+          viewGeneration: receipt.viewGeneration });
+        ports.preview.receive(receipt);
+      }).catch(function () { phase = 'indeterminate'; });
+      return true;
+    }
+    function exportPng(destination, frames, onProgress) {
+      return enqueue(async function () {
+        requireNative(); var current = copyIdentity(), outputHandle = id('n20-output');
+        await ports.bindOutput({ apiVersion: 2, instanceId: current.instanceId,
+          documentId: current.documentId, expectedRevision: current.contentRevision,
+          outputHandle: outputHandle, destination: destination });
+        var snapshotRequest = request('query.document.snapshot.acquire', { atRevision: current.contentRevision });
+        var snapshotResponse = successful(await application.dispatch(snapshotRequest), 'native snapshot');
+        var selected = frames.map(function (frame) { return prepared.frames[frame]; });
+        var begin = ports.exporter.begin(current, snapshotResponse, id('n20-export'), outputHandle, selected);
+        var observed = ports.exporter.observe(begin, successful(await application.dispatch(begin), 'native export begin'));
+        while (observed.receipt.status === 'running') {
+          if (onProgress) onProgress(Math.round(observed.receipt.progress * selected.length), selected.length);
+          await ports.sleep(10);
+          var status = ports.exporter.status(current, id('n20-export-status'), observed.receipt.jobId);
+          observed = ports.exporter.observe(status, successful(await application.dispatch(status), 'native export status'));
+        }
+        if (observed.receipt.status !== 'succeeded') throw new Error('native export did not succeed');
+        if (onProgress) onProgress(selected.length, selected.length); return observed.receipt;
+      });
+    }
+    function legacyIntent(kind, holder, values) {
+      if (phase === 'legacy') return null; if (phase !== 'native') return false;
+      if (kind === 'set' && prepared.opacityMode === 'static') setOpacity(holder.layerUid, values[0]).catch(function () {});
+      else requestRelease({ kind: 'opacity-' + kind, documentId: identity.documentId,
+        generation: generation }).catch(function () {});
+      return false;
+    }
+    function v1(requestValue) {
+      if (phase === 'legacy') return null;
+      requestValue = requestValue || {};
+      var envelope = identity || { instanceId: requestValue.instanceId || '',
+        documentId: requestValue.documentId || '', contentRevision: 0 };
+      function response(ok, value) { var out = { apiVersion: 1, requestId: requestValue.requestId || '',
+        instanceId: envelope.instanceId, documentId: envelope.documentId, revision: envelope.contentRevision, ok: ok };
+        out[ok ? 'result' : 'error'] = value; return out; }
+      function unavailable(error) { return response(false, { code: 'unavailable',
+        message: error && error.message || 'Native authority does not admit this operation.' }); }
+      if (phase !== 'native') return unavailable(new Error('Native opacity ownership is not dispatchable.'));
+      var write = ['property.set', 'property.key.set', 'property.key.remove', 'property.animation.set', 'history.undo', 'history.redo'].indexOf(requestValue.operation) >= 0;
+      if (requestValue.instanceId && requestValue.instanceId !== identity.instanceId ||
+          requestValue.documentId && requestValue.documentId !== identity.documentId ||
+          write && requestValue.expectedRevision !== identity.contentRevision) {
+        return response(false, { code: 'stale_revision', message: 'Native identity or revision is stale.' });
+      }
+      var p = requestValue.payload || {}, frame = p.frame == null ? ports.currentFrame() : p.frame;
+      if (requestValue.operation === 'property.get') return response(true, { layerId: p.layerId, property: 'opacity', value: valueAtFrame(p.layerId, frame)[0] });
+      if (requestValue.operation === 'snapshot') return response(true, { layers: [{ id: prepared.layerUid,
+        name: 'R08 rectangle', opacity: valueAtFrame(prepared.layerUid, frame)[0] }], frame: frame, totalFrames: 21 });
+      if (requestValue.operation === 'property.set') return setOpacity(p.layerId, p.value, requestValue.requestId).then(function () {
+        return response(true, { layerId: p.layerId, property: 'opacity', value: valueAtFrame(p.layerId, frame)[0] }); }, unavailable);
+      if (requestValue.operation === 'history.undo' || requestValue.operation === 'history.redo') {
+        return history(requestValue.operation.slice(8), requestValue.requestId).then(function (result) {
+          return response(true, { applied: result.result.applied }); }, unavailable);
+      }
+      if (write || requestValue.operation === 'start' || requestValue.operation === 'diagnostics.replay') { requestRelease({ kind: 'mcp-' + requestValue.operation,
+        documentId: identity.documentId, generation: generation }).catch(function () {});
+        return response(false, { code: 'unavailable', message: 'Native authority must release before this edit.' }); }
+      return requestValue.operation === 'capabilities' || requestValue.operation === 'diagnostics.trace' ? null : unavailable();
+    }
+    return Object.freeze({ activate: activate, release: release, requestRelease: requestRelease,
+      getNativeIdentity: getNativeIdentity, isActive: function () { return phase === 'native'; },
+      blocksLegacy: function () { return phase !== 'legacy'; }, status: function () { return phase; },
+      identity: copyIdentity, valueAtFrame: valueAtFrame, projectSelection: projectSelection,
+      setOpacity: setOpacity, history: history, renderPreview: renderPreview, exportPng: exportPng,
+      legacyIntent: legacyIntent, handleV1: v1, persistenceJSON: function () { return mutationCount ? null : persistence; },
+      flush: function () { return pending; }, prepared: function () { return prepared; } });
+  }
+  return { create: create, createNative: createNative };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = NemoOpacityApplicationCore;

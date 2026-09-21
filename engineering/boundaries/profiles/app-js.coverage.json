@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the staged N17 native opacity editor/selection intent adapters, the staged N18 native opacity preview/export consumers, and the dormant N19C native edit guard. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, and the active N19C native edit guard. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -224,73 +224,68 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2460,
-          "scriptOrdinal": 139
+          "line": 2497,
+          "scriptOrdinal": 158
         }
       ]
     },
     {
       "path": "src/js/adapters/native-application.js",
       "moduleId": "app.native.application.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/adapters/native-application.js",
-          "line": 1,
-          "role": "N15 pure injected v2 transport/validation adapter; no bootstrap or production host binding before N16/N20"
+          "path": "src/index.html",
+          "line": 2490,
+          "scriptOrdinal": 151
         }
       ]
     },
     {
       "path": "src/js/adapters/native-opacity-editor.js",
       "moduleId": "app.native.opacity.editor.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/adapters/native-opacity-editor.js",
-          "line": 1,
-          "role": "N17 pure static-opacity v2 intent projector; no dispatch, legacy-global access, bootstrap, or authority activation before N20"
+          "path": "src/index.html",
+          "line": 2491,
+          "scriptOrdinal": 152
         }
       ]
     },
     {
       "path": "src/js/adapters/native-opacity-export.js",
       "moduleId": "app.native.opacity.export.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/adapters/native-opacity-export.js",
-          "line": 1,
-          "role": "N18 dormant pinned-export request and receipt consumer over opaque handles; no dispatch, mutable UI reread, pixel payload, bootstrap, or authority activation before N20"
+          "path": "src/index.html",
+          "line": 2494,
+          "scriptOrdinal": 155
         }
       ]
     },
     {
       "path": "src/js/adapters/native-opacity-preview.js",
       "moduleId": "app.native.opacity.preview.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/adapters/native-opacity-preview.js",
-          "line": 1,
-          "role": "N18 dormant immutable preview metadata and viewport-receipt consumer; no native pixel attestation, bootstrap, host discovery, or authority activation before N20"
+          "path": "src/index.html",
+          "line": 2493,
+          "scriptOrdinal": 154
         }
       ]
     },
     {
       "path": "src/js/adapters/native-opacity-selection.js",
       "moduleId": "app.native.opacity.selection.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/adapters/native-opacity-selection.js",
-          "line": 1,
-          "role": "N17 read-only stable-ID projection of already evaluated native opacity; no bootstrap, writable mirror, or authority activation before N20"
+          "path": "src/index.html",
+          "line": 2492,
+          "scriptOrdinal": 153
         }
       ]
     },
@@ -418,13 +413,12 @@
     {
       "path": "src/js/application/native-edit-guard.js",
       "moduleId": "app.native.edit.guard.application",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
+      "executionClass": "document-classic",
+      "loadSites": [
         {
-          "path": "src/js/application/native-edit-guard.js",
-          "line": 1,
-          "role": "N19C dormant feature-neutral pre-mutation legacy edit guard; N20 alone owns production load-site/controller installation and native activation"
+          "path": "src/index.html",
+          "line": 2495,
+          "scriptOrdinal": 156
         }
       ]
     },
@@ -556,8 +550,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2459,
-          "scriptOrdinal": 138
+          "line": 2496,
+          "scriptOrdinal": 157
         }
       ]
     },

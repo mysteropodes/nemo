@@ -104,6 +104,10 @@
   // renderWithOverlayItem drives the picture until pointerup, exactly the
   // single-writer behavior a live preview during an intercepted drag needs.
   var suspended = false;
+  function nativeOpacityAuthority() {
+    var authority = window.NemoNativeOpacityCutover;
+    return authority && authority.blocksLegacy() ? authority : null;
+  }
 
   // Callers below MUST hand this colorHex8(color) — never color.toCSS(true).
   // Paper.js's toCSS(true) hard-codes alpha=1 into the string it returns
@@ -3921,6 +3925,7 @@
   var lastSceneVersion = -1; // forces the very first tick to build+render regardless
   function tick() {
     if (!enabled || !engine) return;
+    if (nativeOpacityAuthority()) { rafId = requestAnimationFrame(tick); return; }
     if (suspended) { rafId = requestAnimationFrame(tick); return; }
     // A frame skipped here is repainted by the next tick — the dirty check
     // below is state-based, not edge-based, so nothing is lost.
@@ -4217,6 +4222,7 @@
   // paint over the freshly-committed stroke after the drag ends.
   var pendingOverlayItem = null, overlayRafId = 0;
   function renderWithOverlayItem(item) {
+    if (nativeOpacityAuthority()) return;
     pendingOverlayItem = item;
     if (overlayRafId) return;
     overlayRafId = requestAnimationFrame(function () {
@@ -4227,6 +4233,7 @@
     });
   }
   function renderOverlayNow(item) {
+    if (nativeOpacityAuthority()) return;
     if (!engine) return;
     syncViewport();
     var vk = viewportKeyNow();
@@ -4273,6 +4280,8 @@
   // geometry without bumping _sceneVersion, so only the call site knows.
   var viewportRafId = 0;
   function renderNow(viewportOnly) {
+    var nativeOpacity = nativeOpacityAuthority();
+    if (nativeOpacity) { nativeOpacity.renderPreview(state.currentFrame); return; }
     if (!engine) return;
     if (_deferForReadback('now')) return;
     if (viewportOnly) {
@@ -4283,6 +4292,7 @@
       if (viewportRafId) return;
       viewportRafId = requestAnimationFrame(function () {
         viewportRafId = 0;
+        if (nativeOpacityAuthority()) return;
         if (!engine) return;
         syncViewport();
         lastViewportKey = viewportKeyNow();
@@ -4345,6 +4355,8 @@
   // JSON string didn't) — then sync tick()'s own version bookkeeping so
   // it doesn't redundantly rebuild+diff on the very next rAF.
   function renderImageOnly() {
+    var nativeOpacity = nativeOpacityAuthority();
+    if (nativeOpacity) { nativeOpacity.renderPreview(state.currentFrame); return; }
     if (!engine) return;
     if (_deferForReadback('image')) return;
     if (!lastSceneJson) { renderNow(); return; } // nothing built yet — first frame
@@ -4460,6 +4472,7 @@
     return new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
   async function renderFrameToPixelsPNG(frameIdx, scale, alphaBg) {
+    if (nativeOpacityAuthority()) throw new Error('Native opacity export must use the pinned native export consumer');
     var cw = state.canvasW, ch = state.canvasH;
     var size = resizeEngineOffscreenAtScale(cw, ch, scale || 1);
     var pixels = await renderFrameRawPixels(frameIdx, alphaBg);
@@ -4491,7 +4504,10 @@
   // handles/marquee/etc. — those belong to the tool driving the MAIN
   // canvas, not a read-only reference view).
   window.SMEngineBridge = {
-    buildSceneJsonForFrame: function (frame) { return buildSceneJson(true, false, { frame: frame, includeEditorOverlays: false }); },
+    buildSceneJsonForFrame: function (frame) {
+      if (nativeOpacityAuthority()) throw new Error('Native opacity preview cannot use the JavaScript scene evaluator');
+      return buildSceneJson(true, false, { frame: frame, includeEditorOverlays: false });
+    },
     setEnabled: setEnabled,
     isEnabled: function () { return enabled; },
     // Adaptive preview render scale (feedback #60 part 2) — read-only
@@ -4567,6 +4583,7 @@
     // aggregate loadFrame + Paper rebuild + engine render + browser paint,
     // which swamped the signal this change actually moves.
     timeSceneBuild: function (n) {
+      if (nativeOpacityAuthority()) throw new Error('Native opacity diagnostics cannot use the JavaScript scene evaluator');
       n = n || 20;
       var t = performance.now(), bytes = 0;
       for (var i = 0; i < n; i++) bytes = buildSceneJson().length;
@@ -4607,7 +4624,10 @@
     // instead of always native, without duplicating the resize+viewport or
     // render_to_pixels call sites.
     resizeEngineOffscreen: function (w, h) { if (!engine) return false; resizeEngineOffscreen(w, h); return true; },
-    renderFrameRawPixels: function (frameIdx) { if (!engine) return Promise.resolve(null); return renderFrameRawPixels(frameIdx); },
+    renderFrameRawPixels: function (frameIdx) {
+      if (nativeOpacityAuthority()) return Promise.reject(new Error('Native opacity export cannot use JavaScript pixels'));
+      if (!engine) return Promise.resolve(null); return renderFrameRawPixels(frameIdx);
+    },
     // Exposed for image-mesh-bridge.js (2026-08-30): the mesh editor's
     // overlay and hit-testing have to agree, to the pixel, with the rect
     // this file feeds the renderer — including the rotation-aware

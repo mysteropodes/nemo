@@ -2047,6 +2047,12 @@ window.SM={
     saveActiveLayerFrameOrPromote();updateUI();showToast('Flip vertical');
   },
   exportJSON:function(){
+    var nativeOpacity=window.NemoNativeOpacityCutover;
+    if(nativeOpacity&&nativeOpacity.blocksLegacy()){
+      var nativeJSON=nativeOpacity.persistenceJSON();
+      if(typeof nativeJSON!=='string')throw new Error('Native opacity persistence is not safely available');
+      return nativeJSON;
+    }
     // Never exits an open component: the 30s autosave calls this, and the
     // old exitToScene() here silently kicked the user out of the component
     // they were editing every autosave tick. While a component is open,

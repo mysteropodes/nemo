@@ -2485,6 +2485,14 @@
 <script src="js/pen-bridge.js"></script>
 <script src="js/rig-bridge.js"></script>
 <script src="js/tutorial.js"></script>
+<!-- N20 native-opacity consumers stay inert in browsers; the desktop-only
+     bootstrap below composes them through the common application transport. -->
+<script src="js/adapters/native-application.js"></script>
+<script src="js/adapters/native-opacity-editor.js"></script>
+<script src="js/adapters/native-opacity-selection.js"></script>
+<script src="js/adapters/native-opacity-preview.js"></script>
+<script src="js/adapters/native-opacity-export.js"></script>
+<script src="js/application/native-edit-guard.js"></script>
 <script src="js/bootstrap/opacity-application.js"></script>
 <script src="js/adapters/application-mcp.js"></script>
 </body>

@@ -3,10 +3,10 @@
   "apiVersion": 2,
   "id": "native.opacity",
   "version": 1,
-  "status": "staged",
+  "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "N19A publishes bounded native persistence and evaluation reads. N16 owns host discovery and N20 owns authority activation."
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -58,8 +58,8 @@
     "forbidden": ["raw pixels", "binary payload", "canvas", "geometry JSON"]
   },
   "ports": [
-    { "label": "ui", "state": "fixture-only" },
-    { "label": "mcp", "state": "fixture-only" }
+    { "label": "ui", "state": "active" },
+    { "label": "mcp", "state": "active" }
   ],
   "examples": [
     {
