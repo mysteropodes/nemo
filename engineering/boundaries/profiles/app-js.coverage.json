@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the staged N17 native opacity editor/selection intent adapters, and the staged N18 native opacity preview/export consumers. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the staged N17 native opacity editor/selection intent adapters, the staged N18 native opacity preview/export consumers, and the dormant N19C native edit guard. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "86a0c9914223daf038aeb66f56afe286e2640505",
-    "sourceRootTree": "a17dada46d4cc87a91fa4a0e2a8de38cd6407a22",
+    "candidateCommit": "4c68ad0e81024c685791c7c96448ced8c94f0215",
+    "sourceRootTree": "abdc5db0ac61d586e8f90e810b2f629ecbd44a46",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "c2db99474904a431a6b8ba3445cb93132efd0aae",
-      "lastChangedCommit": "86a0c9914223daf038aeb66f56afe286e2640505"
+      "gitTree": "fd89dad3af31ddb975b680abe6589e5730edf184",
+      "lastChangedCommit": "4c68ad0e81024c685791c7c96448ced8c94f0215"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "162a67863687bbef3f549180a3d9ec97432a3783d3f3655d4a45127878c6de73"
+      "value": "b1907eaa6a22c22485daaf9c115888239e39ecddf5cbd124f5823c84c27e76e0"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "40bd45013582e5c70e5e028d806e6e7ac2964395",
-        "sha256": "11f53afc55657b60a14aa5af72fcac324a3c20a80139858e4ef728e5606d731f",
-        "moduleCount": 167,
-        "basedOnCommit": "86a0c9914223daf038aeb66f56afe286e2640505"
+        "gitBlob": "f7aa6ff7108e8db865089a4322265dea138b7465",
+        "sha256": "b79f490f87b02ea0c17c22736df7a8d8be326e61bc9d33b1bdf3ad16b2fbeb32",
+        "moduleCount": 168,
+        "basedOnCommit": "4c68ad0e81024c685791c7c96448ced8c94f0215"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -412,6 +412,19 @@
           "path": "src/index.html",
           "line": 2309,
           "scriptOrdinal": 9
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-edit-guard.js",
+      "moduleId": "app.native.edit.guard.application",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/native-edit-guard.js",
+          "line": 1,
+          "role": "N19C dormant feature-neutral pre-mutation legacy edit guard; N20 alone owns production load-site/controller installation and native activation"
         }
       ]
     },

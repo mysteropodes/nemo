@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "86a0c9914223daf038aeb66f56afe286e2640505",
-  "describe": "v0.7.0-alpha.4-495-g86a0c99-dirty"
+  "head": "4c68ad0e81024c685791c7c96448ced8c94f0215",
+  "describe": "v0.7.0-alpha.4-499-g4c68ad0-dirty"
  },
- "inputsDigest": "b9cb9e19a0cfbb7ecef361018f7a138948f5422cbd6c291ac27dab16fbfb6404",
+ "inputsDigest": "e46e287dcb438feaec8435c6a417c33899a5812dd31a554ed3a47f067fb1d717",
  "states": [
   "inventoried",
   "characterized",
@@ -2209,7 +2209,7 @@
    "capability": "Propagate to all frames",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:224 init()"
+    "src/js/fill-bridge.js:232 init()"
    ],
    "events": [
     "click"
@@ -2237,7 +2237,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 426,
+    "functionsVisited": 432,
     "via": "variable propBtn",
     "references": []
    },
@@ -10493,7 +10493,7 @@
     "functionsVisited": 3,
     "via": "chain",
     "references": [
-     "src/js/eraser-bridge.js:228 onMove()"
+     "src/js/eraser-bridge.js:235 onMove()"
     ]
    },
    "fixtures": [
@@ -10735,7 +10735,7 @@
    "capability": "fillgapclose",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:245 init()"
+    "src/js/fill-bridge.js:253 init()"
    ],
    "events": [
     "change"
@@ -10783,7 +10783,7 @@
    "capability": "fillgapsize",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:251 init()"
+    "src/js/fill-bridge.js:259 init()"
    ],
    "events": [
     "change"
@@ -11478,7 +11478,7 @@
    "capability": "nib angle",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:226 init()"
+    "src/js/fill-bridge.js:234 init()"
    ],
    "events": [
     "change"
@@ -11526,7 +11526,7 @@
    "capability": "nib factor",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:232 init()"
+    "src/js/fill-bridge.js:240 init()"
    ],
    "events": [
     "change"
@@ -13391,7 +13391,7 @@
    "capability": "trimends",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:238 init()"
+    "src/js/fill-bridge.js:246 init()"
    ],
    "events": [
     "change"
@@ -13432,7 +13432,7 @@
    "capability": "trimends max",
    "area": "drawing-selection",
    "handler": [
-    "src/js/fill-bridge.js:240 init()"
+    "src/js/fill-bridge.js:248 init()"
    ],
    "events": [
     "change"
