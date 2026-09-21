@@ -1849,6 +1849,30 @@
       ]
     },
     {
+      "id": "app.native.opacity.editor.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-editor.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-opacity-editor.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.selection.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-selection.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-opacity-selection.js"
+      ]
+    },
+    {
       "id": "app.native.viewport.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
