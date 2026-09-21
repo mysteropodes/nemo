@@ -353,6 +353,7 @@ pub(crate) async fn nemo_native_release(
         }
         ReleaseAdmission::Execute { generation } => generation,
     };
+    state.invalidate_native_subscriber(&app);
     let scheduled_native = native.clone();
     let fallback_native = native;
     let scheduled_request = request.clone();

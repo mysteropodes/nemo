@@ -181,6 +181,8 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N19F registers private revision synchronization under ordinary MCP limits without a baseline waiver', [
+    'src-tauri/src/native_revision_sync.rs', 'src-tauri/src/native_revision_sync_tests.rs']],
   ['N19B registers terminal native release lifecycle sources without exclusions or a frozen-baseline waiver', [
     'native-engine/src/export_job_lifecycle.rs', 'native-engine/tests/export_job_lifecycle.rs',
     'src-tauri/src/native_application_release.rs', 'src-tauri/src/native_application_release_tests.rs']],

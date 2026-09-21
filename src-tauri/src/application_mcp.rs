@@ -1,13 +1,11 @@
 //! Native transport port for the single application command authority in the webview.
 #[cfg(test)]
 use crate::native_dispatch::ReleaseTombstone;
-use crate::native_dispatch::{spawn_export_pump, NativeAuthority, NativeDispatch, NativeState};
+use crate::native_dispatch::{NativeAuthority, NativeDispatch, NativeState};
 use native_engine::{
     application::{ExportResourceResolver, NativeApplication},
-    commands::OpacityRequest,
     document::OpacityDocument,
     export_job::{ExportCompositor, JobReceipt, StagedArtifactPort},
-    protocol::OP_JOB_EXPORT_PNG_BEGIN,
 };
 use nemo_mcp::{
     contract::{
@@ -36,11 +34,18 @@ use tokio::{
 
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>;
 
+#[path = "native_revision_sync.rs"]
+mod revision_sync;
+#[cfg(test)]
+use revision_sync::dispatch_native;
+use revision_sync::{RevisionControl, RevisionSync};
+
 pub struct ApplicationMcp {
     instance_id: String,
     started: AtomicBool,
     pending: Pending,
     native: NativeState,
+    revisions: RevisionSync,
 }
 
 pub(crate) struct NativeInstallReservation {
@@ -70,6 +75,7 @@ impl Default for ApplicationMcp {
             started: AtomicBool::new(false),
             pending: Arc::new(Mutex::new(HashMap::new())),
             native: Arc::new(Mutex::new(NativeAuthority::default())),
+            revisions: RevisionSync::default(),
         }
     }
 }
@@ -85,6 +91,7 @@ impl ApplicationMcp {
             .lock()
             .map_err(|_| "native application lock unavailable")?;
         let generation = native.reserve_install()?;
+        self.revisions.invalidate();
         drop(native);
         Ok(NativeInstallReservation {
             native: Arc::clone(&self.native),
@@ -144,7 +151,19 @@ impl ApplicationMcp {
         &self,
         request: NativeApplicationRequest,
     ) -> Result<NativeApplicationResponse, String> {
-        dispatch_native(&self.instance_id, &self.native, request)
+        self.revisions
+            .dispatch(&self.instance_id, &self.native, request, false)
+            .map(|delivery| delivery.response)
+    }
+
+    pub(crate) fn invalidate_native_subscriber(&self, app: &tauri::AppHandle) {
+        if let Some(subscription_id) = self.revisions.invalidate() {
+            let _ = app.emit_to(
+                "main",
+                "nemo-native-revision-disconnected",
+                serde_json::json!({"subscriptionId": subscription_id}),
+            );
+        }
     }
 
     #[cfg(test)]
@@ -200,6 +219,7 @@ pub async fn nemo_mcp_ready(
         state.instance_id.clone(),
         state.pending.clone(),
         state.native.clone(),
+        state.revisions.clone(),
     )
     .await;
     if result.is_err() {
@@ -253,6 +273,16 @@ pub fn nemo_native_dispatch(
     state.dispatch_native(request)
 }
 
+#[tauri::command]
+pub fn nemo_native_revision_sync(
+    window: tauri::Window,
+    state: tauri::State<ApplicationMcp>,
+    request: RevisionControl,
+) -> Result<serde_json::Value, String> {
+    require_main(&window)?;
+    state.revisions.control(&state.native, request)
+}
+
 fn native_status(
     instance_id: &str,
     native: &NativeState,
@@ -295,59 +325,6 @@ fn native_status(
     })
 }
 
-fn dispatch_native(
-    instance_id: &str,
-    native: &NativeState,
-    request: NativeApplicationRequest,
-) -> Result<NativeApplicationResponse, String> {
-    request.validate().map_err(|error| error.to_string())?;
-    let mut authority = native
-        .lock()
-        .map_err(|_| "native application lock unavailable")?;
-    let generation = match authority.active_generation() {
-        Ok(generation) => generation,
-        Err(_) => {
-            return Ok(NativeApplicationResponse {
-                api_version: NATIVE_API_VERSION,
-                request_id: request.request_id,
-                instance_id: instance_id.to_owned(),
-                document_id: request.document_id,
-                content_revision: 0,
-                ok: false,
-                result: None,
-                error: Some(NativeApplicationError {
-                    code: "unavailable".into(),
-                    message: authority.unavailable_reason().into(),
-                    details: None,
-                }),
-            });
-        }
-    };
-    let application = authority.active_mut(generation)?;
-    let operation = request.operation.clone();
-    let native_request: OpacityRequest =
-        serde_json::from_value(serde_json::to_value(&request).map_err(|error| error.to_string())?)
-            .map_err(|error| error.to_string())?;
-    let response: NativeApplicationResponse = serde_json::from_value(
-        serde_json::to_value(application.dispatch(native_request))
-            .map_err(|error| error.to_string())?,
-    )
-    .map_err(|error| error.to_string())?;
-    drop(authority);
-    if operation == OP_JOB_EXPORT_PNG_BEGIN {
-        if let Some(job_id) = response
-            .result
-            .as_ref()
-            .filter(|_| response.ok)
-            .and_then(|result| result.get("jobId"))
-            .and_then(serde_json::Value::as_str)
-        {
-            spawn_export_pump(Arc::clone(native), generation, job_id.to_owned());
-        }
-    }
-    Ok(response)
-}
-
 fn advertise_native(mut response: ApplicationResponse) -> ApplicationResponse {
     if response.ok {
         if let Some(result) = response
@@ -366,6 +343,7 @@ async fn start(
     instance_id: String,
     pending: Pending,
     native: NativeState,
+    revisions: RevisionSync,
 ) -> Result<(), String> {
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
         .await
@@ -389,15 +367,16 @@ async fn start(
             let Ok(permit) = capacity.clone().try_acquire_owned() else {
                 continue;
             };
-            let (app, endpoint, pending, native) = (
+            let (app, endpoint, pending, native, revisions) = (
                 app.clone(),
                 endpoint.clone(),
                 pending.clone(),
                 native.clone(),
+                revisions.clone(),
             );
             tauri::async_runtime::spawn(async move {
                 let _permit = permit;
-                let _ = serve_connection(app, stream, endpoint, pending, native).await;
+                let _ = serve_connection(app, stream, endpoint, pending, native, revisions).await;
             });
         }
     });
@@ -410,6 +389,7 @@ async fn serve_connection(
     endpoint: Endpoint,
     pending: Pending,
     native: NativeState,
+    revisions: RevisionSync,
 ) -> Result<(), String> {
     let message: wire::AuthenticatedWireRequest =
         tokio::time::timeout(Duration::from_secs(5), wire::read_json(&mut stream))
@@ -429,10 +409,23 @@ async fn serve_connection(
             serve_legacy(app, stream, endpoint, pending, message).await
         }
         wire::AuthenticatedWireRequest::Native(message) => {
-            let response = dispatch_native(&endpoint.instance_id, &native, message.native_request)?;
-            wire::write_json(&mut stream, &response)
-                .await
-                .map_err(|error| error.to_string())
+            let window = app
+                .get_webview_window("main")
+                .ok_or("application window unavailable")?;
+            revision_sync::serve_native(
+                &mut stream,
+                &endpoint.instance_id,
+                &native,
+                &revisions,
+                message.native_request,
+                |event| {
+                    window
+                        .emit("nemo-native-revision", event)
+                        .map_err(|error| error.to_string())
+                },
+                Duration::from_secs(5),
+            )
+            .await
         }
         wire::AuthenticatedWireRequest::NativeStatus(message) => {
             let response = native_status(&endpoint.instance_id, &native, message.native_status)?;

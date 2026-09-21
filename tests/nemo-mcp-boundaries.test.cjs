@@ -21,6 +21,8 @@ test('all MCP transport and desktop-host Rust modules have actual size enforceme
     'nemo-mcp/build.rs',
     'src-tauri/src/application_mcp.rs',
     'src-tauri/src/application_mcp_tests.rs',
+    'src-tauri/src/native_revision_sync.rs',
+    'src-tauri/src/native_revision_sync_tests.rs',
   ].sort();
   assert.deepEqual(declared, discovered);
   assert.deepEqual(rustProfile.exceptions, []);
