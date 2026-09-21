@@ -1,5 +1,7 @@
 //! Native transport port for the single application command authority in the webview.
-use crate::native_dispatch::{spawn_export_pump, NativeDispatch, NativeState};
+#[cfg(test)]
+use crate::native_dispatch::ReleaseTombstone;
+use crate::native_dispatch::{spawn_export_pump, NativeAuthority, NativeDispatch, NativeState};
 use native_engine::{
     application::{ExportResourceResolver, NativeApplication},
     commands::OpacityRequest,
@@ -37,18 +39,27 @@ type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>
 pub struct ApplicationMcp {
     instance_id: String,
     started: AtomicBool,
-    native_installing: AtomicBool,
     pending: Pending,
     native: NativeState,
 }
 
-pub(crate) struct NativeInstallReservation<'a> {
-    installing: &'a AtomicBool,
+pub(crate) struct NativeInstallReservation {
+    native: NativeState,
+    generation: u64,
 }
 
-impl Drop for NativeInstallReservation<'_> {
+impl NativeInstallReservation {
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+
+impl Drop for NativeInstallReservation {
     fn drop(&mut self) {
-        self.installing.store(false, Ordering::Release);
+        let Ok(mut native) = self.native.lock() else {
+            return;
+        };
+        native.rollback_install(self.generation);
     }
 }
 
@@ -57,9 +68,8 @@ impl Default for ApplicationMcp {
         Self {
             instance_id: uuid::Uuid::new_v4().to_string(),
             started: AtomicBool::new(false),
-            native_installing: AtomicBool::new(false),
             pending: Arc::new(Mutex::new(HashMap::new())),
-            native: Arc::new(Mutex::new(None)),
+            native: Arc::new(Mutex::new(NativeAuthority::default())),
         }
     }
 }
@@ -69,24 +79,17 @@ impl ApplicationMcp {
         &self.instance_id
     }
 
-    pub(crate) fn reserve_native_install(&self) -> Result<NativeInstallReservation<'_>, String> {
-        if self.native_installing.swap(true, Ordering::AcqRel) {
-            return Err("native application bootstrap is already in progress".into());
-        }
-        let reservation = NativeInstallReservation {
-            installing: &self.native_installing,
-        };
-        if self
+    pub(crate) fn reserve_native_install(&self) -> Result<NativeInstallReservation, String> {
+        let mut native = self
             .native
             .lock()
-            .map_err(|_| "native application lock unavailable")?
-            .is_some()
-        {
-            return Err(
-                "native application is already installed; replace its document explicitly".into(),
-            );
-        }
-        Ok(reservation)
+            .map_err(|_| "native application lock unavailable")?;
+        let generation = native.reserve_install()?;
+        drop(native);
+        Ok(NativeInstallReservation {
+            native: Arc::clone(&self.native),
+            generation,
+        })
     }
 
     pub(crate) fn native_state(&self) -> NativeState {
@@ -95,6 +98,7 @@ impl ApplicationMcp {
 
     pub(crate) fn install_dispatch(
         &self,
+        generation: u64,
         application: Box<dyn NativeDispatch>,
     ) -> Result<(), String> {
         if application.instance_id() != self.instance_id {
@@ -104,13 +108,7 @@ impl ApplicationMcp {
             .native
             .lock()
             .map_err(|_| "native application lock unavailable")?;
-        if native.is_some() {
-            return Err(
-                "native application is already installed; replace its document explicitly".into(),
-            );
-        }
-        *native = Some(application);
-        Ok(())
+        native.install(generation, application)
     }
 
     pub(crate) fn install_native<P, C, R>(
@@ -122,19 +120,20 @@ impl ApplicationMcp {
         C: ExportCompositor + Send + 'static,
         R: ExportResourceResolver + Send + 'static,
     {
-        self.install_dispatch(Box::new(application))
+        let reservation = self.reserve_native_install()?;
+        self.install_dispatch(reservation.generation(), Box::new(application))
     }
 
     pub(crate) fn replace_native_document(
         &self,
         document: OpacityDocument,
     ) -> Result<Vec<JobReceipt>, String> {
-        self.native
+        let mut native = self
+            .native
             .lock()
-            .map_err(|_| "native application lock unavailable")?
-            .as_mut()
-            .ok_or_else(|| "native application is unavailable".to_string())?
-            .replace_document(document)
+            .map_err(|_| "native application lock unavailable")?;
+        let generation = native.active_generation()?;
+        native.active_mut(generation)?.replace_document(document)
     }
 
     fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
@@ -146,6 +145,20 @@ impl ApplicationMcp {
         request: NativeApplicationRequest,
     ) -> Result<NativeApplicationResponse, String> {
         dispatch_native(&self.instance_id, &self.native, request)
+    }
+
+    #[cfg(test)]
+    fn retire_native_for_test(&self, receipt: serde_json::Value) {
+        let mut authority = self.native.lock().unwrap();
+        let generation = authority.next_generation().unwrap();
+        authority.finish_release(ReleaseTombstone {
+            generation,
+            reentry_used: false,
+            request_id: "release-shared".into(),
+            fingerprint: vec![1, 2, 3],
+            receipt,
+            succeeded: true,
+        });
     }
 }
 
@@ -247,10 +260,10 @@ fn native_status(
     request: NativeStatusRequest,
 ) -> Result<NativeHostStatus, String> {
     request.validate().map_err(|error| error.to_string())?;
-    let application = native
+    let authority = native
         .lock()
         .map_err(|_| "native application lock unavailable")?;
-    let Some(application) = application.as_ref() else {
+    let Some((_, application)) = authority.active() else {
         return Ok(NativeHostStatus {
             api_version: NATIVE_API_VERSION,
             request_id: request.request_id,
@@ -258,7 +271,7 @@ fn native_status(
             available: false,
             document_id: None,
             content_revision: None,
-            reason: Some("native application is staged but not active".into()),
+            reason: Some(authority.unavailable_reason().into()),
         });
     };
     if request.instance_id != instance_id || application.instance_id() != instance_id {
@@ -289,25 +302,29 @@ fn dispatch_native(
     request: NativeApplicationRequest,
 ) -> Result<NativeApplicationResponse, String> {
     request.validate().map_err(|error| error.to_string())?;
-    let mut guard = native
+    let mut authority = native
         .lock()
         .map_err(|_| "native application lock unavailable")?;
-    let Some(application) = guard.as_mut() else {
-        return Ok(NativeApplicationResponse {
-            api_version: NATIVE_API_VERSION,
-            request_id: request.request_id,
-            instance_id: instance_id.to_owned(),
-            document_id: request.document_id,
-            content_revision: 0,
-            ok: false,
-            result: None,
-            error: Some(NativeApplicationError {
-                code: "unavailable".into(),
-                message: "native application is staged but not active".into(),
-                details: None,
-            }),
-        });
+    let generation = match authority.active_generation() {
+        Ok(generation) => generation,
+        Err(_) => {
+            return Ok(NativeApplicationResponse {
+                api_version: NATIVE_API_VERSION,
+                request_id: request.request_id,
+                instance_id: instance_id.to_owned(),
+                document_id: request.document_id,
+                content_revision: 0,
+                ok: false,
+                result: None,
+                error: Some(NativeApplicationError {
+                    code: "unavailable".into(),
+                    message: authority.unavailable_reason().into(),
+                    details: None,
+                }),
+            });
+        }
     };
+    let application = authority.active_mut(generation)?;
     let operation = request.operation.clone();
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(&request).map_err(|error| error.to_string())?)
@@ -317,7 +334,7 @@ fn dispatch_native(
             .map_err(|error| error.to_string())?,
     )
     .map_err(|error| error.to_string())?;
-    drop(guard);
+    drop(authority);
     if operation == OP_JOB_EXPORT_PNG_BEGIN {
         if let Some(job_id) = response
             .result
@@ -326,7 +343,7 @@ fn dispatch_native(
             .and_then(|result| result.get("jobId"))
             .and_then(serde_json::Value::as_str)
         {
-            spawn_export_pump(Arc::clone(native), job_id.to_owned());
+            spawn_export_pump(Arc::clone(native), generation, job_id.to_owned());
         }
     }
     Ok(response)

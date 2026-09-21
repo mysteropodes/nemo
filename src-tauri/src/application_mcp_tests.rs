@@ -177,3 +177,20 @@ fn bootstrap_reservation_is_exclusive_and_released_by_drop() {
     drop(reservation);
     assert!(state.reserve_native_install().is_ok());
 }
+
+#[test]
+fn ui_and_bundled_mcp_share_the_released_unavailable_state() {
+    let (state, document_id) = fixture();
+    state.retire_native_for_test(json!({"status":"succeeded"}));
+
+    let status = state.native_status(status_request()).unwrap();
+    assert!(!status.available);
+    assert_eq!(
+        status.reason.as_deref(),
+        Some("native application authority was released")
+    );
+    let ui = state.dispatch_native(request(&document_id)).unwrap();
+    let mcp = dispatch_native(&state.instance_id, &state.native, request(&document_id)).unwrap();
+    assert_eq!(ui, mcp);
+    assert_eq!(ui.error.unwrap().code, "unavailable");
+}

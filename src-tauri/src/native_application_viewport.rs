@@ -23,6 +23,11 @@ pub(crate) struct Presentation {
     pub(crate) status: &'static str,
 }
 
+pub(crate) struct ViewportRelease {
+    pub(crate) work_ids: Vec<WorkId>,
+    pub(crate) status: &'static str,
+}
+
 thread_local! {
     static MAIN_VIEWPORT: RefCell<Option<RetainedViewport>> = const { RefCell::new(None) };
 }
@@ -39,6 +44,29 @@ pub(crate) async fn on_main_thread<T: Send + 'static>(
     receiver
         .await
         .map_err(|_| host_error("unavailable", "native main-thread operation was dropped"))?
+}
+
+/// Release is committed once admitted, so dropping the awaiting caller cannot
+/// prevent the main-thread callback from terminalizing the authority.
+pub(crate) async fn on_main_thread_committed<T: Send + 'static>(
+    app: &tauri::AppHandle,
+    operation: impl FnOnce() -> HostResult<T> + Send + 'static,
+) -> HostResult<T> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        complete_committed_operation(sender, operation);
+    })
+    .map_err(|_| host_error("unavailable", "native main-thread executor unavailable"))?;
+    receiver
+        .await
+        .map_err(|_| host_error("unavailable", "native release callback was dropped"))?
+}
+
+fn complete_committed_operation<T>(
+    sender: tokio::sync::oneshot::Sender<HostResult<T>>,
+    operation: impl FnOnce() -> HostResult<T>,
+) {
+    let _ = sender.send(operation());
 }
 
 fn complete_scheduled_operation<T>(
@@ -159,6 +187,30 @@ pub(crate) fn dispose(instance_id: &str) -> HostResult<Vec<WorkId>> {
     Ok(retained.viewport.dispose())
 }
 
+pub(crate) fn release(instance_id: &str) -> HostResult<ViewportRelease> {
+    let retained = MAIN_VIEWPORT.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        match slot.as_ref() {
+            Some(value) if value.instance_id == instance_id => Ok(slot.take()),
+            Some(_) => Err(host_error(
+                "wrong_instance",
+                "native viewport instance mismatch",
+            )),
+            None => Ok(None),
+        }
+    })?;
+    match retained {
+        Some(mut retained) => Ok(ViewportRelease {
+            work_ids: retained.viewport.dispose(),
+            status: "disposed",
+        }),
+        None => Ok(ViewportRelease {
+            work_ids: Vec::new(),
+            status: "already_absent",
+        }),
+    }
+}
+
 fn with_viewport<T>(
     instance_id: &str,
     operation: impl FnOnce(&mut NativeViewport) -> HostResult<T>,
@@ -214,5 +266,18 @@ mod cancellation_tests {
         });
 
         assert!(!began.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn committed_release_operation_runs_after_waiter_is_cancelled() {
+        let (sender, receiver) = tokio::sync::oneshot::channel::<HostResult<()>>();
+        let began = Arc::new(AtomicBool::new(false));
+        let began_in_operation = Arc::clone(&began);
+        drop(receiver);
+        complete_committed_operation(sender, move || {
+            began_in_operation.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        assert!(began.load(Ordering::SeqCst));
     }
 }

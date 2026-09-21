@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
+pub(crate) const HOST_API_VERSION: u32 = NATIVE_API_VERSION;
 const MAX_PROJECTION_BYTES: usize = 1_048_576;
 const MAX_RESOURCES: usize = 64;
 const MAX_LAYERS_PER_RESOURCE: usize = 256;
@@ -42,6 +43,18 @@ pub(crate) struct NativeReplacementRequest {
     pub(crate) expected_revision: u64,
     pub(crate) projection: Value,
     pub(crate) resources: Vec<GeometryResourceInput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct NativeReleaseRequest {
+    pub(crate) api_version: u32,
+    pub(crate) request_id: String,
+    pub(crate) instance_id: String,
+    pub(crate) document_id: String,
+    pub(crate) expected_revision: u64,
+    #[serde(default)]
+    pub(crate) cancelled_before_dispatch: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,7 +184,7 @@ pub(crate) struct NativeBootstrapReceipt {
     pub(crate) viewport_available: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NativeReplacementReceipt {
     pub(crate) document_id: String,
@@ -181,14 +194,83 @@ pub(crate) struct NativeReplacementReceipt {
     pub(crate) reconciled_exports: Vec<ExportReconciliation>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ExportReconciliation {
-    job_id: String,
-    status: &'static str,
-    cleanup_status: &'static str,
-    external_effect_disposition: &'static str,
-    error_code: Option<String>,
+    pub(crate) job_id: String,
+    pub(crate) status: String,
+    pub(crate) cleanup_status: String,
+    pub(crate) external_effect_disposition: String,
+    pub(crate) error_code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NativeReleaseReceipt {
+    pub(crate) api_version: u32,
+    pub(crate) request_id: String,
+    pub(crate) instance_id: String,
+    pub(crate) document_id: String,
+    pub(crate) content_revision: u64,
+    pub(crate) lifecycle_generation: u64,
+    pub(crate) status: String,
+    pub(crate) retrieved: bool,
+    pub(crate) authority_removal_completed: bool,
+    pub(crate) cancelled_transaction_id: Option<String>,
+    pub(crate) cancelled_transaction: Option<Value>,
+    pub(crate) undo_depth: usize,
+    pub(crate) redo_depth: usize,
+    pub(crate) reconciled_exports: Vec<ExportReconciliation>,
+    pub(crate) cancelled_preview_work_ids: Vec<String>,
+    pub(crate) viewport_status: String,
+    pub(crate) reentry_available: bool,
+    pub(crate) error: Option<NativeApplicationError>,
+}
+
+impl NativeReleaseReceipt {
+    pub(crate) fn indeterminate(
+        request_id: String,
+        identity: (String, String, u64),
+        generation: u64,
+        message: &str,
+    ) -> Self {
+        Self {
+            api_version: HOST_API_VERSION,
+            request_id,
+            instance_id: identity.0,
+            document_id: identity.1,
+            content_revision: identity.2,
+            lifecycle_generation: generation,
+            status: "indeterminate".into(),
+            retrieved: false,
+            authority_removal_completed: true,
+            cancelled_transaction_id: None,
+            cancelled_transaction: None,
+            undo_depth: 0,
+            redo_depth: 0,
+            reconciled_exports: Vec::new(),
+            cancelled_preview_work_ids: Vec::new(),
+            viewport_status: "cleanup_failed".into(),
+            reentry_available: false,
+            error: Some(host_error("cleanup_failed", message)),
+        }
+    }
+
+    pub(crate) fn retained_value(&self) -> Value {
+        serde_json::to_value(self).unwrap_or_else(|_| serde_json::json!({
+            "apiVersion": self.api_version, "requestId": self.request_id,
+            "instanceId": self.instance_id, "documentId": self.document_id,
+            "contentRevision": self.content_revision,
+            "lifecycleGeneration": self.lifecycle_generation, "status": "indeterminate",
+            "retrieved": false, "authorityRemovalCompleted": true,
+            "cancelledTransactionId": self.cancelled_transaction_id,
+            "cancelledTransaction": self.cancelled_transaction,
+            "undoDepth": self.undo_depth, "redoDepth": self.redo_depth,
+            "reconciledExports": [], "cancelledPreviewWorkIds": [],
+            "viewportStatus": "cleanup_failed", "reentryAvailable": false,
+            "error": {"code": "cleanup_failed", "message": "native release receipt serialization failed", "details": null}
+        }))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -361,6 +443,26 @@ pub(crate) fn require_api_instance(version: u32, requested: &str, actual: &str) 
     Ok(())
 }
 
+pub(crate) fn release_fingerprint(request: &NativeReleaseRequest) -> HostResult<Vec<u8>> {
+    if request.api_version != NATIVE_API_VERSION
+        || !bounded_id(&request.request_id)
+        || !bounded_id(&request.instance_id)
+        || !bounded_id(&request.document_id)
+        || request.expected_revision > 9_007_199_254_740_991
+    {
+        return Err(host_error(
+            "invalid_request",
+            "invalid native release request identity",
+        ));
+    }
+    serde_json::to_vec(request).map_err(|_| {
+        host_error(
+            "invalid_request",
+            "native release request is not serializable",
+        )
+    })
+}
+
 pub(crate) fn require_main(window: &tauri::Window) -> HostResult<()> {
     if window.label() == "main" {
         Ok(())
@@ -392,6 +494,17 @@ pub(crate) fn host_error(
     }
 }
 
+pub(crate) fn catch_unwind_message<T>(operation: impl FnOnce() -> T) -> Result<T, String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)).map_err(|payload| {
+        payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("native release cleanup panicked")
+            .to_string()
+    })
+}
+
 pub(crate) fn work_label(work_id: WorkId) -> String {
     format!("native-work-{}", work_id.value())
 }
@@ -404,19 +517,22 @@ pub(crate) fn reconcile_export(receipt: &JobReceipt) -> ExportReconciliation {
             JobStatus::Succeeded => "succeeded",
             JobStatus::Failed => "failed",
             JobStatus::Cancelled => "cancelled",
-        },
+        }
+        .into(),
         cleanup_status: match receipt.cleanup.status {
             CleanupStatus::NotRequired => "not_required",
             CleanupStatus::Pending => "pending",
             CleanupStatus::Complete => "complete",
             CleanupStatus::Failed => "failed",
-        },
+        }
+        .into(),
         external_effect_disposition: match receipt.external_effect_disposition {
             ExternalEffectDisposition::None => "none",
             ExternalEffectDisposition::Contained => "contained",
             ExternalEffectDisposition::Committed => "committed",
             ExternalEffectDisposition::Indeterminate => "indeterminate",
-        },
+        }
+        .into(),
         error_code: receipt.error.as_ref().map(|error| error.code.to_owned()),
     }
 }

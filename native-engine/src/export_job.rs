@@ -3,6 +3,11 @@
 //! This is an internal N14 lifecycle. N15 owns public application dispatch.
 //! N12 currently supplies opaque RGBA8 only; transparent-alpha export is not claimed.
 
+use crate::export_job_lifecycle::{cleanup_allows_release, retry_failed_cleanup, terminalize};
+pub use crate::export_job_lifecycle::{
+    CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
+    ExternalEffectDisposition, JobError, JobReceipt, JobStatus,
+};
 use crate::history::NativeOpacityHistory;
 use crate::png_output;
 pub use crate::png_output::{
@@ -14,93 +19,9 @@ use crate::revision::DocumentSnapshot;
 use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, WorkId,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const WIDTH: u32 = 320;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JobStatus {
-    Running,
-    Succeeded,
-    Failed,
-    Cancelled,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CleanupStatus {
-    NotRequired,
-    Pending,
-    Complete,
-    Failed,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CleanupReceipt {
-    pub status: CleanupStatus,
-    pub error: Option<JobError>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExternalEffectDisposition {
-    None,
-    Contained,
-    Committed,
-    Indeterminate,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JobError {
-    pub code: &'static str,
-    pub message: String,
-    pub details: Option<serde_json::Value>,
-}
-
-impl JobError {
-    fn new(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            details: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct JobReceipt {
-    pub job_id: String,
-    pub status: JobStatus,
-    pub pinned_revision: u64,
-    pub document_snapshot_id: String,
-    pub progress: f64,
-    pub artifact: Option<ExportArtifact>,
-    pub cleanup: CleanupReceipt,
-    pub external_effect_disposition: ExternalEffectDisposition,
-    pub error: Option<JobError>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ExportJobErrorKind {
-    InvalidRequest,
-    ChangedRequestId,
-    Busy,
-    NotFound,
-    WrongDocument,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExportJobError {
-    pub kind: ExportJobErrorKind,
-    pub message: String,
-}
-
-impl ExportJobError {
-    fn new(kind: ExportJobErrorKind, message: impl Into<String>) -> Self {
-        Self {
-            kind,
-            message: message.into(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct PendingFrame {
@@ -138,6 +59,8 @@ pub struct ExportJobManager<P, C> {
     active_job: Option<String>,
     current_document_id: Option<String>,
     next_job_id: u64,
+    #[cfg(test)]
+    fail_release_cancel: bool,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
@@ -151,6 +74,8 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
             active_job: None,
             current_document_id: None,
             next_job_id: 0,
+            #[cfg(test)]
+            fail_release_cancel: false,
         }
     }
 
@@ -435,6 +360,74 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
         &self.port
     }
 
+    #[cfg(test)]
+    pub(crate) fn inject_release_cancel_failure(&mut self, fail: bool) {
+        self.fail_release_cancel = fail;
+    }
+
+    /// Stop every running export and retry any cleanup that was previously
+    /// indeterminate before the enclosing document authority is retired.
+    pub fn reconcile_release(&mut self) -> ExportReleaseReconciliation {
+        let running: Vec<String> = self
+            .jobs
+            .iter()
+            .filter_map(|(id, job)| {
+                (job.receipt.status == JobStatus::Running).then_some(id.clone())
+            })
+            .collect();
+        let mut scheduler_failed = BTreeSet::new();
+        for id in running {
+            let mut scheduler_error = None;
+            if let Some(work) = self.jobs[&id].active_work {
+                #[cfg(test)]
+                let cancel_error = if self.fail_release_cancel {
+                    Some("injected release cancel failure".into())
+                } else {
+                    self.scheduler
+                        .cancel(work)
+                        .err()
+                        .map(|error| error.to_string())
+                };
+                #[cfg(not(test))]
+                let cancel_error = self
+                    .scheduler
+                    .cancel(work)
+                    .err()
+                    .map(|error| error.to_string());
+                if let Some(error) = cancel_error {
+                    scheduler_error = Some(error);
+                } else {
+                    self.jobs.get_mut(&id).unwrap().active_work = None;
+                }
+            }
+            self.cancel_job(&id, "authority_released", "native authority was released");
+            if let Some(message) = scheduler_error {
+                scheduler_failed.insert(id.clone());
+                let receipt = &mut self.jobs.get_mut(&id).unwrap().receipt;
+                receipt.status = JobStatus::Failed;
+                receipt.cleanup = CleanupReceipt {
+                    status: CleanupStatus::Failed,
+                    error: Some(JobError::new("cleanup_failed", message.clone())),
+                };
+                receipt.external_effect_disposition = ExternalEffectDisposition::Indeterminate;
+                receipt.error = Some(JobError::new("cleanup_failed", message));
+            }
+        }
+        for (id, job) in &mut self.jobs {
+            if !scheduler_failed.contains(id) {
+                retry_failed_cleanup(&mut self.port, &mut job.receipt);
+            }
+        }
+        self.active_job = None;
+        let receipts: Vec<JobReceipt> = self.jobs.values().map(|job| job.receipt.clone()).collect();
+        let cleanup_complete = receipts.iter().all(cleanup_allows_release)
+            && self.scheduler.lease_counters().live() == 0;
+        ExportReleaseReconciliation {
+            receipts,
+            cleanup_complete,
+        }
+    }
+
     fn job_running(&self, job_id: &str) -> Result<&JobRecord, ExportJobError> {
         let job = self.jobs.get(job_id).ok_or_else(|| {
             ExportJobError::new(ExportJobErrorKind::NotFound, "export job not found")
@@ -483,29 +476,8 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
     }
 
     fn terminalize(&mut self, job_id: &str, status: JobStatus, error: Option<JobError>) {
-        let cleanup = self.port.cleanup(job_id);
         let job = self.jobs.get_mut(job_id).unwrap();
-        job.receipt.artifact = None;
-        match cleanup {
-            Ok(()) => {
-                job.receipt.status = status;
-                job.receipt.cleanup = CleanupReceipt {
-                    status: CleanupStatus::Complete,
-                    error: None,
-                };
-                job.receipt.external_effect_disposition = ExternalEffectDisposition::None;
-                job.receipt.error = error;
-            }
-            Err(cleanup_error) => {
-                job.receipt.status = JobStatus::Failed;
-                job.receipt.cleanup = CleanupReceipt {
-                    status: CleanupStatus::Failed,
-                    error: Some(JobError::new("cleanup_failed", cleanup_error.clone())),
-                };
-                job.receipt.external_effect_disposition = ExternalEffectDisposition::Indeterminate;
-                job.receipt.error = Some(JobError::new("cleanup_failed", cleanup_error));
-            }
-        }
+        terminalize(&mut self.port, &mut job.receipt, status, error);
         self.active_job = None;
     }
 }
