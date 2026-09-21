@@ -26,6 +26,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 nemo-mcp = { path = "../nemo-mcp" }
+native-engine = { package = "nemo-native-engine", path = "../native-engine", default-features = false, features = ["application", "viewport"] }
 tokio = { version = "1", features = ["net", "time", "sync", "io-util"] }
 uuid = { version = "1", features = ["v4"] }
 tauri = { version = "2", features = ["devtools"] }
@@ -61,3 +62,6 @@ vectorize-core = { path = "../vectorize-core" }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
 block = "0.1"
+raw-window-handle = "0.6.2"
+wgpu = "29.0.4"
+pollster = "0.4"

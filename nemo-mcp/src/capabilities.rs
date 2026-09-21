@@ -6,7 +6,7 @@
 //! `contract.rs`'s payload validation and advertised examples generically.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::OnceLock;
+use std::{collections::BTreeMap, sync::OnceLock};
 
 // Public so the integration tests READ this declaration instead of copying it.
 // Four hand-maintained copies of this list is what made #1310 fail in four
@@ -16,6 +16,13 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/export-job.json"),
     include_str!("../../engineering/application/capabilities/timelapse.json"),
 ];
+
+/// Native v2 declarations are deliberately version-separated from the legacy
+/// catalog above. N16 consumes the feature-owned descriptor but does not add it
+/// to v1 discovery or turn it into another MCP tool.
+pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[include_str!(
+    "../../engineering/application/capabilities-v2/native-opacity.json"
+)];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CapabilityAvailability {
@@ -154,5 +161,81 @@ pub fn catalog() -> &'static CapabilityCatalog {
             })
             .collect();
         CapabilityCatalog { descriptors }
+    })
+}
+
+/// Deterministic, read-only v2 catalog. The original JSON values are retained so
+/// discovery advertises every feature-owned field verbatim; the index exists only
+/// to resolve declared operations without a per-feature switch.
+#[derive(Debug)]
+pub struct NativeCapabilityCatalog {
+    descriptors: Vec<Value>,
+    operations: BTreeMap<String, usize>,
+}
+
+impl NativeCapabilityCatalog {
+    pub fn from_sources(sources: &[&str]) -> Result<Self, String> {
+        let mut descriptors = Vec::with_capacity(sources.len());
+        let mut ids = BTreeMap::<String, usize>::new();
+        let mut operations = BTreeMap::<String, usize>::new();
+        for (index, source) in sources.iter().enumerate() {
+            let descriptor: Value = serde_json::from_str(source)
+                .map_err(|error| format!("native capability source {index}: {error}"))?;
+            let object = descriptor
+                .as_object()
+                .ok_or_else(|| format!("native capability source {index} must be a JSON object"))?;
+            if object.get("schemaVersion").and_then(Value::as_u64) != Some(2)
+                || object.get("apiVersion").and_then(Value::as_u64) != Some(2)
+            {
+                return Err(format!(
+                    "native capability source {index} must declare schemaVersion/apiVersion 2"
+                ));
+            }
+            let id = object
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| format!("native capability source {index} has no id"))?;
+            if ids.insert(id.to_owned(), index).is_some() {
+                return Err(format!("duplicate native capability id {id}"));
+            }
+            let declared = object
+                .get("operations")
+                .and_then(Value::as_array)
+                .filter(|values| !values.is_empty())
+                .ok_or_else(|| format!("native capability {id} has no operations"))?;
+            for operation in declared {
+                let operation = operation
+                    .as_str()
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| format!("native capability {id} has a non-string operation"))?;
+                if operations.insert(operation.to_owned(), index).is_some() {
+                    return Err(format!("duplicate native operation {operation}"));
+                }
+            }
+            descriptors.push(descriptor);
+        }
+        Ok(Self {
+            descriptors,
+            operations,
+        })
+    }
+
+    pub fn descriptors(&self) -> &[Value] {
+        &self.descriptors
+    }
+
+    pub fn capability_for_operation(&self, operation: &str) -> Option<&Value> {
+        self.operations
+            .get(operation)
+            .and_then(|index| self.descriptors.get(*index))
+    }
+}
+
+pub fn native_catalog() -> &'static NativeCapabilityCatalog {
+    static CATALOG: OnceLock<NativeCapabilityCatalog> = OnceLock::new();
+    CATALOG.get_or_init(|| {
+        NativeCapabilityCatalog::from_sources(NATIVE_CAPABILITY_SOURCES)
+            .expect("embedded native capability catalog is valid and unambiguous")
     })
 }

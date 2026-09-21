@@ -64,6 +64,18 @@ async fn compiled_stdio_roundtrip_preserves_identity_and_errors() {
         let discovered = &discover.structured_content.unwrap()["instances"][0];
         assert_eq!(discovered["instanceId"], endpoint.instance_id);
         assert_eq!(discovered["buildId"], "stdio-roundtrip");
+        assert_eq!(discovered["nativeHostStatus"]["apiVersion"], 2);
+        assert_eq!(discovered["nativeHostStatus"]["available"], false);
+        assert_eq!(
+            discovered["nativeHostStatus"]["reason"],
+            "endpoint does not advertise nativeApiVersion 2"
+        );
+        assert!(uuid::Uuid::parse_str(
+            discovered["nativeHostStatus"]["requestId"]
+                .as_str()
+                .unwrap()
+        )
+        .is_ok());
         assert!(!serde_json::to_string(discovered)
             .unwrap()
             .contains(&endpoint.secret));

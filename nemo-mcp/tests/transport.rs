@@ -1,5 +1,8 @@
 use nemo_mcp::{
-    contract::{ApplicationRequest, ApplicationResponse, Operation, MAX_MESSAGE_BYTES},
+    contract::{
+        ApplicationRequest, ApplicationResponse, NativeApplicationError, NativeApplicationRequest,
+        NativeApplicationResponse, Operation, MAX_MESSAGE_BYTES,
+    },
     registry::{read_endpoints, Endpoint, Registration},
     wire,
 };
@@ -16,6 +19,19 @@ fn request() -> ApplicationRequest {
         expected_revision: Some(4),
         operation: Operation::PropertySet,
         payload: json!({"layerId":"layer", "property":"opacity", "value":25}),
+    }
+}
+
+fn native_request() -> NativeApplicationRequest {
+    NativeApplicationRequest {
+        api_version: 2,
+        request_id: "native-1".into(),
+        instance_id: "instance".into(),
+        document_id: "native-document".into(),
+        expected_revision: None,
+        operation: "query.document.opacity".into(),
+        payload: json!({"stableTarget":{"layerUid":"layer"}}),
+        cancelled_before_dispatch: false,
     }
 }
 
@@ -91,6 +107,130 @@ async fn call_preserves_command_and_checks_response_identity() {
         .await
         .is_err());
     server.await.unwrap();
+}
+
+#[test]
+fn legacy_wire_request_bytes_are_unchanged_and_native_variants_are_distinct() {
+    let legacy = wire::WireRequest {
+        secret: "secret".into(),
+        request: request(),
+    };
+    assert_eq!(
+        serde_json::to_string(&legacy).unwrap(),
+        r#"{"secret":"secret","request":{"apiVersion":1,"requestId":"edit-1","instanceId":"instance","documentId":"document","expectedRevision":4,"operation":"property.set","payload":{"layerId":"layer","property":"opacity","value":25}}}"#
+    );
+    let native = wire::NativeWireRequest {
+        secret: "secret".into(),
+        native_request: native_request(),
+    };
+    let encoded = serde_json::to_value(native).unwrap();
+    assert!(encoded.get("nativeRequest").is_some());
+    assert!(encoded.get("request").is_none());
+
+    let mixed = json!({
+        "secret": "secret",
+        "request": request(),
+        "nativeRequest": native_request(),
+    });
+    assert!(
+        serde_json::from_value::<wire::AuthenticatedWireRequest>(mixed).is_err(),
+        "an authenticated envelope must select exactly one protocol"
+    );
+}
+
+#[tokio::test]
+async fn native_call_checks_full_response_identity() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: "instance".into(),
+        port: listener.local_addr().unwrap().port(),
+        secret: "secret".into(),
+        build_id: "candidate".into(),
+    };
+    let server = tokio::spawn(async move {
+        for disposition in [
+            "success",
+            "replaced",
+            "wrong-document-success",
+            "wrong-request",
+        ] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let message: wire::NativeWireRequest = wire::read_json(&mut stream).await.unwrap();
+            assert_eq!(message.secret, "secret");
+            assert_eq!(message.native_request, native_request());
+            let response = NativeApplicationResponse {
+                api_version: 2,
+                request_id: if disposition == "wrong-request" {
+                    "different".into()
+                } else {
+                    message.native_request.request_id
+                },
+                instance_id: "instance".into(),
+                document_id: if matches!(disposition, "replaced" | "wrong-document-success") {
+                    "replacement".into()
+                } else {
+                    "native-document".into()
+                },
+                content_revision: 4,
+                ok: disposition != "replaced",
+                result: (disposition != "replaced")
+                    .then(|| json!({"atRevision":4,"layerUid":"layer","value":25})),
+                error: (disposition == "replaced").then(|| NativeApplicationError {
+                    code: "wrong_document".into(),
+                    message: "document was replaced".into(),
+                    details: Some(json!({"requestedDocumentId":"native-document"})),
+                }),
+            };
+            wire::write_json(&mut stream, &response).await.unwrap();
+        }
+    });
+    let response = wire::call_native(&endpoint, native_request(), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(response.content_revision, 4);
+    let replaced = wire::call_native(&endpoint, native_request(), CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(!replaced.ok);
+    assert_eq!(replaced.document_id, "replacement");
+    assert_eq!(replaced.error.unwrap().code, "wrong_document");
+    assert!(
+        wire::call_native(&endpoint, native_request(), CancellationToken::new())
+            .await
+            .is_err(),
+        "a successful response cannot silently replace document identity"
+    );
+    assert!(
+        wire::call_native(&endpoint, native_request(), CancellationToken::new())
+            .await
+            .is_err()
+    );
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn native_disconnect_is_reported_without_retry_or_replay() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: "instance".into(),
+        port: listener.local_addr().unwrap().port(),
+        secret: "secret".into(),
+        build_id: "candidate".into(),
+    };
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let _: wire::NativeWireRequest = wire::read_json(&mut stream).await.unwrap();
+        drop(stream);
+        tokio::time::timeout(std::time::Duration::from_millis(50), listener.accept())
+            .await
+            .is_err()
+    });
+    assert!(
+        wire::call_native(&endpoint, native_request(), CancellationToken::new())
+            .await
+            .is_err()
+    );
+    assert!(server.await.unwrap(), "native request must not be replayed");
 }
 
 #[tokio::test]

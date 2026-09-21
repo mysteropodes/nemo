@@ -13,6 +13,7 @@ src-tauri/strokemotion.key
 src-tauri/strokemotion.key.pub
 src-tauri/strokemotion_decoded.key
 geometry-wasm/target/
+native-engine/target/
 # src/wasm/ (wasm-pack build output) is intentionally NOT ignored: the app
 # has no build step that regenerates it before packaging (frontendDist just
 # copies src/ verbatim), so it's committed like paper-full.min.js — a

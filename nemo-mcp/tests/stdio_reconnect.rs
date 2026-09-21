@@ -79,8 +79,22 @@ fn discovered(endpoint: &Endpoint, document_id: &str, revision: u64) -> Value {
         "buildId": endpoint.build_id,
         "documentId": document_id,
         "revision": revision,
-        "capabilities": {"buildId": endpoint.build_id}
+        "capabilities": {"buildId": endpoint.build_id},
+        "nativeHostStatus": {"apiVersion": 2, "available": false,
+            "instanceId": endpoint.instance_id,
+            "reason": "endpoint does not advertise nativeApiVersion 2"}
     })
+}
+
+fn normalize_status_request_ids(discovery: &mut Value) {
+    for instance in discovery["instances"].as_array_mut().unwrap() {
+        let request_id = instance["nativeHostStatus"]
+            .as_object_mut()
+            .unwrap()
+            .remove("requestId")
+            .unwrap();
+        assert!(uuid::Uuid::parse_str(request_id.as_str().unwrap()).is_ok());
+    }
 }
 
 fn query(instance_id: &str) -> CallToolRequestParams {
@@ -156,9 +170,15 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
-        let discovery = discovery.structured_content.unwrap();
+        let mut discovery = discovery.structured_content.unwrap();
+        normalize_status_request_ids(&mut discovery);
         assert_eq!(discovery["apiVersion"], 1);
         assert!(discovery["registeredCapabilities"].is_array());
+        assert_eq!(discovery["nativeApiVersion"], 2);
+        assert_eq!(
+            discovery["registeredNativeCapabilities"][0]["id"],
+            "native.opacity"
+        );
         assert_eq!(
             discovery["instances"],
             json!([
@@ -183,7 +203,8 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
-        let discovery = discovery.structured_content.unwrap();
+        let mut discovery = discovery.structured_content.unwrap();
+        normalize_status_request_ids(&mut discovery);
         assert_eq!(discovery["apiVersion"], 1);
         assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(
@@ -196,7 +217,8 @@ async fn executable_rediscovers_replaced_registration_without_restarting() {
         let discovery = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
             .await
             .unwrap();
-        let discovery = discovery.structured_content.unwrap();
+        let mut discovery = discovery.structured_content.unwrap();
+        normalize_status_request_ids(&mut discovery);
         assert_eq!(discovery["apiVersion"], 1);
         assert!(discovery["registeredCapabilities"].is_array());
         assert_eq!(

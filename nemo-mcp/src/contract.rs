@@ -10,6 +10,9 @@ use crate::capability_contract::json_kind;
 
 pub const API_VERSION: u32 = 1;
 pub const MAX_MESSAGE_BYTES: usize = 1_048_576;
+pub const NATIVE_API_VERSION: u32 = 2;
+pub const NATIVE_MAX_MESSAGE_BYTES: usize = 4096;
+pub(crate) const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -312,6 +315,180 @@ impl ApplicationRequest {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeApplicationRequest {
+    pub api_version: u32,
+    pub request_id: String,
+    pub instance_id: String,
+    pub document_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_revision: Option<u64>,
+    pub operation: String,
+    pub payload: Value,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cancelled_before_dispatch: bool,
+}
+
+impl NativeApplicationRequest {
+    pub fn validate(&self) -> Result<(), RequestError> {
+        if self.api_version != NATIVE_API_VERSION {
+            return Err(RequestError::InvalidRequest(
+                "native request requires apiVersion 2".into(),
+            ));
+        }
+        for (label, value) in [
+            ("requestId", self.request_id.as_str()),
+            ("instanceId", self.instance_id.as_str()),
+            ("documentId", self.document_id.as_str()),
+            ("operation", self.operation.as_str()),
+        ] {
+            if !bounded_identifier(value) {
+                return Err(RequestError::InvalidRequest(format!(
+                    "{label} must match ^[A-Za-z0-9][A-Za-z0-9._:/-]{{0,127}}$"
+                )));
+            }
+        }
+        if self
+            .expected_revision
+            .is_some_and(|value| value > MAX_SAFE_REVISION)
+        {
+            return Err(RequestError::InvalidRequest(
+                "expectedRevision exceeds the transport maximum".into(),
+            ));
+        }
+        if !self.payload.is_object() {
+            return Err(RequestError::MalformedPayload(
+                "native payload must be a JSON object".into(),
+            ));
+        }
+        if capabilities::native_catalog()
+            .capability_for_operation(&self.operation)
+            .is_none()
+        {
+            return Err(RequestError::InvalidRequest(format!(
+                "operation {} is not declared by a registered native capability",
+                self.operation
+            )));
+        }
+        if !matches!(
+            serde_json::to_vec(self).map(|bytes| bytes.len()),
+            Ok(0..=NATIVE_MAX_MESSAGE_BYTES)
+        ) {
+            return Err(RequestError::InvalidRequest(
+                "native requests are limited to 4096 encoded bytes".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeApplicationResponse {
+    pub api_version: u32,
+    pub request_id: String,
+    pub instance_id: String,
+    pub document_id: String,
+    pub content_revision: u64,
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<NativeApplicationError>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NativeApplicationError {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeStatusRequest {
+    pub api_version: u32,
+    pub request_id: String,
+    pub instance_id: String,
+}
+
+impl NativeStatusRequest {
+    pub fn validate(&self) -> Result<(), RequestError> {
+        if self.api_version != NATIVE_API_VERSION
+            || !bounded_identifier(&self.request_id)
+            || !bounded_identifier(&self.instance_id)
+        {
+            return Err(RequestError::InvalidRequest(
+                "invalid native status request identity".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NativeHostStatus {
+    pub api_version: u32,
+    pub request_id: String,
+    pub instance_id: String,
+    pub available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_revision: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl NativeHostStatus {
+    pub fn unavailable(request: &NativeStatusRequest, reason: impl Into<String>) -> Self {
+        Self {
+            api_version: NATIVE_API_VERSION,
+            request_id: request.request_id.clone(),
+            instance_id: request.instance_id.clone(),
+            available: false,
+            document_id: None,
+            content_revision: None,
+            reason: Some(reason.into()),
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), RequestError> {
+        if self.api_version != NATIVE_API_VERSION
+            || !bounded_identifier(&self.request_id)
+            || !bounded_identifier(&self.instance_id)
+            || self
+                .document_id
+                .as_deref()
+                .is_some_and(|id| !bounded_identifier(id))
+            || self
+                .content_revision
+                .is_some_and(|value| value > MAX_SAFE_REVISION)
+            || (self.available && (self.document_id.is_none() || self.content_revision.is_none()))
+            || (!self.available && self.reason.as_deref().is_none_or(str::is_empty))
+        {
+            return Err(RequestError::InvalidRequest(
+                "invalid native host status".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn bounded_identifier(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 128
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]

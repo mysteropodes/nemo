@@ -14,9 +14,14 @@ function rustFiles(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap(entry =>
     entry.isDirectory() ? rustFiles(`${dir}/${entry.name}`) : entry.name.endsWith('.rs') ? [`${dir}/${entry.name}`] : []);
 }
-test('all production MCP Rust modules have actual size enforcement without legacy waivers', () => {
+test('all MCP transport and desktop-host Rust modules have actual size enforcement without legacy waivers', () => {
   const declared = rustProfile.modules.flatMap(module => module.files.map(file => `${module.dir}/${file}`)).sort();
-  const discovered = [...rustFiles('nemo-mcp/src'), 'nemo-mcp/build.rs', 'src-tauri/src/application_mcp.rs'].sort();
+  const discovered = [
+    ...rustFiles('nemo-mcp/src'),
+    'nemo-mcp/build.rs',
+    'src-tauri/src/application_mcp.rs',
+    'src-tauri/src/application_mcp_tests.rs',
+  ].sort();
   assert.deepEqual(declared, discovered);
   assert.deepEqual(rustProfile.exceptions, []);
   const result = checkSourceSizes(rustProfile, { root });
@@ -49,5 +54,8 @@ test('MCP transport crate cannot acquire the desktop shell as a dependency', () 
   const transport = metadata.packages.find(pkg => pkg.name === 'nemo-mcp');
   assert.ok(transport);
   // Cargo resolves renamed dependencies and target-specific declarations.
-  assert.deepEqual(transport.dependencies.filter(dep => ['tauri', 'nemo'].includes(dep.name)), []);
+  assert.deepEqual(
+    transport.dependencies.filter(dep => ['tauri', 'nemo', 'nemo-native-engine'].includes(dep.name)),
+    [],
+  );
 });

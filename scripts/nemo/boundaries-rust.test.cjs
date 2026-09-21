@@ -228,7 +228,7 @@ test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the thre
   assert.equal(/^\[features\]/m.test(fs.readFileSync(path.join(ROOT, 'geometry-wasm/Cargo.toml'), 'utf8')), false);
 });
 
-test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, external-crate port pins application_mcp.rs', () => {
+test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and native-engine ports pinned', () => {
   const policy = read('nemo-desktop.edges.json');
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root: ROOT });
   assert.equal(r.ok, true, JSON.stringify(r.violations));
@@ -237,16 +237,55 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, external-
   assert.deepEqual(r.exceptionsApplied, []);
   assert.deepEqual(r.exportedPort, []);
   assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
+    'rust.desktop.mcp.adapter.tests->rust.desktop.mcp.adapter',
     'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
-    'rust.desktop.shell->rust.desktop.tasks', 'rust.desktop.tasks.tests->rust.desktop.tasks']);
-  assert.deepEqual(r.unanalyzedModules.slice().sort(), ['rust.desktop.build', 'rust.mcp.transport']);
-  // The declared port for nemo_mcp must match what application_mcp.rs actually imports today.
-  const src = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp.rs'), 'utf8');
-  assert.match(src, /use nemo_mcp::\{/);
-  assert.match(src, /contract::\{ApplicationRequest, ApplicationResponse\}/);
-  assert.match(src, /registry::\{self, Endpoint, Registration\}/);
-  assert.match(src, /\bwire,/);
-  assert.match(src, /nemo_mcp::BUILD_SOURCE_ID/);
+    'rust.desktop.shell->rust.desktop.native.viewport', 'rust.desktop.shell->rust.desktop.tasks',
+    'rust.desktop.tasks.tests->rust.desktop.tasks']);
+  assert.deepEqual(r.unanalyzedModules.slice().sort(),
+    ['rust.desktop.build', 'rust.mcp.transport', 'rust.native.engine']);
+
+  const application = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp.rs'), 'utf8');
+  const applicationTests = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp_tests.rs'), 'utf8');
+  const viewport = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport.rs'), 'utf8');
+  assert.match(application, /use nemo_mcp::\{/);
+  assert.match(application, /registry::\{self, Endpoint, Registration\}/);
+  assert.match(application, /\bwire,/);
+  assert.match(application, /nemo_mcp::BUILD_SOURCE_ID/);
+  for (const symbol of ['ApplicationRequest', 'ApplicationResponse', 'NativeApplicationError',
+    'NativeApplicationRequest', 'NativeApplicationResponse', 'NativeHostStatus', 'NativeStatusRequest',
+    'NATIVE_API_VERSION', 'Operation']) assert.match(application, new RegExp(`\\b${symbol}\\b`));
   assert.deepEqual(policy.externalCratePorts.nemo_mcp.items.slice().sort(),
-    ['BUILD_SOURCE_ID', 'contract::ApplicationRequest', 'contract::ApplicationResponse', 'registry', 'wire']);
+    ['BUILD_SOURCE_ID', 'contract::ApplicationRequest', 'contract::ApplicationResponse',
+      'contract::NativeApplicationError', 'contract::NativeApplicationRequest',
+      'contract::NativeApplicationResponse', 'contract::NativeHostStatus',
+      'contract::NativeStatusRequest', 'contract::NATIVE_API_VERSION', 'contract::Operation',
+      'registry', 'wire'].sort());
+
+  assert.match(applicationTests, /use crate::application_mcp::\*/);
+  assert.match(application, /use native_engine::\{/);
+  assert.match(applicationTests, /use native_engine::\{/);
+  assert.match(viewport, /use native_engine::compositor::\{/);
+  assert.match(viewport, /use native_engine::desktop_viewport::\{/);
+  assert.deepEqual(policy.externalCratePorts.native_engine.allowedModules.slice().sort(), [
+    'rust.desktop.mcp.adapter',
+    'rust.desktop.mcp.adapter.tests',
+    'rust.desktop.native.viewport',
+  ]);
+  assert.deepEqual(policy.externalCratePorts.native_engine.items.slice().sort(), [
+    'application::ExportResourceResolver', 'application::NativeApplication',
+    'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
+    'codec::decode_project', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+    'compositor::CompositionResult', 'compositor::Compositor', 'compositor::CompositorError',
+    'compositor::CompositorInstance', 'desktop_viewport::AcquiredSurfaceFrame',
+    'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
+    'desktop_viewport::SettledSurfaceFrame',
+    'desktop_viewport::SurfaceAttempt', 'desktop_viewport::SurfacePort',
+    'desktop_viewport::SurfacePresentation', 'desktop_viewport::SurfaceRecoveryError',
+    'desktop_viewport::ViewportError',
+    'desktop_viewport::ViewportMapping', 'document::OpacityDocument',
+    'export_job::ExportArtifact', 'export_job::ExportCompositor', 'export_job::ExportReadback',
+    'export_job::StagedArtifactPort', 'protocol::OpaqueResourceHandle',
+    'render_scene::GeometryPaintInput', 'render_scene::RenderScene',
+    'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId',
+  ].sort());
 });

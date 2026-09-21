@@ -15,9 +15,20 @@
       "files": ["application_mcp.rs"],
       "publicApi": ["application_mcp.rs"],
       "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "mcp.desktop.tests",
+      "layer": "tests",
+      "dir": "src-tauri/src",
+      "files": ["application_mcp_tests.rs"],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
     }
   ],
-  "layerRules": {"adapters": {"allowedLayers": ["adapters"]}},
+  "layerRules": {
+    "adapters": {"allowedLayers": ["adapters"]},
+    "tests": {"allowedLayers": ["adapters"]}
+  },
   "sizeProfiles": {"Rust production module": {"warn": 350, "hardMax": 500}},
   "exceptions": []
 }

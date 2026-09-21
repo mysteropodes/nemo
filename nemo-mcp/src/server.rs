@@ -1,7 +1,10 @@
 //! Small MCP tool family over the running application's versioned API.
 use crate::{
     capabilities,
-    contract::{ApplicationRequest, Operation},
+    contract::{
+        ApplicationRequest, NativeApplicationRequest, NativeHostStatus, NativeStatusRequest,
+        Operation, NATIVE_API_VERSION,
+    },
     registry, wire,
 };
 use rmcp::{
@@ -10,10 +13,10 @@ use rmcp::{
     service::RequestContext,
     tool, tool_handler, tool_router, RoleServer, ServerHandler,
 };
-use schemars::JsonSchema;
-use serde::Deserialize;
-use serde_json::json;
-use std::path::PathBuf;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::{de::Error as _, Deserialize, Deserializer};
+use serde_json::{json, Value};
+use std::{borrow::Cow, path::PathBuf};
 
 #[derive(Clone)]
 pub struct NemoServer {
@@ -38,6 +41,87 @@ fn empty_payload() -> serde_json::Value {
     json!({})
 }
 
+/// One raw command tool with standards-valid v1 and v2 request branches.
+/// `apiVersion` selects deserialization before overlapping operation names do.
+#[derive(Clone, Debug)]
+pub enum CommandRequest {
+    Legacy(ApplicationRequest),
+    Native(NativeApplicationRequest),
+}
+
+impl<'de> Deserialize<'de> for CommandRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = Value::deserialize(deserializer)?;
+        match value.get("apiVersion").and_then(Value::as_u64) {
+            Some(1) => serde_json::from_value(value)
+                .map(Self::Legacy)
+                .map_err(D::Error::custom),
+            Some(2) => serde_json::from_value(value)
+                .map(Self::Native)
+                .map_err(D::Error::custom),
+            version => Err(D::Error::custom(format!(
+                "unsupported apiVersion {}; expected 1 or 2",
+                version.map_or_else(|| "missing".to_owned(), |value| value.to_string())
+            ))),
+        }
+    }
+}
+
+impl JsonSchema for CommandRequest {
+    fn schema_name() -> Cow<'static, str> {
+        ApplicationRequest::schema_name()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        Cow::Borrowed("nemo::CommandRequest:v2-extension")
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        let mut legacy = schemars::schema_for!(ApplicationRequest).to_value();
+        let legacy_object = legacy
+            .as_object_mut()
+            .expect("legacy command schema is an object");
+        legacy_object.remove("title");
+        legacy_object.insert("$id".into(), json!("urn:nemo:mcp:command-request:v1"));
+        legacy_object.insert(
+            "allOf".into(),
+            json!([{
+                "type": "object",
+                "required": ["apiVersion"],
+                "properties": {"apiVersion": {"const": 1}}
+            }]),
+        );
+
+        let native_transport: Value = serde_json::from_str(include_str!(
+            "../../engineering/application/native-transport-v2.schema.json"
+        ))
+        .expect("native transport schema is valid JSON");
+        let mut native = native_transport.clone();
+        let native_object = native
+            .as_object_mut()
+            .expect("native transport schema is an object");
+        native_object
+            .remove("oneOf")
+            .expect("native transport declares its request/response union");
+        native_object.insert("$ref".into(), json!("#/$defs/Request"));
+
+        json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "$defs": {"legacy": legacy, "native": native},
+            "oneOf": [
+                {"$ref": "#/$defs/legacy"},
+                {"$ref": "#/$defs/native"}
+            ],
+            "x-nemo-nativeApiVersion": NATIVE_API_VERSION,
+            "x-nemo-nativeTransportV2": native_transport,
+            "x-nemo-registeredNativeCapabilities": capabilities::native_catalog().descriptors()
+        })
+        .try_into()
+        .expect("command union is a schema object")
+    }
+}
+
 impl NemoServer {
     pub fn new(root: PathBuf) -> Self {
         Self {
@@ -46,7 +130,7 @@ impl NemoServer {
         }
     }
 
-    async fn call(
+    async fn call_legacy(
         &self,
         request: ApplicationRequest,
         context: RequestContext<RoleServer>,
@@ -75,6 +159,38 @@ impl NemoServer {
                 let ok = response.ok;
                 let value =
                     serde_json::to_value(response).expect("serializable application response");
+                if ok {
+                    CallToolResult::structured(value)
+                } else {
+                    CallToolResult::structured_error(value)
+                }
+            }
+            Err(error) => failure("unavailable", &error.to_string()),
+        }
+    }
+
+    async fn call_native(
+        &self,
+        request: NativeApplicationRequest,
+        context: RequestContext<RoleServer>,
+    ) -> CallToolResult {
+        let endpoints = match registry::read_endpoints(&self.root) {
+            Ok(endpoints) => endpoints,
+            Err(_) => return failure("unavailable", "Nemo discovery registry is unavailable"),
+        };
+        let Some(endpoint) = endpoints
+            .into_iter()
+            .find(|record| record.instance_id == request.instance_id)
+        else {
+            return failure(
+                "unavailable",
+                "Selected instance is absent; discover again after reconnect",
+            );
+        };
+        match wire::call_native(&endpoint, request, context.ct).await {
+            Ok(response) => {
+                let ok = response.ok;
+                let value = serde_json::to_value(response).expect("serializable native response");
                 if ok {
                     CallToolResult::structured(value)
                 } else {
@@ -120,8 +236,47 @@ impl NemoServer {
             .await
             {
                 if response.ok {
-                    instances.push(json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
-                        "documentId": response.document_id, "revision": response.revision, "capabilities": response.result}));
+                    let status_request = NativeStatusRequest {
+                        api_version: NATIVE_API_VERSION,
+                        request_id: uuid::Uuid::new_v4().to_string(),
+                        instance_id: endpoint.instance_id.clone(),
+                    };
+                    let advertises_native = response.result.as_ref().is_some_and(|result| {
+                        result.get("nativeApiVersion").and_then(Value::as_u64)
+                            == Some(NATIVE_API_VERSION.into())
+                    });
+                    let native_status = if advertises_native {
+                        match tokio::time::timeout(
+                            std::time::Duration::from_secs(2),
+                            wire::native_status(
+                                &endpoint,
+                                status_request.clone(),
+                                context.ct.child_token(),
+                            ),
+                        )
+                        .await
+                        {
+                            Ok(Ok(status)) => status,
+                            Ok(Err(error)) => NativeHostStatus::unavailable(
+                                &status_request,
+                                format!("native host status unavailable: {error}"),
+                            ),
+                            Err(_) => NativeHostStatus::unavailable(
+                                &status_request,
+                                "native host status timed out",
+                            ),
+                        }
+                    } else {
+                        NativeHostStatus::unavailable(
+                            &status_request,
+                            "endpoint does not advertise nativeApiVersion 2",
+                        )
+                    };
+                    instances.push(
+                        json!({"instanceId": endpoint.instance_id, "buildId": endpoint.build_id,
+                        "documentId": response.document_id, "revision": response.revision,
+                        "capabilities": response.result, "nativeHostStatus": native_status}),
+                    );
                 }
             }
         }
@@ -133,6 +288,8 @@ impl NemoServer {
         CallToolResult::structured(json!({
             "apiVersion": 1,
             "registeredCapabilities": capabilities::catalog().descriptors(),
+            "nativeApiVersion": NATIVE_API_VERSION,
+            "registeredNativeCapabilities": capabilities::native_catalog().descriptors(),
             "instances": instances
         }))
     }
@@ -162,7 +319,7 @@ impl NemoServer {
         if let Err(error) = request.validate() {
             return failure(error.code(), error.message());
         }
-        self.call(request, context).await
+        self.call_legacy(request, context).await
     }
 
     #[tool(
@@ -170,16 +327,26 @@ impl NemoServer {
     )]
     async fn nemo_command(
         &self,
-        Parameters(request): Parameters<ApplicationRequest>,
+        Parameters(request): Parameters<CommandRequest>,
         context: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        if request.operation.is_query() {
-            return failure("invalid_request", "Use nemo_query for reads");
+        match request {
+            CommandRequest::Legacy(request) => {
+                if request.operation.is_query() {
+                    return failure("invalid_request", "Use nemo_query for reads");
+                }
+                if let Err(error) = request.validate() {
+                    return failure(error.code(), error.message());
+                }
+                self.call_legacy(request, context).await
+            }
+            CommandRequest::Native(request) => {
+                if let Err(error) = request.validate() {
+                    return failure(error.code(), error.message());
+                }
+                self.call_native(request, context).await
+            }
         }
-        if let Err(error) = request.validate() {
-            return failure(error.code(), error.message());
-        }
-        self.call(request, context).await
     }
 }
 
