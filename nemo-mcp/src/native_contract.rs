@@ -1,8 +1,16 @@
 //! Closed request and result validation for descriptor-declared native reads.
 
 use crate::contract::bounded_identifier;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 use std::collections::HashSet;
+
+const OPACITY_CURVE: [[f64; 2]; 5] = [
+    [0.0, 0.0],
+    [0.25, 0.156],
+    [0.5, 0.5],
+    [0.75, 0.844],
+    [1.0, 1.0],
+];
 
 pub(crate) fn present_revision<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -65,6 +73,18 @@ fn opacity_vector(value: Option<&Value>) -> bool {
 fn zero_handle(value: Option<&Value>) -> bool {
     value.and_then(Value::as_array).is_some_and(|parts| {
         parts.len() == 2 && parts.iter().all(|part| part.as_f64() == Some(0.0))
+    })
+}
+
+fn opacity_curve(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_array).is_some_and(|points| {
+        points.len() == OPACITY_CURVE.len()
+            && points.iter().zip(OPACITY_CURVE).all(|(point, expected)| {
+                exact(point, &["x", "y"], &[]).is_some_and(|point| {
+                    point.get("x").and_then(Value::as_f64) == Some(expected[0])
+                        && point.get("y").and_then(Value::as_f64) == Some(expected[1])
+                })
+            })
     })
 }
 
@@ -136,11 +156,7 @@ fn opacity_document(value: &Value) -> bool {
                 };
                 if prior.is_some_and(|prior| frame <= prior)
                     || !opacity_vector(key.get("v"))
-                    || key.get("curvePoints")
-                        != Some(&json!([
-                            {"x":0,"y":0}, {"x":0.25,"y":0.156}, {"x":0.5,"y":0.5},
-                            {"x":0.75,"y":0.844}, {"x":1,"y":1}
-                        ]))
+                    || !opacity_curve(key.get("curvePoints"))
                     || !zero_handle(key.get("hOut"))
                     || !zero_handle(key.get("hIn"))
                 {
@@ -231,6 +247,7 @@ pub(crate) fn validate_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     fn serialized(document: Value) -> Value {
         json!({
@@ -247,8 +264,21 @@ mod tests {
         })
     }
 
+    fn decimal_keyed_document() -> Value {
+        json!({
+            "format": "nemo.native-opacity-document", "formatVersion": 1, "totalFrames": 21,
+            "layers": [{"layerUid": "layer-a", "motion": {"opacity": {"keys": [{
+                "frame": 0, "v": [25], "curvePoints": [
+                    {"x": 0.0, "y": 0.0}, {"x": 0.25, "y": 0.156},
+                    {"x": 0.5, "y": 0.5}, {"x": 0.75, "y": 0.844},
+                    {"x": 1.0, "y": 1.0}
+                ], "hOut": [0.0, 0.0], "hIn": [0.0, 0.0]
+            }]}}}]
+        })
+    }
+
     #[test]
-    fn serialized_document_contract_rejects_open_legacy_duplicate_and_malformed_shapes() {
+    fn serialized_document_contract_accepts_semantic_numbers_and_rejects_bad_shapes() {
         let payload = json!({"atRevision": 0});
         let valid = document();
         assert!(validate_result(
@@ -256,6 +286,12 @@ mod tests {
             "native-document-1",
             &payload,
             &serialized(valid.clone())
+        ));
+        assert!(validate_result(
+            "query.document.serialize",
+            "native-document-1",
+            &payload,
+            &serialized(decimal_keyed_document()),
         ));
         let mut open = valid.clone();
         open["legacyVersion"] = json!(13);

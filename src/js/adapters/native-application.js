@@ -27,10 +27,7 @@
     'cleanup_failed', 'document_replaced',
   ]);
   const identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-  const opacityCurve = JSON.stringify([
-    { x: 0, y: 0 }, { x: 0.25, y: 0.156 }, { x: 0.5, y: 0.5 },
-    { x: 0.75, y: 0.844 }, { x: 1, y: 1 },
-  ]);
+  const opacityCurve = [[0, 0], [0.25, 0.156], [0.5, 0.5], [0.75, 0.844], [1, 1]];
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
   function plain(value) {
@@ -178,6 +175,13 @@
     if (!Array.isArray(value) || value.length !== 1 || typeof value[0] !== 'number' ||
         !Number.isFinite(value[0]) || value[0] < 0 || value[0] > 100) throw new TypeError(`${label} is invalid`);
   }
+  function validateCurve(points) {
+    if (!Array.isArray(points) || points.length !== opacityCurve.length) throw new TypeError('opacity curve is unsupported');
+    points.forEach((point, index) => {
+      exact(point, ['x', 'y'], [], 'opacity curve point');
+      if (![point.x, point.y].every(Number.isFinite) || point.x !== opacityCurve[index][0] || point.y !== opacityCurve[index][1]) throw new TypeError('opacity curve is unsupported');
+    });
+  }
   function validateSerializedDocument(document) {
     exact(document, ['format', 'formatVersion', 'totalFrames', 'layers'], [], 'serialized document');
     if (document.format !== 'nemo.native-opacity-document' || document.formatVersion !== 1) throw new TypeError('serialized document format is invalid');
@@ -199,7 +203,8 @@
           exact(key, ['frame', 'v', 'curvePoints', 'hOut', 'hIn'], [], 'opacity key'); frame(key.frame);
           if (key.frame >= document.totalFrames || key.frame <= prior) throw new TypeError('opacity key frames must be strictly ascending and in range');
           prior = key.frame; opacityVector(key.v, 'opacity key value');
-          if (JSON.stringify(key.curvePoints) !== opacityCurve || ![key.hOut, key.hIn].every((handle) => Array.isArray(handle) && handle.length === 2 && handle.every((part) => part === 0))) throw new TypeError('opacity curve is unsupported');
+          validateCurve(key.curvePoints);
+          if (![key.hOut, key.hIn].every((handle) => Array.isArray(handle) && handle.length === 2 && handle.every((part) => part === 0))) throw new TypeError('opacity curve is unsupported');
         });
       }
     });

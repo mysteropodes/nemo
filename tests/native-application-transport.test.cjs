@@ -129,6 +129,12 @@ test('pinned reads require exact selectors and preserve the complete bounded res
       const unsupportedCurve = structuredClone(reply);
       unsupportedCurve.result.document.layers[0].motion.opacity.keys[0].curvePoints[1].y = 0.2;
       assert.throws(() => validateResponse(unsupportedCurve, request.requestId, operation), /curve/);
+      const reorderedCurve = structuredClone(reply);
+      reorderedCurve.result.document.layers[0].motion.opacity.keys.forEach((key) => {
+        key.curvePoints = key.curvePoints.map(({ x, y }) => ({ y, x }));
+      });
+      assert.equal(validateResponse(reorderedCurve, request.requestId, operation), reorderedCurve,
+        'JSON object member order is not contract data');
       const duplicate = structuredClone(reply);
       duplicate.result.document.layers.push(structuredClone(duplicate.result.document.layers[0]));
       assert.throws(() => validateResponse(duplicate, request.requestId, operation), /identity/);
