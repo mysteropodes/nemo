@@ -35,6 +35,18 @@ fn native_request() -> NativeApplicationRequest {
     }
 }
 
+fn native_read_request(operation: &str) -> NativeApplicationRequest {
+    NativeApplicationRequest {
+        operation: operation.into(),
+        payload: if operation == "query.document.serialize" {
+            json!({"atRevision": 0})
+        } else {
+            json!({"atRevision": 0, "contextId": "scene-root", "frame": 10})
+        },
+        ..native_request()
+    }
+}
+
 #[test]
 fn mutation_needs_identity_before_transport() {
     let mut req = request();
@@ -205,6 +217,64 @@ async fn native_call_checks_full_response_identity() {
             .await
             .is_err()
     );
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn native_call_rejects_malformed_pinned_read_results_before_mcp_returns_them() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: "instance".into(),
+        port: listener.local_addr().unwrap().port(),
+        secret: "secret".into(),
+        build_id: "candidate".into(),
+    };
+    let server = tokio::spawn(async move {
+        for result in [
+            json!({"atRevision": 0, "documentSnapshotId": "native-opacity:native-document:0", "document": {}}),
+            json!({"documentSnapshotId": "native-opacity:native-document:0", "documentId": "native-document",
+                "contentRevision": 0, "contextId": "scene-root", "frame": 10,
+                "layers": [{"layerUid": "bad id", "value": 50}]}),
+            json!({"atRevision": 0, "documentSnapshotId": "native-opacity:native-document:0",
+                "document": {"format": "nemo.native-opacity-document", "formatVersion": 1,
+                    "totalFrames": 21, "layers": [{"layerUid": "layer-a", "motionStatic": {"opacity": [25]}}]}}),
+        ] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let message: wire::NativeWireRequest = wire::read_json(&mut stream).await.unwrap();
+            let response = NativeApplicationResponse {
+                api_version: 2,
+                request_id: message.native_request.request_id,
+                instance_id: "instance".into(),
+                document_id: "native-document".into(),
+                content_revision: 0,
+                ok: true,
+                result: Some(result),
+                error: None,
+            };
+            wire::write_json(&mut stream, &response).await.unwrap();
+        }
+    });
+    assert!(wire::call_native(
+        &endpoint,
+        native_read_request("query.document.serialize"),
+        CancellationToken::new()
+    )
+    .await
+    .is_err());
+    assert!(wire::call_native(
+        &endpoint,
+        native_read_request("query.document.evaluate"),
+        CancellationToken::new()
+    )
+    .await
+    .is_err());
+    assert!(wire::call_native(
+        &endpoint,
+        native_read_request("query.document.serialize"),
+        CancellationToken::new()
+    )
+    .await
+    .is_ok());
     server.await.unwrap();
 }
 

@@ -66,3 +66,27 @@ test('feature-owned native declarations cover exactly the v2 transport operation
   assert.equal(new Set(declaredOperations).size, declaredOperations.length, 'native declarations repeat an operation');
   assert.deepEqual([...new Set(declaredOperations)].sort(), [...new Set(schemaOperations)].sort());
 });
+
+test('pinned read schemas declare strict selectors and exact native result identities', () => {
+  for (const [operation, payload, result, required] of [
+    ['query.document.serialize', 'SerializeQueryPayload', 'SerializeQueryResult', ['atRevision']],
+    ['query.document.evaluate', 'EvaluateQueryPayload', 'EvaluateQueryResult', ['atRevision', 'contextId', 'frame']],
+  ]) {
+    const branch = nativeSchema.$defs.Request.oneOf.find((entry) => entry.allOf[1].properties.operation.const === operation);
+    assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest');
+    assert.equal(branch.allOf[1].properties.payload.$ref, `#/$defs/${payload}`);
+    assert.deepEqual(nativeSchema.$defs[payload].required, required);
+    assert.equal(nativeSchema.$defs[payload].additionalProperties, false);
+    assert.equal(nativeSchema.$defs[result].additionalProperties, false);
+    assert.ok(nativeSchema.$defs.ResponseBase.properties.result.oneOf.some((entry) => entry.$ref === `#/$defs/${result}`));
+  }
+  assert.deepEqual(nativeSchema.$defs.SerializeQueryResult.required, ['atRevision', 'documentSnapshotId', 'document']);
+  assert.equal(nativeSchema.$defs.SerializeQueryResult.properties.document.$ref, '#/$defs/NativeOpacityDocument');
+  assert.equal(nativeSchema.$defs.NativeOpacityDocument.additionalProperties, false);
+  assert.equal(nativeSchema.$defs.NativeOpacityLayer.additionalProperties, false);
+  assert.equal(nativeSchema.$defs.OpacityKey.additionalProperties, false);
+  assert.deepEqual(nativeSchema.$defs.EvaluateQueryResult.required,
+    ['documentSnapshotId', 'documentId', 'contentRevision', 'contextId', 'frame', 'layers']);
+  assert.equal(nativeDescriptors[0].resourceBoundary.maxReadResponseBytes, 4096);
+  assert.equal(nativeDescriptors[0].availability.state, 'unavailable');
+});

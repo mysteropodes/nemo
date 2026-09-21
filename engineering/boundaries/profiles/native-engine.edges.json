@@ -24,19 +24,21 @@
     "rust.native.engine.png-output",
     "rust.native.engine.export-job",
     "rust.native.engine.protocol",
-    "rust.native.engine.application"
+    "rust.native.engine.application",
+    "rust.native.engine.read-queries"
   ],
-  "profileModulesNote": "The seventeen production modules under native-engine/src. The integration harness files in native-engine/tests remain registered and size-checked by rust.profile.json, but are outside this crate-source graph.",
+  "profileModulesNote": "The eighteen production modules under native-engine/src. The integration harness files in native-engine/tests remain registered and size-checked by rust.profile.json, but are outside this crate-source graph.",
   "layerRules": {
     "native-root": {
-      "allowedLayers": ["native-document", "native-codec", "native-request-receipts", "native-revision", "native-commands", "native-history", "native-evaluation", "native-resource-leases", "native-scheduler", "native-render-scene", "native-compositor", "native-desktop-viewport", "native-png-output", "native-export-job", "native-protocol", "native-application"],
+      "allowedLayers": ["native-document", "native-codec", "native-request-receipts", "native-revision", "native-commands", "native-history", "native-evaluation", "native-resource-leases", "native-scheduler", "native-render-scene", "native-compositor", "native-desktop-viewport", "native-png-output", "native-export-job", "native-protocol", "native-application", "native-read-queries"],
       "meaning": "lib.rs is the declaration-only crate root and may expose each feature-gated production module."
     },
     "native-document": { "allowedLayers": [], "meaning": "The document model is the dependency floor." },
     "native-codec": { "allowedLayers": ["native-document"], "meaning": "Serialization consumes only the document model." },
     "native-request-receipts": { "allowedLayers": [], "meaning": "Request identity and replay receipts are independent infrastructure." },
     "native-revision": { "allowedLayers": ["native-document"], "meaning": "Snapshots and revision ownership consume only the document model." },
-    "native-commands": { "allowedLayers": ["native-document", "native-request-receipts", "native-revision"], "meaning": "Commands operate on documents with revision and request identity contracts." },
+    "native-commands": { "allowedLayers": ["native-document", "native-request-receipts", "native-revision", "native-read-queries"], "meaning": "Commands operate on documents with revision and request identity contracts; application-gated reads consume immutable revisions." },
+    "native-read-queries": { "allowedLayers": ["native-codec", "native-evaluation", "native-request-receipts", "native-revision"], "meaning": "Pinned reads encode or evaluate immutable snapshots and retain only compact selectors." },
     "native-history": { "allowedLayers": ["native-commands", "native-document", "native-request-receipts", "native-revision"], "meaning": "history.rs and transaction.rs form one authority facade and consume the command/document contracts." },
     "native-evaluation": { "allowedLayers": ["native-document", "native-revision"], "meaning": "Evaluation consumes immutable document snapshots." },
     "native-resource-leases": { "allowedLayers": ["native-revision"], "meaning": "Resource lifetime ownership keys leases to document snapshots." },
@@ -50,8 +52,8 @@
     "native-application": { "allowedLayers": ["native-commands", "native-document", "native-export-job", "native-history", "native-protocol", "native-render-scene", "native-request-receipts", "native-revision"], "meaning": "The application facade composes the native authority without depending on a host shell." }
   },
   "permittedEdges": {
-    "note": "Observed at adoption from use and inline crate paths. Layer rules are the enforced contract; the test suite pins the exact observed 38-edge graph so additions require a reviewed policy change.",
-    "edgeCount": 38
+    "note": "Observed from use and inline crate paths, recomputed for N19A. Layer rules are the enforced contract; the test suite pins the exact observed 43-edge graph so additions require a reviewed policy change.",
+    "edgeCount": 43
   },
   "exportedPort": {
     "source": "native-engine/src/lib.rs exposes modules through a declaration macro rather than pub use; N19 tests pin that macro and its Cargo mapping separately.",

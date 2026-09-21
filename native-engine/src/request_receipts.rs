@@ -12,6 +12,10 @@ pub const OP_COMMAND_APPLY: &str = "command.document.apply";
 pub const OP_QUERY_OPACITY: &str = "query.document.opacity";
 pub const OP_QUERY_REVISION: &str = "query.document.revision";
 pub const OP_QUERY_SNAPSHOT: &str = "query.document.snapshot.acquire";
+#[cfg(feature = "application")]
+pub const OP_QUERY_SERIALIZE: &str = "query.document.serialize";
+#[cfg(feature = "application")]
+pub const OP_QUERY_EVALUATE: &str = "query.document.evaluate";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -20,12 +24,23 @@ pub struct OpacityRequest {
     pub(crate) request_id: String,
     pub(crate) instance_id: String,
     pub(crate) document_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "expected_revision"
+    )]
     pub(crate) expected_revision: Option<u64>,
     pub(crate) operation: String,
     pub(crate) payload: Value,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(crate) cancelled_before_dispatch: bool,
+}
+
+// An omitted expectedRevision differs from an explicitly null wire field.
+fn expected_revision<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error> {
+    u64::deserialize(deserializer).map(Some)
 }
 
 impl OpacityRequest {
@@ -206,6 +221,12 @@ impl RequestFingerprint {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ReceiptDisposition {
+    #[cfg(feature = "application")]
+    ReadQuerySuccess {
+        content_revision: u64,
+        at_revision: u64,
+        context_frame: Option<(String, u32)>,
+    },
     CommandSuccess {
         content_revision: u64,
         applied: bool,
@@ -259,8 +280,21 @@ impl ReceiptDisposition {
         request: &OpacityRequest,
         instance_id: &str,
         document_id: &str,
+        #[cfg(feature = "application")] read_result: impl FnOnce(u64, Option<(String, u32)>) -> Value,
     ) -> ResponseEnvelope {
         match self {
+            #[cfg(feature = "application")]
+            Self::ReadQuerySuccess {
+                content_revision,
+                at_revision,
+                context_frame,
+            } => Self::success_response(
+                request,
+                instance_id,
+                document_id,
+                content_revision,
+                read_result(at_revision, context_frame),
+            ),
             Self::CommandSuccess {
                 content_revision,
                 applied,
@@ -335,7 +369,7 @@ impl ReceiptDisposition {
         }
     }
 
-    fn success_response(
+    pub(crate) fn success_response(
         request: &OpacityRequest,
         instance_id: &str,
         document_id: &str,

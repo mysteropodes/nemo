@@ -324,7 +324,11 @@ pub struct NativeApplicationRequest {
     pub request_id: String,
     pub instance_id: String,
     pub document_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::native_contract::present_revision"
+    )]
     pub expected_revision: Option<u64>,
     pub operation: String,
     pub payload: Value,
@@ -359,9 +363,24 @@ impl NativeApplicationRequest {
                 "expectedRevision exceeds the transport maximum".into(),
             ));
         }
+        if self.expected_revision.is_some()
+            && matches!(
+                self.operation.as_str(),
+                "query.document.serialize" | "query.document.evaluate"
+            )
+        {
+            return Err(RequestError::InvalidRequest(
+                "native pinned reads forbid expectedRevision".into(),
+            ));
+        }
         if !self.payload.is_object() {
             return Err(RequestError::MalformedPayload(
                 "native payload must be a JSON object".into(),
+            ));
+        }
+        if !crate::native_contract::validate_request(&self.operation, &self.payload) {
+            return Err(RequestError::MalformedPayload(
+                "native pinned-read payload does not match its declared contract".into(),
             ));
         }
         if capabilities::native_catalog()

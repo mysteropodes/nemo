@@ -65,6 +65,7 @@
     { "path": "src-tauri/src/video_decode.rs", "ceiling": 2266, "nonblankLinesAtAdoption": 2266, "nonblankLinesNow": 2160, "note": "nonblankLinesAtAdoption is the P11/#1013 adoption record and is deliberately not rewritten; nonblankLinesNow records the 106-line reduction P28/#1030 produced by moving the ffmpeg probe parser out to src-tauri/src/media_probe.rs, so the win stays visible instead of being erased. The ceiling stays at the adoption value: an extraction packet changes code, not size policy, and lowering the candidate ceiling without lowering the frozen baseline would give the baseline growth check 106 lines of slack." }
   ],
   "exclusions": [],
+  "nativeReadRegistration": "N19A/#1373 adds native-engine/src/read_queries.rs and native-engine/tests/application_read.rs under the existing application feature and test target, plus nemo-mcp/src/native_contract.rs for the shared pinned-read wire validator. Ordinary budgets, baseline and exclusions are unchanged.",
   "exclusionsRationale": "Every discovered Rust candidate, including feasibility proofs and staged native-engine modules, must be adopted into a module; no source is hidden through exclusions. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "integration": {
     "gate": "tests/nemo-boundaries-rust.test.cjs",

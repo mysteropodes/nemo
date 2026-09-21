@@ -21,7 +21,7 @@ engine_modules! {
     "compositor" => compositor, render_scene;
     "viewport" => desktop_viewport;
     "export_job" => export_job, png_output;
-    "application" => application, protocol;
+    "application" => application, protocol, read_queries;
 }
 
 // Each named Cargo target uses this existing file as a harness. Selecting its
@@ -45,4 +45,5 @@ test_modules! {
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
     "test-application" => application_tests = "../tests/application.rs";
+    "test-application" => application_read_tests = "../tests/application_read.rs";
 }

@@ -9,6 +9,8 @@ pub use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
     OP_COMMAND_APPLY, OP_QUERY_OPACITY, OP_QUERY_REVISION, OP_QUERY_SNAPSHOT,
 };
+#[cfg(feature = "application")]
+pub use crate::request_receipts::{OP_QUERY_EVALUATE, OP_QUERY_SERIALIZE};
 use crate::revision::{DocumentSnapshot, RevisionOwner};
 use serde_json::{json, Value};
 
@@ -80,6 +82,11 @@ impl NativeOpacityApplication {
             OP_QUERY_OPACITY => self.query_opacity(&request, fingerprint),
             OP_QUERY_REVISION => self.query_revision(&request, fingerprint),
             OP_QUERY_SNAPSHOT => self.query_snapshot(&request, fingerprint),
+            #[cfg(feature = "application")]
+            OP_QUERY_SERIALIZE | OP_QUERY_EVALUATE => {
+                let disposition = crate::read_queries::prepare(&self.owner, &request);
+                self.retain_disposition(&request, fingerprint, disposition)
+            }
             _ => self.failure(
                 &request,
                 DispatchErrorCode::InvalidRequest,
@@ -411,7 +418,20 @@ impl NativeOpacityApplication {
         request: &OpacityRequest,
         disposition: ReceiptDisposition,
     ) -> ResponseEnvelope {
-        disposition.response(request, self.owner.instance_id(), self.owner.document_id())
+        disposition.response(
+            request,
+            self.owner.instance_id(),
+            self.owner.document_id(),
+            #[cfg(feature = "application")]
+            |revision, context_frame| {
+                let snapshot = self
+                    .owner
+                    .acquire(revision)
+                    .expect("read receipt retains its revision");
+                crate::read_queries::result(&snapshot, context_frame.as_ref())
+                    .expect("validated immutable read result remains reproducible")
+            },
+        )
     }
 
     fn failure(

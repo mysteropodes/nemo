@@ -18,6 +18,30 @@ const DOCUMENT = 'native-document-1';
 const STATIC = Object.freeze({ stableTarget: Object.freeze({ layerUid: LAYER }), opacityMode: 'static' });
 const KEYED = Object.freeze({ stableTarget: Object.freeze({ layerUid: LAYER }), opacityMode: 'keyed' });
 
+test('common evaluated read responses feed the existing selection projection unchanged', async () => {
+  for (const [frame, value] of [[0, 20], [10, 50], [20, 80]]) {
+    const evaluation = { documentSnapshotId: `native-opacity:${DOCUMENT}:0`, documentId: DOCUMENT,
+      contentRevision: 0, contextId: 'scene-root', frame, layers: [{ layerUid: LAYER, value }] };
+    const adapter = createNativeApplicationAdapter('read-selection', { dispatch: (request) => ({
+      apiVersion: 2, requestId: request.requestId, instanceId: INSTANCE, documentId: DOCUMENT,
+      contentRevision: 2, ok: true, result: evaluation,
+    }) });
+    const response = await adapter.dispatch({ apiVersion: 2, requestId: `selection-${frame}`,
+      instanceId: INSTANCE, documentId: DOCUMENT, operation: 'query.document.evaluate',
+      payload: { atRevision: 0, contextId: 'scene-root', frame } });
+    const selected = projectSelection(response.result, {
+      activeLayerUid: LAYER, selected: [{ layerUid: LAYER, opacityMode: 'keyed' }],
+    });
+    assert.equal(selected.selected[0].value, value);
+    assert.equal(selected.selected[0].editable, false);
+    assert.equal(selected.documentSnapshotId, evaluation.documentSnapshotId);
+    assert.equal(selected.documentId, DOCUMENT);
+    assert.equal(selected.contentRevision, 0);
+    assert.equal(selected.frame, frame);
+    assert.equal(selected.contextId, 'scene-root');
+  }
+});
+
 function identity(contentRevision = 0, documentId = DOCUMENT) {
   return { instanceId: INSTANCE, documentId, contentRevision };
 }
