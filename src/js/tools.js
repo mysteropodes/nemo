@@ -15,7 +15,7 @@ function constrainAngle45(start,pt){
   var step=Math.PI/4,angle=Math.round(Math.atan2(dy,dx)/step)*step;
   return new Point(start.x+Math.cos(angle)*dist,start.y+Math.sin(angle)*dist);
 }
-var _moveDragStarted=false;
+var _moveDragStarted=false,_legacyMotionGesture=false;
 var _eraseDragActive=false;
 var _eraseLastPt=null;
 // Tracks the last component-layer click for double-click-to-enter timing,
@@ -7160,7 +7160,7 @@ function onMouseDown(event){
   // another branch of this tool chain: only consumes the event (returns
   // true) when the click actually lands on a motion handle/keyframe dot;
   // otherwise falls through unchanged into Select/Draw/etc. below.
-  if(state.appMode==='motion'&&window.SMMotion){event.altKey=!!(event.modifiers&&event.modifiers.alt);if(SMMotion.onDown(event))return;}
+  if(state.appMode==='motion'&&window.SMMotion){if(!allowLegacySelectionEdit(event.event,'select'))return;event.altKey=!!(event.modifiers&&event.modifiers.alt);if(SMMotion.onDown(event)){_legacyMotionGesture=true;return;}}
   var layer=userLayers[state.activeLayerIdx];
   if(state.tool==='draw'){
     if(!canEditActiveLayer())return;
@@ -7624,7 +7624,7 @@ function onMouseDrag(event){
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
-  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
+  if(state.appMode==='motion'&&window.SMMotion){if(_legacyMotionGesture&&!allowLegacySelectionEdit(event.event,'select'))return;if(SMMotion.onDrag(event))return;}
   if(state.tool==='draw'){
     if(!currentPath)return;
     if(state.vectorBrush){
@@ -7823,6 +7823,7 @@ function onMouseDrag(event){
       prevA.activate();
     }else if(draggingArc){setArcHandle(draggingArc.fA,draggingArc.fB,draggingArc.matchIdx,draggingArc.which,draggingArc.ptA,draggingArc.ptB,event.point.x,event.point.y);renderArcs(arcDragCache);}
     else if(selectedPaths.length>0){
+      if(!allowLegacySelectionEdit(event.event,'select'))return;
       if(!_moveDragStarted){pushUndo();_moveDragStarted=true;}
       selectedPaths.forEach(function(p){
       p.position=p.position.add(event.delta);
@@ -7873,7 +7874,7 @@ function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
-  if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
+  if(state.appMode==='motion'&&window.SMMotion){if(_legacyMotionGesture&&!allowLegacySelectionEdit(event.event,'select'))return;var _motionUp=SMMotion.onUp(event);_legacyMotionGesture=false;if(_motionUp)return;}
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
     if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push({id:'fc'+Date.now().toString(36)+'_'+(++_fillCloseIdCounter),points:_fillCloseDrag.points.map(function(p){return[p.x,p.y];})});
@@ -8103,6 +8104,7 @@ function onMouseUp(event){
       _marquee.active=false;renderArcs();updateUI();
     }
     else if(draggingArc){draggingArc=null;arcDragCache=null;generateTweens(undefined,true);}else if(selectedPaths.length>0){
+      if(!allowLegacySelectionEdit(event.event,'select'))return;
       _moveDragStarted=false;
       var mLd2=state.layers[state.activeLayerIdx];
       if(mLd2&&mLd2.symbolId){

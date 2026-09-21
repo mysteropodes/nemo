@@ -84,6 +84,18 @@ function functionEnd(text, open) {
   throw new Error('unterminated function');
 }
 function runTool(name, context) { vm.runInNewContext(toolFunction(name), context, { filename: `tools-${name}.js` }); return context[name]; }
+function bootTools(guard, state, motion) {
+  const stage = { id: 'drawing-canvas', addEventListener() {}, classList: { add() {}, remove() {} }, style: {} };
+  const context = {
+    console, Object, window: null, Tool: function Tool() { return {}; }, view: {}, draggingArc: null,
+    state: Object.assign({ tool: 'draw', appMode: 'animation', playing: false, isPanning: false, spaceDown: false, activeLayerIdx: 0, layers: [{}] }, state),
+    document: { addEventListener() {}, getElementById: () => stage, querySelectorAll: () => [] },
+    SMEngineBridge: { nativeEditGuard: guard }, SMMotion: motion,
+  };
+  context.window = context;
+  vm.runInNewContext(source('src/js/tools.js'), context, { filename: 'tools.js' });
+  return context;
+}
 
 test('native ownership requests one exact release and admits only a later replay', () => {
   const active = { value: true }, releases = [], guard = installGuard(active, releases), context = selectionGuardContext(guard);
@@ -171,4 +183,35 @@ test('idle Paper drag and up do not request release', () => {
   runTool('onMouseDrag', context)({ event: event(), modifiers: {}, point: {} });
   runTool('onMouseUp', context)({ event: event(), modifiers: {}, point: {} });
   assert.equal(releases, 0);
+});
+
+test('full Paper tools guards selected-item drag and up before their mutations', () => {
+  const active = { value: true }, releases = [], guard = installGuard(active, releases);
+  const context = bootTools(guard, { tool: 'select' }, {});
+  context.selectedPaths = [{ position: { add() { throw new Error('Paper move must not run'); } } }];
+  context.onMouseDrag({ event: event(), delta: {} });
+  context.onMouseUp({ event: event() });
+  assert.equal(releases.length, 1);
+});
+
+test('full Paper Motion forwarding guards an active gesture but leaves idle drag/up passive', () => {
+  const active = { value: true }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
+  const motion = { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; } };
+  const context = bootTools(guard, { tool: 'draw', appMode: 'motion' }, motion);
+  context.onMouseDrag({ event: event() });
+  context.onMouseUp({ event: event() });
+  assert.equal(releases.length, 0, 'idle Motion forwarding must not request release');
+  context.onMouseDown({ event: event(), modifiers: {} });
+  assert.equal(calls.down, 0);
+  assert.equal(releases.length, 1);
+  active.value = false;
+  context.onMouseDown({ event: event(), modifiers: {} });
+  assert.equal(calls.down, 1);
+  active.value = true;
+  context.onMouseDrag({ event: event() });
+  assert.equal(calls.drag, 1, 'the denied active drag must not reach Motion');
+  active.value = false;
+  context.onMouseDrag({ event: event() });
+  context.onMouseUp({ event: event() });
+  assert.deepEqual(calls, { down: 1, drag: 2, up: 2 });
 });
