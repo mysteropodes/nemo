@@ -162,10 +162,11 @@ where
     let cleanup_complete = released.application.cleanup_complete()
         && released.preview_stage == ReconciliationStage::Complete
         && cleanup_error.is_none();
-    let mut preview_ids: BTreeSet<WorkId> = released.cancelled_preview.into_iter().collect();
-    if let Ok(viewport) = &viewport {
-        preview_ids.extend(viewport.0.iter().copied());
-    }
+    let cancelled_preview: BTreeSet<WorkId> = released.cancelled_preview.into_iter().collect();
+    let disposed_viewport: BTreeSet<WorkId> = viewport
+        .as_ref()
+        .map(|value| value.0.iter().copied().collect())
+        .unwrap_or_default();
     let receipt = NativeReleaseReceipt {
         api_version: HOST_API_VERSION,
         request_id: request.request_id.clone(),
@@ -192,7 +193,7 @@ where
             .iter()
             .map(reconcile_export)
             .collect(),
-        cancelled_preview_work_ids: preview_ids.into_iter().map(work_label).collect(),
+        cancelled_preview_work_ids: cancelled_preview.into_iter().map(work_label).collect(),
         unresolved_preview_work_ids: Some(
             released
                 .unresolved_preview
@@ -200,6 +201,7 @@ where
                 .map(work_label)
                 .collect(),
         ),
+        disposed_viewport_work_ids: disposed_viewport.into_iter().map(work_label).collect(),
         reconciliation_stages: serde_json::json!({
             "transaction": released.application.transaction_stage.label(),
             "exports": released.application.export_stage.label(),
@@ -440,6 +442,59 @@ mod tests {
             panic!("release receipt was not retained")
         };
         let mut retry: NativeReleaseReceipt = serde_json::from_value(retry).unwrap();
+        retry.retrieved = false;
+        assert_eq!(retry, receipt);
+        assert!(native.lock().unwrap().reserve_install().is_err());
+    }
+
+    #[test]
+    fn preview_cancel_failure_keeps_scheduler_and_viewport_receipts_distinct() {
+        let scratch = Scratch::new();
+        let mut application = desktop(&scratch, None);
+        let document = application.document_id().to_owned();
+        let snapshot = application.core.acquire_snapshot(0).unwrap();
+        let preview: NativePreviewRequest = serde_json::from_value(json!({
+            "apiVersion": HOST_API_VERSION, "instanceId": application.instance_id(),
+            "documentId": document, "contentRevision": 0,
+            "documentSnapshotId": snapshot.id(), "contextId": "scene-root",
+            "frame": 0, "quality": "final",
+            "outputSpec": {"kind":"frame","format":"rgba8","width":320,"height":180,"colorInterpretation":"srgb","alphaMode":"straight"},
+            "geometryHandle": {"resourceId":"geometry","resourceVersion":"v1"}
+        })).unwrap();
+        let work_id = application
+            .prepare_preview(&preview)
+            .unwrap()
+            .identity
+            .work_id();
+        application.inject_release_preview_cancel_failure_at(0);
+        let (native, _) = install(application);
+        let request = release_request(&document, "release-preview-cancel-failure");
+        let generation = admit_generation(&native, &request);
+        let receipt = complete_release(&native, generation, &request, || {
+            Ok((vec![work_id], "disposed"))
+        })
+        .unwrap();
+        let expected = vec![work_label(work_id)];
+        assert_eq!(receipt.status, "indeterminate");
+        assert!(receipt.cancelled_preview_work_ids.is_empty());
+        assert_eq!(receipt.unresolved_preview_work_ids, Some(expected.clone()));
+        assert!(receipt
+            .cancelled_preview_work_ids
+            .iter()
+            .all(|work_id| !receipt
+                .unresolved_preview_work_ids
+                .as_ref()
+                .unwrap()
+                .contains(work_id)));
+        assert_eq!(receipt.disposed_viewport_work_ids, expected);
+        assert_eq!(receipt.viewport_status, "disposed");
+        let ReleaseAdmission::Retry { receipt: retry, .. } =
+            admit_release_request(&native, &request).unwrap()
+        else {
+            panic!("release receipt was not retained")
+        };
+        let mut retry: NativeReleaseReceipt = serde_json::from_value(retry).unwrap();
+        assert!(retry.retrieved);
         retry.retrieved = false;
         assert_eq!(retry, receipt);
         assert!(native.lock().unwrap().reserve_install().is_err());

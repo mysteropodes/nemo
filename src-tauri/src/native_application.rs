@@ -64,6 +64,8 @@ pub(crate) struct DesktopNativeApplication {
     panic_release_after_export_jobs: Option<usize>,
     #[cfg(test)]
     panic_release_after_preview_jobs: Option<usize>,
+    #[cfg(test)]
+    fail_release_preview_cancel_at: Option<usize>,
 }
 
 impl DesktopNativeApplication {
@@ -98,6 +100,8 @@ impl DesktopNativeApplication {
             panic_release_after_export_jobs: None,
             #[cfg(test)]
             panic_release_after_preview_jobs: None,
+            #[cfg(test)]
+            fail_release_preview_cancel_at: None,
         })
     }
 
@@ -286,6 +290,11 @@ impl DesktopNativeApplication {
         for (index, work_id) in pending.into_iter().enumerate() {
             #[cfg(not(test))]
             let _ = index;
+            #[cfg(test)]
+            if self.fail_release_preview_cancel_at == Some(index) {
+                preview_error = Some("injected preview scheduler cancellation failure".into());
+                break;
+            }
             if let Err(error) = self.preview_scheduler.cancel(work_id) {
                 preview_error = Some(error.to_string());
                 break;
@@ -350,6 +359,11 @@ impl DesktopNativeApplication {
     #[cfg(test)]
     fn inject_release_panic_after_preview_jobs(&mut self, jobs: usize) {
         self.panic_release_after_preview_jobs = Some(jobs);
+    }
+
+    #[cfg(test)]
+    fn inject_release_preview_cancel_failure_at(&mut self, index: usize) {
+        self.fail_release_preview_cancel_at = Some(index);
     }
 
     pub(crate) fn require_identity(

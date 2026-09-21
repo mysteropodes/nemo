@@ -223,6 +223,7 @@ pub(crate) struct NativeReleaseReceipt {
     pub(crate) reconciled_exports: Vec<ExportReconciliation>,
     pub(crate) cancelled_preview_work_ids: Vec<String>,
     pub(crate) unresolved_preview_work_ids: Option<Vec<String>>,
+    pub(crate) disposed_viewport_work_ids: Vec<String>,
     pub(crate) reconciliation_stages: Value,
     pub(crate) viewport_status: String,
     pub(crate) reentry_available: bool,
@@ -253,6 +254,7 @@ impl NativeReleaseReceipt {
             reconciled_exports: Vec::new(),
             cancelled_preview_work_ids: Vec::new(),
             unresolved_preview_work_ids: None,
+            disposed_viewport_work_ids: Vec::new(),
             reconciliation_stages: serde_json::json!({"transaction":"unknown","exports":"unknown","preview":"unknown"}),
             viewport_status: "cleanup_failed".into(),
             reentry_available: false,
@@ -271,6 +273,7 @@ impl NativeReleaseReceipt {
             "cancelledTransaction": self.cancelled_transaction,
             "undoDepth": self.undo_depth, "redoDepth": self.redo_depth,
             "reconciledExports": [], "cancelledPreviewWorkIds": [], "unresolvedPreviewWorkIds": null,
+            "disposedViewportWorkIds": [],
             "viewportStatus": "cleanup_failed", "reentryAvailable": false,
             "error": {"code": "cleanup_failed", "message": "native release receipt serialization failed", "details": null}
         }))
