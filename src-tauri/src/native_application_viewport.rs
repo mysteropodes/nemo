@@ -33,12 +33,21 @@ pub(crate) async fn on_main_thread<T: Send + 'static>(
 ) -> HostResult<T> {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.run_on_main_thread(move || {
-        let _ = sender.send(operation());
+        complete_scheduled_operation(sender, operation);
     })
     .map_err(|_| host_error("unavailable", "native main-thread executor unavailable"))?;
     receiver
         .await
         .map_err(|_| host_error("unavailable", "native main-thread operation was dropped"))?
+}
+
+fn complete_scheduled_operation<T>(
+    sender: tokio::sync::oneshot::Sender<HostResult<T>>,
+    operation: impl FnOnce() -> HostResult<T>,
+) {
+    if !sender.is_closed() {
+        let _ = sender.send(operation());
+    }
 }
 
 pub(crate) fn create(
@@ -181,5 +190,29 @@ fn status_label(status: &ViewportStatus) -> &'static str {
         ViewportStatus::Failed(FatalAction::RetryOutdated) => "failed-retry-outdated",
         ViewportStatus::Failed(FatalAction::RecreateFailed) => "failed-recreate",
         ViewportStatus::Failed(FatalAction::ReconfigureFailed) => "failed-reconfigure",
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn cancelled_main_thread_wait_does_not_begin_the_scheduled_operation() {
+        let (sender, receiver) = tokio::sync::oneshot::channel::<HostResult<()>>();
+        let began = Arc::new(AtomicBool::new(false));
+        let began_in_operation = Arc::clone(&began);
+        drop(receiver);
+
+        complete_scheduled_operation(sender, move || {
+            began_in_operation.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+
+        assert!(!began.load(Ordering::SeqCst));
     }
 }

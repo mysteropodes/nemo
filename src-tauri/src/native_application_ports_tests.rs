@@ -139,6 +139,17 @@ fn stages_are_private_unique_and_job_ids_never_form_paths() {
 }
 
 #[test]
+fn cross_volume_publication_stages_on_the_destination_filesystem() {
+    let private = Path::new("/private-cache");
+    let destination = Path::new("/external-volume/output-parent");
+    assert_eq!(select_staging_parent(private, destination, 7, 7), private);
+    assert_eq!(
+        select_staging_parent(private, destination, 7, 11),
+        destination
+    );
+}
+
+#[test]
 fn frame_names_are_exact_and_writes_never_overwrite() {
     let scratch = Scratch::new();
     let mut port = scratch.port();

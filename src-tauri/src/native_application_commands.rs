@@ -42,7 +42,6 @@ async fn bootstrap_reserved(
         state.instance_id(),
     )?;
     let admitted = admit_project(&request.projection, &request.resources)?;
-    let resource_count = admitted.resources.len();
     let root = app
         .path()
         .app_cache_dir()
@@ -57,30 +56,48 @@ async fn bootstrap_reserved(
     )
     .map_err(|message| host_error("invalid_request", message))?;
     let mapping = request.viewport.map(ViewportInput::admit).transpose()?;
-    let viewport_available = mapping.is_some();
-    let compositor = if let Some(mapping) = mapping {
+    if let Some(mapping) = mapping {
         let app_for_main = app.clone();
         let instance = request.instance_id.clone();
         viewport_host::on_main_thread(&app, move || {
-            viewport_host::create(&app_for_main, instance, mapping)
+            let compositor = viewport_host::create(&app_for_main, instance.clone(), mapping)?;
+            let state = app_for_main.state::<ApplicationMcp>();
+            finish_bootstrap(&state, instance, admitted, artifacts, compositor, true)
         })
-        .await?
+        .await
     } else {
-        Compositor::new().map_err(|error| host_error("unavailable", error.to_string()))?
-    };
+        let compositor =
+            Compositor::new().map_err(|error| host_error("unavailable", error.to_string()))?;
+        finish_bootstrap(
+            state,
+            request.instance_id,
+            admitted,
+            artifacts,
+            compositor,
+            false,
+        )
+    }
+}
+
+fn finish_bootstrap(
+    state: &ApplicationMcp,
+    instance_id: String,
+    admitted: AdmittedProject,
+    artifacts: DesktopArtifactPort,
+    compositor: Compositor,
+    viewport_retained: bool,
+) -> HostResult<NativeBootstrapReceipt> {
+    let resource_count = admitted.resources.len();
     let application = match DesktopNativeApplication::new(
-        request.instance_id.clone(),
+        instance_id.clone(),
         admitted,
         artifacts,
         SharedCompositor::new(compositor),
     ) {
         Ok(application) => application,
         Err(error) => {
-            if viewport_available {
-                let instance = request.instance_id.clone();
-                let _ =
-                    viewport_host::on_main_thread(&app, move || viewport_host::remove(&instance))
-                        .await;
+            if viewport_retained {
+                let _ = viewport_host::remove(&instance_id);
             }
             return Err(error);
         }
@@ -88,20 +105,18 @@ async fn bootstrap_reserved(
     let document_id = application.document_id().to_owned();
     let content_revision = application.content_revision();
     if let Err(message) = state.install_dispatch(Box::new(application)) {
-        if viewport_available {
-            let instance = request.instance_id.clone();
-            let _ =
-                viewport_host::on_main_thread(&app, move || viewport_host::remove(&instance)).await;
+        if viewport_retained {
+            let _ = viewport_host::remove(&instance_id);
         }
         return Err(host_error("duplicate_bootstrap", message));
     }
     Ok(NativeBootstrapReceipt {
         api_version: NATIVE_API_VERSION,
-        instance_id: request.instance_id,
+        instance_id,
         document_id,
         content_revision,
         resource_count,
-        viewport_available,
+        viewport_available: viewport_retained,
     })
 }
 

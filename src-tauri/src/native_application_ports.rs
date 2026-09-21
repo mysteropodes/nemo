@@ -88,23 +88,8 @@ impl ExportResourceResolver for DesktopResourceResolver {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum ArtifactError {
-    InvalidBinding,
-    DuplicateBinding,
-    UnknownTarget,
-    DuplicateJob,
-    UnknownJob,
-    InvalidFrame,
-    FrameCollision,
-    ManifestMismatch,
-    TargetMismatch,
-    OutputCollision,
-    StageUnavailable,
-    StageIdentityChanged,
-    WriteFailed,
-    PublishFailed,
-    CleanupFailed,
-}
+#[rustfmt::skip]
+enum ArtifactError { InvalidBinding, DuplicateBinding, UnknownTarget, DuplicateJob, UnknownJob, InvalidFrame, FrameCollision, ManifestMismatch, TargetMismatch, OutputCollision, StageUnavailable, StageIdentityChanged, WriteFailed, PublishFailed, CleanupFailed }
 
 impl ArtifactError {
     fn message(self) -> String {
@@ -212,9 +197,22 @@ impl StagedArtifactPort for DesktopArtifactPort {
         if destination.symlink_metadata().is_ok() {
             return Err(ArtifactError::OutputCollision.message());
         }
-        let path = self
-            .root
-            .join(format!("native-stage-{}", uuid::Uuid::new_v4()));
+        let destination_parent = destination
+            .parent()
+            .ok_or_else(|| ArtifactError::StageUnavailable.message())?;
+        let root_device = directory_identity(&self.root)
+            .map_err(|_| ArtifactError::StageUnavailable.message())?
+            .0;
+        let destination_device = directory_identity(destination_parent)
+            .map_err(|_| ArtifactError::StageUnavailable.message())?
+            .0;
+        let staging_parent = select_staging_parent(
+            &self.root,
+            destination_parent,
+            root_device,
+            destination_device,
+        );
+        let path = staging_parent.join(format!(".nemo-native-stage-{}", uuid::Uuid::new_v4()));
         let mut builder = fs::DirBuilder::new();
         #[cfg(unix)]
         {
@@ -330,6 +328,9 @@ fn valid_frame_name(name: &str) -> bool {
         .and_then(|n| n.strip_suffix(".png"))
         .is_some_and(|digits| digits.len() == 4 && digits.bytes().all(|b| b.is_ascii_digit()))
 }
+
+#[rustfmt::skip]
+fn select_staging_parent<'a>(private_root: &'a Path, destination_parent: &'a Path, private_device: u64, destination_device: u64) -> &'a Path { if private_device == destination_device { private_root } else { destination_parent } }
 
 fn directory_identity(path: &Path) -> Result<(u64, u64), ArtifactError> {
     let metadata = fs::symlink_metadata(path).map_err(|_| ArtifactError::StageIdentityChanged)?;
