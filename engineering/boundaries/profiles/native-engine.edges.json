@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "rust-crate",
+  "policyId": "nemo.rust.native-engine.edges",
+  "status": "adopted",
+  "purpose": "N19/#1351: enforce the internal native-engine module graph, deny reverse dependencies on host crates, pin the crate feature surface, and run the policy through the normal local boundary lane.",
+  "crate": "nemo-native-engine",
+  "root": "native-engine/src/lib.rs",
+  "sourceDir": "native-engine/src",
+  "profileModules": [
+    "rust.native.engine",
+    "rust.native.engine.document",
+    "rust.native.engine.codec",
+    "rust.native.engine.request-receipts",
+    "rust.native.engine.revision",
+    "rust.native.engine.commands",
+    "rust.native.engine.history",
+    "rust.native.engine.evaluation",
+    "rust.native.engine.resource-leases",
+    "rust.native.engine.scheduler",
+    "rust.native.engine.render-scene",
+    "rust.native.engine.compositor",
+    "rust.native.engine.desktop-viewport",
+    "rust.native.engine.png-output",
+    "rust.native.engine.export-job",
+    "rust.native.engine.protocol",
+    "rust.native.engine.application"
+  ],
+  "profileModulesNote": "The seventeen production modules under native-engine/src. The integration harness files in native-engine/tests remain registered and size-checked by rust.profile.json, but are outside this crate-source graph.",
+  "layerRules": {
+    "native-root": {
+      "allowedLayers": ["native-document", "native-codec", "native-request-receipts", "native-revision", "native-commands", "native-history", "native-evaluation", "native-resource-leases", "native-scheduler", "native-render-scene", "native-compositor", "native-desktop-viewport", "native-png-output", "native-export-job", "native-protocol", "native-application"],
+      "meaning": "lib.rs is the declaration-only crate root and may expose each feature-gated production module."
+    },
+    "native-document": { "allowedLayers": [], "meaning": "The document model is the dependency floor." },
+    "native-codec": { "allowedLayers": ["native-document"], "meaning": "Serialization consumes only the document model." },
+    "native-request-receipts": { "allowedLayers": [], "meaning": "Request identity and replay receipts are independent infrastructure." },
+    "native-revision": { "allowedLayers": ["native-document"], "meaning": "Snapshots and revision ownership consume only the document model." },
+    "native-commands": { "allowedLayers": ["native-document", "native-request-receipts", "native-revision"], "meaning": "Commands operate on documents with revision and request identity contracts." },
+    "native-history": { "allowedLayers": ["native-commands", "native-document", "native-request-receipts", "native-revision"], "meaning": "history.rs and transaction.rs form one authority facade and consume the command/document contracts." },
+    "native-evaluation": { "allowedLayers": ["native-document", "native-revision"], "meaning": "Evaluation consumes immutable document snapshots." },
+    "native-resource-leases": { "allowedLayers": ["native-revision"], "meaning": "Resource lifetime ownership keys leases to document snapshots." },
+    "native-scheduler": { "allowedLayers": ["native-resource-leases", "native-revision"], "meaning": "Scheduling owns work and lease lifetimes." },
+    "native-render-scene": { "allowedLayers": ["native-evaluation", "native-scheduler"], "meaning": "Render-scene preparation consumes evaluation and scheduled identity only." },
+    "native-compositor": { "allowedLayers": ["native-render-scene"], "meaning": "The compositor consumes prepared render scenes." },
+    "native-desktop-viewport": { "allowedLayers": ["native-compositor", "native-render-scene", "native-scheduler"], "meaning": "The viewport presents compositor output under scheduler identity." },
+    "native-png-output": { "allowedLayers": ["native-compositor", "native-render-scene"], "meaning": "PNG output consumes the same prepared scene and compositor port as preview." },
+    "native-export-job": { "allowedLayers": ["native-history", "native-png-output", "native-render-scene", "native-revision", "native-scheduler", "native-resource-leases"], "meaning": "Export coordinates immutable history snapshots, scheduling, resource leases and PNG output." },
+    "native-protocol": { "allowedLayers": ["native-commands", "native-export-job"], "meaning": "The wire-neutral application protocol translates commands and export results." },
+    "native-application": { "allowedLayers": ["native-commands", "native-document", "native-export-job", "native-history", "native-protocol", "native-render-scene", "native-request-receipts", "native-revision"], "meaning": "The application facade composes the native authority without depending on a host shell." }
+  },
+  "permittedEdges": {
+    "note": "Observed at adoption from use and inline crate paths. Layer rules are the enforced contract; the test suite pins the exact observed 38-edge graph so additions require a reviewed policy change.",
+    "edgeCount": 38
+  },
+  "exportedPort": {
+    "source": "native-engine/src/lib.rs exposes modules through a declaration macro rather than pub use; N19 tests pin that macro and its Cargo mapping separately.",
+    "items": []
+  },
+  "features": {
+    "declared": ["default", "codec", "commands", "history", "evaluation", "scheduler", "compositor", "viewport", "export_job", "application", "test-codec", "test-commands", "test-history", "test-evaluation", "test-scheduler", "test-compositor", "test-viewport", "test-export_job", "test-application"],
+    "declaredNote": "Exact [features] keys from native-engine/Cargo.toml. The declaration macro uses a metavariable cfg; the N19 test pins every production and test mapping to Cargo and proves a literal undeclared feature is rejected.",
+    "allowedCfgs": ["test", "feature = $feature"]
+  },
+  "externalCratePorts": {
+    "tauri": { "allowedModules": [], "items": [], "note": "The engine cannot depend on the desktop host." },
+    "nemo_mcp": { "allowedModules": [], "items": [], "note": "The engine cannot depend on the MCP transport." },
+    "geometry_wasm": { "allowedModules": [], "items": [], "note": "The native engine cannot reverse-depend on the legacy WebAssembly engine." },
+    "nemo": { "allowedModules": [], "items": [], "note": "The engine cannot depend on the desktop crate by its package name." }
+  },
+  "unanalyzedModules": ["rust.native.engine.tests"],
+  "exceptions": []
+}
