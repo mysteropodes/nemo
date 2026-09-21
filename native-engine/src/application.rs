@@ -16,6 +16,7 @@ use crate::protocol::{
 };
 use crate::render_scene::GeometryPaintInput;
 use crate::request_receipts::RequestFingerprint;
+use crate::revision::DocumentSnapshot;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,6 +107,12 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.history.content_revision()
     }
 
+    /// Narrow native-host access to the same immutable snapshot authority used
+    /// by export. Transport responses continue to expose identity only.
+    pub fn acquire_snapshot(&self, revision: u64) -> Option<DocumentSnapshot> {
+        self.history.acquire_snapshot(revision)
+    }
+
     pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
         if let Some(response) = protocol::preflight_identity(
             &request,
@@ -168,10 +175,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         }
     }
 
-    pub fn run_export_to_completion(
-        &mut self,
-        job_id: &str,
-    ) -> Result<JobReceipt, ExportJobError> {
+    pub fn run_export_to_completion(&mut self, job_id: &str) -> Result<JobReceipt, ExportJobError> {
         self.exports.run_to_completion(job_id)
     }
 
@@ -193,7 +197,9 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         &mut self,
         document: OpacityDocument,
     ) -> Result<Vec<JobReceipt>, String> {
-        self.history.replace_document(document).map_err(str::to_owned)?;
+        self.history
+            .replace_document(document)
+            .map_err(str::to_owned)?;
         let document_id = self.history.document_id().to_owned();
         let reconciled = self
             .exports
@@ -211,16 +217,18 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.exports.port()
     }
 
+    pub fn resource_resolver_mut(&mut self) -> &mut R {
+        &mut self.resources
+    }
+
     fn history_stage(
         &mut self,
         request: OpacityRequest,
         fingerprint: RequestFingerprint,
     ) -> ResponseEnvelope {
         let response = self.history.handle(request.clone());
-        self.requests.insert(
-            request.request_id,
-            RecordedRequest::History(fingerprint),
-        );
+        self.requests
+            .insert(request.request_id, RecordedRequest::History(fingerprint));
         response
     }
 
@@ -297,11 +305,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                 let response = self.job_response(request, &receipt);
                 self.requests.insert(
                     request.request_id.clone(),
-                    RecordedRequest::JobBegin(
-                        fingerprint,
-                        response.content_revision(),
-                        receipt,
-                    ),
+                    RecordedRequest::JobBegin(fingerprint, response.content_revision(), receipt),
                 );
                 response
             }
@@ -344,11 +348,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                 let response = self.job_response(request, &receipt);
                 self.requests.insert(
                     request.request_id.clone(),
-                    RecordedRequest::JobReceipt(
-                        fingerprint,
-                        response.content_revision(),
-                        receipt,
-                    ),
+                    RecordedRequest::JobReceipt(fingerprint, response.content_revision(), receipt),
                 );
                 response
             }

@@ -165,3 +165,15 @@ fn legacy_capabilities_advertise_v2_without_activating_a_document() {
     });
     assert_eq!(response.result.unwrap()["nativeApiVersion"], 2);
 }
+
+#[test]
+fn bootstrap_reservation_is_exclusive_and_released_by_drop() {
+    let state = ApplicationMcp::default();
+    let reservation = state.reserve_native_install().unwrap();
+    assert_eq!(
+        state.reserve_native_install().err().unwrap(),
+        "native application bootstrap is already in progress"
+    );
+    drop(reservation);
+    assert!(state.reserve_native_install().is_ok());
+}

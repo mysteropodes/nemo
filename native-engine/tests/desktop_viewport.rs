@@ -312,3 +312,12 @@ fn dispose_returns_only_pending_ids_once_and_then_closes_all_activity() {
     let first = identity(&app, &mut scheduler, 2); let second = identity(&app, &mut scheduler, 3); host.register(first.clone()).unwrap(); host.register(second.clone()).unwrap(); let events = host.test_port().events.borrow().len(); assert_eq!(host.dispose(), vec![first.work_id(), second.work_id()]); assert!(host.dispose().is_empty()); assert_eq!(host.test_port().disposals, 1); assert_eq!(host.register(first.clone()), Err(ViewportError::Disposed)); assert_eq!(host.resize(mapping(PhysicalExtent { width: 640, height: 360 }, PhysicalExtent { width: 320, height: 180 }, 1.0)), Err(ViewportError::Disposed)); assert_eq!(host.pointer_intent(CssPoint { x: 1.0, y: 1.0 }), Err(ViewportError::Disposed)); assert_eq!(host.selection_intent(CompositionEdges { x0: 0.0, y0: 0.0, x1: 1.0, y1: 1.0 }), Err(ViewportError::Disposed)); assert_eq!(host.simulate_port_completion(second.clone()), Err(ViewportError::Disposed)); assert_eq!(host.test_port().events.borrow().len(), events + 1);
     assert_eq!(scheduler.succeed(terminal.work_id()).unwrap().publication(), &PublicationDisposition::SuppressedStale { newest_generation: second.view_generation() }); scheduler.cancel(first.work_id()).unwrap(); scheduler.cancel(second.work_id()).unwrap(); assert_leases(&scheduler, 3);
 }
+
+#[rustfmt::skip]
+#[test]
+fn replacement_reconciles_deferred_viewport_work_before_later_disposal() {
+    let app = app(); let mut scheduler = FrameScheduler::new(); let pending = identity(&app, &mut scheduler, 1); let deferred = identity(&app, &mut scheduler, 2);
+    let mut host = DesktopViewportHost::new(FakePort::default(), standard()); host.register(pending.clone()).unwrap(); host.register(deferred.clone()).unwrap(); queue(&mut host, &[Step::Timeout]); assert_eq!(host.simulate_port_completion(deferred.clone()).unwrap().status(), &ViewportStatus::Deferred(DeferredAction::Timeout));
+    let replaced = scheduler.replace_document("replacement-document").unwrap(); let replaced_ids: Vec<_> = replaced.iter().map(|receipt| receipt.work_id()).collect(); assert_eq!(replaced_ids, vec![pending.work_id(), deferred.work_id()]);
+    assert_eq!(host.reconcile_replaced(&replaced_ids), replaced_ids); assert!(host.pending_work_ids().is_empty()); assert!(host.reconcile_replaced(&replaced_ids).is_empty()); assert!(host.dispose().is_empty()); assert_eq!(host.test_port().disposals, 1); assert_leases(&scheduler, 2);
+}
