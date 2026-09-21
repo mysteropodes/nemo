@@ -4651,8 +4651,21 @@
     {
       "id": "C02:10",
       "note": "motion.js:9841-11140 (1300 lines) — per-property row rendering (renderElementsList, renderColorRow/renderFillColorRow/renderStrokeColorRow, renderTrimScalarRow/renderTrimPathsGroup, renderTextAnimatorsList, renderPathVertexGroup/renderPathGroupTrackRow, renderMeshVertexGroup/renderVertexRow, trackRowHtml, renderTracksFor) has no packet owner.",
-      "disposition": "needs-reconciliation",
-      "evidence": "Cited 9841-11140 (ded641b) maps to 9826-11125 at the frozen tree; rangeCoverage lists it as one open span of 1300 lines with no C20 supplement yet. Queued for the C20g+ supplement series (P03C Motion queue), alongside the sibling C19s+ timeline queue (C08:1) and C21a/#1180 for app.js."
+      "disposition": "covered-by-packet",
+      "packets": [
+        "C20g.render-elements-list",
+        "C20g.color-hex-helpers-and-color-rows",
+        "C20g.trim-scalar-row-and-trim-paths-group",
+        "C20h.text-animator-timeline-rows",
+        "C20h.path-group-expand-state",
+        "C20h.path-as-one-property-key-helpers",
+        "C20h.path-vertex-group-panel-and-grid-rows",
+        "C20h.discrete-key-grid-row",
+        "C20h.mesh-vertex-group-and-vertex-row",
+        "C20i.track-row-html",
+        "C20i.render-tracks-for-and-grid-select-lead-in"
+      ],
+      "evidence": "C02 source ded641bd763379f36d629bf1686fcce8a6137a66 motion.js:9841-11140 maps exactly to frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 motion.js:9826-11125. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, pinned source 59a5a38c514f5da830dd2f2df4c83c63b1b22fba, and post-N11 main 656d91e211d7a66746c9af028270f0dd91472fab all resolve src/js/motion.js to blob 6617bac29042c22399cac202bf054c09e4fdf30e. Accepted census receipts: C20g/#1218, PR #1225 merge b74df7893015b87b10b16c3d125350e94150ba29; C20h/#1224, PR #1233 merge 73ee70feaacb73ecd3083c3a53d2c1930fcf4b5c; C20i/#1227, PR #1241 merge 21ce20348fe48e0b6e2b91045954d8ef067d543c. Their eleven pending packet ranges form an exact 1,300-line union over 9826-11125 with zero missing or duplicate lines. This is census ownership only, not implementation; all eleven packet admissions remain pending."
     },
     {
       "id": "C03:1",
