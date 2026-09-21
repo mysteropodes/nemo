@@ -9,6 +9,7 @@
   const operations = new Set([
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
+    'query.document.serialize', 'query.document.evaluate',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
     'job.export.png.begin', 'job.export.png.status', 'job.export.png.cancel',
@@ -26,6 +27,7 @@
     'cleanup_failed', 'document_replaced',
   ]);
   const identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+  const opacityCurve = [[0, 0], [0.25, 0.156], [0.5, 0.5], [0.75, 0.844], [1, 1]];
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
   function plain(value) {
@@ -83,7 +85,12 @@
     id(payload.transactionId, `${label}.transactionId`);
   }
   function validatePayload(operation, payload) {
-    if (operation === 'command.document.apply') {
+    if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
+      const evaluate = operation === 'query.document.evaluate';
+      exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
+      revision(payload.atRevision, 'atRevision');
+      if (evaluate) { id(payload.contextId, 'contextId'); frame(payload.frame); }
+    } else if (operation === 'command.document.apply') {
       exact(payload, ['command', 'stableTarget', 'value'], [], 'command payload');
       if (payload.command !== 'layer.opacity.set') throw new TypeError('unsupported command');
       target({ stableTarget: payload.stableTarget }, 'command target');
@@ -164,9 +171,62 @@
       if (!jobErrors.has(error.code) || typeof error.message !== 'string') throw new TypeError('invalid job error');
     }
   }
+  function opacityVector(value, label) {
+    if (!Array.isArray(value) || value.length !== 1 || typeof value[0] !== 'number' ||
+        !Number.isFinite(value[0]) || value[0] < 0 || value[0] > 100) throw new TypeError(`${label} is invalid`);
+  }
+  function validateCurve(points) {
+    if (!Array.isArray(points) || points.length !== opacityCurve.length) throw new TypeError('opacity curve is unsupported');
+    points.forEach((point, index) => {
+      exact(point, ['x', 'y'], [], 'opacity curve point');
+      if (![point.x, point.y].every(Number.isFinite) || point.x !== opacityCurve[index][0] || point.y !== opacityCurve[index][1]) throw new TypeError('opacity curve is unsupported');
+    });
+  }
+  function validateSerializedDocument(document) {
+    exact(document, ['format', 'formatVersion', 'totalFrames', 'layers'], [], 'serialized document');
+    if (document.format !== 'nemo.native-opacity-document' || document.formatVersion !== 1) throw new TypeError('serialized document format is invalid');
+    frame(document.totalFrames); if (document.totalFrames === 0) throw new TypeError('serialized totalFrames must be positive');
+    if (!Array.isArray(document.layers) || !document.layers.length) throw new TypeError('serialized layers must be nonempty');
+    const ids = new Set();
+    document.layers.forEach((layer) => {
+      exact(layer, ['layerUid'], ['motionStatic', 'motion'], 'serialized layer'); id(layer.layerUid, 'layerUid');
+      if (ids.has(layer.layerUid) || (!has(layer, 'motionStatic') && !has(layer, 'motion'))) throw new TypeError('serialized layer identity or motion is invalid');
+      ids.add(layer.layerUid);
+      if (has(layer, 'motionStatic')) {
+        exact(layer.motionStatic, ['opacity'], [], 'motionStatic'); opacityVector(layer.motionStatic.opacity, 'motionStatic.opacity');
+      }
+      if (has(layer, 'motion')) {
+        exact(layer.motion, ['opacity'], [], 'motion'); exact(layer.motion.opacity, ['keys'], [], 'motion.opacity');
+        const keys = layer.motion.opacity.keys; if (!Array.isArray(keys) || !keys.length) throw new TypeError('opacity keys must be nonempty');
+        let prior = -1;
+        keys.forEach((key) => {
+          exact(key, ['frame', 'v', 'curvePoints', 'hOut', 'hIn'], [], 'opacity key'); frame(key.frame);
+          if (key.frame >= document.totalFrames || key.frame <= prior) throw new TypeError('opacity key frames must be strictly ascending and in range');
+          prior = key.frame; opacityVector(key.v, 'opacity key value');
+          validateCurve(key.curvePoints);
+          if (![key.hOut, key.hIn].every((handle) => Array.isArray(handle) && handle.length === 2 && handle.every((part) => part === 0))) throw new TypeError('opacity curve is unsupported');
+        });
+      }
+    });
+  }
   function validateResult(value, operation) {
     if (!operation) return;
-    if (['command.document.apply', 'history.undo', 'history.redo'].includes(operation)) {
+    if (operation === 'query.document.serialize') {
+      exact(value, ['atRevision', 'documentSnapshotId', 'document'], [], 'serialize result');
+      revision(value.atRevision, 'atRevision'); id(value.documentSnapshotId, 'documentSnapshotId');
+      validateSerializedDocument(value.document);
+    } else if (operation === 'query.document.evaluate') {
+      exact(value, ['documentSnapshotId', 'documentId', 'contentRevision', 'contextId', 'frame', 'layers'], [], 'evaluate result');
+      ['documentSnapshotId', 'documentId', 'contextId'].forEach((key) => id(value[key], key));
+      revision(value.contentRevision, 'contentRevision'); frame(value.frame);
+      if (!Array.isArray(value.layers)) throw new TypeError('evaluated layers must be an array');
+      const seen = new Set();
+      value.layers.forEach((layer) => {
+        exact(layer, ['layerUid', 'value'], [], 'evaluated layer'); id(layer.layerUid, 'layerUid');
+        if (seen.has(layer.layerUid) || typeof layer.value !== 'number' || !Number.isFinite(layer.value) || layer.value < 0 || layer.value > 100) throw new TypeError('invalid evaluated opacity');
+        seen.add(layer.layerUid);
+      });
+    } else if (['command.document.apply', 'history.undo', 'history.redo'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'command result');
       if (typeof value.applied !== 'boolean' || ![0, 1].includes(value.historyEntriesAdded)) throw new TypeError('invalid command result');
     } else if (operation === 'query.document.opacity') {
@@ -193,6 +253,11 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value);
+    if (['query.document.serialize', 'query.document.evaluate'].includes(operation)) {
+      const encoded = JSON.stringify(value);
+      const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
+      if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
+    }
     exact(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'contentRevision', 'ok'], value.ok ? ['result'] : ['error'], 'response');
     if (value.apiVersion !== 2 || value.requestId !== requestId || typeof value.ok !== 'boolean') throw new TypeError('response identity is invalid');
     id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.contentRevision, 'contentRevision');
@@ -206,6 +271,10 @@
     return value;
   }
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function frame(value) {
+    revision(value, 'frame');
+    if (value > 4294967295) throw new TypeError('frame exceeds native u32 range');
+  }
   function createNativeApplicationAdapter(label, transport) {
     id(label, 'port label');
     if (!transport || typeof transport.dispatch !== 'function') throw new TypeError('injected transport requires dispatch(request)');
@@ -214,7 +283,16 @@
       dispatch(request) {
         validateRequest(request);
         const outbound = clone(request);
-        return Promise.resolve(transport.dispatch(outbound)).then((response) => validateResponse(response, request.requestId, request.operation));
+        return Promise.resolve(transport.dispatch(outbound)).then((response) => {
+          validateResponse(response, outbound.requestId, outbound.operation);
+          if (response.ok && ['query.document.serialize', 'query.document.evaluate'].includes(outbound.operation)) {
+            const result = response.result, evaluate = outbound.operation === 'query.document.evaluate';
+            if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId ||
+                (evaluate ? result.contentRevision : result.atRevision) !== outbound.payload.atRevision ||
+                (evaluate && (result.documentId !== outbound.documentId || result.contextId !== outbound.payload.contextId || result.frame !== outbound.payload.frame))) throw new TypeError('pinned read identity mismatch');
+          }
+          return response;
+        });
       },
     });
   }

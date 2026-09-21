@@ -23,6 +23,12 @@ const POLICY = 'engineering/boundaries/profiles/native-engine.edges.json';
 const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
+  'native-engine/src/lib.rs',
+  'native-engine/src/commands.rs',
+  'native-engine/src/history.rs',
+  'native-engine/src/request_receipts.rs',
+  'native-engine/src/read_queries.rs',
+  'native-engine/tests/application_read.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
@@ -43,6 +49,7 @@ const EXPECTED_MODULES = [
   'rust.native.engine.scheduler', 'rust.native.engine.render-scene', 'rust.native.engine.compositor',
   'rust.native.engine.desktop-viewport', 'rust.native.engine.png-output', 'rust.native.engine.export-job',
   'rust.native.engine.protocol', 'rust.native.engine.application',
+  'rust.native.engine.read-queries',
 ];
 
 const EXPECTED_EDGES = [
@@ -56,6 +63,8 @@ const EXPECTED_EDGES = [
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
   'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->scheduler',
   'resource-leases->revision', 'revision->document', 'scheduler->resource-leases', 'scheduler->revision',
+  'commands->read-queries', 'read-queries->codec', 'read-queries->evaluation',
+  'read-queries->request-receipts', 'read-queries->revision',
 ].sort();
 
 const PRODUCTION = {
@@ -67,7 +76,7 @@ const PRODUCTION = {
   compositor: ['compositor', 'render_scene'],
   viewport: ['desktop_viewport'],
   export_job: ['export_job', 'png_output'],
-  application: ['application', 'protocol'],
+  application: ['application', 'protocol', 'read_queries'],
 };
 
 const TEST_TARGETS = {
@@ -91,9 +100,11 @@ function section(text, start) {
 function macroMappings(text, name) {
   const match = new RegExp(`${name}!\\s*\\{([\\s\\S]*?)\\n\\}`).exec(text);
   assert.ok(match, `${name}! invocation missing`);
-  return Object.fromEntries([...match[1].matchAll(/"([^"]+)"\s*=>\s*([^;]+);/g)].map((entry) => [
-    entry[1], entry[2].split(',').map((item) => item.trim()),
-  ]));
+  const result = {};
+  for (const entry of match[1].matchAll(/"([^"]+)"\s*=>\s*([^;]+);/g)) {
+    (result[entry[1]] ||= []).push(...entry[2].split(',').map((item) => item.trim()));
+  }
+  return result;
 }
 
 function macroDefinition(text, name) {
@@ -159,8 +170,8 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   assert.deepEqual(policy.exceptions, []);
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
-  assert.equal(result.moduleCount, 17);
-  assert.equal(result.edges.length, 38);
+  assert.equal(result.moduleCount, 18);
+  assert.equal(result.edges.length, 43);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
@@ -177,7 +188,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   const testMacros = macroMappings(rootText, 'test_modules');
   assert.deepEqual(Object.keys(testMacros), Object.keys(TEST_TARGETS).map((name) => `test-${name}`));
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
-    assert.deepEqual(testMacros[`test-${name}`], [`${name}_tests = "${source}"`]);
+    const expected = [`${name}_tests = "${source}"`];
+    if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"');
+    assert.deepEqual(testMacros[`test-${name}`], expected);
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });
   }
   assert.deepEqual(Object.keys(cargo.targets), Object.keys(TEST_TARGETS));

@@ -6,7 +6,7 @@
   "status": "staged",
   "availability": {
     "state": "unavailable",
-    "reason": "N15 publishes the v2 contract only. N16 owns host discovery and N20 owns authority activation."
+    "reason": "N19A publishes bounded native persistence and evaluation reads. N16 owns host discovery and N20 owns authority activation."
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -14,6 +14,8 @@
     "query.document.opacity",
     "query.document.revision",
     "query.document.snapshot.acquire",
+    "query.document.serialize",
+    "query.document.evaluate",
     "transaction.begin",
     "transaction.update",
     "transaction.commit",
@@ -51,6 +53,7 @@
     "fallback": "none"
   },
   "resourceBoundary": {
+    "maxReadResponseBytes": 4096,
     "accepted": ["opaque geometry resource handle", "opaque output handle"],
     "forbidden": ["raw pixels", "binary payload", "canvas", "geometry JSON"]
   },

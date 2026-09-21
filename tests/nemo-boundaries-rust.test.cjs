@@ -181,6 +181,9 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N19A registers immutable application reads without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/read_queries.rs', 'native-engine/tests/application_read.rs',
+    'nemo-mcp/src/native_contract.rs']],
   ['N07 registers every codec source without exclusions or a frozen-baseline waiver', [
     'native-engine/src/codec.rs', 'native-engine/src/document.rs', 'native-engine/tests/codec.rs']],
   ['N08 registers every revision and command source without exclusions or a frozen-baseline waiver', [

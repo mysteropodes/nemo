@@ -125,6 +125,7 @@ pub async fn call_native(
     request.validate().map_err(io::Error::other)?;
     let request_id = request.request_id.clone();
     let document_id = request.document_id.clone();
+    let response_contract = request.clone();
     let round_trip = async {
         let mut stream = TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, endpoint.port)).await?;
         write_json(
@@ -137,7 +138,7 @@ pub async fn call_native(
         .await?;
         let response: NativeApplicationResponse =
             read_json_bounded(stream, NATIVE_MAX_MESSAGE_BYTES).await?;
-        validate_native_response(&response)?;
+        validate_native_response(&response, &response_contract)?;
         let reports_replacement = !response.ok
             && response
                 .error
@@ -155,14 +156,25 @@ pub async fn call_native(
     cancellable(round_trip, cancel).await
 }
 
-fn validate_native_response(response: &NativeApplicationResponse) -> io::Result<()> {
+fn validate_native_response(
+    response: &NativeApplicationResponse,
+    request: &NativeApplicationRequest,
+) -> io::Result<()> {
     let identity_is_valid = response.api_version == NATIVE_API_VERSION
         && bounded_identifier(&response.request_id)
         && bounded_identifier(&response.instance_id)
         && bounded_identifier(&response.document_id)
         && response.content_revision <= MAX_SAFE_REVISION;
     let disposition_is_valid = match (response.ok, &response.result, &response.error) {
-        (true, Some(result), None) => result.is_object(),
+        (true, Some(result), None) => {
+            result.is_object()
+                && crate::native_contract::validate_result(
+                    &request.operation,
+                    &request.document_id,
+                    &request.payload,
+                    result,
+                )
+        }
         (false, None, Some(error)) => {
             !error.code.is_empty()
                 && !error.message.is_empty()

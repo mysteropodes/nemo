@@ -137,10 +137,18 @@
       "sizeProfile": "Rust production module"
     },
     {
+      "id": "rust.native.engine.read-queries",
+      "layer": "native-read-queries",
+      "dir": "native-engine/src",
+      "files": ["read_queries.rs"],
+      "publicApi": ["read_queries.rs"],
+      "sizeProfile": "Rust production module"
+    },
+    {
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "history.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
@@ -172,6 +180,7 @@
         "src/contract_tests.rs",
         "src/lib.rs",
         "src/main.rs",
+        "src/native_contract.rs",
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",

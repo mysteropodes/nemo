@@ -26,7 +26,8 @@ const net = require('node:net');
 const repo = process.argv[1], instanceId = process.argv[2], secret = process.argv[3];
 const core = require(path.join(repo, 'src/js/application/opacity-application.js'));
 const domain = require(path.join(repo, 'src/js/domain/animation/opacity.js'));
-let identity = 0, context = {}, checkpoints = 0, mutations = 0, nativeCalls = 0;
+const nativeTransport = require(path.join(repo, 'src/js/adapters/native-application.js'));
+let identity = 0, context = {}, checkpoints = 0, mutations = 0, nativeCalls = 0, evaluations = 0;
 let state = fresh(), undo = [], redo = [];
 function fresh() {
   return {currentFrame: 0, totalFrames: 24,
@@ -36,7 +37,7 @@ function copy(value) { return JSON.parse(JSON.stringify(value)); }
 const api = core.create({
   newId: () => 'document-' + (++identity), context: () => context,
   state: () => state, canMutate: () => true,
-  valueAtFrame: layer => layer.motionStatic.opacity,
+  valueAtFrame: layer => { evaluations++; return layer.motionStatic.opacity; },
   snapshot: () => ({frame: state.currentFrame, layers: state.layers.map(layer =>
     ({id: layer.layerUid, name: layer.name, opacity: layer.motionStatic.opacity[0]}))}),
   history: {
@@ -58,11 +59,30 @@ function legacy(request) {
 }
 function local(message) {
   if (message.action === 'call') return legacy(message.request);
+  if (message.action === 'native') return native(message.request);
   if (message.action === 'replace') {
     state = fresh(); undo = []; redo = []; context = {}; api.documentChanged();
   } else if (message.action !== 'inspect') throw new Error('Unexpected fixture action');
   return {meta: api.meta(), state: copy(state), checkpoints, mutations,
-    nativeCalls, undoDepth: undo.length, redoDepth: redo.length};
+    nativeCalls, evaluations, undoDepth: undo.length, redoDepth: redo.length};
+}
+// Fixed transport fixtures only; native-engine application_read.rs proves the Rust authority.
+function native(request) {
+  nativeTransport.validateRequest(request);
+  nativeCalls++;
+  let result = {atRevision: 0, layerUid: request.payload.stableTarget?.layerUid, value: 25};
+  const snapshot = 'native-opacity:native-document-1:0';
+  if (request.operation === 'query.document.serialize') {
+    result = {atRevision: request.payload.atRevision, documentSnapshotId: snapshot,
+      document: {format: 'nemo.native-opacity-document', formatVersion: 1, totalFrames: 21,
+        layers: [{layerUid: 'layer-a', motionStatic: {opacity: [25]}}]}};
+  } else if (request.operation === 'query.document.evaluate') {
+    result = {documentSnapshotId: snapshot, documentId: request.documentId,
+      contentRevision: request.payload.atRevision, contextId: request.payload.contextId,
+      frame: request.payload.frame, layers: [{layerUid: 'layer-a', value: 50}]};
+  }
+  return {apiVersion: 2, requestId: request.requestId, instanceId,
+    documentId: request.documentId, contentRevision: 0, ok: true, result};
 }
 const server = net.createServer(socket => {
   socket.setTimeout(5000, () => socket.destroy());
@@ -82,11 +102,7 @@ const server = net.createServer(socket => {
         socket.end(JSON.stringify({apiVersion: 2, requestId: status.requestId,
           instanceId, available: true, documentId: 'native-document-1', contentRevision: 0}) + '\n');
       } else if (message.nativeRequest) {
-        const request = message.nativeRequest;
-        nativeCalls++;
-        socket.end(JSON.stringify({apiVersion: 2, requestId: request.requestId,
-          instanceId, documentId: request.documentId, contentRevision: 0, ok: true,
-          result: {atRevision: 0, layerUid: request.payload.stableTarget.layerUid, value: 25}}) + '\n');
+        socket.end(JSON.stringify(native(message.nativeRequest)) + '\n');
       } else {
         socket.end(JSON.stringify(legacy(message.request)) + '\n');
       }
@@ -255,6 +271,28 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
         assert_eq!(native_response["ok"], true);
         assert_eq!(native_response["result"]["layerUid"], "layer-a");
         assert_eq!(app.inspect().await["nativeCalls"], 1);
+        for (operation, payload, expected) in [
+            ("query.document.serialize", json!({"atRevision": 0}), json!({
+                "atRevision": 0, "documentSnapshotId": "native-opacity:native-document-1:0",
+                "document": {"format": "nemo.native-opacity-document", "formatVersion": 1,
+                    "totalFrames": 21, "layers": [{"layerUid": "layer-a", "motionStatic": {"opacity": [25]}}]}
+            })),
+            ("query.document.evaluate", json!({"atRevision": 0, "contextId": "scene-root", "frame": 10}), json!({
+                "documentSnapshotId": "native-opacity:native-document-1:0", "documentId": "native-document-1",
+                "contentRevision": 0, "contextId": "scene-root", "frame": 10,
+                "layers": [{"layerUid": "layer-a", "value": 50}]
+            })),
+        ] {
+            assert!(discovery["registeredNativeCapabilities"][0]["operations"].as_array().unwrap().contains(&json!(operation)));
+            let read = json!({"apiVersion": 2, "requestId": operation,
+                "instanceId": instance, "documentId": "native-document-1", "operation": operation, "payload": payload});
+            let direct = app.send(json!({"action": "native", "request": read})).await;
+            assert_eq!(direct["result"], expected);
+            assert_eq!(command(&client, &read).await, direct);
+        }
+        let after_reads = app.inspect().await;
+        assert_eq!(after_reads["evaluations"], 0, "native reads never invoke the JS evaluator");
+        state_is(&after_reads, 100, 0, 0, 0);
 
         let direct_set = request(&initial["meta"], "direct-set", "property.set", opacity(75));
         let direct_result = app.direct(&direct_set).await;

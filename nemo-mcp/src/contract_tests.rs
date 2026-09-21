@@ -73,6 +73,71 @@ fn native_request_resolution_is_descriptor_driven_and_bounded() {
 }
 
 #[test]
+fn native_pinned_reads_are_discovered_without_transport_operation_variants() {
+    let descriptor: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-opacity.json"
+    ))
+    .unwrap();
+    assert_eq!(descriptor["availability"]["state"], "unavailable");
+    assert_eq!(
+        descriptor["resourceBoundary"]["maxReadResponseBytes"],
+        NATIVE_MAX_MESSAGE_BYTES
+    );
+    for (operation, payload) in [
+        ("query.document.serialize", json!({"atRevision": 0})),
+        (
+            "query.document.evaluate",
+            json!({"atRevision": 0, "contextId": "scene-root", "frame": 10}),
+        ),
+    ] {
+        assert!(crate::capabilities::native_catalog()
+            .capability_for_operation(operation)
+            .is_some());
+        let request = native_request(operation, payload);
+        assert!(request.validate().is_ok());
+        let encoded = serde_json::to_value(&request).unwrap();
+        assert_eq!(encoded["operation"], operation);
+        assert!(encoded.get("expectedRevision").is_none());
+        assert_eq!(
+            serde_json::from_value::<NativeApplicationRequest>(encoded.clone()).unwrap(),
+            request
+        );
+        let mut explicit_null = encoded;
+        explicit_null["expectedRevision"] = Value::Null;
+        assert!(serde_json::from_value::<NativeApplicationRequest>(explicit_null).is_err());
+    }
+    for (operation, payload) in [
+        ("query.document.serialize", json!({})),
+        (
+            "query.document.serialize",
+            json!({"atRevision": 0, "extra": true}),
+        ),
+        (
+            "query.document.evaluate",
+            json!({"atRevision": 0, "contextId": "bad id", "frame": 10}),
+        ),
+        (
+            "query.document.evaluate",
+            json!({"atRevision": 0, "contextId": "scene-root", "frame": 4294967296_u64}),
+        ),
+    ] {
+        assert_eq!(
+            native_request(operation, payload)
+                .validate()
+                .unwrap_err()
+                .code(),
+            "malformed_payload"
+        );
+    }
+    let mut with_revision = native_request("query.document.serialize", json!({"atRevision": 0}));
+    with_revision.expected_revision = Some(0);
+    assert_eq!(
+        with_revision.validate().unwrap_err().code(),
+        "invalid_request"
+    );
+}
+
+#[test]
 fn json_kind_names_every_json_shape() {
     assert_eq!(json_kind(&json!(null)), "null");
     assert_eq!(json_kind(&json!(true)), "a boolean");

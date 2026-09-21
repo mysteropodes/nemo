@@ -121,6 +121,10 @@ impl NativeOpacityHistory {
             OP_QUERY_OPACITY | OP_QUERY_REVISION | OP_QUERY_SNAPSHOT => {
                 self.forward_query(request, fingerprint)
             }
+            #[cfg(feature = "application")]
+            crate::commands::OP_QUERY_SERIALIZE | crate::commands::OP_QUERY_EVALUATE => {
+                self.forward_query(request, fingerprint)
+            }
             OP_TRANSACTION_BEGIN => self.begin(&request, fingerprint),
             OP_TRANSACTION_UPDATE => self.update(&request, fingerprint),
             OP_TRANSACTION_COMMIT => self.commit(&request, fingerprint),
