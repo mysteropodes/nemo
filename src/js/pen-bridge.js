@@ -16,8 +16,8 @@
 (function () {
   var draggingHandle = false;
   function allowLegacyEdit(event) {
-    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('pen')) return true;
-    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('pen') === true; } catch (_) {}
+    if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
     return false;
   }
   // Set only by the Alt+drag-on-an-existing-anchor gesture below — tells

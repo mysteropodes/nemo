@@ -14,8 +14,8 @@
 (function () {
   var pointerIsDown = false; // gesture lifecycle (suspend/resume span)
   function allowLegacyEdit(event) {
-    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('eraser')) return true;
-    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('eraser') === true; } catch (_) {}
+    if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
     return false;
   }
   var lastErasePt = null; // world Point of the previous erase sample this gesture, or null for the first — fed to eraseAtPoint so it sweeps a continuous capsule instead of a lone circle per move (see eraseAtPoint's own comment for why)

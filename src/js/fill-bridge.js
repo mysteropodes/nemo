@@ -12,8 +12,8 @@
 // fillRegenerateLinked relies on later.
 (function () {
   function allowLegacyEdit(event) {
-    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('fill')) return true;
-    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('fill') === true; } catch (_) {}
+    if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
     return false;
   }
   function shouldIntercept() {

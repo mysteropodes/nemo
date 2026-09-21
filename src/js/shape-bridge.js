@@ -13,8 +13,8 @@
   var shapeStart = null; // world [x,y]
   var shapeTool = null;
   function allowLegacyEdit(event) {
-    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('shape')) return true;
-    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('shape') === true; } catch (_) {}
+    if (allowed) return true; if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
     return false;
   }
 

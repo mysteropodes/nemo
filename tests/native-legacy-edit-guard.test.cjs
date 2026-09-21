@@ -100,8 +100,7 @@ function directCallback(file, tool) {
     window: null,
   };
   context.window = context;
-  context.SMNativeEditGuard = guard;
-  context.SMEngineBridge = { isEnabled: () => true };
+  context.SMEngineBridge = { isEnabled: () => true, nativeEditGuard: guard };
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context, { filename: file });
   const callback = handlers.pointerdown;
   assert.equal(typeof callback, 'function', `${file} did not register its direct pointerdown callback`);
@@ -117,13 +116,41 @@ function directCallback(file, tool) {
   assert.ok(second.prevented >= 1);
 }
 
-for (const [file, tool] of [
+const OWNED_BRIDGES = [
   ['src/js/draw-bridge.js', 'draw'],
   ['src/js/fill-bridge.js', 'fill'],
   ['src/js/pen-bridge.js', 'pen'],
   ['src/js/shape-bridge.js', 'rect'],
   ['src/js/eraser-bridge.js', 'eraser'],
-]) {
+];
+
+test('the compatibility port is optional only while absent and no bridge reads a second guard global', () => {
+  for (const [file] of OWNED_BRIDGES) {
+    const original = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert.doesNotMatch(original, /window\.SMNativeEditGuard/);
+    const source = original.replace(
+      /\n  if \(document\.readyState === 'loading'\) document\.addEventListener\('DOMContentLoaded', init\);\n  else init\(\);\n}\)\(\);\s*$/,
+      '\n  window.__n19cAllow = allowLegacyEdit;\n})();\n',
+    );
+    assert.notEqual(source, original, `${file} guard hook was not installed`);
+    const context = { window: null, SMEngineBridge: {} };
+    context.window = context;
+    vm.runInNewContext(source, context, { filename: file });
+    const legacyEvent = event();
+    assert.equal(context.__n19cAllow(legacyEvent), true, `${file} must pass through only while the port is absent`);
+    assert.equal(legacyEvent.stopped, 0);
+    assert.equal(legacyEvent.prevented, 0);
+    for (const nativeEditGuard of [null, {}, { allow() { throw new Error('broken guard'); } }]) {
+      context.SMEngineBridge.nativeEditGuard = nativeEditGuard;
+      const denied = event();
+      assert.equal(context.__n19cAllow(denied), false, `${file} must fail closed for a present malformed port`);
+      assert.ok(denied.stopped >= 1);
+      assert.ok(denied.prevented >= 1);
+    }
+  }
+});
+
+for (const [file, tool] of OWNED_BRIDGES) {
   test(`native-owned direct ${tool} callback stops before bridge mutation`, () => directCallback(file, tool));
 }
 
@@ -142,9 +169,8 @@ test('idle pointer events and brush-resize gestures do not request native releas
     window: null,
   };
   context.window = context;
-  context.SMNativeEditGuard = guard;
   context.SMEngineBridge = {
-    isEnabled: () => true, screenToWorld: () => [0, 0], suspend() {}, setPressureCursor() {}, renderNow() {},
+    isEnabled: () => true, screenToWorld: () => [0, 0], suspend() {}, setPressureCursor() {}, renderNow() {}, nativeEditGuard: guard,
   };
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), context);
   const resize = event(); resize.altKey = true; resize.clientX = 1;
@@ -173,7 +199,7 @@ test('direct programmatic commit helpers deny before downstream Paper/document a
       getNativeIdentity: () => ({ documentId: 'document-1', generation: 4 }),
       requestRelease: () => { releases++; return null; },
     });
-    const context = { window: null, SMNativeEditGuard: guard };
+    const context = { window: null, SMEngineBridge: { nativeEditGuard: guard } };
     context.window = context;
     Object.defineProperty(context, 'userLayers', { get() { downstream++; return []; } });
     const source = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(

@@ -25,7 +25,7 @@
 // work exactly as before — one Paper scene mutation instead of one per
 // mousemove.
 (function () {
-  var dragging = false; function allowLegacyEdit(event) { var allowed = !window.SMNativeEditGuard || window.SMNativeEditGuard.allow('draw'); if (!allowed && event) { event.stopImmediatePropagation(); event.preventDefault(); } return allowed; }
+  var dragging = false; function allowLegacyEdit(event) { var bridge = window.SMEngineBridge; if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true; var allowed = false; try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('draw') === true; } catch (_) {} if (!allowed && event) { event.stopImmediatePropagation(); event.preventDefault(); } return allowed; }
   // Alt+drag brush-resize gesture (feedback #24): horizontal drag scales
   // state.brushSize with a live circle preview at the press point, like
   // every mainstream drawing app. viewtools-bridge.js's global
