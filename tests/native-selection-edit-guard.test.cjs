@@ -8,102 +8,167 @@ const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const GUARD = path.join(ROOT, 'src/js/application/native-edit-guard.js');
-
-function source(file) {
-  return fs.readFileSync(path.join(ROOT, file), 'utf8');
-}
-
-function freshGuard() {
-  delete require.cache[require.resolve(GUARD)];
-  return require(GUARD);
-}
-
-function event() {
-  return {
-    stopped: 0,
-    prevented: 0,
-    stopImmediatePropagation() { this.stopped++; },
-    preventDefault() { this.prevented++; },
-  };
-}
-
-function deniedPointerDown(file, tool) {
-  const handlers = {};
-  const target = { addEventListener(type, handler) { handlers[type] = handler; } };
+const source = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+function freshGuard() { delete require.cache[require.resolve(GUARD)]; return require(GUARD); }
+function event() { return { stopped: 0, prevented: 0, stopImmediatePropagation() { this.stopped++; }, preventDefault() { this.prevented++; } }; }
+function installGuard(active, releases) {
   const guard = freshGuard();
-  let releases = 0;
   guard.install({
-    getNativeIdentity: () => ({ documentId: 'document-1', generation: 4 }),
-    requestRelease: () => { releases++; return null; },
+    getNativeIdentity: () => active.value ? { documentId: 'document-1', generation: 4 } : null,
+    requestRelease: (request) => { releases.push(request); return { documentId: request.documentId, generation: request.generation, owner: 'legacy', status: 'released' }; },
   });
+  return guard;
+}
+function selectionGuardContext(port) {
+  const text = source('src/js/select-bridge.js');
+  const context = { console, Object, window: null, SMEngineBridge: { isEnabled: () => true } };
+  context.window = context;
+  context.addEventListener = () => {};
+  if (port !== undefined) context.SMEngineBridge.nativeEditGuard = port;
+  vm.runInNewContext(text.slice(0, text.indexOf('  // Same handle-position math')) + '\nwindow.__selectionGuard={allowLegacySelectionEdit:allowLegacySelectionEdit,guardMenuItems:guardMenuItems};\n})();', context);
+  return context;
+}
+function bootSelect(guard, motion) {
+  const handlers = {}, target = { addEventListener(type, handler) { handlers[type] = handler; } };
   const context = {
-    console,
-    state: { tool, playing: false, appMode: 'animation', layers: [{ locked: false }], activeLayerIdx: 0 },
+    console, Object, state: { tool: 'select', playing: false, appMode: 'motion', layers: [{ locked: false }], activeLayerIdx: 0 },
     document: { readyState: 'complete', addEventListener() {}, getElementById: () => target },
-    window: null,
+    Point: function Point(x, y) { this.x = x; this.y = y; }, window: null,
   };
   context.window = context;
-  context.SMEngineBridge = { isEnabled: () => true, nativeEditGuard: guard };
-  vm.runInNewContext(source(file), context, { filename: file });
-  const callback = handlers.pointerdown;
-  assert.equal(typeof callback, 'function', `${file} did not install a pointerdown callback`);
-  const first = event();
-  callback(first);
-  assert.equal(releases, 1, `${file} must request release before its first edit`);
-  assert.ok(first.stopped >= 1, `${file} must stop the denied stack`);
-  assert.ok(first.prevented >= 1, `${file} must prevent the denied default`);
-  const second = event();
-  callback(second);
-  assert.equal(releases, 1, `${file} must not retry an indeterminate release`);
+  context.SMEngineBridge = { isEnabled: () => true, screenToWorld: (x, y) => [x, y], nativeEditGuard: guard };
+  context.SMMotion = motion;
+  vm.runInNewContext(source('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
+  return { handlers, context };
 }
-
-test('native-owned direct Selection and Subselection callbacks deny before mutation', () => {
-  deniedPointerDown('src/js/select-bridge.js', 'select');
-  deniedPointerDown('src/js/subselect-bridge.js', 'subselect');
-});
-
-test('N19D uses only N19C’s bridge port and preserves absent-port pass-through', () => {
-  for (const file of [
-    'src/js/select-bridge.js',
-    'src/js/subselect-bridge.js',
-    'src/js/tools.js',
-    'src/js/shapes-panel.js',
-  ]) {
-    const text = source(file);
-    assert.match(text, /bridge\.nativeEditGuard/);
-    assert.doesNotMatch(text, /window\.SMNativeEditGuard/);
-    assert.match(text, /hasOwnProperty\.call\(bridge,\s*['"]nativeEditGuard['"]\)/);
-  }
-});
-
-test('every owned callback and public mutation helper gates before legacy mutation', () => {
-  const expected = {
-    'src/js/select-bridge.js': [
-      "if (shouldIntercept() && !allowLegacySelectionEdit(e, 'select')) return;",
-      "if (mode && !allowLegacySelectionEdit(e, 'select')) return;",
-      "if ((mode || draggingArc) && !allowLegacySelectionEdit(e, 'select')) return;",
-      "if (!allowLegacySelectionEdit(e, 'select')) return;",
-      "if (!allowLegacySelectionEdit(null, 'select')) return;",
-    ],
-    'src/js/subselect-bridge.js': [
-      'if (!allowLegacySelectionEdit(e)) return;',
-      'if (!(_nmq.active || _nodeDrag.active)) return;\n    if (!allowLegacySelectionEdit(e)) return;',
-    ],
-    'src/js/tools.js': [
-      "if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;",
-      "if(!allowLegacySelectionEdit(null,'fsselect'))return;",
-      "if((state.tool==='select'||state.appMode==='motion')&&!allowLegacySelectionEdit(event.event,'select'))return;",
-    ],
-    'src/js/shapes-panel.js': [
-      'function applySelection(li, strokeIds, additive) {\n    if (!allowLegacySelectionEdit()) return;',
-      'function performPaintSwap(overRow) {\n    if (!allowLegacySelectionEdit()) return;',
-      'function performMemberReorder(overRow) {\n    if (!allowLegacySelectionEdit()) return;',
-      'function performDropInto(destGid) {\n    if (!allowLegacySelectionEdit()) return;',
-      'function performReorder(overRow) {\n    if (!allowLegacySelectionEdit()) return;',
-    ],
+function fakeElement() {
+  return { children: [], events: {}, dataset: {}, style: {}, className: '', innerHTML: '', textContent: '', title: '',
+    classList: { add() {}, remove() {} }, appendChild(child) { this.children.push(child); return child; },
+    addEventListener(type, handler) { this.events[type] = handler; }, querySelectorAll() { return []; } };
+}
+function bootShapes(port, calls) {
+  const list = fakeElement();
+  const context = {
+    console, Object, window: null, selectedPaths: [], userLayers: [], ICO_GROUP: '', ICO_EYE: '', ICO_EYE_CLOSED: '', ICO_COMBINE_UNITE: '', ICO_COMBINE_EXCLUDE: '', ICO_COMBINE_NONE: '',
+    state: { activeLayerIdx: 0, layers: [{ groups: { group: { combineMode: 'none' } } }], selectedStrokeIndices: [] },
+    document: { getElementById: (id) => id === 'shapes-list' ? list : null, createElement: fakeElement }, SM: { t: (key) => key },
+    SMMotion: { buildShapeTree: () => [{ type: 'group', gid: 'group', memberIds: [], children: [] }], layerElements: () => [], liveItemByStrokeId: () => null },
+    SMGroup: { setGroupCombineMode(...args) { calls.push(args); } },
   };
-  for (const [file, snippets] of Object.entries(expected)) {
-    const text = source(file);
-    for (const snippet of snippets) assert.ok(text.includes(snippet), `${file} lost ${snippet}`);
+  context.window = context;
+  context.addEventListener = () => {};
+  context.SMEngineBridge = port === undefined ? {} : { nativeEditGuard: port };
+  vm.runInNewContext(source('src/js/shapes-panel.js'), context, { filename: 'shapes-panel.js' });
+  context.renderShapesPanel();
+  return { context, list };
+}
+function toolFunction(name) {
+  const text = source('src/js/tools.js'), start = text.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing ${name}`);
+  const open = text.indexOf('{', start), end = functionEnd(text, open);
+  return text.slice(start, end + 1);
+}
+function functionEnd(text, open) {
+  let depth = 0, quote = '', line = false, block = false;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i], next = text[i + 1];
+    if (line) { if (ch === '\n') line = false; continue; }
+    if (block) { if (ch === '*' && next === '/') { block = false; i++; } continue; }
+    if (quote) { if (ch === '\\') { i++; continue; } if (ch === quote) quote = ''; continue; }
+    if (ch === '/' && next === '/') { line = true; i++; continue; }
+    if (ch === '/' && next === '*') { block = true; i++; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '{') depth++;
+    if (ch === '}' && --depth === 0) return i;
   }
+  throw new Error('unterminated function');
+}
+function runTool(name, context) { vm.runInNewContext(toolFunction(name), context, { filename: `tools-${name}.js` }); return context[name]; }
+
+test('native ownership requests one exact release and admits only a later replay', () => {
+  const active = { value: true }, releases = [], guard = installGuard(active, releases), context = selectionGuardContext(guard);
+  let mutations = 0;
+  const retained = context.__selectionGuard.guardMenuItems([{ action() { mutations++; } }]);
+  retained[0].action();
+  assert.equal(mutations, 0);
+  assert.deepEqual(releases, [{ kind: 'select', documentId: 'document-1', generation: 4 }]);
+  retained[0].action();
+  assert.equal(releases.length, 1);
+  active.value = false;
+  retained[0].action();
+  assert.equal(mutations, 1);
+});
+
+test('absent ports pass through; malformed and throwing ports fail closed', () => {
+  assert.equal(selectionGuardContext().__selectionGuard.allowLegacySelectionEdit(event(), 'select'), true);
+  for (const port of [{}, { allow() { throw new Error('broken'); } }]) {
+    const context = selectionGuardContext(port), e = event();
+    assert.equal(context.__selectionGuard.allowLegacySelectionEdit(e, 'select'), false);
+    assert.equal(e.stopped, 1);
+    assert.equal(e.prevented, 1);
+  }
+});
+
+test('Motion forwards no down, drag, or up callback on the denied stack', () => {
+  const active = { value: true }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
+  const { handlers } = bootSelect(guard, { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; }, onHoverMove() { return false; } });
+  const denied = event(); denied.clientX = 2; denied.clientY = 3; denied.button = 0;
+  handlers.pointerdown(denied);
+  assert.deepEqual(calls, { down: 0, drag: 0, up: 0 });
+  assert.equal(releases.length, 1);
+  active.value = false;
+  const down = event(); down.clientX = 2; down.clientY = 3; down.button = 0; handlers.pointerdown(down);
+  const drag = event(); drag.clientX = 3; drag.clientY = 4; handlers.pointermove(drag);
+  const up = event(); up.clientX = 3; up.clientY = 4; handlers.pointerup(up);
+  assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
+});
+
+test('a Shapes combine menu retained from legacy cannot mutate after activation', () => {
+  const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = [];
+  const { context, list } = bootShapes(undefined, calls);
+  let menu;
+  context.showContextMenu = (_x, _y, items) => { menu = items; };
+  list.children[0].events.contextmenu({ clientX: 1, clientY: 2, preventDefault() {}, stopPropagation() {} });
+  const unite = menu.find((item) => item.label === 'combineUnion');
+  assert.ok(unite);
+  context.SMEngineBridge.nativeEditGuard = guard;
+  active.value = true;
+  unite.action();
+  assert.equal(calls.length, 0);
+  assert.equal(releases.length, 1);
+  active.value = false;
+  unite.action();
+  assert.equal(calls.length, 1);
+});
+
+test('public selection helpers deny before undo or Paper mutation', () => {
+  const helpers = [
+    ['nodeSelApplyMove', [1, 1], { nodeEditTargetPath: () => ({}), _nodeSel: [0] }],
+    ['nodeSelApplyScale', [2, 2, { x: 0, y: 0 }], { nodeEditTargetPath: () => ({}), _nodeSel: [0] }],
+    ['nodeSelApplyRotate', [30, { x: 0, y: 0 }], { nodeEditTargetPath: () => ({}), _nodeSel: [0] }],
+    ['alignSelection', ['left'], { selectedPaths: [{}, {}] }], ['distributeSelection', ['horizontal'], { selectedPaths: [{}, {}, {}] }],
+    ['duplicateSelection', [], { selectedPaths: [{}] }], ['cutSelection', [], { selectedPaths: [{}] }],
+    ['pasteSelection', [], { _canvasClip: { snaps: [{}] } }], ['fsApplyDelete', [], { _fsSel: [{}] }],
+    ['insertVertexAt', [{ getNearestLocation() { throw new Error('Paper must not run'); } }, {}], {}],
+  ];
+  for (const [name, args, extra] of helpers) {
+    let undo = 0;
+    const context = Object.assign({ allowLegacySelectionEdit: () => false, pushUndo() { undo++; }, window: {}, state: {}, SM: { t: () => '' }, showToast() {} }, extra);
+    runTool(name, context)(...args);
+    assert.equal(undo, 0, `${name} reached undo while denied`);
+  }
+});
+
+test('idle Paper drag and up do not request release', () => {
+  let releases = 0;
+  const context = {
+    state: { tool: 'select', playing: false, isPanning: false, spaceDown: false, appMode: 'animation' },
+    _xform: { active: false }, _marquee: { active: false }, _nodeDrag: { active: false }, _nmq: { active: false },
+    _fsPromoteDrag: null, _fsBreak: null, draggingArc: null, _moveDragStarted: false, selectedPaths: [], window: {},
+    allowLegacySelectionEdit() { releases++; return false; },
+  };
+  vm.runInNewContext(source('src/js/tools.js').match(/function selectionGestureActive\(\)\{[^\n]+/)[0], context);
+  runTool('onMouseDrag', context)({ event: event(), modifiers: {}, point: {} });
+  runTool('onMouseUp', context)({ event: event(), modifiers: {}, point: {} });
+  assert.equal(releases, 0);
 });

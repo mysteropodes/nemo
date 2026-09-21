@@ -1,17 +1,7 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
-function allowLegacySelectionEdit(event,kind){
-  var bridge=window.SMEngineBridge;
-  if(!bridge||!Object.prototype.hasOwnProperty.call(bridge,'nativeEditGuard'))return true;
-  var allowed=false;
-  try{allowed=!!bridge.nativeEditGuard&&typeof bridge.nativeEditGuard.allow==='function'&&bridge.nativeEditGuard.allow(kind||'select')===true;}catch(_){}
-  if(!allowed&&event){
-    if(typeof event.stopImmediatePropagation==='function')event.stopImmediatePropagation();
-    if(typeof event.preventDefault==='function')event.preventDefault();
-    if(typeof event.stop==='function')event.stop();
-  }
-  return allowed;
-}
+function allowLegacySelectionEdit(e,k){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){}if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
+function selectionGestureActive(){return state.tool==='select'?!!(_xform.active||_marquee.active||draggingArc||_moveDragStarted):state.tool==='subselect'?!!(_nodeDrag.active||_nmq.active):state.tool==='fsselect'?!!(_fsPromoteDrag||_marquee.active||_fsBreak):false;}
 var _textDragStart=null,_textDragRect=null;
 // Shift-constrain helpers for Rectangle/Ellipse/Line (see their onMouseDrag
 // handler) — kept standalone rather than inlined since both the shape and
@@ -94,8 +84,8 @@ function fsSelectionAtPoint(pt){
 // rotate UI instead of maintaining a second, subtly different transform
 // implementation for aspect selections.
 function fsPromoteSelectionForTransform(layer){
-  if(!_fsSel.length)return[];
   if(!allowLegacySelectionEdit(null,'fsselect'))return[];
+  if(!_fsSel.length)return[];
   var promoted=[];
   // Fill cuts change the source geometry, so realize them first.
   _fsSel.filter(function(s){return s.kind==='fillregion';}).forEach(function(s){
@@ -154,21 +144,8 @@ document.addEventListener('pointerdown',function(e){
   renderTransformHandles();renderNodeHandles();updateUI();
   e.preventDefault();e.stopImmediatePropagation();
 },{capture:true});
-// Raw pointermove/pointerup listeners for the fsselect marquee/lasso
-// (2026-07) — NOT Paper.js Tool's own onMouseDrag/onMouseUp (the branches
-// below still handle those, for when the Rust engine is off and Paper's
-// own Tool event loop runs normally). Confirmed live: with the engine on
-// (the default), Paper's Tool onMouseDrag/onMouseUp never fire at all for
-// a real drag gesture on this tool (view.autoUpdate=false likely stops
-// Paper's own queued-event dispatch loop) — onMouseDown still fires fine
-// (that's what starts the marquee/lasso below), but nothing ever grew or
-// resolved it, so a drag-select silently did nothing. select-bridge.js's
-// OWN marquee for the Select tool sidesteps this entirely by never
-// depending on Paper's Tool system in the first place (raw DOM listeners
-// throughout) — mirrored here rather than fighting Paper's dead event
-// loop. Harmless alongside the Paper-Tool branches below when the engine
-// IS off: whichever resolves first clears _marquee.active, making the
-// other a no-op.
+// Raw fsselect drag listeners cover engine-on Paper Tool bypass; inactive
+// gestures remain no-ops alongside the Paper callbacks.
 document.addEventListener('pointermove',function(e){
   if(_fsPromoteDrag){
     if(!allowLegacySelectionEdit(e,'fsselect'))return;
@@ -432,8 +409,8 @@ function fsBreakUpdateMarks(pt){
   if(window.SMEngineBridge)window.SMEngineBridge.setFSBreakMarks(pts);
 }
 function fsBreakCommit(){
-  if(!_fsBreak)return;
   if(!allowLegacySelectionEdit(null,'fsselect'))return;
+  if(!_fsBreak)return;
   var layer=userLayers[state.activeLayerIdx];
   var any=false;
   _fsBreak.marks.forEach(function(set,path){
@@ -827,8 +804,8 @@ function fsUnlinkFillRegen(p){
   delete p.data.fillSeed;delete p.data.fillWalls;delete p.data.fillGapPx;delete p.data.fillSeeds;
 }
 function fsApplyDelete(){
-  if(!_fsSel.length)return;
   if(!allowLegacySelectionEdit(null,'fsselect'))return;
+  if(!_fsSel.length)return;
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
   _fsSel.slice().forEach(function(sel){
@@ -1052,24 +1029,9 @@ function nodeSelCommitTail(path){
 // `tolerance` from the curve — a pure, non-mutating query in that case,
 // so a caller can safely try this before committing to pushUndo().
 //
-// Same isVectorBrush/centerSegments branch nodeSelApplyMove/Scale/Rotate
-// already use: a ribbon's editable spine is data.centerSegments, never
-// the baked outline (path.segments) — same reasoning as those three,
-// see nodeSelApplyMove's own header. A disposable {insert:false} Path is
-// built from the raw dict array (Segment already accepts point/handleIn/
-// handleOut as plain [x,y] pairs, same construction rebuildVectorBrushOutline
-// uses for the linked-fill sync above) purely so Paper's own curve-
-// subdivision math can run on it; centerSegments is overwritten from the
-// result and the temp path discarded either way.
-//
-// No Motion-vertex-track (vtxN) reindexing here — the sibling Delete-key
-// removal handler (timeline.js) doesn't do this either (checked before
-// writing this), so a shape with an armed Path vertex track can drift its
-// vtxN-to-point mapping after either an insert or a delete. Consistent
-// with the already-shipped half of this feature; fixing that interaction
-// for both at once is a separate, bigger piece of work if it turns out to
-// matter in practice.
+// Vector brushes subdivide a disposable centerline, then replace its data.
 function insertVertexAt(path,pt,tolerance){
+  if(!allowLegacySelectionEdit(null,'subselect'))return -1;
   var tol=tolerance||8/view.zoom;
   var isCenter=!!(path.data&&path.data.isVectorBrush&&path.data.centerSegments);
   var tmp=null,loc;
@@ -1095,6 +1057,7 @@ function insertVertexAt(path,pt,tolerance){
   return newSeg2?newSeg2.index:-1;
 }
 function nodeSelApplyMove(dx,dy,skipUndo){
+  if(!allowLegacySelectionEdit(null,'subselect'))return;
   var path=nodeEditTargetPath();
   if((!dx&&!dy)||!path||!_nodeSel.length)return;
   if(!skipUndo)pushUndo();
@@ -1107,6 +1070,7 @@ function nodeSelApplyMove(dx,dy,skipUndo){
   nodeSelCommitTail(path);
 }
 function nodeSelApplyScale(sx,sy,anchor,skipUndo){
+  if(!allowLegacySelectionEdit(null,'subselect'))return;
   var path=nodeEditTargetPath();
   if((sx===1&&sy===1)||!path||!_nodeSel.length)return;
   if(!skipUndo)pushUndo();
@@ -1131,6 +1095,7 @@ function nodeSelApplyScale(sx,sy,anchor,skipUndo){
   nodeSelCommitTail(path);
 }
 function nodeSelApplyRotate(deltaDeg,center,skipUndo){
+  if(!allowLegacySelectionEdit(null,'subselect'))return;
   var path=nodeEditTargetPath();
   if(!deltaDeg||!path||!_nodeSel.length)return;
   if(!skipUndo)pushUndo();
@@ -1318,6 +1283,7 @@ function transformFillGradient(path, pointTransform){
 // backdrop, brush-texture dabs) need the same translate to avoid the
 // "parallax drift" bug already fixed once this session.
 function alignSelection(mode){
+  if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<2)return;
   var b=xformSelBounds();if(!b)return;
   pushUndo();
@@ -1356,6 +1322,7 @@ function alignSelection(mode){
 // alignSelection right above, for the identical "don't tear the drawing
 // apart" reason (CLAUDE.md §1).
 function distributeSelection(mode){
+  if(!allowLegacySelectionEdit(null,'select'))return;
   if(selectedPaths.length<3)return;
   pushUndo();
   var isH=mode==='horizontal';
@@ -1657,6 +1624,7 @@ function _materializeClones(snaps,layer,offset,srcGroups){
   return clones;
 }
 function duplicateSelection(){
+  if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
@@ -1694,12 +1662,14 @@ function copySelection(){
   showToast(SM.t('toastCopied')+snaps.length+')');
 }
 function cutSelection(){
+  if(!allowLegacySelectionEdit(null,'select'))return;
   if(!selectedPaths.length)return;
   copySelection();
   window.SM.deleteSelStrokes(); // pushes its own undo entry
   showToast(SM.t('toastCut')+_canvasClip.snaps.length+')');
 }
 function pasteSelection(){
+  if(!allowLegacySelectionEdit(null,'select'))return;
   if(!_canvasClip||!_canvasClip.snaps.length){showToast(SM.t('toastNothingToPaste'));return;}
   pushUndo();
   // A HELD frame is neither a keyframe nor an interpolated one, and
@@ -7653,7 +7623,7 @@ function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
-  if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
+  if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
   if(state.tool==='draw'){
     if(!currentPath)return;
@@ -7902,7 +7872,7 @@ function onMouseDrag(event){
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
-  if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
+  if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){

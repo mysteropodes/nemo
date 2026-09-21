@@ -60,36 +60,13 @@
     var li = state.activeLayerIdx;
     return { li: li, ld: state.layers[li] };
   }
-  function allowLegacySelectionEdit(event) {
-    var bridge = window.SMEngineBridge;
-    if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true;
-    var allowed = false;
-    try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('shapes-panel') === true; } catch (_) {}
-    if (!allowed && event) {
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-      if (typeof event.preventDefault === 'function') event.preventDefault();
-    }
-    return allowed;
-  }
+  function allowLegacySelectionEdit(e){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow('shapes-panel')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function isStrokeSelected(li, strokeId) {
     if (!window.selectedPaths || !window.selectedPaths.length) return false;
     var item = window.SMMotion.liveItemByStrokeId(li, strokeId);
     return !!item && window.selectedPaths.indexOf(item) >= 0;
   }
-  // Multi-select (2026-08, "impossible d'avoir le multiselect shift ou
-  // alt dans le panel") — SMMotion.selectShapesByStrokeIds always REPLACES
-  // the whole selection, same as every click in this panel used before
-  // this fix; there was no additive path at all (confirmed: Motion's own
-  // left-panel Éléments list has the identical gap, so there was no
-  // existing helper to reuse here). additive=true toggles the clicked
-  // strokeId(s) in/out of the CURRENT selection instead of replacing it —
-  // same toggle semantics select-bridge.js's own canvas Shift-click
-  // already uses (add if entirely absent, remove if already present), so
-  // canvas and panel behave identically under Shift/Alt. Alt is treated
-  // the same as Shift here — Cyril asked for "shift ou alt", and neither
-  // this panel nor Motion's own list has a distinct meaning to give Alt
-  // beyond "also multi-select", so inventing one would be undirected
-  // scope, not a fix.
+  // Shift/Alt toggles panel selection to match canvas multi-select.
   function applySelection(li, strokeIds, additive) {
     if (!allowLegacySelectionEdit()) return;
     _paintFocus = null; // a plain shape selection doesn't imply fill or stroke specifically
@@ -854,8 +831,7 @@
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           if (!window.showContextMenu) return;
-          // Combined Shape (2026-08, "peut être avoir les combined shape
-          // option pour le groupe") — same SMGroup.setGroupCombineMode the
+          // Combined Shape uses the existing SMGroup.setGroupCombineMode
           // existing toolbar buttons call (timeline.js's updateCombinePanel/
           // COMBINE_MODE_BTN_IDS), just reachable from this row's own menu
           // instead of only via canvas selection + the right-panel toolbar.
@@ -865,6 +841,7 @@
           var curMode = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
           function combineItem(mode, key) {
             return { label: SM.t(key) + (curMode === mode ? ' ✓' : ''), action: function () {
+              if (!allowLegacySelectionEdit()) return;
               if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, mode);
               renderShapesPanel();
             } };
