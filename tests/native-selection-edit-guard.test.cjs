@@ -85,16 +85,16 @@ function functionEnd(text, open) {
 }
 function runTool(name, context) { vm.runInNewContext(toolFunction(name), context, { filename: `tools-${name}.js` }); return context[name]; }
 function bootTools(guard, state, motion) {
-  const stage = { id: 'drawing-canvas', addEventListener() {}, classList: { add() {}, remove() {} }, style: {} };
+  const stage = { id: 'drawing-canvas', events: {}, addEventListener(type, handler) { this.events[type] = handler; }, classList: { add() {}, remove() {} }, style: {} };
   const context = {
     console, Object, window: null, Tool: function Tool() { return {}; }, view: {}, draggingArc: null,
     state: Object.assign({ tool: 'draw', appMode: 'animation', playing: false, isPanning: false, spaceDown: false, activeLayerIdx: 0, layers: [{}] }, state),
     document: { addEventListener() {}, getElementById: () => stage, querySelectorAll: () => [] },
-    SMEngineBridge: { nativeEditGuard: guard }, SMMotion: motion,
+    SMEngineBridge: { nativeEditGuard: guard, isEnabled: () => true, screenToWorld: (x, y) => [x, y] }, SMMotion: motion,
   };
   context.window = context;
   vm.runInNewContext(source('src/js/tools.js'), context, { filename: 'tools.js' });
-  return context;
+  return { context, stage };
 }
 
 test('native ownership requests one exact release and admits only a later replay', () => {
@@ -187,7 +187,7 @@ test('idle Paper drag and up do not request release', () => {
 
 test('full Paper tools guards selected-item drag and up before their mutations', () => {
   const active = { value: true }, releases = [], guard = installGuard(active, releases);
-  const context = bootTools(guard, { tool: 'select' }, {});
+  const { context } = bootTools(guard, { tool: 'select' }, {});
   context.selectedPaths = [{ position: { add() { throw new Error('Paper move must not run'); } } }];
   context.onMouseDrag({ event: event(), delta: {} });
   context.onMouseUp({ event: event() });
@@ -197,7 +197,7 @@ test('full Paper tools guards selected-item drag and up before their mutations',
 test('full Paper Motion forwarding guards an active gesture but leaves idle drag/up passive', () => {
   const active = { value: true }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
   const motion = { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; } };
-  const context = bootTools(guard, { tool: 'draw', appMode: 'motion' }, motion);
+  const { context } = bootTools(guard, { tool: 'draw', appMode: 'motion' }, motion);
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
   assert.equal(releases.length, 0, 'idle Motion forwarding must not request release');
@@ -214,4 +214,31 @@ test('full Paper Motion forwarding guards an active gesture but leaves idle drag
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
   assert.deepEqual(calls, { down: 1, drag: 2, up: 2 });
+});
+
+test('complete Select bridge and Paper tools share a debug-visible Motion gesture', () => {
+  const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
+  let drag = null;
+  const motion = {
+    onDown() { calls.down++; drag = { mode: 'point' }; return true; },
+    onDrag() { if (!drag) return false; calls.drag++; return true; },
+    onUp() { if (!drag) return false; calls.up++; drag = null; return true; },
+    debugMotionDrag() { return drag; }, onHoverMove() { return false; },
+  };
+  const { context, stage } = bootTools(guard, { tool: 'select', appMode: 'motion', layers: [{ locked: false }] }, motion);
+  context.Point = function Point(x, y) { this.x = x; this.y = y; };
+  context.document.readyState = 'complete';
+  vm.runInNewContext(source('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
+  const down = event(); down.button = 0; down.clientX = 1; down.clientY = 2;
+  stage.events.pointerdown(down);
+  assert.equal(calls.down, 1);
+  active.value = true;
+  context.onMouseDrag({ event: event() });
+  context.onMouseUp({ event: event() });
+  assert.deepEqual(calls, { down: 1, drag: 0, up: 0 });
+  assert.equal(releases.length, 1);
+  active.value = false;
+  context.onMouseDrag({ event: event() });
+  context.onMouseUp({ event: event() });
+  assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
 });

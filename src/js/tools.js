@@ -2,6 +2,7 @@
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
 function allowLegacySelectionEdit(e,k){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){}if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
 function selectionGestureActive(){return state.tool==='select'?!!(_xform.active||_marquee.active||draggingArc||_moveDragStarted):state.tool==='subselect'?!!(_nodeDrag.active||_nmq.active):state.tool==='fsselect'?!!(_fsPromoteDrag||_marquee.active||_fsBreak):false;}
+function motionGestureActive(){try{return!!(window.SMMotion&&SMMotion.debugMotionDrag&&SMMotion.debugMotionDrag());}catch(_){return false;}}
 var _textDragStart=null,_textDragRect=null;
 // Shift-constrain helpers for Rectangle/Ellipse/Line (see their onMouseDrag
 // handler) — kept standalone rather than inlined since both the shape and
@@ -7624,7 +7625,7 @@ function onMouseDrag(event){
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
-  if(state.appMode==='motion'&&window.SMMotion){if(_legacyMotionGesture&&!allowLegacySelectionEdit(event.event,'select'))return;if(SMMotion.onDrag(event))return;}
+  if(state.appMode==='motion'&&window.SMMotion){if((_legacyMotionGesture||motionGestureActive())&&!allowLegacySelectionEdit(event.event,'select'))return;if(SMMotion.onDrag(event))return;}
   if(state.tool==='draw'){
     if(!currentPath)return;
     if(state.vectorBrush){
@@ -7874,7 +7875,7 @@ function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
   if(selectionGestureActive()&&!allowLegacySelectionEdit(event.event,state.tool))return;
-  if(state.appMode==='motion'&&window.SMMotion){if(_legacyMotionGesture&&!allowLegacySelectionEdit(event.event,'select'))return;var _motionUp=SMMotion.onUp(event);_legacyMotionGesture=false;if(_motionUp)return;}
+  if(state.appMode==='motion'&&window.SMMotion){if((_legacyMotionGesture||motionGestureActive())&&!allowLegacySelectionEdit(event.event,'select'))return;var _motionUp=SMMotion.onUp(event);_legacyMotionGesture=false;if(_motionUp)return;}
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
     if(_fillCloseDrag.points.length>=2)_fillCloseStrokes.push({id:'fc'+Date.now().toString(36)+'_'+(++_fillCloseIdCounter),points:_fillCloseDrag.points.map(function(p){return[p.x,p.y];})});
