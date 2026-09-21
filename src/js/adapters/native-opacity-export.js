@@ -163,6 +163,13 @@
     return freeze({ jobId: id(value.jobId, 'job receipt.jobId'), status: value.status, pinnedRevision: revision(value.pinnedRevision, 'job receipt.pinnedRevision'), documentSnapshotId: id(value.documentSnapshotId, 'job receipt.documentSnapshotId'), progress: value.progress, artifact, cleanup, externalEffectDisposition: value.externalEffectDisposition, ...(has(value, 'error') ? { error: error(value.error, jobErrors, 'job error') } : {}) });
   }
   function terminalInvariant(value) {
+    const cleanupFailed = value.cleanup.status === 'failed';
+    const topLevelCleanupFailed = has(value, 'error') && value.error.code === 'cleanup_failed';
+    if (cleanupFailed !== topLevelCleanupFailed || (cleanupFailed &&
+        (!has(value.cleanup, 'error') || value.cleanup.error.code !== 'cleanup_failed' ||
+         value.externalEffectDisposition !== 'indeterminate'))) {
+      throw new Error('cleanup_failed requires failed cleanup and an indeterminate external effect');
+    }
     if (value.status === 'running') {
       if (value.artifact !== null || value.cleanup.status !== 'pending' || value.externalEffectDisposition !== 'none' || has(value, 'error')) throw new Error('running job must retain pending cleanup, no artifact, no error, and no external effect');
       return;
@@ -175,7 +182,6 @@
     if (value.status === 'cancelled' && (value.cleanup.status !== 'complete' || value.externalEffectDisposition !== 'none' || (has(value, 'error') && value.error.code !== 'document_replaced'))) throw new Error('cancelled job requires complete cleanup, no external effect, and at most document_replaced');
     if (value.status === 'failed' && !['complete', 'failed'].includes(value.cleanup.status)) throw new Error('failed job cleanup must be complete or failed');
     if (value.status === 'failed' && value.cleanup.status === 'complete' && value.externalEffectDisposition !== 'none') throw new Error('contained failed job must expose no external effect');
-    if (value.cleanup.status === 'failed' && (!has(value.cleanup, 'error') || value.cleanup.error.code !== 'cleanup_failed' || !has(value, 'error') || value.error.code !== 'cleanup_failed' || value.externalEffectDisposition !== 'indeterminate')) throw new Error('cleanup failure must be retained as indeterminate cleanup_failed');
   }
 
   function createNativeOpacityExportAdapter() {
@@ -230,6 +236,9 @@
       if (!session) throw new Error('job receipt has no retained export plan');
       if (old && old !== session) throw new Error('jobId cannot be rebound to a different retained export plan');
       if (session.snapshot.documentSnapshotId !== received.documentSnapshotId || session.snapshot.atRevision !== received.pinnedRevision) throw new Error('job receipt does not retain the pinned snapshot and revision');
+      if (received.status === 'succeeded' && received.artifact.target !== session.request.payload.outputHandle) {
+        throw new Error('successful artifact target must match the retained output handle');
+      }
       if (old) {
         if (JSON.stringify(old.receipt) === JSON.stringify(received)) return old;
         if (old.receipt.status !== 'running') throw new Error('terminal job receipt conflicts with retained receipt');

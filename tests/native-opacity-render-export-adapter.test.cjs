@@ -187,6 +187,37 @@ test('job progress cannot regress when a running receipt advances into a termina
   }
 });
 
+test('succeeded receipts must publish the artifact at the retained begin outputHandle', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const adapter = create();
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-artifact-target', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  const begin = adapter.begin(identity, snapshot, 'begin-artifact-target', 'retained-output', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g', resourceVersion: 'v' } }]);
+  assert.throws(() => adapter.observe(begin, { apiVersion: 2, requestId: begin.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { jobId: 'job-artifact-target', status: 'succeeded', pinnedRevision: 0, documentSnapshotId: 'snapshot-0', progress: 1,
+      artifact: { target: 'different-output', files: ['frame.png'] }, cleanup: { status: 'complete' }, externalEffectDisposition: 'committed' } }), /artifact|target|outputHandle|retained/i);
+});
+
+test('top-level cleanup_failed requires failed cleanup, matching cleanup error, and indeterminate effect', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-cleanup-contract', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  const invalidReceipts = [
+    { cleanup: { status: 'complete' }, externalEffectDisposition: 'none' },
+    { cleanup: { status: 'failed' }, externalEffectDisposition: 'indeterminate' },
+    { cleanup: { status: 'failed', error: { code: 'cleanup_failed', message: 'cleanup failed' } }, externalEffectDisposition: 'none' },
+  ];
+  for (const [index, variant] of invalidReceipts.entries()) {
+    const adapter = create();
+    const begin = adapter.begin(identity, snapshot, `begin-cleanup-contract-${index}`, 'out', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g', resourceVersion: 'v' } }]);
+    assert.throws(() => adapter.observe(begin, { apiVersion: 2, requestId: begin.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+      result: { jobId: `job-cleanup-contract-${index}`, status: 'failed', pinnedRevision: 0, documentSnapshotId: 'snapshot-0', progress: 0.75,
+        artifact: null, ...variant, error: { code: 'cleanup_failed', message: 'cleanup failed' } } }), /cleanup|indeterminate|error|failed/i);
+  }
+});
+
 test('job receipts cover running/succeeded/cancelled/failed cleanup and external-effect invariants without retry ownership', () => {
   const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
   const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
