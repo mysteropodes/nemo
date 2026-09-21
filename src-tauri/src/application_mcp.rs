@@ -153,7 +153,6 @@ impl ApplicationMcp {
         let generation = authority.next_generation().unwrap();
         authority.finish_release(ReleaseTombstone {
             generation,
-            reentry_used: false,
             request_id: "release-shared".into(),
             fingerprint: vec![1, 2, 3],
             receipt,

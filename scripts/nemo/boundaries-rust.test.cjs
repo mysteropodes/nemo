@@ -303,6 +303,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
     'rust.desktop.mcp.adapter->rust.desktop.native.dispatch',
     'rust.desktop.mcp.adapter.tests->rust.desktop.mcp.adapter',
+    'rust.desktop.mcp.adapter.tests->rust.desktop.native.application',
+    'rust.desktop.mcp.adapter.tests->rust.desktop.native.application.contract',
     'rust.desktop.native.application->rust.desktop.native.application.contract',
     'rust.desktop.native.application->rust.desktop.native.application.ports',
     'rust.desktop.native.application->rust.desktop.native.dispatch',
@@ -399,9 +401,11 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'desktop_viewport::FatalAction', 'desktop_viewport::ViewportMapping', 'desktop_viewport::ViewportStatus',
       'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId'],
     'rust.desktop.native.application': [
-      'application::NativeApplication', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+      'application::ApplicationReleaseReceipt', 'application::NativeApplication',
+      'commands::OpacityRequest', 'commands::ResponseEnvelope',
       'compositor::CompositionResult', 'document::OpacityDocument',
-      'export_job::JobReceipt', 'export_job::PendingFrame', 'render_scene',
+      'export_job::JobReceipt', 'export_job::PendingFrame', 'export_job::ReconciliationStage',
+      'render_scene',
       'resource_leases::FrameFailure', 'resource_leases::FrameFailureKind', 'resource_leases::WorkId',
       'scheduler::EvaluationKey', 'scheduler::FrameScheduler'],
     'rust.desktop.native.application.commands': ['compositor::Compositor'],

@@ -183,7 +183,7 @@ function assertRegisteredLeaf(required) {
 const REGISTERED_LEAVES = [
   ['N19B registers terminal native release lifecycle sources without exclusions or a frozen-baseline waiver', [
     'native-engine/src/export_job_lifecycle.rs', 'native-engine/tests/export_job_lifecycle.rs',
-    'src-tauri/src/native_application_release_tests.rs']],
+    'src-tauri/src/native_application_release.rs', 'src-tauri/src/native_application_release_tests.rs']],
   ['N19A registers immutable application reads without exclusions or a frozen-baseline waiver', [
     'native-engine/src/read_queries.rs', 'native-engine/tests/application_read.rs',
     'nemo-mcp/src/native_contract.rs']],

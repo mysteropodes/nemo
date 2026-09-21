@@ -1,14 +1,10 @@
-//! One staged native application composition root.
-//!
-//! N15 activates no host. It routes typed v2 requests to the existing N09
-//! history authority and N14 export manager, resolving only opaque resources.
-
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::document::OpacityDocument;
 use crate::export_job::{
     ExportBegin, ExportCompositor, ExportFrameInput, ExportJobError, ExportJobErrorKind,
-    ExportJobManager, ExportReleaseReconciliation, JobReceipt, PendingFrame, StagedArtifactPort,
+    ExportJobManager, JobReceipt, PendingFrame, ReconciliationStage, StagedArtifactPort,
 };
+pub use crate::export_job_lifecycle::ApplicationReleaseReceipt;
 use crate::history::NativeOpacityHistory;
 use crate::protocol::{
     self, ExportBeginPayload, JobIdPayload, OpaqueResourceHandle, OP_JOB_EXPORT_PNG_BEGIN,
@@ -43,8 +39,6 @@ impl ResourceResolutionError {
     }
 }
 
-/// Resolves one declared opaque handle without admitting pixels, canvas data,
-/// geometry JSON, or a transport-side fallback into the v2 request.
 pub trait ExportResourceResolver {
     fn resolve_geometry(
         &mut self,
@@ -58,24 +52,6 @@ enum RecordedRequest {
     JobBegin(RequestFingerprint, u64, JobReceipt),
     JobReceipt(RequestFingerprint, u64, JobReceipt),
     Failure(RequestFingerprint, u64, DispatchErrorCode, String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ApplicationReleaseReceipt {
-    pub instance_id: String,
-    pub document_id: String,
-    pub content_revision: u64,
-    pub cancelled_transaction_id: Option<String>,
-    pub cancelled_transaction: Option<serde_json::Value>,
-    pub undo_depth: usize,
-    pub redo_depth: usize,
-    pub exports: ExportReleaseReconciliation,
-}
-
-impl ApplicationReleaseReceipt {
-    pub fn cleanup_complete(&self) -> bool {
-        self.exports.cleanup_complete
-    }
 }
 
 impl RecordedRequest {
@@ -128,8 +104,6 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.history.content_revision()
     }
 
-    /// Narrow native-host access to the same immutable snapshot authority used
-    /// by export. Transport responses continue to expose identity only.
     pub fn acquire_snapshot(&self, revision: u64) -> Option<DocumentSnapshot> {
         self.history.acquire_snapshot(revision)
     }
@@ -254,13 +228,31 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         &mut self.resources
     }
 
-    /// Close the document authority exactly once. The receipt stays available
-    /// until the host moves it into its lifecycle tombstone.
     pub fn release_authority(&mut self) -> ApplicationReleaseReceipt {
-        if let Some(receipt) = &self.release {
-            return receipt.clone();
+        self.release_transaction_stage();
+        self.release_export_stage()
+    }
+
+    pub fn release_transaction_stage(&mut self) -> ApplicationReleaseReceipt {
+        if matches!(self.release.as_ref(), Some(receipt) if receipt.transaction_stage == ReconciliationStage::Complete)
+        {
+            return self.release.clone().unwrap();
         }
+        let (undo_depth, redo_depth) = self.history.history_depths();
         let cancelled_transaction_id = self.history.transactions.active_id().map(str::to_owned);
+        let mut receipt = ApplicationReleaseReceipt {
+            instance_id: self.instance_id().to_owned(),
+            document_id: self.document_id().to_owned(),
+            content_revision: self.content_revision(),
+            cancelled_transaction_id: cancelled_transaction_id.clone(),
+            cancelled_transaction: None,
+            undo_depth,
+            redo_depth,
+            transaction_stage: ReconciliationStage::Pending,
+            export_stage: ReconciliationStage::Pending,
+            exports: self.exports.release_snapshot(),
+        };
+        self.release = Some(receipt.clone());
         let cancelled_transaction = cancelled_transaction_id.as_deref().map(|id| {
             let record = self
                 .history
@@ -274,20 +266,38 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             );
             result
         });
-        let (undo_depth, redo_depth) = self.history.history_depths();
-        let receipt = ApplicationReleaseReceipt {
-            instance_id: self.instance_id().to_owned(),
-            document_id: self.document_id().to_owned(),
-            content_revision: self.content_revision(),
-            cancelled_transaction_id,
-            cancelled_transaction,
-            undo_depth,
-            redo_depth,
-            exports: self.exports.reconcile_release(),
-        };
+        receipt.cancelled_transaction = cancelled_transaction;
+        (receipt.undo_depth, receipt.redo_depth) = self.history.history_depths();
+        receipt.transaction_stage = ReconciliationStage::Complete;
+        self.release = Some(receipt.clone());
+        receipt
+    }
+
+    pub fn release_export_stage(&mut self) -> ApplicationReleaseReceipt {
+        self.release_export_stage_with_checkpoint(|| {})
+    }
+
+    pub fn release_export_stage_with_checkpoint<F: FnMut()>(
+        &mut self,
+        checkpoint: F,
+    ) -> ApplicationReleaseReceipt {
+        let mut receipt = self.release_transaction_stage();
+        if receipt.export_stage == ReconciliationStage::Complete {
+            return receipt;
+        }
+        receipt.exports = self.exports.reconcile_release_with(checkpoint);
+        receipt.export_stage = ReconciliationStage::Complete;
         self.requests.clear();
         self.release = Some(receipt.clone());
         receipt
+    }
+
+    pub fn release_progress(&self) -> Option<ApplicationReleaseReceipt> {
+        let mut receipt = self.release.clone()?;
+        if receipt.export_stage == ReconciliationStage::Pending {
+            receipt.exports = self.exports.release_snapshot();
+        }
+        Some(receipt)
     }
 
     fn history_stage(

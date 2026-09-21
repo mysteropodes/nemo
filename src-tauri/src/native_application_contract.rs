@@ -222,6 +222,8 @@ pub(crate) struct NativeReleaseReceipt {
     pub(crate) redo_depth: usize,
     pub(crate) reconciled_exports: Vec<ExportReconciliation>,
     pub(crate) cancelled_preview_work_ids: Vec<String>,
+    pub(crate) unresolved_preview_work_ids: Option<Vec<String>>,
+    pub(crate) reconciliation_stages: Value,
     pub(crate) viewport_status: String,
     pub(crate) reentry_available: bool,
     pub(crate) error: Option<NativeApplicationError>,
@@ -250,6 +252,8 @@ impl NativeReleaseReceipt {
             redo_depth: 0,
             reconciled_exports: Vec::new(),
             cancelled_preview_work_ids: Vec::new(),
+            unresolved_preview_work_ids: None,
+            reconciliation_stages: serde_json::json!({"transaction":"unknown","exports":"unknown","preview":"unknown"}),
             viewport_status: "cleanup_failed".into(),
             reentry_available: false,
             error: Some(host_error("cleanup_failed", message)),
@@ -262,11 +266,11 @@ impl NativeReleaseReceipt {
             "instanceId": self.instance_id, "documentId": self.document_id,
             "contentRevision": self.content_revision,
             "lifecycleGeneration": self.lifecycle_generation, "status": "indeterminate",
-            "retrieved": false, "authorityRemovalCompleted": true,
+            "retrieved": false, "authorityRemovalCompleted": true, "reconciliationStages": self.reconciliation_stages,
             "cancelledTransactionId": self.cancelled_transaction_id,
             "cancelledTransaction": self.cancelled_transaction,
             "undoDepth": self.undo_depth, "redoDepth": self.redo_depth,
-            "reconciledExports": [], "cancelledPreviewWorkIds": [],
+            "reconciledExports": [], "cancelledPreviewWorkIds": [], "unresolvedPreviewWorkIds": null,
             "viewportStatus": "cleanup_failed", "reentryAvailable": false,
             "error": {"code": "cleanup_failed", "message": "native release receipt serialization failed", "details": null}
         }))
@@ -492,17 +496,6 @@ pub(crate) fn host_error(
         message: message.into(),
         details: None,
     }
-}
-
-pub(crate) fn catch_unwind_message<T>(operation: impl FnOnce() -> T) -> Result<T, String> {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)).map_err(|payload| {
-        payload
-            .downcast_ref::<&str>()
-            .copied()
-            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
-            .unwrap_or("native release cleanup panicked")
-            .to_string()
-    })
 }
 
 pub(crate) fn work_label(work_id: WorkId) -> String {

@@ -66,7 +66,7 @@
   ],
   "exclusions": [],
   "nativeReadRegistration": "N19A/#1373 adds native-engine/src/read_queries.rs and native-engine/tests/application_read.rs under the existing application feature and test target, plus nemo-mcp/src/native_contract.rs for the shared pinned-read wire validator. Ordinary budgets, baseline and exclusions are unchanged.",
-  "nativeReleaseRegistration": "N19B/#1374 adds native-engine/src/export_job_lifecycle.rs, native-engine/tests/export_job_lifecycle.rs and src-tauri/src/native_application_release_tests.rs under their existing export/application and desktop modules. Ordinary budgets, the frozen baseline and exclusions remain unchanged.",
+  "nativeReleaseRegistration": "N19B/#1374 adds native-engine/src/export_job_lifecycle.rs, native-engine/tests/export_job_lifecycle.rs, src-tauri/src/native_application_release.rs and src-tauri/src/native_application_release_tests.rs under their existing export/application and desktop modules. Ordinary budgets, the frozen baseline and exclusions remain unchanged.",
   "exclusionsRationale": "Every discovered Rust candidate, including feasibility proofs and staged native-engine modules, must be adopted into a module; no source is hidden through exclusions. An empty list is an assertion, not an omission: checkSourceCoverage reports coverage-unprofiled-source for any selected path that is neither declared nor exactly excluded, and the regression test exercises that failure.",
   "integration": {
     "gate": "tests/nemo-boundaries-rust.test.cjs",

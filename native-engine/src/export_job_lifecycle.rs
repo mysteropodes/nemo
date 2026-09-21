@@ -3,6 +3,23 @@
 use crate::png_output::{ExportArtifact, StagedArtifactPort};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReconciliationStage {
+    Pending,
+    Complete,
+    Unknown,
+}
+
+impl ReconciliationStage {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Complete => "complete",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JobStatus {
     Running,
     Succeeded,
@@ -91,6 +108,35 @@ impl ExportJobError {
 pub struct ExportReleaseReconciliation {
     pub receipts: Vec<JobReceipt>,
     pub cleanup_complete: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApplicationReleaseReceipt {
+    pub instance_id: String,
+    pub document_id: String,
+    pub content_revision: u64,
+    pub cancelled_transaction_id: Option<String>,
+    pub cancelled_transaction: Option<serde_json::Value>,
+    pub undo_depth: usize,
+    pub redo_depth: usize,
+    pub transaction_stage: ReconciliationStage,
+    pub export_stage: ReconciliationStage,
+    pub exports: ExportReleaseReconciliation,
+}
+
+impl ApplicationReleaseReceipt {
+    pub fn cleanup_complete(&self) -> bool {
+        self.export_stage == ReconciliationStage::Complete && self.exports.cleanup_complete
+    }
+}
+
+pub(crate) fn release_snapshot(
+    receipts: impl Iterator<Item = JobReceipt>,
+) -> ExportReleaseReconciliation {
+    ExportReleaseReconciliation {
+        receipts: receipts.collect(),
+        cleanup_complete: false,
+    }
 }
 
 pub(crate) fn cleanup_allows_release(receipt: &JobReceipt) -> bool {

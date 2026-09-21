@@ -11,6 +11,7 @@ use crate::{codec::decode_project, history::NativeOpacityHistory};
 struct Port {
     cleanup_calls: usize,
     fail_cleanup: bool,
+    cleanup_failures_remaining: usize,
     fail_write: bool,
     writes: usize,
     publishes: usize,
@@ -41,7 +42,8 @@ impl StagedArtifactPort for Port {
     }
     fn cleanup(&mut self, _: &str) -> Result<(), String> {
         self.cleanup_calls += 1;
-        if self.fail_cleanup {
+        if self.fail_cleanup || self.cleanup_failures_remaining > 0 {
+            self.cleanup_failures_remaining = self.cleanup_failures_remaining.saturating_sub(1);
             Err("injected cleanup failure".into())
         } else {
             Ok(())
@@ -219,6 +221,21 @@ fn manager_release_retries_terminal_failed_cleanup_and_remains_indeterminate() {
     );
     assert_eq!(manager.port().cleanup_calls, 2);
     assert_eq!(manager.port().publishes, 0);
+}
+
+#[test]
+fn fresh_release_cleanup_failure_is_not_retried_in_the_same_release() {
+    let (history, request) = manager_fixture();
+    let port = Port {
+        cleanup_failures_remaining: 1,
+        ..Port::default()
+    };
+    let mut manager = ExportJobManager::new(port, Compositor);
+    manager.begin(&history, request).unwrap();
+    let released = manager.reconcile_release();
+    assert!(!released.cleanup_complete);
+    assert_eq!(manager.port().cleanup_calls, 1);
+    assert_eq!(released.receipts[0].cleanup.status, CleanupStatus::Failed);
 }
 
 #[test]

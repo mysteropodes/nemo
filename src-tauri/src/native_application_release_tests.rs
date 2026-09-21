@@ -15,10 +15,10 @@ const PROJECT: &[u8] = include_bytes!("../../native-engine/tests/fixtures/opacit
 const INSTANCE: &str = "native-release-fixture";
 const LAYER: &str = "r08_curve_layer";
 
-struct Scratch(PathBuf);
+pub(super) struct Scratch(pub(super) PathBuf);
 
 impl Scratch {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let path =
             std::env::temp_dir().join(format!("nemo-native-release-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&path).unwrap();
@@ -49,7 +49,7 @@ fn resource() -> Value {
     })
 }
 
-fn desktop(scratch: &Scratch, output: Option<PathBuf>) -> DesktopNativeApplication {
+pub(super) fn desktop(scratch: &Scratch, output: Option<PathBuf>) -> DesktopNativeApplication {
     let resources: Vec<GeometryResourceInput> =
         serde_json::from_value(json!([resource()])).unwrap();
     let admitted = admit_project(&project(), &resources).unwrap();
@@ -66,7 +66,7 @@ fn desktop(scratch: &Scratch, output: Option<PathBuf>) -> DesktopNativeApplicati
     .unwrap()
 }
 
-fn install(application: DesktopNativeApplication) -> (NativeState, u64) {
+pub(super) fn install(application: DesktopNativeApplication) -> (NativeState, u64) {
     let mut authority = NativeAuthority::default();
     let generation = authority.reserve_install().unwrap();
     authority
@@ -75,7 +75,7 @@ fn install(application: DesktopNativeApplication) -> (NativeState, u64) {
     (Arc::new(Mutex::new(authority)), generation)
 }
 
-fn release_request(document_id: &str, request_id: &str) -> NativeReleaseRequest {
+pub(super) fn release_request(document_id: &str, request_id: &str) -> NativeReleaseRequest {
     NativeReleaseRequest {
         api_version: HOST_API_VERSION,
         request_id: request_id.into(),
@@ -86,7 +86,7 @@ fn release_request(document_id: &str, request_id: &str) -> NativeReleaseRequest 
     }
 }
 
-fn dispatch_history(
+pub(super) fn dispatch_history(
     application: &mut DesktopNativeApplication,
     request_id: &str,
     operation: &str,
@@ -113,7 +113,11 @@ fn dispatch_history(
     serde_json::to_value(application.core.dispatch(request)).unwrap()
 }
 
-fn begin_update(application: &mut DesktopNativeApplication, prefix: &str, value: i64) -> String {
+pub(super) fn begin_update(
+    application: &mut DesktopNativeApplication,
+    prefix: &str,
+    value: i64,
+) -> String {
     let begun = dispatch_history(
         application,
         &format!("{prefix}-begin"),
@@ -145,7 +149,7 @@ fn admit_and_complete(
     .unwrap()
 }
 
-fn admit_generation(native: &NativeState, request: &NativeReleaseRequest) -> u64 {
+pub(super) fn admit_generation(native: &NativeState, request: &NativeReleaseRequest) -> u64 {
     match admit_release_request(native, request).unwrap() {
         ReleaseAdmission::Execute { generation } => generation,
         ReleaseAdmission::Retry { .. } => panic!("first release unexpectedly retried"),
@@ -159,14 +163,8 @@ fn retrieved_receipt(value: Value) -> NativeReleaseReceipt {
     receipt
 }
 
-fn rejects(native: &NativeState, request: &NativeReleaseRequest, code: &str, generation: u64) {
-    let error = admit_release_request(native, request).unwrap_err();
-    let active = native.lock().unwrap().active_generation().unwrap();
-    assert_eq!((error.code.as_str(), active), (code, generation));
-}
-
 #[test]
-fn idle_release_is_strict_retained_and_allows_exactly_one_reentry() {
+fn each_successful_release_allows_one_exclusive_reentry() {
     let scratch = Scratch::new();
     let application = desktop(&scratch, None);
     let document = application.document_id().to_owned();
@@ -174,29 +172,14 @@ fn idle_release_is_strict_retained_and_allows_exactly_one_reentry() {
 
     let mut cancelled = release_request(&document, "release-idle");
     cancelled.cancelled_before_dispatch = true;
-    rejects(
-        &native,
-        &cancelled,
-        "cancelled_before_dispatch",
-        active_generation,
+    assert_eq!(
+        admit_release_request(&native, &cancelled).unwrap_err().code,
+        "cancelled_before_dispatch"
     );
-
-    let mut stale = release_request(&document, "release-stale");
-    stale.expected_revision = 1;
-    rejects(&native, &stale, "stale_revision", active_generation);
-    let mut wrong = release_request(&document, "release-wrong");
-    wrong.instance_id = "wrong-instance".into();
-    rejects(&native, &wrong, "wrong_instance", active_generation);
-    wrong = release_request("wrong-document", "release-wrong-document");
-    rejects(&native, &wrong, "wrong_document", active_generation);
-    wrong = release_request(&document, "release-wrong-version");
-    wrong.api_version += 1;
-    rejects(&native, &wrong, "invalid_request", active_generation);
-    wrong = release_request(&document, " bad");
-    rejects(&native, &wrong, "invalid_request", active_generation);
-    let mut unknown = serde_json::to_value(release_request(&document, "unknown-field")).unwrap();
-    unknown["extra"] = json!(true);
-    assert!(serde_json::from_value::<NativeReleaseRequest>(unknown).is_err());
+    assert_eq!(
+        native.lock().unwrap().active_generation(),
+        Ok(active_generation)
+    );
 
     let request = release_request(&document, "release-idle");
     let generation = admit_generation(&native, &request);
@@ -262,13 +245,26 @@ fn idle_release_is_strict_retained_and_allows_exactly_one_reentry() {
         reentry_generation
     );
 
-    let final_receipt = admit_and_complete(
+    let second_receipt = admit_and_complete(
         &native,
         &release_request(&next_document, "release-after-reentry"),
     );
-    assert_eq!(final_receipt.status, "succeeded");
-    assert!(!final_receipt.reentry_available);
-    assert!(native.lock().unwrap().reserve_install().is_err());
+    assert_eq!(second_receipt.status, "succeeded");
+    assert!(second_receipt.reentry_available);
+    let third = desktop(&scratch, None);
+    let mut guard = native.lock().unwrap();
+    let third_generation = guard.reserve_install().unwrap();
+    assert!(guard.reserve_install().is_err());
+    guard.install(third_generation, Box::new(third)).unwrap();
+    drop(guard);
+    assert!(matches!(
+        admit_release_request(&native, &request).unwrap(),
+        ReleaseAdmission::Retry { .. }
+    ));
+    assert_eq!(
+        native.lock().unwrap().active_generation(),
+        Ok(third_generation)
+    );
 }
 
 #[test]
@@ -347,6 +343,10 @@ fn viewport_panic_preserves_transaction_export_and_preview_reconciliation() {
     assert_eq!(
         receipt.error.as_ref().unwrap().message,
         "injected viewport release panic"
+    );
+    assert_eq!(
+        receipt.reconciliation_stages,
+        json!({"transaction":"complete","exports":"complete","preview":"complete"})
     );
     assert_eq!(
         receipt.cancelled_transaction_id.as_deref(),

@@ -3,10 +3,12 @@
 //! This is an internal N14 lifecycle. N15 owns public application dispatch.
 //! N12 currently supplies opaque RGBA8 only; transparent-alpha export is not claimed.
 
-use crate::export_job_lifecycle::{cleanup_allows_release, retry_failed_cleanup, terminalize};
+use crate::export_job_lifecycle::{
+    cleanup_allows_release, release_snapshot, retry_failed_cleanup, terminalize,
+};
 pub use crate::export_job_lifecycle::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
-    ExternalEffectDisposition, JobError, JobReceipt, JobStatus,
+    ExternalEffectDisposition, JobError, JobReceipt, JobStatus, ReconciliationStage,
 };
 use crate::history::NativeOpacityHistory;
 use crate::png_output;
@@ -360,6 +362,10 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
         &self.port
     }
 
+    pub fn release_snapshot(&self) -> ExportReleaseReconciliation {
+        release_snapshot(self.jobs.values().map(|job| job.receipt.clone()))
+    }
+
     #[cfg(test)]
     pub(crate) fn inject_release_cancel_failure(&mut self, fail: bool) {
         self.fail_release_cancel = fail;
@@ -368,6 +374,20 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
     /// Stop every running export and retry any cleanup that was previously
     /// indeterminate before the enclosing document authority is retired.
     pub fn reconcile_release(&mut self) -> ExportReleaseReconciliation {
+        self.reconcile_release_with(|| {})
+    }
+
+    pub(crate) fn reconcile_release_with<F: FnMut()>(
+        &mut self,
+        mut checkpoint: F,
+    ) -> ExportReleaseReconciliation {
+        let retry_cleanup: BTreeSet<String> = self
+            .jobs
+            .iter()
+            .filter_map(|(id, job)| {
+                (job.receipt.cleanup.status == CleanupStatus::Failed).then(|| id.clone())
+            })
+            .collect();
         let running: Vec<String> = self
             .jobs
             .iter()
@@ -412,10 +432,12 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
                 receipt.external_effect_disposition = ExternalEffectDisposition::Indeterminate;
                 receipt.error = Some(JobError::new("cleanup_failed", message));
             }
+            checkpoint();
         }
         for (id, job) in &mut self.jobs {
-            if !scheduler_failed.contains(id) {
+            if retry_cleanup.contains(id) && !scheduler_failed.contains(id) {
                 retry_failed_cleanup(&mut self.port, &mut job.receipt);
+                checkpoint();
             }
         }
         self.active_job = None;

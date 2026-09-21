@@ -1,25 +1,30 @@
 //! Dormant native opacity composition root; N20 alone may activate it.
 
+#[cfg(test)]
+pub(crate) use crate::native_dispatch::{
+    NativeAuthority, NativePhase, NativeState, ReleaseAdmission,
+};
 use crate::{
     native_application_contract::*,
     native_application_ports::{
         DesktopArtifactBindings, DesktopArtifactPort, DesktopResourceResolver, SharedCompositor,
     },
-    native_dispatch::{
-        NativeAuthority, NativeDispatch, NativePhase, NativeState, ReleaseAdmission,
-        ReleaseTombstone,
-    },
+    native_dispatch::NativeDispatch,
 };
 use native_engine::{
-    application::NativeApplication,
+    application::{ApplicationReleaseReceipt, NativeApplication},
     compositor::CompositionResult,
     document::OpacityDocument,
-    export_job::{JobReceipt, PendingFrame},
+    export_job::{JobReceipt, PendingFrame, ReconciliationStage},
     render_scene::{self, ScheduledFrameIdentity},
     resource_leases::{FrameFailure, FrameFailureKind, WorkId},
     scheduler::{EvaluationKey, FrameScheduler},
 };
 use std::{collections::BTreeSet, path::PathBuf};
+
+#[path = "native_application_release.rs"]
+mod release;
+pub(crate) use release::{admit_release_request, complete_release};
 
 #[cfg(test)]
 pub(crate) use crate::native_dispatch::run_export_pump_interleaved;
@@ -33,17 +38,16 @@ pub(crate) struct PreparedPreview {
 }
 
 pub(crate) struct DesktopRelease {
-    pub(crate) instance_id: String,
-    pub(crate) document_id: String,
-    pub(crate) content_revision: u64,
-    pub(crate) cancelled_transaction_id: Option<String>,
-    pub(crate) cancelled_transaction: Option<serde_json::Value>,
-    pub(crate) undo_depth: usize,
-    pub(crate) redo_depth: usize,
-    pub(crate) reconciled_exports: Vec<JobReceipt>,
-    pub(crate) export_cleanup_complete: bool,
+    pub(crate) application: ApplicationReleaseReceipt,
     pub(crate) cancelled_preview: Vec<WorkId>,
+    pub(crate) unresolved_preview: Vec<WorkId>,
     pub(crate) preview_error: Option<String>,
+    pub(crate) preview_stage: ReconciliationStage,
+}
+
+struct PreviewReleaseProgress {
+    cancelled: BTreeSet<WorkId>,
+    unresolved: BTreeSet<WorkId>,
 }
 
 pub(crate) struct DesktopNativeApplication {
@@ -53,6 +57,13 @@ pub(crate) struct DesktopNativeApplication {
     preview_scheduler: FrameScheduler,
     preview_work: BTreeSet<WorkId>,
     artifact_bindings: DesktopArtifactBindings,
+    preview_release: Option<PreviewReleaseProgress>,
+    #[cfg(test)]
+    panic_release_after_transaction: bool,
+    #[cfg(test)]
+    panic_release_after_export_jobs: Option<usize>,
+    #[cfg(test)]
+    panic_release_after_preview_jobs: Option<usize>,
 }
 
 impl DesktopNativeApplication {
@@ -80,6 +91,13 @@ impl DesktopNativeApplication {
             preview_scheduler: FrameScheduler::new(),
             preview_work: BTreeSet::new(),
             artifact_bindings: bindings,
+            preview_release: None,
+            #[cfg(test)]
+            panic_release_after_transaction: false,
+            #[cfg(test)]
+            panic_release_after_export_jobs: None,
+            #[cfg(test)]
+            panic_release_after_preview_jobs: None,
         })
     }
 
@@ -241,26 +259,97 @@ impl DesktopNativeApplication {
     }
 
     pub(crate) fn release_project(&mut self) -> DesktopRelease {
-        let application = self.core.release_authority();
-        let export_cleanup_complete = application.cleanup_complete();
-        let pending: Vec<WorkId> = self.preview_work.iter().copied().collect();
-        let preview_error = self
-            .cancel_preview(&pending)
-            .err()
-            .map(|error| error.message);
+        self.core.release_transaction_stage();
+        #[cfg(test)]
+        if self.panic_release_after_transaction {
+            panic!("injected core release panic after transaction reconciliation");
+        }
+        #[cfg(test)]
+        let application = {
+            let mut reconciled = 0;
+            let panic_after = self.panic_release_after_export_jobs;
+            self.core.release_export_stage_with_checkpoint(|| {
+                reconciled += 1;
+                if panic_after == Some(reconciled) {
+                    panic!("injected core release panic after {reconciled} export job");
+                }
+            })
+        };
+        #[cfg(not(test))]
+        let application = self.core.release_export_stage();
+        let pending = self.preview_work.clone();
+        self.preview_release = Some(PreviewReleaseProgress {
+            cancelled: BTreeSet::new(),
+            unresolved: pending.clone(),
+        });
+        let mut preview_error = None;
+        for (index, work_id) in pending.into_iter().enumerate() {
+            #[cfg(not(test))]
+            let _ = index;
+            if let Err(error) = self.preview_scheduler.cancel(work_id) {
+                preview_error = Some(error.to_string());
+                break;
+            }
+            self.preview_work.remove(&work_id);
+            let progress = self.preview_release.as_mut().unwrap();
+            progress.unresolved.remove(&work_id);
+            progress.cancelled.insert(work_id);
+            #[cfg(test)]
+            if self.panic_release_after_preview_jobs == Some(index + 1) {
+                panic!(
+                    "injected core release panic after {} preview job",
+                    index + 1
+                );
+            }
+        }
+        let progress = self.preview_release.as_ref().unwrap();
         DesktopRelease {
-            instance_id: application.instance_id,
-            document_id: application.document_id,
-            content_revision: application.content_revision,
-            cancelled_transaction_id: application.cancelled_transaction_id,
-            cancelled_transaction: application.cancelled_transaction,
-            undo_depth: application.undo_depth,
-            redo_depth: application.redo_depth,
-            reconciled_exports: application.exports.receipts,
-            export_cleanup_complete,
-            cancelled_preview: pending,
+            application,
+            cancelled_preview: progress.cancelled.iter().copied().collect(),
+            unresolved_preview: progress.unresolved.iter().copied().collect(),
+            preview_stage: if preview_error.is_some() {
+                ReconciliationStage::Unknown
+            } else {
+                ReconciliationStage::Complete
+            },
             preview_error,
         }
+    }
+
+    fn release_progress(&self) -> Option<DesktopRelease> {
+        self.core.release_progress().map(|application| {
+            let (cancelled, unresolved) = self.preview_release.as_ref().map_or_else(
+                || (Vec::new(), self.preview_work.iter().copied().collect()),
+                |progress| {
+                    (
+                        progress.cancelled.iter().copied().collect(),
+                        progress.unresolved.iter().copied().collect(),
+                    )
+                },
+            );
+            DesktopRelease {
+                application,
+                cancelled_preview: cancelled,
+                unresolved_preview: unresolved,
+                preview_error: None,
+                preview_stage: ReconciliationStage::Unknown,
+            }
+        })
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_transaction(&mut self) {
+        self.panic_release_after_transaction = true;
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_export_jobs(&mut self, jobs: usize) {
+        self.panic_release_after_export_jobs = Some(jobs);
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_preview_jobs(&mut self, jobs: usize) {
+        self.panic_release_after_preview_jobs = Some(jobs);
     }
 
     pub(crate) fn require_identity(
@@ -318,196 +407,6 @@ impl NativeDispatch for DesktopNativeApplication {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
-}
-
-pub(crate) fn admit_release_request(
-    native: &NativeState,
-    request: &NativeReleaseRequest,
-) -> HostResult<ReleaseAdmission> {
-    let fingerprint = release_fingerprint(request)?;
-    native
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .admit_release(
-            &request.request_id,
-            &request.instance_id,
-            &request.document_id,
-            request.expected_revision,
-            &fingerprint,
-            request.cancelled_before_dispatch,
-        )
-        .map_err(|message| {
-            let (code, message) = message
-                .split_once(':')
-                .unwrap_or(("internal", message.as_str()));
-            host_error(code, message)
-        })
-}
-
-pub(crate) fn complete_release<F>(
-    native: &NativeState,
-    generation: u64,
-    request: &NativeReleaseRequest,
-    viewport_release: F,
-) -> HostResult<NativeReleaseReceipt>
-where
-    F: FnOnce() -> HostResult<(Vec<WorkId>, &'static str)>,
-{
-    let (mut authority, authority_poisoned) = match native.lock() {
-        Ok(authority) => (authority, false),
-        Err(poisoned) => (poisoned.into_inner(), true),
-    };
-    let phase = std::mem::replace(&mut authority.phase, NativePhase::Vacant);
-    let NativePhase::Releasing {
-        generation: active_generation,
-        reentry_used,
-        request_id: retained_request_id,
-        fingerprint,
-        application,
-    } = phase
-    else {
-        authority.phase = phase;
-        return Err(host_error("unavailable", "stale native release generation"));
-    };
-    if active_generation != generation || retained_request_id != request.request_id {
-        authority.phase = NativePhase::Releasing {
-            generation: active_generation,
-            reentry_used,
-            request_id: retained_request_id,
-            fingerprint,
-            application,
-        };
-        return Err(host_error("unavailable", "stale native release generation"));
-    }
-    let Some(mut application) = application else {
-        return Ok(retain_failed_release(
-            &mut authority,
-            generation,
-            reentry_used,
-            retained_request_id,
-            fingerprint,
-            (
-                request.instance_id.clone(),
-                request.document_id.clone(),
-                request.expected_revision,
-            ),
-            "native release application was unavailable during cleanup",
-        ));
-    };
-    let retained_identity = (
-        application.instance_id().to_owned(),
-        application.document_id().to_owned(),
-        application.content_revision(),
-    );
-    let released = catch_unwind_message(|| {
-        application
-            .as_any_mut()
-            .downcast_mut::<DesktopNativeApplication>()
-            .map(DesktopNativeApplication::release_project)
-            .ok_or_else(|| "native desktop host was unavailable during cleanup".to_string())
-    })
-    .and_then(|released| released);
-    let released = match released {
-        Ok(released) => released,
-        Err(message) => {
-            drop(application);
-            return Ok(retain_failed_release(
-                &mut authority,
-                generation,
-                reentry_used,
-                retained_request_id,
-                fingerprint,
-                retained_identity,
-                &message,
-            ));
-        }
-    };
-    let viewport = catch_unwind_message(viewport_release)
-        .unwrap_or_else(|message| Err(host_error("cleanup_failed", message)));
-    drop(application);
-    let mut cleanup_error = authority_poisoned
-        .then(|| host_error("cleanup_failed", "native authority lock was poisoned"))
-        .or_else(|| {
-            released
-                .preview_error
-                .map(|message| host_error("cleanup_failed", message))
-        })
-        .or_else(|| viewport.as_ref().err().cloned());
-    if cleanup_error.is_none() && !released.export_cleanup_complete {
-        cleanup_error = Some(host_error(
-            "cleanup_failed",
-            "native export cleanup remained indeterminate",
-        ));
-    }
-    let cleanup_complete = released.export_cleanup_complete && cleanup_error.is_none();
-    let mut preview_ids: BTreeSet<WorkId> = released.cancelled_preview.into_iter().collect();
-    if let Ok(viewport) = &viewport {
-        preview_ids.extend(viewport.0.iter().copied());
-    }
-    let receipt = NativeReleaseReceipt {
-        api_version: HOST_API_VERSION,
-        request_id: request.request_id.clone(),
-        instance_id: released.instance_id,
-        document_id: released.document_id,
-        content_revision: released.content_revision,
-        lifecycle_generation: generation,
-        status: if cleanup_complete {
-            "succeeded"
-        } else {
-            "indeterminate"
-        }
-        .into(),
-        retrieved: false,
-        authority_removal_completed: true,
-        cancelled_transaction_id: released.cancelled_transaction_id,
-        cancelled_transaction: released.cancelled_transaction,
-        undo_depth: released.undo_depth,
-        redo_depth: released.redo_depth,
-        reconciled_exports: released
-            .reconciled_exports
-            .iter()
-            .map(reconcile_export)
-            .collect(),
-        cancelled_preview_work_ids: preview_ids.into_iter().map(work_label).collect(),
-        viewport_status: viewport
-            .as_ref()
-            .map(|value| value.1)
-            .unwrap_or("cleanup_failed")
-            .into(),
-        reentry_available: cleanup_complete && !reentry_used,
-        error: cleanup_error,
-    };
-    authority.finish_release(ReleaseTombstone {
-        generation,
-        reentry_used,
-        request_id: request.request_id.clone(),
-        fingerprint,
-        receipt: receipt.retained_value(),
-        succeeded: cleanup_complete,
-    });
-    Ok(receipt)
-}
-
-fn retain_failed_release(
-    authority: &mut NativeAuthority,
-    generation: u64,
-    reentry_used: bool,
-    request_id: String,
-    fingerprint: Vec<u8>,
-    identity: (String, String, u64),
-    message: &str,
-) -> NativeReleaseReceipt {
-    let receipt =
-        NativeReleaseReceipt::indeterminate(request_id.clone(), identity, generation, message);
-    authority.finish_release(ReleaseTombstone {
-        generation,
-        reentry_used,
-        request_id,
-        fingerprint,
-        receipt: receipt.retained_value(),
-        succeeded: false,
-    });
-    receipt
 }
 
 #[cfg(test)]

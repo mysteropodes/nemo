@@ -29,12 +29,10 @@ pub(crate) enum NativePhase {
     },
     Active {
         generation: u64,
-        reentry_used: bool,
         application: Box<dyn NativeDispatch>,
     },
     Releasing {
         generation: u64,
-        reentry_used: bool,
         request_id: String,
         fingerprint: Vec<u8>,
         application: Option<Box<dyn NativeDispatch>>,
@@ -50,7 +48,6 @@ pub(crate) enum InstallOrigin {
 #[derive(Clone)]
 pub(crate) struct ReleaseTombstone {
     pub(crate) generation: u64,
-    pub(crate) reentry_used: bool,
     pub(crate) request_id: String,
     pub(crate) fingerprint: Vec<u8>,
     pub(crate) receipt: serde_json::Value,
@@ -141,7 +138,7 @@ impl NativeAuthority {
     pub(crate) fn reserve_install(&mut self) -> Result<u64, String> {
         match &self.phase {
             NativePhase::Vacant => {}
-            NativePhase::Released(tombstone) if tombstone.succeeded && !tombstone.reentry_used => {}
+            NativePhase::Released(tombstone) if tombstone.succeeded => {}
             NativePhase::Installing { .. } => {
                 return Err("native application bootstrap is already in progress".into());
             }
@@ -165,7 +162,7 @@ impl NativeAuthority {
         let phase = std::mem::replace(&mut self.phase, NativePhase::Vacant);
         let origin = match phase {
             NativePhase::Vacant => InstallOrigin::Vacant,
-            NativePhase::Released(tombstone) if tombstone.succeeded && !tombstone.reentry_used => {
+            NativePhase::Released(tombstone) if tombstone.succeeded => {
                 InstallOrigin::Released(tombstone)
             }
             _ => unreachable!("install eligibility was validated before phase extraction"),
@@ -201,11 +198,10 @@ impl NativeAuthority {
         match phase {
             NativePhase::Installing {
                 generation: active,
-                origin,
+                origin: _,
             } if active == generation => {
                 self.phase = NativePhase::Active {
                     generation,
-                    reentry_used: matches!(origin, InstallOrigin::Released(_)),
                     application,
                 };
                 Ok(())
@@ -278,15 +274,10 @@ impl NativeAuthority {
             .ok_or_else(|| "native lifecycle generation exhausted".to_string())?;
         let phase = std::mem::replace(&mut self.phase, NativePhase::Vacant);
         match phase {
-            NativePhase::Active {
-                reentry_used,
-                application,
-                ..
-            } => {
+            NativePhase::Active { application, .. } => {
                 self.generation = next_generation;
                 self.phase = NativePhase::Releasing {
                     generation: next_generation,
-                    reentry_used,
                     request_id: request_id.into(),
                     fingerprint: fingerprint.to_vec(),
                     application: Some(application),
@@ -469,7 +460,6 @@ pub(crate) mod tests {
             retained_releases: BTreeMap::new(),
             phase: NativePhase::Active {
                 generation: 1,
-                reentry_used: false,
                 application: Box::new(TerminalPump(Arc::clone(&advances))),
             },
         }));
@@ -487,7 +477,6 @@ pub(crate) mod tests {
             retained_releases: BTreeMap::new(),
             phase: NativePhase::Active {
                 generation: u64::MAX,
-                reentry_used: false,
                 application: Box::new(TerminalPump(Arc::new(AtomicUsize::new(0)))),
             },
         };
@@ -509,7 +498,6 @@ pub(crate) mod tests {
     fn generation_exhaustion_preserves_released_reentry_tombstone() {
         let tombstone = ReleaseTombstone {
             generation: u64::MAX,
-            reentry_used: false,
             request_id: "release".into(),
             fingerprint: b"body".to_vec(),
             receipt: serde_json::json!({"status":"succeeded"}),
