@@ -68,6 +68,12 @@
       "functions": 100,
       "note": "Lines 100% but regions 81.25%: the binary entry point is executed by the stdio integration tests, while some error-path regions inside covered lines are not. T04/#1053."
     },
+    "nemo-mcp/src/native_contract.rs": {
+      "lines": 94.32,
+      "regions": 95.65,
+      "functions": 97.36,
+      "note": "N19A/#1373 floor measured at bd134dbbf57e93f789bda3b1a6d31b7dbdd1295d with 39 tests passing. Existing T04/P07 per-file and aggregate floors remain unchanged; N19A neither excludes the new validator nor lowers prior ratchets."
+    },
     "nemo-mcp/src/registry.rs": {
       "lines": 69.49,
       "regions": 71.17,
