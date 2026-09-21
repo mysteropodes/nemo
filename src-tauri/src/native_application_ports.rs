@@ -49,20 +49,18 @@ pub(crate) struct DesktopResourceResolver {
 }
 
 impl DesktopResourceResolver {
-    pub(crate) fn new(resources: Vec<GeometryPaintInput>) -> Result<Self, String> {
-        let mut admitted = BTreeMap::new();
-        for resource in resources {
+    pub(crate) fn new(inputs: Vec<GeometryPaintInput>) -> Result<Self, String> {
+        let mut resources = BTreeMap::new();
+        for resource in inputs {
             let key = (
                 resource.resource_id().into(),
                 resource.resource_version().into(),
             );
-            if admitted.insert(key, resource).is_some() {
+            if resources.insert(key, resource).is_some() {
                 return Err("duplicate_resource_identity".into());
             }
         }
-        Ok(Self {
-            resources: admitted,
-        })
+        Ok(Self { resources })
     }
 
     pub(crate) fn resolve_identity(
@@ -170,20 +168,19 @@ impl DesktopArtifactPort {
         root: PathBuf,
         bindings: impl IntoIterator<Item = (String, PathBuf)>,
     ) -> Result<Self, String> {
-        let mut port = Self {
-            root,
-            bindings: DesktopArtifactBindings::default(),
-            stages: BTreeMap::new(),
-        };
+        let controls = DesktopArtifactBindings::default();
         for (handle, destination) in bindings {
-            port.bindings.bind(handle, destination)?;
+            controls.bind(handle, destination)?;
         }
-        fs::create_dir_all(&port.root).map_err(|_| ArtifactError::StageUnavailable.message())?;
-        port.root = port
-            .root
+        fs::create_dir_all(&root).map_err(|_| ArtifactError::StageUnavailable.message())?;
+        let root = root
             .canonicalize()
             .map_err(|_| ArtifactError::StageUnavailable.message())?;
-        Ok(port)
+        Ok(Self {
+            root,
+            bindings: controls,
+            stages: BTreeMap::new(),
+        })
     }
 
     pub(crate) fn bindings(&self) -> DesktopArtifactBindings {
@@ -259,13 +256,10 @@ impl StagedArtifactPort for DesktopArtifactPort {
                 }
             })?;
         // Retain even a partial write so explicit cleanup can remove it.
-        self.stages
-            .get_mut(job_id)
-            .unwrap()
-            .files
-            .insert(name.into());
+        let stage = self.stages.get_mut(job_id).unwrap();
+        stage.files.insert(name.into());
         if file.write_all(bytes).and_then(|_| file.sync_all()).is_err() {
-            self.stages.get_mut(job_id).unwrap().failed_write = true;
+            stage.failed_write = true;
             return Err(ArtifactError::WriteFailed.message());
         }
         Ok(())
@@ -355,14 +349,10 @@ fn directory_identity(path: &Path) -> Result<(u64, u64), ArtifactError> {
 
 #[cfg(target_os = "macos")]
 fn publish_exclusive(stage: &Path, destination: &Path) -> Result<(), ArtifactError> {
-    use std::ffi::CString;
+    use std::ffi::{c_char, CString};
     use std::os::unix::ffi::OsStrExt;
     unsafe extern "C" {
-        fn renamex_np(
-            from: *const std::ffi::c_char,
-            to: *const std::ffi::c_char,
-            flags: u32,
-        ) -> i32;
+        fn renamex_np(from: *const c_char, to: *const c_char, flags: u32) -> i32;
     }
     let from =
         CString::new(stage.as_os_str().as_bytes()).map_err(|_| ArtifactError::PublishFailed)?;
