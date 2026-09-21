@@ -78,8 +78,10 @@ than substituting an empty suite.
 
 ## Exact local commands
 
-From the repository root, keep build outputs in the already ignored receipt
-directory; `native-engine/target` is not covered by the existing ignore rules:
+From the repository root, keep build outputs in the ignored receipt directory
+so exact validation artifacts remain isolated. The default `native-engine/target`
+directory is ignored defensively as well, so an ordinary Cargo invocation cannot
+turn generated Rust into false unregistered-source findings:
 
 ```sh
 export CARGO_TARGET_DIR="$PWD/reports/native-engine-target"

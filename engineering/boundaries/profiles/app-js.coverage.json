@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, and the staged N15 native application v2 adapter. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, and the N16 Tauri/MCP v2 host transport. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "398b0dc649ec4e492403d7c6866eab08e1ac2ac2",
-    "sourceRootTree": "7e049b5a4c42a0070cf0524b3b36581052437a96",
+    "candidateCommit": "3656b75e1aa8ec8055390a897e961162ab5ddb55",
+    "sourceRootTree": "e3ed930eaccd6d01a2f54ba0e0e336c4d2ab85fa",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "1b4188c8820e520b5203fa0389f140dbba19825e",
-      "lastChangedCommit": "398b0dc649ec4e492403d7c6866eab08e1ac2ac2"
+      "gitTree": "7c2ef1d2e9dbd3af495dcc581c68bc87a3824765",
+      "lastChangedCommit": "3656b75e1aa8ec8055390a897e961162ab5ddb55"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "e65ebd4abc0cdd8dcd035b99add762631b3b8c786fb9508164779c281f7b3dda"
+      "value": "5a39e354c428003350f07b8ee1ba2c2139a07d510c889f2dc2756fa7e3a384de"
     },
     "profiles": [
       {
@@ -56,8 +56,8 @@
     "exclusionSupport": [
       {
         "path": ".gitignore",
-        "gitBlob": "bd4832bff7e91fbd758f386f3a844f44f5d3e386",
-        "sha256": "14d67915d6cdab22901e5e227da46d588c25b20f32e7501cec5707423bcb6670"
+        "gitBlob": "b8e1a4f6a4aabb9ef93770a94c2d0ec54a514a06",
+        "sha256": "386b4ef5f5d6d805bc673b50b559b8af4572a11a2ad8de896b8fcd6361ed9dc9"
       },
       {
         "path": "THIRD_PARTY_NOTICES.md",

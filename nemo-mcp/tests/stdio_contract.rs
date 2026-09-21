@@ -80,7 +80,7 @@ async fn advertised_payload_schema_names_every_key_and_operation_template() {
     };
 
     let command = schema("nemo_command");
-    let payload = &command["properties"]["payload"];
+    let payload = &command["$defs"]["legacy"]["properties"]["payload"];
     // The defect verbatim: schemars renders `serde_json::Value` as `true`.
     assert_ne!(payload, &json!(true), "payload must carry a real schema");
     assert_eq!(payload["type"], "object");
@@ -158,10 +158,7 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
     let body = discovery.structured_content.unwrap();
     assert_eq!(body["apiVersion"], 1);
     assert_eq!(body["instances"], json!([]));
-    assert_eq!(
-        body["registeredCapabilities"],
-        registered_capabilities()
-    );
+    assert_eq!(body["registeredCapabilities"], registered_capabilities());
     client.cancel().await.unwrap();
 }
 

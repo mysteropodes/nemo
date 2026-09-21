@@ -88,6 +88,28 @@
       "sizeProfile": "Rust production module"
     },
     {
+      "id": "rust.desktop.mcp.adapter.tests",
+      "layer": "tests",
+      "dir": "src-tauri/src",
+      "files": [
+        "application_mcp_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.viewport",
+      "layer": "adapters",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_viewport.rs"
+      ],
+      "publicApi": [
+        "native_viewport.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
       "id": "rust.desktop.shell",
       "layer": "desktop-shell",
       "dir": "src-tauri/src",

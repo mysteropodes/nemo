@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
@@ -8,11 +9,23 @@ const test = require('node:test');
 const root = path.join(__dirname, '..');
 const load = (...parts) => JSON.parse(fs.readFileSync(path.join(root, ...parts), 'utf8'));
 const schema = load('engineering', 'application', 'transport-v1.schema.json');
+const nativeSchema = load('engineering', 'application', 'native-transport-v2.schema.json');
 const descriptors = [
   load('engineering', 'application', 'capabilities', 'opacity.json'),
   load('engineering', 'application', 'capabilities', 'export-job.json'),
   load('engineering', 'application', 'capabilities', 'timelapse.json'),
 ];
+const nativeDescriptors = [
+  load('engineering', 'application', 'capabilities-v2', 'native-opacity.json'),
+];
+
+function compiledSchema(...args) {
+  return execFileSync('cargo', [
+    'run', '--locked', '--offline', '--quiet',
+    '--manifest-path', path.join(root, 'nemo-mcp', 'Cargo.toml'),
+    '--bin', 'nemo-mcp-schema', '--', ...args,
+  ], { cwd: root });
+}
 
 test('generated MCP transport schema embeds every complete registered descriptor', () => {
   const payload = schema.request.properties.payload;
@@ -30,4 +43,26 @@ test('generated property branch derives input fields and types from its descript
   assert.equal(opacity.properties.value.type, 'number');
   assert.ok(opacity.required.includes('layerId'));
   assert.ok(opacity.required.includes('property'));
+});
+
+test('compiled schema selector preserves the committed v1 bytes and exact accepted v2 bytes', () => {
+  assert.deepEqual(
+    compiledSchema(),
+    fs.readFileSync(path.join(root, 'engineering', 'application', 'transport-v1.schema.json')),
+  );
+  assert.deepEqual(
+    compiledSchema('--api-version', '2'),
+    fs.readFileSync(path.join(root, 'engineering', 'application', 'native-transport-v2.schema.json')),
+  );
+});
+
+test('feature-owned native declarations cover exactly the v2 transport operation set', () => {
+  const schemaOperations = nativeSchema.$defs.Request.oneOf.flatMap((branch) => {
+    const operation = branch.allOf[1].properties.operation;
+    return Object.hasOwn(operation, 'const') ? [operation.const] : operation.enum;
+  });
+  const declaredOperations = nativeDescriptors.flatMap((descriptor) => descriptor.operations);
+  assert.equal(new Set(schemaOperations).size, schemaOperations.length, 'v2 schema repeats an operation');
+  assert.equal(new Set(declaredOperations).size, declaredOperations.length, 'native declarations repeat an operation');
+  assert.deepEqual([...new Set(declaredOperations)].sort(), [...new Set(schemaOperations)].sort());
 });

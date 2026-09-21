@@ -4,10 +4,72 @@
 //! test). Kept a separate file, included via `#[path]`, so this module's size
 //! counts against its own budget instead of inflating `contract.rs`'s.
 use super::*;
-use crate::capabilities::CapabilityCatalog;
+use crate::capabilities::{CapabilityCatalog, NativeCapabilityCatalog};
 
 fn descriptor(json: &str) -> CapabilityCatalog {
     CapabilityCatalog::from_sources(&[json])
+}
+
+fn native_request(operation: &str, payload: Value) -> NativeApplicationRequest {
+    NativeApplicationRequest {
+        api_version: 2,
+        request_id: "native-request-1".into(),
+        instance_id: "instance-a".into(),
+        document_id: "native-document-1".into(),
+        expected_revision: None,
+        operation: operation.into(),
+        payload,
+        cancelled_before_dispatch: false,
+    }
+}
+
+#[test]
+fn native_catalog_rejects_duplicate_ids_and_operations() {
+    let first = r#"{"schemaVersion":2,"apiVersion":2,"id":"first","operations":["query.first"]}"#;
+    let duplicate_id =
+        r#"{"schemaVersion":2,"apiVersion":2,"id":"first","operations":["query.second"]}"#;
+    let duplicate_operation =
+        r#"{"schemaVersion":2,"apiVersion":2,"id":"second","operations":["query.first"]}"#;
+    assert!(
+        NativeCapabilityCatalog::from_sources(&[first, duplicate_id])
+            .unwrap_err()
+            .contains("duplicate native capability id")
+    );
+    assert!(
+        NativeCapabilityCatalog::from_sources(&[first, duplicate_operation])
+            .unwrap_err()
+            .contains("duplicate native operation")
+    );
+}
+
+#[test]
+fn native_request_resolution_is_descriptor_driven_and_bounded() {
+    let valid = native_request(
+        "query.document.opacity",
+        json!({
+            "stableTarget": {"layerUid": "r08_curve_layer"}
+        }),
+    );
+    assert!(valid.validate().is_ok());
+
+    let unknown = native_request("query.feature.not.registered", json!({}));
+    assert_eq!(unknown.validate().unwrap_err().code(), "invalid_request");
+
+    let malformed = native_request("query.document.opacity", json!("encoded"));
+    assert_eq!(
+        malformed.validate().unwrap_err().code(),
+        "malformed_payload"
+    );
+
+    let oversized = native_request(
+        "query.document.opacity",
+        json!({"padding": "x".repeat(NATIVE_MAX_MESSAGE_BYTES)}),
+    );
+    assert!(oversized.validate().unwrap_err().message().contains("4096"));
+
+    let mut bad_identity = valid;
+    bad_identity.request_id = "-not-leading-alphanumeric".into();
+    assert!(bad_identity.validate().is_err());
 }
 
 #[test]

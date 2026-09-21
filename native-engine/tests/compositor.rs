@@ -1,6 +1,6 @@
 use crate::codec::decode_project;
 use crate::commands::NativeOpacityApplication;
-use crate::compositor::Compositor;
+use crate::compositor::{Compositor, CompositorInstance};
 use crate::render_scene::{
     prepare, GeometryPaintInput, LayerGeometry, OpaqueSrgbPaint, RenderSceneErrorKind,
     ScheduledFrameIdentity,
@@ -54,6 +54,21 @@ fn scheduled_with(
     let mut scheduler = FrameScheduler::new();
     let scheduled = scheduler.schedule(snapshot, key).unwrap();
     (scheduler, scheduled)
+}
+
+#[test]
+fn two_stage_construction_retains_the_exact_instance_for_native_surface_binding() {
+    let construction = CompositorInstance::new();
+    let exact_instance = construction.instance().clone();
+    let compositor = construction
+        .create_headless()
+        .expect("a real native GPU adapter is required for N16");
+
+    assert_eq!(compositor.instance(), &exact_instance);
+    assert_eq!(
+        compositor.adapter().get_info().backend,
+        wgpu::Backend::Metal
+    );
 }
 
 #[test]

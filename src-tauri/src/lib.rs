@@ -8,6 +8,8 @@ mod video_decode;
 mod media_probe;
 mod vectorize;
 mod application_mcp;
+#[allow(dead_code, unused_imports)]
+mod native_viewport;
 // Per-task isolation of the app's native mutable state (R06, #902).
 mod task_runtime;
 
@@ -219,6 +221,8 @@ pub fn run() {
             application_mcp::nemo_mcp_identity,
             application_mcp::nemo_mcp_ready,
             application_mcp::nemo_mcp_reply,
+            application_mcp::nemo_native_status,
+            application_mcp::nemo_native_dispatch,
             run_ffmpeg,
             fetch_google_font,
             video_decode::open_video_session,

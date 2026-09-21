@@ -3,38 +3,42 @@
   "kind": "rust-crate",
   "policyId": "nemo.rust.nemo-desktop.edges",
   "status": "adopted",
-  "purpose": "B01/#1046: permitted module edges, exported port, external-crate port and Cargo feature configuration of the native desktop crate (src-tauri), enforced through the normal local boundaries lane by the Rust-aware analyzer (scripts/nemo/lib/boundaries-rust.cjs). Module identity and layers come from rust.profile.json; this policy also pins the application_mcp.rs <-> nemo-mcp crate boundary (the application MCP adapter port) that P12's intra-crate-only analyzer did not previously cover.",
+  "purpose": "B01/#1046 and N16/#1348: permitted module edges, exported ports, external-crate ports and Cargo feature configuration of the native desktop crate (src-tauri), enforced through the normal local boundaries lane by the Rust-aware analyzer (scripts/nemo/lib/boundaries-rust.cjs). Module identity and layers come from rust.profile.json; this policy pins both the application_mcp.rs <-> nemo-mcp transport port and the staged Tauri-host <-> native-engine port that the original intra-crate-only analyzer did not cover.",
   "crate": "nemo",
   "root": "src-tauri/src/lib.rs",
   "sourceDir": "src-tauri/src",
   "profileModules": [
     "rust.desktop.shell",
     "rust.desktop.mcp.adapter",
+    "rust.desktop.mcp.adapter.tests",
+    "rust.desktop.native.viewport",
     "rust.desktop.media",
     "rust.desktop.tasks",
     "rust.desktop.tasks.tests"
   ],
-  "profileModulesNote": "The five profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
+  "profileModulesNote": "The seven profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
   "layerRules": {
     "desktop-shell": {
       "allowedLayers": ["desktop-shell", "adapters"],
-      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media) and task_runtime.rs (tasks) may depend on each other and on the adapters layer (lib.rs declares `mod application_mcp;`), never directly on tests"
+      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media) and task_runtime.rs (tasks) may depend on each other and on the adapters layer (lib.rs declares `mod application_mcp;` and `mod native_viewport;`), never directly on tests"
     },
     "adapters": {
       "allowedLayers": [],
-      "meaning": "application_mcp.rs has no intra-crate `crate::`/`super::`/`self::` references at all; its only crate-level dependency is the external nemo-mcp port, governed separately by externalCratePorts below, not by this layer graph"
+      "meaning": "application_mcp.rs and native_viewport.rs are host adapters with no cross-adapter intra-crate edge; their nemo-mcp and native-engine dependencies are governed separately by externalCratePorts below"
     },
     "tests": {
-      "allowedLayers": ["desktop-shell"],
-      "meaning": "task_runtime/tests.rs reaches task_runtime.rs via `use super::*;`"
+      "allowedLayers": ["desktop-shell", "adapters"],
+      "meaning": "task_runtime/tests.rs reaches task_runtime.rs via `use super::*;`; application_mcp_tests.rs names its actual application_mcp parent explicitly via `use crate::application_mcp::*;`"
     }
   },
   "permittedEdges": {
     "note": "Observed at adoption from `mod …;` declarations in lib.rs (the crate root) and `use super::*;` in task_runtime/tests.rs (analyzer output). Layer rules are the enforced contract; this list documents which edges exist so a new one is a visible diff. Plain function-call references such as `video_decode::VideoSessions::default()` in lib.rs are unqualified sibling-module paths, not `crate::`/`super::`/`self::` paths, so they are outside what this analyzer resolves and add no edges beyond the `mod …;` declarations already listed.",
     "edges": [
       "rust.desktop.shell -> rust.desktop.mcp.adapter (lib.rs: mod application_mcp;)",
+      "rust.desktop.shell -> rust.desktop.native.viewport (lib.rs: mod native_viewport;)",
       "rust.desktop.shell -> rust.desktop.media (lib.rs: mod video_decode; mod media_probe; mod vectorize;)",
       "rust.desktop.shell -> rust.desktop.tasks (lib.rs: mod task_runtime;)",
+      "rust.desktop.mcp.adapter.tests -> rust.desktop.mcp.adapter (application_mcp_tests.rs: use crate::application_mcp::*;)",
       "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)"
     ]
   },
@@ -55,11 +59,65 @@
   "externalCratePorts": {
     "nemo_mcp": {
       "allowedModules": ["rust.desktop.mcp.adapter"],
-      "items": ["contract::ApplicationRequest", "contract::ApplicationResponse", "registry", "wire", "BUILD_SOURCE_ID"],
-      "note": "The nemo-mcp crate's transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) as consumed today by application_mcp.rs: the `use nemo_mcp::{contract::{ApplicationRequest, ApplicationResponse}, registry::{self, Endpoint, Registration}, wire};` block and the inline `nemo_mcp::BUILD_SOURCE_ID` reference. A declared item covers itself and any deeper path under it (e.g. `registry` covers `registry::Endpoint`). Only rust.desktop.mcp.adapter may reference nemo_mcp at all; any other module doing so is an external-crate-violation, and rust.desktop.mcp.adapter reaching an undeclared nemo_mcp path is a private-port-access violation."
+      "items": [
+        "BUILD_SOURCE_ID",
+        "contract::ApplicationRequest",
+        "contract::ApplicationResponse",
+        "contract::NativeApplicationError",
+        "contract::NativeApplicationRequest",
+        "contract::NativeApplicationResponse",
+        "contract::NativeHostStatus",
+        "contract::NativeStatusRequest",
+        "contract::NATIVE_API_VERSION",
+        "contract::Operation",
+        "registry",
+        "wire"
+      ],
+      "note": "The versioned nemo-mcp transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) consumed by application_mcp.rs. A declared item covers itself and any deeper path under it (for example, registry covers registry::Endpoint). Only rust.desktop.mcp.adapter may reference nemo_mcp; any other module doing so is an external-crate-violation, and an undeclared nemo_mcp path is a private-port-access violation."
+    },
+    "native_engine": {
+      "allowedModules": [
+        "rust.desktop.mcp.adapter",
+        "rust.desktop.mcp.adapter.tests",
+        "rust.desktop.native.viewport"
+      ],
+      "items": [
+        "application::ExportResourceResolver",
+        "application::NativeApplication",
+        "application::ResourceResolutionError",
+        "application::ResourceResolutionErrorKind",
+        "codec::decode_project",
+        "commands::OpacityRequest",
+        "commands::ResponseEnvelope",
+        "compositor::CompositionResult",
+        "compositor::Compositor",
+        "compositor::CompositorError",
+        "compositor::CompositorInstance",
+        "desktop_viewport::AcquiredSurfaceFrame",
+        "desktop_viewport::DesktopViewportHost",
+        "desktop_viewport::PresentationReceipt",
+        "desktop_viewport::SettledSurfaceFrame",
+        "desktop_viewport::SurfaceAttempt",
+        "desktop_viewport::SurfacePort",
+        "desktop_viewport::SurfacePresentation",
+        "desktop_viewport::SurfaceRecoveryError",
+        "desktop_viewport::ViewportError",
+        "desktop_viewport::ViewportMapping",
+        "document::OpacityDocument",
+        "export_job::ExportArtifact",
+        "export_job::ExportCompositor",
+        "export_job::ExportReadback",
+        "export_job::StagedArtifactPort",
+        "protocol::OpaqueResourceHandle",
+        "render_scene::GeometryPaintInput",
+        "render_scene::RenderScene",
+        "render_scene::ScheduledFrameIdentity",
+        "scheduler::WorkId"
+      ],
+      "note": "The narrow native-engine host port used by the staged macOS surface adapter, the shared application/MCP host and its focused same-instance test. No other desktop module may reach native-engine, and the common nemo-mcp transport crate remains independent of native-engine."
     }
   },
-  "unanalyzedModules": ["rust.desktop.build", "rust.mcp.transport"],
-  "unanalyzedModulesNote": "Census entries only, never graphed by this analyzer: rust.desktop.build is the Cargo build script (outside sourceDir, no crate module graph); rust.mcp.transport is the whole nemo-mcp crate, referenced here only as the target of externalCratePorts.nemo_mcp and not itself given an intra-crate policy by this file.",
+  "unanalyzedModules": ["rust.desktop.build", "rust.mcp.transport", "rust.native.engine"],
+  "unanalyzedModulesNote": "Census entries only, never graphed by this analyzer: rust.desktop.build is the Cargo build script outside sourceDir; rust.mcp.transport and rust.native.engine are separate crates referenced only as targets of the declared external-crate ports and are not given intra-crate policies by this file.",
   "exceptions": []
 }

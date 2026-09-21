@@ -26,7 +26,7 @@ const net = require('node:net');
 const repo = process.argv[1], instanceId = process.argv[2], secret = process.argv[3];
 const core = require(path.join(repo, 'src/js/application/opacity-application.js'));
 const domain = require(path.join(repo, 'src/js/domain/animation/opacity.js'));
-let identity = 0, context = {}, checkpoints = 0, mutations = 0;
+let identity = 0, context = {}, checkpoints = 0, mutations = 0, nativeCalls = 0;
 let state = fresh(), undo = [], redo = [];
 function fresh() {
   return {currentFrame: 0, totalFrames: 24,
@@ -51,13 +51,18 @@ const api = core.create({
   afterMutation() { mutations++; }
 });
 if (!api.setInstanceId(instanceId).ok) throw new Error('Instance binding failed');
+function legacy(request) {
+  const response = api.handle(request);
+  if (request.operation === 'capabilities' && response.ok) response.result.nativeApiVersion = 2;
+  return response;
+}
 function local(message) {
-  if (message.action === 'call') return api.handle(message.request);
+  if (message.action === 'call') return legacy(message.request);
   if (message.action === 'replace') {
     state = fresh(); undo = []; redo = []; context = {}; api.documentChanged();
   } else if (message.action !== 'inspect') throw new Error('Unexpected fixture action');
   return {meta: api.meta(), state: copy(state), checkpoints, mutations,
-    undoDepth: undo.length, redoDepth: redo.length};
+    nativeCalls, undoDepth: undo.length, redoDepth: redo.length};
 }
 const server = net.createServer(socket => {
   socket.setTimeout(5000, () => socket.destroy());
@@ -72,7 +77,19 @@ const server = net.createServer(socket => {
     try {
       const message = JSON.parse(data.slice(0, data.indexOf('\n')));
       if (message.secret !== secret) throw new Error('Wrong test endpoint secret');
-      socket.end(JSON.stringify(api.handle(message.request)) + '\n');
+      if (message.nativeStatus) {
+        const status = message.nativeStatus;
+        socket.end(JSON.stringify({apiVersion: 2, requestId: status.requestId,
+          instanceId, available: true, documentId: 'native-document-1', contentRevision: 0}) + '\n');
+      } else if (message.nativeRequest) {
+        const request = message.nativeRequest;
+        nativeCalls++;
+        socket.end(JSON.stringify({apiVersion: 2, requestId: request.requestId,
+          instanceId, documentId: request.documentId, contentRevision: 0, ok: true,
+          result: {atRevision: 0, layerUid: request.payload.stableTarget.layerUid, value: 25}}) + '\n');
+      } else {
+        socket.end(JSON.stringify(legacy(message.request)) + '\n');
+      }
     } catch (error) { console.error(error.message); socket.destroy(); }
   });
 });
@@ -209,6 +226,11 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
             .structured_content
             .unwrap();
         assert_eq!(discovery["instances"].as_array().unwrap().len(), 1);
+        assert_eq!(discovery["nativeApiVersion"], 2);
+        assert_eq!(
+            discovery["registeredNativeCapabilities"][0]["id"],
+            "native.opacity"
+        );
         assert_eq!(discovery["instances"][0]["instanceId"], instance);
         assert_eq!(
             discovery["instances"][0]["documentId"],
@@ -218,6 +240,22 @@ async fn compiled_mcp_shares_application_revision_retries_and_history() {
             discovery["instances"][0]["capabilities"],
             direct_capabilities["result"]
         );
+        assert_eq!(
+            discovery["instances"][0]["nativeHostStatus"],
+            json!({"apiVersion":2,"requestId":discovery["instances"][0]["nativeHostStatus"]["requestId"],
+                "instanceId":instance,"available":true,"documentId":"native-document-1",
+                "contentRevision":0})
+        );
+
+        let native_query = json!({"apiVersion":2,"requestId":"native-query",
+            "instanceId":instance,"documentId":"native-document-1",
+            "operation":"query.document.opacity",
+            "payload":{"stableTarget":{"layerUid":"layer-a"}}});
+        let native_response = command(&client, &native_query).await;
+        assert_eq!(native_response["ok"], true);
+        assert_eq!(native_response["result"]["layerUid"], "layer-a");
+        assert_eq!(app.inspect().await["nativeCalls"], 1);
+
         let direct_set = request(&initial["meta"], "direct-set", "property.set", opacity(75));
         let direct_result = app.direct(&direct_set).await;
         assert_eq!(direct_result["ok"], true);

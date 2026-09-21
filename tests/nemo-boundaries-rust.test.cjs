@@ -412,6 +412,36 @@ test('N15 registers the common v2 application dispatcher without exclusions or a
     required.map((file) => ['coverage-unprofiled-source', file]));
 });
 
+test('N16 registers the native desktop host and focused MCP host test without exclusions or a frozen-baseline waiver', () => {
+  const required = [
+    'src-tauri/src/application_mcp_tests.rs',
+    'src-tauri/src/native_viewport.rs',
+  ];
+  const { rust } = discoverRust();
+  const declared = declaredPaths();
+  for (const file of required) {
+    assert.ok(rust.includes(file), `discovery omitted ${file}`);
+    assert.ok(declared.includes(file), `profile omitted ${file}`);
+    assert.equal(coverage.exclusions.some((entry) => entry.path === file), false);
+    assert.equal(profile.exceptions.some((entry) => entry.path === file), false);
+  }
+  assert.deepEqual(
+    coverage.sizePolicy.warnOnlyAtAdoption.find((entry) => entry.path === 'src-tauri/src/native_viewport.rs'),
+    { path: 'src-tauri/src/native_viewport.rs', nonblankLines: 497 },
+  );
+
+  const dropped = structuredClone(profile);
+  for (const module of dropped.modules) {
+    module.files = module.files.filter((file) => !required.includes(path.posix.join(module.dir, file)));
+    module.publicApi = module.publicApi.filter((file) => !required.includes(path.posix.join(module.dir, file)));
+  }
+  dropped.modules = dropped.modules.filter((module) => module.files.length > 0);
+  const result = checkSourceCoverage(dropped, { sourcePaths: rust, root: ROOT });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.violations.filter((entry) => required.includes(entry.file)).map((entry) => [entry.rule, entry.file]),
+    required.map((file) => ['coverage-unprofiled-source', file]));
+});
+
 test('no declared Rust source exceeds its effective ceiling, and retained ceilings are exact', () => {
   const result = checkSourceSizes(profile, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));

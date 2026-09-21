@@ -18,6 +18,7 @@ dirs = "6"
 [dev-dependencies]
 tempfile = "3"
 rmcp = { version = "=3.2.0", features = ["client", "transport-child-process"] }
+jsonschema = { version = "=0.56.0", default-features = false }
 
 [[bin]]
 name = "nemo-mcp-schema"

@@ -1,6 +1,16 @@
 //! Native transport port for the single application command authority in the webview.
+use native_engine::{
+    application::{ExportResourceResolver, NativeApplication},
+    commands::{OpacityRequest, ResponseEnvelope},
+    document::OpacityDocument,
+    export_job::{ExportCompositor, StagedArtifactPort},
+};
 use nemo_mcp::{
-    contract::{ApplicationRequest, ApplicationResponse},
+    contract::{
+        ApplicationRequest, ApplicationResponse, NativeApplicationError, NativeApplicationRequest,
+        NativeApplicationResponse, NativeHostStatus, NativeStatusRequest, Operation,
+        NATIVE_API_VERSION,
+    },
     registry::{self, Endpoint, Registration},
     wire,
 };
@@ -21,11 +31,44 @@ use tokio::{
 };
 
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>;
+type NativeState = Arc<Mutex<Option<Box<dyn NativeDispatch>>>>;
+
+trait NativeDispatch: Send {
+    fn instance_id(&self) -> &str;
+    fn document_id(&self) -> &str;
+    fn content_revision(&self) -> u64;
+    fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope;
+    fn replace_document(&mut self, document: OpacityDocument) -> Result<(), String>;
+}
+
+impl<P, C, R> NativeDispatch for NativeApplication<P, C, R>
+where
+    P: StagedArtifactPort + Send,
+    C: ExportCompositor + Send,
+    R: ExportResourceResolver + Send,
+{
+    fn instance_id(&self) -> &str {
+        NativeApplication::instance_id(self)
+    }
+    fn document_id(&self) -> &str {
+        NativeApplication::document_id(self)
+    }
+    fn content_revision(&self) -> u64 {
+        NativeApplication::content_revision(self)
+    }
+    fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+        NativeApplication::dispatch(self, request)
+    }
+    fn replace_document(&mut self, document: OpacityDocument) -> Result<(), String> {
+        NativeApplication::replace_document(self, document).map(|_| ())
+    }
+}
 
 pub struct ApplicationMcp {
     instance_id: String,
     started: AtomicBool,
     pending: Pending,
+    native: NativeState,
 }
 
 impl Default for ApplicationMcp {
@@ -34,7 +77,55 @@ impl Default for ApplicationMcp {
             instance_id: uuid::Uuid::new_v4().to_string(),
             started: AtomicBool::new(false),
             pending: Arc::new(Mutex::new(HashMap::new())),
+            native: Arc::new(Mutex::new(None)),
         }
+    }
+}
+
+impl ApplicationMcp {
+    pub(crate) fn install_native<P, C, R>(
+        &self,
+        application: NativeApplication<P, C, R>,
+    ) -> Result<(), String>
+    where
+        P: StagedArtifactPort + Send + 'static,
+        C: ExportCompositor + Send + 'static,
+        R: ExportResourceResolver + Send + 'static,
+    {
+        if application.instance_id() != self.instance_id {
+            return Err("native application instance mismatch".into());
+        }
+        let mut native = self
+            .native
+            .lock()
+            .map_err(|_| "native application lock unavailable")?;
+        if native.is_some() {
+            return Err(
+                "native application is already installed; replace its document explicitly".into(),
+            );
+        }
+        *native = Some(Box::new(application));
+        Ok(())
+    }
+
+    pub(crate) fn replace_native_document(&self, document: OpacityDocument) -> Result<(), String> {
+        self.native
+            .lock()
+            .map_err(|_| "native application lock unavailable")?
+            .as_mut()
+            .ok_or_else(|| "native application is unavailable".to_string())?
+            .replace_document(document)
+    }
+
+    fn native_status(&self, request: NativeStatusRequest) -> Result<NativeHostStatus, String> {
+        native_status(&self.instance_id, &self.native, request)
+    }
+
+    fn dispatch_native(
+        &self,
+        request: NativeApplicationRequest,
+    ) -> Result<NativeApplicationResponse, String> {
+        dispatch_native(&self.instance_id, &self.native, request)
     }
 }
 
@@ -72,7 +163,13 @@ pub async fn nemo_mcp_ready(
     if state.started.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
-    let result = start(app, state.instance_id.clone(), state.pending.clone()).await;
+    let result = start(
+        app,
+        state.instance_id.clone(),
+        state.pending.clone(),
+        state.native.clone(),
+    )
+    .await;
     if result.is_err() {
         state.started.store(false, Ordering::SeqCst);
     }
@@ -101,7 +198,125 @@ pub fn nemo_mcp_reply(
     Ok(())
 }
 
-async fn start(app: tauri::AppHandle, instance_id: String, pending: Pending) -> Result<(), String> {
+#[tauri::command]
+pub fn nemo_native_status(
+    window: tauri::Window,
+    state: tauri::State<ApplicationMcp>,
+) -> Result<NativeHostStatus, String> {
+    require_main(&window)?;
+    state.native_status(NativeStatusRequest {
+        api_version: NATIVE_API_VERSION,
+        request_id: uuid::Uuid::new_v4().to_string(),
+        instance_id: state.instance_id.clone(),
+    })
+}
+
+#[tauri::command]
+pub fn nemo_native_dispatch(
+    window: tauri::Window,
+    state: tauri::State<ApplicationMcp>,
+    request: NativeApplicationRequest,
+) -> Result<NativeApplicationResponse, String> {
+    require_main(&window)?;
+    state.dispatch_native(request)
+}
+
+fn native_status(
+    instance_id: &str,
+    native: &NativeState,
+    request: NativeStatusRequest,
+) -> Result<NativeHostStatus, String> {
+    request.validate().map_err(|error| error.to_string())?;
+    let application = native
+        .lock()
+        .map_err(|_| "native application lock unavailable")?;
+    let Some(application) = application.as_ref() else {
+        return Ok(NativeHostStatus {
+            api_version: NATIVE_API_VERSION,
+            request_id: request.request_id,
+            instance_id: instance_id.to_owned(),
+            available: false,
+            document_id: None,
+            content_revision: None,
+            reason: Some("native application is staged but not active".into()),
+        });
+    };
+    if request.instance_id != instance_id || application.instance_id() != instance_id {
+        return Ok(NativeHostStatus {
+            api_version: NATIVE_API_VERSION,
+            request_id: request.request_id,
+            instance_id: instance_id.to_owned(),
+            available: false,
+            document_id: None,
+            content_revision: None,
+            reason: Some("native application instance mismatch".into()),
+        });
+    }
+    Ok(NativeHostStatus {
+        api_version: NATIVE_API_VERSION,
+        request_id: request.request_id,
+        instance_id: instance_id.to_owned(),
+        available: true,
+        document_id: Some(application.document_id().to_owned()),
+        content_revision: Some(application.content_revision()),
+        reason: None,
+    })
+}
+
+fn dispatch_native(
+    instance_id: &str,
+    native: &NativeState,
+    request: NativeApplicationRequest,
+) -> Result<NativeApplicationResponse, String> {
+    request.validate().map_err(|error| error.to_string())?;
+    let mut application = native
+        .lock()
+        .map_err(|_| "native application lock unavailable")?;
+    let Some(application) = application.as_mut() else {
+        return Ok(NativeApplicationResponse {
+            api_version: NATIVE_API_VERSION,
+            request_id: request.request_id,
+            instance_id: instance_id.to_owned(),
+            document_id: request.document_id,
+            content_revision: 0,
+            ok: false,
+            result: None,
+            error: Some(NativeApplicationError {
+                code: "unavailable".into(),
+                message: "native application is staged but not active".into(),
+                details: None,
+            }),
+        });
+    };
+    let native_request: OpacityRequest =
+        serde_json::from_value(serde_json::to_value(&request).map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
+    serde_json::from_value(
+        serde_json::to_value(application.dispatch(native_request))
+            .map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())
+}
+
+fn advertise_native(mut response: ApplicationResponse) -> ApplicationResponse {
+    if response.ok {
+        if let Some(result) = response
+            .result
+            .as_mut()
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            result.insert("nativeApiVersion".into(), NATIVE_API_VERSION.into());
+        }
+    }
+    response
+}
+
+async fn start(
+    app: tauri::AppHandle,
+    instance_id: String,
+    pending: Pending,
+    native: NativeState,
+) -> Result<(), String> {
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
         .await
         .map_err(|e| e.to_string())?;
@@ -124,10 +339,15 @@ async fn start(app: tauri::AppHandle, instance_id: String, pending: Pending) -> 
             let Ok(permit) = capacity.clone().try_acquire_owned() else {
                 continue;
             };
-            let (app, endpoint, pending) = (app.clone(), endpoint.clone(), pending.clone());
+            let (app, endpoint, pending, native) = (
+                app.clone(),
+                endpoint.clone(),
+                pending.clone(),
+                native.clone(),
+            );
             tauri::async_runtime::spawn(async move {
                 let _permit = permit;
-                let _ = serve_connection(app, stream, endpoint, pending).await;
+                let _ = serve_connection(app, stream, endpoint, pending, native).await;
             });
         }
     });
@@ -139,19 +359,52 @@ async fn serve_connection(
     mut stream: TcpStream,
     endpoint: Endpoint,
     pending: Pending,
+    native: NativeState,
 ) -> Result<(), String> {
-    let message: wire::WireRequest =
+    let message: wire::AuthenticatedWireRequest =
         tokio::time::timeout(Duration::from_secs(5), wire::read_json(&mut stream))
             .await
             .map_err(|_| "connection initialization timed out")?
             .map_err(|e| e.to_string())?;
-    if message.secret != endpoint.secret {
+    let secret = match &message {
+        wire::AuthenticatedWireRequest::Legacy(message) => &message.secret,
+        wire::AuthenticatedWireRequest::Native(message) => &message.secret,
+        wire::AuthenticatedWireRequest::NativeStatus(message) => &message.secret,
+    };
+    if secret != &endpoint.secret {
         return Err("unauthorized connection".into());
     }
+    match message {
+        wire::AuthenticatedWireRequest::Legacy(message) => {
+            serve_legacy(app, stream, endpoint, pending, message).await
+        }
+        wire::AuthenticatedWireRequest::Native(message) => {
+            let response = dispatch_native(&endpoint.instance_id, &native, message.native_request)?;
+            wire::write_json(&mut stream, &response)
+                .await
+                .map_err(|error| error.to_string())
+        }
+        wire::AuthenticatedWireRequest::NativeStatus(message) => {
+            let response = native_status(&endpoint.instance_id, &native, message.native_status)?;
+            wire::write_json(&mut stream, &response)
+                .await
+                .map_err(|error| error.to_string())
+        }
+    }
+}
+
+async fn serve_legacy(
+    app: tauri::AppHandle,
+    mut stream: TcpStream,
+    endpoint: Endpoint,
+    pending: Pending,
+    message: wire::WireRequest,
+) -> Result<(), String> {
     message.request.validate().map_err(|e| e.to_string())?;
     if message.request.instance_id.as_deref() != Some(endpoint.instance_id.as_str()) {
         return Err("request instance mismatch".into());
     }
+    let is_capabilities = matches!(message.request.operation, Operation::Capabilities);
     let window = app
         .get_webview_window("main")
         .ok_or("application window unavailable")?;
@@ -183,9 +436,12 @@ async fn serve_connection(
         .lock()
         .map_err(|_| "pending request lock unavailable")?
         .remove(&connection_id);
-    if let Some(response) = response {
+    if let Some(mut response) = response {
         if response.request_id != request_id {
             return Err("response request mismatch".into());
+        }
+        if is_capabilities {
+            response = advertise_native(response);
         }
         wire::write_json(&mut stream, &response)
             .await
@@ -198,3 +454,7 @@ async fn serve_connection(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "application_mcp_tests.rs"]
+mod tests;

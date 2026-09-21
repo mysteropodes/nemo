@@ -34,24 +34,59 @@ impl std::error::Error for CompositorError {}
 
 /// The sole N12 native GPU owner. It retains exactly one Vello `Scene`.
 pub struct Compositor {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
     renderer: Renderer,
     scene: Scene,
 }
 
-impl Compositor {
-    pub fn new() -> Result<Self, CompositorError> {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::METAL,
-            ..wgpu::InstanceDescriptor::new_without_display_handle()
-        });
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            force_fallback_adapter: false,
-            compatible_surface: None,
-        }))
-        .map_err(|error| CompositorError::new(format!("request native GPU adapter: {error}")))?;
+/// First half of native GPU construction. A window host creates its surface
+/// from this exact instance before adapter/device selection; headless callers
+/// can continue to use [`Compositor::new`].
+pub struct CompositorInstance {
+    instance: wgpu::Instance,
+}
+
+impl CompositorInstance {
+    pub fn new() -> Self {
+        Self {
+            instance: wgpu::Instance::new(wgpu::InstanceDescriptor {
+                backends: wgpu::Backends::METAL,
+                ..wgpu::InstanceDescriptor::new_without_display_handle()
+            }),
+        }
+    }
+
+    pub fn instance(&self) -> &wgpu::Instance {
+        &self.instance
+    }
+
+    pub fn create_headless(self) -> Result<Compositor, CompositorError> {
+        self.create(None)
+    }
+
+    pub fn create_for_surface(
+        self,
+        surface: &wgpu::Surface<'_>,
+    ) -> Result<Compositor, CompositorError> {
+        self.create(Some(surface))
+    }
+
+    fn create(
+        self,
+        compatible_surface: Option<&wgpu::Surface<'_>>,
+    ) -> Result<Compositor, CompositorError> {
+        let adapter =
+            pollster::block_on(self.instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
+                compatible_surface,
+            }))
+            .map_err(|error| {
+                CompositorError::new(format!("request native GPU adapter: {error}"))
+            })?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             label: Some("n12-native-compositor-device"),
             required_limits: adapter.limits(),
@@ -66,12 +101,37 @@ impl Compositor {
             },
         )
         .map_err(|error| CompositorError::new(format!("create Vello renderer: {error}")))?;
-        Ok(Self {
+        Ok(Compositor {
+            instance: self.instance,
+            adapter,
             device,
             queue,
             renderer,
             scene: Scene::new(),
         })
+    }
+}
+
+impl Default for CompositorInstance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Compositor {
+    pub fn new() -> Result<Self, CompositorError> {
+        CompositorInstance::new().create_headless()
+    }
+
+    /// The instance which created both the retained adapter and any compatible
+    /// native surface constructed through [`CompositorInstance`].
+    pub fn instance(&self) -> &wgpu::Instance {
+        &self.instance
+    }
+
+    /// The adapter selected before this compositor's sole device and queue.
+    pub fn adapter(&self) -> &wgpu::Adapter {
+        &self.adapter
     }
 
     /// Native-only access for the later viewport host; no CPU pixel boundary.
