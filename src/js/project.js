@@ -18,17 +18,9 @@
   var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
-  function importProjectJSON(json,silent){
-    return window.NemoNativeOpacityProject
-      ? window.NemoNativeOpacityProject.importJSON(json,silent)
-      : window.SM.importJSON(json,silent);
-  }
-  function afterMaybe(value,next){
-    return value&&typeof value.then==='function'?value.then(next):next(value);
-  }
-  function releaseNative(kind){
-    return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;
-  }
+  function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
+  function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
+  function releaseNative(kind){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
   // mirrored to IndexedDB (async, no practical size ceiling) so a project
   // with embedded media doesn't silently lose its autosave the moment it
@@ -111,9 +103,7 @@
     try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
-  function newProject(cfg){
-    return afterMaybe(releaseNative('new-project'),function(){return newProjectNow(cfg);});
-  }
+  function newProject(cfg){return afterMaybe(releaseNative('new-project'),function(){return newProjectNow(cfg);});}
 
   // Last successfully persisted document, for the close-with-unsaved-work
   // guard below. null = "never saved/loaded anything yet" — a brand-new

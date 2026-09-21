@@ -4,14 +4,8 @@
 // JSON are pure-JS and also work in the plain-browser dev preview.
 var _exportLayer = null;
 function exportTauriAvailable(){return typeof window.__TAURI__!=='undefined';}
-function exportNativeOpacity(){
-  var authority=window.NemoNativeOpacityCutover;
-  return authority&&authority.blocksLegacy()?authority:null;
-}
-async function exportReleaseNative(kind){
-  var authority=exportNativeOpacity();
-  if(authority)await authority.release({kind:kind});
-}
+function exportNativeOpacity(){var authority=window.NemoNativeOpacityCutover;return authority&&authority.blocksLegacy()?authority:null;}
+async function exportReleaseNative(kind){var authority=exportNativeOpacity();if(authority)await authority.release({kind:kind});}
 
 function exportEnsureLayer(){
   if(!_exportLayer){_exportLayer=new Layer({name:'__export__'});_exportLayer.visible=false;}
@@ -342,9 +336,7 @@ function exportBuildFrame(frameIdx,alpha){
   prev.activate();
   return L;
 }
-function exportFrameDataURL(frameIdx,scale,alpha){
-  var nativeAuthority=window.NemoNativeOpacityCutover;
-  if(nativeAuthority&&nativeAuthority.blocksLegacy())throw new Error('Native opacity frames cannot use the Paper.js exporter');
+function exportFrameDataURL(frameIdx,scale,alpha){var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())throw new Error('Native opacity frames cannot use the Paper.js exporter');
   var L=exportBuildFrame(frameIdx,alpha);
   // Paper.js's rasterize() skips invisible items entirely (same rule as
   // on-screen rendering), so the hidden export layer must be flipped
@@ -359,8 +351,7 @@ function exportFrameDataURL(frameIdx,scale,alpha){
   raster.remove();
   return url;
 }
-function exportFrameSVGString(frameIdx){
-  var nativeAuthority=window.NemoNativeOpacityCutover;
+function exportFrameSVGString(frameIdx){var nativeAuthority=window.NemoNativeOpacityCutover;
   if(nativeAuthority&&nativeAuthority.blocksLegacy())throw new Error('Native opacity SVG export requires release to legacy ownership');
   // The wrapper (visibility flip around exportSVG, XML preamble, root <svg>
   // sized to the canvas) lives in adapters/export-svg-frame.js (P17); this
@@ -420,8 +411,7 @@ async function exportMP4ToPath(outPath,opts){
   var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var fps=(opts&&opts.fps)||state.fps;
   var tmp=exportTempDirPath?await exportTempDirPath():null;
   var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
-  await exportMkdir(workDir);
-  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
+  await exportMkdir(workDir);var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
   // h264_videotoolbox (Apple's own hardware/OS H.264 encoder via the
   // VideoToolbox framework), not libx264 — the 2026-08-18 license rebuild
   // (THIRD_PARTY_NOTICES.md) dropped libx264 (GPL + H.264 patent exposure).
@@ -581,17 +571,11 @@ function exportHasCenterlineMotion(){
 function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion()||exportHasImageMesh()||exportHasCenterlineMotion();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
-  var nativeOpacity=exportNativeOpacity();
-  if(nativeOpacity){
+  var nativeOpacity=exportNativeOpacity();if(nativeOpacity){
     if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');
-    if((scale&&scale!==1)||alpha){
-      await nativeOpacity.release({kind:alpha?'alpha-raster-export':'scaled-raster-export'});
-      return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);
-    }
-    var destination=dir.replace(/[\\/]+$/,'')+'/nemo-native-opacity-'+Date.now()+'-'+Math.floor(Math.random()*1000000);
-    var frames=[];for(var nativeFrame=start;nativeFrame<=end;nativeFrame++)frames.push(nativeFrame);
-    await nativeOpacity.exportPng(destination,frames,onProgress);
-    return destination;
+    if((scale&&scale!==1)||alpha){await nativeOpacity.release({kind:alpha?'alpha-raster-export':'scaled-raster-export'});return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);}
+    var destination=dir.replace(/[\\/]+$/,'')+'/nemo-native-opacity-'+Date.now()+'-'+Math.floor(Math.random()*1000000);var frames=[];for(var nativeFrame=start;nativeFrame<=end;nativeFrame++)frames.push(nativeFrame);
+    await nativeOpacity.exportPng(destination,frames,onProgress);return destination;
   }
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
   // the live GPU preview — exportFrameDataURL rasterizes straight from
@@ -617,8 +601,7 @@ async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
     }
   }finally{
     if(useFx)SMEngineBridge.endEffectsExport();
-  }
-  return dir;
+  }return dir;
 }
 
 // ---- Browser-compatible video export (2026-08-17) ----
@@ -1201,8 +1184,7 @@ async function exportPNGSequenceToDir(dir,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
   var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
   await exportMkdir(dir);
-  var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);
-  return{ok:true,dir:renderedDir};
+  var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);return{ok:true,dir:renderedDir};
 }
 async function exportTIFFSequenceToDir(outDir,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
@@ -1211,8 +1193,7 @@ async function exportTIFFSequenceToDir(outDir,opts){
   var tmp=exportTempDirPath?await exportTempDirPath():null;
   var workDir=(tmp||outDir)+'/sm-export-'+Date.now();
   await exportMkdir(workDir);
-  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-  await exportRunFfmpeg(['-y','-start_number','1','-i',pngDir+'/frame_%04d.png','-start_number','1',outDir+'/frame_%04d.tif'],opts&&opts.onFfmpeg);
+  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);await exportRunFfmpeg(['-y','-start_number','1','-i',pngDir+'/frame_%04d.png','-start_number','1',outDir+'/frame_%04d.tif'],opts&&opts.onFfmpeg);
   await exportRemoveDir(workDir);
   return{ok:true,dir:outDir};
 }
@@ -1227,10 +1208,8 @@ function exportSvgSequenceJob(){
 }
 async function exportSVGSequenceToDir(dir,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
-  var nativeAuthority=window.NemoNativeOpacityCutover;
-  if(nativeAuthority&&nativeAuthority.blocksLegacy())await nativeAuthority.release({kind:'svg-export'});
-  var r=exportFrameRange(opts);
-  return await exportSvgSequenceJob().run({dir:dir,start:r.start,end:r.end,requestId:opts&&opts.requestId,onProgress:opts&&opts.onProgress});
+  var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())await nativeAuthority.release({kind:'svg-export'});
+  var r=exportFrameRange(opts);return await exportSvgSequenceJob().run({dir:dir,start:r.start,end:r.end,requestId:opts&&opts.requestId,onProgress:opts&&opts.onProgress});
 }
 async function exportGIFToPath(outPath,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportGifBrowser.'};
@@ -1238,8 +1217,7 @@ async function exportGIFToPath(outPath,opts){
   var tmp=exportTempDirPath?await exportTempDirPath():null;
   var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
   await exportMkdir(workDir);
-  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-  var palette=workDir+'/palette.png';
+  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);var palette=workDir+'/palette.png';
   await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',pngDir+'/frame_%04d.png','-vf','palettegen=stats_mode=diff',palette],opts&&opts.onFfmpeg);
   await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',pngDir+'/frame_%04d.png','-i',palette,'-lavfi','paletteuse=dither=bayer','-loop','0',outPath],opts&&opts.onFfmpeg);
   await exportRemoveDir(workDir);
@@ -1251,8 +1229,7 @@ async function exportProResToPath(outPath,opts){
   var alpha=!!(opts&&opts.alpha);
   var tmp=exportTempDirPath?await exportTempDirPath():null;
   var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
-  await exportMkdir(workDir);
-  var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
+  await exportMkdir(workDir);var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
   var vArgs=alpha
     ?['-c:v','prores_ks','-profile:v','4','-pix_fmt','yuva444p10le']
     :['-c:v','prores_ks','-profile:v','3','-pix_fmt','yuv422p10le'];
@@ -1262,8 +1239,7 @@ async function exportProResToPath(outPath,opts){
 }
 async function exportLottieToPath(outPath,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur) — voir exportLottie (repli navigateur).'};
-  await exportReleaseNative('lottie-export');
-  var r=exportFrameRange(opts);
+  await exportReleaseNative('lottie-export');var r=exportFrameRange(opts);
   var json=lottieBuild(r.start,r.end);
   var text=JSON.stringify(json);
   await exportWriteText(outPath,text);
@@ -1298,8 +1274,7 @@ window.SMExport={
   pickVideoMimeType:function(){return typeof exportPickVideoMimeType==='function'?exportPickVideoMimeType():'';},
 
   exportSVGSequence:async function(opts){
-    await exportReleaseNative('svg-export');
-    var r=exportFrameRange(opts);
+    await exportReleaseNative('svg-export');var r=exportFrameRange(opts);
     if(exportTauriAvailable()){
       var dir=await exportPickDir('Dossier de séquence SVG');
       if(!dir)return{cancelled:true};
@@ -1320,8 +1295,7 @@ window.SMExport={
     var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
     var dir=await exportPickDir('Dossier de séquence PNG');
     if(!dir)return{cancelled:true};
-    var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);
-    return{ok:true,dir:renderedDir};
+    var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);return{ok:true,dir:renderedDir};
   },
 
   exportTIFFSequence:async function(opts){
@@ -1332,8 +1306,7 @@ window.SMExport={
     var tmp=exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||outDir)+'/sm-export-'+Date.now();
     await exportMkdir(workDir);
-    var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-    await exportRunFfmpeg(['-y','-start_number','1','-i',pngDir+'/frame_%04d.png','-start_number','1',outDir+'/frame_%04d.tif'],opts&&opts.onFfmpeg);
+    var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);await exportRunFfmpeg(['-y','-start_number','1','-i',pngDir+'/frame_%04d.png','-start_number','1',outDir+'/frame_%04d.tif'],opts&&opts.onFfmpeg);
     await exportRemoveDir(workDir);
     return{ok:true,dir:outDir};
   },
@@ -1346,8 +1319,7 @@ window.SMExport={
     var tmp=exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
     await exportMkdir(workDir);
-    var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);
-    var palette=workDir+'/palette.png';
+    var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress);var palette=workDir+'/palette.png';
     await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',pngDir+'/frame_%04d.png','-vf','palettegen=stats_mode=diff',palette],opts&&opts.onFfmpeg);
     await exportRunFfmpeg(['-y','-framerate',String(fps),'-i',pngDir+'/frame_%04d.png','-i',palette,'-lavfi','paletteuse=dither=bayer','-loop','0',outPath],opts&&opts.onFfmpeg);
     await exportRemoveDir(workDir);
@@ -1384,8 +1356,7 @@ window.SMExport={
     if(!outPath)return{cancelled:true};
     var tmp=exportTempDirPath?await exportTempDirPath():null;
     var workDir=(tmp||outPath.replace(/[^/\\]+$/,''))+'sm-export-'+Date.now();
-    await exportMkdir(workDir);
-    var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
+    await exportMkdir(workDir);var pngDir=await exportRenderPNGsToDir(workDir,r.start,r.end,scale,opts&&opts.onProgress,alpha);
     // ProRes 4444 (profile 4) is the alpha-capable variant — regular ProRes
     // (profile 3, "HQ") has no alpha channel at all, same as any other
     // standard video codec, so a real alpha export needs both the profile
@@ -1399,8 +1370,7 @@ window.SMExport={
   },
 
   exportLottie:async function(opts){
-    await exportReleaseNative('lottie-export');
-    var r=exportFrameRange(opts);
+    await exportReleaseNative('lottie-export');var r=exportFrameRange(opts);
     var json=lottieBuild(r.start,r.end);
     var text=JSON.stringify(json);
     if(exportTauriAvailable()){

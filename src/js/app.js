@@ -2946,9 +2946,7 @@ function unlinkTimeLinkPreserveRange(ld){
 // status-bar stroke count, doubling the per-frame transform cost of every
 // scrub and playback tick (2026-07-28). Do NOT use countOnly to get strokes
 // you intend to draw: the returned dicts are untransformed.
-function getEffectiveStrokes(layerIdx,frameIdx,countOnly){
-  var nativeOpacity=window.NemoNativeOpacityCutover;
-  if(nativeOpacity&&nativeOpacity.blocksLegacy())return[];
+function getEffectiveStrokes(layerIdx,frameIdx,countOnly){var nativeOpacity=window.NemoNativeOpacityCutover;if(nativeOpacity&&nativeOpacity.blocksLegacy())return[];
   var ld=state.layers[layerIdx];if(!ld)return[];
   if(layerHasTimeRange(ld)&&(frameIdx<layerInPoint(ld)||frameIdx>layerOutPoint(ld)))return[];
   // EXPERIMENTAL (native-video-decode): a natively-decoded video layer's
@@ -4633,8 +4631,7 @@ function _invalidateSymbolUnionIfEditingSymbol(){
   if(!state.activeSymbolId)return;
   if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 }
-function saveActiveLayerFrame(){
-  if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
+function saveActiveLayerFrame(){if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
   window._sceneVersion++;
   _invalidateSymbolUnionIfEditingSymbol();
   // duplicator (unless in edit-source mode): the live Paper layer holds the
@@ -4693,8 +4690,7 @@ function saveActiveLayerFrame(){
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;
 }
-function saveAllLayerFrames(){
-  if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
+function saveAllLayerFrames(){if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.

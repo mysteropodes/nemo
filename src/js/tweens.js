@@ -4738,12 +4738,6 @@ function renderOS(){
 // and JS strings are immutable, so sharing the heavy fields by reference is
 // unconditionally safe. Same split the render path already uses
 // (cloneStrokeForTransform, app.js). 2026-07-28.
-function _nativeOpacityHistory(action){
-  var nativeOpacity=window.NemoNativeOpacityCutover;
-  if(!nativeOpacity||!nativeOpacity.blocksLegacy())return false;
-  if(nativeOpacity.isActive())nativeOpacity.history(action).catch(function(){});
-  return true;
-}
 function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}
 // Walks every stroke of a layers tree in a deterministic order. Both the
 // live tree and its clone have identical shape, so two walks stay in lockstep
@@ -4968,7 +4962,7 @@ function restoreLayersSnapshot(s){
 }
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function undo(){if(_nativeOpacityHistory('undo'))return;if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function undo(){var nativeOpacity=window.NemoNativeOpacityCutover;if(nativeOpacity&&nativeOpacity.blocksLegacy()){if(nativeOpacity.isActive())nativeOpacity.history('undo').catch(function(){});return;}if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.undoStack.length){showToast(SM.t('toastNothingToUndo'));return;}
 // Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
 // entry stays on the stack untouched so the user can navigate to the right
@@ -4986,7 +4980,7 @@ if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels
 var applied=NemoFrameHistoryEntry.apply(state,s);state.redoStack.push(applied.inverse);state.redoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function redo(){if(_nativeOpacityHistory('redo'))return;if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function redo(){var nativeOpacity=window.NemoNativeOpacityCutover;if(nativeOpacity&&nativeOpacity.blocksLegacy()){if(nativeOpacity.isActive())nativeOpacity.history('redo').catch(function(){});return;}if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.redoStack.length){showToast(SM.t('toastNothingToRedo'));return;}
 // Same cross-context guard as undo() above, mirrored for the redo stack.
 var top=state.redoStack[state.redoStack.length-1];
