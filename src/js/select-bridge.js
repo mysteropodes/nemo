@@ -472,6 +472,9 @@
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'select' && !state.playing;
   }
 
+  function allowLegacySelectionEdit(e,k){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
+  function guardMenuItems(a){return a.map(function(i){if(i.action){var f=i.action;i.action=function(){if(allowLegacySelectionEdit(null,'select'))return f.apply(this,arguments);};}return i;});}
+
   // Same handle-position math as buildTransformBoxItems() in
   // engine-bridge.js and renderTransformHandles() in tools.js — recomputed
   // directly from xformSelBounds()/selectedPaths rather than reading
@@ -770,7 +773,7 @@
     return null;
   }
 
-  var lastPt = null;
+  var lastPt = null, motionGesture = false;
   function onDown(e) {
     // Right/middle-click never drives select/marquee/move/Motion-drag — a
     // pre-existing gap (no button check at all) that used to go unnoticed
@@ -782,6 +785,7 @@
     // about to act on. Left as a no-op here (no stopPropagation) so
     // 'contextmenu' fires completely normally afterward.
     if (e.button !== undefined && e.button !== 0) return;
+    if (shouldIntercept() && !allowLegacySelectionEdit(e, 'select')) return;
     // One-shot guard (2026-08 fix, "je select une forme dans le groupe...
     // si j'essaie de bouger la forme dans le canvas alors ça select le
     // groupe") — set by motion.js's selectShapesByStrokeIds (Elements panel
@@ -794,23 +798,13 @@
     // click) exist for.
     var skipGroupWiden = !!window._skipGroupWidenOnce;
     window._skipGroupWidenOnce = false;
-    // Motion mode's position-keyframe/spatial-handle canvas dragging
-    // (motion.js's onDown/onDrag/onUp — the bezier-handle motion path,
-    // same gizmo pattern as the camera layer) was originally wired ONLY
-    // into tools.js's own Paper-Tool onMouseDown/Drag/Up — dead code the
-    // moment the Rust engine is on (the default): this file's own onDown
-    // stopImmediatePropagation()s at CAPTURE phase, which never lets
-    // Paper's Tool system (and therefore tools.js's handler) see the event
-    // at all. Found live (2026-07, "ajoute des bezier de controle comme
-    // pour le calque caméra au motion path de position" — the feature
-    // already existed, just never actually reachable). Checked first, tool-
-    // agnostic like tools.js's own placement of this same check — only
-    // consumes the event (returns true) when the click actually lands on a
-    // motion handle/keyframe dot; otherwise falls through unchanged into
-    // this file's own shouldIntercept()-gated logic below.
+    // Capture-phase forwarding keeps Motion handles reachable when Paper Tool
+    // callbacks are bypassed; it consumes only a Motion hit.
     if (state.appMode === 'motion' && window.SMMotion) {
+      if (!allowLegacySelectionEdit(e, 'select')) return;
       var w0 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       if (SMMotion.onDown({ point: new Point(w0[0], w0[1]), altKey: e.altKey })) {
+        motionGesture = true;
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
@@ -903,7 +897,8 @@
           // match this same click and start 'elementMove' properly, so the
           // single gesture both selects AND drags the sibling, like every
           // other grab in this file already does for the FIRST element.
-          SMMotion.onDown({ point: ptEx, altKey: e.altKey });
+          if (!allowLegacySelectionEdit(e, 'select')) return;
+          if (SMMotion.onDown({ point: ptEx, altKey: e.altKey })) motionGesture = true;
         } else if (sidEx === window._motionExpandedElement) {
           // feedback #216 investigation (2026-08-31): re-clicking the SAME
           // shape that is already the isolation target hit neither branch
@@ -1789,15 +1784,13 @@
   }
 
   function onMove(e) {
-    // See onDown's comment — SMMotion.onDrag no-ops (returns false) unless
-    // its own onDown just started a handle/dot/anchor drag, so this is safe
-    // to probe unconditionally without any extra state of our own.
     if (state.appMode === 'motion' && window.SMMotion) {
       var w1 = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
       // shiftKey travels with the point (2026-09, #802): Motion's own drags
       // (element move, multi-layer move) apply the axis lock themselves, and
       // this forwarded event was the only place that state could come from.
-      if (SMMotion.onDrag({ point: new Point(w1[0], w1[1]), shiftKey: e.shiftKey })) {
+      if (motionGesture && !allowLegacySelectionEdit(e, 'select')) return;
+      if (motionGesture && SMMotion.onDrag({ point: new Point(w1[0], w1[1]), shiftKey: e.shiftKey })) {
         e.stopImmediatePropagation(); e.preventDefault();
         return;
       }
@@ -1808,6 +1801,7 @@
       // Animation 2D's own hover-only pass just below.
       if (window.SMMotion.onHoverMove({ x: w1[0], y: w1[1] })) window.SMEngineBridge.renderNow();
     }
+    if (mode && !allowLegacySelectionEdit(e, 'select')) return;
     if (mode === 'cornerRadius' && _cornerDrag) {
       e.stopImmediatePropagation(); e.preventDefault();
       var wc = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -2503,11 +2497,13 @@
   }
 
   function onUp(e) {
+    if ((mode || draggingArc || motionGesture) && !allowLegacySelectionEdit(e, 'select')) return;
     // See onDown's comment — clears _motionDrag if a motion handle/dot/
     // anchor drag was in progress; no-ops otherwise. Must run even though
     // this file's own `mode` stays null for a motion-path drag (onDown
     // never touched it), or _motionDrag would never get released.
-    if (state.appMode === 'motion' && window.SMMotion && SMMotion.onUp()) {
+    if (state.appMode === 'motion' && window.SMMotion && motionGesture && SMMotion.onUp()) {
+      motionGesture = false;
       e.stopImmediatePropagation(); e.preventDefault();
       return;
     }
@@ -2914,6 +2910,7 @@
   // only pays off past ~10 items, not warranted here yet).
   function onContext(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacySelectionEdit(e, 'select')) return;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     // Ctrl+click free-transform distort (see beginDistort's own comment) —
@@ -3034,7 +3031,7 @@
       }
       if (!emptyItems.length) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      window.showContextMenu(e.clientX, e.clientY, emptyItems);
+      window.showContextMenu(e.clientX, e.clientY, guardMenuItems(emptyItems));
       return;
     }
     e.preventDefault(); e.stopImmediatePropagation();
@@ -3288,7 +3285,7 @@
         }
       });
     }
-    window.showContextMenu(e.clientX, e.clientY, items);
+    window.showContextMenu(e.clientX, e.clientY, guardMenuItems(items));
   }
 
   // 2026-07 feedback ("tween seulement des éléments select... avec le clic
@@ -3308,6 +3305,7 @@
   // full auto-match, zero change in behavior.
   function toggleTweenOnForSelection() {
     if (!selectedPaths.length) return;
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     pushUndo();
     var newVal = !selectedPaths.every(function (p) { return p.data && p.data.tweenOn; });
     var li = state.activeLayerIdx, ld = state.layers[li], cf = state.currentFrame;
@@ -3378,6 +3376,7 @@
   }
   function tagSelectionAsRole(p0) {
     if (!(p0 instanceof Path)) return;
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     var current = (p0.data && p0.data.trackRoleId) || '';
     var name = prompt('Nom du rôle suivi (ex. « Balle ») — réutilise un nom existant pour continuer ce rôle :', current);
     if (name == null) return; // cancelled
@@ -3447,6 +3446,7 @@
   // live children, not just the active layer.
   function attachSelectionToRole(p0, roleId) {
     if (!(p0 instanceof Path)) return;
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     var roleShape = null;
     for (var i = 0; i < state.layers.length && !roleShape; i++) {
       if (!layerIsEffectivelyVisible(i)) continue;
@@ -3552,6 +3552,7 @@
   // selection highlight) and prompts the user to confirm via the usual
   // "Marquer comme rôle suivi…" action. NEVER tags anything by itself.
   function applyRoleSuggestion(s) {
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     var cand = _findClosestPathToPoint(s.center);
     if (!cand) { showToast(SM.t('hsNoShapeOnFrame')); return; }
     clearSel();

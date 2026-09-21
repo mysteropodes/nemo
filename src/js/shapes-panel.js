@@ -60,26 +60,15 @@
     var li = state.activeLayerIdx;
     return { li: li, ld: state.layers[li] };
   }
+  function allowLegacySelectionEdit(e){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow('shapes-panel')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function isStrokeSelected(li, strokeId) {
     if (!window.selectedPaths || !window.selectedPaths.length) return false;
     var item = window.SMMotion.liveItemByStrokeId(li, strokeId);
     return !!item && window.selectedPaths.indexOf(item) >= 0;
   }
-  // Multi-select (2026-08, "impossible d'avoir le multiselect shift ou
-  // alt dans le panel") — SMMotion.selectShapesByStrokeIds always REPLACES
-  // the whole selection, same as every click in this panel used before
-  // this fix; there was no additive path at all (confirmed: Motion's own
-  // left-panel Éléments list has the identical gap, so there was no
-  // existing helper to reuse here). additive=true toggles the clicked
-  // strokeId(s) in/out of the CURRENT selection instead of replacing it —
-  // same toggle semantics select-bridge.js's own canvas Shift-click
-  // already uses (add if entirely absent, remove if already present), so
-  // canvas and panel behave identically under Shift/Alt. Alt is treated
-  // the same as Shift here — Cyril asked for "shift ou alt", and neither
-  // this panel nor Motion's own list has a distinct meaning to give Alt
-  // beyond "also multi-select", so inventing one would be undirected
-  // scope, not a fix.
+  // Shift/Alt toggles panel selection to match canvas multi-select.
   function applySelection(li, strokeIds, additive) {
+    if (!allowLegacySelectionEdit()) return;
     _paintFocus = null; // a plain shape selection doesn't imply fill or stroke specifically
     if (!additive) { window.SMMotion.selectShapesByStrokeIds(li, strokeIds); return; }
     var items = strokeIds.map(function (sid) { return window.SMMotion.liveItemByStrokeId(li, sid); }).filter(Boolean);
@@ -120,6 +109,7 @@
   // into view, rather than pretending there's a fill-only vs stroke-only
   // selection mode that the panel doesn't actually have.
   function selectPaintAspect(li, strokeId, shapeStrokeId, kind) {
+    if (!allowLegacySelectionEdit()) return;
     // MUST be set before selectShapesByStrokeIds — that call triggers a
     // SYNCHRONOUS updateUI -> renderShapesPanel itself (found live: setting
     // it after left the panel re-rendered against the still-null/stale
@@ -376,6 +366,7 @@
   // overwrites state.paintOrder, the default for the NEXT shape drawn —
   // an unwanted global side effect for what should be a per-shape swap).
   function performPaintSwap(overRow) {
+    if (!allowLegacySelectionEdit()) return;
     var destPaintId = overRow.dataset.paintid;
     if (!destPaintId || destPaintId === _elDrag.id) return;
     var srcParts = _elDrag.id.split(':'), destParts = destPaintId.split(':');
@@ -455,6 +446,7 @@
     else block.forEach(function (it) { it.insertAbove(anchor); anchor = it; });
   }
   function performMemberReorder(overRow) {
+    if (!allowLegacySelectionEdit()) return;
     var destGroupGid = overRow.dataset.groupmember, destStrokeId = overRow.dataset.strokeid, destGid = overRow.dataset.gid;
     if (destStrokeId === _elDrag.id) return;
     var c = currentLayer(); if (!c.ld) return;
@@ -503,6 +495,7 @@
   // z-order move right after keeps the canvas stack matching what the
   // panel now shows.
   function performDropInto(destGid) {
+    if (!allowLegacySelectionEdit()) return;
     var c = currentLayer(); if (!c.ld || !c.ld.groups || !c.ld.groups[destGid]) return;
     var ld = c.ld, layer = window.userLayers ? userLayers[c.li] : null;
     if (!layer) return;
@@ -552,6 +545,7 @@
     if (window.SMEngineBridge) SMEngineBridge.renderNow();
   }
   function performReorder(overRow) {
+    if (!allowLegacySelectionEdit()) return;
     if (_elDrag.kind === 'paint') { performPaintSwap(overRow); return; }
     if (_elDrag.dropInto && overRow.dataset.gid) { performDropInto(overRow.dataset.gid); return; }
     if (_elDrag.kind === 'member') { performMemberReorder(overRow); return; }
@@ -652,6 +646,7 @@
     eye.innerHTML = hidden ? ICO_EYE_CLOSED : ICO_EYE;
     eye.addEventListener('click', function (e) {
       e.stopPropagation();
+      if (!allowLegacySelectionEdit(e)) return;
       window.setElemHidden(li, ids);
       renderShapesPanel();
     });
@@ -661,6 +656,7 @@
     solo.textContent = 'S';
     solo.addEventListener('click', function (e) {
       e.stopPropagation();
+      if (!allowLegacySelectionEdit(e)) return;
       window.setElemSolo(li, ids);
       renderShapesPanel();
     });
@@ -728,6 +724,7 @@
     // drop target to be a member of the SAME group (see its own comment).
     else if (groupGid) row.addEventListener('mousedown', function (e) { armDrag(e, 'member', entry.strokeId, groupGid); });
     function commitShapeRename(v) {
+      if (!allowLegacySelectionEdit()) return;
       pushUndo();
       if (!c.ld.shapeNames) c.ld.shapeNames = {};
       c.ld.shapeNames[entry.strokeId] = v;
@@ -739,7 +736,7 @@
       if (!window.showContextMenu) return;
       window.showContextMenu(e.clientX, e.clientY, [
         { label: SM.t('elementsRename'), action: function () { startRename(row, nm.textContent, commitShapeRename); } },
-        { label: SM.t('elementsSelect'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, [entry.strokeId]); } },
+        { label: SM.t('elementsSelect'), action: function () { applySelection(c.li, [entry.strokeId], false); } },
       ]);
     });
     appendVisIcons(row, c.li, [entry.strokeId]);
@@ -812,6 +809,7 @@
         combineBadge.title = SM.t(combineModeLabelKey(curCombineMode));
         combineBadge.addEventListener('click', function (e) {
           e.stopPropagation();
+          if (!allowLegacySelectionEdit(e)) return;
           var cur = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
           if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, nextCombineMode(cur));
           renderShapesPanel();
@@ -819,6 +817,7 @@
         grow.appendChild(combineBadge);
         appendVisIcons(grow, c.li, memberIds);
         function commitGroupRename(v) {
+          if (!allowLegacySelectionEdit()) return;
           pushUndo();
           if (window.SMGroup && SMGroup.renameGroup) SMGroup.renameGroup(node.gid, c.ld, v, memberIds);
           saveActiveLayerFrame(); renderShapesPanel();
@@ -832,8 +831,7 @@
         grow.addEventListener('contextmenu', function (e) {
           e.preventDefault(); e.stopPropagation();
           if (!window.showContextMenu) return;
-          // Combined Shape (2026-08, "peut être avoir les combined shape
-          // option pour le groupe") — same SMGroup.setGroupCombineMode the
+          // Combined Shape uses the existing SMGroup.setGroupCombineMode
           // existing toolbar buttons call (timeline.js's updateCombinePanel/
           // COMBINE_MODE_BTN_IDS), just reachable from this row's own menu
           // instead of only via canvas selection + the right-panel toolbar.
@@ -843,6 +841,7 @@
           var curMode = (c.ld.groups && c.ld.groups[node.gid] && c.ld.groups[node.gid].combineMode) || 'none';
           function combineItem(mode, key) {
             return { label: SM.t(key) + (curMode === mode ? ' ✓' : ''), action: function () {
+              if (!allowLegacySelectionEdit()) return;
               if (window.SMGroup && SMGroup.setGroupCombineMode) SMGroup.setGroupCombineMode(node.gid, c.ld, mode);
               renderShapesPanel();
             } };
@@ -851,15 +850,15 @@
             // A text run has no combine/ungroup semantics — its one
             // structural action is to stop being text (#747).
             window.showContextMenu(e.clientX, e.clientY, [
-              { label: SM.t('elementsSelectMembers'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, memberIds); } },
+              { label: SM.t('elementsSelectMembers'), action: function () { applySelection(c.li, memberIds, false); } },
               { sep: true },
-              { label: SM.t('elementsExplodeText'), action: function () { window.SMMotion.explodeTextRun(c.li, c.ld, node.gid); } },
+              { label: SM.t('elementsExplodeText'), action: function () { if (allowLegacySelectionEdit()) window.SMMotion.explodeTextRun(c.li, c.ld, node.gid); } },
             ]);
             return;
           }
           window.showContextMenu(e.clientX, e.clientY, [
             { label: SM.t('elementsRename'), action: function () { startRename(grow, node.name, commitGroupRename); } },
-            { label: SM.t('elementsSelectMembers'), action: function () { window.SMMotion.selectShapesByStrokeIds(c.li, memberIds); } },
+            { label: SM.t('elementsSelectMembers'), action: function () { applySelection(c.li, memberIds, false); } },
             { sep: true },
             combineItem('unite', 'combineUnion'),
             combineItem('subtract', 'combineSubtract'),
@@ -868,6 +867,7 @@
             combineItem('none', 'combineNone'),
             { sep: true },
             { label: SM.t('elementsUngroup'), action: function () {
+              if (!allowLegacySelectionEdit()) return;
               pushUndo();
               // One level only (2026-09, #738): SMGroup.dissolveGroup
               // promotes this group's child GROUPS to its own place instead

@@ -39,24 +39,8 @@
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
   }
-  // 2026-07-29 fix ("les poignées se dessinent hors de la forme sur un
-  // Component déplacé/tourné en Motion"): a layer's Motion Position/
-  // Rotation/Scale is, by design, applied ONLY at render time (engine-
-  // bridge.js's buildSceneJson composes it into a pathTransform matrix —
-  // see motion.js's computeMotionMat/layerMotionAt header comment) and is
-  // NEVER baked into the Paper.js document's own segments. select-bridge.js
-  // already accounts for this on every hit-test (SMMotion.layerMotionPointMap,
-  // .inv to map a click's rendered/world point back into the raw geometry
-  // space `layer.hitTest`/path.segments actually live in) — this file never
-  // did, so every hit-test/drag here silently operated in the WRONG space
-  // the instant the active layer had a non-identity Motion transform (in
-  // practice: any Component instance moved/rotated/scaled via Motion,
-  // per CLAUDE.md §8's auto-conversion rule). Mapping the pointer into
-  // local/document space ONCE, right here, keeps every downstream line in
-  // this file (hit-testing nodeHandles[].pos, layer.hitTest, the node
-  // marquee's containment test, drag delta math) consistently in the SAME
-  // space path.segments/nodeEditSegmentsData already use — no other line
-  // needs to change.
+  function allowLegacySelectionEdit(e){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow('subselect')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
+  // Map rendered Motion points back to the document geometry used below.
   //
   // 2026-08-29 fix (feedback #125, "pourquoi les points de tracé ne
   // correspondent pas à la forme dessinée ?"): the Motion mapping above
@@ -169,6 +153,7 @@
 
   function onDown(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -353,6 +338,7 @@
 
   function onMove(e) {
     if (!(_nmq.active || _nodeDrag.active)) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -456,6 +442,7 @@
 
   function onUp(e) {
     if (!(_nmq.active || _nodeDrag.active)) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     if (_nmq.active) {
