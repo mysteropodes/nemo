@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, and the staged N17 native opacity editor/selection intent adapters. Complete architecture boundaries remain a separate gate.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the staged N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the staged N17 native opacity editor/selection intent adapters, and the staged N18 native opacity preview/export consumers. Complete architecture boundaries remain a separate gate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "d2aa9eeb294abc9b6b1607a8fda40f1274704d75",
-    "sourceRootTree": "e9e7616852e8de916795efe000541a90b02215e2",
+    "candidateCommit": "478ea738ce755f5b96ee1dcdacc670bdc8aeac8a",
+    "sourceRootTree": "a2da0eb3b73bb133a71740e39fc3dd4bc1783f95",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "99526439e7c3913cbe800fcb905d91ddab274dcf",
-      "lastChangedCommit": "d2aa9eeb294abc9b6b1607a8fda40f1274704d75"
+      "gitTree": "1b898907612322d97fe56ba448a7e2b715ebb0ed",
+      "lastChangedCommit": "478ea738ce755f5b96ee1dcdacc670bdc8aeac8a"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "caa6102d5e5d062b7eafee7f782f209155c7132bb06b1b34e9a3662fbca857a7"
+      "value": "3334ce16b635ebe5045d057fef52f5bd0a91ea6249ffa97adc95f37f191385d6"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "a15657d1adb94d3b0381fb854e80ea85e21c59c7",
-        "sha256": "394295fc4d3e9178d24886273486fca2313486c5242e39f68fd8c83a8cc14a73",
-        "moduleCount": 165,
-        "basedOnCommit": "d2aa9eeb294abc9b6b1607a8fda40f1274704d75"
+        "gitBlob": "40bd45013582e5c70e5e028d806e6e7ac2964395",
+        "sha256": "11f53afc55657b60a14aa5af72fcac324a3c20a80139858e4ef728e5606d731f",
+        "moduleCount": 167,
+        "basedOnCommit": "478ea738ce755f5b96ee1dcdacc670bdc8aeac8a"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -252,6 +252,32 @@
           "path": "src/js/adapters/native-opacity-editor.js",
           "line": 1,
           "role": "N17 pure static-opacity v2 intent projector; no dispatch, legacy-global access, bootstrap, or authority activation before N20"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-export.js",
+      "moduleId": "app.native.opacity.export.adapter",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-opacity-export.js",
+          "line": 1,
+          "role": "N18 dormant pinned-export request and receipt consumer over opaque handles; no dispatch, mutable UI reread, pixel payload, bootstrap, or authority activation before N20"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-preview.js",
+      "moduleId": "app.native.opacity.preview.adapter",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-opacity-preview.js",
+          "line": 1,
+          "role": "N18 dormant immutable preview metadata and viewport-receipt consumer; no native pixel attestation, bootstrap, host discovery, or authority activation before N20"
         }
       ]
     },
