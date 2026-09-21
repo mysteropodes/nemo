@@ -1,5 +1,17 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
+function allowLegacySelectionEdit(event,kind){
+  var bridge=window.SMEngineBridge;
+  if(!bridge||!Object.prototype.hasOwnProperty.call(bridge,'nativeEditGuard'))return true;
+  var allowed=false;
+  try{allowed=!!bridge.nativeEditGuard&&typeof bridge.nativeEditGuard.allow==='function'&&bridge.nativeEditGuard.allow(kind||'select')===true;}catch(_){}
+  if(!allowed&&event){
+    if(typeof event.stopImmediatePropagation==='function')event.stopImmediatePropagation();
+    if(typeof event.preventDefault==='function')event.preventDefault();
+    if(typeof event.stop==='function')event.stop();
+  }
+  return allowed;
+}
 var _textDragStart=null,_textDragRect=null;
 // Shift-constrain helpers for Rectangle/Ellipse/Line (see their onMouseDrag
 // handler) — kept standalone rather than inlined since both the shape and
@@ -83,6 +95,7 @@ function fsSelectionAtPoint(pt){
 // implementation for aspect selections.
 function fsPromoteSelectionForTransform(layer){
   if(!_fsSel.length)return[];
+  if(!allowLegacySelectionEdit(null,'fsselect'))return[];
   var promoted=[];
   // Fill cuts change the source geometry, so realize them first.
   _fsSel.filter(function(s){return s.kind==='fillregion';}).forEach(function(s){
@@ -131,6 +144,7 @@ document.addEventListener('pointerdown',function(e){
   var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pt=new Point(w[0],w[1]);
   var selectedAtPointer=fsSelectionAtPoint(pt);
   if(!selectedAtPointer||e.shiftKey)return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   pushUndo();
   selectedPaths=fsPromoteSelectionForTransform(userLayers[state.activeLayerIdx]);
   fsClearSel();_fsIsolation=null;
@@ -157,6 +171,7 @@ document.addEventListener('pointerdown',function(e){
 // other a no-op.
 document.addEventListener('pointermove',function(e){
   if(_fsPromoteDrag){
+    if(!allowLegacySelectionEdit(e,'fsselect'))return;
     var wm=SMEngineBridge.screenToWorld(e.clientX,e.clientY),pm=new Point(wm[0],wm[1]);
     var delta=pm.subtract(_fsPromoteDrag.last);_fsPromoteDrag.last=pm;
     selectedPaths.forEach(function(p){
@@ -167,6 +182,7 @@ document.addEventListener('pointermove',function(e){
     e.preventDefault();e.stopImmediatePropagation();return;
   }
   if(!(_marquee.active&&_marquee.mode==='fsselect')||!window.SMEngineBridge)return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   var w=window.SMEngineBridge.screenToWorld(e.clientX,e.clientY);
   var pt=new Point(w[0],w[1]);
   var prevA=project.activeLayer;marqueeLayer.activate();
@@ -222,11 +238,13 @@ function fsResolveRegionSelection(region,layer){
 }
 document.addEventListener('pointerup',function(e){
   if(_fsPromoteDrag){
+    if(!allowLegacySelectionEdit(e,'fsselect'))return;
     _fsPromoteDrag=null;saveActiveLayerFrame();renderArcs();updateUI();
     if(window.SMEngineBridge)SMEngineBridge.renderNow();
     e.preventDefault();e.stopImmediatePropagation();return;
   }
   if(!(_marquee.active&&_marquee.mode==='fsselect'))return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   if(_marquee.rect){
     var mbf=_marquee.rect.bounds;
     var lassoF=null;
@@ -415,6 +433,7 @@ function fsBreakUpdateMarks(pt){
 }
 function fsBreakCommit(){
   if(!_fsBreak)return;
+  if(!allowLegacySelectionEdit(null,'fsselect'))return;
   var layer=userLayers[state.activeLayerIdx];
   var any=false;
   _fsBreak.marks.forEach(function(set,path){
@@ -430,6 +449,7 @@ function fsBreakCommit(){
 document.addEventListener('pointerdown',function(e){
   var onStage=e.target===canvasEl||(e.target&&e.target.id==='rust-canvas');
   if(e.button!==0||state.tool!=='fsselect'||!state.fsBreakMode||!window.SMEngineBridge||!SMEngineBridge.isEnabled()||!onStage)return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   pushUndo();
   _fsBreak={marks:new Map(),cache:new Map()};
   var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
@@ -439,6 +459,7 @@ document.addEventListener('pointerdown',function(e){
 },{capture:true});
 document.addEventListener('pointermove',function(e){
   if(!_fsBreak)return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   var w=SMEngineBridge.screenToWorld(e.clientX,e.clientY);
   fsBreakUpdateMarks(new Point(w[0],w[1]));
   if(window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
@@ -446,6 +467,7 @@ document.addEventListener('pointermove',function(e){
 },{capture:true});
 document.addEventListener('pointerup',function(e){
   if(!_fsBreak)return;
+  if(!allowLegacySelectionEdit(e,'fsselect'))return;
   fsBreakCommit();
   if(window.SMEngineBridge&&window.SMEngineBridge.renderNow)window.SMEngineBridge.renderNow();
   e.preventDefault();e.stopImmediatePropagation();
@@ -806,6 +828,7 @@ function fsUnlinkFillRegen(p){
 }
 function fsApplyDelete(){
   if(!_fsSel.length)return;
+  if(!allowLegacySelectionEdit(null,'fsselect'))return;
   pushUndo();
   var layer=userLayers[state.activeLayerIdx];
   _fsSel.slice().forEach(function(sel){
@@ -7159,6 +7182,7 @@ function onMouseDown(event){
   if(state.playing){stopPlay();return;}
   if(state.tool==='hand'||state.spaceDown){state.isPanning=true;return;}
   if(state.tool==='zoom'){if(event.event.altKey)view.zoom=Math.max(.05,view.zoom*.8);else view.zoom=Math.min(20,view.zoom*1.25);updZoom();renderArcs();return;}
+  if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   // Motion mode (motion.js) is a persistent app-mode, not a tool value —
   // unlike the camera row below (a dedicated 'camera' tool that REPLACES
   // Select/Draw/etc.), its on-canvas position-handle dragging must coexist
@@ -7629,6 +7653,7 @@ function onMouseDrag(event){
   if(state.playing)return;
   if(state.isPanning||state.spaceDown){var dx=event.event.movementX||0;var dy=event.event.movementY||0;view.center=view.center.subtract(new Point(dx,dy).divide(view.zoom));return;}
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onDrag(event);return;}
+  if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onDrag(event))return;
   if(state.tool==='draw'){
     if(!currentPath)return;
@@ -7877,6 +7902,7 @@ function onMouseDrag(event){
 function onMouseUp(event){
   if(state.isPanning){state.isPanning=false;return;}if(state.playing)return;
   if(state.tool==='camera'){if(window.SMCamera)SMCamera.onUp(event);return;}
+  if((state.tool==='select'||state.tool==='subselect'||state.tool==='fsselect')&&!allowLegacySelectionEdit(event.event,state.tool))return;
   if(state.appMode==='motion'&&window.SMMotion&&SMMotion.onUp(event))return;
   _eraseDragActive=false;_eraseLastPt=null;
   if(state.tool==='fill'&&_fillCloseDrag){
@@ -8361,6 +8387,7 @@ window.perObjectShapesOf=perObjectShapesOf;
 window.elementPosedBounds=elementPosedBounds;
 window.perObjectUnionBounds=perObjectUnionBounds;
 function onViewDoubleClick(event){
+  if((state.tool==='select'||state.appMode==='motion')&&!allowLegacySelectionEdit(event.event,'select'))return;
   // Re-edit a placed text block in place (2026-07 rework) — checked before
   // the select-only guard below since double-clicking with the Text tool
   // itself active must also work, not just Select.

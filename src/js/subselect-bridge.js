@@ -39,6 +39,17 @@
   function shouldIntercept() {
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'subselect' && !state.playing;
   }
+  function allowLegacySelectionEdit(event) {
+    var bridge = window.SMEngineBridge;
+    if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true;
+    var allowed = false;
+    try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow('subselect') === true; } catch (_) {}
+    if (!allowed && event) {
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      if (typeof event.preventDefault === 'function') event.preventDefault();
+    }
+    return allowed;
+  }
   // 2026-07-29 fix ("les poignées se dessinent hors de la forme sur un
   // Component déplacé/tourné en Motion"): a layer's Motion Position/
   // Rotation/Scale is, by design, applied ONLY at render time (engine-
@@ -169,6 +180,7 @@
 
   function onDown(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -353,6 +365,7 @@
 
   function onMove(e) {
     if (!(_nmq.active || _nodeDrag.active)) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -456,6 +469,7 @@
 
   function onUp(e) {
     if (!(_nmq.active || _nodeDrag.active)) return;
+    if (!allowLegacySelectionEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     if (_nmq.active) {

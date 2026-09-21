@@ -472,6 +472,20 @@
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'select' && !state.playing;
   }
 
+  // N19D routes Selection through N19C's optional compatibility port. A
+  // present bad port is denied; no second guard global is permitted.
+  function allowLegacySelectionEdit(event, kind) {
+    var bridge = window.SMEngineBridge;
+    if (!bridge || !Object.prototype.hasOwnProperty.call(bridge, 'nativeEditGuard')) return true;
+    var allowed = false;
+    try { allowed = !!bridge.nativeEditGuard && typeof bridge.nativeEditGuard.allow === 'function' && bridge.nativeEditGuard.allow(kind || 'select') === true; } catch (_) {}
+    if (!allowed && event) {
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      if (typeof event.preventDefault === 'function') event.preventDefault();
+    }
+    return allowed;
+  }
+
   // Same handle-position math as buildTransformBoxItems() in
   // engine-bridge.js and renderTransformHandles() in tools.js — recomputed
   // directly from xformSelBounds()/selectedPaths rather than reading
@@ -782,6 +796,7 @@
     // about to act on. Left as a no-op here (no stopPropagation) so
     // 'contextmenu' fires completely normally afterward.
     if (e.button !== undefined && e.button !== 0) return;
+    if (shouldIntercept() && !allowLegacySelectionEdit(e, 'select')) return;
     // One-shot guard (2026-08 fix, "je select une forme dans le groupe...
     // si j'essaie de bouger la forme dans le canvas alors ça select le
     // groupe") — set by motion.js's selectShapesByStrokeIds (Elements panel
@@ -1808,6 +1823,8 @@
       // Animation 2D's own hover-only pass just below.
       if (window.SMMotion.onHoverMove({ x: w1[0], y: w1[1] })) window.SMEngineBridge.renderNow();
     }
+    // Passive hover remains available; active legacy gesture ticks do not.
+    if (mode && !allowLegacySelectionEdit(e, 'select')) return;
     if (mode === 'cornerRadius' && _cornerDrag) {
       e.stopImmediatePropagation(); e.preventDefault();
       var wc = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -2503,6 +2520,7 @@
   }
 
   function onUp(e) {
+    if ((mode || draggingArc) && !allowLegacySelectionEdit(e, 'select')) return;
     // See onDown's comment — clears _motionDrag if a motion handle/dot/
     // anchor drag was in progress; no-ops otherwise. Must run even though
     // this file's own `mode` stays null for a motion-path drag (onDown
@@ -2914,6 +2932,7 @@
   // only pays off past ~10 items, not warranted here yet).
   function onContext(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacySelectionEdit(e, 'select')) return;
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
     var pt = new Point(w[0], w[1]);
     // Ctrl+click free-transform distort (see beginDistort's own comment) —
@@ -3308,6 +3327,7 @@
   // full auto-match, zero change in behavior.
   function toggleTweenOnForSelection() {
     if (!selectedPaths.length) return;
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     pushUndo();
     var newVal = !selectedPaths.every(function (p) { return p.data && p.data.tweenOn; });
     var li = state.activeLayerIdx, ld = state.layers[li], cf = state.currentFrame;
@@ -3552,6 +3572,7 @@
   // selection highlight) and prompts the user to confirm via the usual
   // "Marquer comme rôle suivi…" action. NEVER tags anything by itself.
   function applyRoleSuggestion(s) {
+    if (!allowLegacySelectionEdit(null, 'select')) return;
     var cand = _findClosestPathToPoint(s.center);
     if (!cand) { showToast(SM.t('hsNoShapeOnFrame')); return; }
     clearSel();
