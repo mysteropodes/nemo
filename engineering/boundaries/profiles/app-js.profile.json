@@ -1981,6 +1981,18 @@
       ]
     },
     {
+      "id": "app.native.edit.guard.application",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-edit-guard.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-edit-guard.js"
+      ]
+    },
+    {
       "id": "app.project.document",
       "layer": "app-domain",
       "dir": "src/js",

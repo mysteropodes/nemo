@@ -15,6 +15,11 @@
 // picks up _pen.path's live segments same as any other layer content).
 (function () {
   var draggingHandle = false;
+  function allowLegacyEdit(event) {
+    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('pen')) return true;
+    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    return false;
+  }
   // Set only by the Alt+drag-on-an-existing-anchor gesture below — tells
   // onMove to reshape THAT stored segment instead of the path's own
   // lastSegment (the normal placement-drag target). Cleared in onUp.
@@ -54,6 +59,7 @@
 
   function onDown(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -169,6 +175,7 @@
 
   function onMove(e) {
     if (!shouldIntercept()) return;
+    if (draggingHandle && !allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);
@@ -233,6 +240,7 @@
     // what I do afterward" bug report: the scrub's own pointerup/endScrub
     // never ran because this handler intercepted it first.
     if (!draggingHandle) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     draggingHandle = false;

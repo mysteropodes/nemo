@@ -11,6 +11,11 @@
 // active layer, and stores the same fillSeed/fillGapPx data
 // fillRegenerateLinked relies on later.
 (function () {
+  function allowLegacyEdit(event) {
+    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('fill')) return true;
+    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    return false;
+  }
   function shouldIntercept() {
     return (
       window.SMEngineBridge && window.SMEngineBridge.isEnabled() &&
@@ -20,6 +25,7 @@
 
   function onDown(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     // Alt+drag: same temporary closing-stroke gesture as tools.js's Paper
@@ -150,6 +156,7 @@
   }
   function onUp(e) {
     if (!_fillCloseDrag) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
@@ -201,6 +208,7 @@
   // rather than automatic on every fill click: it costs ~3.5s on a 120-frame
   // project, which would be punishing when colouring many zones in a row.
   function onPropagateClick() {
+    if (!allowLegacyEdit()) return;
     if (state.layers[state.activeLayerIdx].locked) { showToast(SM.t('toastLayerLocked')); return; }
     var layer = userLayers[state.activeLayerIdx];
     var fills = layer.children.filter(function (c) { return c.data && c.data.fillSeed; });

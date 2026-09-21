@@ -12,6 +12,11 @@
   var dragging = false;
   var shapeStart = null; // world [x,y]
   var shapeTool = null;
+  function allowLegacyEdit(event) {
+    if (!window.SMNativeEditGuard || window.SMNativeEditGuard.allow('shape')) return true;
+    if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+    return false;
+  }
 
   // Motion transform (2026-08-29, feedback #135: "si je dessine dans le
   // layer dont la position a été changé dans motion... le dessin se
@@ -148,6 +153,7 @@
 
   function onDown(e) {
     if (!shouldIntercept()) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     // Order matters — see draw-bridge.js's commitStroke comment: pushUndo()
@@ -204,6 +210,7 @@
   }
   function onUp(e) {
     if (!dragging) return;
+    if (!allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     dragging = false;
@@ -215,6 +222,7 @@
   }
 
   function commitShape(ex, ey) {
+    if (!allowLegacyEdit()) return;
     // World-space endpoints — the <2px drag-discard check below stays
     // against THESE (a screen-space "did you actually drag" threshold,
     // unaffected by the layer's Motion transform).
