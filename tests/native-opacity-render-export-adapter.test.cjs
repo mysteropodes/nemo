@@ -121,6 +121,72 @@ test('export begin/status/cancel use v2 validation, pin snapshot/revision, and r
   assert.throws(() => adapter.begin(cleanIdentity, cleanSnapshot, 'bad', 'output-1', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g', resourceVersion: 'v' }, extra: true }]), /unknown|fields|validation/i);
 });
 
+test('oversized encoded begin envelopes are rejected before an invalid v2 request can escape', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const adapter = create();
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-size', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  const oversizedFrames = Array.from({ length: 120 }, (_, sourceFrame) => ({
+    sourceFrame,
+    geometryHandle: { resourceId: 'g'.repeat(128), resourceVersion: 'v'.repeat(128) },
+  }));
+  assert.throws(() => adapter.begin(identity, snapshot, 'begin-oversized', 'out', oversizedFrames), /4096|encoded|size|bounded/i);
+});
+
+test('a running jobId cannot rebind to a different pending immutable export plan', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const adapter = create();
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-rebind', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  const first = adapter.begin(identity, snapshot, 'begin-rebind-1', 'out-1', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g-1', resourceVersion: 'v1' } }]);
+  const firstReceipt = { jobId: 'job-rebind', status: 'running', pinnedRevision: 0, documentSnapshotId: 'snapshot-0',
+    progress: 0.25, artifact: null, cleanup: { status: 'pending' }, externalEffectDisposition: 'none' };
+  const firstSession = adapter.observe(first, { apiVersion: 2, requestId: first.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: firstReceipt });
+  const duplicate = adapter.observe(first, { apiVersion: 2, requestId: first.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: firstReceipt });
+  assert.deepEqual(duplicate, firstSession, 'identical observations retain the same immutable session value');
+
+  const second = adapter.begin(identity, snapshot, 'begin-rebind-2', 'out-2', [{ sourceFrame: 10, geometryHandle: { resourceId: 'g-2', resourceVersion: 'v2' } }]);
+  assert.throws(() => adapter.observe(second, { apiVersion: 2, requestId: second.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: firstReceipt }), /rebind|retained|immutable|job/i);
+  assert.strictEqual(adapter.plan('job-rebind'), firstSession, 'the original plan remains authoritative');
+});
+
+test('running receipts cannot carry cleanup errors while cleanup is pending', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const adapter = create();
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-cleanup-error', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  const begin = adapter.begin(identity, snapshot, 'begin-cleanup-error', 'out', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g', resourceVersion: 'v' } }]);
+  assert.throws(() => adapter.observe(begin, { apiVersion: 2, requestId: begin.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { jobId: 'job-cleanup-error', status: 'running', pinnedRevision: 0, documentSnapshotId: 'snapshot-0', progress: 0.1,
+      artifact: null, cleanup: { status: 'pending', error: { code: 'cleanup_failed', message: 'cleanup is not terminal' } }, externalEffectDisposition: 'none' } }), /running|cleanup|pending|error/i);
+});
+
+test('job progress cannot regress when a running receipt advances into a terminal state', () => {
+  const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
+  const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };
+  const snapshot = { apiVersion: 2, requestId: 'snapshot-progress', instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+    result: { atRevision: 0, documentSnapshotId: 'snapshot-0' } };
+  for (const [status, terminal] of [
+    ['failed', { cleanup: { status: 'complete' }, externalEffectDisposition: 'none', error: { code: 'frame_failed', message: 'frame failed' } }],
+    ['cancelled', { cleanup: { status: 'complete' }, externalEffectDisposition: 'none' }],
+  ]) {
+    const adapter = create();
+    const begin = adapter.begin(identity, snapshot, `begin-progress-${status}`, 'out', [{ sourceFrame: 0, geometryHandle: { resourceId: 'g', resourceVersion: 'v' } }]);
+    adapter.observe(begin, { apiVersion: 2, requestId: begin.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+      result: { jobId: `job-progress-${status}`, status: 'running', pinnedRevision: 0, documentSnapshotId: 'snapshot-0', progress: 0.75,
+        artifact: null, cleanup: { status: 'pending' }, externalEffectDisposition: 'none' } });
+    assert.throws(() => adapter.observe(begin, { apiVersion: 2, requestId: begin.requestId, instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0, ok: true,
+      result: { jobId: `job-progress-${status}`, status, pinnedRevision: 0, documentSnapshotId: 'snapshot-0', progress: 0.5,
+        artifact: null, ...terminal } }), /progress|regress|receipt|terminal/i);
+  }
+});
+
 test('job receipts cover running/succeeded/cancelled/failed cleanup and external-effect invariants without retry ownership', () => {
   const create = pick(exporter, ['createNativeOpacityExportAdapter', 'createExportAdapter']);
   const identity = { instanceId: 'n18-fixture', documentId: 'opacity-document', contentRevision: 0 };

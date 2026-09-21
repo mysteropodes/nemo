@@ -119,7 +119,7 @@
     return freeze({ documentId: current.documentId, atRevision, documentSnapshotId: id(response.result.documentSnapshotId, 'snapshot response.result.documentSnapshotId') });
   }
   function request(current, requestId, operation, payload, expectedRevision) {
-    return freeze({
+    const projected = {
       apiVersion: 2,
       requestId: id(requestId, 'requestId'),
       instanceId: current.instanceId,
@@ -127,7 +127,15 @@
       ...(expectedRevision === undefined ? {} : { expectedRevision }),
       operation,
       payload: freeze(payload),
-    });
+    };
+    const encoded = JSON.stringify(projected);
+    const bytes = typeof TextEncoder === 'function'
+      ? new TextEncoder().encode(encoded).length
+      : unescape(encodeURIComponent(encoded)).length;
+    if (typeof encoded !== 'string' || bytes > 4096) {
+      throw new RangeError('staged v2 request exceeds 4096 encoded bytes');
+    }
+    return freeze(projected);
   }
   function error(value, codes, label) {
     exact(value, ['code', 'message'], ['details'], 'response.error');
@@ -141,6 +149,9 @@
     if (!statuses.has(value.status) || typeof value.progress !== 'number' || !Number.isFinite(value.progress) || value.progress < 0 || value.progress > 1 || !external.has(value.externalEffectDisposition)) throw new TypeError('job receipt is invalid');
     exact(value.cleanup, ['status'], ['error'], 'job receipt.cleanup');
     if (!cleanupStatuses.has(value.cleanup.status)) throw new TypeError('job receipt.cleanup.status is invalid');
+    if (has(value.cleanup, 'error') && value.cleanup.status !== 'failed') {
+      throw new TypeError('job receipt.cleanup.error requires failed cleanup');
+    }
     const artifact = value.artifact === null ? null : (() => {
       exact(value.artifact, ['target', 'files'], [], 'job receipt.artifact');
       if (!Array.isArray(value.artifact.files) || value.artifact.files.some((file) => typeof file !== 'string')) {
@@ -209,16 +220,21 @@
       if (response.ok !== true || has(response, 'error') || !has(response, 'result')) throw new Error('successful response must carry only result');
       const received = receipt(response.result);
       terminalInvariant(received);
-      let session = pending.get(projected.requestId) || jobs.get(received.jobId);
-      if (!session) throw new Error('job receipt has no retained export plan');
+      const pendingSession = pending.get(projected.requestId);
+      const boundSession = projected.payload.jobId === undefined
+        ? null : jobs.get(projected.payload.jobId);
       if (projected.payload.jobId !== undefined && projected.payload.jobId !== received.jobId) throw new Error('job receipt does not match the observed jobId');
-      if (session.snapshot.documentSnapshotId !== received.documentSnapshotId || session.snapshot.atRevision !== received.pinnedRevision) throw new Error('job receipt does not retain the pinned snapshot and revision');
       const old = jobs.get(received.jobId);
-      if (old && old.receipt.status !== 'running') {
-        if (JSON.stringify(old.receipt) !== JSON.stringify(received)) throw new Error('terminal job receipt conflicts with retained receipt');
-        return old;
+      let session = pendingSession || boundSession;
+      if (!session && old && old.request === projected) session = old;
+      if (!session) throw new Error('job receipt has no retained export plan');
+      if (old && old !== session) throw new Error('jobId cannot be rebound to a different retained export plan');
+      if (session.snapshot.documentSnapshotId !== received.documentSnapshotId || session.snapshot.atRevision !== received.pinnedRevision) throw new Error('job receipt does not retain the pinned snapshot and revision');
+      if (old) {
+        if (JSON.stringify(old.receipt) === JSON.stringify(received)) return old;
+        if (old.receipt.status !== 'running') throw new Error('terminal job receipt conflicts with retained receipt');
+        if (received.progress < old.receipt.progress) throw new Error('job progress cannot regress across lifecycle observations');
       }
-      if (old && old.receipt.status === 'running' && received.status === 'running' && received.progress < old.receipt.progress) throw new Error('running job progress cannot regress');
       session = freeze({ request: session.request, snapshot: session.snapshot, outputSpec: session.outputSpec, receipt: received });
       jobs.set(received.jobId, session);
       pending.delete(projected.requestId);
