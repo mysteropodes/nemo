@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f64b411029f5bc273cab21784578990ca752e73e",
-  "describe": "v0.7.0-alpha.4-516-gf64b411-dirty"
+  "head": "de8163509aced4584edde71f062e3faccd15eb5d",
+  "describe": "v0.7.0-alpha.4-518-gde81635-dirty"
  },
- "inputsDigest": "a1e04673dd042a1d05fc57bd6743fe53fdbfc10a92280cdd08e1565a89d387d9",
+ "inputsDigest": "e7e34db6b9eb897dee505c7cc9fbd2917518f0c156ffe81554b945c0a4d95e0c",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 401,
+   "line": 391,
    "members": 2
   },
   "SMPsdImport": {
@@ -2465,7 +2465,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:739 initStartScreen()"
+    "src/js/project.js:729 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3337,7 +3337,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:736 initStartScreen()"
+    "src/js/project.js:726 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3418,7 +3418,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:735 initStartScreen()"
+    "src/js/project.js:725 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4632,7 +4632,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:733 initStartScreen()"
+    "src/js/project.js:723 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4674,7 +4674,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:734 initStartScreen()"
+    "src/js/project.js:724 initStartScreen()"
    ],
    "events": [
     "click"
@@ -5271,7 +5271,7 @@
    "capability": "Reassign an inbetween…",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/tweens.js:5123 initReassignUI()"
+    "src/js/tweens.js:5117 initReassignUI()"
    ],
    "events": [
     "click"
@@ -7818,7 +7818,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:744 initStartScreen()"
+    "src/js/project.js:734 initStartScreen()"
    ],
    "events": [
     "change"
@@ -7845,7 +7845,7 @@
     "functionsVisited": 71,
     "via": "chain",
     "references": [
-     "src/js/project.js:221 openDialog()"
+     "src/js/project.js:211 openDialog()"
     ]
    },
    "fixtures": [
@@ -8269,7 +8269,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:741 initStartScreen()"
+    "src/js/project.js:731 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9169,7 +9169,7 @@
    "capability": "Cancel",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:713 initStartScreen()"
+    "src/js/project.js:703 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9206,7 +9206,7 @@
    "capability": "Create",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:717 initStartScreen()"
+    "src/js/project.js:707 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9256,7 +9256,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:722 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:712 initStartScreen())",
    "source": "src/index.html:80",
    "meta": {
     "data": {},
@@ -9266,7 +9266,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:722 initStartScreen()"
+     "src/js/project.js:712 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9290,7 +9290,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:720 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:710 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9302,7 +9302,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:720 initStartScreen()"
+     "src/js/project.js:710 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9328,7 +9328,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:723 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:713 initStartScreen())",
    "source": "src/index.html:71",
    "meta": {
     "data": {},
@@ -9338,7 +9338,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:723 initStartScreen()"
+     "src/js/project.js:713 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9353,7 +9353,7 @@
    "capability": "np preset",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:714 initStartScreen()"
+    "src/js/project.js:704 initStartScreen()"
    ],
    "events": [
     "change"
@@ -9377,7 +9377,7 @@
     "functionsVisited": 1,
     "via": "chain",
     "references": [
-     "src/js/project.js:718 initStartScreen()"
+     "src/js/project.js:708 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9401,7 +9401,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:720 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:710 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9413,7 +9413,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:720 initStartScreen()"
+     "src/js/project.js:710 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -14684,7 +14684,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:641"
+    "src/js/project.js:631"
    ],
    "events": [
     "click"
@@ -14714,7 +14714,7 @@
     "functionsVisited": 170,
     "via": "chain",
     "references": [
-     "src/js/project.js:641",
+     "src/js/project.js:631",
      "src/js/timeline.js:9043 action()"
     ]
    },
@@ -15721,7 +15721,7 @@
    "capability": "start new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:709 initStartScreen()"
+    "src/js/project.js:699 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15758,7 +15758,7 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:712 initStartScreen()"
+    "src/js/project.js:702 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15799,7 +15799,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:684 initStartScreen()"
+    "src/js/project.js:674 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15828,7 +15828,7 @@
     "functionsVisited": 85,
     "via": "chain",
     "references": [
-     "src/js/project.js:672 initStartScreen()"
+     "src/js/project.js:662 initStartScreen()"
     ]
    },
    "fixtures": [
