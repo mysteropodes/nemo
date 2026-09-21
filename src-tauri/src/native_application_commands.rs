@@ -6,11 +6,11 @@
 
 use crate::{
     application_mcp::ApplicationMcp,
-    native_application::DesktopNativeApplication,
+    native_application::{self, DesktopNativeApplication},
     native_application_contract::*,
     native_application_ports::{DesktopArtifactPort, SharedCompositor},
     native_application_viewport as viewport_host,
-    native_dispatch::{NativeDispatch, NativeState},
+    native_dispatch::{NativeAuthority, NativeState, ReleaseAdmission},
 };
 use native_engine::compositor::Compositor;
 use nemo_mcp::contract::NATIVE_API_VERSION;
@@ -28,12 +28,14 @@ pub(crate) async fn nemo_native_bootstrap(
     let _reservation = state
         .reserve_native_install()
         .map_err(|message| host_error("duplicate_bootstrap", message))?;
-    bootstrap_reserved(app, &state, request).await
+    let generation = _reservation.generation();
+    bootstrap_reserved(app, &state, generation, request).await
 }
 
 async fn bootstrap_reserved(
     app: tauri::AppHandle,
     state: &ApplicationMcp,
+    generation: u64,
     request: NativeBootstrapRequest,
 ) -> HostResult<NativeBootstrapReceipt> {
     require_api_instance(
@@ -60,27 +62,37 @@ async fn bootstrap_reserved(
         let app_for_main = app.clone();
         let instance = request.instance_id.clone();
         viewport_host::on_main_thread(&app, move || {
-            let compositor = viewport_host::create(&app_for_main, instance.clone(), mapping)?;
             let state = app_for_main.state::<ApplicationMcp>();
-            finish_bootstrap(&state, instance, admitted, artifacts, compositor, true)
+            let native = state.native_state();
+            with_install_reservation(&native, generation, |authority| {
+                let compositor = viewport_host::create(&app_for_main, instance.clone(), mapping)?;
+                finish_bootstrap(
+                    authority, generation, instance, admitted, artifacts, compositor, true,
+                )
+            })
         })
         .await
     } else {
         let compositor =
             Compositor::new().map_err(|error| host_error("unavailable", error.to_string()))?;
-        finish_bootstrap(
-            state,
-            request.instance_id,
-            admitted,
-            artifacts,
-            compositor,
-            false,
-        )
+        let native = state.native_state();
+        with_install_reservation(&native, generation, |authority| {
+            finish_bootstrap(
+                authority,
+                generation,
+                request.instance_id,
+                admitted,
+                artifacts,
+                compositor,
+                false,
+            )
+        })
     }
 }
 
 fn finish_bootstrap(
-    state: &ApplicationMcp,
+    authority: &mut NativeAuthority,
+    generation: u64,
     instance_id: String,
     admitted: AdmittedProject,
     artifacts: DesktopArtifactPort,
@@ -104,7 +116,7 @@ fn finish_bootstrap(
     };
     let document_id = application.document_id().to_owned();
     let content_revision = application.content_revision();
-    if let Err(message) = state.install_dispatch(Box::new(application)) {
+    if let Err(message) = authority.install(generation, Box::new(application)) {
         if viewport_retained {
             let _ = viewport_host::remove(&instance_id);
         }
@@ -136,13 +148,14 @@ pub(crate) async fn nemo_native_replace(
     let admitted = admit_project(&request.projection, &request.resources)?;
     let resource_count = admitted.resources.len();
     let native = state.native_state();
+    let generation = active_generation(&native)?;
     let instance = request.instance_id.clone();
     viewport_host::on_main_thread(&app, move || {
         viewport_host::require_instance_or_absent(&instance)?;
         let mut guard = native
             .lock()
             .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-        let application = desktop_mut(&mut guard)?;
+        let application = desktop_mut(&mut guard, generation)?;
         application.require_identity(
             &request.instance_id,
             &request.document_id,
@@ -177,10 +190,11 @@ pub(crate) fn nemo_native_bind_output(
         return Err(host_error("invalid_request", "invalid output handle"));
     }
     let native = state.native_state();
+    let generation = active_generation(&native)?;
     let mut guard = native
         .lock()
         .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-    let application = desktop_mut(&mut guard)?;
+    let application = desktop_mut(&mut guard, generation)?;
     application.require_identity(
         &request.instance_id,
         &request.document_id,
@@ -209,12 +223,13 @@ pub(crate) async fn nemo_native_preview(
         state.instance_id(),
     )?;
     let native = state.native_state();
+    let generation = active_generation(&native)?;
     let instance = request.instance_id.clone();
     viewport_host::on_main_thread(&app, move || {
         let mut guard = native
             .lock()
             .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-        let application = desktop_mut(&mut guard)?;
+        let application = desktop_mut(&mut guard, generation)?;
         let prepared = application.prepare_preview(&request)?;
         let work_id = prepared.identity.work_id();
         let shared = application.preview_compositor().inner();
@@ -255,13 +270,15 @@ pub(crate) async fn nemo_native_viewport_resize(
     )?;
     let mapping = request.viewport.admit()?;
     let native = state.native_state();
+    let generation = active_generation(&native)?;
     let instance = request.instance_id;
     viewport_host::on_main_thread(&app, move || {
-        require_installed_instance(&native, &instance)?;
-        viewport_host::resize(&instance, mapping)?;
-        Ok(NativeViewportReceipt {
-            status: "resized",
-            cancelled_work_ids: Vec::new(),
+        with_installed_instance(&native, generation, &instance, || {
+            viewport_host::resize(&instance, mapping)?;
+            Ok(NativeViewportReceipt {
+                status: "resized",
+                cancelled_work_ids: Vec::new(),
+            })
         })
     })
     .await
@@ -281,12 +298,13 @@ pub(crate) async fn nemo_native_viewport_dispose(
         state.instance_id(),
     )?;
     let native = state.native_state();
+    let generation = active_generation(&native)?;
     let instance = request.instance_id;
     viewport_host::on_main_thread(&app, move || {
         let mut guard = native
             .lock()
             .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-        let application = desktop_mut(&mut guard)?;
+        let application = desktop_mut(&mut guard, generation)?;
         if application.instance_id() != instance {
             return Err(host_error(
                 "wrong_instance",
@@ -303,29 +321,184 @@ pub(crate) async fn nemo_native_viewport_dispose(
     .await
 }
 
+#[tauri::command]
+pub(crate) async fn nemo_native_release(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    state: tauri::State<'_, ApplicationMcp>,
+    request: NativeReleaseRequest,
+) -> HostResult<NativeReleaseReceipt> {
+    require_main(&window)?;
+    require_api_instance(
+        request.api_version,
+        &request.instance_id,
+        state.instance_id(),
+    )?;
+    let native = state.native_state();
+    let admission = native_application::admit_release_request(&native, &request)?;
+    let generation = match admission {
+        ReleaseAdmission::Retry {
+            generation,
+            receipt,
+        } => {
+            let receipt: NativeReleaseReceipt = serde_json::from_value(receipt)
+                .map_err(|_| host_error("internal", "retained release receipt is invalid"))?;
+            if receipt.lifecycle_generation != generation {
+                return Err(host_error(
+                    "internal",
+                    "retained release generation is invalid",
+                ));
+            }
+            return Ok(receipt);
+        }
+        ReleaseAdmission::Execute { generation } => generation,
+    };
+    let scheduled_native = native.clone();
+    let fallback_native = native;
+    let scheduled_request = request.clone();
+    let fallback_request = request;
+    let scheduled = viewport_host::on_main_thread_committed(&app, move || {
+        let instance_id = scheduled_request.instance_id.clone();
+        native_application::complete_release(
+            &scheduled_native,
+            generation,
+            &scheduled_request,
+            move || {
+                viewport_host::release(&instance_id)
+                    .map(|released| (released.work_ids, released.status))
+            },
+        )
+    })
+    .await;
+    match scheduled {
+        Ok(receipt) => Ok(receipt),
+        Err(error) => native_application::complete_release(
+            &fallback_native,
+            generation,
+            &fallback_request,
+            || {
+                Err(host_error(
+                    "cleanup_failed",
+                    format!(
+                        "native main-thread release completion was indeterminate: {}",
+                        error.message
+                    ),
+                ))
+            },
+        )
+        .or_else(|_| {
+            match native_application::admit_release_request(&fallback_native, &fallback_request)? {
+                ReleaseAdmission::Retry {
+                    generation: retained_generation,
+                    receipt,
+                } if retained_generation == generation => serde_json::from_value(receipt)
+                    .map_err(|_| host_error("internal", "retained release receipt is invalid")),
+                _ => Err(host_error(
+                    "unavailable",
+                    "native release completion could not be reconciled",
+                )),
+            }
+        }),
+    }
+}
+
 fn desktop_mut(
-    guard: &mut Option<Box<dyn NativeDispatch>>,
+    guard: &mut NativeAuthority,
+    generation: u64,
 ) -> HostResult<&mut DesktopNativeApplication> {
     guard
-        .as_mut()
-        .ok_or_else(|| host_error("unavailable", "native application is unavailable"))?
+        .active_mut(generation)
+        .map_err(|message| host_error("unavailable", message))?
         .as_any_mut()
         .downcast_mut::<DesktopNativeApplication>()
         .ok_or_else(|| host_error("unavailable", "native desktop host is unavailable"))
 }
 
-fn require_installed_instance(native: &NativeState, instance: &str) -> HostResult<()> {
+fn active_generation(native: &NativeState) -> HostResult<u64> {
+    native
+        .lock()
+        .map_err(|_| host_error("unavailable", "native application lock unavailable"))?
+        .active_generation()
+        .map_err(|message| host_error("unavailable", message))
+}
+
+fn with_install_reservation<T>(
+    native: &NativeState,
+    generation: u64,
+    operation: impl FnOnce(&mut NativeAuthority) -> HostResult<T>,
+) -> HostResult<T> {
+    let mut authority = native
+        .lock()
+        .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
+    authority
+        .require_installing_generation(generation)
+        .map_err(|message| host_error("duplicate_bootstrap", message))?;
+    operation(&mut authority)
+}
+
+fn with_installed_instance<T>(
+    native: &NativeState,
+    generation: u64,
+    instance: &str,
+    operation: impl FnOnce() -> HostResult<T>,
+) -> HostResult<T> {
     let guard = native
         .lock()
         .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-    let application = guard
-        .as_ref()
-        .ok_or_else(|| host_error("unavailable", "native application is unavailable"))?;
+    let (_, application) = guard
+        .active()
+        .filter(|(active, _)| *active == generation)
+        .ok_or_else(|| host_error("unavailable", "native lifecycle generation is stale"))?;
     if application.instance_id() != instance {
         return Err(host_error(
             "wrong_instance",
             "native application instance mismatch",
         ));
     }
-    Ok(())
+    operation()
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use crate::native_dispatch::tests::TerminalPump;
+
+    #[test]
+    fn stale_install_cannot_begin_viewport_work_and_resize_holds_authority() {
+        let native = std::sync::Arc::new(std::sync::Mutex::new(NativeAuthority::default()));
+        let (stale, current) = {
+            let mut authority = native.lock().unwrap();
+            let stale = authority.reserve_install().unwrap();
+            authority.rollback_install(stale);
+            (stale, authority.reserve_install().unwrap())
+        };
+        let mut touched = false;
+        assert!(with_install_reservation(&native, stale, |_| {
+            touched = true;
+            Ok(())
+        })
+        .is_err());
+        assert!(!touched);
+        with_install_reservation(&native, current, |authority| {
+            touched = true;
+            authority
+                .install(
+                    current,
+                    Box::new(TerminalPump(std::sync::Arc::new(
+                        std::sync::atomic::AtomicUsize::new(0),
+                    ))),
+                )
+                .map_err(|error| host_error("internal", error))
+        })
+        .unwrap();
+        assert!(touched);
+        with_installed_instance(&native, current, "pump-fixture", || {
+            assert!(matches!(
+                native.try_lock(),
+                Err(std::sync::TryLockError::WouldBlock)
+            ));
+            Ok(())
+        })
+        .unwrap();
+    }
 }

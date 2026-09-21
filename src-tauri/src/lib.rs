@@ -243,6 +243,7 @@ pub fn run() {
             native_application_commands::nemo_native_preview,
             native_application_commands::nemo_native_viewport_resize,
             native_application_commands::nemo_native_viewport_dispose,
+            native_application_commands::nemo_native_release,
             run_ffmpeg,
             fetch_google_font,
             video_decode::open_video_session,

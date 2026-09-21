@@ -1,8 +1,9 @@
-//! Dormant production composition root for the admitted native opacity host.
-//!
-//! N18A exposes strict commands but installs no startup caller. N20 alone may
-//! select this host for a production document; N21 owns installed acceptance.
+//! Dormant native opacity composition root; N20 alone may activate it.
 
+#[cfg(test)]
+pub(crate) use crate::native_dispatch::{
+    NativeAuthority, NativePhase, NativeState, ReleaseAdmission,
+};
 use crate::{
     native_application_contract::*,
     native_application_ports::{
@@ -11,15 +12,22 @@ use crate::{
     native_dispatch::NativeDispatch,
 };
 use native_engine::{
-    application::NativeApplication,
+    application::{ApplicationReleaseReceipt, NativeApplication},
     compositor::CompositionResult,
     document::OpacityDocument,
-    export_job::{JobReceipt, PendingFrame},
+    export_job::{JobReceipt, PendingFrame, ReconciliationStage},
     render_scene::{self, ScheduledFrameIdentity},
     resource_leases::{FrameFailure, FrameFailureKind, WorkId},
     scheduler::{EvaluationKey, FrameScheduler},
 };
-use std::path::PathBuf;
+use std::{collections::BTreeSet, path::PathBuf};
+
+#[path = "native_application_release.rs"]
+mod release;
+pub(crate) use release::{admit_release_request, complete_release};
+
+#[cfg(test)]
+pub(crate) use crate::native_dispatch::run_export_pump_interleaved;
 
 type DesktopCore =
     NativeApplication<DesktopArtifactPort, SharedCompositor, DesktopResourceResolver>;
@@ -29,12 +37,35 @@ pub(crate) struct PreparedPreview {
     pub(crate) identity: ScheduledFrameIdentity,
 }
 
+pub(crate) struct DesktopRelease {
+    pub(crate) application: ApplicationReleaseReceipt,
+    pub(crate) cancelled_preview: Vec<WorkId>,
+    pub(crate) unresolved_preview: Vec<WorkId>,
+    pub(crate) preview_error: Option<String>,
+    pub(crate) preview_stage: ReconciliationStage,
+}
+
+struct PreviewReleaseProgress {
+    cancelled: BTreeSet<WorkId>,
+    unresolved: BTreeSet<WorkId>,
+}
+
 pub(crate) struct DesktopNativeApplication {
     core: DesktopCore,
     preview_resources: DesktopResourceResolver,
     preview_compositor: SharedCompositor,
     preview_scheduler: FrameScheduler,
+    preview_work: BTreeSet<WorkId>,
     artifact_bindings: DesktopArtifactBindings,
+    preview_release: Option<PreviewReleaseProgress>,
+    #[cfg(test)]
+    panic_release_after_transaction: bool,
+    #[cfg(test)]
+    panic_release_after_export_jobs: Option<usize>,
+    #[cfg(test)]
+    panic_release_after_preview_jobs: Option<usize>,
+    #[cfg(test)]
+    fail_release_preview_cancel_at: Option<usize>,
 }
 
 impl DesktopNativeApplication {
@@ -60,7 +91,17 @@ impl DesktopNativeApplication {
             preview_resources: resources,
             preview_compositor: compositor,
             preview_scheduler: FrameScheduler::new(),
+            preview_work: BTreeSet::new(),
             artifact_bindings: bindings,
+            preview_release: None,
+            #[cfg(test)]
+            panic_release_after_transaction: false,
+            #[cfg(test)]
+            panic_release_after_export_jobs: None,
+            #[cfg(test)]
+            panic_release_after_preview_jobs: None,
+            #[cfg(test)]
+            fail_release_preview_cancel_at: None,
         })
     }
 
@@ -91,6 +132,9 @@ impl DesktopNativeApplication {
             .preview_scheduler
             .replace_document(document_id)
             .map_err(|error| host_error("internal", error.to_string()))?;
+        for receipt in &preview {
+            self.preview_work.remove(&receipt.work_id());
+        }
         *self.core.resource_resolver_mut() = resources.clone();
         self.preview_resources = resources;
         Ok((
@@ -168,10 +212,13 @@ impl DesktopNativeApplication {
                 .map_err(|error| error.to_string())
         })();
         match result {
-            Ok(result) => Ok(PreparedPreview {
-                result,
-                identity: ScheduledFrameIdentity::from_scheduled(&scheduled),
-            }),
+            Ok(result) => {
+                self.preview_work.insert(scheduled.work_id());
+                Ok(PreparedPreview {
+                    result,
+                    identity: ScheduledFrameIdentity::from_scheduled(&scheduled),
+                })
+            }
             Err(message) => {
                 let _ = self.preview_scheduler.fail(
                     scheduled.work_id(),
@@ -196,9 +243,13 @@ impl DesktopNativeApplication {
             self.preview_scheduler
                 .fail(work_id, FrameFailure::new(FrameFailureKind::Worker, status))
         };
-        result
+        let result = result
             .map(|_| ())
-            .map_err(|error| host_error("internal", error.to_string()))
+            .map_err(|error| host_error("internal", error.to_string()));
+        if result.is_ok() {
+            self.preview_work.remove(&work_id);
+        }
+        result
     }
 
     pub(crate) fn cancel_preview(&mut self, work_ids: &[WorkId]) -> HostResult<()> {
@@ -206,8 +257,113 @@ impl DesktopNativeApplication {
             self.preview_scheduler
                 .cancel(*work_id)
                 .map_err(|error| host_error("internal", error.to_string()))?;
+            self.preview_work.remove(work_id);
         }
         Ok(())
+    }
+
+    pub(crate) fn release_project(&mut self) -> DesktopRelease {
+        self.core.release_transaction_stage();
+        #[cfg(test)]
+        if self.panic_release_after_transaction {
+            panic!("injected core release panic after transaction reconciliation");
+        }
+        #[cfg(test)]
+        let application = {
+            let mut reconciled = 0;
+            let panic_after = self.panic_release_after_export_jobs;
+            self.core.release_export_stage_with_checkpoint(|| {
+                reconciled += 1;
+                if panic_after == Some(reconciled) {
+                    panic!("injected core release panic after {reconciled} export job");
+                }
+            })
+        };
+        #[cfg(not(test))]
+        let application = self.core.release_export_stage();
+        let pending = self.preview_work.clone();
+        self.preview_release = Some(PreviewReleaseProgress {
+            cancelled: BTreeSet::new(),
+            unresolved: pending.clone(),
+        });
+        let mut preview_error = None;
+        for (index, work_id) in pending.into_iter().enumerate() {
+            #[cfg(not(test))]
+            let _ = index;
+            #[cfg(test)]
+            if self.fail_release_preview_cancel_at == Some(index) {
+                preview_error = Some("injected preview scheduler cancellation failure".into());
+                break;
+            }
+            if let Err(error) = self.preview_scheduler.cancel(work_id) {
+                preview_error = Some(error.to_string());
+                break;
+            }
+            self.preview_work.remove(&work_id);
+            let progress = self.preview_release.as_mut().unwrap();
+            progress.unresolved.remove(&work_id);
+            progress.cancelled.insert(work_id);
+            #[cfg(test)]
+            if self.panic_release_after_preview_jobs == Some(index + 1) {
+                panic!(
+                    "injected core release panic after {} preview job",
+                    index + 1
+                );
+            }
+        }
+        let progress = self.preview_release.as_ref().unwrap();
+        DesktopRelease {
+            application,
+            cancelled_preview: progress.cancelled.iter().copied().collect(),
+            unresolved_preview: progress.unresolved.iter().copied().collect(),
+            preview_stage: if preview_error.is_some() {
+                ReconciliationStage::Unknown
+            } else {
+                ReconciliationStage::Complete
+            },
+            preview_error,
+        }
+    }
+
+    fn release_progress(&self) -> Option<DesktopRelease> {
+        self.core.release_progress().map(|application| {
+            let (cancelled, unresolved) = self.preview_release.as_ref().map_or_else(
+                || (Vec::new(), self.preview_work.iter().copied().collect()),
+                |progress| {
+                    (
+                        progress.cancelled.iter().copied().collect(),
+                        progress.unresolved.iter().copied().collect(),
+                    )
+                },
+            );
+            DesktopRelease {
+                application,
+                cancelled_preview: cancelled,
+                unresolved_preview: unresolved,
+                preview_error: None,
+                preview_stage: ReconciliationStage::Unknown,
+            }
+        })
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_transaction(&mut self) {
+        self.panic_release_after_transaction = true;
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_export_jobs(&mut self, jobs: usize) {
+        self.panic_release_after_export_jobs = Some(jobs);
+    }
+
+    #[cfg(test)]
+    fn inject_release_panic_after_preview_jobs(&mut self, jobs: usize) {
+        self.panic_release_after_preview_jobs = Some(jobs);
+    }
+
+    #[cfg(test)]
+    fn inject_release_preview_cancel_failure_at(&mut self, index: usize) {
+        self.fail_release_preview_cancel_at = Some(index);
     }
 
     pub(crate) fn require_identity(
@@ -216,22 +372,16 @@ impl DesktopNativeApplication {
         document: &str,
         revision: u64,
     ) -> HostResult<()> {
-        if instance != self.core.instance_id() {
-            return Err(host_error(
-                "wrong_instance",
-                "native application instance mismatch",
-            ));
-        }
-        if document != self.core.document_id() {
-            return Err(host_error("wrong_document", "native document was replaced"));
-        }
-        if revision != self.core.content_revision() {
-            return Err(host_error(
-                "stale_revision",
-                "native content revision is stale",
-            ));
-        }
-        Ok(())
+        let error = if instance != self.core.instance_id() {
+            Some(("wrong_instance", "native application instance mismatch"))
+        } else if document != self.core.document_id() {
+            Some(("wrong_document", "native document was replaced"))
+        } else if revision != self.core.content_revision() {
+            Some(("stale_revision", "native content revision is stale"))
+        } else {
+            None
+        };
+        error.map_or(Ok(()), |(code, message)| Err(host_error(code, message)))
     }
 
     pub(crate) fn preview_compositor(&self) -> SharedCompositor {
@@ -276,3 +426,7 @@ impl NativeDispatch for DesktopNativeApplication {
 #[cfg(test)]
 #[path = "native_application_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_application_release_tests.rs"]
+mod release_tests;

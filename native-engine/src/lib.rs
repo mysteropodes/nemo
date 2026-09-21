@@ -20,7 +20,7 @@ engine_modules! {
     "scheduler" => resource_leases, scheduler;
     "compositor" => compositor, render_scene;
     "viewport" => desktop_viewport;
-    "export_job" => export_job, png_output;
+    "export_job" => export_job, export_job_lifecycle, png_output;
     "application" => application, protocol, read_queries;
 }
 
@@ -44,6 +44,7 @@ test_modules! {
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
+    "test-export_job" => export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs";
     "test-application" => application_tests = "../tests/application.rs";
     "test-application" => application_read_tests = "../tests/application_read.rs";
 }

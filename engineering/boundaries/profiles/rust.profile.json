@@ -116,8 +116,8 @@
       "id": "rust.native.engine.export-job",
       "layer": "native-export-job",
       "dir": "native-engine/src",
-      "files": ["export_job.rs"],
-      "publicApi": ["export_job.rs"],
+      "files": ["export_job.rs", "export_job_lifecycle.rs"],
+      "publicApi": ["export_job.rs", "export_job_lifecycle.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
@@ -297,10 +297,12 @@
       "layer": "bootstrap",
       "dir": "src-tauri/src",
       "files": [
-        "native_application.rs"
+        "native_application.rs",
+        "native_application_release.rs"
       ],
       "publicApi": [
-        "native_application.rs"
+        "native_application.rs",
+        "native_application_release.rs"
       ],
       "sizeProfile": "Rust production module"
     },
@@ -321,7 +323,8 @@
       "layer": "tests",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_tests.rs"
+        "native_application_tests.rs",
+        "native_application_release_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

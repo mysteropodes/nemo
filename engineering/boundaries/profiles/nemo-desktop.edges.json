@@ -52,7 +52,7 @@
     },
     "bootstrap": {
       "allowedLayers": ["host-contract", "host-ports", "host-seam"],
-      "meaning": "native_application.rs owns the dormant application core through the strict contract, concrete ports and shared dispatch seam; command and presentation concerns live in their own modules"
+      "meaning": "native_application.rs and native_application_release.rs own the dormant application core and terminal release lifecycle through the strict contract, concrete ports and shared dispatch seam; command and presentation concerns live in their own modules"
     },
     "command-adapter": {
       "allowedLayers": ["mcp-adapter", "bootstrap", "host-contract", "host-ports", "viewport-owner", "host-seam"],
@@ -82,6 +82,8 @@
       "rust.desktop.shell -> rust.desktop.tasks (lib.rs: mod task_runtime;)",
       "rust.desktop.mcp.adapter -> rust.desktop.native.dispatch (application_mcp.rs: use crate::native_dispatch::{...};)",
       "rust.desktop.mcp.adapter.tests -> rust.desktop.mcp.adapter (application_mcp_tests.rs: use crate::application_mcp::*;)",
+      "rust.desktop.mcp.adapter.tests -> rust.desktop.native.application (application_mcp_tests.rs: use crate::native_application::{...};)",
+      "rust.desktop.mcp.adapter.tests -> rust.desktop.native.application.contract (application_mcp_tests.rs: use crate::native_application_contract::{...};)",
       "rust.desktop.native.application -> rust.desktop.native.application.contract (native_application.rs: use crate::native_application_contract::*;)",
       "rust.desktop.native.application -> rust.desktop.native.application.ports (native_application.rs: use crate::native_application_ports::{...};)",
       "rust.desktop.native.application -> rust.desktop.native.dispatch (native_application.rs: use crate::native_dispatch::{...};)",
@@ -215,6 +217,7 @@
           "resource_leases::WorkId"
         ],
         "rust.desktop.native.application": [
+          "application::ApplicationReleaseReceipt",
           "application::NativeApplication",
           "commands::OpacityRequest",
           "commands::ResponseEnvelope",
@@ -222,6 +225,7 @@
           "document::OpacityDocument",
           "export_job::JobReceipt",
           "export_job::PendingFrame",
+          "export_job::ReconciliationStage",
           "render_scene",
           "resource_leases::FrameFailure",
           "resource_leases::FrameFailureKind",

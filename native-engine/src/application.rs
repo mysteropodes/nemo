@@ -1,14 +1,10 @@
-//! One staged native application composition root.
-//!
-//! N15 activates no host. It routes typed v2 requests to the existing N09
-//! history authority and N14 export manager, resolving only opaque resources.
-
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::document::OpacityDocument;
 use crate::export_job::{
     ExportBegin, ExportCompositor, ExportFrameInput, ExportJobError, ExportJobErrorKind,
-    ExportJobManager, JobReceipt, PendingFrame, StagedArtifactPort,
+    ExportJobManager, JobReceipt, PendingFrame, ReconciliationStage, StagedArtifactPort,
 };
+pub use crate::export_job_lifecycle::ApplicationReleaseReceipt;
 use crate::history::NativeOpacityHistory;
 use crate::protocol::{
     self, ExportBeginPayload, JobIdPayload, OpaqueResourceHandle, OP_JOB_EXPORT_PNG_BEGIN,
@@ -17,6 +13,7 @@ use crate::protocol::{
 use crate::render_scene::GeometryPaintInput;
 use crate::request_receipts::RequestFingerprint;
 use crate::revision::DocumentSnapshot;
+use crate::transaction::TerminalDisposition;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,8 +39,6 @@ impl ResourceResolutionError {
     }
 }
 
-/// Resolves one declared opaque handle without admitting pixels, canvas data,
-/// geometry JSON, or a transport-side fallback into the v2 request.
 pub trait ExportResourceResolver {
     fn resolve_geometry(
         &mut self,
@@ -75,6 +70,7 @@ pub struct NativeApplication<P, C, R> {
     exports: ExportJobManager<P, C>,
     resources: R,
     requests: HashMap<String, RecordedRequest>,
+    release: Option<ApplicationReleaseReceipt>,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
@@ -92,6 +88,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             exports: ExportJobManager::new(artifact_port, compositor),
             resources,
             requests: HashMap::new(),
+            release: None,
         })
     }
 
@@ -107,13 +104,18 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.history.content_revision()
     }
 
-    /// Narrow native-host access to the same immutable snapshot authority used
-    /// by export. Transport responses continue to expose identity only.
     pub fn acquire_snapshot(&self, revision: u64) -> Option<DocumentSnapshot> {
         self.history.acquire_snapshot(revision)
     }
 
     pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+        if self.release.is_some() {
+            return self.failure(
+                &request,
+                DispatchErrorCode::Unavailable,
+                "Native application authority has been released.",
+            );
+        }
         if let Some(response) = protocol::preflight_identity(
             &request,
             self.instance_id(),
@@ -176,6 +178,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 
     pub fn run_export_to_completion(&mut self, job_id: &str) -> Result<JobReceipt, ExportJobError> {
+        self.require_active()?;
         self.exports.run_to_completion(job_id)
     }
 
@@ -183,6 +186,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         &mut self,
         job_id: &str,
     ) -> Result<Option<PendingFrame>, ExportJobError> {
+        self.require_active()?;
         self.exports.start_next_frame(job_id)
     }
 
@@ -197,6 +201,9 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         &mut self,
         document: OpacityDocument,
     ) -> Result<Vec<JobReceipt>, String> {
+        if self.release.is_some() {
+            return Err("native application authority has been released".into());
+        }
         self.history
             .replace_document(document)
             .map_err(str::to_owned)?;
@@ -219,6 +226,78 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
 
     pub fn resource_resolver_mut(&mut self) -> &mut R {
         &mut self.resources
+    }
+
+    pub fn release_authority(&mut self) -> ApplicationReleaseReceipt {
+        self.release_transaction_stage();
+        self.release_export_stage()
+    }
+
+    pub fn release_transaction_stage(&mut self) -> ApplicationReleaseReceipt {
+        if matches!(self.release.as_ref(), Some(receipt) if receipt.transaction_stage == ReconciliationStage::Complete)
+        {
+            return self.release.clone().unwrap();
+        }
+        let (undo_depth, redo_depth) = self.history.history_depths();
+        let cancelled_transaction_id = self.history.transactions.active_id().map(str::to_owned);
+        let mut receipt = ApplicationReleaseReceipt {
+            instance_id: self.instance_id().to_owned(),
+            document_id: self.document_id().to_owned(),
+            content_revision: self.content_revision(),
+            cancelled_transaction_id: cancelled_transaction_id.clone(),
+            cancelled_transaction: None,
+            undo_depth,
+            redo_depth,
+            transaction_stage: ReconciliationStage::Pending,
+            export_stage: ReconciliationStage::Pending,
+            exports: self.exports.release_snapshot(),
+        };
+        self.release = Some(receipt.clone());
+        let cancelled_transaction = cancelled_transaction_id.as_deref().map(|id| {
+            let record = self
+                .history
+                .transactions
+                .finish(id, TerminalDisposition::Cancelled, None)
+                .expect("the observed active transaction cancels without commit");
+            let mut result = record.result();
+            result.as_object_mut().unwrap().insert(
+                "committedValue".into(),
+                serde_json::Value::Number(record.base_value),
+            );
+            result
+        });
+        receipt.cancelled_transaction = cancelled_transaction;
+        (receipt.undo_depth, receipt.redo_depth) = self.history.history_depths();
+        receipt.transaction_stage = ReconciliationStage::Complete;
+        self.release = Some(receipt.clone());
+        receipt
+    }
+
+    pub fn release_export_stage(&mut self) -> ApplicationReleaseReceipt {
+        self.release_export_stage_with_checkpoint(|| {})
+    }
+
+    pub fn release_export_stage_with_checkpoint<F: FnMut()>(
+        &mut self,
+        checkpoint: F,
+    ) -> ApplicationReleaseReceipt {
+        let mut receipt = self.release_transaction_stage();
+        if receipt.export_stage == ReconciliationStage::Complete {
+            return receipt;
+        }
+        receipt.exports = self.exports.reconcile_release_with(checkpoint);
+        receipt.export_stage = ReconciliationStage::Complete;
+        self.requests.clear();
+        self.release = Some(receipt.clone());
+        receipt
+    }
+
+    pub fn release_progress(&self) -> Option<ApplicationReleaseReceipt> {
+        let mut receipt = self.release.clone()?;
+        if receipt.export_stage == ReconciliationStage::Pending {
+            receipt.exports = self.exports.release_snapshot();
+        }
+        Some(receipt)
     }
 
     fn history_stage(
@@ -412,6 +491,17 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             receipt,
         )
     }
+
+    fn require_active(&self) -> Result<(), ExportJobError> {
+        if self.release.is_some() {
+            Err(ExportJobError {
+                kind: ExportJobErrorKind::Released,
+                message: "native application authority has been released".into(),
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 fn resolution_code(kind: ResourceResolutionErrorKind) -> DispatchErrorCode {
@@ -431,5 +521,6 @@ fn export_error_code(kind: ExportJobErrorKind) -> DispatchErrorCode {
         ExportJobErrorKind::Busy => DispatchErrorCode::BusyConflict,
         ExportJobErrorKind::NotFound => DispatchErrorCode::NotFound,
         ExportJobErrorKind::WrongDocument => DispatchErrorCode::WrongDocument,
+        ExportJobErrorKind::Released => DispatchErrorCode::Unavailable,
     }
 }
