@@ -5,16 +5,25 @@ use tauri_plugin_shell::ShellExt;
 // EXPERIMENTAL (experimental/native-video-decode) — see the module header.
 mod video_decode;
 // Pure text parsing of `ffmpeg -i` output, split out of video_decode (P28).
-mod media_probe;
-mod vectorize;
 mod application_mcp;
-#[allow(dead_code, unused_imports)]
+mod media_probe;
+mod native_application;
+mod native_application_commands;
+mod native_application_contract;
+mod native_application_ports;
+mod native_application_viewport;
+mod native_dispatch;
 mod native_viewport;
+mod vectorize;
 // Per-task isolation of the app's native mutable state (R06, #902).
 mod task_runtime;
 
 #[tauri::command]
-async fn run_ffmpeg(app: tauri::AppHandle, window: tauri::Window, args: Vec<String>) -> Result<i32, String> {
+async fn run_ffmpeg(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    args: Vec<String>,
+) -> Result<i32, String> {
     let sidecar = app
         .shell()
         .sidecar("ffmpeg")
@@ -118,7 +127,12 @@ async fn fetch_google_font(family: String, weight: u32, italic: bool) -> Result<
         .split("url(")
         .nth(1)
         .and_then(|rest| rest.split(')').next())
-        .ok_or_else(|| format!("no font URL found for '{}' — family name may not exist on Google Fonts", family))?
+        .ok_or_else(|| {
+            format!(
+                "no font URL found for '{}' — family name may not exist on Google Fonts",
+                family
+            )
+        })?
         .to_string();
     let bytes = client
         .get(&ttf_url)
@@ -223,6 +237,12 @@ pub fn run() {
             application_mcp::nemo_mcp_reply,
             application_mcp::nemo_native_status,
             application_mcp::nemo_native_dispatch,
+            native_application_commands::nemo_native_bootstrap,
+            native_application_commands::nemo_native_replace,
+            native_application_commands::nemo_native_bind_output,
+            native_application_commands::nemo_native_preview,
+            native_application_commands::nemo_native_viewport_resize,
+            native_application_commands::nemo_native_viewport_dispose,
             run_ffmpeg,
             fetch_google_font,
             video_decode::open_video_session,

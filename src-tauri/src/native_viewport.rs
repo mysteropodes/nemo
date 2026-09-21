@@ -456,14 +456,14 @@ mod platform {
     }
 
     #[rustfmt::skip]
-    pub(crate) struct NativeViewport { compositor: Compositor, host: DesktopViewportHost<MacOsSurfacePort> }
+    pub(crate) struct NativeViewport { host: DesktopViewportHost<MacOsSurfacePort> }
 
     impl NativeViewport {
         pub(crate) fn from_app(
             app: &tauri::AppHandle,
             window_label: &str,
             mapping: ViewportMapping,
-        ) -> Result<Self, NativeViewportError> {
+        ) -> Result<(Self, Compositor), NativeViewportError> {
             let window = app.get_webview_window(window_label).ok_or_else(|| {
                 NativeViewportError::new(format!(
                     "native viewport unavailable: Tauri webview window '{window_label}' is absent"
@@ -475,7 +475,7 @@ mod platform {
         fn from_window(
             window: &tauri::WebviewWindow,
             mapping: ViewportMapping,
-        ) -> Result<Self, NativeViewportError> {
+        ) -> Result<(Self, Compositor), NativeViewportError> {
             let content_view = window.ns_view().map_err(|error| {
                 NativeViewportError::new(format!("resolve AppKit view: {error}"))
             })? as *mut Object;
@@ -484,14 +484,12 @@ mod platform {
             let surface = create_surface(construction.instance(), &view)?;
             let compositor = construction.create_for_surface(&surface)?;
             let port = MacOsSurfacePort::new(surface, view, &compositor, mapping)?;
-            Ok(Self {
+            Ok((
+                Self {
+                    host: DesktopViewportHost::new(port, mapping),
+                },
                 compositor,
-                host: DesktopViewportHost::new(port, mapping),
-            })
-        }
-
-        pub(crate) fn compositor_mut(&mut self) -> &mut Compositor {
-            &mut self.compositor
+            ))
         }
 
         pub(crate) fn register(
@@ -507,9 +505,14 @@ mod platform {
 
         pub(crate) fn present(
             &mut self,
+            compositor: &Compositor,
             result: &CompositionResult,
         ) -> Result<PresentationReceipt, ViewportError> {
-            self.host.present_composition(&self.compositor, result)
+            self.host.present_composition(compositor, result)
+        }
+
+        pub(crate) fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId> {
+            self.host.reconcile_replaced(work_ids)
         }
 
         pub(crate) fn dispose(&mut self) -> Vec<WorkId> {
@@ -530,16 +533,14 @@ mod platform {
 
     pub(crate) struct NativeViewport;
 
+    #[rustfmt::skip]
     impl NativeViewport {
-        pub(crate) fn from_app(
-            _app: &tauri::AppHandle,
-            _window_label: &str,
-            _mapping: ViewportMapping,
-        ) -> Result<Self, NativeViewportError> {
-            Err(NativeViewportError::new(
-                "native viewport unavailable: the staged N16 surface is macOS-only",
-            ))
-        }
+        pub(crate) fn from_app(_app: &tauri::AppHandle, _window_label: &str, _mapping: ViewportMapping) -> Result<(Self, Compositor), NativeViewportError> { Err(NativeViewportError::new("native viewport unavailable: the staged N16 surface is macOS-only")) }
+        pub(crate) fn register(&mut self, _identity: ScheduledFrameIdentity) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
+        pub(crate) fn resize(&mut self, _mapping: ViewportMapping) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
+        pub(crate) fn present(&mut self, _compositor: &Compositor, _result: &CompositionResult) -> Result<PresentationReceipt, ViewportError> { Err(ViewportError::Disposed) }
+        pub(crate) fn reconcile_replaced(&mut self, _work_ids: &[WorkId]) -> Vec<WorkId> { Vec::new() }
+        pub(crate) fn dispose(&mut self) -> Vec<WorkId> { Vec::new() }
     }
 }
 

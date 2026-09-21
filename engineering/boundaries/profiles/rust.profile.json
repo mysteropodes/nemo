@@ -77,7 +77,7 @@
     },
     {
       "id": "rust.desktop.mcp.adapter",
-      "layer": "adapters",
+      "layer": "mcp-adapter",
       "dir": "src-tauri/src",
       "files": [
         "application_mcp.rs"
@@ -99,13 +99,105 @@
     },
     {
       "id": "rust.desktop.native.viewport",
-      "layer": "adapters",
+      "layer": "viewport-adapter",
       "dir": "src-tauri/src",
       "files": [
         "native_viewport.rs"
       ],
       "publicApi": [
         "native_viewport.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.ports",
+      "layer": "host-ports",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_ports.rs"
+      ],
+      "publicApi": [
+        "native_application_ports.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.ports.tests",
+      "layer": "tests",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_ports_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.contract",
+      "layer": "host-contract",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_contract.rs"
+      ],
+      "publicApi": [
+        "native_application_contract.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.viewport",
+      "layer": "viewport-owner",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_viewport.rs"
+      ],
+      "publicApi": [
+        "native_application_viewport.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application",
+      "layer": "bootstrap",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application.rs"
+      ],
+      "publicApi": [
+        "native_application.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.commands",
+      "layer": "command-adapter",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_commands.rs"
+      ],
+      "publicApi": [
+        "native_application_commands.rs"
+      ],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.application.tests",
+      "layer": "tests",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
+      "id": "rust.desktop.native.dispatch",
+      "layer": "host-seam",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_dispatch.rs"
+      ],
+      "publicApi": [
+        "native_dispatch.rs"
       ],
       "sizeProfile": "Rust production module"
     },

@@ -3,7 +3,7 @@
   "kind": "rust-crate",
   "policyId": "nemo.rust.nemo-desktop.edges",
   "status": "adopted",
-  "purpose": "B01/#1046 and N16/#1348: permitted module edges, exported ports, external-crate ports and Cargo feature configuration of the native desktop crate (src-tauri), enforced through the normal local boundaries lane by the Rust-aware analyzer (scripts/nemo/lib/boundaries-rust.cjs). Module identity and layers come from rust.profile.json; this policy pins both the application_mcp.rs <-> nemo-mcp transport port and the staged Tauri-host <-> native-engine port that the original intra-crate-only analyzer did not cover.",
+  "purpose": "B01/#1046, N16/#1348 and N18A/#1367: permitted module edges, exported ports, external-crate ports and Cargo feature configuration of the native desktop crate (src-tauri), enforced through the normal local boundaries lane by the Rust-aware analyzer (scripts/nemo/lib/boundaries-rust.cjs). Module identity and layers come from rust.profile.json; this policy pins the application_mcp.rs <-> nemo-mcp transport port plus module-local Tauri-host <-> native-engine ports for the dormant bootstrap, commands, tests, viewport, concrete ports and dispatch seam.",
   "crate": "nemo",
   "root": "src-tauri/src/lib.rs",
   "sourceDir": "src-tauri/src",
@@ -12,23 +12,59 @@
     "rust.desktop.mcp.adapter",
     "rust.desktop.mcp.adapter.tests",
     "rust.desktop.native.viewport",
+    "rust.desktop.native.application.ports",
+    "rust.desktop.native.application.ports.tests",
+    "rust.desktop.native.application.contract",
+    "rust.desktop.native.application.viewport",
+    "rust.desktop.native.application",
+    "rust.desktop.native.application.commands",
+    "rust.desktop.native.application.tests",
+    "rust.desktop.native.dispatch",
     "rust.desktop.media",
     "rust.desktop.tasks",
     "rust.desktop.tasks.tests"
   ],
-  "profileModulesNote": "The seven profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
+  "profileModulesNote": "The fifteen profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
   "layerRules": {
     "desktop-shell": {
-      "allowedLayers": ["desktop-shell", "adapters"],
-      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media) and task_runtime.rs (tasks) may depend on each other and on the adapters layer (lib.rs declares `mod application_mcp;` and `mod native_viewport;`), never directly on tests"
+      "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-seam", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
+      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media) and task_runtime.rs (tasks) may depend on each other and declare the dormant host modules, never directly on tests"
     },
-    "adapters": {
+    "mcp-adapter": {
+      "allowedLayers": ["host-seam"],
+      "meaning": "application_mcp.rs owns transport and may depend on the shared boxed native-dispatch seam, but not on bootstrap or sibling presentation/resource adapters"
+    },
+    "viewport-adapter": {
       "allowedLayers": [],
-      "meaning": "application_mcp.rs and native_viewport.rs are host adapters with no cross-adapter intra-crate edge; their nemo-mcp and native-engine dependencies are governed separately by externalCratePorts below"
+      "meaning": "native_viewport.rs is the platform surface adapter and does not reach the bootstrap, transport, contract or host ports"
+    },
+    "host-ports": {
+      "allowedLayers": [],
+      "meaning": "native_application_ports.rs owns concrete resource, artifact and shared-compositor ports without reaching host orchestration"
+    },
+    "host-contract": {
+      "allowedLayers": ["host-ports"],
+      "meaning": "native_application_contract.rs validates versioned requests and admitted resources through the concrete resource resolver without reaching transport, bootstrap or presentation owners"
+    },
+    "viewport-owner": {
+      "allowedLayers": ["host-contract", "viewport-adapter"],
+      "meaning": "native_application_viewport.rs retains the main-thread viewport and uses only the strict host contract plus platform viewport adapter"
+    },
+    "bootstrap": {
+      "allowedLayers": ["host-contract", "host-ports", "host-seam"],
+      "meaning": "native_application.rs owns the dormant application core through the strict contract, concrete ports and shared dispatch seam; command and presentation concerns live in their own modules"
+    },
+    "command-adapter": {
+      "allowedLayers": ["mcp-adapter", "bootstrap", "host-contract", "host-ports", "viewport-owner", "host-seam"],
+      "meaning": "native_application_commands.rs is the dormant Tauri command surface and composes existing owners without becoming another state authority"
+    },
+    "host-seam": {
+      "allowedLayers": [],
+      "meaning": "native_dispatch.rs owns the shared boxed application seam and export pump. It is depended on by owners, but does not reach back into the MCP adapter, application bootstrap or viewport."
     },
     "tests": {
-      "allowedLayers": ["desktop-shell", "adapters"],
-      "meaning": "task_runtime/tests.rs reaches task_runtime.rs via `use super::*;`; application_mcp_tests.rs names its actual application_mcp parent explicitly via `use crate::application_mcp::*;`"
+      "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
+      "meaning": "Focused tests may reach their declared owners but not the shared host-seam directly: task-runtime, MCP, application and concrete-port tests each name the production module they exercise"
     }
   },
   "permittedEdges": {
@@ -36,9 +72,32 @@
     "edges": [
       "rust.desktop.shell -> rust.desktop.mcp.adapter (lib.rs: mod application_mcp;)",
       "rust.desktop.shell -> rust.desktop.native.viewport (lib.rs: mod native_viewport;)",
+      "rust.desktop.shell -> rust.desktop.native.application (lib.rs: mod native_application;)",
+      "rust.desktop.shell -> rust.desktop.native.application.commands (lib.rs: mod native_application_commands;)",
+      "rust.desktop.shell -> rust.desktop.native.application.contract (lib.rs: mod native_application_contract;)",
+      "rust.desktop.shell -> rust.desktop.native.application.ports (lib.rs: mod native_application_ports;)",
+      "rust.desktop.shell -> rust.desktop.native.application.viewport (lib.rs: mod native_application_viewport;)",
+      "rust.desktop.shell -> rust.desktop.native.dispatch (lib.rs: mod native_dispatch;)",
       "rust.desktop.shell -> rust.desktop.media (lib.rs: mod video_decode; mod media_probe; mod vectorize;)",
       "rust.desktop.shell -> rust.desktop.tasks (lib.rs: mod task_runtime;)",
+      "rust.desktop.mcp.adapter -> rust.desktop.native.dispatch (application_mcp.rs: use crate::native_dispatch::{...};)",
       "rust.desktop.mcp.adapter.tests -> rust.desktop.mcp.adapter (application_mcp_tests.rs: use crate::application_mcp::*;)",
+      "rust.desktop.native.application -> rust.desktop.native.application.contract (native_application.rs: use crate::native_application_contract::*;)",
+      "rust.desktop.native.application -> rust.desktop.native.application.ports (native_application.rs: use crate::native_application_ports::{...};)",
+      "rust.desktop.native.application -> rust.desktop.native.dispatch (native_application.rs: use crate::native_dispatch::{...};)",
+      "rust.desktop.native.application.commands -> rust.desktop.mcp.adapter (native_application_commands.rs: use crate::application_mcp::ApplicationMcp;)",
+      "rust.desktop.native.application.commands -> rust.desktop.native.application (native_application_commands.rs: use crate::native_application::DesktopNativeApplication;)",
+      "rust.desktop.native.application.commands -> rust.desktop.native.application.contract (native_application_commands.rs: use crate::native_application_contract::*;)",
+      "rust.desktop.native.application.commands -> rust.desktop.native.application.ports (native_application_commands.rs: use crate::native_application_ports::{...};)",
+      "rust.desktop.native.application.commands -> rust.desktop.native.application.viewport (native_application_commands.rs: use crate::native_application_viewport;)",
+      "rust.desktop.native.application.commands -> rust.desktop.native.dispatch (native_application_commands.rs: use crate::native_dispatch::{...};)",
+      "rust.desktop.native.application.tests -> rust.desktop.native.application (native_application_tests.rs: use crate::native_application::*;)",
+      "rust.desktop.native.application.tests -> rust.desktop.native.application.contract (native_application_tests.rs: use crate::native_application_contract::{...};)",
+      "rust.desktop.native.application.tests -> rust.desktop.native.application.ports (native_application_tests.rs: use crate::native_application_ports::{...};)",
+      "rust.desktop.native.application.contract -> rust.desktop.native.application.ports (native_application_contract.rs: use crate::native_application_ports::DesktopResourceResolver;)",
+      "rust.desktop.native.application.ports.tests -> rust.desktop.native.application.ports (native_application_ports_tests.rs: use crate::native_application_ports::*;)",
+      "rust.desktop.native.application.viewport -> rust.desktop.native.application.contract (native_application_viewport.rs: use crate::native_application_contract::{...};)",
+      "rust.desktop.native.application.viewport -> rust.desktop.native.viewport (native_application_viewport.rs: use crate::native_viewport::NativeViewport;)",
       "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)"
     ]
   },
@@ -58,7 +117,7 @@
   },
   "externalCratePorts": {
     "nemo_mcp": {
-      "allowedModules": ["rust.desktop.mcp.adapter"],
+      "allowedModules": ["rust.desktop.mcp.adapter", "rust.desktop.native.application.contract", "rust.desktop.native.application.commands", "rust.desktop.native.application.tests"],
       "items": [
         "BUILD_SOURCE_ID",
         "contract::ApplicationRequest",
@@ -73,48 +132,123 @@
         "registry",
         "wire"
       ],
-      "note": "The versioned nemo-mcp transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) consumed by application_mcp.rs. A declared item covers itself and any deeper path under it (for example, registry covers registry::Endpoint). Only rust.desktop.mcp.adapter may reference nemo_mcp; any other module doing so is an external-crate-violation, and an undeclared nemo_mcp path is a private-port-access violation."
+      "note": "The versioned nemo-mcp transport port (rust.mcp.transport, nemo-mcp/src/lib.rs publicApi) consumed by application_mcp.rs and the dormant native host contract, commands and focused tests. This legacy form shares one item list across its named modules; a declared item covers itself and deeper paths (for example, registry covers registry::Endpoint). Every other module is denied, and an undeclared nemo_mcp path is a private-port-access violation."
     },
     "native_engine": {
-      "allowedModules": [
-        "rust.desktop.mcp.adapter",
-        "rust.desktop.mcp.adapter.tests",
-        "rust.desktop.native.viewport"
-      ],
-      "items": [
-        "application::ExportResourceResolver",
-        "application::NativeApplication",
-        "application::ResourceResolutionError",
-        "application::ResourceResolutionErrorKind",
-        "codec::decode_project",
-        "commands::OpacityRequest",
-        "commands::ResponseEnvelope",
-        "compositor::CompositionResult",
-        "compositor::Compositor",
-        "compositor::CompositorError",
-        "compositor::CompositorInstance",
-        "desktop_viewport::AcquiredSurfaceFrame",
-        "desktop_viewport::DesktopViewportHost",
-        "desktop_viewport::PresentationReceipt",
-        "desktop_viewport::SettledSurfaceFrame",
-        "desktop_viewport::SurfaceAttempt",
-        "desktop_viewport::SurfacePort",
-        "desktop_viewport::SurfacePresentation",
-        "desktop_viewport::SurfaceRecoveryError",
-        "desktop_viewport::ViewportError",
-        "desktop_viewport::ViewportMapping",
-        "document::OpacityDocument",
-        "export_job::ExportArtifact",
-        "export_job::ExportCompositor",
-        "export_job::ExportReadback",
-        "export_job::StagedArtifactPort",
-        "protocol::OpaqueResourceHandle",
-        "render_scene::GeometryPaintInput",
-        "render_scene::RenderScene",
-        "render_scene::ScheduledFrameIdentity",
-        "scheduler::WorkId"
-      ],
-      "note": "The narrow native-engine host port used by the staged macOS surface adapter, the shared application/MCP host and its focused same-instance test. No other desktop module may reach native-engine, and the common nemo-mcp transport crate remains independent of native-engine."
+      "moduleItems": {
+        "rust.desktop.mcp.adapter": [
+          "application::ExportResourceResolver",
+          "application::NativeApplication",
+          "commands::OpacityRequest",
+          "document::OpacityDocument",
+          "export_job::ExportCompositor",
+          "export_job::JobReceipt",
+          "export_job::StagedArtifactPort",
+          "protocol::OP_JOB_EXPORT_PNG_BEGIN"
+        ],
+        "rust.desktop.mcp.adapter.tests": [
+          "application::ResourceResolutionError",
+          "application::ResourceResolutionErrorKind",
+          "codec::decode_project",
+          "export_job::ExportArtifact",
+          "export_job::ExportReadback",
+          "protocol::OpaqueResourceHandle",
+          "render_scene::GeometryPaintInput",
+          "render_scene::RenderScene"
+        ],
+        "rust.desktop.native.viewport": [
+          "compositor::CompositionResult",
+          "compositor::Compositor",
+          "compositor::CompositorError",
+          "compositor::CompositorInstance",
+          "desktop_viewport::AcquiredSurfaceFrame",
+          "desktop_viewport::DesktopViewportHost",
+          "desktop_viewport::PresentationReceipt",
+          "desktop_viewport::SettledSurfaceFrame",
+          "desktop_viewport::SurfaceAttempt",
+          "desktop_viewport::SurfacePort",
+          "desktop_viewport::SurfacePresentation",
+          "desktop_viewport::SurfaceRecoveryError",
+          "desktop_viewport::ViewportError",
+          "desktop_viewport::ViewportMapping",
+          "render_scene::ScheduledFrameIdentity",
+          "scheduler::WorkId"
+        ],
+        "rust.desktop.native.application.ports": [
+          "application::ExportResourceResolver",
+          "application::ResourceResolutionError",
+          "application::ResourceResolutionErrorKind",
+          "compositor::CompositionResult",
+          "compositor::Compositor",
+          "png_output::ExportArtifact",
+          "png_output::ExportCompositor",
+          "png_output::ExportReadback",
+          "png_output::StagedArtifactPort",
+          "protocol::OpaqueResourceHandle",
+          "render_scene::GeometryPaintInput",
+          "render_scene::RenderScene"
+        ],
+        "rust.desktop.native.application.contract": [
+          "codec::decode_project",
+          "desktop_viewport::CssBounds",
+          "desktop_viewport::PhysicalExtent",
+          "desktop_viewport::ViewportMapping",
+          "document::OpacityDocument",
+          "export_job::CleanupStatus",
+          "export_job::ExternalEffectDisposition",
+          "export_job::JobReceipt",
+          "export_job::JobStatus",
+          "render_scene::GeometryPaintInput",
+          "render_scene::LayerGeometry",
+          "render_scene::OpaqueSrgbPaint",
+          "resource_leases::WorkId",
+          "scheduler::OutputSpec"
+        ],
+        "rust.desktop.native.application.viewport": [
+          "compositor::CompositionResult",
+          "compositor::Compositor",
+          "desktop_viewport::DeferredAction",
+          "desktop_viewport::FatalAction",
+          "desktop_viewport::ViewportMapping",
+          "desktop_viewport::ViewportStatus",
+          "render_scene::ScheduledFrameIdentity",
+          "resource_leases::WorkId"
+        ],
+        "rust.desktop.native.application": [
+          "application::NativeApplication",
+          "commands::OpacityRequest",
+          "commands::ResponseEnvelope",
+          "compositor::CompositionResult",
+          "document::OpacityDocument",
+          "export_job::JobReceipt",
+          "export_job::PendingFrame",
+          "render_scene",
+          "resource_leases::FrameFailure",
+          "resource_leases::FrameFailureKind",
+          "resource_leases::WorkId",
+          "scheduler::EvaluationKey",
+          "scheduler::FrameScheduler"
+        ],
+        "rust.desktop.native.application.commands": [
+          "compositor::Compositor"
+        ],
+        "rust.desktop.native.application.tests": [
+          "compositor::Compositor"
+        ],
+        "rust.desktop.native.dispatch": [
+          "application::ExportResourceResolver",
+          "application::NativeApplication",
+          "commands::OpacityRequest",
+          "commands::ResponseEnvelope",
+          "document::OpacityDocument",
+          "export_job::ExportCompositor",
+          "export_job::JobReceipt",
+          "export_job::JobStatus",
+          "export_job::PendingFrame",
+          "export_job::StagedArtifactPort"
+        ]
+      },
+      "note": "The narrow native-engine host port is declared per exact desktop profile module, so bootstrap, focused tests, surface presentation and concrete resource/artifact/compositor ports cannot borrow each other's native-engine privileges. An omitted module is denied. The common nemo-mcp transport crate remains independent of native-engine and keeps the legacy shared allowlist form."
     }
   },
   "unanalyzedModules": ["rust.desktop.build", "rust.mcp.transport", "rust.native.engine"],

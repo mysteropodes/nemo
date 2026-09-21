@@ -260,6 +260,15 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
     pub fn pending_work_ids(&self) -> Vec<WorkId> {
         self.pending.keys().copied().collect()
     }
+    /// Retire exactly the scheduler work terminalized by document replacement
+    /// without disposing the still-valid surface or replaying presentation.
+    pub fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId> {
+        work_ids
+            .iter()
+            .copied()
+            .filter(|work_id| self.pending.remove(work_id).is_some())
+            .collect()
+    }
     pub fn dispose(&mut self) -> Vec<WorkId> {
         if self.disposed {
             return Vec::new();
