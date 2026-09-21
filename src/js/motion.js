@@ -2697,6 +2697,8 @@
   function opacityLegacy(kind, holder, values, frame, curvePoints) {
     var application = window.NemoOpacityApplication;
     if (application && typeof application.legacy === 'function') return application.legacy(kind, holder, values, frame, curvePoints);
+    var guard = window.SMNativeEditGuard;
+    if (guard && !guard.allow('opacity-' + kind)) return false;
     return null;
   }
   function opacityDomain() { return window.NemoOpacityDomain; }

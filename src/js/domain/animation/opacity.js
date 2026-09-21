@@ -7,9 +7,6 @@ var NemoOpacityDomain = (function () {
   var DEFAULT_CURVE = [{ x: 0, y: 0 }, { x: 0.25, y: 0.156 }, { x: 0.5, y: 0.5 }, { x: 0.75, y: 0.844 }, { x: 1, y: 1 }];
 
   function number(value) { return typeof value === 'number' && isFinite(value); }
-  function legacyAllowed(kind) {
-    return typeof window === 'undefined' || !window.SMNativeEditGuard || window.SMNativeEditGuard.allow(kind);
-  }
   function copyCurvePoints(points) {
     return points.map(function (point) {
       var copy = { x: point.x, y: point.y };
@@ -58,7 +55,6 @@ var NemoOpacityDomain = (function () {
     return key;
   }
   function setKeyAtFrame(holder, frame, values, curvePoints, defaults) {
-    if (!legacyAllowed('opacity-key-write')) return false;
     return setTrackKey(ensureTrack(holder), frame, values, curvePoints, defaults);
   }
   function removeTrackKey(track, frame) {
@@ -66,17 +62,14 @@ var NemoOpacityDomain = (function () {
     if (key) track.keys.splice(track.keys.indexOf(key), 1);
   }
   function setValue(holder, values, frame, defaults) {
-    if (!legacyAllowed('opacity-value-write')) return false;
     if (isAnimated(holder)) { setKeyAtFrame(holder, frame, values, null, defaults); return; }
     if (!holder.motionStatic) holder.motionStatic = {};
     holder.motionStatic.opacity = values.slice();
   }
   function removeKeyAtFrame(holder, frame) {
-    if (!legacyAllowed('opacity-key-remove')) return false;
     removeTrackKey(trackFor(holder), frame);
   }
   function setAnimated(holder, animated, frame, effectiveValue, defaults) {
-    if (!legacyAllowed('opacity-animation-write')) return false;
     if (isAnimated(holder) === animated) return;
     if (!animated) {
       ensureTrack(holder).keys = [];
