@@ -8,8 +8,10 @@ supplemental censuses and the first reviewed dispositions, and
 and reconciled the C02/C06/C20 packet-range drift the earlier freezes had left open, and
 [P03C-b / #1278](https://github.com/mysteropodes/nemo/issues/1278) refroze the index at the
 post-census `main` so the 50 census supplements merged after P03C-a (C19s–C19al, C20g–C20s,
-C21a–C21q) are pinned and the residual gap is published from facts. None of these leaves
-completes P03 or admits the extraction queue; that is the rest of P03C.
+C21a–C21q) are pinned and the residual gap is published from facts, and
+[P03C-c / #1362](https://github.com/mysteropodes/nemo/issues/1362) reconciled C02:10 to the
+eleven accepted C20g–C20i census packets without admitting or implementing them. None of
+these leaves completes P03 or admits the extraction queue; that is the rest of P03C.
 
 [remediation-scope.json](remediation-scope.json) (schema `nemo.remediation-scope/2`) freezes
 all **756 Git-tracked paths** at `3f6eed2a500f2ce868b711e063816029eb8fefa5`. Every path has one
@@ -121,14 +123,13 @@ Every reviewed claim carries its evidence and is validated by shape:
   (issue) or `deferred` (reason). No delivered leaf matched an entire packet: P20, P21, P22, P23,
   P26, P28, A01, P17 and P18 each extracted part of a larger packet, so all 762 stay pending
   until P03C splits them (the 292 packets pinned by P03C-b enter as `pending`).
-- **Uncovered-responsibility notes** — 35 verbatim notes: **14 `covered-by-packet`** (cite
+- **Uncovered-responsibility notes** — 35 verbatim notes: **15 `covered-by-packet`** (cite
   existing packets — P03C-a closed C20a:1, C20a:2 and C20b:1 by amending the C02 packet ranges
   they pointed at), 3 `resolved` (measured), 14 `boundary` (scope statements, cross-checked
   against the spans), 2 `human-decision` (C03:3 unwired selection API, C08:3 `40min-checkins/`),
-  and **2 `needs-reconciliation`**: C02:10, C08:1 — kept verbatim from P03C-a. Their cited
-  spans (`motion.js` 9826-11125, `timeline.js` from 5710) are now covered by the pinned C20g–C20s
-  and C19s–C19al supplements, so their evidence text is stale; re-dispositioning them is a
-  reviewed decision for the next P03C leaf, not this refreeze.
+  and **1 `needs-reconciliation`**: C08:1 — kept verbatim from P03C-a. P03C-c reconciled
+  C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets;
+  their admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 40, all dispositioned: 32 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
@@ -161,10 +162,11 @@ P03C-a/#1179 closed the five open notes and the C02/C06/C20 range drift (packet 
 amendments, no new owners) and pinned C19r. P03C-b/#1278 pinned the 50 census supplements that
 completed the `app.js`, `timeline.js` and `motion.js` censuses (C21a–C21q, C19s–C19al,
 C20g–C20s) at `3f6eed2…` and published the residual gap above; it changed no packet range, owner
-or disposition. **P03 is not complete and no extraction is admitted**: the gate still exits 1
-with 762 pending packets, 2 notes needing reconciliation, 6 unmapped paths and 151
-undispositioned spans.
-What remains, in order: reconcile C02:10, C08:1 against the now-covered spans; disposition
+or disposition. P03C-c/#1362 reconciled only C02:10 to the eleven accepted C20g–C20i census
+packets; all eleven packet admissions remain pending and no implementation is claimed.
+**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
+packets, 1 note needing reconciliation, 6 unmapped paths and 151 undispositioned spans.
+What remains, in order: reconcile C08:1 against the now-covered span; disposition
 the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
