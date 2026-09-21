@@ -12,7 +12,7 @@
       "id": "mcp.desktop",
       "layer": "adapters",
       "dir": "src-tauri/src",
-      "files": ["application_mcp.rs"],
+      "files": ["application_mcp.rs", "native_revision_sync.rs"],
       "publicApi": ["application_mcp.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -20,7 +20,7 @@
       "id": "mcp.desktop.tests",
       "layer": "tests",
       "dir": "src-tauri/src",
-      "files": ["application_mcp_tests.rs"],
+      "files": ["application_mcp_tests.rs", "native_revision_sync_tests.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     }

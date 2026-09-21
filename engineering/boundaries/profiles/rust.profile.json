@@ -217,7 +217,8 @@
       "layer": "mcp-adapter",
       "dir": "src-tauri/src",
       "files": [
-        "application_mcp.rs"
+        "application_mcp.rs",
+        "native_revision_sync.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -229,7 +230,8 @@
       "layer": "tests",
       "dir": "src-tauri/src",
       "files": [
-        "application_mcp_tests.rs"
+        "application_mcp_tests.rs",
+        "native_revision_sync_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

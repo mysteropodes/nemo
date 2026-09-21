@@ -237,6 +237,7 @@ pub fn run() {
             application_mcp::nemo_mcp_reply,
             application_mcp::nemo_native_status,
             application_mcp::nemo_native_dispatch,
+            application_mcp::nemo_native_revision_sync,
             native_application_commands::nemo_native_bootstrap,
             native_application_commands::nemo_native_replace,
             native_application_commands::nemo_native_bind_output,
