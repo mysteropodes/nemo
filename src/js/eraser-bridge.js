@@ -238,8 +238,7 @@
       return;
     }
     if (!shouldIntercept()) return;
-    if (!pointerIsDown) return;
-    if (!allowLegacyEdit(e)) return;
+    if (pointerIsDown && !allowLegacyEdit(e)) return;
     e.stopImmediatePropagation();
     e.preventDefault();
     var rawW = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY);

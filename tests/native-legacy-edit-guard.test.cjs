@@ -164,7 +164,7 @@ test('idle pointer events and brush-resize gestures do not request native releas
     requestRelease: () => { releases++; return null; },
   });
   const context = {
-    state: { tool: 'draw', playing: false, layers: [{ locked: false }], activeLayerIdx: 0, brushSize: 10 },
+    state: { tool: 'draw', playing: false, layers: [{ locked: false }], activeLayerIdx: 0, brushSize: 10, eraserSize: 20 },
     document: { readyState: 'complete', addEventListener() {}, getElementById: () => target },
     window: null,
   };
@@ -178,12 +178,19 @@ test('idle pointer events and brush-resize gestures do not request native releas
   assert.equal(releases, 0, 'Alt brush resize is not a document edit');
 
   context.state.tool = 'eraser';
+  const cursorCalls = [];
+  let hoverRenders = 0;
+  context.SMEngineBridge.screenToWorld = () => [30, 40];
+  context.SMEngineBridge.setEraserCursor = (point, radius) => cursorCalls.push([point, radius]);
+  context.SMEngineBridge.renderNow = () => { hoverRenders++; };
   const eraserHandlers = {};
   context.document.getElementById = () => ({ addEventListener(type, handler) { eraserHandlers[type] = handler; } });
   vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/eraser-bridge.js'), 'utf8'), context);
   eraserHandlers.pointermove(event());
   eraserHandlers.pointerup(event());
   assert.equal(releases, 0, 'eraser hover and idle pointerup are not document edits');
+  assert.deepEqual(cursorCalls, [[[30, 40], 10]], 'eraser hover preserves its cursor update');
+  assert.equal(hoverRenders, 1, 'eraser hover preserves its render request');
 });
 
 test('direct programmatic commit helpers deny before downstream Paper/document access', () => {
@@ -223,7 +230,7 @@ test('every owned callback and commit helper contains the pre-mutation guard', (
     'src/js/fill-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onUp(e) {\n    if (!_fillCloseDrag) return;\n    if (!allowLegacyEdit(e)) return;', 'function onPropagateClick() {\n    if (!allowLegacyEdit()) return;'],
     'src/js/pen-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onMove(e) {\n    if (!shouldIntercept()) return;\n    if (draggingHandle && !allowLegacyEdit(e)) return;', 'if (!draggingHandle) return;\n    if (!allowLegacyEdit(e)) return;'],
     'src/js/shape-bridge.js': ['function onDown(e) {\n    if (!shouldIntercept()) return;\n    if (!allowLegacyEdit(e)) return;', 'function onUp(e) {\n    if (!dragging) return;\n    if (!allowLegacyEdit(e)) return;', 'function commitShape(ex, ey) {\n    if (!allowLegacyEdit()) return;'],
-    'src/js/eraser-bridge.js': ['function eraseAt(pt, radius) {\n    if (!allowLegacyEdit()) return;', 'function onDown(e) {', 'if (!allowLegacyEdit(e)) return;', 'if (!pointerIsDown) return;\n    if (!allowLegacyEdit(e)) return;', 'function onUp(e) {'],
+    'src/js/eraser-bridge.js': ['function eraseAt(pt, radius) {\n    if (!allowLegacyEdit()) return;', 'function onDown(e) {', 'if (!allowLegacyEdit(e)) return;', 'if (pointerIsDown && !allowLegacyEdit(e)) return;', 'function onUp(e) {'],
   };
   for (const [file, snippets] of Object.entries(expectations)) {
     const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
