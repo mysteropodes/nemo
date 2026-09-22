@@ -51,6 +51,9 @@ The optional workflow's aggregate retains the name **`Nemo / required`** for com
 `boundaries` and `surfaces` require `NEMO_CI_BASE_SHA`, the full 40-character reviewed
 protected-base commit SHA. Locally, fetch the protected branch, select its reviewed SHA
 and set that variable; do not substitute an arbitrary contributor revision. For an
+in-progress remediation PR, the protected base is `codex/native-remediation`, not
+operational `main`; record its exact reviewed SHA. For final promotion, compare against
+the reviewed `main` base and validate the integrated result separately. For an
 explicitly requested hosted run, provide the same SHA as the required `base_sha` input.
 The workflow checks out the selected dispatch ref, with full history where base content
 is needed; it does not synthesize a PR merge candidate. Use a reviewed integration ref
@@ -139,8 +142,18 @@ Actions exception is [.github/workflows/collaborator-pr-policy.yml](../../.githu
 It reads PR/review metadata and live author permissions, then acknowledges policy eligibility
 with an explicitly automated approval at the current head. It never checks out or executes
 PR code, builds, tests, publishes artifacts, merges PRs or dismisses a human review. The
-script is loaded from the trusted base SHA; manual dispatch is restricted to `main`.
+script is loaded from the trusted execution-branch SHA, never the PR head. Automatic
+`pull_request_target` events remain restricted to default-branch `main`.
 The pinned official action receives only contents-read and pull-requests-write permissions.
+
+The initial policy-amendment PR into protected `codex/native-remediation` requires an
+ordinary eligible other-account GitHub approval at its exact head: the currently deployed
+policy supports `main` only. After that amendment is accepted and verified on the
+protected integration branch, an eligible collaborator PR may obtain its policy
+acknowledgement by explicit `workflow_dispatch` from that branch for the exact PR number.
+No integration PR event triggers the policy automatically. Do not dispatch the current
+main-only policy for an integration PR, self-approve or bypass protection. This is an
+approval-route distinction, not authority to run hosted product CI.
 
 Keep the native one-review requirement, latest-push approval, stale-review dismissal and
 conversation resolution. Only current human authors with write/maintain/admin permission
@@ -150,13 +163,25 @@ acknowledgement cannot substitute for that evidence. Human change requests remai
 GitHub's existing administrator emergency bypass is not the ordinary merge route.
 
 An admin enables “Allow GitHub Actions to create and approve pull requests” while keeping
-the default workflow token read-only. The four product workflows stay disabled. PR metadata
-events reconcile eligible heads automatically. To recover a failed/missed event, run:
+the default workflow token read-only. The four product workflows stay disabled. `main`
+PR metadata events reconcile eligible heads automatically. To recover a failed/missed
+`main` event, run:
 
 ```sh
 gh workflow run collaborator-pr-policy.yml --repo mysteropodes/nemo --ref main -f pull_request=1077
 # Omit the PR input for a one-time reconciliation of every open main PR.
 ```
+
+After the reviewed extension is merged and verified on `codex/native-remediation`,
+dispatch only the metadata policy for a specific integration PR from that trusted ref:
+
+```sh
+gh workflow run collaborator-pr-policy.yml --repo mysteropodes/nemo --ref codex/native-remediation -f pull_request=<PR_NUMBER>
+```
+
+The workflow file must also exist on default `main` for manual dispatch to be available;
+the selected ref supplies the protected integration policy source. Verify the selected
+ref, PR base, current head and resulting review before relying on the acknowledgement.
 
 This policy-only dispatch is covered by the agreed workflow, not permission to run product
 CI. Inspect failed/ambiguous writes before retrying; a matching bot approval at the same SHA
