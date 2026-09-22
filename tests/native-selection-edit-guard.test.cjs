@@ -36,6 +36,7 @@ function bootSelect(guard, motion) {
     Point: function Point(x, y) { this.x = x; this.y = y; }, window: null,
   };
   context.window = context;
+  context.addEventListener = () => {};
   context.SMEngineBridge = { isEnabled: () => true, screenToWorld: (x, y) => [x, y], nativeEditGuard: guard };
   context.SMMotion = motion;
   vm.runInNewContext(source('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
@@ -93,6 +94,7 @@ function bootTools(guard, state, motion) {
     SMEngineBridge: { nativeEditGuard: guard, isEnabled: () => true, screenToWorld: (x, y) => [x, y] }, SMMotion: motion,
   };
   context.window = context;
+  context.addEventListener = () => {};
   vm.runInNewContext(source('src/js/tools.js'), context, { filename: 'tools.js' });
   return { context, stage };
 }

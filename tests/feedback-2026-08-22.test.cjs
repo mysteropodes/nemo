@@ -112,8 +112,9 @@ test('multi-layer selection has one union overlay and three transforms in both m
   const source = read('src/js/motion.js');
   assert.match(source, /function multiLayerBox\(\)/);
   assert.match(source, /if \(ml\) return multiLayerOverlay\(ml\)/);
+  const intent = read('src/js/adapters/motion-canvas-intent.js');
   for (const mode of ['multiLayerMove', 'multiLayerScale', 'multiLayerRotate']) {
-    assert.ok((source.match(new RegExp(mode, 'g')) || []).length >= 2, `${mode} must be started and dragged`);
+    assert.ok(intent.includes(mode) && source.includes(mode), `${mode} must be started through the adapter and dragged locally`);
   }
   const select = read('src/js/select-bridge.js');
   assert.match(select, /function multiLayerSelectionBox\(\)/);

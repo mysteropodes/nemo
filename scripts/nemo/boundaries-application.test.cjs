@@ -160,6 +160,24 @@ test('N20 activates the N19C native edit guard without weakening discovery', () 
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
+test('N19G canvas adapters cannot be omitted from fresh discovery or loaded after consumers', () => {
+  const profile = read('app-js.profile.json'), policy = read('app-js.coverage.json');
+  const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+  for (const name of ['motion', 'select']) {
+    const sourcePath = `src/js/adapters/${name}-canvas-intent.js`, id = `app.${name}.canvas-intent.adapter`;
+    const entry = policy.retainedSources.find((record) => record.path === sourcePath);
+    assert.ok(entry && entry.moduleId === id && entry.executionClass === 'document-classic');
+    const tag = `<script src="js/adapters/${name}-canvas-intent.js"></script>`;
+    const consumer = `<script src="js/${name === 'select' ? 'select-bridge' : 'motion'}.js"></script>`;
+    assert.ok(html.includes(tag) && html.indexOf(tag) < html.indexOf(consumer));
+    assert.equal(html.split(tag).length - 1, 1, 'one classic registration');
+    const dropped = { ...profile, modules: profile.modules.filter((module) => module.id !== id) };
+    const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((record) => record.path !== sourcePath) };
+    assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
+      /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+  }
+});
+
 test('N20 contract, authority, adapters and bootstrap load in their frozen order', () => {
   const policy = read('app-js.coverage.json');
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8').split('\n');
@@ -194,7 +212,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 157, 158, 159, 160, 161, 162, 163, 164, 165]);
+    [6, 7, 8, 9, 10, 11, 159, 160, 161, 162, 163, 164, 165, 166, 167]);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {

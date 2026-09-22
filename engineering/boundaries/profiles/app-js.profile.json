@@ -1933,6 +1933,30 @@
       ]
     },
     {
+      "id": "app.motion.canvas-intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "motion-canvas-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "motion-canvas-intent.js"
+      ]
+    },
+    {
+      "id": "app.select.canvas-intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "select-canvas-intent.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "select-canvas-intent.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.editor.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

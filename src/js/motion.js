@@ -6166,7 +6166,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   // === 0` is now the PRIMARY signal (matching the row highlight exactly,
   // so the two can never show different things); the flag stays as an
   // extra OR-condition, not the sole source of truth anymore.
-  function activeMotionTarget() {
+  function activeMotionTarget(observe) {
     if (state.appMode !== 'motion') return null;
     if (_motionCanvasEmptyClick) return null;
     if (window._motionExpandedLayer == null && typeof _layerSel !== 'undefined' && _layerSel.length === 0) return null;
@@ -6194,7 +6194,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // like THIS frame, same as any element's box always has.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
-      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: elementHolderView(ld, window._motionExpandedElement), boundsCenter: item.bounds.center, bounds: item.bounds };
+      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: observe ? elementHolder(ld, window._motionExpandedElement) || seedElementHolder(item) : elementHolderView(ld, window._motionExpandedElement), boundsCenter: item.bounds.center, bounds: item.bounds };
       // Element no longer present at this frame (drawing changed) — fall
       // back to the layer rather than silently drawing nothing.
     }
@@ -6220,8 +6220,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     var lb = ub || userLayers[li].bounds;
     return { li: li, strokeId: null, holder: ld, boundsCenter: lb.center, bounds: lb };
   }
-  function activePositionKeys() {
-    var t = activeMotionTarget();
+  function activePositionKeys(target) {
+    var t = target || activeMotionTarget();
     var surface = nativeMotionSurface();
     if (!t || surface && surface.nativeKeyInteractionPlan(window.NemoNativeOpacityCutover, t.holder).handled || !hasKeys(t.holder, 'position')) return null;
     return t.holder.motion.position.keys;
@@ -6255,268 +6255,81 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     }
     return null;
   }
-  function onDown(event) {
-    // Inside a group with nothing picked yet, a click that lands ON a shape
-    // belongs to that shape (2026-08-31). Without this the whole-LAYER gizmo
-    // claimed it first — its ring, corners and body all sit over the very
-    // shapes you are trying to pick, and the more the layer is rotated or
-    // scaled the more of them fall under the cursor. Measured with the layer
-    // at rotation 25°: clicking a shape inside the group targeted nothing
-    // (_motionExpandedElement stayed empty) and the following drag moved the
-    // whole layer instead, which reads exactly as "I can select an object
-    // but not drag it".
-    //
-    // Deliberately narrow: only while per-object mode is on for THIS layer,
-    // only while no element is targeted yet, and only when the point is
-    // really on a shape. Every other Motion gesture — including the layer
-    // gizmo outside a group, and every grab once an element IS targeted —
-    // is untouched. Returning false hands the click to select-bridge, whose
-    // Motion block does the targeting.
-    if (window._perObjBoxes === state.activeLayerIdx && window._motionExpandedElement == null
-        && window.hitTestPosed && userLayers[state.activeLayerIdx]) {
-      var surForme = hitTestPosed(state.activeLayerIdx, event.point, 6 / Math.max(0.0001, view.zoom));
-      if (surForme && surForme.item && surForme.item.data && surForme.item.data.strokeId) return false;
-    }
-    var ml = multiLayerBox();
-    if (ml) {
-      var mb = ml.bounds, mz = 1 / Math.max(0.0001, view.zoom);
-      var dRing = Math.abs(Math.hypot(event.point.x - ml.pivot.x, event.point.y - ml.pivot.y) - ml.ringRadius);
-      var hitCorner = false;
-      [{x:mb.left,y:mb.top},{x:mb.right,y:mb.top},{x:mb.right,y:mb.bottom},{x:mb.left,y:mb.bottom}].forEach(function(p){
-        if(Math.hypot(event.point.x-p.x,event.point.y-p.y)<9*mz)hitCorner=true;
-      });
-      var inside = event.point.x >= mb.left && event.point.x <= mb.right && event.point.y >= mb.top && event.point.y <= mb.bottom;
-      if (dRing < 7 * mz || hitCorner || inside) {
-        pushUndo();
-        var records = ml.targets.map(function (rec) {
-          return { t: rec.t, center: rec.center, pos: valueAtFrame(rec.t.holder, 'position', state.currentFrame).slice(), scale: valueAtFrame(rec.t.holder, 'scale', state.currentFrame).slice(), rot: valueAtFrame(rec.t.holder, 'rotation', state.currentFrame)[0] };
+  // Canvas adapter construction is lazy: evaluator-only callers need no canvas.
+  var canvasIntentAdapter = null;
+  function canvasIntent() {
+    if (canvasIntentAdapter) return canvasIntentAdapter;
+    var readers = {
+      multiLayerBox: multiLayerBox,
+      valueAtFrame: valueAtFrame,
+      unifiedMotionTargets: unifiedMotionTargets,
+      unifiedFrames: unifiedFrames,
+      unifiedPointAt: unifiedPointAt,
+      activeMotionTarget: activeMotionTarget,
+      findElementItem: findElementItem,
+      motionBoxGeom: motionBoxGeom,
+      elementVertexPoints: elementVertexPoints,
+      hit3DGizmoAxis: hit3DGizmoAxis,
+      hit3DGizmoRing: hit3DGizmoRing,
+      gizmo3DAxisScreenPoints: gizmo3DAxisScreenPoints,
+      outerWorldPoint: outerWorldPoint,
+      gizmo3DOriginScreen: gizmo3DOriginScreen,
+      hitMotionBoxHandle: hitMotionBoxHandle,
+      motionHandlePositions: motionHandlePositions,
+      activePositionKeys: activePositionKeys,
+      hitPositionHandle: hitPositionHandle,
+      hitPositionDot: hitPositionDot,
+      hitAnchorPoint: hitAnchorPoint,
+      hitEffectorHandle: hitEffectorHandle,
+      outerLocalPoint: outerLocalPoint,
+      context: function () {
+        var c = window.NemoNativeOpacityCutover;
+        return { frame: state.currentFrame, zoom: view.zoom, activeLayer: state.activeLayerIdx,
+          symbolId: state.activeSymbolId || null, nativeOwned: !!(c && c.blocksLegacy()),
+          identity: c ? JSON.stringify(c.identity()) : null };
+      },
+      yieldToShape: function (event) {
+        if (window._perObjBoxes !== state.activeLayerIdx || window._motionExpandedElement != null ||
+            !window.hitTestPosed || !userLayers[state.activeLayerIdx]) return false;
+        var hit = hitTestPosed(state.activeLayerIdx, event.point, 6 / Math.max(0.0001, view.zoom));
+        return !!(hit && hit.item && hit.item.data && hit.item.data.strokeId);
+      },
+      targetKind: function (li) {
+        var ld = state.layers[li];
+        return { isNull: !!(ld && ld.isNullLayer), threeD: !!(ld && ld.threeD), layerUid: ld && ld.layerUid || null };
+      },
+      vertexExpanded: function (t) { return window._motionExpandedPathHolder === t.holder; },
+      probeAvailable: function () {
+        return state.layers.every(function (ld) {
+          if (ld.symbolId || ld.expressions || ld.followPath || ld.duplicator) return false;
+          return Object.keys(ld.elementMotion || {}).every(function (sid) {
+            var h = ld.elementMotion[sid];
+            return !h.expressions && !hasPathVertexMotion(h);
+          });
         });
-        if (dRing < 7 * mz) {
-          _motionDrag = { mode: 'multiLayerRotate', pivot: ml.pivot, startAngle: Math.atan2(event.point.y-ml.pivot.y,event.point.x-ml.pivot.x)*180/Math.PI, records: records };
-        } else if (hitCorner) {
-          _motionDrag = { mode: 'multiLayerScale', pivot: ml.pivot, origDist: Math.max(1e-6,Math.hypot(event.point.x-ml.pivot.x,event.point.y-ml.pivot.y)), records: records };
-        } else {
-          _motionDrag = { mode: 'multiLayerMove', start: {x:event.point.x,y:event.point.y}, records: records };
-        }
-        return true;
       }
-      return false;
-    }
-    // Unified multi-selection path first — while it's active the overlay
-    // shows ONLY the unified dots (see buildOverlayItems), so the single-
-    // target hit-tests below would grab invisible geometry.
-    var u = unifiedMotionTargets();
-    if (u) {
-      var uFrames = unifiedFrames(u.targets), uTol = 8 / view.zoom;
-      for (var ui = 0; ui < uFrames.length; ui++) {
-        var upt = unifiedPointAt(u, uFrames[ui]);
-        if (Math.hypot(event.point.x - upt.x, event.point.y - upt.y) < uTol) {
-          pushUndo();
-          _motionDrag = { mode: 'unified', u: u, frame: uFrames[ui], last: { x: event.point.x, y: event.point.y } };
-          return true;
-        }
-      }
-      return false;
-    }
-    var t = activeMotionTarget();
-    // Vertex handles (2026-07) checked FIRST, before the box/position/anchor
-    // hit-tests below — once the Path group is expanded the user's whole
-    // focus is on a specific vertex, so a vertex dot must win any incidental
-    // overlap with the (usually much larger) scale/rotate box.
-    if (t && t.strokeId && window._motionExpandedPathHolder === t.holder) {
-      var vItem2 = findElementItem(t.li, t.strokeId);
-      var vg2 = motionBoxGeom(t);
-      var vPts2 = elementVertexPoints(vItem2);
-      if (vPts2.length && vg2) {
-        var vTol = 9 / view.zoom;
-        for (var vi2 = 0; vi2 < vPts2.length; vi2++) {
-          var seg2 = vPts2[vi2];
-          var voff2 = valueAtFrame(t.holder, 'vtx' + vi2, state.currentFrame);
-          var wp2 = vg2.fwd(seg2.x + (voff2[0] || 0), seg2.y + (voff2[1] || 0));
-          if (Math.hypot(event.point.x - wp2.x, event.point.y - wp2.y) < vTol) {
-            pushUndo();
-            _motionDrag = { mode: 'vertex', t: t, vi: vi2, basePt: { x: seg2.x, y: seg2.y } };
-            return true;
-          }
-        }
-      }
-    }
-    // Position keys/handles checked BEFORE the anchor point (2026-07-17
-    // motion-path-at-anchor fix made this ordering matter): a key at its
-    // default [0,0] delta now draws its dot exactly ON the anchor
-    // crosshair (motionPivotOf) — dragging keyframes is the far more
-    // common gesture, so it wins the overlap; the anchor stays reachable
-    // once a key has been moved away from it (the ordinary case) or by
-    // starting the drag from a few px off-center.
-    if (t) {
-      // 3D gizmo (2026-07-28) checked BEFORE the 2D scale/rotate box below —
-      // when a layer has 3D on, its own axis arrows/rotation rings are the
-      // deliberate, precise controls for it, same "precise grab wins"
-      // priority the box-handles-before-position-dots ordering already
-      // established for the 2D case. Between the two 3D control types
-      // (arrows vs rings), whichever is NUMERICALLY CLOSER to the click
-      // wins — found by testing that a fixed "arrows always win" priority
-      // let an arrow's line steal a click clearly aimed at a nearby ring
-      // sample point.
-      var axisHit3D = hit3DGizmoAxis(event.point, t);
-      var ringHit3D = hit3DGizmoRing(event.point, t);
-      if (axisHit3D && (!ringHit3D || axisHit3D.dist <= ringHit3D.dist)) {
-        pushUndo();
-        var axisPts3D_ = gizmo3DAxisScreenPoints(axisHit3D.pose);
-        var o3d = outerWorldPoint(t, axisPts3D_[axisHit3D.axis].origin), tp3d = outerWorldPoint(t, axisPts3D_[axisHit3D.axis].tip);
-        var dx3d = tp3d.x - o3d.x, dy3d = tp3d.y - o3d.y, dl3d = Math.hypot(dx3d, dy3d) || 1;
-        _motionDrag = {
-          mode: 'axis3d', t: t, axis: axisHit3D.axis,
-          dirX: dx3d / dl3d, dirY: dy3d / dl3d,
-          startPt: { x: event.point.x, y: event.point.y },
-          baseline: axisHit3D.axis === 'z' ? axisHit3D.pose.posZ : axisHit3D.pose.pos[axisHit3D.axis === 'x' ? 0 : 1],
-        };
-        return true;
-      }
-      if (ringHit3D) {
-        pushUndo();
-        var center3d = outerWorldPoint(t, gizmo3DOriginScreen(ringHit3D.pose));
-        var startAngle3D = Math.atan2(event.point.y - center3d.y, event.point.x - center3d.x) * 180 / Math.PI;
-        _motionDrag = {
-          mode: 'ring3d', t: t, axis: ringHit3D.axis, center: center3d, startAngle: startAngle3D,
-          baseline: ringHit3D.axis === 'x' ? ringHit3D.pose.rotX : (ringHit3D.axis === 'y' ? ringHit3D.pose.rotY : ringHit3D.pose.rot),
-        };
-        return true;
-      }
-      // Scale/rotate box handles checked FIRST — same priority order as
-      // Animation 2D's own hitTestHandles (select-bridge.js): a corner/
-      // rotate grab is a deliberate, precise action, so it should win any
-      // rare overlap with a position dot/anchor rather than the reverse.
-      // Skipped entirely for a 3D layer — the box isn't drawn there (see
-      // buildOverlayItems' is3DTargetForBox), so it must not still be a
-      // live (invisible) hit-target either.
-      // Also skipped for a Null layer (feedback #59, "un petit bounding box
-      // que l'on peu déplacer" never actually moved on drag): motionBoxGeom
-      // gives a Null a fixed tiny 24px-equivalent box (hs=12/zoom) so
-      // ringRadius (30% of that) collapses to ~7.2px — right on top of
-      // hitMotionBoxHandle's own ±7px ring tolerance. The tolerance band
-      // then swallows the ENTIRE clickable marker, so every click matched
-      // 'rotate' and the correctly-working move handler in select-bridge.js
-      // (mode:'null-drag', a few lines below this file's own onDown return)
-      // never got a chance to run — confirmed live, dragging always rotated,
-      // position never budged. A Null has no real use for a canvas
-      // rotate/scale drag anyway (both properties stay reachable from the
-      // panel) — skip the box gizmo outright so a plain click always falls
-      // through to the dedicated move handler instead of chasing a
-      // per-layer-type ring-radius tune.
-      var isNullTarget = t.li != null && state.layers[t.li] && state.layers[t.li].isNullLayer;
-      var boxHit = (isNullTarget || (t.li != null && state.layers[t.li] && state.layers[t.li].threeD && !t.strokeId)) ? null : hitMotionBoxHandle(event.point, t);
-      if (boxHit) {
-        pushUndo();
-        var g = motionBoxGeom(t);
-        if (boxHit.type === 'rotate') {
-          var startAngle = Math.atan2(event.point.y - g.pivot.y, event.point.x - g.pivot.x) * 180 / Math.PI;
-          _motionDrag = { mode: 'motionRotate', t: t, pivot: g.pivot, startAngle: startAngle, origRot: g.rot };
-        } else {
-          var corner = motionHandlePositions(t).corners[boxHit.dir];
-          var origDist = Math.hypot(corner.x - g.pivot.x, corner.y - g.pivot.y) || 1;
-          // Single-axis edge handle (feedback #98) — the handle's own
-          // world-space direction from the pivot (already rotation-correct,
-          // since it's the ACTUAL rendered position, same box the corner
-          // branch already trusts) becomes the axis to project the drag
-          // onto, so only n/s scales Y and only e/w scales X. Two-letter
-          // corners keep the untouched uniform-ratio path below.
-          var axisDir = null;
-          if (boxHit.dir === 'n' || boxHit.dir === 's' || boxHit.dir === 'e' || boxHit.dir === 'w') {
-            axisDir = { ux: (corner.x - g.pivot.x) / origDist, uy: (corner.y - g.pivot.y) / origDist };
-          }
-          _motionDrag = { mode: 'motionScale', t: t, pivot: g.pivot, dir: boxHit.dir, axisDir: axisDir, origDist: origDist, origScale: g.scl.slice() };
-        }
-        return true;
-      }
-      var ks = activePositionKeys();
-      if (ks) {
-        var anc2=valueAtFrame(t.holder,'anchor',state.currentFrame);
-        var pv={x:t.boundsCenter.x+anc2[0],y:t.boundsCenter.y+anc2[1]};
-        var hp = hitPositionHandle(event.point, ks, pv,t);
-        if (hp) { pushUndo(); _motionDrag = { mode: 'handle', key: hp.key, which: hp.which, pv: pv,t:t }; return true; }
-        var pk = hitPositionDot(event.point, ks, pv,t);
-        if (pk) { pushUndo(); _motionDrag = { mode: 'point', key: pk, pv: pv,t:t }; return true; }
-      }
-      // Alt required (2026-08-21, "pour bouger le point d'ancrage c'est
-      // clic + alt + drag il me semble pas le cas là") — matches Animation
-      // 2D's own anchor-crosshair convention (select-bridge.js's
-      // hitTestHandles: "checked FIRST/exclusively, but ONLY while Alt is
-      // held... a click in that same spot now falls through to the normal
-      // move/marquee logic below" when Alt isn't held). Motion mode never
-      // had that gate — a plain click within the small hit radius grabbed
-      // the anchor unconditionally, which is what "il bouge encore" (the
-      // artwork/box moving when the user only meant to click-drag
-      // normally) was really describing: an accidental anchor grab, not
-      // the anchor itself misbehaving.
-      var ap = event.altKey ? hitAnchorPoint(event.point, t) : null;
-      if (ap) { pushUndo(); _motionDrag = { mode: 'anchor', holder: ap.holder, bc: ap.bc, t:ap.target }; return true; }
-      // Effector handles (2026-07-29) — checked last, lowest priority: they
-      // only exist on duplicator layers and the user places them wherever
-      // they like, so overlap with the box/position/anchor controls above
-      // is rare, but those established grabs should still win if it happens.
-      var effHit = hitEffectorHandle(event.point, t);
-      if (effHit) { pushUndo(); _motionDrag = { mode: 'effector', t: t, eff: effHit }; return true; }
-      // Dragging the BODY of a per-element box moves that element
-      // (2026-08-30, feedback #170 follow-up: "si je bouge la box de
-      // l'ellement aprés double clic ça bouge l'ensemble et pas les
-      // propriété de la shape en question").
-      //
-      // onDown had no body-move mode at all — only ring/corners/anchor/
-      // handles/vertices/effectors. For a whole-LAYER target that is
-      // correct and deliberate: returning false lets select-bridge.js take
-      // the gesture and move the layer, which is what its box means. But a
-      // box that now hugs ONE element still fell through to that same
-      // layer move, so the visible box and the thing that moved were
-      // different objects. Measured before the fix: drag the element box by
-      // (200,80) and ld.motionStatic.position became [200,80] while the
-      // element holder stayed null.
-      //
-      // Gated on t.strokeId so the whole-layer path is untouched, and
-      // placed LAST so every more specific grab above still wins.
-      if (t.strokeId) {
-        var gBody = motionBoxGeom(t);
-        if (gBody && gBody.bounds && gBody.inv) {
-          // Test in the box's OWN local space, not as a world-space AABB:
-          // gBody.bounds is un-transformed geometry and the drawn box can be
-          // rotated/scaled, so comparing a world point against it directly
-          // would hit-test a rectangle that isn't the one on screen. inv()
-          // exists for exactly this (it was added for vertex dragging).
-          //
-          // event.point must go through outerLocalPoint FIRST (2026-08-31
-          // fix) — motionBoxGeom's own inv is explicitly LOCAL-only (see its
-          // comment: "no outer wrapping... every caller composes that
-          // separately via outerWorldPoint/outerLocalPoint"), but this is
-          // the one caller in this file that fed it the raw world point
-          // directly. Every sibling grab just above (handles, position
-          // dots, anchor, effector) already wraps through outerWorldPoint/
-          // outerLocalPoint; this one, added later for feedback #170, never
-          // got the same treatment. Invisible as long as the CONTAINING
-          // layer had no Motion of its own — the two points coincide then —
-          // which is why it went unnoticed until Cyril moved a whole group
-          // and then tried to drag one of its elements: the box still drew
-          // in the right (rotated) place, but a click dead-center on it
-          // computed `lp` as if the layer had never moved, missing the
-          // element's own local bounds entirely. Measured: layer rotated
-          // 76.8°, click at the element's true rendered center — old code
-          // path declined every time; onDown now grabs it.
-          var outerPt = outerLocalPoint(t, { x: event.point.x, y: event.point.y });
-          var lp = gBody.inv(outerPt.x, outerPt.y);
-          var bb = gBody.bounds;
-          var insideEl = lp && lp.x >= bb.left && lp.x <= bb.right && lp.y >= bb.top && lp.y <= bb.bottom;
-          if (insideEl) {
-            pushUndo();
-            _motionDrag = {
-              mode: 'elementMove', t: t,
-              start: { x: event.point.x, y: event.point.y },
-              basePos: valueAtFrame(t.holder, 'position', state.currentFrame).slice()
-            };
-            return true;
-          }
-        }
-      }
-    }
-    return false;
+    };
+    canvasIntentAdapter = window.NemoMotionCanvasIntent.create(readers, allowCanvasWriter, function (drag) {
+      if (!drag) return false;
+      _motionDrag = drag;
+      return true;
+    }, pushUndo);
+    return canvasIntentAdapter;
+  }
+  function probeCanvasIntent(event) { return canvasIntent().probe(event); }
+  function beginCanvasGesture(intent) { return canvasIntent().begin(intent); }
+  function allowCanvasWriter() {
+    try {
+      var controller = window.NemoNativeOpacityCutover;
+      if (controller !== undefined && (!controller || typeof controller.blocksLegacy !== 'function'
+          || controller.blocksLegacy() !== false)) return false;
+    } catch (_) { return false; }
+    return n20AllowLegacyWrite('motion-canvas');
+  }
+  function onDown(event) {
+    // Retained Paper callers deny before any adapter or legacy reader runs.
+    if (!allowCanvasWriter()) return false;
+    return canvasIntent().onDown(event);
   }
   // Local accessor for the layer point map — layerMotionPointMap is defined
   // on the exported SMMotion object at the bottom of this file, not as a
@@ -6539,6 +6352,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   }
   function onDrag(event) {
     if (!_motionDrag) return false;
+    if (!allowCanvasWriter()) { _motionDrag = null; return true; }
     if (_motionDrag.mode === 'elementMove') {
       // Writes to the ELEMENT's own holder, which is what its box stands
       // for — same setValue every other Motion drag uses, so it keys at the
@@ -6788,6 +6602,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   }
   function onUp() {
     if (!_motionDrag) return false;
+    if (!allowCanvasWriter()) { _motionDrag = null; return true; }
     _motionDrag = null;
     renderLayerList(); // scrub fields must reflect the dragged position/handle
     // ...and the GRID half, or a key the drag just created is invisible
@@ -13813,6 +13628,8 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     renderLayerListMotion: renderLayerListMotion,
     renderTimelineMotion: renderTimelineMotion,
     setAppMode: setAppMode,
+    probeCanvasIntent: probeCanvasIntent,
+    beginCanvasGesture: beginCanvasGesture,
     onDown: onDown,
     onDrag: onDrag,
     onUp: onUp,

@@ -472,8 +472,81 @@
     return window.SMEngineBridge && window.SMEngineBridge.isEnabled() && state.tool === 'select' && !state.playing;
   }
 
-  function allowLegacySelectionEdit(e,k){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
+  function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false)){if(e){e.stopImmediatePropagation();e.preventDefault();}return false;}a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){e.stopImmediatePropagation();e.preventDefault();}return a;}
   function guardMenuItems(a){return a.map(function(i){if(i.action){var f=i.action;i.action=function(){if(allowLegacySelectionEdit(null,'select'))return f.apply(this,arguments);};}return i;});}
+  var nativePointerIntent = null, nativeLayersRef = null, nativeLayersEpoch = 0;
+  function nativePointer() {
+    if (nativePointerIntent) return nativePointerIntent;
+    nativePointerIntent = window.NemoSelectCanvasIntent.create({
+      context: function () {
+        var c = window.NemoNativeOpacityCutover;
+        if (!c || c.blocksLegacy() !== true) throw new Error('Native canvas authority unavailable');
+        if (nativeLayersRef !== state.layers) { nativeLayersRef = state.layers; nativeLayersEpoch++; }
+        return JSON.stringify([nativeLayersEpoch, c.identity(), state.tool, state.appMode,
+          state.currentFrame, state.activeLayerIdx, state.activeSymbolId || null,
+          selectedPaths.map(function (p) { return p.data && p.data.strokeId; }),
+          typeof _layerSel === 'undefined' ? null : _layerSel]);
+      },
+      probe: function (e) {
+        var c = window.NemoNativeOpacityCutover, prepared = c.prepared();
+        var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
+        if (!prepared || !ld || !layer || prepared.layerUid !== ld.layerUid)
+          return Object.freeze({ mode: 'unavailable' });
+        var w = window.SMEngineBridge.screenToWorld(e.clientX, e.clientY), pt = new Point(w[0], w[1]);
+        if (state.appMode === 'motion') {
+          var motion = window.SMMotion.probeCanvasIntent({ point: pt, altKey: e.altKey });
+          if (!motion.available || motion.handled) return Object.freeze({ mode: 'unavailable' });
+        } else if (state.tool !== 'select' || hitTestHandles(pt, e.altKey)) {
+          return Object.freeze({ mode: 'unavailable' });
+        }
+        var hit = window.hitTestPosed ? hitTestPosed(state.activeLayerIdx, pt, 8 / view.zoom)
+          : layer.hitTest(pt, { stroke: true, fill: true, tolerance: 8 / view.zoom });
+        var item = hit && hit.item, sid = item && item.data && item.data.strokeId;
+        return Object.freeze(sid ? { mode: 'select', layerUid: ld.layerUid, strokeId: sid }
+          : { mode: 'clear' });
+      },
+      select: function (intent, shift) {
+        if (intent.mode === 'unavailable') return;
+        var c = window.NemoNativeOpacityCutover, prepared = c.prepared(), identity = c.identity();
+        var ld = state.layers[state.activeLayerIdx], layer = userLayers[state.activeLayerIdx];
+        if (!prepared || !identity || !ld || !layer || prepared.layerUid !== ld.layerUid) return;
+        var item = intent.mode === 'select' && layer.children.find(function (p) {
+          return p.data && p.data.strokeId === intent.strokeId;
+        });
+        if (intent.mode === 'select' && (!item || intent.layerUid !== ld.layerUid)) return;
+        var projected = c.projectSelection({ activeLayerUid: item ? ld.layerUid : null,
+          selected: item ? [{ layerUid: ld.layerUid, opacityMode: prepared.opacityMode }] : [] }, state.currentFrame);
+        if (!projected || projected.documentId !== identity.documentId ||
+            projected.contentRevision !== identity.contentRevision || !Array.isArray(projected.selected) ||
+            projected.selected.length !== (item ? 1 : 0) ||
+            (item && (!projected.selected[0].stableTarget || projected.selected[0].stableTarget.layerUid !== ld.layerUid))) return;
+        if (item) {
+          if (shift && selectedPaths.indexOf(item) >= 0) selectedPaths = selectedPaths.filter(function (p) { return p !== item; });
+          else if (shift) selectedPaths = selectedPaths.concat([item]);
+          else selectedPaths = [item];
+        } else if (!shift) selectedPaths = [];
+        state.selectedStrokeIndices = selectedPaths.map(getSI).filter(function (i) { return i >= 0; });
+        syncMotionLayerSelection(selectedPaths.length ? state.activeLayerIdx : null, !!selectedPaths.length && shift);
+        if (window.SMMotion) SMMotion.setMotionCanvasEmptyClick(!selectedPaths.length);
+        renderArcs(); updateUI(); window.SMEngineBridge.renderNow();
+      }
+    });
+    return nativePointerIntent;
+  }
+  function nativePointerEvent(method, e) {
+    if (nativePointerIntent && nativePointerIntent.snapshot()) {
+      try { if (window.NemoNativeOpacityCutover.blocksLegacy() !== true) {
+        nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true;
+      } } catch (_) { nativePointerIntent.cancel(); e.stopImmediatePropagation(); e.preventDefault(); return true; }
+    }
+    if (!Object.prototype.hasOwnProperty.call(window, 'NemoNativeOpacityCutover')) return false;
+    try {
+      var c = window.NemoNativeOpacityCutover;
+      if (c && typeof c.blocksLegacy === 'function' && c.blocksLegacy() === false) return false;
+      nativePointer()[method](e);
+    } catch (_) { e.stopImmediatePropagation(); e.preventDefault(); }
+    return true;
+  }
 
   // Same handle-position math as buildTransformBoxItems() in
   // engine-bridge.js and renderTransformHandles() in tools.js — recomputed
@@ -587,88 +660,8 @@
   }
 
   function hitTestHandles(pt, altHeld) {
-    var h = computeHandles();
-    if (!h) return null;
-    // NOTE (2026-08-31): `pt` stays in WORLD space here on purpose.
-    // computeHandles already maps its corners/ring/anchor through the
-    // layer's Motion transform (its own `WP` helper), so both sides are
-    // world-space and agree. Converting the point here — as
-    // hitTestOrientedBoxA2D genuinely must, since orientedBoxForPath is
-    // raw geometry — was tried and broke the drag outright: with a
-    // selection live, the mismatched point matched a handle, onDown took
-    // the handle branch and never reached the branch that sets mode
-    // 'move', so a shape could be selected and then not moved at all.
-    var tol = 9 / view.zoom;
-    // Anchor crosshair — checked FIRST/exclusively, but ONLY while Alt is
-    // held (live feedback 2026-07: "ça peut être confusant quand il faut
-    // déplacer un petit élément" — a small object's own body can fall
-    // within the anchor's hit tolerance, so an unconditional grab there
-    // silently moved the PIVOT instead of the object with no way to tell
-    // which one just happened). Without Alt, a click in that same spot now
-    // falls through to the normal move/marquee logic below — Alt+drag is
-    // otherwise free on the Select tool (viewtools-bridge.js's global
-    // Alt-drag-rotate never reaches here anyway: this file's onDown always
-    // stopImmediatePropagation()s first while the Select tool is active),
-    // so repurposing it for "grab the anchor" doesn't collide with
-    // anything. A default (center) anchor sits nowhere near a resize
-    // handle so this never shadows them in the common case; when a preset
-    // corner anchor DOES coincide with its own resize handle, grabbing the
-    // anchor (Alt held) is what the user is more likely reaching for right
-    // there, so it still wins that specific tie.
-    if (h.anchorPos && altHeld) {
-      var dAnchor = pt.getDistance(h.anchorPos);
-      if (dAnchor < tol) return { type: 'anchor' };
-    }
-    // Ring band test — anywhere within ~7px of the circumference counts,
-    // not just a single point, checked before the corners since the 16px
-    // margin baked into ringRadius already keeps it clear of them.
-    var ringTol = 7 / view.zoom;
-    if (Math.abs(pt.getDistance(h.ringCenter) - h.ringRadius) < ringTol) return { type: 'rotate' };
-    var bestD = tol, best = null;
-    Object.keys(h.corners).forEach(function (k) {
-      var d = pt.getDistance(h.corners[k]);
-      if (d < bestD) { bestD = d; best = { type: 'scale', dir: k }; }
-    });
-    if (best) return best;
-    // Skew zones (2026-08) — checked only once no corner/edge scale handle
-    // matched, so a resize handle always wins a tie. Two small hit-zones
-    // flank each edge's midpoint handle, running ALONG that edge, starting
-    // just past the scale handle's own tolerance (SKEW_INNER) so the two
-    // never overlap. Mirrors buildTransformBoxItems' (engine-bridge.js) own
-    // tick-mark geometry exactly — the two must agree, or a mark could be
-    // drawn somewhere a click here won't recognize.
-    var skewHit = skewZoneHitTest(h, pt);
-    if (skewHit) return skewHit;
-    return null;
+    return window.NemoSelectCanvasIntent.hitHandles(computeHandles(), pt, altHeld, view.zoom);
   }
-  var SKEW_MIN_EDGE_PX = 48, SKEW_INNER_PX = 9, SKEW_OUTER_PX = 20;
-  var EDGE_ENDPOINTS = { n: ['nw', 'ne'], s: ['sw', 'se'], w: ['nw', 'sw'], e: ['ne', 'se'] };
-  function skewZoneHitTest(h, pt) {
-    var zs = 1 / view.zoom;
-    var found = null;
-    Object.keys(EDGE_ENDPOINTS).forEach(function (k) {
-      if (found) return;
-      var ep = EDGE_ENDPOINTS[k];
-      var a = h.corners[ep[0]], b2 = h.corners[ep[1]];
-      var edgeVec = b2.subtract(a);
-      var edgeLenPx = edgeVec.length * view.zoom;
-      if (edgeLenPx < SKEW_MIN_EDGE_PX) return;
-      var dir = edgeVec.normalize();
-      var mid = h.corners[k];
-      [-1, 1].forEach(function (side) {
-        if (found) return;
-        var base = mid.add(dir.multiply(side * (SKEW_INNER_PX + SKEW_OUTER_PX) / 2 * zs));
-        var ext = pt.subtract(base);
-        var along = ext.dot(dir);
-        var perp = ext.subtract(dir.multiply(along)).length;
-        if (Math.abs(along) <= (SKEW_OUTER_PX - SKEW_INNER_PX) / 2 * zs && perp <= SKEW_INNER_PX * zs) {
-          found = { type: 'skew', edge: k };
-        }
-      });
-    });
-    return found;
-  }
-
   // ---- Free-transform distort (Ctrl+drag a corner pin) ----
   // Inverts P = nw + u*ex + v*ey for (u,v) — valid because the SOURCE box
   // is always a plain (possibly rotated) rectangle, i.e. an affine image of
@@ -3568,6 +3561,7 @@
   // pre-distort rectangle while a corner-pin drag is in progress.
   window.SMSelectBridge = {
     refreshAfterDocumentRestore: function () {
+      if (nativePointerIntent) nativePointerIntent.cancel();
       // Undo/redo rebuilds every Paper item. Any gesture-local object
       // reference therefore points at removed geometry after the restore.
       mode = null;
@@ -3606,6 +3600,7 @@
     // already handles committing what THEY changed; this isn't a general
     // abandon-any-gesture hook).
     cancelMarquee: function () {
+      if (nativePointerIntent) nativePointerIntent.cancel();
       if (mode !== 'marquee') return;
       if (_marquee.rect) { _marquee.rect.remove(); _marquee.rect = null; }
       _marquee.active = false;
@@ -3617,11 +3612,13 @@
 
   function init() {
     var target = document.getElementById('canvas-area') || document.getElementById('drawing-canvas');
-    target.addEventListener('pointerdown', onDown, { capture: true });
-    target.addEventListener('pointermove', onMove, { capture: true });
-    target.addEventListener('pointerup', onUp, { capture: true });
-    target.addEventListener('pointercancel', onUp, { capture: true });
-    target.addEventListener('contextmenu', onContext, { capture: true });
+    target.addEventListener('pointerdown', function (e) { if (!nativePointerEvent('down', e)) onDown(e); }, { capture: true });
+    target.addEventListener('pointermove', function (e) { if (!nativePointerEvent('move', e)) onMove(e); }, { capture: true });
+    target.addEventListener('pointerup', function (e) { if (!nativePointerEvent('up', e)) onUp(e); }, { capture: true });
+    target.addEventListener('pointercancel', function (e) { if (!nativePointerEvent('cancelEvent', e)) onUp(e); }, { capture: true });
+    target.addEventListener('lostpointercapture', function (e) { nativePointerEvent('cancelEvent', e); }, { capture: true });
+    window.addEventListener('blur', function () { if (nativePointerIntent) nativePointerIntent.cancel(); });
+    target.addEventListener('contextmenu', function (e) { if (!nativePointerEvent('cancelEvent', e)) onContext(e); }, { capture: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
