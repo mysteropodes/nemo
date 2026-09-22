@@ -214,11 +214,17 @@ test('undo can reuse an explicit frame save without saving twice', () => {
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   let saves = 0;
+  const legacyWriteKinds = [];
   const window = { _scrubLiveActive: false };
   const state = { undoStack: [], undoLabels: [], redoStack: [{}], redoLabels: [{}], maxUndo: 60 };
   const sandbox = {
     window,
     state,
+    n20RequireLegacyWrite(kind) {
+      legacyWriteKinds.push(kind);
+      assert.equal(kind, 'layers-history-checkpoint');
+      return true;
+    },
     saveAllLayerFrames() { saves++; },
     layersSnapshotNow() { return { snapshot: true }; },
     _actionLabelNow() { return { label: 'test' }; },
@@ -238,6 +244,7 @@ test('undo can reuse an explicit frame save without saving twice', () => {
   sandbox.pushUndoLayersTest();
   assert.equal(saves, 1);
   assert.equal(state.undoStack.length, 2);
+  assert.deepEqual(legacyWriteKinds, ['layers-history-checkpoint', 'layers-history-checkpoint', 'layers-history-checkpoint']);
 });
 
 test('explicit save plus undo call sites declare that the save is reusable', () => {
