@@ -15,6 +15,7 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/opacity.json"),
     include_str!("../../engineering/application/capabilities/export-job.json"),
     include_str!("../../engineering/application/capabilities/timelapse.json"),
+    include_str!("../../engineering/application/capabilities/diagnostics.json"),
 ];
 
 /// Native v2 declarations are deliberately version-separated from the legacy
