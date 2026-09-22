@@ -7,6 +7,16 @@
 // (updater-bridge.js) — this is the shared, correct replacement: the real
 // Promise<boolean> API when running in Tauri, plain confirm() otherwise
 // (browser preview has no window.__TAURI__ at all).
+var n20AllowLegacyWrite=typeof n20AllowLegacyWrite==='function'?n20AllowLegacyWrite:typeof n20AllowLegacyWrite!=='undefined'?function(){return false;}:function(kind){
+  try{var admission=typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+    return admission===undefined||!!admission&&typeof admission.allow==='function'&&admission.allow(kind)===true;
+  }catch(_){return false;}
+};
+var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLegacyWrite:function(kind){
+  try{if(n20AllowLegacyWrite(kind)===true)return true;}catch(_){}
+  var error=new Error('Native document authority must release before this legacy edit.');
+  error.name='NemoNativeReleaseRequired';throw error;
+};
 async function smConfirm(msg, title) {
   if (typeof window.__TAURI__ !== 'undefined' && window.__TAURI__.dialog) {
     return window.__TAURI__.dialog.confirm(msg, { title: title || 'Confirmer' });
@@ -517,7 +527,9 @@ window.SM={
   // Tool settings double as selection editors (Animate behavior): with the
   // Select tool active and strokes selected, changing width/style/color/
   // cap/join restyles the selection instead of only future strokes.
-  setBrushSize:function(v){state.brushSize=v;
+  setBrushSize:function(v){
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-brush-size'))return false;
+    state.brushSize=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
       pushUndo();
       selectedPaths.forEach(function(p){
@@ -605,14 +617,18 @@ window.SM={
   // showing something correct for the frame being edited.
   // A shape with no track at all — every shape in plain Animation 2D — takes
   // the early `false` and behaves exactly as before.
-  setStrokeColor:function(v){state.strokeColor=v;paintStrokeSwatches(v);
+  setStrokeColor:function(v){
+    if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-color'))return false;
+    state.strokeColor=v;paintStrokeSwatches(v);
     if(routeColorToSelectedMotionRow('strokeColor',v)){}
     else if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush){p.fillColor=v;applyBrushKeyline(p);}else if(p.strokeColor){routeColorToMotion(p,'strokeColor',v);p.strokeColor=v;}});saveActiveLayerFrame();updateUI();}
     // Fill/Stroke Select tool: recolor ONLY the clicked aspect — a 'stroke'
     // selection here means strokeColor, never touches fillColor even on a
     // combined shape (that's the whole point of this tool vs plain Select).
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='stroke')return sel;var arc=fsRealizeStrokeSegment(sel,userLayers[state.activeLayerIdx]);arc.strokeColor=v;return{path:arc,kind:'stroke',segStart:0,segEnd:arc.length,closed:arc.closed};});saveActiveLayerFrame();updateUI();}},
-  setFillColor:function(v){state.fillColor=v;paintFillSwatches(v);
+  setFillColor:function(v){
+    if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-color'))return false;
+    state.fillColor=v;paintFillSwatches(v);
     if(routeColorToSelectedMotionRow('fillColor',v)){}
     else if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.fillColor){routeColorToMotion(p,'fillColor',v);p.fillColor=v;}});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v;return sel;});saveActiveLayerFrame();updateUI();}},
@@ -644,14 +660,18 @@ window.SM={
       if(el){el.classList.toggle('off',!v);el.innerHTML=v?ICO_EYE:ICO_EYE_CLOSED;}
     });
   },
-  setFillEnabled:function(v){state.fillEnabled=v;window.SM._syncFillEnabledUI(v);
+  setFillEnabled:function(v){
+    if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';}))&&!n20AllowLegacyWrite('timeline-selection-fill-enabled'))return false;
+    state.fillEnabled=v;window.SM._syncFillEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(p.data&&p.data.isVectorBrush)return;p.fillColor=v?state.fillColor:null;});saveActiveLayerFrame();updateUI();}
     else if(state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='fill'||s.kind==='fillregion';})){pushUndo();_fsSel=_fsSel.map(function(sel){if(sel.kind!=='fill'&&sel.kind!=='fillregion')return sel;if(sel.kind==='fillregion')sel=fsRealizeFillRegion(sel,userLayers[state.activeLayerIdx]);sel.path.fillColor=v?state.fillColor:null;if(!v){fsUnlinkFillRegen(sel.path);if(!sel.path.strokeColor){sel.path.remove();return null;}}return sel;}).filter(Boolean);saveActiveLayerFrame();updateUI();}},
   // Mirrors setFillEnabled exactly, for the Stroke side — didn't exist
   // before (Stroke had no on/off concept, only a color), added alongside
   // the quick phdr toggle button since disabling stroke without it required
   // opening the color popover and hunting for "None".
-  setStrokeEnabled:function(v){state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
+  setStrokeEnabled:function(v){
+    if(((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length||state.tool==='fsselect'&&_fsSel.some(function(s){return s.kind==='stroke';}))&&!n20AllowLegacyWrite('timeline-selection-stroke-enabled'))return false;
+    state.strokeEnabled=v;window.SM._syncStrokeEnabledUI(v);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){
       if(p.data&&p.data.isVectorBrush){
         var c=p.fillColor?p.fillColor.clone():new Color(state.strokeColor);
@@ -675,6 +695,7 @@ window.SM={
   // selectedPaths on their own). Fill's enabled/disabled state is left
   // alone; only the color VALUES swap.
   swapStrokeFill:function(){
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-swap-paint'))return false;
     var s=state.strokeColor,f=state.fillColor;
     window.SM.setFillColor(s);
     window.SM.setStrokeColor(f);
@@ -704,6 +725,7 @@ window.SM={
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){
       var eligible=selectedPaths.filter(function(p){return p instanceof Path&&!(p.data&&(p.data.isVectorBrush||p.data.isFillShape))&&(p.strokeColor||(p.data&&(p.data.brushTexturePreset||p.data.bitmapBrushSpec)));});
       if(eligible.length){
+        if(!n20AllowLegacyWrite('timeline-selection-brush-preset'))return false;
         pushUndo();
         eligible.forEach(function(p){
           stripAnyBrushTexture(p);
@@ -714,17 +736,17 @@ window.SM={
     }
   },
   setSmoothing:function(v){state.smoothing=v;},setStabilizer:function(v){state.stabilizer=parseInt(v);},
-  setStrokeCap:function(v){state.strokeCap=v;
+  setStrokeCap:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-cap'))return false;state.strokeCap=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeCap=v;});saveActiveLayerFrame();}},
-  setStrokeJoin:function(v){state.strokeJoin=v;
+  setStrokeJoin:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-join'))return false;state.strokeJoin=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.strokeJoin=v;});saveActiveLayerFrame();}},
-  setMiterLimit:function(v){state.miterLimit=Math.max(1,parseFloat(v)||10);
+  setMiterLimit:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-miter-limit'))return false;state.miterLimit=Math.max(1,parseFloat(v)||10);
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush))p.miterLimit=state.miterLimit;});saveActiveLayerFrame();}},
-  setPaintOrder:function(v){state.paintOrder=v;
+  setPaintOrder:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-paint-order'))return false;state.paintOrder=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){p.data=p.data||{};p.data.paintOrder=v;});saveActiveLayerFrame();updateUI();}},
-  setDashOffset:function(v){state.dashOffset=parseFloat(v)||0;
+  setDashOffset:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-dash-offset'))return false;state.dashOffset=parseFloat(v)||0;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.dashArray&&p.dashArray.length)p.dashOffset=state.dashOffset;});saveActiveLayerFrame();}},
-  setStrokeStyle:function(v){state.strokeStyle=v;
+  setStrokeStyle:function(v){if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-stroke-style'))return false;state.strokeStyle=v;
     if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length){pushUndo();selectedPaths.forEach(function(p){if(!(p.data&&p.data.isVectorBrush)&&p.strokeColor)applyStrokeStyle(p);});saveActiveLayerFrame();updateUI();}},
   // One-shot "smooth this already-drawn stroke more" action (Stroke panel's
   // Smooth+Apply), distinct from Tool Options' Smooth which only shapes NEW
@@ -740,6 +762,7 @@ window.SM={
   // survives even as the centerline geometry itself gets smoother.
   smoothSelectedStroke:function(amount){
     if(!((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length))return;
+    if(!n20AllowLegacyWrite('timeline-selection-smooth-stroke'))return false;
     amount=Math.max(0,parseFloat(amount)||0);
     // No Apply button anymore (2026-07: "plus besoin du bouton apply pour
     // smooth, il le fait directement quand on change de valeur") — wired to
@@ -796,7 +819,9 @@ window.SM={
   // afterward should feel like a clean reset, not a value the dropdown
   // silently ignores from then on.
   setPressureCurve:function(v){state.pressureCurve=['linear','sqrt','cbrt','pow2','pow3'].indexOf(v)>=0?v:'linear';state.pressureCurvePoints=null;},
-  setOpacity:function(v){state.opacity=parseInt(v);
+  setOpacity:function(v){
+    if((state.tool==='select'||state.tool==='subselect')&&selectedPaths.length&&!n20AllowLegacyWrite('timeline-selection-opacity'))return false;
+    state.opacity=parseInt(v);
     // Unlike setFillColor/setStrokeColor right above, this never applied to
     // the current selection — only ever wrote the tool-default opacity for
     // the NEXT stroke drawn, so editing the Opacity field with something
@@ -2358,6 +2383,15 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     showToast('Couleur propagee sur '+count+' frame(s)');
   },
   importJSON:function(json,silent){
+    var n20Allowed=false;
+    try{
+      var n20Admission=typeof n20AllowLegacyWrite==='undefined'&&typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+      n20Allowed=typeof n20AllowLegacyWrite!=='undefined'
+        ?typeof n20AllowLegacyWrite==='function'&&n20AllowLegacyWrite('document-import')===true
+        :n20Admission===undefined||!!n20Admission&&typeof n20Admission.allow==='function'&&n20Admission.allow('document-import')===true;
+    }catch(_){}
+    if(!n20Allowed){var n20Error=new Error('Native document authority must release before this legacy edit.');
+      n20Error.name='NemoNativeReleaseRequired';throw n20Error;}
     try{var d=window.SMProjectDocument.parse(json);
     // See labs-core.js's own comment on resetAll — a Labs prototype flag
     // must never silently carry into a different project. `silent` here
@@ -2697,7 +2731,16 @@ videoMeshId:l.videoMeshId,layerUid:l.layerUid,parentLayerUid:l.parentLayerUid,pa
     if(window.NemoOpacityApplication)window.NemoOpacityApplication.documentChanged();
     return true;
     }catch(e){showToast('Erreur: '+e.message);return false;}},
-  getState:function(){return state;},
+  getState:function(){
+    var cutover=window.NemoNativeOpacityCutover;
+    if(cutover&&typeof cutover.blocksLegacy==='function'&&cutover.blocksLegacy()){
+      // This public API historically returned the live document object. Do
+      // not expose a writable JS mirror while native owns the document.
+      try{return typeof structuredClone==='function'?structuredClone(state):JSON.parse(JSON.stringify(state));}
+      catch(_){return null;}
+    }
+    return state;
+  },
 };
 
 // ---- UI UPDATE ----
@@ -2791,6 +2834,7 @@ document.getElementById('p-mask-mode').addEventListener('change',function(){
 });
 document.getElementById('p-mask-feather').addEventListener('input',function(){
   var p=selectedPaths[0];if(!p||!p.data||!p.data.isMask||!p.layer)return;
+  if(!n20AllowLegacyWrite('timeline-mask-feather'))return false;
   var v=Math.max(0,parseFloat(this.value)||0);
   // Shared per-layer value (see updateMaskPanel's comment) — every mask on
   // this layer gets the same feather, matching what the engine actually

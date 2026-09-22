@@ -375,6 +375,7 @@ var xformLayer=new Layer({name:'xform'});
 var LAYER_COLOR_PALETTE=['#5FA875','#B49BE6','#F0A585','#E88BAE','#E7C74C','#EE7C58','#7EA0FA','#5FD1C4'];
 function nextLayerColor(){return LAYER_COLOR_PALETTE[state.layers.length%LAYER_COLOR_PALETTE.length];}
 function createUserLayer(name){
+  n20RequireLegacyWrite('create-layer');
   arcLayer.activate();var l=new Layer({name:'user-'+userLayers.length});l.insertBelow(arcLayer);userLayers.push(l);
   var frames=[];for(var i=0;i<state.totalFrames;i++)frames.push({strokes:[],isKeyframe:i===0,isInterpolated:false});
   // layerUid: stable identity for parenting (motion.js's setLayerParent/
@@ -436,6 +437,14 @@ function reorderLayersBatch(fromIndices,toIdx){
   reorderLayersAtGap(fromIndices,toIdx);
 }
 function reorderLayersAtGap(fromIndices,gapIdx,skipUndo){
+  var n20Allowed=false;
+  try{
+    var n20Admission=typeof n20AllowLegacyWrite==='undefined'&&typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+    n20Allowed=typeof n20AllowLegacyWrite!=='undefined'
+      ?typeof n20AllowLegacyWrite==='function'&&n20AllowLegacyWrite('layer-reorder')===true
+      :n20Admission===undefined||!!n20Admission&&typeof n20Admission.allow==='function'&&n20Admission.allow('layer-reorder')===true;
+  }catch(_){}
+  if(!n20Allowed)return false;
   var moving=fromIndices.filter(function(i){return i>=0&&i<state.layers.length;})
     .filter(function(i,p,a){return a.indexOf(i)===p;}).sort(function(a,b){return a-b;});
   if(!moving.length)return;
@@ -920,6 +929,7 @@ function desP(d,layer,op){var prev=project.activeLayer;layer.activate();var p=ne
 //     supervisor's in-app revision, without local ever needing an
 //     isRevisionGhost flag (it isn't superseded, just contested).
 function mergeRemoteSnapshot(remoteData, remoteProfile) {
+  if(!n20AllowLegacyWrite('remote-snapshot-merge'))return false;
   var report = { added: 0, conflicts: 0, identical: 0, layersSkipped: 0 };
   if (!remoteData || !remoteData.layers) return report;
   remoteData.layers.forEach(function (remoteLd) {
@@ -2517,6 +2527,7 @@ function applyRigDeform(ld){
   Object.keys(boneCache).forEach(function(bid){boneCache[bid].rest.remove();boneCache[bid].cur.remove();});
 }
 function rigResetPose(ld){
+  if(!n20AllowLegacyWrite('rig-reset-pose'))return false;
   var rig=ld.rig;if(!rig)return;
   Object.keys(rig.bones).forEach(function(bid){
     var bone=rig.bones[bid];
@@ -2534,6 +2545,7 @@ function rigResetPose(ld){
 // deform (ensureKeyframe's own loadFrame just rebuilt fresh, undeformed
 // Paper items from the newly-promoted keyframe's stored data), THEN save.
 function rigCommitFrame(ld){
+  if(!n20AllowLegacyWrite('rig-commit-frame'))return false;
   if(!ld.rig||!ld.rig.binds.length){showToast(SM.t('toastNoRiggedStroke'));return false;}
   if(!canEditActiveLayer())return false;
   // Skip when a pose-drag already pushed its own checkpoint (rig-bridge.js,
@@ -2559,6 +2571,7 @@ function rigCommitFrame(ld){
 // POSITIONS only, indifferent to whether they're freeform dots (as in the
 // prototype) or a bone path's own segment points (here).
 function rigSetIK(ld,rootRef,jointRef,endRef,flip){
+  if(!n20AllowLegacyWrite('rig-set-ik'))return false;
   var rig=ensureLayerRig(ld);
   var r=rigAnchorPoint(rig,rootRef),j=rigAnchorPoint(rig,jointRef),e=rigAnchorPoint(rig,endRef);
   if(!r||!j||!e)return false;
@@ -3139,34 +3152,10 @@ function getEffectiveStrokes(layerIdx,frameIdx,countOnly){var nativeOpacity=wind
       var m=symMatrixOf(ld);
       out=out.map(function(sd){return applyMatrixToStrokeData(cloneStrokeForTransform(sd),m);});
     }
-    // Exposed-property overrides (2026-08-18, see exposeSymbolProperty's own
-    // comment) — resolved LAST, after every transform above, since these
-    // touch paint/visibility fields a matrix never does. `ld` (the INSTANCE
-    // layer, not the symbol) is what carries each property's actual value —
-    // SMMotion.valueAtFrame already knows how to fall back through
-    // animated→static→PROP_DEFAULT for any prop key, exposed ones included,
-    // so this reuses that evaluator directly rather than re-deriving a
-    // default here. Re-registers metadata every call (cheap, idempotent) —
-    // see propsFor's identical reasoning for why this can't be a one-time
-    // registration at exposure time alone.
-    if(sym.exposedProps&&sym.exposedProps.length&&window.SMMotion){
-      sym.exposedProps.forEach(function(ep){if(SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default);});
-      var epByStroke={};
-      sym.exposedProps.forEach(function(ep){(epByStroke[ep.targetStrokeId]=epByStroke[ep.targetStrokeId]||[]).push(ep);});
-      out=out.map(function(sd){
-        if(!sd.strokeId||!epByStroke[sd.strokeId])return sd;
-        var sd2=null,hide=false;
-        epByStroke[sd.strokeId].forEach(function(ep){
-          var val=SMMotion.valueAtFrame(ld,ep.key,frameIdx)[0];
-          if(ep.targetField==='__visible'){if(val<50)hide=true;return;}
-          if(!sd2)sd2=JSON.parse(JSON.stringify(sd));
-          if(ep.targetField==='opacity')sd2.opacity=Math.max(0,Math.min(1,val/100));
-          else sd2[ep.targetField]=val;
-        });
-        return hide?null:(sd2||sd);
-      }).filter(function(sd){return sd;});
-    }
-    return out;
+    return window.NemoComponentExposedProperties.applyOverrides(sym,out,ld,frameIdx,
+      function(){return !!window.SMMotion;},
+      function(ep){if(SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(ep.key,ep.label,ep.default);},
+      function(layer,key,frame){return SMMotion.valueAtFrame(layer,key,frame);});
   }
   // Plain layer, the overwhelmingly common case — hot path, called every
   // frame load/scrub/playback tick for every layer, so deliberately NOT
@@ -3244,24 +3233,11 @@ function cloneRigForSymbol(rig){
     // line documented in exportJSON's own copy of this list.
     binds:(rig.binds||[]).map(function(b){return{strokeId:b.strokeId,meshId:b.meshId,rest:b.rest,restHandles:b.restHandles,weights:b.weights,rotate:b.rotate};})};
 }
-// Component exposed properties (2026-08-18) — declares a property on the
-// SYMBOL (state.symbols[symId].exposedProps), bound to one stroke inside it
-// by its stable strokeId. Every instance of this symbol then gets it as an
-// ordinary Motion property (propsFor, motion.js — registers PROP_LABEL/DIM/
-// UNIT/DEFAULT there, not here, so a project reload rehydrates it the first
-// time propsFor is called rather than needing a separate boot-time pass).
-// `targetField` is a real field name on a serialized stroke dict
-// ('fillColor','strokeColor','opacity'...) EXCEPT the sentinel '__visible',
-// which getEffectiveStrokes reads as "drop this stroke from the instance's
-// output entirely" rather than writing it onto the dict.
 function exposeSymbolProperty(symId,targetStrokeId,targetField,label,defaultVal){
-  var sym=state.symbols[symId];if(!sym)return null;
-  if(!sym.exposedProps)sym.exposedProps=[];
-  var key='ep_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
-  var entry={key:key,label:label,targetStrokeId:targetStrokeId,targetField:targetField,default:defaultVal};
-  sym.exposedProps.push(entry);
-  if(window.SMMotion&&SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(key,label,defaultVal);
-  return entry;
+  if(!n20AllowLegacyWrite('symbol-expose-property'))return false;
+  return window.NemoComponentExposedProperties.expose(state.symbols,symId,targetStrokeId,targetField,label,defaultVal,
+    function(){return Date.now();},function(){return Math.random();},
+    function(key,label,value){if(window.SMMotion&&SMMotion.registerExposedPropMeta)SMMotion.registerExposedPropMeta(key,label,value);});
 }
 // NOT attached to window.SM here — timeline.js (loaded after this file,
 // index.html) assigns `window.SM={...}` as a fresh object LITERAL, which
@@ -3598,6 +3574,7 @@ function splitLayerIntoElements(li){
 // once split, each resulting layer has exactly 1 element, so a later
 // re-entry's auto-split pass no-ops via the `els.length<2` guard below.
 function splitLayerIntoElementsCore(li,opts){
+  n20RequireLegacyWrite('split-layer-elements-core');
   var silent=!!(opts&&opts.silent);
   var ld=state.layers[li];if(!ld||ld.symbolId){if(!silent)showToast(SM.t('toastNothingToSplitHere'));return false;}
   if(!window.SMMotion)return false;
@@ -3765,6 +3742,7 @@ function splitLayerIntoElementsCore(li,opts){
 // which differs from a true group pivot — flagged in the toast rather than
 // silently approximated.
 function mergeLayersIntoOne(indices,opts){
+  if(!n20AllowLegacyWrite('merge-layers'))return false;
   var silent=!!(opts&&opts.silent);
   var idx=(indices||[]).slice().sort(function(a,b){return a-b;});
   // de-dup — a caller can easily pass the active layer twice (selection + active)
@@ -4085,6 +4063,7 @@ function _lineBoundsFromStrokes(strokes){
   return{x:minX,y:minY,width:maxX-minX,height:maxY-minY};
 }
 function propagateLFSFill(layerIdx,which){
+  if(!n20AllowLegacyWrite('lfs-fill-propagation'))return false;
   if(state.activeSymbolId){showToast(SM.t('toastCloseComponentFirst'));return;}
   var ld=state.layers[layerIdx];if(!ld||!ld.lfsGroup){showToast(SM.t('toastNotALFSGroup'));return;}
   var targetSymId=ld.lfsIds[which];var targetSym=targetSymId&&state.symbols[targetSymId];
@@ -4631,7 +4610,7 @@ function _invalidateSymbolUnionIfEditingSymbol(){
   if(!state.activeSymbolId)return;
   if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 }
-function saveActiveLayerFrame(){if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
+function saveActiveLayerFrame(){n20RequireLegacyWrite('save-active-layer-frame');
   window._sceneVersion++;
   _invalidateSymbolUnionIfEditingSymbol();
   // duplicator (unless in edit-source mode): the live Paper layer holds the
@@ -4690,7 +4669,7 @@ function saveActiveLayerFrame(){if(window.NemoNativeOpacityCutover&&window.NemoN
   _maybePromoteInterpolated(f,strokes);
   f.strokes=strokes;
 }
-function saveAllLayerFrames(){if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy())return;
+function saveAllLayerFrames(){n20RequireLegacyWrite('save-all-layer-frames');
   _invalidateSymbolUnionIfEditingSymbol();
   _writeBackGhostProxies(state.activeLayerIdx);
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
@@ -5056,6 +5035,7 @@ function enforceChannelStrip(ld,c){
 // channel by convention (closest analogue: a bitmap IS a filled region, no
 // separate outline).
 function convertLayerToStrokeFillShadowFolder(layerIdx){
+  if(!n20AllowLegacyWrite('stroke-fill-shadow-split'))return false;
   var src=state.layers[layerIdx];
   if(!src)return;
   if(src.symbolId||src.lfsGroup){showToast(SM.t('hsNotOnComponentOrLfs'));return;}
@@ -5322,7 +5302,7 @@ function insertBlankKeyframe(){
   ld.frames[state.currentFrame]=f;
   loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();showToast('Blank keyframe (F7)');
 }
-function removeFrame(){if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var lyr=state.layers[i];lyr.frames.splice(cf,1);
+function removeFrame(){if(!n20AllowLegacyWrite('timeline-remove-frame'))return false;if(state.totalFrames<=1)return;pushUndoLayers();var cf=state.currentFrame;for(var i=0;i<state.layers.length;i++){var lyr=state.layers[i];lyr.frames.splice(cf,1);
   // Mirror of insertFrame's own fix (2026-08-16): removing the slot at cf
   // shifts every LATER frame number down by one, same shift a manual trim/
   // marker needs or it silently points one frame later than the content it
@@ -5401,6 +5381,7 @@ function removeFrameSpan(){
 // Duplicate the current frame selection in place, right after itself —
 // equivalent to copy + paste-at-selection-end, exposed as one menu action.
 function duplicateSelectedFrames(){
+  if(!n20AllowLegacyWrite('timeline-duplicate-frames'))return false;
   var b=selBounds();
   if(!b){showToast(SM.t('toastNoSelection'));return;}
   window.SM.copyFrames();

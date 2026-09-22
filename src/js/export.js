@@ -5,7 +5,7 @@
 var _exportLayer = null;
 function exportTauriAvailable(){return typeof window.__TAURI__!=='undefined';}
 function exportNativeOpacity(){var authority=window.NemoNativeOpacityCutover;return authority&&authority.blocksLegacy()?authority:null;}
-async function exportReleaseNative(kind){var authority=exportNativeOpacity();if(authority)await authority.release({kind:kind});}
+async function exportReleaseNative(kind){var authority=exportNativeOpacity();if(authority)await authority.releaseCurrent(kind);}
 
 function exportEnsureLayer(){
   if(!_exportLayer){_exportLayer=new Layer({name:'__export__'});_exportLayer.visible=false;}
@@ -573,7 +573,7 @@ function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerComp
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   var nativeOpacity=exportNativeOpacity();if(nativeOpacity){
     if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');
-    if((scale&&scale!==1)||alpha){await nativeOpacity.release({kind:alpha?'alpha-raster-export':'scaled-raster-export'});return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);}
+    if((scale&&scale!==1)||alpha){await nativeOpacity.releaseCurrent(alpha?'alpha-raster-export':'scaled-raster-export');return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);}
     var destination=dir.replace(/[\\/]+$/,'')+'/nemo-native-opacity-'+Date.now()+'-'+Math.floor(Math.random()*1000000);var frames=[];for(var nativeFrame=start;nativeFrame<=end;nativeFrame++)frames.push(nativeFrame);
     await nativeOpacity.exportPng(destination,frames,onProgress);return destination;
   }
@@ -1208,7 +1208,7 @@ function exportSvgSequenceJob(){
 }
 async function exportSVGSequenceToDir(dir,opts){
   if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
-  var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())await nativeAuthority.release({kind:'svg-export'});
+  var nativeAuthority=window.NemoNativeOpacityCutover;if(nativeAuthority&&nativeAuthority.blocksLegacy())await nativeAuthority.releaseCurrent('svg-export');
   var r=exportFrameRange(opts);return await exportSvgSequenceJob().run({dir:dir,start:r.start,end:r.end,requestId:opts&&opts.requestId,onProgress:opts&&opts.onProgress});
 }
 async function exportGIFToPath(outPath,opts){
