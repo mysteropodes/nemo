@@ -142,18 +142,28 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const response = await dispatch('query.document.opacity', { stableTarget: target });
     assert.equal(response.ok, true); return response.result.value;
   }
-  async function uiValue() {
+  async function uiValue(waitForAdmission = false) {
     const current = await status();
-    const request = { apiVersion: 1, requestId: randomUUID(),
-      instanceId: current.instanceId, documentId: current.documentId, operation: 'property.get',
-      payload: { layerId: target.layerUid, property: 'opacity' } };
-    const response = await wire(endpoint, 'request', request);
-    // Keep the actual rejection for diagnosis; never include the registry secret
-    // or replace an unsuccessful live UI read with a native-query result.
-    write(path.join(reportDir, 'last-ui-read.json'), { checkpoint: stage, nativeStatus: current, request, response });
-    assert.equal(response.ok, true, 'Live v1 property.get failed: ' +
-      (response.error && response.error.code || 'missing error code') + '; see private last-ui-read.json');
-    assert.equal(response.documentId, request.documentId, 'Live UI read belongs to a different document');
+    let response;
+    await waitFor(async () => {
+      const request = { apiVersion: 1, requestId: randomUUID(),
+        instanceId: current.instanceId, documentId: current.documentId, operation: 'property.get',
+        payload: { layerId: target.layerUid, property: 'opacity' } };
+      response = await wire(endpoint, 'request', request);
+      // Preserve every admission response, including temporary rejections, without
+      // the registry secret. A native-query result never substitutes for this read.
+      const observed = { checkpoint: stage, nativeStatus: current, request, response };
+      write(path.join(reportDir, 'last-ui-read.json'), observed);
+      fs.appendFileSync(path.join(reportDir, 'ui-reads.jsonl'), JSON.stringify(observed) + '\n', { mode: 0o600 });
+      // Rust publishes its owner before the UI finishes installing its consumers.
+      // Only document admission may wait for that exact guard, and only boundedly.
+      if (waitForAdmission && response.ok === false && response.error?.code === 'unavailable'
+        && response.error.message === 'Native opacity ownership is not dispatchable.') return false;
+      assert.equal(response.ok, true, 'Live v1 property.get failed: ' +
+        (response.error && response.error.code || 'missing error code') + '; see private last-ui-read.json');
+      return true;
+    }, 'same-document UI admission', 10000);
+    assert.equal(response.documentId, current.documentId, 'Live UI read belongs to a different document');
     assert.equal(response.revision, current.contentRevision, 'Live UI read belongs to a different revision');
     return response.result.value;
   }
@@ -184,7 +194,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal((await status()).available, false);
     phase('admit-static', 'Open static.json from the start screen. Close introductory overlays; enter Motion and select R08 rectangle.');
     await waitFor(async () => (await status()).available, stage);
-    assert.equal(await opacity(), 25); assert.equal(await uiValue(), 25);
+    assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
     report.checks.push({ checkpoint: stage, value: 25 });
     await valueCheckpoint('edit-40', 'Set the Motion layer Opacity field to 40 and commit with Tab.', 40);
     await valueCheckpoint('edit-60', 'Set the same Opacity field to 60 and commit with Tab.', 60);
@@ -218,13 +228,14 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.deepEqual(saved.layers[0].motionStatic.opacity, [25]);
     phase('reopen', 'Open the saved.json file through the real project-open UI.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
-    assert.equal(await opacity(), 25); assert.equal(await uiValue(), 25);
+    assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
     const replaced = await dispatch('command.document.apply', mutation, { documentId: prior.documentId, expectedRevision: prior.contentRevision });
     assert.equal(replaced.ok, false); assert.equal(replaced.error.code, 'wrong_document'); assert.equal(await opacity(), 25);
     report.checks.push({ checkpoint: 'save-reopen-old-document-rejected', savedSha256: hash(fixtures.saved) });
     const staticDocument = await status();
     phase('open-keyed', 'Open keyed.json, enter Motion and select R08 rectangle.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== staticDocument.documentId; }, stage);
+    assert.equal(await uiValue(true), 20);
     const pinned = await status();
     const beforeExport = await dispatch('query.document.serialize', { atRevision: pinned.contentRevision });
     assert.equal(beforeExport.ok, true);
@@ -252,6 +263,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     report.checks.push({ checkpoint: 'released-native-owner-unavailable' });
     phase('reenter-static', 'Open static.json once more; this must admit a fresh native owner.');
     await waitFor(async () => (await status()).available, stage); assert.equal(await opacity(), 25);
+    assert.equal(await uiValue(true), 25);
     assert.notEqual((await status()).documentId, pinned.documentId);
     stage = 'host-resource-loss';
     // Terminate only the verified child of this owned launcher. This exercises
