@@ -690,6 +690,107 @@ test('canonical shape seeding preserves the original live getter order', () => {
   }
 });
 
+function layerSelectionFixture(controller) {
+  const app = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
+  const timeline = fs.readFileSync(path.join(ROOT, 'src/js/timeline.js'), 'utf8');
+  const tools = fs.readFileSync(path.join(ROOT, 'src/js/tools.js'), 'utf8');
+  const start = timeline.indexOf('  setActiveLayer:function(');
+  const end = timeline.indexOf('\n  toggleLayerVis:function(', start);
+  assert.ok(start >= 0 && end > start);
+  const select = timeline.slice(start, end).replace('  setActiveLayer:', '').replace(/},\s*$/, '}');
+  class Path {}
+  class Raster {}
+  const calls = [];
+  const state = { layers: [0, 1].map(() => ({ frames: [{ isKeyframe: true, strokes: ['stored'] }] })),
+    currentFrame: 0, activeLayerIdx: 0, selectedStrokeIndices: [0], tool: 'select', appMode: 'motion' };
+  const scope = { state, Path, Raster, selectedPaths: [], _layerSel: [0], _layerSelAnchor: 0,
+    userLayers: [0, 1].map((idx) => ({ children: [new Path(), new Raster(), {}],
+      activate() { calls.push(['activate', idx]); } })),
+    n20RequireLegacyWrite(kind) {
+      calls.push(['guard', kind]);
+      if (controller && controller.blocksLegacy()) throw new Error('legacy save requires release');
+    },
+    _invalidateSymbolUnionIfEditingSymbol() {}, _writeBackGhostProxies() {},
+    layerIsEffectivelyVisible: () => true, layerHasTimeRange: () => false,
+    _collectLayerStrokes(idx) { calls.push(['save', idx, state.activeLayerIdx]); return [`live-${idx}`]; },
+    _maybePromoteInterpolated() {}, isSelectablePathChild: () => true,
+    renderArcs() { calls.push(['arcs']); }, updateUI() { calls.push(['ui']); },
+    SMMotion: { setMotionCanvasEmptyClick(value) { calls.push(['empty-click', value]); } },
+  };
+  scope.window = scope;
+  if (arguments.length) scope.NemoNativeOpacityCutover = controller;
+  vm.runInNewContext(extractFunction(app, 'activateUL') + '\n' + extractFunction(app, 'saveAllLayerFrames') +
+    '\n' + extractFunction(tools, 'clearSel') + `\nthis.SM = { setActiveLayer: (${select}) };`, scope);
+  return { scope, calls, state };
+}
+
+test('native row selection preserves authority without entering the frame save guard', async () => {
+  const harness = nativeHarness(staticSource());
+  await harness.controller.activate(harness.prepared);
+  const { scope, calls, state } = layerSelectionFixture(harness.controller);
+  const layersBefore = JSON.stringify(state.layers);
+  const nativeBefore = harness.controller.persistenceJSON();
+  scope.SM.setActiveLayer(1);
+  assert.equal(state.activeLayerIdx, 1);
+  assert.deepEqual(Array.from(scope._layerSel), [1]);
+  assert.equal(scope._layerSelAnchor, 1);
+  assert.equal(scope._layerActiveExplicit, true);
+  assert.deepEqual(Array.from(scope.selectedPaths), scope.userLayers[1].children.slice(0, 2));
+  assert.deepEqual(calls, [['activate', 1], ['empty-click', false], ['arcs'], ['ui']]);
+  assert.equal(JSON.stringify(state.layers), layersBefore);
+  assert.equal(harness.controller.persistenceJSON(), nativeBefore);
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.state.releases, 0);
+  scope._layerSel = [0, 1]; scope._layerSelAnchor = 0;
+  scope.SM.setActiveLayer(0, true);
+  assert.deepEqual(Array.from(scope._layerSel), [0, 1]);
+  assert.equal(scope._layerSelAnchor, 0);
+  assert.equal(calls.some(([name]) => name === 'guard' || name === 'save'), false);
+  assert.throws(() => scope.saveAllLayerFrames(), /legacy save requires release/,
+    'the actual frame writer remains guarded outside selection');
+});
+
+test('legacy row selection flushes every frame exactly once before changing the active layer', () => {
+  for (const { scope, calls, state } of [layerSelectionFixture(), layerSelectionFixture({ blocksLegacy: () => false })]) {
+    scope.SM.setActiveLayer(1);
+    assert.deepEqual(calls, [['guard', 'save-all-layer-frames'], ['save', 0, 0], ['save', 1, 0],
+      ['activate', 1], ['empty-click', false], ['arcs'], ['ui']]);
+    assert.deepEqual(state.layers.map((layer) => layer.frames[0].strokes), [['live-0'], ['live-1']]);
+    assert.equal(state.activeLayerIdx, 1);
+    calls.length = 0;
+    scope.SM.setActiveLayer(-1); scope.SM.setActiveLayer(2);
+    assert.deepEqual(calls, [], 'invalid row indices still do nothing');
+  }
+});
+
+test('row selection suppresses frame saves for present malformed or throwing ownership controllers', () => {
+  const throws = () => { throw new Error('ownership unavailable'); };
+  const cases = [
+    ['native true', { value: { blocksLegacy: () => true } }],
+    ['null controller', { value: null }],
+    ['present undefined controller', { value: undefined }],
+    ['false controller', { value: false }],
+    ['missing method', { value: {} }],
+    ['non-callable method', { value: { blocksLegacy: false } }],
+    ['throwing controller getter', { get: throws }],
+    ['throwing method getter', { value: Object.defineProperty({}, 'blocksLegacy', { get: throws }) }],
+    ['throwing method call', { value: { blocksLegacy: throws } }],
+    ...[undefined, null, 0, 1, '', 'false', {}].map((value) =>
+      [`non-boolean result ${String(value)}`, { value: { blocksLegacy: () => value } }]),
+  ];
+  for (const [label, descriptor] of cases) {
+    const { scope, calls, state } = layerSelectionFixture();
+    Object.defineProperty(scope, 'NemoNativeOpacityCutover', descriptor);
+    const before = JSON.stringify(state.layers);
+    scope.SM.setActiveLayer(1);
+    assert.equal(state.activeLayerIdx, 1, label);
+    assert.deepEqual(Array.from(scope._layerSel), [1], label);
+    assert.deepEqual(Array.from(scope.selectedPaths), scope.userLayers[1].children.slice(0, 2), label);
+    assert.deepEqual(calls, [['activate', 1], ['empty-click', false], ['arcs'], ['ui']], label);
+    assert.equal(JSON.stringify(state.layers), before, label);
+  }
+});
+
 test('N20 file-local legacy admission fails closed without relying on app.js globals', () => {
   for (const file of ['motion.js', 'timeline.js', 'tweens.js']) {
     const source = fs.readFileSync(path.join(ROOT, 'src/js', file), 'utf8');

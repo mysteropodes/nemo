@@ -1556,7 +1556,20 @@ window.SM={
     if(window._motionExpandedLayer===srcIdx)window._motionExpandedLayer=ni;
     else if(typeof window._motionExpandedLayer==='number'&&window._motionExpandedLayer>=ni)window._motionExpandedLayer++;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
-  setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;saveAllLayerFrames();activateUL(idx);clearSel();
+  setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;
+    // Native owns the saved frame; selecting a row only changes editor state.
+    // Only an absent controller or exact legacy ownership permits a flush.
+    // Unavailable ownership must not turn selection into a legacy write.
+    var flushLegacy=false;
+    try{
+      if(!('NemoNativeOpacityCutover' in window))flushLegacy=true;
+      else{
+        var nativeOpacity=window.NemoNativeOpacityCutover;
+        flushLegacy=!!nativeOpacity&&typeof nativeOpacity.blocksLegacy==='function'&&nativeOpacity.blocksLegacy()===false;
+      }
+    }catch(_){}
+    if(flushLegacy)saveAllLayerFrames();
+    activateUL(idx);clearSel();
     // Release Motion's per-element group isolation when it belongs to a
     // DIFFERENT layer than the one being picked (2026-08-31, Cyril: "quand
     // je select le groupe de gauche pourquoi le layer 2 reste highlighté
