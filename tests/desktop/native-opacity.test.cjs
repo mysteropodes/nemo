@@ -144,10 +144,18 @@ test('installed native opacity: live command oracles and externally driven UI ch
   }
   async function uiValue() {
     const current = await status();
-    const response = await wire(endpoint, 'request', { apiVersion: 1, requestId: randomUUID(),
+    const request = { apiVersion: 1, requestId: randomUUID(),
       instanceId: current.instanceId, documentId: current.documentId, operation: 'property.get',
-      payload: { layerId: target.layerUid, property: 'opacity' } });
-    assert.equal(response.ok, true); return response.result.value;
+      payload: { layerId: target.layerUid, property: 'opacity' } };
+    const response = await wire(endpoint, 'request', request);
+    // Keep the actual rejection for diagnosis; never include the registry secret
+    // or replace an unsuccessful live UI read with a native-query result.
+    write(path.join(reportDir, 'last-ui-read.json'), { checkpoint: stage, nativeStatus: current, request, response });
+    assert.equal(response.ok, true, 'Live v1 property.get failed: ' +
+      (response.error && response.error.code || 'missing error code') + '; see private last-ui-read.json');
+    assert.equal(response.documentId, request.documentId, 'Live UI read belongs to a different document');
+    assert.equal(response.revision, current.contentRevision, 'Live UI read belongs to a different revision');
+    return response.result.value;
   }
   async function valueCheckpoint(name, instruction, value) {
     phase(name, instruction); await waitFor(async () => await opacity() === value, name);
