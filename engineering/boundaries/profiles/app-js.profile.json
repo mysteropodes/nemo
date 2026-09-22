@@ -973,6 +973,18 @@
       ]
     },
     {
+      "id": "app.labs.diagnostics.panel",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "diagnostics-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "diagnostics-panel.js"
+      ]
+    },
+    {
       "id": "app.app",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -1786,6 +1798,18 @@
       "sizeProfile": "Domain/application",
       "publicApi": [
         "timelapse-capability.js"
+      ]
+    },
+    {
+      "id": "app.diagnostics.capability",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "diagnostics-capability.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "diagnostics-capability.js"
       ]
     },
     {

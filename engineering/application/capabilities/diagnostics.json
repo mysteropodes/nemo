@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "id": "diagnostics",
+  "version": 1,
+  "handlerKey": "application.diagnostics.inspect",
+  "input": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 32,
+        "description": "Most recent N entries only. Omit for every retained entry (bounded to the 32-entry retention window regardless)."
+      }
+    }
+  },
+  "output": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "entries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requestId": {
+              "type": "string"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "number"
+            },
+            "ok": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "requestId",
+            "operation",
+            "revision",
+            "ok"
+          ]
+        }
+      },
+      "retentionLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "The trace ring buffer bound (T05); entries never exceeds this."
+      }
+    },
+    "required": [
+      "entries",
+      "retentionLimit"
+    ]
+  },
+  "units": {},
+  "effects": {
+    "kind": "query",
+    "scope": "none",
+    "lifecycle": [
+      "inspect"
+    ]
+  },
+  "availability": {
+    "state": "unavailable",
+    "reason": "missing-dependency"
+  },
+  "fixture": {
+    "label": "inspect the 5 most recent recorded opacity commands",
+    "input": {
+      "limit": 5
+    },
+    "output": {
+      "entries": [],
+      "retentionLimit": 32
+    }
+  },
+  "examples": [
+    {
+      "label": "inspect every retained entry",
+      "input": {},
+      "output": {
+        "entries": [],
+        "retentionLimit": 32
+      }
+    },
+    {
+      "label": "inspect the 5 most recent recorded opacity commands",
+      "input": {
+        "limit": 5
+      },
+      "output": {
+        "entries": [],
+        "retentionLimit": 32
+      }
+    }
+  ]
+}

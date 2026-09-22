@@ -544,6 +544,19 @@
       ]
     },
     {
+      "path": "src/js/application/diagnostics-capability.js",
+      "moduleId": "app.diagnostics.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/diagnostics-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
+        }
+      ]
+    },
+    {
       "path": "src/js/asset-tree.js",
       "moduleId": "app.asset.tree",
       "executionClass": "document-classic",
@@ -1666,6 +1679,18 @@
           "path": "src/index.html",
           "line": 2361,
           "scriptOrdinal": 46
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/diagnostics-panel.js",
+      "moduleId": "app.labs.diagnostics.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2351,
+          "scriptOrdinal": 36
         }
       ]
     },
