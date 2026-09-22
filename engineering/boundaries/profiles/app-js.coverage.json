@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "0066b52da9fab142f802e5319d0485ac328717c4",
-    "sourceRootTree": "914730a465f86d12544fb2b84877caf29cbbd7c0",
+    "candidateCommit": "848d20f62808c8e0495f6e25e53b5bc1c962a34a",
+    "sourceRootTree": "5574dcbafd6ec36297b2070c58edaf8e99e011dc",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "2229ef6bea7fb71cbeee373b52aaf250e20bbad6",
-      "lastChangedCommit": "0066b52da9fab142f802e5319d0485ac328717c4"
+      "gitTree": "88170af714d2048c05625a0678aa5e2482eb25c1",
+      "lastChangedCommit": "848d20f62808c8e0495f6e25e53b5bc1c962a34a"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "42ac8add0c6e4840556a51d4e45970bdd316205e5144ddb5daff212b0a62bf39"
+      "value": "015c532f355b4a3eeeb9925337324b04e91613cca1133d588025677d17ccb9b6"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "a84a1b400fd3bc38f700dadb3f3d4a11876e2ee8",
-        "sha256": "1194e33edb14da8be5d539c002ee6e3616dde31cb11d54f73a00c163c814f696",
-        "moduleCount": 176,
-        "basedOnCommit": "0066b52da9fab142f802e5319d0485ac328717c4"
+        "gitBlob": "ad263c187da7647788b2c6b0798350aa1f34a65b",
+        "sha256": "a4bafeeda028f00a8da8908c33ac984694396312ca58cecf310e6657b9935ef0",
+        "moduleCount": 177,
+        "basedOnCommit": "38d148747ae8ef9ba499be9c1cfc04dc42c22403"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -830,6 +830,13 @@
           "scriptOrdinal": 71
         }
       ]
+    },
+    {
+      "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
+      "moduleId": "app.opacity.reproduction.bundle.domain",
+      "executionClass": "imported-module",
+      "loadSites": [],
+      "activation": "T07: not yet wired into src/index.html -- required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs today. T08's UI/MCP diagnostics inspector is the leaf that gives it a production caller."
     },
     {
       "path": "src/js/draw-bridge.js",
