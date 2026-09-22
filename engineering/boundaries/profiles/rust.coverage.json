@@ -58,7 +58,7 @@
   "retainedCeilings": [
     { "path": "native-feasibility/n03-headless-evaluator/src/lib.rs", "ceiling": 655, "nonblankLinesAtAdoption": 655 },
     { "path": "native-feasibility/n04-native-viewport/src/native_surface.rs", "ceiling": 814, "nonblankLinesAtAdoption": 814 },
-    { "path": "geometry-wasm/src/engine.rs", "ceiling": 4151, "nonblankLinesAtAdoption": 4151 },
+    { "path": "geometry-wasm/src/engine.rs", "ceiling": 4151, "nonblankLinesAtAdoption": 4151, "nonblankLinesNow": 4019 },
     { "path": "geometry-wasm/src/fill.rs", "ceiling": 998, "nonblankLinesAtAdoption": 998 },
     { "path": "geometry-wasm/src/tweenmatch.rs", "ceiling": 1074, "nonblankLinesAtAdoption": 1074 },
     { "path": "geometry-wasm/tests/effect_layer_overlay_repro.rs", "ceiling": 503, "nonblankLinesAtAdoption": 503 },
