@@ -130,6 +130,19 @@ test('installed native opacity: live command oracles and externally driven UI ch
     requestId: `n21-status-${++sequence}`, instanceId: endpoint.instanceId }); }
   async function dispatch(operation, payload = {}, extra = {}) {
     const current = await status();
+    if (current.available !== true) {
+      const snapshotRequest = { apiVersion: 1, requestId: randomUUID(),
+        instanceId: endpoint.instanceId, operation: 'snapshot', payload: {} };
+      const loss = { checkpoint: stage, operation, nativeStatus: current, snapshotRequest };
+      const file = path.join(reportDir, 'native-loss.json');
+      write(file, loss);
+      // One diagnostic read of the actual current owner, without the retired
+      // document selector. Neither a legacy reply nor transport failure recovers
+      // native availability or changes the original assertion below.
+      try { loss.snapshotResponse = await wire(endpoint, 'request', snapshotRequest); }
+      catch (error) { loss.snapshotError = error.message; }
+      write(file, loss);
+    }
     assert.equal(current.available, true, 'Native document is not available for ' + operation);
     const request = { apiVersion: 2, requestId: randomUUID(), instanceId: current.instanceId,
       documentId: current.documentId, operation, payload, ...extra };
@@ -192,10 +205,12 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await waitFor(() => fs.existsSync(registry) && fs.readdirSync(registry).filter(file => file.endsWith('.json')).length === 1, 'owned MCP registration', 30000);
     endpoint = read(path.join(registry, fs.readdirSync(registry).find(file => file.endsWith('.json'))));
     assert.equal((await status()).available, false);
-    phase('admit-static', 'Open static.json from the start screen. Close introductory overlays; enter Motion and select R08 rectangle.');
+    phase('admit-static', 'Open static.json from the start screen. Wait for the Motion preparation checkpoint before editing.');
     await waitFor(async () => (await status()).available, stage);
     assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
     report.checks.push({ checkpoint: stage, value: 25 });
+    await capture('motion-ready', 'Close the automatic tutorial and any introductory overlays, enter Motion, and select R08 rectangle. Capture the actual Motion surface with the selected layer and visible Opacity field before editing.');
+    assert.equal(await opacity(), 25); assert.equal(await uiValue(), 25);
     await valueCheckpoint('edit-40', 'Set the Motion layer Opacity field to 40 and commit with Tab.', 40);
     await valueCheckpoint('edit-60', 'Set the same Opacity field to 60 and commit with Tab.', 60);
     await valueCheckpoint('undo-40', 'Use the actual UI undo command.', 40);
