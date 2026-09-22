@@ -17,7 +17,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const stub = path.join(scratch, 'build-stub');
 fs.writeFileSync(stub, `#!/usr/bin/env node\n` + String.raw`
 const fs = require('node:fs');
-const [capture, delay, exitCode] = process.argv.slice(2);
+const [capture, delay, exitCode, releaseFile] = process.argv.slice(2);
 fs.writeFileSync(capture, JSON.stringify({
   pid: process.pid,
   target: process.env.CARGO_TARGET_DIR,
@@ -26,7 +26,13 @@ fs.writeFileSync(capture, JSON.stringify({
   reports: process.env.NEMO_REPORT_DIR,
   task: process.env.NEMO_TASK_ID,
 }));
-setTimeout(() => process.exit(Number(exitCode || 0)), Number(delay || 0));
+if (releaseFile) {
+  setInterval(() => {
+    if (fs.existsSync(releaseFile)) process.exit(Number(exitCode || 0));
+  }, 20);
+} else {
+  setTimeout(() => process.exit(Number(exitCode || 0)), Number(delay || 0));
+}
 `, { mode: 0o700 });
 
 const stubbornStub = path.join(scratch, 'stubborn-build-stub');
@@ -68,8 +74,9 @@ function firstLine(child) {
   });
 }
 
-async function launch(task, capture, delay = 200, exitCode = 0, executable = stub) {
+async function launch(task, capture, delay = 200, exitCode = 0, executable = stub, releaseFile = null) {
   const args = executable === stub ? [capture, String(delay), String(exitCode)] : [capture];
+  if (releaseFile) args.push(releaseFile);
   const child = spawn(process.execPath, [cli, 'start', '--task', task, '--command', executable, '--', ...args], {
     cwd: repoRoot,
     env: { ...process.env },
@@ -79,12 +86,31 @@ async function launch(task, capture, delay = 200, exitCode = 0, executable = stu
 }
 
 function command(args) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cli, ...args], { cwd: repoRoot, env: { ...process.env }, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = ''; let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    let started = false; let cleanup = Promise.resolve();
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+      if (args[0] !== 'start' || started || !stdout.includes('\n')) return;
+      const info = JSON.parse(stdout.slice(0, stdout.indexOf('\n')));
+      if (!info.started) return;
+      // These one-shot start probes expect refusal. If a regression admits
+      // one, retain its owner token and stop it before returning the result;
+      // waiting for its natural exit would hang on the retained launcher.
+      started = true;
+      // Readiness is emitted before the launcher installs its stop handlers.
+      // These short probe builds must finish before we send the owner stop;
+      // the bounded wait still attempts cleanup if the expected state fails.
+      cleanup = waitForStates(info.taskId, ['completed', 'failed', 'reconciliation-required'])
+        .finally(() => stopOwned({ child, info }));
+      cleanup.catch(reject);
+    });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
-    child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr }));
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      cleanup.then((status) => resolve({ code, signal, stdout, stderr, startState: status?.state }), reject);
+    });
   });
 }
 
@@ -132,7 +158,8 @@ test('launch plans isolate mutable build paths and serialize only the same workt
 test('active build holds the worktree slot, completion releases it, and artifacts remain owner-addressable', async () => {
   const captureA = path.join(scratch, 'capture-a.json');
   const captureB = path.join(scratch, 'capture-b.json');
-  const a = await launch(`build-active-a-${process.pid}`, captureA, 350);
+  const releaseA = path.join(scratch, 'release-a');
+  const a = await launch(`build-active-a-${process.pid}`, captureA, 0, 0, stub, releaseA);
   let b;
   try {
     await waitForState(a.info.taskId, 'active');
@@ -140,6 +167,8 @@ test('active build holds the worktree slot, completion releases it, and artifact
     assert.equal(refused.code, 1);
     assert.match(refused.stderr, /same-worktree desktop build unavailable/);
     assert.equal(fs.existsSync(captureB), false);
+    assert.equal(runtime.readBuildStatus(a.info.taskId).state, 'active');
+    fs.writeFileSync(releaseA, 'release');
     await waitForState(a.info.taskId, 'completed');
     assert.equal(runtime.readBuildStatus(a.info.taskId).slotRelease.released, true);
     assert.equal(isolation.pidAlive(a.child.pid), true, 'completed launcher retains artifacts and owner status');
@@ -155,6 +184,17 @@ test('active build holds the worktree slot, completion releases it, and artifact
     await stopOwned(a);
     await stopOwned(b);
   }
+});
+
+test('a short start probe reaches terminal state before cleaning its retained launcher', async () => {
+  const capture = path.join(scratch, 'capture-unexpected.json');
+  const result = await command(['start', '--task', `build-unexpected-${process.pid}`, '--command', stub, '--', capture, '1', '0']);
+  assert.equal(result.code, 0, result.stderr);
+  const info = JSON.parse(result.stdout);
+  assert.equal(info.started, true);
+  assert.equal(result.startState, 'completed');
+  assert.equal(isolation.pidAlive(info.pid), false);
+  assert.equal(fs.existsSync(info.roots.root), false);
 });
 
 test('status and stop require the owner and preserve peer launchers', async () => {
