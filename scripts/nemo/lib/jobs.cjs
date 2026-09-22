@@ -151,6 +151,80 @@ function jobTestUnit() {
   return (r.status === 0 ? pass : fail)(`node --test: ${summary}`, { exitCode: r.status, log: logOf(r), details: { files } });
 }
 
+function mcpSidecarTarget() {
+  let target = process.env.TAURI_ENV_TARGET_TRIPLE || process.env.NEMO_MCP_TARGET;
+  if (!target) {
+    const host = run('rustc', ['-vV'], { timeout: 15000 });
+    target = host.status === 0 ? /^host: (\S+)$/m.exec(host.stdout)?.[1] : null;
+  }
+  if (!target || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(target)) return null;
+  return path.join(ROOT, 'src-tauri', 'binaries', `nemo-mcp-${target}${target.includes('windows') ? '.exe' : ''}`);
+}
+
+function mcpSidecarPresent(sidecar) {
+  try { return fs.lstatSync(sidecar); }
+  catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function jobTestTauri(ctx, manifest, label) {
+  const selected = mcpSidecarTarget();
+  if (!selected) return fail('MCP sidecar target is unavailable');
+  const existing = mcpSidecarPresent(selected);
+  let staged = false;
+  let result;
+  let primaryError;
+  try {
+    if (!existing) {
+      staged = true;
+      const builder = run(process.execPath, ['scripts/build-mcp-sidecar.cjs'], { timeout: 10 * 60 * 1000 });
+      if (builder.status !== 0) {
+        result = fail(`MCP sidecar builder failed (${builder.status})`, { exitCode: builder.status, log: logOf(builder) });
+        return result;
+      }
+      const artifact = mcpSidecarPresent(selected);
+      if (!artifact || !artifact.isFile()) {
+        result = fail(`MCP sidecar builder produced no regular expected artifact: ${path.relative(ROOT, selected)}`, { log: logOf(builder) });
+        return result;
+      }
+    }
+    // --no-fail-fast: cargo stops at the first failing test BINARY, so the
+    // summary below would sum one binary's result and under-report the crate.
+    const args = ['test', '--no-fail-fast', '--release', '--manifest-path', manifest, '--', '--test-threads=1'];
+    const r = run('cargo', args, { timeout: 60 * 60 * 1000 });
+    const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
+    const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);
+    const summary = results.length ? `${results.length} binaries, ${passed} passed, ${failed} failed` : `exit ${r.status}`;
+    result = (r.status === 0 ? pass : fail)(`cargo test ${label}: ${summary}`, { exitCode: r.status, log: logOf(r) });
+    return result;
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    // Only a target absent before this job can be builder-owned. Do not touch
+    // a pre-existing sidecar, including its bytes and mode, on any Cargo path.
+    if (staged) {
+      try { fs.unlinkSync(selected); }
+      catch (error) {
+        if (error.code !== 'ENOENT' && result) {
+          const cleanup = `MCP sidecar cleanup failed: ${error.message || error.code}`;
+          if (result.status === STATUS.PASS) {
+            result.status = STATUS.FAIL;
+            result.reason = cleanup;
+            result.exitCode = 1;
+          } else {
+            result.limitations = (result.limitations || []).concat(cleanup);
+          }
+        } else if (error.code !== 'ENOENT' && primaryError && typeof primaryError === 'object') {
+          primaryError.message = `${primaryError.message || primaryError}; MCP sidecar cleanup failed: ${error.message || error.code}`;
+        }
+      }
+    }
+  }
+}
+
 function jobTestRust(ctx, crateDir, label) {
   if (!which('cargo')) return blocked('cargo not found');
   const manifest = path.join(ROOT, crateDir, 'Cargo.toml');
@@ -160,6 +234,7 @@ function jobTestRust(ctx, crateDir, label) {
     if (!sidecar.runs) return blocked(`native fixture sidecar unavailable (${sidecar.source}): ${sidecar.path}: ${sidecar.failure}`, {
       details: { nativeFixtureSidecar: sidecar },
     });
+    return jobTestTauri(ctx, manifest, label);
   }
   // --no-fail-fast: cargo stops at the first failing test BINARY, so the
   // summary below would sum one binary's result and under-report the crate.
@@ -168,9 +243,7 @@ function jobTestRust(ctx, crateDir, label) {
   // those through an unoptimized test binary or beside dozens of other
   // FFmpeg processes measures the harness, not production decoder latency.
   // Keep every assertion and threshold, but exercise optimized code serially.
-  if (crateDir === 'src-tauri') args.push('--release');
   args.push('--manifest-path', manifest);
-  if (crateDir === 'src-tauri') args.push('--', '--test-threads=1');
   const r = run('cargo', args, { timeout: 60 * 60 * 1000 });
   const results = [...r.stdout.matchAll(/^test result: (\w+)\. (\d+) passed; (\d+) failed/gm)];
   const passed = results.reduce((a, m) => a + Number(m[2]), 0), failed = results.reduce((a, m) => a + Number(m[3]), 0);
