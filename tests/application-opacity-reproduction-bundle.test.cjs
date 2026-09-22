@@ -158,3 +158,54 @@ test('routing guard: the bundle codec never dispatches and never touches window/
   assert.doesNotMatch(source, /\bhandle\s*\(/, 'the codec must never call a dispatcher itself -- only the caller replays through its own app');
   assert.doesNotMatch(source, /\bwindow\./, 'the codec must stay pure -- no implicit globals');
 });
+
+// ---- isolation: the bundle must never alias the caller's live trace -------
+// The whole point of this codec is that it "never touches application state".
+// That property had no test: reducing clone() to identity left the entire
+// suite green while a built bundle aliased the caller's live diagnostics
+// entries, so mutating the bundle would reach back into the recorded trace.
+// Same family as CLAUDE.md section 1 -- a live reference where an isolated
+// copy was intended. These two tests are what make that regression loud.
+
+test('a built bundle is a copy: mutating it never reaches the recorded trace', () => {
+  const live = [{ request: { operation: 'property.set', payload: { layerId: 'layer-a', value: 1 } } }];
+  const bundle = bundleCodec.buildBundle({ id: 'iso', hash: 'h' }, live);
+  bundle.commands[0].payload.value = 999;
+  bundle.commands[0].operation = 'mutated';
+  assert.equal(live[0].request.payload.value, 1, 'the caller\'s live trace payload must be unreachable through the bundle');
+  assert.equal(live[0].request.operation, 'property.set');
+});
+
+test('a parsed bundle is a copy: mutating the parse result never reaches the bundle', () => {
+  const live = [{ request: { operation: 'property.set', payload: { layerId: 'layer-a', value: 1 } } }];
+  const bundle = bundleCodec.buildBundle({ id: 'iso', hash: 'h' }, live);
+  const parsed = bundleCodec.parseBundle(bundle);
+  parsed.commands[0].payload.value = 777;
+  parsed.fixture.id = 'mutated';
+  assert.equal(bundle.commands[0].payload.value, 1, 'the bundle must be unreachable through its own parse result');
+  assert.equal(bundle.fixture.id, 'iso');
+});
+
+// ---- clock/seed must survive the codec's own round-trip ------------------
+// buildBundle records them so a future non-deterministic diagnostics source
+// can state what made its sequence reproducible. parseBundle used to drop
+// them silently, so the only reader in the codec discarded exactly the data
+// a replayer would need -- reproduction would diverge with nothing to show
+// for it. Write-only fields are worse than absent ones: they read as support.
+
+test('clock and seed survive a build/parse round-trip instead of being silently dropped', () => {
+  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const bundle = bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, { clock: 1234, seed: 99 });
+  assert.equal(bundle.clock, 1234);
+  assert.equal(bundle.seed, 99);
+  const parsed = bundleCodec.parseBundle(bundle);
+  assert.equal(parsed.clock, 1234, 'a replayer must receive the clock the recording was made under');
+  assert.equal(parsed.seed, 99, 'a replayer must receive the seed the recording was made under');
+});
+
+test('an absent clock/seed round-trips as null, not undefined', () => {
+  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const parsed = bundleCodec.parseBundle(bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, null));
+  assert.equal(parsed.clock, null);
+  assert.equal(parsed.seed, null);
+});
