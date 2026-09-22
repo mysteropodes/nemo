@@ -1,8 +1,11 @@
 'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const core = require('../src/js/application/opacity-application.js');
 const domain = require('../src/js/domain/animation/opacity.js');
+const diagnostics = require('../src/js/domain/diagnostics/opacity-diagnostics.js');
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const opacity = value => ({ layerId: 'layer-a', property: 'opacity', value });
@@ -119,6 +122,101 @@ test('stale replay and old-document retries reject before touching the new state
   const replacement = f.effects();
   assert.equal(f.app.handle(replay).error.code, 'wrong_document');
   assert.deepEqual(f.effects(), replacement);
+});
+
+// ---- NemoOpacityDiagnostics (T05) — the extracted module in isolation ----
+// The tests above already prove the observable behavior is unchanged through
+// the full application core; these exercise the extracted port directly.
+
+test('diagnostics: the bound is exactly LIMIT, oldest entry shifted first', () => {
+  const d = diagnostics.create(['property.set']);
+  for (let i = 0; i < diagnostics.LIMIT + 5; i++) {
+    d.remember({ requestId: `r${i}`, payload: {} }, { revision: i, ok: true });
+  }
+  const entries = d.entries();
+  assert.equal(entries.length, diagnostics.LIMIT);
+  assert.equal(entries[0].request.requestId, 'r5');
+  assert.equal(entries.at(-1).request.requestId, `r${diagnostics.LIMIT + 4}`);
+});
+
+test('diagnostics: entries() and remember() both clone, so callers cannot alter retained state', () => {
+  const d = diagnostics.create(['property.set']);
+  const request = { requestId: 'r0', payload: { value: 1 } };
+  d.remember(request, { revision: 0, ok: true });
+  request.payload.value = 999;
+  assert.equal(d.entries()[0].request.payload.value, 1, 'mutating the caller copy after remember() must not reach the stored copy');
+  const entries = d.entries();
+  entries[0].request.payload.value = 999;
+  assert.equal(d.entries()[0].request.payload.value, 1, 'mutating a returned entry must not reach the stored copy');
+});
+
+test('diagnostics: clear() empties the trace', () => {
+  const d = diagnostics.create(['property.set']);
+  d.remember({ requestId: 'r0', payload: {} }, { revision: 0, ok: true });
+  d.clear();
+  assert.deepEqual(d.entries(), []);
+});
+
+test('diagnostics: prepareReplay shapes a valid envelope against the CURRENT identity, not the recorded one', () => {
+  const d = diagnostics.create(['property.set']);
+  const recorded = { operation: 'property.set', payload: { layerId: 'layer-a', property: 'opacity', value: 40 } };
+  const identity = { instanceId: 'inst-2', documentId: 'doc-2', revision: 7 };
+  const { envelope, error } = d.prepareReplay({ requestId: 'repeat', payload: { request: recorded } }, identity);
+  assert.equal(error, undefined);
+  assert.deepEqual(envelope, { apiVersion: 1, requestId: 'repeat:replay', instanceId: 'inst-2',
+    documentId: 'doc-2', expectedRevision: 7, operation: 'property.set', payload: recorded.payload });
+});
+
+test('diagnostics: prepareReplay mutating the returned envelope cannot reach the recorded payload', () => {
+  const d = diagnostics.create(['property.set']);
+  const recorded = { operation: 'property.set', payload: { value: 1 } };
+  const { envelope } = d.prepareReplay({ requestId: 'r', payload: { request: recorded } }, { instanceId: 'i', documentId: 'doc', revision: 0 });
+  envelope.payload.value = 999;
+  assert.equal(recorded.payload.value, 1);
+});
+
+const invalidReplayInputs = [
+  ['missing record', undefined],
+  ['null record', null],
+  ['array record', []],
+  ['not a replayable operation', { operation: 'history.undo', payload: {} }],
+  ['missing payload', { operation: 'property.set' }],
+  ['null payload', { operation: 'property.set', payload: null }],
+  ['array payload', { operation: 'property.set', payload: [] }],
+];
+for (const [name, recorded] of invalidReplayInputs) {
+  test(`diagnostics: prepareReplay rejects ${name}`, () => {
+    const d = diagnostics.create(['property.set']);
+    const { envelope, error } = d.prepareReplay({ requestId: 'r', payload: { request: recorded } }, { instanceId: 'i', documentId: 'doc', revision: 0 });
+    assert.equal(envelope, undefined);
+    assert.equal(typeof error, 'string');
+  });
+}
+
+test('diagnostics: prepareReplay rejects an oversized requestId', () => {
+  const d = diagnostics.create(['property.set']);
+  const recorded = { operation: 'property.set', payload: { value: 1 } };
+  const { envelope, error } = d.prepareReplay({ requestId: 'x'.repeat(121), payload: { request: recorded } }, { instanceId: 'i', documentId: 'doc', revision: 0 });
+  assert.equal(envelope, undefined);
+  assert.equal(typeof error, 'string');
+});
+
+test('diagnostics: only operations the caller declared replayable are eligible', () => {
+  const d = diagnostics.create(['property.set']);
+  const recorded = { operation: 'property.key.set', payload: { value: 1 } };
+  const { envelope, error } = d.prepareReplay({ requestId: 'r', payload: { request: recorded } }, { instanceId: 'i', documentId: 'doc', revision: 0 });
+  assert.equal(envelope, undefined);
+  assert.equal(typeof error, 'string');
+});
+
+test('routing guard: opacity-application.js delegates trace/replay to NemoOpacityDiagnostics and never dispatches from inside it', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/js/application/opacity-application.js'), 'utf8');
+  assert.match(source, /diagnostics\.remember\(/);
+  assert.match(source, /diagnostics\.entries\(\)/);
+  assert.match(source, /diagnostics\.prepareReplay\(/);
+  assert.doesNotMatch(source, /trace\.push|trace\.shift|trace\.length\s*=\s*0/, 'the inline ring buffer must not come back');
+  const diagnosticsSource = fs.readFileSync(path.join(__dirname, '../src/js/domain/diagnostics/opacity-diagnostics.js'), 'utf8');
+  assert.doesNotMatch(diagnosticsSource, /\bhandle\s*\(/, 'the extracted module must never call a dispatcher itself -- only the caller re-enters its own writer');
 });
 
 test('trace results are detached and obey the advertised retention bound', () => {

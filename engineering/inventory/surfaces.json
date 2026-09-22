@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f59b8693116087cc1d63058aed8bfacf2abdee82",
-  "describe": "v0.7.0-alpha.4-535-gf59b869"
+  "head": "0066b52da9fab142f802e5319d0485ac328717c4",
+  "describe": "v0.7.0-alpha.4-540-g0066b52-dirty"
  },
- "inputsDigest": "5324fa42d22d909525722594f3e96f21997e233ff9e9f088a7a64c13c4c7172d",
+ "inputsDigest": "c45eb2a2ebefadabaf9f7d51b7ecdcbdbe2ce21de6ee0e62b1da325f4db576ca",
  "states": [
   "inventoried",
   "characterized",
@@ -2316,7 +2316,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 144,
+    "functionsVisited": 143,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -23991,7 +23991,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 103
+    "functionsVisited": 102
    },
    "fixtures": [
     "mesh",
