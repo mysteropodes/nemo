@@ -137,6 +137,23 @@ test('Motion forwards no down, drag, or up callback on the denied stack', () => 
   assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
 });
 
+test('Paper view down denies native Select and Motion before the release guard', () => {
+  for (const tool of ['select', 'draw']) {
+    const active = { value: true }, releases = [], guard = installGuard(active, releases);
+    let motionDown = 0;
+    const { context } = bootTools(guard, { tool, appMode: 'motion' }, {
+      onDown() { motionDown++; return true; },
+    });
+    context.NemoNativeOpacityCutover = { blocksLegacy: () => true };
+    const nativeEvent = event();
+    context.view.onMouseDown({ event: nativeEvent, modifiers: {}, point: { x: 2, y: 3 } });
+    assert.equal(nativeEvent.stopped, 1, tool);
+    assert.equal(nativeEvent.prevented, 1, tool);
+    assert.equal(motionDown, 0, tool);
+    assert.deepEqual(releases, [], tool);
+  }
+});
+
 test('a Shapes combine menu retained from legacy cannot mutate after activation', () => {
   const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = [];
   const { context, list } = bootShapes(undefined, calls);
