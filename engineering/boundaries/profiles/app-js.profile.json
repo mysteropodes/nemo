@@ -1885,6 +1885,18 @@
       ]
     },
     {
+      "id": "app.opacity.reproduction.bundle.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/diagnostics",
+      "files": [
+        "opacity-reproduction-bundle.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "opacity-reproduction-bundle.js"
+      ]
+    },
+    {
       "id": "app.expression.random.domain",
       "layer": "domain",
       "dir": "src/js/domain/animation",
