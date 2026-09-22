@@ -1,5 +1,14 @@
 // The opacity command service owns legacy validation, revision and retry boundaries.
 // Native authority is composed from the bounded N20 contract/lifecycle/operations modules.
+// NemoOpacityDiagnostics (T05) is a classic-script global in the browser and a
+// CommonJS module under Node's test runner, resolved here the same dual way
+// this file exports itself below -- mirrored on the import side.
+// It does NOT load immediately before this file: N20 freezes the exact script
+// ordinals of the native-opacity chain, so the diagnostics tag sits further
+// down index.html. That is safe because both files declare the same global
+// `var` and create() dereferences it only when called -- and the first call is
+// made by bootstrap/opacity-application.js, which loads after both.
+var NemoOpacityDiagnostics = typeof require === 'function' ? require('../domain/diagnostics/opacity-diagnostics.js') : window.NemoOpacityDiagnostics;
 var NemoOpacityApplicationCore = (function () {
   'use strict';
   var READS = ['capabilities', 'snapshot', 'property.get', 'diagnostics.trace'];
@@ -10,7 +19,8 @@ var NemoOpacityApplicationCore = (function () {
 
   function create(ports) {
     var identity = { instanceId: ports.newId(), documentId: ports.newId(), revision: 0 };
-    var assigned = false, retained = new Map(), trace = [], editing = false;
+    var assigned = false, retained = new Map(), editing = false;
+    var diagnostics = NemoOpacityDiagnostics.create(PROPERTY_WRITES);
     var context = ports.context(), frame = ports.state().currentFrame;
     function response(request, ok, value) {
       var result = { apiVersion: 1, requestId: request && request.requestId || '',
@@ -22,7 +32,7 @@ var NemoOpacityApplicationCore = (function () {
     function touch() { identity.revision++; }
     function documentChanged() {
       identity.documentId = ports.newId(); identity.revision = 0;
-      retained.clear(); trace.length = 0;
+      retained.clear(); diagnostics.clear();
       context = ports.context(); frame = ports.state().currentFrame;
     }
     function setInstanceId(id) {
@@ -51,8 +61,7 @@ var NemoOpacityApplicationCore = (function () {
       if (!WRITES.includes(request.operation)) return;
       retained.set(request.requestId, { body: body, result: clone(result) });
       if (retained.size > 256) retained.delete(retained.keys().next().value);
-      trace.push({ request: clone(request), revision: result.revision, ok: result.ok });
-      if (trace.length > 32) trace.shift();
+      diagnostics.remember(request, result);
     }
     function property(request) {
       var p = request.payload, state = ports.state();
@@ -94,14 +103,11 @@ var NemoOpacityApplicationCore = (function () {
       var op = request.operation;
       if (op === 'capabilities') return response(request, true, capabilitySummary());
       if (op === 'snapshot') return response(request, true, ports.snapshot());
-      if (op === 'diagnostics.trace') return response(request, true, { entries: clone(trace) });
+      if (op === 'diagnostics.trace') return response(request, true, { entries: diagnostics.entries() });
       if (op === 'diagnostics.replay') {
-        var recorded = request.payload.request;
-        if (!object(recorded) || !object(recorded.payload) || !PROPERTY_WRITES.includes(recorded.operation) || request.requestId.length > 120) return fail(request, 'invalid_request', 'Replay requires one recorded property command.');
-        var replay = { apiVersion: 1, requestId: request.requestId + ':replay', instanceId: identity.instanceId,
-          documentId: identity.documentId, expectedRevision: identity.revision,
-          operation: recorded.operation, payload: clone(recorded.payload) };
-        var replayed = handle(replay);
+        var prepared = diagnostics.prepareReplay(request, identity);
+        if (prepared.error) return fail(request, 'invalid_request', prepared.error);
+        var replayed = handle(prepared.envelope);
         return replayed.ok ? response(request, true, { replay: replayed }) : fail(request, replayed.error.code, replayed.error.message);
       }
       if (op === 'history.undo' || op === 'history.redo') {

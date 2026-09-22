@@ -224,8 +224,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2504,
-          "scriptOrdinal": 165
+          "line": 2512,
+          "scriptOrdinal": 166
         }
       ]
     },
@@ -236,8 +236,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2496,
-          "scriptOrdinal": 157
+          "line": 2504,
+          "scriptOrdinal": 158
         }
       ]
     },
@@ -248,8 +248,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2497,
-          "scriptOrdinal": 158
+          "line": 2505,
+          "scriptOrdinal": 159
         }
       ]
     },
@@ -260,8 +260,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2500,
-          "scriptOrdinal": 161
+          "line": 2508,
+          "scriptOrdinal": 162
         }
       ]
     },
@@ -296,8 +296,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2499,
-          "scriptOrdinal": 160
+          "line": 2507,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -308,8 +308,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2498,
-          "scriptOrdinal": 159
+          "line": 2506,
+          "scriptOrdinal": 160
         }
       ]
     },
@@ -441,8 +441,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2501,
-          "scriptOrdinal": 162
+          "line": 2509,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -610,8 +610,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2503,
-          "scriptOrdinal": 164
+          "line": 2511,
+          "scriptOrdinal": 165
         }
       ]
     },
@@ -622,8 +622,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2502,
-          "scriptOrdinal": 163
+          "line": 2510,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -816,6 +816,18 @@
           "path": "src/index.html",
           "line": 2318,
           "scriptOrdinal": 15
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/diagnostics/opacity-diagnostics.js",
+      "moduleId": "app.opacity.diagnostics.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2393,
+          "scriptOrdinal": 71
         }
       ]
     },

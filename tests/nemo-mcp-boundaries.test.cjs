@@ -33,6 +33,7 @@ test('all MCP transport and desktop-host Rust modules have actual size enforceme
 test('opacity application slice declares contract, lifecycle, operations, bootstrap and adapter boundaries', () => {
   const expected = [
     ['app.opacity.domain', 'domain', 'src/js/domain/animation/opacity.js', 'Domain kernel'],
+    ['app.opacity.diagnostics.domain', 'domain', 'src/js/domain/diagnostics/opacity-diagnostics.js', 'Domain kernel'],
     ['app.native.opacity.contract', 'domain', 'src/js/application/native-opacity-contract.js', 'Domain/application'],
     ['app.native.opacity.lifecycle', 'application', 'src/js/application/native-opacity-lifecycle.js', 'Domain/application'],
     ['app.native.opacity.operations', 'application', 'src/js/application/native-opacity-operations.js', 'Domain/application'],

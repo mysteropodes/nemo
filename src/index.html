@@ -2383,6 +2383,14 @@
 <script src="js/text-selector.js"></script>
 <script src="js/animation/curve.js"></script>
 <script src="js/domain/animation/opacity.js"></script>
+<!-- Bounded write-trace and replay-envelope preparation (T05): consumed by
+     opacity-application.js's diagnostics.trace / diagnostics.replay handling.
+     It cannot sit next to its consumer: N20 freezes the exact script ordinals
+     of the native-opacity chain (boundaries-application.test.cjs), and the
+     7 tags before js/app.js are asserted contiguous. Loading before the first
+     create() call -- made by bootstrap/opacity-application.js -- is the real
+     requirement, and this position satisfies it. -->
+<script src="js/domain/diagnostics/opacity-diagnostics.js"></script>
 <script src="js/domain/animation/expression-time.js"></script>
 <script src="js/domain/animation/expression-random.js"></script>
 <script src="js/motion.js"></script>
