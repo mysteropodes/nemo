@@ -44,9 +44,14 @@ var NemoOpacityReproductionBundle = (function () {
   }
 
   // Validates a bundle's shape and version WITHOUT touching any document.
-  // Returns {fixture, commands} on success or {error} on rejection -- never
-  // throws on malformed input, so a caller can safely try an untrusted
-  // bundle before deciding whether to replay it at all.
+  // Returns {fixture, commands, clock, seed} on success or {error} on
+  // rejection -- never throws on malformed input, so a caller can safely try
+  // an untrusted bundle before deciding whether to replay it at all.
+  // clock/seed are returned rather than dropped: buildBundle records them so
+  // a non-deterministic source can say what made its sequence reproducible,
+  // and a replayer that never receives them would silently diverge from the
+  // recording instead of failing. They stay opaque here -- this codec does
+  // not interpret them, it only refuses to lose them.
   function parseBundle(bundle) {
     if (!object(bundle)) return { error: 'Bundle must be an object.' };
     if (bundle.formatVersion !== FORMAT_VERSION) return { error: 'Unsupported or missing bundle format version.' };
@@ -61,7 +66,12 @@ var NemoOpacityReproductionBundle = (function () {
         return { error: 'Bundle command ' + i + ' is malformed.' };
       }
     }
-    return { fixture: clone(bundle.fixture), commands: clone(bundle.commands) };
+    return {
+      fixture: clone(bundle.fixture),
+      commands: clone(bundle.commands),
+      clock: bundle.clock != null ? clone(bundle.clock) : null,
+      seed: bundle.seed != null ? clone(bundle.seed) : null,
+    };
   }
 
   return { FORMAT_VERSION: FORMAT_VERSION, buildBundle: buildBundle, parseBundle: parseBundle };
