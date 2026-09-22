@@ -76,13 +76,13 @@ test('N13 native viewport adapter cannot be omitted from fresh application disco
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N15 native application adapter cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N15 native application adapter without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/adapters/native-application.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.application.adapter'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.application.adapter');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
@@ -90,13 +90,13 @@ test('N15 native application adapter cannot be omitted from fresh application di
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N17 native opacity editor adapter cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N17 native opacity editor adapter without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/adapters/native-opacity-editor.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.opacity.editor.adapter'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.editor.adapter');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
@@ -104,13 +104,13 @@ test('N17 native opacity editor adapter cannot be omitted from fresh application
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N17 native opacity selection adapter cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N17 native opacity selection adapter without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/adapters/native-opacity-selection.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.opacity.selection.adapter'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.selection.adapter');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
@@ -118,13 +118,13 @@ test('N17 native opacity selection adapter cannot be omitted from fresh applicat
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N18 native opacity preview adapter cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N18 native opacity preview adapter without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/adapters/native-opacity-preview.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.opacity.preview.adapter'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.preview.adapter');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
@@ -132,13 +132,13 @@ test('N18 native opacity preview adapter cannot be omitted from fresh applicatio
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N18 native opacity export adapter cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N18 native opacity export adapter without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/adapters/native-opacity-export.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.opacity.export.adapter'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.opacity.export.adapter');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
@@ -146,18 +146,55 @@ test('N18 native opacity export adapter cannot be omitted from fresh application
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
 });
 
-test('N19C dormant native edit guard cannot be omitted from fresh application discovery', () => {
+test('N20 activates the N19C native edit guard without weakening discovery', () => {
   const profile = read('app-js.profile.json');
   const policy = read('app-js.coverage.json');
   const required = 'src/js/application/native-edit-guard.js';
   assert.ok(policy.retainedSources.some((entry) => entry.path === required
     && entry.moduleId === 'app.native.edit.guard.application'
-    && entry.executionClass === 'classic-without-load-site'));
+    && entry.executionClass === 'document-classic'));
   const dropped = structuredClone(profile);
   dropped.modules = dropped.modules.filter((module) => module.id !== 'app.native.edit.guard.application');
   const droppedPolicy = { ...policy, retainedSources: policy.retainedSources.filter((entry) => entry.path !== required) };
   assert.throws(() => checkApplicationPolicy(dropped, droppedPolicy, { root: ROOT }),
     /fresh discovery found \d+ source\(s\), but the policy accounts for \d+ retained \+ \d+ excluded/);
+});
+
+test('N20 contract, authority, adapters and bootstrap load in their frozen order', () => {
+  const policy = read('app-js.coverage.json');
+  const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8').split('\n');
+  let ordinal = 0;
+  const actual = new Map();
+  html.forEach((line, index) => {
+    if (!line.includes('<script')) return;
+    ordinal += 1;
+    const match = line.match(/src=["']([^"']+)/);
+    if (match) actual.set('src/' + match[1], { path: 'src/index.html', line: index + 1, scriptOrdinal: ordinal });
+  });
+  const paths = [
+    'src/js/application/native-opacity-contract.js',
+    'src/js/application/native-opacity-lifecycle.js',
+    'src/js/application/native-opacity-operations.js',
+    'src/js/application/opacity-application.js',
+    'src/js/adapters/native-opacity-legacy-surface.js',
+    'src/js/adapters/native-opacity-motion-surface.js',
+    'src/js/adapters/native-application.js',
+    'src/js/adapters/native-opacity-editor.js',
+    'src/js/adapters/native-opacity-selection.js',
+    'src/js/adapters/native-opacity-preview.js',
+    'src/js/adapters/native-opacity-export.js',
+    'src/js/application/native-edit-guard.js',
+    'src/js/bootstrap/opacity-application.js',
+    'src/js/bootstrap/native-opacity-application.js',
+    'src/js/adapters/application-mcp.js',
+  ];
+  for (const sourcePath of paths) {
+    const entry = policy.retainedSources.find((record) => record.path === sourcePath);
+    assert.equal(entry.executionClass, 'document-classic', sourcePath);
+    assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
+  }
+  assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
+    [6, 7, 8, 9, 10, 11, 157, 158, 159, 160, 161, 162, 163, 164, 165]);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {

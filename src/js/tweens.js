@@ -1,4 +1,14 @@
 // ---- TWEEN ENGINE FEATURE FLAGS (2026-07) ----
+var n20AllowLegacyWrite=typeof n20AllowLegacyWrite==='function'?n20AllowLegacyWrite:typeof n20AllowLegacyWrite!=='undefined'?function(){return false;}:function(kind){
+  try{var admission=typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+    return admission===undefined||!!admission&&typeof admission.allow==='function'&&admission.allow(kind)===true;
+  }catch(_){return false;}
+};
+var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLegacyWrite:function(kind){
+  try{if(n20AllowLegacyWrite(kind)===true)return true;}catch(_){}
+  var error=new Error('Native document authority must release before this legacy edit.');
+  error.name='NemoNativeReleaseRequired';throw error;
+};
 // Cyril: "possibilité de revenir sur ou/et l'autre" — each of the two
 // 2026-07 additions below (curvature-aware DTW cost, fold-correction
 // pass) can be independently switched off for A/B comparison or a quick
@@ -3741,6 +3751,7 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
   }
 }
 function generateTweens(explicitRestrictTo,skipUndo){
+  if(!n20AllowLegacyWrite('timeline-generate-tweens'))return false;
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
@@ -4368,6 +4379,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
 // Opt-in (state.tweenHarmonizeEdits, "en option" per the feedback) since
 // it silently re-tweens a whole span from a plain sculpt/subselect drag.
 function harmonizeAfterEdit(fi){
+  if(!n20AllowLegacyWrite('timeline-harmonize-edit'))return false;
   if(!state.tweenHarmonizeEdits)return;
   var ld=state.layers[state.activeLayerIdx];if(!ld)return;
   var f=ld.frames[fi];if(!f||!f.isKeyframe)return;
@@ -4738,7 +4750,7 @@ function renderOS(){
 // and JS strings are immutable, so sharing the heavy fields by reference is
 // unconditionally safe. Same split the render path already uses
 // (cloneStrokeForTransform, app.js). 2026-07-28.
-function pushUndo(alreadySaved){pushUndoLayers(alreadySaved);}
+function pushUndo(alreadySaved){n20RequireLegacyWrite('history-checkpoint');pushUndoLayers(alreadySaved);}
 // Walks every stroke of a layers tree in a deterministic order. Both the
 // live tree and its clone have identical shape, so two walks stay in lockstep
 // and a flat array indexed by visit order is enough to pair them up.
@@ -4805,6 +4817,15 @@ function _cloneStrokesForUndo(strokes){
 // calls saveAllLayerFrames() rather than saveActiveLayerFrame()) must keep
 // using the full pushUndo() instead.
 function pushUndoActiveFrame(){
+  var n20Allowed=false;
+  try{
+    var n20Admission=typeof n20AllowLegacyWrite==='undefined'&&typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+    n20Allowed=typeof n20AllowLegacyWrite!=='undefined'
+      ?typeof n20AllowLegacyWrite==='function'&&n20AllowLegacyWrite('frame-history-checkpoint')===true
+      :n20Admission===undefined||!!n20Admission&&typeof n20Admission.allow==='function'&&n20Admission.allow('frame-history-checkpoint')===true;
+  }catch(_){}
+  if(!n20Allowed){var n20Error=new Error('Native document authority must release before this legacy edit.');
+    n20Error.name='NemoNativeReleaseRequired';throw n20Error;}
   if(window._scrubLiveActive)return;
   if(typeof saveActiveLayerFrame==='function')saveActiveLayerFrame();
   // Entry kind + capture live in application/history/frame-entry.js (P21).
@@ -4893,7 +4914,7 @@ function _actionLabelNow(){
 // snapshot par tick aurait pollué la pile pour un seul geste. ui.js pousse
 // UN snapshot pré-geste au premier mouvement puis lève ce flag ; ici on
 // no-op tant qu'il est levé (y compris le 'change' final du release).
-function pushUndoLayers(alreadySaved){if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
+function pushUndoLayers(alreadySaved){n20RequireLegacyWrite('layers-history-checkpoint');if(window._scrubLiveActive)return;if(!alreadySaved)saveAllLayerFrames();state.undoStack.push(layersSnapshotNow());state.undoLabels.push(_actionLabelNow());if(state.undoStack.length>state.maxUndo){state.undoStack.shift();state.undoLabels.shift();}state.redoStack=[];state.redoLabels=[];if(window.SMFeedback)SMFeedback.logAction();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();
   // Playback bake cache (playback-cache.js): this is the SAME chokepoint
   // SMFeedback.logAction() right above already trusts as "a real content-
   // mutating action happened" — any baked bitmap for the frame(s) this
@@ -4961,7 +4982,7 @@ function restoreLayersSnapshot(s){
 }
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function undo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function undo(){var nativeOpacity=window.NemoNativeOpacityCutover;if(nativeOpacity&&nativeOpacity.blocksLegacy()){if(nativeOpacity.isActive())nativeOpacity.historyFromUi('undo').catch(function(){});return;}if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.undoStack.length){showToast(SM.t('toastNothingToUndo'));return;}
 // Cross-context guard (2026-07-30 fix) — PEEK before popping: a mismatched
 // entry stays on the stack untouched so the user can navigate to the right
@@ -4979,7 +5000,7 @@ if(s.type==='layers'){state.redoStack.push(layersSnapshotNow());state.redoLabels
 var applied=NemoFrameHistoryEntry.apply(state,s);state.redoStack.push(applied.inverse);state.redoLabels.push(sl);loadFrame(state.currentFrame);renderOS();renderArcs();updateUI();if(window.renderHistoryPanelIfOpen)renderHistoryPanelIfOpen();}
 // Both branches below rewrite frame strokes; Motion's component union-bounds
 // cache is derived from those, so drop it here rather than in each branch.
-function redo(){if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
+function redo(){var nativeOpacity=window.NemoNativeOpacityCutover;if(nativeOpacity&&nativeOpacity.blocksLegacy()){if(nativeOpacity.isActive())nativeOpacity.historyFromUi('redo').catch(function(){});return;}if(window.SMMotion&&SMMotion.invalidateSymbolUnionBounds)SMMotion.invalidateSymbolUnionBounds();
 if(!state.redoStack.length){showToast(SM.t('toastNothingToRedo'));return;}
 // Same cross-context guard as undo() above, mirrored for the redo stack.
 var top=state.redoStack[state.redoStack.length-1];

@@ -1,5 +1,5 @@
-// The opacity command service owns validation, revision and retry boundaries.
-// Concrete document/history/render bindings are supplied by bootstrap.
+// The opacity command service owns legacy validation, revision and retry boundaries.
+// Native authority is composed from the bounded N20 contract/lifecycle/operations modules.
 var NemoOpacityApplicationCore = (function () {
   'use strict';
   var READS = ['capabilities', 'snapshot', 'property.get', 'diagnostics.trace'];
@@ -21,8 +21,7 @@ var NemoOpacityApplicationCore = (function () {
     function fail(request, code, message) { return response(request, false, { code: code, message: message }); }
     function touch() { identity.revision++; }
     function documentChanged() {
-      identity.documentId = ports.newId();
-      identity.revision = 0;
+      identity.documentId = ports.newId(); identity.revision = 0;
       retained.clear(); trace.length = 0;
       context = ports.context(); frame = ports.state().currentFrame;
     }
@@ -115,8 +114,7 @@ var NemoOpacityApplicationCore = (function () {
       if (target.error) return fail(request, 'invalid_request', target.error);
       if (op === 'property.get') return response(request, true, readProperty(target.layer, target.frame));
       var before = identity.revision;
-      ports.history.checkpoint();
-      ports.write(op, target.layer, request.payload);
+      ports.history.checkpoint(); ports.write(op, target.layer, request.payload);
       if (identity.revision === before) touch();
       ports.afterMutation(target.layer);
       return response(request, true, readProperty(target.layer, target.frame));
@@ -135,17 +133,50 @@ var NemoOpacityApplicationCore = (function () {
           || request.expectedRevision !== identity.revision)) return fail(request, 'stale_revision', 'Read a current snapshot before writing.');
       if (WRITES.includes(request.operation) && !ports.canMutate()) return fail(request, 'unavailable', 'An interactive gesture owns the document.');
       if (editing) return fail(request, 'unavailable', 'A document edit is already in progress.');
-      // Replay re-enters only with a validated property command, never replay/history.
       editing = request.operation !== 'diagnostics.replay';
       var result;
-      try { result = perform(request); }
-      finally { editing = false; }
+      try { result = perform(request); } finally { editing = false; }
       remember(request, body, result);
       return result;
     }
     return { handle: handle, setInstanceId: setInstanceId, documentChanged: documentChanged,
       historyChanged: touch, changed: touch, meta: function () { return Object.assign({}, identity); } };
   }
-  return { create: create };
+
+  function createNative(ports, modules) {
+    if (!modules || !modules.contract || !modules.lifecycle || !modules.operations) {
+      throw new Error('native opacity modules must be supplied to the core');
+    }
+    function requireMotionSurface() {
+      var surface = modules.motionSurface;
+      var methods = ['requireAvailable', 'owns', 'read', 'detachedElementView', 'detachedExpressionView',
+        'expressionSnapshot', 'positionOverlayPlan', 'nativeKeyInteractionPlan', 'renderedOpacityRoute', 'routeIntent', 'routeDimension', 'publishWriters'];
+      if (!surface || !Object.isFrozen(surface) || methods.some(function (name) { return typeof surface[name] !== 'function'; })) {
+        throw new Error('native Motion surface is unavailable or malformed');
+      }
+      surface.requireAvailable(surface);
+    }
+    requireMotionSurface();
+    var operations;
+    var lifecycle = modules.lifecycle.create(Object.assign({}, ports, {
+      legacyImport: function () { return operations.reenterLegacy.apply(null, arguments); },
+      onDisposed: function (session) { operations.disposeSession(session); }
+    }), modules.contract);
+    operations = modules.operations.create(lifecycle, ports, modules.contract);
+    return Object.freeze({ activate: function (prepared) { requireMotionSurface(); return lifecycle.activate(prepared); },
+      release: lifecycle.requestRelease,
+      releaseCurrent: lifecycle.releaseCurrent, requestRelease: lifecycle.requestRelease,
+      getNativeIdentity: lifecycle.getNativeIdentity, isActive: lifecycle.isActive,
+      blocksLegacy: lifecycle.blocksLegacy, status: lifecycle.status, identity: lifecycle.identity,
+      valueAtFrame: lifecycle.valueAtFrame, projectSelection: lifecycle.projectSelection,
+      setOpacity: operations.setOpacity, setOpacityFromUi: operations.setOpacityFromUi,
+      history: operations.history, historyFromUi: operations.historyFromUi,
+      renderPreview: lifecycle.renderPreview, exportPng: lifecycle.exportPng,
+      legacyIntent: operations.legacyIntent, handleV1: operations.handleV1,
+      persistenceJSON: lifecycle.persistenceJSON, flush: lifecycle.flush, prepared: lifecycle.prepared,
+      install: operations.install });
+  }
+
+  return { create: create, createNative: createNative };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = NemoOpacityApplicationCore;

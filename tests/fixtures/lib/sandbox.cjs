@@ -135,6 +135,7 @@ function loadAppHelpers(state = defaultState(), motion = null) {
   const code = APP_FUNCTIONS.map((n) => extractFunction(src, n)).join('\n');
   const sb = baseSandbox(state);
   if (motion) sb.SMMotion = motion.SMMotion;
+  vm.runInNewContext(read('domain/component/exposed-properties.js'), sb, { filename: 'src/js/domain/component/exposed-properties.js' });
   vm.runInNewContext(code + '\nthis.__api = { getEffectiveStrokes, resolveSymbolFrameIdx, layerInPoint, layerOutPoint, migrateTimeLinkOffsets, effectorChannels };', sb, { filename: 'src/js/app.js (extract)' });
   return Object.assign({ state, sandbox: sb }, sb.__api);
 }

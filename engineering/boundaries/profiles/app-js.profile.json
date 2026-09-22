@@ -1693,6 +1693,42 @@
       ]
     },
     {
+      "id": "app.native.opacity.contract",
+      "layer": "domain",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-contract.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-contract.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.lifecycle",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-lifecycle.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-lifecycle.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.operations",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-operations.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-operations.js"
+      ]
+    },
+    {
       "id": "app.opacity.application",
       "layer": "application",
       "dir": "src/js/application",
@@ -1753,6 +1789,18 @@
       ]
     },
     {
+      "id": "app.native.opacity.bootstrap",
+      "layer": "bootstrap",
+      "dir": "src/js/bootstrap",
+      "files": [
+        "native-opacity-application.js"
+      ],
+      "sizeProfile": "Handwritten config/bootstrap",
+      "publicApi": [
+        "native-opacity-application.js"
+      ]
+    },
+    {
       "id": "app.opacity.bootstrap",
       "layer": "bootstrap",
       "dir": "src/js/bootstrap",
@@ -1762,6 +1810,18 @@
       "sizeProfile": "Handwritten config/bootstrap",
       "publicApi": [
         "opacity-application.js"
+      ]
+    },
+    {
+      "id": "app.component.exposed-properties.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/component",
+      "files": [
+        "exposed-properties.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "exposed-properties.js"
       ]
     },
     {
@@ -1846,6 +1906,30 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-application.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.legacy-surface.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-legacy-surface.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-opacity-legacy-surface.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.motion-surface.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-motion-surface.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-opacity-motion-surface.js"
       ]
     },
     {

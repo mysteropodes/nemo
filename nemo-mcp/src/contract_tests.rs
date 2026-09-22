@@ -78,7 +78,8 @@ fn native_pinned_reads_are_discovered_without_transport_operation_variants() {
         "../../engineering/application/capabilities-v2/native-opacity.json"
     ))
     .unwrap();
-    assert_eq!(descriptor["availability"]["state"], "unavailable");
+    assert_eq!(descriptor["availability"]["state"], "available");
+    assert!(descriptor["availability"]["reason"].is_null());
     assert_eq!(
         descriptor["resourceBoundary"]["maxReadResponseBytes"],
         NATIVE_MAX_MESSAGE_BYTES

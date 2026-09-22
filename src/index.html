@@ -2301,6 +2301,13 @@
 <script>window.SM_FROZEN_IN_DEV={rig:false,storyboard:true,import3d:true};</script>
 <script src="js/ui.js"></script>
 <script src="js/color-picker.js"></script>
+<script src="js/application/native-opacity-contract.js"></script>
+<script src="js/application/native-opacity-lifecycle.js"></script>
+<script src="js/application/native-opacity-operations.js"></script>
+<script src="js/application/opacity-application.js"></script>
+<script src="js/adapters/native-opacity-legacy-surface.js"></script>
+<script src="js/adapters/native-opacity-motion-surface.js"></script>
+<script src="js/domain/component/exposed-properties.js"></script>
 <script src="js/app.js"></script>
 <!-- Folder-metadata codec (P20). Placed immediately before its consumers
      tweens.js (undo snapshot/restore) and timeline.js (document export/
@@ -2383,7 +2390,6 @@
      before the application services that register into it. -->
 <script src="js/application/capability-registry.js"></script>
 <script src="js/application/opacity-capability.js"></script>
-<script src="js/application/opacity-application.js"></script>
 <!-- Bounded export job (P18): consumed by export.js at export time, not at parse time. -->
 <script src="js/application/export-job.js"></script>
 <!-- Categorized library of expression snippets (window.SM_EXPR_EXAMPLES) and
@@ -2485,7 +2491,16 @@
 <script src="js/pen-bridge.js"></script>
 <script src="js/rig-bridge.js"></script>
 <script src="js/tutorial.js"></script>
+<!-- N20 native-opacity consumers stay inert in browsers; the desktop-only
+     bootstrap below composes them through the common application transport. -->
+<script src="js/adapters/native-application.js"></script>
+<script src="js/adapters/native-opacity-editor.js"></script>
+<script src="js/adapters/native-opacity-selection.js"></script>
+<script src="js/adapters/native-opacity-preview.js"></script>
+<script src="js/adapters/native-opacity-export.js"></script>
+<script src="js/application/native-edit-guard.js"></script>
 <script src="js/bootstrap/opacity-application.js"></script>
+<script src="js/bootstrap/native-opacity-application.js"></script>
 <script src="js/adapters/application-mcp.js"></script>
 </body>
 </html>

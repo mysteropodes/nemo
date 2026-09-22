@@ -18,6 +18,9 @@
   var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
+  function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
+  function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
+  function releaseNative(kind){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
   // mirrored to IndexedDB (async, no practical size ceiling) so a project
   // with embedded media doesn't silently lose its autosave the moment it
@@ -51,7 +54,7 @@
 
 
   // ---- New / Open / Save (native fs, real files on disk) ----
-  function newProject(cfg){
+  function newProjectNow(cfg){
     if(window.SMLabs&&window.SMLabs.resetAll)window.SMLabs.resetAll(); // see labs-core.js's own comment — a Labs prototype must never silently carry into a new project
     if(state.activeSymbolId)exitToScene();
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
@@ -100,6 +103,7 @@
     try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
+  function newProject(cfg){return afterMaybe(releaseNative('new-project'),function(){return newProjectNow(cfg);});}
 
   // Last successfully persisted document, for the close-with-unsaved-work
   // guard below. null = "never saved/loaded anything yet" — a brand-new
@@ -186,7 +190,7 @@
     if(!tauriOk())return;
     try{
       var json=await window.__TAURI__.fs.readTextFile(path);
-      if(!window.SM.importJSON(json,true))throw new Error('Invalid project');
+      if(!await importProjectJSON(json,true))throw new Error('Invalid project');
       // Re-export rather than keeping the file's own text: importJSON
       // normalizes (fills defaults, pads frames), so the round-tripped
       // form is what future exportJSON calls will actually produce —
@@ -257,7 +261,7 @@
     try{window.SMProjectDocument.parse(json);}catch(e){return false;}
     saveAllLayerFrames();
     var previousJson=window.SM.exportJSON();
-    if(!window.SM.importJSON(json,true))return false;
+    if(!await importProjectJSON(json,true))return false;
     try{await pushVersionSnapshot(previousJson);}catch(e){console.warn('[history] pre-restore snapshot failed',e);}
     ensureInitialTab();
     showToast(SM.t('toastVersionRestored'));
@@ -384,7 +388,7 @@
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){newProject(cfg);hideStartScreen();ensureInitialTab();},
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){return afterMaybe(newProject(cfg),function(){hideStartScreen();ensureInitialTab();});},
     // "A project is now open, show the editor" — hideStartScreen +
     // ensureInitialTab, the pair newProject above already runs. Exported
     // (2026-09 QA sweep) because kitsu.js called those two by their bare
@@ -524,54 +528,56 @@
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
     snapshotActiveIntoTab();
-    if(target.json){
-      if(!window.SM.importJSON(target.json,true))return;
-      activeTabId=id;
-      // importJSON normalizes (fills defaults, pads frames — same trap
-      // openPath's own comment already documents), so a fresh exportJSON()
-      // right after this import can differ textually from target.json even
-      // with zero real changes. Comparing the OLD pre-import string against
-      // the NEW post-import baseline would false-positive as dirty on every
-      // switch back to an untouched tab. Since target.dirty was captured
-      // pre-import (same-generation, reliable), branch on THAT instead:
-      // clean → re-export now and use that as the fresh baseline; dirty →
-      // there's no real "last saved" string to compare against without
-      // re-importing an old disk copy we don't have handy, so force
-      // isDirty() to keep reading true with a baseline no live export can
-      // ever equal (isDirty() itself treats plain null as "not dirty yet",
-      // so that sentinel specifically can't be null).
-      lastSavedJson=target.dirty?'':window.SM.exportJSON();
+    function entered(){
+      currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
+      renderTabBar();
     }
-    else {activeTabId=id;newProject({w:1920,h:1080,fps:24,name:target.name});} // markSaved belongs to the new tab
-    currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
-    renderTabBar();
+    if(target.json){
+      return afterMaybe(importProjectJSON(target.json,true),function(imported){
+        if(!imported)return;
+        activeTabId=id;
+        // importJSON normalizes (fills defaults, pads frames — same trap
+        // openPath's own comment already documents), so a fresh exportJSON()
+        // right after this import can differ textually from target.json even
+        // with zero real changes. target.dirty was captured pre-import.
+        lastSavedJson=target.dirty?'':window.SM.exportJSON();
+        entered();
+      });
+    }
+    return afterMaybe(releaseNative('tab-switch'),function(){
+      activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
+    }); // markSaved belongs to the new tab
   }
   function addTab(){
-    snapshotActiveIntoTab();
-    var n=tabs.length+1;
-    var id=makeTabId();
-    tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
-    activeTabId=id;
-    newProject({w:1920,h:1080,fps:24,name:'Untitled '+n});
-    currentPath=null;currentName='Untitled '+n;updateCurrentLabel();
-    renderTabBar();
+    return afterMaybe(releaseNative('tab-add'),function(){
+      snapshotActiveIntoTab();
+      var n=tabs.length+1;
+      var id=makeTabId();
+      tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
+      activeTabId=id;
+      newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});
+      currentPath=null;currentName='Untitled '+n;updateCurrentLabel();
+      renderTabBar();
+    });
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
     if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
     var wasActive=id===activeTabId;
-    if(wasActive){
-      var next=tabs[idx>0?idx-1:1];
-      if(next.json){
-        if(!window.SM.importJSON(next.json,true))return;
+    function closed(){tabs.splice(idx,1);renderTabBar();}
+    if(!wasActive){closed();return;}
+    var next=tabs[idx>0?idx-1:1];
+    function enterBlank(){activeTabId=next.id;newProjectNow({w:1920,h:1080,fps:24,name:next.name});
+      currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();}
+    if(next.json){
+      return afterMaybe(importProjectJSON(next.json,true),function(imported){
+        if(!imported)return;
         activeTabId=next.id;
         lastSavedJson=next.dirty?'':window.SM.exportJSON(); // see switchToTab's comment for why
-      }
-      else {activeTabId=next.id;newProject({w:1920,h:1080,fps:24,name:next.name});}
-      currentPath=next.path||null;currentName=next.name;updateCurrentLabel();
+        currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();
+      });
     }
-    tabs.splice(idx,1);
-    renderTabBar();
+    return afterMaybe(releaseNative('tab-close'),enterBlank);
   }
   function startTabRename(id){
     var el=document.querySelector('.project-tab[data-tab="'+id+'"] .pt-name');if(!el)return;
@@ -674,12 +680,17 @@
       var auto=null;
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
       var applyAuto=function(auto){
-        if(auto){
-          try{if(!window.SM.importJSON(auto,true)){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}}
-          catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}
+        function applied(imported){
+          if(auto&&!imported){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}
+          currentPath=null;currentName='Untitled';updateCurrentLabel();
+          hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Session resumed');
         }
-        currentPath=null;currentName='Untitled';updateCurrentLabel();
-        hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Session resumed');
+        try{
+          var importing=auto?importProjectJSON(auto,true):true;
+          var result=afterMaybe(importing,applied);
+          if(result&&typeof result.catch==='function')result.catch(function(){showToast(SM.t('toastCannotResumeSessionCorrupt'));});
+          return result;
+        }catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
       };
       if(auto)applyAuto(auto);
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
@@ -722,7 +733,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{if(!window.SM.importJSON(ev.target.result,true))throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true),function(imported){if(!imported)throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });

@@ -88,5 +88,5 @@ test('pinned read schemas declare strict selectors and exact native result ident
   assert.deepEqual(nativeSchema.$defs.EvaluateQueryResult.required,
     ['documentSnapshotId', 'documentId', 'contentRevision', 'contextId', 'frame', 'layers']);
   assert.equal(nativeDescriptors[0].resourceBoundary.maxReadResponseBytes, 4096);
-  assert.equal(nativeDescriptors[0].availability.state, 'unavailable');
+  assert.deepEqual(nativeDescriptors[0].availability, { state: 'available', reason: null });
 });

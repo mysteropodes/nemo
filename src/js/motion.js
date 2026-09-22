@@ -1,4 +1,14 @@
 // ---- MOTION MODE (v1, 2026-07) ----
+var n20AllowLegacyWrite=typeof n20AllowLegacyWrite==='function'?n20AllowLegacyWrite:typeof n20AllowLegacyWrite!=='undefined'?function(){return false;}:function(kind){
+  try{var admission=typeof window==='object'?window.NemoNativeOpacityLegacyAdmission:undefined;
+    return admission===undefined||!!admission&&typeof admission.allow==='function'&&admission.allow(kind)===true;
+  }catch(_){return false;}
+};
+var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLegacyWrite:function(kind){
+  try{if(n20AllowLegacyWrite(kind)===true)return true;}catch(_){}
+  var error=new Error('Native document authority must release before this legacy edit.');
+  error.name='NemoNativeReleaseRequired';throw error;
+};
 // A second animation paradigm alongside Animation 2D's frame-by-frame
 // drawing: After-Effects-style property keyframing (Position/Rotation/
 // Scale/Opacity per layer), reusing the SAME layers ("on doit retrouver
@@ -1106,13 +1116,13 @@
     if (!r) return null;
     return { uid: r.ld.layerUid || null, elem: r.strokeId || null };
   }
-  function holderFromRef(ref) {
+  function holderFromRef(ref, create) {
     if (!ref) return null;
     var li = ref.uid ? findLayerIndexByUid(ref.uid) : -1;
     var ld = li >= 0 ? state.layers[li] : null;
     if (!ld) return null;
     if (!ref.elem) return ld;
-    return (ld.elementMotion && ld.elementMotion[ref.elem]) || ensureElementHolder(ld, ref.elem);
+    return (ld.elementMotion && ld.elementMotion[ref.elem]) || (create ? ensureElementHolder(ld, ref.elem) : null);
   }
   function copySelectedKeys() {
     var sel = _motionKeySel;
@@ -1137,7 +1147,7 @@
       // the old behaviour for the cases that relied on it: a single-layer copy
       // deliberately re-pasted somewhere else, and a clipboard whose source
       // layer has since been deleted.
-      var target = holderFromRef(c.src) || ld;
+      var target = holderFromRef(c.src, true) || ld;
       if (touched.indexOf(target) < 0) touched.push(target);
       var track = ensureTrack(target, c.prop);
       var ex = keyAt(track, f);
@@ -1151,18 +1161,20 @@
   function hasKeySelection() { return !!(_motionKeySel && _motionKeySel.length); }
   function hasKeyClipboard() { return !!(_keyClip && _keyClip.length); }
   function migrateLegacyCurves() {
-    var n = 0;
+    var legacy = [];
     (state.layers || []).forEach(function (ld) {
       if (!ld || !ld.motion) return;
       Object.keys(ld.motion).forEach(function (prop) {
         var trk = ld.motion[prop];
         if (!trk || !trk.keys) return;
         trk.keys.forEach(function (k) {
-          if (isLegacyStepCurve(k.curvePoints)) { k.curvePoints = cloneCurvePts(DEFAULT_CURVE); n++; }
+          if (isLegacyStepCurve(k.curvePoints)) legacy.push(k);
         });
       });
     });
-    return n;
+    if (!legacy.length) return 0;
+    legacy.forEach(function (k) { k.curvePoints = cloneCurvePts(DEFAULT_CURVE); });
+    return legacy.length;
   }
   // tx/ty preserved: a point's manual tangent override (draggable Alt-
   // handles in the shared curve editor, ui.js) — stripping them here
@@ -1218,6 +1230,7 @@
   // live-drag refresh so the two can never show two different numbers for
   // the same untouched layer.
   function displayValueFor(holder, prop) {
+    if (nativeOwns(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
     if (isAnimated(holder, prop)) return valueAtFrame(holder, prop, state.currentFrame);
     if (prop === 'order') {
       var li = state.layers.indexOf(holder);
@@ -1330,9 +1343,12 @@
   //     trips it switches itself off.
   //   - Compiled once per (holder,prop), cached until the code string
   //     changes — not re-parsed every frame.
+  function expressionSeed(holder, prop) { return holder.expressions && holder.expressions[prop] || { code: '', enabled: false, lastError: null }; }
+  function expressionSnapshotValue(expr) { return { code: expr.code || '', enabled: !!expr.enabled, lastError: expr.lastError || null, errorLine: expr.errorLine }; }
   function ensureExpr(holder, prop) {
+    if (!holder.expressions || !holder.expressions[prop]) n20RequireLegacyWrite('motion-expression-create');
     if (!holder.expressions) holder.expressions = {};
-    if (!holder.expressions[prop]) holder.expressions[prop] = { code: '', enabled: false, lastError: null };
+    if (!holder.expressions[prop]) holder.expressions[prop] = expressionSeed(holder, prop);
     return holder.expressions[prop];
   }
   function hasExpr(holder, prop) { return !!(holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled && holder.expressions[prop].code); }
@@ -2637,6 +2653,8 @@
   // still falls through to the exact keyframed/static value it would have
   // shown before expressions existed (never a blank/NaN/frozen property).
   function valueAtFrame(ld, prop, frame) {
+    var native = nativeRead(ld, prop, frame);
+    if (native && native.handled) return native.value;
     var raw = rawValueAtFrame(ld, prop, frame);
     if (hasExpr(ld, prop)) {
       var evaluated = evalExpressionFor(ld, prop, frame, raw);
@@ -2644,6 +2662,7 @@
     }
     return raw;
   }
+  function ownedRawValueAtFrame(holder, prop, frame) { var native = nativeRead(holder, prop, frame); return native && native.handled ? native.value : rawValueAtFrame(holder, prop, frame); }
   // The segment whose ease governs `frame` (its LEFT key) — same contract
   // as camera.js's segmentLeftKey, generalized to any track.
   function segmentLeftKey(track, frame) {
@@ -2691,15 +2710,23 @@
   function opacityLegacy(kind, holder, values, frame, curvePoints) {
     var application = window.NemoOpacityApplication;
     if (application && typeof application.legacy === 'function') return application.legacy(kind, holder, values, frame, curvePoints);
+    var guard = window.SMNativeEditGuard;
+    if (guard && !guard.allow('opacity-' + kind)) return false;
     return null;
   }
   function opacityDomain() { return window.NemoOpacityDomain; }
+  function nativeMotionSurface() { var surface = window.NemoNativeOpacityMotionSurface, controller = window.NemoNativeOpacityCutover;
+    if (!surface && controller && controller.blocksLegacy()) throw new Error('native Motion surface is unavailable');
+    return surface; }
+  function nativeRead(holder, prop, frame) { var surface = nativeMotionSurface(); return surface && surface.read(window.NemoNativeOpacityCutover, holder, prop, frame); }
+  function nativeOwns(holder, prop) { var surface = nativeMotionSurface(); return !!surface && surface.owns(window.NemoNativeOpacityCutover, holder, prop); }
   function setKeyAtCurrentFrame(ld, prop, values) {
     if (prop === 'opacity') {
       var legacy = opacityLegacy('key-current', ld, values, state.currentFrame);
       if (legacy !== null) return legacy;
       return opacityDomain().setKeyAtFrame(ld, state.currentFrame, values);
     }
+    if (!n20AllowLegacyWrite('motion-key-current')) return false;
     return NemoOpacityDomain.setTrackKey(ensureTrack(ld, prop), state.currentFrame, values);
   }
   // Arbitrary-frame sibling of setKeyAtCurrentFrame — for callers that
@@ -2720,6 +2747,7 @@
       if (legacy !== null) return legacy;
       return opacityDomain().removeKeyAtFrame(ld, state.currentFrame);
     }
+    if (!n20AllowLegacyWrite('motion-remove-key')) return false;
     return NemoOpacityDomain.removeTrackKey(trackFor(ld, prop), state.currentFrame);
   }
   // Stopwatch toggle: OFF→ON starts animating from the CURRENT effective
@@ -2753,6 +2781,7 @@
       if (legacy !== null) return legacy;
       return opacityDomain().setAnimated(ld, animated, state.currentFrame, effectiveValue);
     }
+    if (!n20AllowLegacyWrite('motion-toggle-animated')) return false;
     // The Time Remap row's stopwatch IS the remap switch (AE behavior) —
     // there is no "static timeRemap" fallback to freeze into, the feature
     // is either on (track exists) or off (field deleted, default playback).
@@ -2803,12 +2832,14 @@
     renderLayerList(); renderTimeline();
   }
   function setValue(ld, prop, values) {
-    selectLayerForEdit(ld);
     if (prop === 'opacity') {
+      selectLayerForEdit(ld);
       var legacy = opacityLegacy('set', ld, values, state.currentFrame);
       if (legacy !== null) return legacy;
       return opacityDomain().setValue(ld, values, state.currentFrame);
     }
+    if (!n20AllowLegacyWrite('motion-set-value')) return false;
+    selectLayerForEdit(ld);
     if (isAnimated(ld, prop)) setKeyAtCurrentFrame(ld, prop, values);
     else { if (!ld.motionStatic) ld.motionStatic = {}; ld.motionStatic[prop] = values.slice(); }
     // Order (feedback #97, "l'order n'a pas l'air de marcher... dans le
@@ -2876,39 +2907,37 @@
   // reads/writes `.motion`/`.motionStatic` on whatever object it's handed,
   // so passing an element holder instead of `ld` just works, zero duplicated
   // logic needed for the per-element case.
+  function elementItem(ld, strokeId) { var li = state.layers.indexOf(ld); return li >= 0 ? liveItemByStrokeId(li, strokeId) : null; }
+  function seedElementHolder(item) {
+    var holder = {};
+    if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'rect') {
+      var ps = item.data.paramShape;
+      holder.paramShapeKind = 'rect';
+      holder.motionStatic = { cornerTL: [ps.tl || 0], cornerTR: [ps.tr || 0], cornerBR: [ps.br || 0], cornerBL: [ps.bl || 0] };
+    } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'ellipse') {
+      var pse = item.data.paramShape;
+      holder.paramShapeKind = 'ellipse';
+      holder.motionStatic = { arcStart: [pse.startAngle || 0], arcSweep: [pse.sweep !== undefined ? pse.sweep : 359.9], arcInner: [Math.round((pse.innerRadius || 0) * 100)] };
+    } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'star') {
+      var pss = item.data.paramShape;
+      holder.paramShapeKind = 'star';
+      holder.motionStatic = { starInner: [Math.round((pss.innerRatio !== undefined ? pss.innerRatio : 0.5) * 100)], starCorner: [pss.cornerRadius || 0] };
+    }
+    return holder;
+  }
   function ensureElementHolder(ld, strokeId) {
-    if (!ld.elementMotion) ld.elementMotion = {};
-    if (!ld.elementMotion[strokeId]) {
-      ld.elementMotion[strokeId] = {};
-      // Dynamic shapes phase 2 (2026-08-18) — auto-tag + seed from the live
-      // item's OWN current radii, found once here rather than re-derived on
-      // every propsFor call: unlike Component exposedProps (one shared
-      // default per key across every instance), each rect's un-animated
-      // corner value is genuinely its OWN (data.paramShape.tl/tr/br/bl),
-      // so PROP_DEFAULT can't carry it — motionStatic must, from the start,
-      // or clicking the stopwatch for the first time (toggleAnimated's
-      // OFF→ON reads valueAtFrame → staticValue → PROP_DEFAULT[0] when
-      // nothing else is seeded) would silently snap a 40px corner back to
-      // 0 the instant it's keyed.
-      var li = state.layers.indexOf(ld);
-      var item = li >= 0 ? liveItemByStrokeId(li, strokeId) : null;
-      if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'rect') {
-        var ps = item.data.paramShape;
-        ld.elementMotion[strokeId].paramShapeKind = 'rect';
-        ld.elementMotion[strokeId].motionStatic = { cornerTL: [ps.tl || 0], cornerTR: [ps.tr || 0], cornerBR: [ps.br || 0], cornerBL: [ps.bl || 0] };
-      } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'ellipse') {
-        var pse = item.data.paramShape;
-        ld.elementMotion[strokeId].paramShapeKind = 'ellipse';
-        ld.elementMotion[strokeId].motionStatic = { arcStart: [pse.startAngle || 0], arcSweep: [pse.sweep !== undefined ? pse.sweep : 359.9], arcInner: [Math.round((pse.innerRadius || 0) * 100)] };
-      } else if (item && item.data && item.data.paramShape && item.data.paramShape.kind === 'star') {
-        var pss = item.data.paramShape;
-        ld.elementMotion[strokeId].paramShapeKind = 'star';
-        ld.elementMotion[strokeId].motionStatic = { starInner: [Math.round((pss.innerRatio !== undefined ? pss.innerRatio : 0.5) * 100)], starCorner: [pss.cornerRadius || 0] };
-      }
+    if (!ld.elementMotion || !ld.elementMotion[strokeId]) {
+      n20RequireLegacyWrite('motion-element-holder-create');
+      if (!ld.elementMotion) ld.elementMotion = {};
+      ld.elementMotion[strokeId] = seedElementHolder(elementItem(ld, strokeId));
     }
     return ld.elementMotion[strokeId];
   }
   function elementHolder(ld, strokeId) { return ld.elementMotion ? ld.elementMotion[strokeId] : null; }
+  function elementHolderView(ld, strokeId) { var holder = elementHolder(ld, strokeId); if (holder) return holder;
+    var surface = nativeMotionSurface();
+    return surface ? surface.detachedElementView(elementItem(ld, strokeId), seedElementHolder) : ensureElementHolder(ld, strokeId);
+  }
   function elementHasMotion(ld, strokeId) {
     var h = elementHolder(ld, strokeId);
     return !!(h && (h.motion || h.motionStatic));
@@ -4492,6 +4521,7 @@
   // as setLayerParent's own compensation (a rotated/scaled parent still
   // reorients the child going forward, same as After Effects).
   function upsertParentKeyAt(li, frame, uid) {
+    if (!n20AllowLegacyWrite('motion-upsert-parent-key')) return false;
     var ld = state.layers[li];
     if (!ld) return;
     var before = composedPivotWorld(li, frame);
@@ -5600,6 +5630,8 @@
         });
       }
     }
+    var surface = nativeMotionSurface();
+    if (surface && surface.positionOverlayPlan(window.NemoNativeOpacityCutover, holder, [state.currentFrame]).handled) return items;
     if (!hasKeys(holder, 'position')) return items;
     // Position keys store a DELTA translation (computeMotionMat's dx/dy —
     // [0,0] means "no motion", added on top of the artwork's own drawn
@@ -6162,7 +6194,7 @@
     // like THIS frame, same as any element's box always has.
     if (window._motionExpandedLayer != null && window._motionExpandedElement != null) {
       var item = findElementItem(li, window._motionExpandedElement);
-      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: ensureElementHolder(ld, window._motionExpandedElement), boundsCenter: item.bounds.center, bounds: item.bounds };
+      if (item) return { li: li, strokeId: window._motionExpandedElement, holder: elementHolderView(ld, window._motionExpandedElement), boundsCenter: item.bounds.center, bounds: item.bounds };
       // Element no longer present at this frame (drawing changed) — fall
       // back to the layer rather than silently drawing nothing.
     }
@@ -6190,7 +6222,8 @@
   }
   function activePositionKeys() {
     var t = activeMotionTarget();
-    if (!t || !hasKeys(t.holder, 'position')) return null;
+    var surface = nativeMotionSurface();
+    if (!t || surface && surface.nativeKeyInteractionPlan(window.NemoNativeOpacityCutover, t.holder).handled || !hasKeys(t.holder, 'position')) return null;
     return t.holder.motion.position.keys;
   }
   function hitAnchorPoint(pt, t) {
@@ -7188,7 +7221,7 @@
       // this is precisely where the Position Z/Rotation X/Y properties it
       // reveals actually live and get keyframed.
       var d3 = document.createElement('div'); d3.className = 'lico motion-col-3d' + (ld.threeD ? '' : ' off'); d3.title = '3D Layer'; d3.innerHTML = ICO_3D;
-      d3.addEventListener('click', function (e) { e.stopPropagation(); toggleLayer3D(li); renderLayerList(); });
+      d3.addEventListener('click', function (e) { e.stopPropagation(); window.SMMotion.toggleLayer3D(li); renderLayerList(); });
       row.appendChild(d3);
       // Mograph duplicator toggle — shown here too since the dupOffset*
       // properties it reveals live/get keyframed in this list (same
@@ -7506,7 +7539,7 @@
       // in the row list differs. MUST stay mirrored by renderTimelineMotion's
       // grid half — CLAUDE.md §11.
       if (videoMeshRowsFor(ld)) {
-        renderMeshVertexGroup(list, ensureElementHolder(ld, ld.videoMeshId), videoMeshRowsFor(ld));
+        renderMeshVertexGroup(list, elementHolderView(ld, ld.videoMeshId), videoMeshRowsFor(ld));
       }
       // Per-element sub-list used to be component-exclusive ("a symbol
       // instance's actual strokes live inside the SYMBOL's own sub-layer,
@@ -7606,7 +7639,7 @@
     var elSel = (window._motionExpandedElement != null && window._motionExpandedLayer === state.activeLayerIdx)
       ? window._motionExpandedElement : null;
     if (elSel) {
-      var elHolder = ensureElementHolder(ld, elSel);
+      var elHolder = elementHolderView(ld, elSel);
       renderTransformGroup(body, elHolder, SM.t('hdrTransformElement'));
       // Extended per-shape properties (2026-08-31, "voir si toute les
       // propriétés keyframable pour les shapes apparaissent aussi dans
@@ -7628,7 +7661,7 @@
           renderPathVertexGroup(body, elHolder, pathVertexRowCount(elEntry.sd));
         }
         if (elEntry.sd.isRaster && elEntry.sd.meshId && meshVertexRowCount(elEntry.sd.meshId)) {
-          renderMeshVertexGroup(body, ensureElementHolder(ld, elEntry.sd.meshId), meshVertexRowCount(elEntry.sd.meshId));
+          renderMeshVertexGroup(body, elementHolderView(ld, elEntry.sd.meshId), meshVertexRowCount(elEntry.sd.meshId));
         }
         if (elEntry.sd.fillColor && (!elEntry.sd.isVectorBrush || elEntry.sd.__linkedFillStrokeId)) {
           renderFillColorRow(body, elHolder, elEntry.sd.fillColor);
@@ -8701,6 +8734,7 @@
     transformRowPlan(holder).forEach(function (entry) {
       if (entry.row === 'dupHeader') { renderDupGroupHeader(list, holder); return; }
       var prop = entry.prop;
+      var motionSurface = nativeMotionSurface(), nativeOpacityRoute = motionSurface && motionSurface.renderedOpacityRoute(window.NemoNativeOpacityCutover, holder, prop, state.currentFrame);
       var pr = document.createElement('div'); pr.className = 'lrow motion-prop-row';
       // Same identity tags the grid's track rows carry (renderTracksFor) —
       // without them the expression pickwhip could only be dropped on the
@@ -8708,8 +8742,8 @@
       // an expression in the panel.
       pr._smHolder = holder; pr._smProp = prop;
       var sw = document.createElement('div');
-      var swOn = isAnimated(holder, prop);
-      var hasKeyHere = swOn && !!keyAt(trackFor(holder, prop), state.currentFrame);
+      var swOn = nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.animated : isAnimated(holder, prop);
+      var hasKeyHere = nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.keyAtFrame : swOn && !!keyAt(trackFor(holder, prop), state.currentFrame);
       // Single diamond, three states — merges what used to be two separate
       // icons (this stopwatch AND a second .motion-addkey diamond appended
       // after the value fields further down): they always showed the exact
@@ -8726,7 +8760,9 @@
       sw.title = stopwatchTitle('motionAnimateProp', swOn, hasKeyHere);
       sw.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12"><path d="M12 3l9 9-9 9-9-9z" fill="' + (hasKeyHere ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"/></svg>';
       sw.addEventListener('click', function (e) {
-        e.stopPropagation(); pushUndo();
+        e.stopPropagation();
+        if (motionSurface && motionSurface.routeIntent(nativeOpacityRoute, window.NemoOpacityApplication, 'animated', !swOn, state.currentFrame)) return;
+        pushUndo();
         if (!swOn) {
           toggleAnimated(holder, prop); // OFF->ON: first key at the current frame (see toggleAnimated's own comment)
         } else if (prop === 'timeRemap') {
@@ -8821,6 +8857,7 @@
       // setValue" contract the scrub fields below follow, so editing a
       // control behaves identically however it's rendered.
       function commitControlValue(nvals) {
+        if (motionSurface && motionSurface.routeIntent(nativeOpacityRoute, window.NemoOpacityApplication, 'set', nvals, state.currentFrame)) return;
         pushUndo();
         if (!setSelectedKeyVector(holder, prop, nvals)) setValue(holder, prop, nvals);
         renderLayerList(); renderTimeline();
@@ -8860,6 +8897,7 @@
           }
           var display = selectedDimensionDisplay(holder, prop, dim, vals[dim]);
           var f = scrubField(display.value, function (nv, edit) {
+            if (motionSurface && motionSurface.routeDimension(nativeOpacityRoute, window.NemoOpacityApplication, vals, dim, nv, state.currentFrame)) return;
             pushUndo();
             var changed = edit && edit.relative
               ? offsetSelectedKeyDimension(holder, prop, dim, edit.delta)
@@ -8995,13 +9033,14 @@
     return parts.join('  ›  ');
   }
   function buildExprEditorRow(holder, prop) {
-    var expr = ensureExpr(holder, prop);
+    var surface = nativeMotionSurface(), expr = surface ? surface.detachedExpressionView(holder, prop, expressionSeed) : ensureExpr(holder, prop);
+    function writableExpr() { expr = ensureExpr(holder, prop); return expr; }
     var row = document.createElement('div'); row.className = 'lrow motion-expr-editor';
     var head = document.createElement('label'); head.className = 'motion-expr-toggle';
     var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!expr.enabled;
     cb.addEventListener('change', function () {
       pushUndo();
-      expr.enabled = cb.checked;
+      writableExpr().enabled = cb.checked;
       if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
       renderLayerList(); renderTimeline();
       reloadIfTimeLinkOffset(prop);
@@ -9019,7 +9058,7 @@
     }
     var rawWrap = document.createElement('span');
     rawWrap.className = 'motion-expr-raw';
-    var raw = rawValueAtFrame(holder, prop, state.currentFrame);
+    var raw = ownedRawValueAtFrame(holder, prop, state.currentFrame);
     rawWrap.textContent = SM.t('exprRawValuePrefix') + fmtVals(raw);
     rawWrap.title = SM.t('titleRawValueHint');
     row.appendChild(rawWrap);
@@ -9036,7 +9075,7 @@
     function paintResult() {
       outWrap.classList.remove('err');
       if (!expr.enabled || !expr.code) { outWrap.textContent = SM.t('exprResultPrefix') + '—'; return; }
-      var cur = rawValueAtFrame(holder, prop, state.currentFrame);
+      var cur = ownedRawValueAtFrame(holder, prop, state.currentFrame);
       var evaluated = evalExpressionFor(holder, prop, state.currentFrame, cur);
       if (evaluated === null) {
         outWrap.classList.add('err');
@@ -9252,9 +9291,10 @@
     function commit() {
       if (ta.value === expr.code) return;
       pushUndo();
-      expr.code = ta.value;
-      expr.lastError = null;
-      expr.errorLine = -1;
+      var targetExpr = writableExpr();
+      targetExpr.code = ta.value;
+      targetExpr.lastError = null;
+      targetExpr.errorLine = -1;
       if (holder._exprCompiled) delete holder._exprCompiled[prop];
       if (typeof saveActiveLayerFrame === 'function') saveActiveLayerFrame();
       reloadIfTimeLinkOffset(prop);
@@ -9290,6 +9330,7 @@
     var grip = document.createElement('div'); grip.className = 'motion-expr-grip';
     grip.title = SM.t('titleResizeEditorHint');
     grip.addEventListener('mousedown', function (e) {
+      if (!n20AllowLegacyWrite('motion-expression-editor-height')) return;
       e.preventDefault(); e.stopPropagation();
       var startY = e.clientY, startH = ta.offsetHeight;
       function mv(ev) {
@@ -9299,7 +9340,8 @@
       function up() {
         document.removeEventListener('mousemove', mv);
         document.removeEventListener('mouseup', up);
-        expr.editorHeight = parseInt(ta.style.height, 10) || undefined;
+        n20RequireLegacyWrite('motion-expression-editor-height');
+        writableExpr().editorHeight = parseInt(ta.style.height, 10) || undefined;
         renderTimeline(); // re-reserve the matching height on the grid side
       }
       document.addEventListener('mousemove', mv);
@@ -9942,7 +9984,7 @@
       list.appendChild(row);
       if (!expanded) return;
       // 2026-08 fix: hardcoded French group header.
-      renderTransformGroup(list, ensureElementHolder(ld, entry.strokeId), SM.t('hdrTransformElement'));
+      renderTransformGroup(list, elementHolderView(ld, entry.strokeId), SM.t('hdrTransformElement'));
       // Path property (2026-07): opt-in extended property, hidden unless
       // the element actually has vertex geometry (a Raster/image entry
       // never does) — same "hidden by default, opt-in" convention CLAUDE.md
@@ -9952,7 +9994,7 @@
         // a vector-brush ribbon the vertices are its centerline, not the
         // baked outline (#181). The grid half below reads the SAME helper —
         // CLAUDE.md §11.
-        renderPathVertexGroup(list, ensureElementHolder(ld, entry.strokeId), pathVertexRowCount(entry.sd));
+        renderPathVertexGroup(list, elementHolderView(ld, entry.strokeId), pathVertexRowCount(entry.sd));
       }
       // Image mesh (2026-08-30) — the raster counterpart of the Path group
       // just above: same accordion, same vertex rows, same stopwatches,
@@ -9961,7 +10003,7 @@
       // own comment). MUST stay mirrored by renderTimelineMotion's grid
       // half — CLAUDE.md §11.
       if (entry.sd.isRaster && entry.sd.meshId && meshVertexRowCount(entry.sd.meshId)) {
-        renderMeshVertexGroup(list, ensureElementHolder(ld, entry.sd.meshId), meshVertexRowCount(entry.sd.meshId));
+        renderMeshVertexGroup(list, elementHolderView(ld, entry.sd.meshId), meshVertexRowCount(entry.sd.meshId));
       }
       // Fill color (2026-07): opt-in extended property, hidden unless the
       // element actually has a fill — same convention as Path above.
@@ -9976,7 +10018,7 @@
       // showing this row for it was the Fill-side phantom-row twin of the
       // bug hasRealStroke already guards against for Stroke.
       if (entry.sd.fillColor && (!entry.sd.isVectorBrush || entry.sd.__linkedFillStrokeId)) {
-        renderFillColorRow(list, ensureElementHolder(ld, entry.strokeId), entry.sd.fillColor);
+        renderFillColorRow(list, elementHolderView(ld, entry.strokeId), entry.sd.fillColor);
       }
       // Stroke color/width (2026-08 — second slice of the "propriétés
       // étendues par forme" chantier, same convention as Fill color above):
@@ -10020,7 +10062,7 @@
       // anchor's real pre-merge value, preserved by that same merge
       // specifically for this row to read.
       if (hasRealStrokeEl || entry.sd.isVectorBrush) {
-        var strokeHolder = ensureElementHolder(ld, entry.strokeId);
+        var strokeHolder = elementHolderView(ld, entry.strokeId);
         var inkDefault = entry.sd.__inkColor !== undefined ? entry.sd.__inkColor : entry.sd.fillColor;
         renderStrokeColorRow(list, strokeHolder, entry.sd.isVectorBrush ? inkDefault : entry.sd.strokeColor);
         if (!entry.sd.isVectorBrush && entry.sd.strokeWidth !== undefined) {
@@ -10033,12 +10075,12 @@
       // a plain shape has no width profile to scale. % of the shape's own
       // recorded pressure widths, same convention as the base Scale prop.
       if (entry.sd.isVectorBrush && entry.sd.centerSegments && entry.sd.centerSegments.length >= 2) {
-        renderTrimScalarRow(list, ensureElementHolder(ld, entry.strokeId), 'brushSize', SM.t('propBrushSize'), '%', 10, 500, 100);
+        renderTrimScalarRow(list, elementHolderView(ld, entry.strokeId), 'brushSize', SM.t('propBrushSize'), '%', 10, 500, 100);
       }
       // Trim Paths (2026-08, "animer les stroke en in et out"): opt-in,
       // same visibility gate as Path above (needs real vertex geometry).
       if (!entry.sd.isRaster && entry.sd.segments && entry.sd.segments.length) {
-        renderTrimPathsGroup(list, ensureElementHolder(ld, entry.strokeId));
+        renderTrimPathsGroup(list, elementHolderView(ld, entry.strokeId));
       }
     });
   }
@@ -11201,7 +11243,7 @@
       // mesh mirror further down, one level up.
       var vmRows = videoMeshRowsFor(ld);
       if (vmRows) {
-        var vmHolder = ensureElementHolder(ld, ld.videoMeshId);
+        var vmHolder = elementHolderView(ld, ld.videoMeshId);
         var vmHdrSpacer = document.createElement('div'); vmHdrSpacer.className = 'frow motion-group-row';
         grid.appendChild(vmHdrSpacer);
         if (isPathGroupExpanded(vmHolder)) {
@@ -11237,7 +11279,7 @@
           var elSpacer = document.createElement('div'); elSpacer.className = 'frow';
           grid.appendChild(elSpacer);
           if (!elExpanded) return;
-          var elHolder = ensureElementHolder(ld, entry.strokeId);
+          var elHolder = elementHolderView(ld, entry.strokeId);
           // Bug found live (2026-07 — "problème d'alignement de clé par
           // rapport aux properties"): renderElementsList calls
           // renderTransformGroup(list, elHolder, 'Transform (élément)') here,
@@ -11292,7 +11334,7 @@
           // tracks both live on it, so reusing elHolder here would silently
           // render the wrong side of the accordion.
           if (entry.sd.isRaster && entry.sd.meshId && meshVertexRowCount(entry.sd.meshId)) {
-            var meshHolderEl = ensureElementHolder(ld, entry.sd.meshId);
+            var meshHolderEl = elementHolderView(ld, entry.sd.meshId);
             var meshHdrSpacer = document.createElement('div'); meshHdrSpacer.className = 'frow motion-group-row';
             grid.appendChild(meshHdrSpacer);
             if (isPathGroupExpanded(meshHolderEl)) {
@@ -13620,13 +13662,11 @@
     // in the color picker).
     holderRefOf: holderRefOf,
     exprSnapshotFor: function (ref, prop) {
-      var holder = holderFromRef(ref);
-      if (!holder) return null;
-      var e = ensureExpr(holder, prop);
-      return { code: e.code || '', enabled: !!e.enabled, lastError: e.lastError || null, errorLine: e.errorLine };
+      var surface = nativeMotionSurface(), holder = holderFromRef(ref, !surface);
+      return surface ? surface.expressionSnapshot(holder, prop, expressionSeed, expressionSnapshotValue) : holder ? expressionSnapshotValue(ensureExpr(holder, prop)) : null;
     },
     applyExprCode: function (ref, prop, code) {
-      var holder = holderFromRef(ref);
+      var holder = holderFromRef(ref, true);
       if (!holder) return false;
       var e = ensureExpr(holder, prop);
       if (e.code === code) return false;
@@ -13642,7 +13682,7 @@
       return true;
     },
     setExprEnabled: function (ref, prop, on) {
-      var holder = holderFromRef(ref);
+      var holder = holderFromRef(ref, true);
       if (!holder) return false;
       pushUndo();
       ensureExpr(holder, prop).enabled = !!on;
@@ -13740,7 +13780,7 @@
     // "show the unaffected value of the property"). rawValueAtFrame is the
     // pre-expression path by construction — valueAtFrame is the one that
     // layers the expression on top — so this cannot drift from it.
-    rawValueAtFrame: function (holder, prop, frame) { return rawValueAtFrame(holder, prop, frame); },
+    rawValueAtFrame: function (holder, prop, frame) { return ownedRawValueAtFrame(holder, prop, frame); },
     enableTimeRemap: enableTimeRemap,
     disableTimeRemap: disableTimeRemap,
     timeRemapValue: timeRemapValue,
@@ -13900,6 +13940,7 @@
     hasKeySelection: hasKeySelection,
     hasKeyClipboard: hasKeyClipboard,
   };
+  if (window.NemoNativeOpacityMotionSurface) window.SMMotion = window.NemoNativeOpacityMotionSurface.publishWriters(window.SMMotion, function (kind) { return n20AllowLegacyWrite(kind); });
   // Workspace continuity, restore half (2026-08) — runs once at startup,
   // after timeline.js's own nemo-auto project restore (script tag order:
   // timeline.js, then this file) so layers/timeline already exist by the

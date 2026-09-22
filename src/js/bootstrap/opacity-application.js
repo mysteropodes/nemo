@@ -1,4 +1,4 @@
-// Bind the application service to existing document, history and display ports.
+// Bind the legacy/browser application service to document, history and display ports.
 (function (root) {
   'use strict';
   var domain = NemoOpacityDomain;
@@ -41,30 +41,13 @@
     capabilities: function () { return registry.list(); }
   });
   ensureIds();
-  // P06: opacity registers itself, and the application entry point reaches its
-  // handler THROUGH the registry instead of closing over `app.handle`. The
-  // lookup happens per call rather than being cached here, so there is exactly
-  // one place that decides which handler serves a request — changing the
-  // registration changes dispatch, and no stale reference survives it.
+  // P06: registry lookup is resolved for every request so no stale handler survives.
   NemoOpacityCapability.register(registry, app.handle);
-  // P19/#1021: the export job registers the same way — its own descriptor with
-  // its own handler — and drives the ONE session export.js memoises, so the
-  // export dialog, the render queue and an MCP client share a lifecycle instead
-  // of running two exporters. The session is resolved per call, never captured.
   var exportCapability = NemoExportSvgSequence.capability({
     session: function () { return (root.SMExport && root.SMExport.svgSequenceJob) ? root.SMExport.svgSequenceJob() : null; },
     meta: app.meta,
   });
   registry.register(exportCapability.descriptor, exportCapability.handler);
-  // Dispatch picks the capability by operation instead of assuming there is
-  // only ever one. Opacity stays the DEFAULT because it also serves the
-  // service-wide operations that belong to no single feature (`capabilities`,
-  // `snapshot`, `history.*`, `diagnostics.*`) and are deliberately absent from
-  // its own effects.lifecycle; every other capability claims exactly the
-  // operations its descriptor declares. Resolved per call from the registry,
-  // for the same reason the handler lookup is (P06): changing a registration
-  // changes dispatch, and no stale table survives it. Two capabilities
-  // claiming one operation is a loud failure, not a silent mis-route.
   function capabilityFor(operation) {
     var found = null;
     registry.list().forEach(function (entry) {
@@ -99,13 +82,11 @@
       else if (kind === 'animated') result = domain.setAnimated(holder, values, root.state.currentFrame, read(holder, root.state.currentFrame));
       else throw new Error('Unsupported opacity edit');
       app.changed();
-      // Existing UI handlers own their gesture checkpoint and repaint schedule.
       return result;
     }
   };
-  // These classic-script functions are global bindings. Wrapping them here
-  // covers keyboard/UI history and API history without a second history stack.
-  [['pushUndoLayers', 'undoStack'], ['pushUndoActiveFrame', 'undoStack'], ['undo', 'undoStack'], ['redo', 'redoStack']].forEach(function (entry) {
+  [['pushUndoLayers', 'undoStack'], ['pushUndoActiveFrame', 'undoStack'],
+    ['undo', 'undoStack'], ['redo', 'redoStack']].forEach(function (entry) {
     var original = root[entry[0]];
     if (typeof original !== 'function') return;
     root[entry[0]] = function () {
