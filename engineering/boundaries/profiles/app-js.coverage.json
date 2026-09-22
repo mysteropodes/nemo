@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "848d20f62808c8e0495f6e25e53b5bc1c962a34a",
-    "sourceRootTree": "5574dcbafd6ec36297b2070c58edaf8e99e011dc",
+    "candidateCommit": "7ce79b2c6550a1b67e30c8715f3a4c11f3d9bb9c",
+    "sourceRootTree": "8cf540fa3989a78d84da20f27968792e0db85c14",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "88170af714d2048c05625a0678aa5e2482eb25c1",
-      "lastChangedCommit": "848d20f62808c8e0495f6e25e53b5bc1c962a34a"
+      "gitTree": "f043b20140c721c1fdd365903a4acc83a46fbb12",
+      "lastChangedCommit": "7ce79b2c6550a1b67e30c8715f3a4c11f3d9bb9c"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "36a4cdc3f67bcb2cef31848b0a88162799d93059",
-      "sha256": "094ed3f51e3da45c7915bb5d8c39e382fccdf5d00fe8ab9e71e9a680077722a0",
-      "lastChangedCommit": "0066b52da9fab142f802e5319d0485ac328717c4"
+      "gitBlob": "9a5696dfcd721545f1a2339bb21799d08c24ee16",
+      "sha256": "a5ceaf14ea8cae2bfd36fc02a2052b35f17e49b900b556256679d47228023f95",
+      "lastChangedCommit": "6a895c16d21a69d8b71111890d39e6834153cb6a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "015c532f355b4a3eeeb9925337324b04e91613cca1133d588025677d17ccb9b6"
+      "value": "98ddfeaa8cbfb3ee1cd893dfe7f640a8ac2688e6dfdd5d9a1452f0b3da6c2b19"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ad263c187da7647788b2c6b0798350aa1f34a65b",
-        "sha256": "a4bafeeda028f00a8da8908c33ac984694396312ca58cecf310e6657b9935ef0",
-        "moduleCount": 177,
-        "basedOnCommit": "38d148747ae8ef9ba499be9c1cfc04dc42c22403"
+        "gitBlob": "ec956b6e5fd2fe6b1f6bf71202a226ed8e1f18ec",
+        "sha256": "ae882235ac9b2a0698aff61d28cfbac52f56a85937d215602c4197ae255e948d",
+        "moduleCount": 179,
+        "basedOnCommit": "6a895c16d21a69d8b71111890d39e6834153cb6a"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -224,8 +224,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 166
+          "line": 2513,
+          "scriptOrdinal": 167
         }
       ]
     },
@@ -236,8 +236,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2504,
-          "scriptOrdinal": 158
+          "line": 2505,
+          "scriptOrdinal": 159
         }
       ]
     },
@@ -248,8 +248,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2505,
-          "scriptOrdinal": 159
+          "line": 2506,
+          "scriptOrdinal": 160
         }
       ]
     },
@@ -260,8 +260,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 162
+          "line": 2509,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -296,8 +296,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 161
+          "line": 2508,
+          "scriptOrdinal": 162
         }
       ]
     },
@@ -308,8 +308,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 160
+          "line": 2507,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -441,8 +441,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 163
+          "line": 2510,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -544,6 +544,19 @@
       ]
     },
     {
+      "path": "src/js/application/diagnostics-capability.js",
+      "moduleId": "app.diagnostics.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/diagnostics-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
+        }
+      ]
+    },
+    {
       "path": "src/js/asset-tree.js",
       "moduleId": "app.asset.tree",
       "executionClass": "document-classic",
@@ -610,8 +623,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 165
+          "line": 2512,
+          "scriptOrdinal": 166
         }
       ]
     },
@@ -622,8 +635,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 164
+          "line": 2511,
+          "scriptOrdinal": 165
         }
       ]
     },
@@ -826,8 +839,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2393,
-          "scriptOrdinal": 71
+          "line": 2394,
+          "scriptOrdinal": 72
         }
       ]
     },
@@ -1666,6 +1679,18 @@
           "path": "src/index.html",
           "line": 2361,
           "scriptOrdinal": 46
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/diagnostics-panel.js",
+      "moduleId": "app.labs.diagnostics.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2358,
+          "scriptOrdinal": 43
         }
       ]
     },

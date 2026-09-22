@@ -10,11 +10,26 @@ const root = path.join(__dirname, '..');
 const load = (...parts) => JSON.parse(fs.readFileSync(path.join(root, ...parts), 'utf8'));
 const schema = load('engineering', 'application', 'transport-v1.schema.json');
 const nativeSchema = load('engineering', 'application', 'native-transport-v2.schema.json');
-const descriptors = [
-  load('engineering', 'application', 'capabilities', 'opacity.json'),
-  load('engineering', 'application', 'capabilities', 'export-job.json'),
-  load('engineering', 'application', 'capabilities', 'timelapse.json'),
-];
+// Derived from the Rust declaration, not copied from it. capabilities.rs's own
+// comment says integration tests must READ CAPABILITY_SOURCES rather than keep a
+// parallel copy; this file kept one anyway, and that is why a capability could be
+// added to the generator (and so to the schema Rust emits) while the committed
+// transport-v1.schema.json silently stayed one descriptor short -- the only test
+// pinning that array compared it against the same stale list. Source order is
+// significant: catalog().descriptors() returns registration order, not sorted.
+function declaredDescriptors() {
+  const rust = fs.readFileSync(path.join(root, 'nemo-mcp', 'src', 'capabilities.rs'), 'utf8');
+  const start = rust.indexOf('CAPABILITY_SOURCES');
+  const block = rust.slice(start, rust.indexOf('];', start));
+  const out = [];
+  const re = /include_str!\s*\(\s*"([^"]+)"\s*\)/g;
+  let m;
+  while ((m = re.exec(block))) {
+    out.push(JSON.parse(fs.readFileSync(path.resolve(root, 'nemo-mcp', 'src', m[1]), 'utf8')));
+  }
+  return out;
+}
+const descriptors = declaredDescriptors();
 const nativeDescriptors = [
   load('engineering', 'application', 'capabilities-v2', 'native-opacity.json'),
 ];

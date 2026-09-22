@@ -194,7 +194,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 158, 159, 160, 161, 162, 163, 164, 165, 166]);
+    [6, 7, 8, 9, 10, 11, 159, 160, 161, 162, 163, 164, 165, 166, 167]);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {
