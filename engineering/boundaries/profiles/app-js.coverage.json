@@ -832,6 +832,13 @@
       ]
     },
     {
+      "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
+      "moduleId": "app.opacity.reproduction.bundle.domain",
+      "executionClass": "imported-module",
+      "loadSites": [],
+      "activation": "T07: not yet wired into src/index.html -- required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs today. T08's UI/MCP diagnostics inspector is the leaf that gives it a production caller."
+    },
+    {
       "path": "src/js/draw-bridge.js",
       "moduleId": "app.draw.bridge",
       "executionClass": "document-classic",
