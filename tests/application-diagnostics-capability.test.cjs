@@ -231,3 +231,91 @@ test('the diagnostics capability and the panel observe the exact same synthetic 
   assert.match(panelEl.innerHTML, /panel-c2/);
   assert.match(panelEl.innerHTML, /property\.set/);
 });
+
+// ---- review fixes (Pollen, 2026-09-22) -------------------------------------
+
+test('a hostile requestId cannot inject markup into the panel', () => {
+  // requestId is caller-supplied and only length-checked by validate(), so it
+  // arrives here verbatim from whatever drove the command -- an MCP client
+  // included. The panel builds rows as an innerHTML string, so this is the
+  // regression guard for that escaping.
+  const HOSTILE = '"><img src=x onerror=alert(1)>';
+  const { ctx, layerA } = panelWindow();
+  const meta = () => ctx.NemoOpacityApplication.meta();
+  const written = ctx.NemoApplication.handle({ apiVersion: 1, requestId: HOSTILE, ...meta(),
+    expectedRevision: meta().revision, operation: 'property.set',
+    payload: { layerId: layerA, property: 'opacity', value: 42 } });
+  assert.equal(written.ok, true, 'the core still accepts it as an ordinary requestId; the panel is what must be safe');
+
+  ctx.SMLabs.enable('diagnostics-panel');
+  const html = ctx.document._lastCreated.innerHTML;
+  assert.doesNotMatch(html, /<img/, 'no tag may survive into the rendered markup');
+  assert.ok(!html.includes(HOSTILE), 'the payload must not appear verbatim');
+  assert.match(html, /&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;/, 'it must appear escaped instead');
+});
+
+test('the panel escapes every interpolated trace field, not only requestId', () => {
+  const { ctx, layerA } = panelWindow();
+  const meta = () => ctx.NemoOpacityApplication.meta();
+  ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'a<b>&c"d', ...meta(),
+    expectedRevision: meta().revision, operation: 'property.set',
+    payload: { layerId: layerA, property: 'opacity', value: 7 } });
+  ctx.SMLabs.enable('diagnostics-panel');
+  const html = ctx.document._lastCreated.innerHTML;
+  assert.match(html, /a&lt;b&gt;&amp;c&quot;d/);
+});
+
+test('retentionLimit is read from the application, not restated as a literal', () => {
+  // A bound change made coherently (ring buffer + capabilitySummary) used to
+  // leave this capability advertising a stale 32 that no test could see.
+  const win = opacityWindow();
+  const realHandle = win.NemoApplication.handle;
+  win.NemoApplication.handle = function (request) {
+    const response = realHandle(request);
+    if (request.operation === 'capabilities' && response.ok) response.result.traceRetention = 16;
+    return response;
+  };
+  const inspected = capability.handlerFor(win)({ operation: 'inspect', payload: {} });
+  assert.equal(inspected.ok, true);
+  assert.equal(inspected.result.retentionLimit, 16, 'it must follow the application, not a hardcoded 32');
+});
+
+test('inspect fails honestly when the application reports no retention bound', () => {
+  const win = opacityWindow();
+  const realHandle = win.NemoApplication.handle;
+  win.NemoApplication.handle = function (request) {
+    const response = realHandle(request);
+    if (request.operation === 'capabilities' && response.ok) delete response.result.traceRetention;
+    return response;
+  };
+  const inspected = capability.handlerFor(win)({ operation: 'inspect', payload: {} });
+  assert.equal(inspected.ok, false);
+  assert.equal(inspected.error.code, 'unavailable', 'a wrong bound would be worse than an error');
+});
+
+test('a limit outside the declared bounds is ignored, never inverted', () => {
+  const win = opacityWindow();
+  const layerId = win._f.state.layers[0].layerUid;
+  ['g1', 'g2', 'g3', 'g4'].forEach((id, i) => send(win, id, 'property.set', { layerId, property: 'opacity', value: 10 + i }));
+  const handler = capability.handlerFor(win);
+  const ids = (payload) => handler({ operation: 'inspect', payload }).result.entries.map((e) => e.requestId);
+
+  assert.deepEqual(ids({ limit: 2 }), ['g3', 'g4'], 'a valid limit keeps the most recent');
+  // slice(-0) is slice(0): asking for none used to return the WHOLE buffer.
+  assert.deepEqual(ids({ limit: 0 }), ids({}), 'limit 0 is below the declared minimum: treated as absent');
+  // A negative limit used to drop the OLDEST entries instead of keeping the newest.
+  assert.deepEqual(ids({ limit: -3 }), ids({}), 'a negative limit is invalid: treated as absent, never inverted');
+  assert.deepEqual(ids({ limit: 1.5 }), ids({}), 'a non-integer is treated as absent');
+});
+
+test('routing guard: no trace field is interpolated into the panel markup without esc()', () => {
+  // The behavioral tests above can only drive a hostile requestId: `operation`
+  // is constrained to opacity-application.js's closed READS/WRITES list, so no
+  // test can reach the panel with a hostile one. This guard is what keeps that
+  // field's escaping from being silently dropped.
+  const code = withoutLineComments(fs.readFileSync(path.join(ROOT, 'src/js/labs/diagnostics-panel.js'), 'utf8'));
+  assert.doesNotMatch(code, /\+\s*(req|entry)\.[A-Za-z]/,
+    'every req./entry. field must reach the markup through esc(), never by direct interpolation');
+  assert.match(code, /esc\(req\.requestId\)/);
+  assert.match(code, /esc\(req\.operation\)/);
+});

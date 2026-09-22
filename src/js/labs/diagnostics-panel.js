@@ -18,6 +18,15 @@
 (function () {
   var panel = null;
 
+  // Trace fields are NOT trusted text. `requestId` is caller-supplied and only
+  // length-checked by opacity-application.js's validate(), so it reaches here
+  // verbatim from whatever drove the command -- including an MCP client. This
+  // panel builds its rows as an innerHTML string, so every interpolated value
+  // has to be escaped or a requestId can close an attribute and inject markup
+  // into the Tauri webview, where window.__TAURI__ is in scope.
+  var ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function esc(value) { return String(value).replace(/[&<>"']/g, function (c) { return ESCAPES[c]; }); }
+
   function correlatedLayerIndices() {
     var idx = {};
     if (window.state && Array.isArray(window._layerSel) && window._layerSel.length) {
@@ -54,9 +63,9 @@
     return '<tr data-layer-idx="' + layerIdx + '" style="cursor:' + (layerIdx >= 0 ? 'pointer' : 'default') + ';' +
       (correlated ? 'background:rgba(78,111,242,.25);' : '') + '">' +
       '<td style="padding:1px 8px;color:' + statusColor + ';">' + (entry.ok ? 'ok' : 'fail') + '</td>' +
-      '<td style="padding:1px 8px;">' + req.operation + '</td>' +
-      '<td style="padding:1px 8px;color:#888;">' + entry.revision + '</td>' +
-      '<td style="padding:1px 8px;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + req.requestId + '</td>' +
+      '<td style="padding:1px 8px;">' + esc(req.operation) + '</td>' +
+      '<td style="padding:1px 8px;color:#888;">' + esc(entry.revision) + '</td>' +
+      '<td style="padding:1px 8px;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(req.requestId) + '</td>' +
       '</tr>';
   }
 
@@ -80,7 +89,7 @@
     var selectedLayers = correlatedLayerIndices();
     var t2 = (typeof SM !== 'undefined' && SM.t) ? SM.t : function (k) { return k; };
     var body = result.error
-      ? '<div style="padding:6px 8px;color:#e08787;">' + result.error + '</div>'
+      ? '<div style="padding:6px 8px;color:#e08787;">' + esc(result.error) + '</div>'
       : (result.entries.length
         ? '<table style="border-collapse:collapse;"><tr><th style="padding:2px 8px;color:#888;">status</th><th style="padding:2px 8px;color:#888;">operation</th><th style="padding:2px 8px;color:#888;">rev</th><th style="padding:2px 8px;color:#888;">requestId</th></tr>'
           + result.entries.slice().reverse().map(function (e) { return rowHtml(e, selectedLayers); }).join('') + '</table>'

@@ -95,11 +95,28 @@ var NemoDiagnosticsCapability = (function () {
       var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-inspect:' + Math.random(),
         ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
       if (!traced.ok) return { ok: false, error: traced.error };
+      // The bound is the application's to declare, not ours to restate: the
+      // ring buffer (T05) and capabilitySummary().traceRetention are already
+      // held equal by the opacity retention test, so reading it here keeps a
+      // future bound change from leaving this capability advertising a stale
+      // number that no test can see. Never substitute a literal on failure --
+      // a wrong bound is worse than an honest error.
+      var summary = win.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-inspect-caps:' + identity.revision,
+        ...identity, expectedRevision: identity.revision, operation: 'capabilities', payload: {} });
+      var caps = summary.ok && summary.result;
+      if (!caps || !Number.isInteger(caps.traceRetention)) {
+        return { ok: false, error: { code: 'unavailable', message: 'The application did not report a trace retention bound.' } };
+      }
       var entries = traced.result.entries.map(function (entry) {
         return { requestId: entry.request.requestId, operation: entry.request.operation, revision: entry.revision, ok: entry.ok };
       });
-      if (Number.isInteger(limit)) entries = entries.slice(-limit);
-      return { ok: true, result: { entries: entries, retentionLimit: 32 } };
+      // `limit` must be a positive integer: slice(-0) is slice(0) (the WHOLE
+      // buffer for a caller asking for none) and a negative limit drops the
+      // OLDEST entries instead of keeping the newest. The declared input
+      // schema says minimum 1, and nothing between a caller and this handler
+      // enforces it -- the registry states it does not validate payloads.
+      if (Number.isInteger(limit) && limit > 0) entries = entries.slice(-limit);
+      return { ok: true, result: { entries: entries, retentionLimit: caps.traceRetention } };
     };
   }
 
