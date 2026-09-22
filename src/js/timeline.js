@@ -346,6 +346,16 @@ function retimeTweenSpans(li,pairs,captured){
 
 // ---- API ----
 var PRODUCER_ALLOWED_TOOLS=['hand','zoom','rotate','comment'];
+// Provenance stamping (tweens.js TW_PROVENANCE_PINS): make sure every source
+// stroke has a stable id before it is copied, so the copy's dupOf resolves.
+function _stampProvenance(strokes){
+  var counter=0;
+  strokes.forEach(function(sd,i){
+    if(!sd||sd.isBrushTextureCopy)return;
+    if(!sd.strokeId)sd.strokeId='s'+Date.now().toString(36)+'_'+i+'_'+(counter++)+'_'+Math.floor(Math.random()*1e6);
+  });
+}
+
 window.SM={
   // Placeholder translator (2026-08-30). i18n.js overwrites this with the
   // real one (`window.SM.t=t`, i18n.js) — but it loads AFTER this file, and
@@ -1825,6 +1835,9 @@ window.SM={
       if(tl<0||tl>=state.layers.length||tf<0||tf>=state.totalFrames)return;
       if(state.layers[tl].locked)return; // pasting into a locked layer must no-op for that layer, same as any other edit
       var pasted=JSON.parse(JSON.stringify(d.content));
+      // provenance, same as duplicateKeyframe: a pasted stroke descends from
+      // the stroke it was copied from (its id travelled in the clipboard)
+      if(pasted.strokes)pasted.strokes.forEach(function(sd){if(sd.strokeId&&!sd.isBrushTextureCopy)sd.dupOf=sd.origId||sd.strokeId;});
       // A copied TWEEN frame (generated in-between) pastes as a normal
       // FULL keyframe — explicit request (2026-07-16, "un clé de tween
       // copier et collé ailleurs devient une keyframe pleine normal") :
@@ -2015,7 +2028,13 @@ window.SM={
     var strokes=getEffectiveStrokes(li,cf);if(!strokes.length){showToast(SM.t('toastNothingToDuplicate'));return;}
     pushUndo();for(var i=0;i<state.layers.length;i++)state.layers[i].frames.splice(cf+1,0,{strokes:[],isKeyframe:false,isInterpolated:false});
     state.totalFrames++;if(state.waOut<state.totalFrames-1)state.waOut++;window._waOut=state.waOut;window._totalF=state.totalFrames;
-    ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)),isKeyframe:true,isInterpolated:false};
+    // PROVENANCE (TW_PROVENANCE_PINS, tweens.js): every copy remembers the
+    // id of the stroke it was duplicated from. The tween matcher pairs a
+    // copy with its source outright — the correspondence is known here,
+    // exactly, for free; only strokes actually redrawn afterwards go
+    // through matching. Source strokes get an id if they had none yet.
+    _stampProvenance(strokes);
+    ld.frames[cf+1]={strokes:JSON.parse(JSON.stringify(strokes)).map(function(sd,i){if(strokes[i]&&strokes[i].strokeId&&!sd.isBrushTextureCopy)sd.dupOf=strokes[i].origId||strokes[i].strokeId;return sd;}),isKeyframe:true,isInterpolated:false};
     goToFrame(cf+1);showToast(SM.t('toastKeyframeDuplicated'));
   },
   extendExposure:function(n){

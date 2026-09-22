@@ -10,6 +10,40 @@
 // misdirects the warping path more often than it helps. Off by default,
 // left in for Cyril to flip on and compare — see the flag comment below.
 var TW_CURVATURE_DTW=false;
+// TW_DTW_SIGN (2026-09-06, testC/brasG 0→14, « l'index devient le pouce ») :
+// le coût du DTW ne regarde que la position prédite et l'angle de tangente,
+// jamais le SENS d'un coin. Sur la main droite, le chemin envoyait un creux
+// entre deux doigts de A (+154°) sur une pointe de doigt de B (−134°) et une
+// pointe de A sur un plat de B : à l'image, un doigt glisse d'un rang. Ici :
+// un coin franc (|virage| ≥ DTW_SIGN_MIN sur deux pas de grille, hors
+// rebroussements quasi complets ≥ DTW_SIGN_CUSP) ne peut s'apparier à un coin
+// franc de signe opposé qu'au prix de DTW_SIGN_W — de l'ordre du terme de
+// position à un quart de longueur de trait. window.__TW_DEBUG_DTW=true
+// compte les conflits de signe restants sur le chemin (window.__twDtwLog).
+// MESURÉ (2026-09-06, dix fichiers, 1 433 coins francs) : conflits de signe sur
+// le chemin retenu 50 → 13 (brasG 3→0, testB 10→0, testC 3→0, testD 11→0, cats
+// 12→6) ; extrémités et vérité terrain par clés retirées neutres. Mais la
+// pénalité de signe seule laisse la main droite glisser d'un doigt entier
+// (signes cohérents) : voir DTW_LOST_W ci-dessous, qui règle ce cas. Actif.
+var TW_DTW_SIGN=true,DTW_SIGN_MIN=0.6,DTW_SIGN_CUSP=2.6,DTW_SIGN_W=0.6;
+// DTW_SIGN_REWARD : variante à mesurer — deux coins francs de MÊME signe se
+// paient moins cher (coût − REWARD), pour attirer une pointe sur une pointe et
+// pas seulement interdire pointe↔creux. 0 = désactivé.
+var DTW_SIGN_REWARD=0;
+// DTW_LOST_W : un coin franc d'un côté posé sur un PLAT de l'autre (|virage| <
+// DTW_FLAT) coûte DTW_LOST_W. Sans cela, la main droite de testC glisse d'un
+// doigt entier : la pointe 1 de A est absorbée par le plat du poignet de B, la
+// pointe 4 de B par le plat après la main de A, et entre les deux chaque doigt
+// se pose sur son voisin — signes cohérents, donc invisible pour la pénalité de
+// signe seule. 0 = désactivé.
+// MESURÉ avec la pénalité de signe (2026-09-06) : coins perdus 373 → 265 à
+// 0,3 (219 à 0,6, mais les conflits de signe remontent 13→22 : les deux
+// termes se disputent). À 0,3 la main droite de testC/brasG s'aligne
+// pointe 1→pointe 1 … pointe 4→pointe 4, creux sur creux ; compression
+// locale (B.bouts) brasG 1,1→0,1, testB 5,2→2,9, testC 1,2→0,2 ; écart
+// latéral neutre (testD 11,0→12,3, le seul mouvement) ; vérité terrain par
+// clés retirées identique sur cinq fichiers. Actif à 0,3.
+var DTW_LOST_W=0.3,DTW_FLAT=0.3;
 var TW_CORRECTION_PASS=true;
 var TW_POINT_REDUCTION=true;
 var TW_HANDLE_REHARMONISE=true;
@@ -31,6 +65,58 @@ var FOLDBACK_MIN=0.02;
 // _intrinsicSegs' `else` branch. Set false to restore forward-only
 // integration.
 var TW_INTRINSIC_ANCHOR=true;
+// TW_XING_LERP (2026-09-04) — l'allocation d'auto-intersections de
+// l'arbitrage suit A→B au lieu d'être le forfait constant max(xA,xB).
+// Voir le commentaire détaillé au point d'usage (xingA/xingB).
+var TW_XING_LERP=true;
+// TW_XING_AREA (2026-09-04) — l'arbitrage paie la SURFACE des boucles
+// d'auto-intersection, pas seulement leur nombre : une boucle visible et un
+// frisson de resample comptaient tous deux pour « 1 ». Voir
+// _segsSelfLoopArea. Poids : la boucle fautive couvre ~0,10 de la boîte du
+// trait et l'écart à battre entre candidats était de 1,9 point.
+var TW_XING_AREA=true,XING_AREA_W=60;
+// TW_ALIGN_WINDING (2026-09-04, « la main droite la shape se retourne »).
+// Le sens de parcours de B (direct ou inversé) était choisi sur la seule
+// distance centroïde-relative des points, aux DEUX endroits où il se
+// décide (orientation précoce dans resamplePairFeatureAware, puis
+// alignResampledPairJS). Or inverser un trait change le SIGNE de son
+// enroulement : mesuré sur la patte signalée (cats_anim.json, portée
+// 6→16), A est un C de −272° et B un U de −55° dans le sens direct — même
+// sens de courbure, la patte se DÉROULE. L'inversion gagnait pourtant à la
+// distance (25 039 contre 37 543 : les extrémités restent du même côté),
+// ce qui faisait passer B à +55° ; le mélange traverse alors une ligne
+// droite (image 7 quasi rectiligne) et se recourbe à l'envers — c'est le
+// retournement que voit l'utilisateur. Le terme de désaccord de virage
+// existant (moyenne des |Δ| par sommet) ne le voit pas : il vaut 12° en
+// direct contre 22° en inversé, l'écart de distance l'emporte. Règle :
+// quand les deux traits sont franchement courbes (enroulement ≥
+// WIND_MIN_DEG chacun), l'orientation qui CONSERVE le signe l'emporte,
+// sauf si son coût dépasse WIND_MAX_RATIO fois l'autre (formes trop
+// différentes pour que l'enroulement dise quelque chose). Une rotation
+// remplace le retournement ; l'autre cas (une main qui se retourne
+// vraiment, paume dessus/dessous) devient une rotation, jamais un
+// aplatissement en ligne.
+var TW_ALIGN_WINDING=true,WIND_MIN_DEG=40,WIND_MAX_RATIO=4;
+function _turningDeg(P){
+  var s=0,pv=null;
+  for(var i=1;i<P.length;i++){
+    var dx=P[i][0]-P[i-1][0],dy=P[i][1]-P[i-1][1];
+    if(dx*dx+dy*dy<1e-6)continue;
+    var t=Math.atan2(dy,dx);
+    if(pv!==null)s+=_wrapPI(t-pv);
+    pv=t;
+  }
+  return s*180/Math.PI;
+}
+// +1 : garder B direct ; −1 : inverser B ; 0 : pas d'avis (laisser la
+// distance décider). PA/PB = listes de [x,y] dans l'ordre de parcours.
+function _windingPref(PA,PB,costDirect,costRev){
+  if(!TW_ALIGN_WINDING)return 0;
+  var wA=_turningDeg(PA),wB=_turningDeg(PB);
+  if(Math.min(Math.abs(wA),Math.abs(wB))<WIND_MIN_DEG)return 0;
+  if((wA>0)===(wB>0))return costDirect<=costRev*WIND_MAX_RATIO?1:0;
+  return costRev<=costDirect*WIND_MAX_RATIO?-1:0;
+}
 // 2026-09 (tween audit) — two interpolation-QUALITY changes, each behind
 // its own flag so they can be A/B'd from the console and rolled back
 // independently (set to false, regenerate). Left for Cyril to judge on
@@ -100,6 +186,777 @@ var MATCH_LEN_W=0.15;
 // reverse-or-not choice, scored on position. JS-only, wasm align_pair
 // bypassed while on (twin of the old behaviour).
 var TW_ALIGN_HAIRPIN=true;
+// TW_MATCH_MULTI_MOTION (2026-09, Cyril's cat "confusion totale", keys
+// 6→15): the head jumps ~400 px while whiskers, paws and body stay put.
+// Every motion model so far is LOCAL (a stroke's motion predicted from its
+// neighbours' confident matches) — and every neighbour of a head stroke is
+// static, so nothing could ever predict the jump; the head's nine strokes
+// got matched to whatever static stroke looked vaguely alike (eye→ear,
+// mouth→paw), each individually mediocre, none faded. Fix: MULTI-MOTION
+// HYPOTHESES, RANSAC-style. Shape-only candidate pairs (A's samples
+// translated onto B's centroid, so proximity measures shape not place)
+// vote with their displacement vector; coherent clusters of ≥3 distinct
+// strokes become a motion hypothesis (similarity fit on their centroids,
+// then absorb + refit). Every hypothesis is one more channel in the unary
+// cost (min over channels, plus a bias shrinking with support), so a
+// stroke may be explained by "it stayed", "it followed its neighbours", or
+// "it moved with THAT group" — and the Hungarian + relational pass pick
+// the globally consistent story. JS-only, wasm auto_match bypassed.
+var TW_MATCH_MULTI_MOTION=true;
+var MM_MIN_SUPPORT=3,MM_SHAPE_TH=0.5,MM_BIAS=0.04,MM_BIAS_SUPPORT=0.08,MM_MAX_HYPS=6;
+// ---- ZOOM (loup 47→57, 2026-09-06) ----
+// La clé 57 est un gros plan de la tête : chaque trait de tête y est 1,7 à
+// 2,2 fois plus long et l'ensemble s'écarte (les oreilles ×3). Aucun canal
+// ne modélise un changement d'échelle : les candidats des hypothèses de
+// mouvement comparent les formes à l'échelle 1 (Chamfer normalisé par la
+// taille des deux traits, pénalités de longueur dès 1,3×), le regroupement
+// se fait par vecteur de déplacement (un zoom diverge) et l'ajustement
+// refuse une échelle hors [0,5 ; 2]. Résultat mesuré : les traits du corps
+// rattrapés vers les lignes de la grosse tête (7 rattrapages à 0,49–0,69,
+// jambe → mâchoire, queue → oreille). Avec le drapeau : candidats à échelle
+// normalisée (longueur B / longueur A, forme de A mise à cette échelle,
+// pénalités de longueur, d'aire et de position relatives à l'échelle —
+// matchSc opts), RANSAC sur deux candidats → similitude, support = les
+// candidats cohérents (position prédite à ZOOM_TOL près, échelle propre à
+// ZOOM_LEN_TOL près en log), ≥ ZOOM_MIN_SUPPORT traits distincts. Canal
+// d'hypothèse comme les autres (adoption ≥ MM_MIN_SUPPORT), noté avec
+// l'échelle. Un zoom réel seulement : |log échelle| ≥ ZOOM_MIN_LOG, les
+// déplacements à échelle 1 restent aux hypothèses existantes.
+// MESURÉ (2026-09-06, loup2 = loup + clés 35/39/47/57 de Cyril) : 47→57,
+// zoom ×1,68 à 8 membres adopté par 10 paires ; oreilles → oreilles,
+// mâchoires → mâchoires, museau → museau, poing → main ; jambes, queue,
+// torse, bras levé fondus (15 → 19 fondus). Bouts 47→57 : compression
+// 12,9 → 0, latéral 15,5 → 3,1, rebroussements 2 → 1 ; holdout 39→47→57
+// 21,7 → 20,2. Corpus (17 fichiers) : aucune autre portée changée. Réglage :
+// ZOOM_LEN_TOL 0,6 et ZOOM_MIN_LOG 0,25 laissaient passer des zooms ×0,77 à
+// 8–13 membres partout (abandonnés, mais souris 5→16 changeait de 3 paires,
+// neutre à l'œil et au holdout) ; à 0,4 / 0,35 / support 5, seul 47→57
+// bouge. Reste connu : l'oreille droite (9_373438 → 3_387278, 0,435) fond au
+// tour relationnel — les oreilles s'écartent ×3 quand la tête ne grandit
+// que ×1,7, une similitude ne le prédit pas ; elle apparaît en fondu.
+// → ALLUMÉ.
+var TW_MM_ZOOM=true,ZOOM_SCALE_MIN=0.3,ZOOM_SCALE_MAX=3.5,ZOOM_MIN_LOG=0.35,ZOOM_LEN_TOL=0.4,ZOOM_MAX_ROT=0.6,ZOOM_MIN_SUPPORT=5,ZOOM_MAX_CANDS=60,ZOOM_MAX_HYPS=2;
+// ZOOM DOMINANT : quand une hypothèse de zoom est adoptée par au moins
+// ZOOM_DOMINANT_FRAC des paires possibles, la caméra a zoomé ; un trait de A
+// que le zoom envoie hors des bornes de B (à ZOOM_TOL près) est sorti du
+// cadre. Sans cela, une jambe (prédite 300 px sous le cadre) s'apparie par
+// proximité brute avec la main de B, et le bras avec le museau (0,24–0,25,
+// sous le seuil). Chaque appariement d'un tel trait hors du canal zoom coûte
+// ZOOM_OFFSCREEN_PEN de plus, puis un tour de plus d'affectation.
+var ZOOM_DOMINANT_FRAC=0.5,ZOOM_OFFSCREEN_PEN=0.35;
+// TW_REL_2OPT: exact-objective pairwise swap pass at the end of
+// relationalRefine (see its comment). Same PR; separately flippable.
+var TW_REL_2OPT=true;
+// TW_MATCH_TRACKING (2026-09, "tracking" — Cyril's idea list, point 1+3):
+// a stroke's identity persists across keys (generateTweens stamps the
+// pair's strokeId on the B key, which is the next pair's A key), so when
+// matching K1→K2 we know how each K1 stroke moved in K0→K1. Two uses.
+// PIECES: strokes that moved TOGETHER in K0→K1 (same displacement
+// cluster, non-static) are a known piece; in K1→K2 a displacement
+// cluster made of members of one known piece counts as a hypothesis with
+// only 2 votes instead of 3 (co-membership is prior evidence), and its
+// pruning threshold drops likewise. MOMENTUM: each known piece also
+// proposes "same displacement again" as a hypothesis — free when the
+// motion is roughly constant, pruned when nobody adopts it (a reversal).
+// History is read from the layer's stored keyframes, never written.
+var TW_MATCH_TRACKING=true;
+var MM_MIN_SUPPORT_KNOWN=2;
+// TW_PIECE_COMPLETION (2026-09, Cyril's face: "la pupille gauche part
+// dans le nez, la droite part en haut au lieu d'aller vers le petit point
+// du bas"): a 106 px pupil line becomes a 6 px dot when the eye narrows —
+// a 20× length ratio no shape score can accept, and no motion model
+// predicts it either (the eye SQUASHES: brow −131 px, lower lid −10 px,
+// and the brow isn't even a pass-1 seed). What a viewer uses is
+// structure: one leftover mark sits between the brow and the lower lid
+// in A, one leftover mark sits between the SAME two (matched) strokes in
+// B — they are the same thing. After matching + rescue, an unmatched A
+// stroke and an unmatched B stroke whose two nearest matched neighbours
+// are the same two pairs are paired, shape ignored (bounded: the
+// leftover is no longer than its anchors and sits within their bounds;
+// several leftovers inside one anchor pair are assigned by position).
+var TW_PIECE_COMPLETION=true;
+var PC_MAX_D=0.5;
+// ---- 2026-09-04, audit autotween (branche claude/autotween-signals) ----
+// Constat de l'audit : le solveur (Hongrois + passe relationnelle + 2-opt)
+// est bon, ce sont les SIGNAUX qui manquent. Chaque ajout ci-dessous est un
+// signal de plus, derrière son propre drapeau, étage 1 (appariement)
+// seulement — l'étage 2 (les quatre moteurs d'interpolation) est intouché.
+// Rien de manuel, rien qui suppose un rig ou un ordre de dessin.
+//
+// TW_MOTION_FIELD — la prédiction de mouvement (étage 4 du pipeline) était
+// une similitude ajustée sur les 4 graines les plus proches : un modèle
+// local sans aucune régularité, d'où l'œil déplacé à tort (409 px
+// d'étalement, 36 px de résidu) et le compromis « les jambes veulent la
+// prédiction, les yeux veulent le brut ». Remplacée par un champ de
+// déformation LISSE (plaque mince régularisée, ajustée sur les graines
+// avec rejet des graines aberrantes, leave-one-out conservé) : un trait
+// suit ses voisins exactement dans la mesure où le champ est cohérent
+// autour de lui. Le canal brut (min(prédit, brut+biais)) est conservé.
+var TW_MOTION_FIELD=true;
+var MF_MIN_SEEDS=4;        // en dessous, similitude globale comme avant
+var MF_LAMBDA=0.02;        // régularisation, relative au diag du dessin
+var MF_OUTLIER_K=3;        // graine rejetée si résidu > K × médiane
+// TW_CHIRALITY — toutes les confusions récurrentes (yeux G↔D, moustaches
+// G↔D, jambes) sont des INVERSIONS MIROIR. Une déformation lisse préserve
+// l'orientation signée des triplets de voisins ; un appariement qui la
+// retourne paye. Terme de la passe relationnelle (et de l'objectif 2-opt).
+// Poids calibrés au banc (__twBench.suite/ablation, cats_anim.json, clés 0
+// et 6, 3 graines par niveau, erreurs = faux + manqués + faux-appariés) :
+//   base (tous les nouveaux drapeaux off) 10,11,2,8   [K0-moyen, K0-redraw, K6-moyen, K6-redraw]
+//   champ seul                             7,13,2,6   ← gagne 2 fois, régresse K0-redraw
+//   champ + topologie 0.10..0.15           7,11,2,6   ← la topologie annule cette régression
+// REL_CHIR : NEUTRE sur ce banc (0 et 0.10 donnent le même score), NUISIBLE
+// au-dessus de 0.15 (K0-moyen 7 → 10). Gardé à 0.10 parce que le banc ne
+// PEUT PAS produire le cas pour lequel il existe — sa déformation est lisse
+// donc préserve l'orientation, alors que les confusions réelles (yeux G↔D,
+// moustaches, jambes) sont des inversions miroir. À passer à 0 en premier
+// si un cas réel régresse.
+var TW_CHIRALITY=true;
+var REL_CHIR=0.10,CHIR_SIN=0.30;
+// TW_REL_REVERSE (2026-09-04, « entre 26 et 35 confusion au niveau de son
+// bras droit ») — INVERSION DE CÔTÉS entre voisins PROCHES. Les deux
+// contours du bras pendant (15, 16 de la clé 25, centroïdes à 20 px) se
+// croisaient pour rejoindre les deux boucles du bras plié : extérieur →
+// intérieur et inversement, d'où une grande boucle avec la main dedans à
+// mi-portée. Les coûts bruts étaient à 0,006 près égaux entre croisé et
+// non-croisé, et le terme relationnel existant n'y voit rien : il
+// normalise l'écart par la TAILLE des traits (~120 px de diagonale), donc
+// un arrangement à l'échelle de 15 px lui est invisible ; la chiralité
+// exige un triplet bien ouvert ; `uncrossMatches` exige des jumeaux de
+// même longueur (88 contre 140 ici) et ne tourne plus sur ce chemin.
+// Signal : pour chaque voisin j de i dont la distance est sous REV_NEAR ×
+// la plus petite des deux tailles, le vecteur relatif PRÉDIT (tourné par
+// le mouvement local de i, comme le reste du terme) et le vecteur
+// relatif obtenu en B ne doivent pas être opposés : cosinus sous −0,3,
+// gradué jusqu'à −0,8. Une rotation réelle du membre est absorbée par la
+// prédiction ; seul l'échange de côtés reste. Même objectif pour les
+// tours du Hongrois et pour le 2-opt (structTerm).
+// DÉSACTIVÉ par défaut : mesuré inutile pour le cas du bras (la garde
+// d'arrangement de la passe d'ordre, TW_OC_SIDE_GUARD, suffit : 6/6) et il
+// coûtait deux paires de moustaches sur 34→46 (petits traits qui suivent
+// une tête déplacée de 250 px). Gardé pour une prochaine mesure.
+var TW_REL_REVERSE=false,REL_REVERSE=0.30,REV_NEAR=0.5;
+// TW_OC_SIDE_GUARD — la passe d'ordre (fin de _spanPairSpecs) ne défait
+// pas un arrangement conservé ; voir le commentaire au point d'usage.
+var TW_OC_SIDE_GUARD=true;
+// TW_MATCH_WIDTH — l'épaisseur n'entrait pas dans le descripteur. Même
+// rampe douce que lenT (ratio 1.5 → 2.5), même exemption des micro-traits.
+var TW_MATCH_WIDTH=true;
+var MATCH_WIDTH_W=0.10;
+// TW_MATCH_AXIS (2026-09-04, cas signalé par Cyril : « à la frame 7 la main
+// devient un bout du corps »). Diagnostic chiffré : la boucle de la patte
+// (49×34) était appariée à un long trait du corps (29×131) et TOUS les
+// termes de forme étaient d'accord — le descripteur de Fourier donnait 0.003
+// pour ce faux appariement contre 0.075 pour le bon. Cause : Fourier
+// normalise sa magnitude et jette la phase, le profil d'angles est
+// normalisé par sa longueur — les deux sont invariants à l'échelle ET à la
+// rotation par construction. Une petite boucle large et un long trait fin
+// leur sont littéralement IDENTIQUES. Aucun terme du coût ne regardait la
+// FORME GLOBALE du nuage de points ; szD compare des aires de boîte
+// (poids 0.06) et dirX/dirY, calculés dans strokeFeat, n'étaient jamais lus.
+// Signal ajouté : l'ÉLONGATION (rapport des valeurs propres de la matrice
+// de covariance des 16 échantillons). Mesuré sur ce fichier : les paires
+// légitimes sont à |log(eA/eB)| = 0.03..0.64, le faux appariement de la
+// patte à 3.01. L'ANGLE de l'axe principal, lui, est INUTILISABLE : de
+// bonnes paires y sont à 66°, 80°, 87° d'écart (le chat pivote entre les
+// clés) — d'où élongation seule, sans orientation.
+// L'élongation est plafonnée à AXIS_CAP : au-delà, un trait est « en gros
+// droit » et deux droits ne doivent pas se départager sur ce critère.
+// Quand la passe 2 fournit les points transportés, l'élongation de A est
+// mesurée SUR EUX : un trait réellement écrasé par la déformation n'est
+// donc pas puni pour l'avoir été.
+// Poids : 0.40. Compromis MESURÉ, à connaître avant d'y toucher — le cas
+// réel et le banc synthétique ne sont pas d'accord ici :
+//   terme éteint            2,13,24,0,5,13 (tot 57) — main → corps (le bug)
+//   W=0.25                  2,16,25,0,5,11 (tot 59) — main → corps encore
+//   W=0.40                  2,16,25,0,5,11 (tot 59) — main RÉPARÉE, et
+//                           l'orphelin parasite de B disparaît
+//   W=0.60                  2,16,33,0,5,11 (tot 67) — trop
+// Le banc perd 3 sur K0-moyen et en regagne 2 sur K6-redraw. Sa déformation
+// synthétique ne change quasiment PAS l'élongation d'un trait (écart médian
+// mesuré 0.03, max 0.83 au niveau redraw) : il ne peut donc pas récompenser
+// ce terme, alors que le cas réel signalé par Cyril en dépend entièrement.
+// Arbitré en faveur du cas réel, drapeau prévu pour revenir en arrière.
+// REMPLACÉ par TW_MATCH_TURNING (2026-09-04, « entre les clés 35 et 47
+// confusion sur le bras qui passe d'un côté à l'autre ») — gardé
+// désactivé pour comparaison. Mesuré sur cette portée : les lignes de bras
+// sont TOUTES à l'élongation plafond 8, le terme ne les départageait pas
+// directement ; il agissait par ricochet en interdisant au bras PLIÉ de A
+// (e = 1,6–2,0) de devenir le bras TENDU de B (e = 8, |log| = 1,4–1,6, au-
+// delà de la zone franche 0,7) — alors que c'est précisément le mouvement
+// dessiné, un membre qui se déplie. L'assignation globale se réarrangeait
+// alors : bras droit de A → bras tendu de B (traversée du corps), main →
+// ligne du corps. Ablation drapeau par drapeau : seul ce terme éteint
+// remettait les six traits du bon côté. Ce qui distingue vraiment la
+// patte en boucle (le cas d'origine) d'un bras plié, ce n'est pas
+// l'élongation mais l'ENROULEMENT TOTAL : ~300° contre ~90°, contre ~10°
+// pour une ligne. Un membre s'articule de ≤ 120° entre deux clés ; une
+// boucle ne se déroule pas en ligne.
+var TW_MATCH_AXIS=false;
+var MATCH_AXIS_W=0.40,AXIS_CAP=8,AXIS_FREE=0.7,AXIS_FULL=2.0,AXIS_MIN_PX=6;
+// TW_MATCH_TURNING — enroulement total SIGNÉ du trait (|Σ Δθ| sur les 16
+// échantillons, en radians), porté par le même objet `elong` que
+// l'élongation, donc même câblage (buildCost, canaux d'hypothèses,
+// appelants directs de matchSc) et même normalisation par ligne. Signé et
+// non en valeur absolue : le tremblement d'une droite dessinée à la main
+// se compense, une boucle non. Zone franche 120° (une articulation qui se
+// plie ou se déplie), plein tarif à 250° (une boucle contre une ligne).
+// Poids : 0,30 — FENÊTRE ÉTROITE, mesurée sur les deux cas réels de
+// cats_anim.json qui tirent en sens contraire (patte → patte sur 6→16,
+// bras du bon côté sur 34→46) :
+//   W ≤ 0,26   patte → corps (le bug d'origine revient)
+//   0,27–0,28  patte OK, bras 0 exact / 3 du bon côté
+//   0,29–0,35  patte OK, bras 5 exacts / 6 du bon côté   ← ici
+//   W ≥ 0,36   patte OK, bras 1 / 4
+// Non monotone : l'assignation bascule entre plusieurs optima globaux
+// presque égaux. Le banc synthétique dit 58 (contre 55 avec l'élongation
+// à 0,40, 64 sans rien) — il ne modélise pas un changement de structure de
+// dessin (trois courbes → deux lignes + une courbe), il ne peut pas
+// récompenser ce choix. Arbitré en faveur des deux cas réels.
+var TW_MATCH_TURNING=true;
+var MATCH_TURN_W=0.30,TURN_FREE=2.1,TURN_FULL=4.4;
+// TW_MATCH_GAP (2026-09-04, « le corps devient le bras maintenant ») —
+// FERMETURE du trait : distance entre ses deux bouts rapportée à sa
+// diagonale. Mesuré sur cats_anim.json, c'est LE trait géométrique qui
+// sépare les cas que l'enroulement confondait : la patte en boucle se
+// referme (0,35), les mains aussi (0,28–0,39), alors que les traits du bras
+// plié de A — 290° d'enroulement comme une patte — restent OUVERTS
+// (0,75–0,81) et les lignes valent 1,0. Une patte ne doit pas devenir une
+// ligne (Δ 0,65), un bras plié peut se déplier en ligne (Δ 0,2). Même objet
+// `elong`, même câblage, même normalisation par ligne.
+// Poids : les deux termes ensemble ouvrent enfin une région LARGE et plate,
+// mesurée sur les trois cibles réelles à la fois (patte 6→16, bras et
+// contours du corps 34→46 — 8 paires exactes sur 8) :
+//   enroulement 0,20–0,40 × fermeture 0,40–1,0 : tout juste
+//   fermeture 0,30 : 7/8 ; fermeture seule (enroulement éteint) : 8/8 mais
+//   la patte redevient un bout du corps ; enroulement seul : voir sa fenêtre.
+// Réglé au centre : 0,30 / 0,50. Banc synthétique 55 (base 64).
+var TW_MATCH_GAP=true;
+var MATCH_GAP_W=0.50,GAP_FREE=0.3,GAP_FULL=0.6;
+// TW_MATCH_TOPOLOGY — « topologie floue » (FTP-SC 2018) : graphe de
+// contacts entre traits (extrémité posée sur un autre trait, à tolérance).
+// Une paire qui casse une jonction coûte, une paire qui la préserve gagne.
+// C'est le signal qui manquait sur la chaîne œil/paupière/sourcil, où
+// l'arrangement des centroïdes est préservé par les DEUX chaînes.
+var TW_MATCH_TOPOLOGY=true;
+var REL_TOPO=0.12; // banc : 0.10 et 0.15 identiques, 0.30 régresse K0-moyen
+// TW_MATCH_REGIONS — appartenance aux régions fermées (« Labeling Closed
+// Areas », 2021) : un trait DANS une boucle fermée (pupille dans l'œil,
+// œil dans la tête) doit rester dans la boucle appariée.
+var TW_MATCH_REGIONS=true;
+var REL_REGION=0.35;
+// TW_PROVENANCE_PINS — la correspondance existe déjà dans l'historique
+// d'édition : dupliquer/coller une clé estampille `dupOf` (l'id du trait
+// source) sur chaque copie. Un trait de B qui DESCEND d'un trait de A est
+// apparié d'office (garde d'identité type/couleur), le matcher ne tourne
+// que sur ce qui a vraiment été redessiné. Exact, gratuit, aucun papier
+// ne peut le faire (ils ne voient que deux dessins finis).
+var TW_PROVENANCE_PINS=true;
+// TW_PIN_IN_SOLVER — les paires forcées (overrides existants + provenance)
+// sont imposées DANS le Hongrois au lieu d'être retirées après coup : le
+// reste de l'affectation se résout autour d'elles et elles servent de
+// graines certaines au champ de mouvement.
+var TW_PIN_IN_SOLVER=true;
+// TW_ORPHAN_FOLLOW — un trait sans partenaire fondait/se rétractait SUR
+// PLACE (la ligne de bouche apparaissait d'emblée à sa position finale
+// au-dessus de la tête). Il est maintenant transporté par le champ de
+// déformation de la portée (ajusté sur les paires retenues) pendant qu'il
+// fond ou se rétracte : il suit ses voisins.
+// TW_ID_PINS (2026-09-05, « test sur plusieurs anim ») — ÉPINGLES PAR
+// IDENTITÉ DE TRAIT. Un trait qui garde son `strokeId` d'une clé à l'autre
+// est le même objet dessiné ; c'est une correspondance connue, gratuite,
+// qu'aucun descripteur géométrique ne peut battre. Mesuré sur six fichiers :
+// le moteur est d'accord avec elle sur 267 paires sur 316, et là où il ne
+// l'est pas c'est presque toujours le même motif — des petits traits
+// parallèles (moustaches, doigts) dont l'ORDRE DANS LE TABLEAU a changé
+// entre les clés. Le moteur les apparie rang par rang et apparie donc une
+// moustache avec sa voisine : trajectoires croisées, 10 croisements contre
+// 5 pour l'identité sur la portée mesurée.
+//
+// MAIS elle n'est pas fiable brute : sur « confusion totale » elle propose
+// 338 px → 41 px et 116 px → 11 px. Trois filtres, tous mesurés :
+//  1. rapport de longueurs ≤ ID_PIN_LEN_RATIO — écarte les deux cas
+//     ci-dessus ;
+//  2. déplacement ≤ ID_PIN_TRAVEL_K × la MÉDIANE des déplacements des
+//     candidates elles-mêmes — estimation robuste du mouvement de la
+//     portée, sans rien connaître du dessin ;
+//  3. une épingle dont la trajectoire en croise une autre est écartée.
+//     Deux traits d'un même dessin qui échangent leur place est rare, et
+//     c'est exactement le cas du bras signalé par Cyril (portée 26→35), où
+//     l'identité veut échanger les deux contours et où l'œil dit le
+//     contraire. Écarter ne force RIEN : la paire retourne simplement au
+//     matcher, qui tranche comme avant.
+// Les épingles de provenance (dupOf) restent prioritaires.
+//  4. décision PAR PORTÉE : l'identité décrit le mouvement de cette portée,
+//     ou elle ne le décrit pas. Critère : le déplacement TOTAL qu'elle
+//     impose, rapporté à celui du partenaire le plus proche de forme
+//     comparable pour chaque trait. Un rapport proche de 1 veut dire que
+//     l'identité ne fait que départager des ambiguïtés locales ; un rapport
+//     élevé veut dire qu'elle veut déplacer des traits à travers le dessin.
+//     Mesuré sur les dix portées des fichiers de test :
+//       cats 0→6 1,15 | 6→16 1,36 | 16→25 0 | 25→34 1,47 | 34→46 1,69
+//       Untitled(3) 0→6 1,14 | 6→16 1,40
+//       totale 0→6 1,43 | 6→15 1,93 | traits 0→12 1,55 | b 0 et 0
+//     La seule portée qu'il FAUT écarter est cats 34→46 (1,69) : c'est le
+//     « bras qui passe d'un côté à l'autre » signalé par Cyril, où
+//     l'identité fait voyager deux traits de 246 px et 207 px alors qu'un
+//     partenaire les attend à 117 px et 50 px. Seuil à 1,6. La marge avec
+//     traits (1,55) est mince et assumée ; le drapeau est là pour ça.
+//     Écarter une portée ne force rien : le matcher tranche comme avant.
+//  0. (ajouté en dernier, 2026-09-05) garde de FORME : un identifiant peut
+//     avoir été écrit par un ANCIEN tween et non par l'artiste — rien ne
+//     les distingue. Dans cats_anim.json, la patte de la clé 7 et une ligne
+//     du corps de la clé 17 portent le même identifiant : c'est l'erreur du
+//     moteur d'origine, sauvegardée dans le fichier. Une épingle dont la
+//     pénalité de forme (enroulement + fermeture, axisPenaltyPair) dépasse
+//     ID_PIN_SHAPE_MAX est refusée. Mesuré sur 299 candidates de six
+//     fichiers : 277 à 0, aucune entre 0,40 et 0,67, puis 0,67 / 0,69 /
+//     0,80 — les deux patte → corps et un cas où le moteur choisit pareil.
+//     Le seuil 0,5 est dans ce trou. Il vaut ~60 % de la pénalité maximale
+//     (0,30 + 0,50) : à revoir si ces poids changent.
+var TW_ID_PINS=true;
+var ID_PIN_LEN_RATIO=2.0,ID_PIN_TRAVEL_K=3.0,ID_PIN_MIN=3,ID_PIN_SPAN_RATIO=1.6,ID_PIN_SHAPE_MAX=0.5;
+// Épingles d'identité : tout ou rien AUSSI au niveau des filtres géométriques.
+// Le filtre 4 rend la portée tout-ou-rien sur le COÛT, mais rien n'empêchait
+// jusqu'ici qu'une identité vraie soit écartée par le filtre de longueur pendant
+// que sa voisine, elle, était épinglée. Cas mesuré sur cats_anim 6→16 : le petit
+// trait du museau (L16 → L41, rapport 2,56 > 2) voit son épingle refusée, celle
+// de son voisin passe et lui prend sa cible ; le museau de la clé B se retrouve
+// sans partenaire (apparition ex nihilo) et le petit trait est recollé sur un
+// morceau d'un trait du corps 100 px plus bas. C'est exactement le « hybride
+// pire que rien » déjà constaté sur le rapport de coût. Quand une identité
+// unique est écartée par un filtre géométrique, on abandonne donc toutes les
+// épingles de la portée et on laisse la géométrie décider seule.
+//
+// Mesuré sur les 7 fichiers de test, 16 portées. Douze ne bougent pas : aucune
+// identité n'y est écartée, les épingles s'appliquent comme avant. Les quatre
+// autres (paires, fondus, découpes, croisements de trajectoires, trajet max) :
+//   cats 6→16      25p 3f 2s  5x 173px  ->  25p 2f 0s  8x 154px
+//   untitled3 6→16 27p 1f 6s  8x 173px  ->  25p 2f 0s  8x 154px
+//   traits 0→12    15p 1f 4s  2x 312px  ->  15p 0f 2s  0x 133px
+//   totale 0→6     24p 1f 2s 201x 408px ->  24p 0f 0s 195x 408px
+// Les découpes tombent partout, le trajet maximum baisse ou reste égal, les
+// fondus baissent sauf sur untitled3 (1→2). Seul contre-exemple : les
+// croisements de cats 6→16 montent de 5 à 8 — comptés sur les centroïdes, ils
+// pénalisent des moustaches qui se croisent sans que ce soit visible ; le rendu
+// de l'image 8, lui, perd le trait parasite sous le museau. 70/70 tests passent.
+var TW_ID_PIN_ALL_OR_NONE=true;
+
+// TW_FIELD_ITER — champ de déformation ITÉRÉ (esprit Coherent Point Drift).
+// Le champ TPS existe depuis longtemps, mais il n'est calé QU'UNE FOIS, sur la
+// meilleure moitié des appariements de la passe 1. Si la passe 1 se trompe, le
+// champ hérite de l'erreur et la passe 2 confirme la faute qu'elle devait
+// corriger — la correction par exclusion (leave-one-out) protège un trait
+// contre SA PROPRE erreur, pas contre celle de ses voisins. CPD résout ça en
+// alternant : on estime la correspondance, on recale le champ dessus, on
+// recommence. C'est ce que fait ce drapeau : N tours supplémentaires où les
+// germes du champ sont les appariements du tour précédent, avec arrêt dès que
+// l'assignation ne bouge plus. 0 = comportement d'avant.
+//
+// MESURÉ, ET LAISSÉ À 0. Sur les 7 fichiers, 16 portées, deux tours de plus :
+// quatorze portées ne bougent pas du tout, et les deux qui bougent ne vont pas
+// dans le bon sens.
+//   cats 34→46   25p 3f 16x 457px  ->  22p 9f 10x 281px
+//   untitled4 20→32  ...2x...      ->  ...3x...
+// Sur 34→46 — justement la portée des moustaches — le champ affiné réduit le
+// trajet maximum de 457 à 281 px et les croisements de 16 à 10, mais il y
+// arrive en ABANDONNANT : six traits de plus préfèrent le fondu plutôt qu'un
+// appariement. Vérifié à l'image (38, 40, 43) : les moustaches disparaissent au
+// lieu de se déplacer mal. Un fondu de moustache est plus visible qu'un
+// déplacement imparfait, donc ce n'est pas un progrès. Le coût est réel au
+// passage : de +50 % à +85 % de temps de calcul (192 → 355 ms sur la grosse
+// portée de b).
+// À retenir pour la suite : ce n'est PAS le champ de déformation qui manquait —
+// il existe depuis longtemps, régularisé et robuste, avec exclusion du germe
+// courant. L'affiner ne crée pas d'appariement là où le moteur n'en voit pas.
+// La question ouverte sur 34→46 est en amont : ces six traits ont-ils seulement
+// un partenaire, ou le dessin change-t-il de topologie entre les deux clés ?
+var TW_FIELD_ITER=0;
+
+// TW_PIVOT — pivot de la rampe rigide au POINT FIXE du mouvement, pas au centre.
+// La rampe rigide faisait tourner chaque trait autour de son centroïde pendant
+// que ce centroïde glissait en ligne droite de A vers B. Pour un membre qui
+// pivote à l'épaule c'est faux par construction : le vrai centroïde décrit un
+// arc, et l'extrémité côté épaule — celle qui ne devrait pas bouger — se
+// déporte au milieu puis revient (Cyril : « l'épaule fait des aller-retour »).
+// Le bon pivot est le point invariant de la similitude fittée entre A et B :
+// (I − sR)·p* = cB − sR·cA. Quand il existe et qu'il est à portée du trait
+// (≤ PIVOT_REACH × étendue), fwd ET bwd tournent autour de LUI — ce sont alors
+// le même arc, et l'amortissement par écart des centroïdes (rotTrust), qui ne
+// servait qu'à masquer le conflit entre deux pivots différents, est levé.
+// Sinon (translation pure, pivot trop loin, arc de mouvement posé à la main),
+// comportement d'avant, bit pour bit.
+// MESURE du mode 'fixed' (2026-09-06, easing neutralisé, 5 fichiers) : le pivot
+// s'applique sur ~1/3 des paires qui tournent, mais il tombe typiquement à une
+// étendue du trait, loin des deux bouts (méd. bout 0,8–1,1 ; centre 1,0–1,4) —
+// ce n'est PAS une articulation. La similitude fittée sur un trait qui change de
+// forme n'a pas de point fixe fiable. Déviation latérale de l'extrémité-
+// articulation : cats 3,39→3,30, untitled3 2,10→1,86, untitled4 1,70→1,76,
+// testanim 0,34→0,68 ; élargir la portée (2,5 ; 4) dégrade partout ; les pires
+// cas (66 px) ne bougent pas. Verdict : neutre à négatif. D'où le mode 'end'.
+// Mode 'end' : le pivot est l'extrémité qui voyage le moins entre A et B (si
+// elle voyage nettement moins que l'autre, rapport < PIVOT_END_RATIO), et il se
+// DÉPLACE le long de sa propre corde — l'épaule suit le corps, le reste du
+// trait tourne autour d'elle. Aucun fit, aucune sensibilité numérique.
+// MESURE du mode 'end' (2026-09-06, easing neutralisé, 7 fichiers ; déviation
+// latérale moyenne/max de l'extrémité-articulation, replis, longueur perdue
+// sous min(LA,LB) en px cumulés) :
+//   cats      pivots 16/68  3,39/66 → 3,20/66   replis 43=43   raccourci 205 → 148
+//   untitled3 pivots  5/35  2,10/21 → 2,13/21   replis 15=15   raccourci   9 =   9
+//   untitled4 pivots 10/27  1,70/29 → 1,63/29   replis 16=16   raccourci  28 =  28
+//   traits    pivots  3/6   0,59/2  → 0,31/1    replis  0= 0   raccourci   0 =   0
+//   testanim  pivots  1/5   0,34/1  → 0,31/1    replis 22=22   raccourci  21 =  21
+//   b, totale : 0 et 4 pivots, tout identique.
+// Amélioration petite mais cohérente sur 4 fichiers, une variation de 0,03 sur
+// untitled3, aucun repli en plus nulle part, +8 aller-retours sur 360 sur cats.
+// Vérifié à l'image sur le bras du chat 34→46 : le bras se déplie autour de
+// l'épaule sans artefact. Actif par défaut. Les pires cas (66 px) ne sont pas
+// touchés : ils ne sont pas des rotations de membre, c'est un autre sujet.
+var TW_PIVOT=true,PIVOT_MODE='end',PIVOT_MIN_DEG=10,PIVOT_REACH=1.5,PIVOT_END_RATIO=0.5;
+
+// Arbitrage entre moteurs (candScore) — deux corrections de pondération.
+// Cas mesuré (brasG.json, bras gauche, 150 points) : les moteurs linéaire, blend
+// et MLS ont 2,5 auto-croisements de plus que la tolérance sur les 5 échantillons,
+// facturés 25 points — mais leur aire de boucle EXCÉDENTAIRE est nulle : ce sont
+// des croisements en cheveu dans les doigts, invisibles. L'intrinsèque uniforme
+// n'en a que 0,5 (5 points) et gagne à 12 contre 26, alors qu'il traîne une
+// excursion d'extrémité de 59 px et un rebroussement de 5,4 : à l'image, le bras
+// s'écrase à mi-parcours puis se redéploie. Un croisement invisible pesait dix
+// fois un bras qui s'écrase.
+// TW_XING_HAIRLINE : quand l'aire excédentaire par croisement est sous
+// XING_HAIRLINE_AREA px², le croisement n'est pas visible et ne coûte que
+// XING_HAIRLINE_W au lieu de 10. Un vrai repli (aire réelle) garde ses 10.
+// TW_CAND_ENDS : les extrémités sont des sommets appariés ; leur position
+// attendue est le lerp A→B. Au-delà de CAND_END_TOL px d'écart maximal sur les
+// échantillons, chaque pixel coûte CAND_END_W.
+// MESURE (2026-09-06, easing neutralisé, 8 fichiers ; déviation latérale de
+// l'articulation · replis total/visibles(>4 px²) · aller-retours · longueur
+// perdue · excursion max des bouts) — TW_XING_HAIRLINE seul :
+//   brasG     4,16 · 12/10 ·  4 · 449 px · 59  ->  1,70 · 13/13 · 0 · 268 px · 20
+//   cats      3,20 · 43/6  · 368 · 148 px      ->  3,17 · 46/5  · 368 · 143 px
+//   untitled3 2,13 · 15/6  · 155 ·   9 px      ->  2,04 · 17/5  · 155 ·   4 px
+//   untitled4, traits, b, testanim, totale : strictement identiques.
+// Sur brasG le bras ne s'écrase plus (vérifié à l'image) ; les trois « replis
+// visibles » en plus sont les boucles des doigts du poing, 14 à 28 px², présentes
+// dans les clés elles-mêmes. Les replis en cheveu montent de 2 à 3 par fichier :
+// c'est le prix assumé, ils ne se voient pas. Actif par défaut.
+// TW_CAND_ENDS, mesuré seul et combiné (matin) : améliore la déviation latérale
+// (cats 3,20→3,07, untitled3 2,13→1,78) mais AGGRAVE la longueur perdue de ~49 px
+// sur ces deux fichiers — il pousse vers des candidats qui tiennent les bouts au
+// prix du raccourcissement. Laissé désactivé à ce moment-là.
+// RÉACTIVÉ (2026-09-06 après-midi, « les épaules font des aller-retours ») : avec
+// TW_CAND_EDGE actif, l'arbitrage de brasG 9_864309 (trait d'épaule) bascule sur
+// l'intrinsèque uniforme (0,99 contre linéaire 1,48) dont l'extrémité fixe
+// avance de 5 px, RECULE à 0, puis saute à 37 px, avec 29 px d'écart latéral :
+// un vrai aller-retour d'épaule, visible. Le terme d'extrémités le sanctionne.
+// Mesuré, arêtes + bouts contre arêtes seul, easing neutralisé :
+//   brasG  rebroussements 1→0, écart latéral 4,8→1,7, poignet inchangé
+//          (ratio d'arêtes 1,05, progression 0,49/0,49)
+//   testC  1→0, 2,0→0,8 (même trait d'épaule)     testB  latéral 8,6→6,3
+//   testD, testG, untitled4, totale, traits, b, testanim : neutres
+//   cats   rebroussements 82→80, latéral 4,2 égal
+//   vérité terrain par clés retirées : strictement identique partout.
+// ---- MOUVEMENT RIGIDE PAR GROUPE (plan 2026-09, chantier 2.1) ----
+// Les traits qui se touchent en A et dont les centroïdes suivent UNE même
+// similitude A→B (rotation + échelle, résidu de témoin ≤ 0,35 × déplacement
+// + 15 px) forment un groupe rigide : tête + oreilles + yeux, bras + main.
+// Chaque membre reçoit alors la rotation, l'échelle et le PIVOT du groupe
+// (point fixe de la similitude s'il est à portée, sinon le centre du groupe)
+// à la place de sa propre similitude : les traits d'une même région tournent
+// ensemble autour du même point, au lieu que chacun tourne autour de son
+// propre centre (ce qui désynchronisait le visage de cats, voir
+// TW_ORPHAN_FOLLOW : « la courbure devrait porter sur le mouvement rigide
+// de la région »). Le trait garde sa propre déformation par-dessus.
+// Groupe retenu à partir de GROUP_MIN_MEMBERS membres et GROUP_MIN_DEG de
+// rotation (en dessous, la rampe par trait suffit). Mesure : B.groupes(),
+// window.__twGroupStats. Mise en garde de Cyril : « j'ai peur que ça ne
+// fonctionne pas mais on essaye » — d'où le drapeau.
+// MESURÉ (2026-09-06, onze fichiers) : les groupes sont trouvés là où on les
+// attend (cats 34→46 : tête 6 traits à 49°, visage 7 traits, bras 3 ; souris
+// 5→16 : un groupe de 3 ; brasG/testB/testC/testD : aucun, un bras est un seul
+// trait). Effet : NEUTRE à l'image (tête du chat et souris identiques éteint /
+// allumé), vérité terrain par clés retirées ±0,05, extrémités neutres sauf
+// compression locale cats 2,6→6,4. La synchronisation qu'il devait apporter
+// existait déjà : fraction de rotation accomplie au milieu de la portée, écart
+// entre membres d'un groupe 0,01–0,10 éteint comme allumé — la
+// désynchronisation décrite sous TW_ORPHAN_FOLLOW venait des ARCS, éteints
+// depuis. DÉSACTIVÉ, code conservé (Cyril : « j'ai peur que ça ne fonctionne
+// pas » — il avait raison).
+var TW_GROUP_RIGID=false,GROUP_MIN_MEMBERS=3,GROUP_MIN_DEG=6,GROUP_REACH=1.5,GROUP_CONTACT_TOL=14,GROUP_RESID_F=0.35,GROUP_RESID_PX=15;
+// ---- FONDU DES PAIRES DOUTEUSES SUR UNE PORTÉE DOUTEUSE (souris 5→16) ----
+// Sur un tournant (3/4 → dos), le moteur préfère un mouvement à un fondu
+// (rattrapage, plafond 0,78) et morphe une oreille en dessus de crâne. Ici :
+// quand l'indice de confiance de la portée (2 × score moyen + part de paires
+// > 0,3 + part hors appariement direct) dépasse DOUBT_INDICE, les paires non
+// forcées dont le score dépasse DOUBT_SCORE sont rendues au fondu / retrait,
+// comme si elles n'avaient jamais été appariées. Une portée normale (indice
+// 0,7–0,9) n'est jamais touchée. À juger à l'image : forme perdue contre
+// fondu franc.
+// MESURÉ (2026-09-06) : à 1,2 seules cats 34→46 (7 paires rendues) et totale
+// 6→15 (7) déclenchent ; à 1,1 cats 25→34 s'ajoute ; souris 5→16 ne déclenche
+// pas (l'indice calculé ici, avant scissions et complétions, vaut ~1,05 contre
+// 1,38 après). Vérité terrain : cats identique, totale 40,9→41,0 mais meilleur
+// rang 32,5→30,6. À l'image (cats 34→46) : il rend aussi des paires JUSTES
+// (les contours du bras) et les remplace par des retraits ; pas convaincant.
+// DÉSACTIVÉ, à essayer sur un tournant via window.TW_DOUBT_FADE=true.
+var TW_DOUBT_FADE=false,DOUBT_INDICE=1.2,DOUBT_SCORE=0.4;
+// ---- SCISSION : RETOUR EN ARRIÈRE RELATIF (tête de Cyril, 2026-09-06) ----
+// Un visage dessiné d'un seul trait (contour + nez + bouche, 1 217 px) en A
+// et en deux traits (551 + 461 px) en B : la scission avait tout — deux
+// candidats, longueurs 0,84, morceaux à 0,14 et 0,10 — et refusait, parce
+// que le morceau du contour revient en arrière de 30 % de sa corde, au-delà
+// des 25 % de la garde anti-artefact. Or c'est la forme du menton, et le
+// trait cible revient autant. Ici : un morceau n'est suspect que si son
+// retour dépasse celui de son trait cible de SPLIT_BACK_MARGIN (la garde
+// absolue reste pour un trait cible droit). Mesuré ci-dessous.
+// MESURÉ (2026-09-06, douze fichiers, avec la coupe à la jonction) : la tête
+// de Cyril 10→17 passe de « visage rattrapé sur un seul des deux traits +
+// l'autre en fondu » à deux morceaux coupés à la jonction (0,23 et 0,15) ;
+// vérité terrain par clés retirées 21,5 → 17,1 px (meilleur rang 11,8 →
+// 10,8). cats gagne deux scissions (6→16, 34→46 ; 16,5→16,4 et 28,5→28,2).
+// Neuf fichiers strictement identiques. Extrémités neutres. Actif.
+var TW_SPLIT_BACK_RELATIVE=true,SPLIT_BACK_MARGIN=0.15;
+// ---- SCISSION : COUPE À LA JONCTION (même cas) ----
+// La scission coupe le trait fusionné au prorata des longueurs des parties.
+// Quand l'artiste a coupé ailleurs (le nez fait 40 % du visage en A mais
+// 46 % en B), chaque morceau embarque un bout du voisin : le morceau du
+// contour revenait de 30 % en arrière avec un bout du nez. Ici, une deuxième
+// coupe candidate : le point de contact entre deux parties consécutives de B
+// (extrémités à ≤ SPLIT_JUNCTION_MAX px), projeté sur le trait fusionné. On
+// évalue les deux coupes et on garde celle qui passe les gardes avec le
+// meilleur score moyen.
+// MESURÉ avec le retour relatif (voir ci-dessus) : sans la coupe à la
+// jonction, le morceau du contour au prorata revient de 30 % au bord et
+// reste refusé ; avec, le morceau coupé au point de contact (jonction en T
+// comprise) revient de 0 au bord et passe. Actif.
+var TW_SPLIT_JUNCTION_CUT=true,SPLIT_JUNCTION_MAX=24;
+// ---- SCISSION : COUPE PAR CORRESPONDANCE (image 14 « bizarre au menton ») ----
+// La jonction est projetée depuis B sur le trait de A ; quand la tête a bougé
+// entre les clés, elle tombe à côté (110 px trop loin sur le menton, et le
+// bout du morceau nez-bouche glisse le long du menton toute la portée). Ici :
+// les parties de B sont mises bout à bout dans l'ordre, un DTW aligne ce
+// chemin sur le trait fusionné (il porte sa propre similitude, donc le
+// déplacement ne le trompe pas), et la frontière entre parties se lit sur A à
+// l'indice où la fraction de B franchit la frontière. Troisième coupe
+// candidate, évaluée en premier.
+// MESURÉ (2026-09-06) : sur la tête, la coupe DTW tombe à 0,472 du trait
+// (jonction projetée : 0,292 ; prorata : 0,104), morceaux à 0,13 et 0,09 contre
+// 0,23 et 0,15 ; le bout du morceau nez-bouche glisse de 60 px vers la lèvre
+// au lieu de 110 px le long du menton. Onze autres fichiers identiques,
+// vérité terrain et extrémités inchangées. Actif, évalué en premier.
+var TW_SPLIT_DTW_CUT=true;
+// ---- SCISSION : SOUS-ENSEMBLES DE CANDIDATS (« la bouche vient de nulle part ») ----
+// Clé 24 de la tête : le trait nez-bouche (461 px) doit se couper en nez
+// (227) + bouche (104). Un troisième trait sans rapport (une mèche de 150 px
+// dont la boîte chevauche) entre dans les candidats, la scission n'essaie que
+// les trois ensemble, un morceau tombe sur la mèche avec un score > 0,48 et
+// TOUT est refusé : la bouche arrive en fondu. Ici, avec trois candidats, on
+// évalue aussi chaque paire, et on garde le meilleur découpage accepté.
+// Et l'ORDRE des parties : il vient de la projection de leur centre sur le
+// trait fusionné, qui n'a plus de sens quand la tête a bougé (nez et bouche
+// projetaient tous deux sur le bout du trait, à égalité). Avec le drapeau, on
+// essaie aussi les autres ordres (au plus six pour trois parties) et chaque
+// ordre est jugé par ses morceaux.
+// Et la CONTIGUÏTÉ : les parties d'un trait coupé viennent d'un seul tracé,
+// deux parties consécutives doivent donc rester proches en B. Sans cela, la
+// mèche à 200 px du nez entrait dans un découpage à trois (nez, bouche, mèche)
+// accepté sur ses seuls scores de forme. Écart maximal entre parties
+// consécutives : SPLIT_PART_GAP × longueur du trait fusionné, plancher 40 px.
+// Et la POSITION PRÉDITE : la contiguïté seule ne sépare pas la mèche (119 px
+// du nez) de la bouche (80 px, un vrai écart dessiné). Le trait fusionné est
+// transporté par le mouvement de la portée (similitude ajustée sur les
+// centres des paires retenues, au moins trois) ; une partie candidate doit
+// avoir son centre à ≤ SPLIT_PRED_TOL × longueur du trait (plancher 40 px) de
+// ce tracé prédit. Le nez et la bouche y sont, la mèche est 150 px à côté.
+// MESURÉ (2026-09-06, quatorze fichiers) : tête clé 24, nez-bouche (461 px)
+// → nez (227) + bouche (104) en deux morceaux, la mèche redevient un fondu ;
+// à SPLIT_PART_GAP 0,3 la mèche entrait (nez–mèche 119 px ≤ 144), à 0,15 la
+// scission se perdait (nez–bouche 80 px > 72) ; 0,2 retenu. La position
+// prédite n'a PAS tranché ici (mouvement global de la tête : la mèche à 24 px
+// du tracé prédit, la bouche à 94 — le nez a bougé plus que le contour) mais
+// reste comme garde. Vérité terrain, sous-ensembles et ordres compris : cats
+// 0→6→16 18,7→18,5, untitled4 0→15→20 16,6→15,8, totale 40,9→38,5 (meilleur
+// rang 32,5→29,9), souris 18,1→17,8, tête 10→17→24 19,1→18,5 ; testB écart
+// latéral 6,5→2,0 ; testC, testD, brasG identiques. Actif.
+var TW_SPLIT_SUBSETS=true,SPLIT_PART_GAP=0.2,SPLIT_PRED_TOL=0.25;
+// ---- MORCEAUX : HÉRITAGE DE LA TEXTURE (loup, 2026-09-06) ----
+// extractStrokePiece ne recopiait pas le préréglage de pinceau : un morceau
+// de scission ou de retrait sur un trait de craie n'avait de texture que
+// « d'un côté », et la génération l'estompait sur la portée — un membre en
+// craie coupé en deux devenait invisible. Avec le drapeau, le morceau hérite
+// des champs de texture de son trait d'origine.
+// MESURÉ (loup, 2026-09-06) : sans le drapeau, les morceaux de la scission
+// du visage (19→30) avaient leurs touches à 0,19 d'opacité à l'image 22
+// (fondu depuis zéro, le trait entier de l'autre clé portant seul la
+// texture) et la main rendue au bras (TW_LIMB_FOLLOW) perdait ses touches
+// à l'image 28 (0,29 → 0,10 → plus rien). Avec : 0,50 constant, comme tous
+// les autres groupes. Aucune paire changée sur les 16 fichiers du corpus
+// (diffReal), holdout et bouts inchangés. → ALLUMÉ.
+var TW_PIECE_TEXTURE=true;
+// ---- MEMBRE QUI SE LÈVE (loup 19→30, 2026-09-06) ----
+// Un trait de B sans partenaire, long (≥ LIMB_MIN_LEN), attaché à un trait de
+// B apparié dont le partenaire de A a beaucoup bougé (≥ LIMB_MOVE_MIN) : c'est
+// l'avant-bras et la main d'un bras qui se lève. Dans A, la petite extrémité
+// attachée à ce même trait (la main à la hanche) a été appariée à un trait
+// immobile qui traîne à sa place (la ligne de hanche) — la position brute a
+// gagné sur la cohérence. La passe rend l'extrémité à sa fenêtre du trait
+// orphelin (meilleure fenêtre à l'extrémité libre, score ≤ LIMB_SCORE_MAX), et
+// le reste du trait orphelin apparaît comme une paire dont le côté A est un
+// point à l'attache : il se déploie depuis le coude.
+// Les scores se calculent depuis la position PRÉDITE de l'extrémité (bloc
+// rigide du membre A→B appliqué à ses échantillons) : en position brute, la
+// ligne de hanche gagnait (0,25 contre 0,47) ; en position prédite la
+// fenêtre gagne (0,255 contre 0,387). Une simple translation ne suffisait
+// pas (l'avant-bras tourne). Tous les candidats d'un même orphelin sont
+// notés, le meilleur seul est appliqué (9_296665 à 0,337 perdait contre la
+// main à 0,255).
+// MESURÉ (2026-09-06) : loup 19→30, la main 1_700745 quitte la ligne de
+// hanche 3_412070 pour la fenêtre 0,37 de l'avant-bras 53_25412, qui se
+// déploie depuis le coude au lieu d'apparaître par fondu (planche
+// loup_membre2) ; la hanche devient un fondu. Compression 2,5 → 1,1, latMoy
+// 15,7 → 16,5, rebroussements 1 → 1, holdout identique. Sur les 15 autres
+// fichiers du corpus la passe n'atteint même pas un candidat (diffReal :
+// zéro portée changée). Nécessite TW_PIECE_TEXTURE sinon la main rendue
+// perd ses touches. → ALLUMÉ.
+var TW_LIMB_FOLLOW=true,LIMB_MIN_LEN=120,LIMB_MOVE_MIN=60,LIMB_SCORE_MAX=0.48;
+// Retour en arrière d'un trait, mesuré sur sa COURBE échantillonnée (60 points
+// sur le chemin Paper), pas sur ses ancres : un menton à 4 ancres ne revient
+// jamais en arrière par ses ancres, alors que sa courbe si — et le morceau
+// qu'on lui compare est, lui, échantillonné dense par extractStrokePiece.
+function _backtrackRatioSd(sd){
+  var p=buildTPFeat(sd);var len=p.length;if(!(len>1)){p.remove();return 0;}
+  var K=60,pts=[];for(var i=0;i<=K;i++){var q=p.getPointAt(len*i/K);if(q)pts.push([q.x,q.y]);}
+  p.remove();if(pts.length<3)return 0;
+  var p0=pts[0],pl=pts[pts.length-1],ch=Math.hypot(pl[0]-p0[0],pl[1]-p0[1]);
+  if(ch<=1)return 0;
+  var ux=(pl[0]-p0[0])/ch,uy=(pl[1]-p0[1])/ch,mx=-Infinity,wb=0;
+  for(var j=0;j<pts.length;j++){var pr=(pts[j][0]-p0[0])*ux+(pts[j][1]-p0[1])*uy;if(pr>mx)mx=pr;else if(mx-pr>wb)wb=mx-pr;}
+  return wb/ch;
+}
+var TW_XING_HAIRLINE=true,XING_HAIRLINE_AREA=4,XING_HAIRLINE_W=2;
+var TW_CAND_ENDS=true,CAND_END_TOL=6,CAND_END_W=0.15;
+// TW_CAND_EDGE — compression LOCALE d'arêtes dans l'arbitrage. Cas mesuré (brasG,
+// « rétractation du poignet ») : mélange 5,83 contre linéaire 5,84, égalité
+// tranchée pour le mélange par la règle des 0,05 — mais le mélange compresse les
+// arêtes 101–108 (le poignet) à 69 % de leur longueur de clé et fait traîner le
+// poignet à 28 % de progression à mi-parcours quand l'avant-bras est à 52 %.
+// ld5 ne voit rien : la longueur TOTALE est à 1 %. Terme : pour chaque arête,
+// si la longueur au milieu tombe sous CAND_EDGE_FLOOR × min(longueur A,
+// longueur B), on facture l'écart × CAND_EDGE_W. Une arête qui raccourcit
+// légitimement d'une clé à l'autre n'est jamais sous le plus court des deux.
+// MESURE (2026-09-06, easing neutralisé, 8 fichiers, poids 0,25 / 0,5 / 1 tous
+// équivalents) : six fichiers strictement identiques ; untitled4 1,63→1,61 de
+// déviation, 28→23 px de longueur perdue ; brasG : compression locale 46→0,
+// longueur perdue 268→0, mais déviation latérale de l'épaule 1,70→4,80 et cinq
+// micro-rebroussements (le linéaire remplace le mélange). Vérifié à l'image : le
+// poignet ne se rétracte plus, l'épaule ne bouge pas visiblement. Actif.
+var TW_CAND_EDGE=true,CAND_EDGE_FLOOR=0.8,CAND_EDGE_W=0.5;
+function _segsCentroidXY(segs){var x=0,y=0,n=segs.length;for(var i=0;i<n;i++){x+=segs[i].point[0];y+=segs[i].point[1];}return[x/n,y/n];}
+// TW_ARC_FROM_CHAIN (2026-09-05, Cyril : « une main va parcourir un chemin
+// courbe, si on déduit la courbe par rapport à toutes les keyframes… on
+// n'aurait plus des tweens sur un chemin linéaire »). Le centroïde de
+// chaque paire suit DÉJÀ une Bézier cubique (getArcHandles), mais ses
+// poignées valent la ligne droite tant que l'utilisateur ne les tire pas.
+// Ici elles sont déduites de la CHAÎNE de clés : quand le même trait est
+// suivi dans la clé précédente et/ou la suivante (par strokeId, que la
+// construction des paires ré-estampille justement pour cette continuité),
+// la tangente en chaque clé est celle de Catmull-Rom, (P_suivant −
+// P_précédent)/2, convertie en poignées de Bézier (m/3). Trois gardes :
+//  - ARC_TENSION < 1 réduit le gonflement sur les mouvements courts ;
+//  - une poignée ne dépasse jamais ARC_MAX_FRAC × la longueur de la portée ;
+//  - un ALLER-RETOUR n'est pas un virage : si deux déplacements consécutifs
+//    font plus de ARC_REVERSAL_DEG entre eux, la tangente de ce côté reste
+//    droite (un arrêt, pas une courbe).
+// La clé suivante n'étant pas encore appariée quand on traite une portée,
+// un appariement d'anticipation est calculé sur une COPIE des deux clés
+// (même chemin que le banc), après le ré-estampillage, donc il voit
+// exactement ce que la portée suivante verra. Une poignée réglée à la
+// main (state.motionArcs) garde la priorité. L'easing qui dépasse 1
+// extrapole le long de la courbe : les deux se composent.
+// TW_TWIN_GROUPS (2026-09-05, Cyril : « tu identifies aussi les formes
+// répétitives afin de mieux identifier ? »). Non, jusqu'ici : trois
+// moustaches, quatre doigts, étaient trois ou quatre problèmes
+// indépendants, et l'assignation globale les mélangeait volontiers avec
+// leurs voisines (moustaches de la portée 35→47 : 3 sur 8 du bon côté).
+// Un GROUPE DE JUMEAUX = des traits de même type, de longueurs proches,
+// d'enroulement et de fermeture proches, et proches dans l'espace. La
+// bonne question pour un tel groupe est « où va le groupe, et dans quel
+// ordre à l'intérieur ». Passe en deux temps après la première
+// assignation : (1) le groupe de A est envoyé sur le groupe de B que ses
+// membres ont majoritairement choisi en première passe, à condition qu'il
+// ait la même taille ; (2) à l'intérieur, les membres sont appariés par
+// RANG le long de l'axe principal de chaque groupe, le sens de l'axe de B
+// étant celui qui s'accorde le mieux avec le vote. Le résultat est posé
+// en épingles et l'assignation est résolue à nouveau autour. Une épingle
+// déjà posée (consigne, provenance, identité) sur un membre exclut le
+// groupe : ces sources priment.
+// DÉSACTIVÉ après trois conceptions mesurées sur six fichiers + banc :
+//   v1 (transitif, rang partout)          banc 46 → 62, aucun effet réel
+//   v2 (intervention minimale)            banc 55, force des fondus (bras)
+//   v3 (cliques, petits traits seulement) banc 59, totale 2 → 6 croisements
+// Cause de fond : quand les groupes de A et de B n'ont pas exactement la
+// même composition (un trait de bord change de groupe sous la
+// déformation), la passe « corrige » une assignation juste. Et le cas
+// visé (moustaches contre traits du menton, 35→47) demande un échange de
+// GROUPE À GROUPE que seule l'assignation globale peut faire. Gardé pour
+// une prochaine idée ; ne pas réactiver sans le banc.
+var TW_TWIN_GROUPS=false;
+// Critères mesurés sur les moustaches de cats (35→47) : longueurs 33/23/26
+// (rapport 1,43), enroulements 95°/6°/84° — des « jumeaux » à la main sont
+// surtout de PETITS traits de tailles voisines et PROCHES ; la forme ne
+// doit être qu'un garde-fou large. Première version (1,4 / 45°) ne les
+// voyait pas, et remplaçait par un rang des paires déjà justes : banc
+// 46 → 62. Intervention minimale depuis : seuls les membres partis HORS
+// du groupe de B sont réassignés, aux places restées libres, par rang si
+// le groupe a un axe net (anisotropie ≥ TWIN_ANISO) et au plus proche
+// sinon. Une assignation déjà cohérente n'est jamais touchée.
+// Troisième version : regroupement par CLIQUES (chaque paire du groupe doit
+// être jumelle, pas de chaîne transitive — la version précédente reliait
+// dix traits de proche en proche sur la tête du chat, bras compris, et
+// forçait des fondus), petits traits seulement (longueur ≤ TWIN_MAX_FRAC ×
+// la diagonale du dessin : des moustaches, des doigts, pas des membres),
+// et au plus TWIN_MAX membres.
+var TWIN_LEN_RATIO=1.6,TWIN_TURN_DEG=90,TWIN_GAP=0.35,TWIN_NEAR=3.0,TWIN_MAX=6,TWIN_ANISO=3.0,TWIN_MAX_FRAC=0.12;
+// TW_TEMPORAL_PRIOR (2026-09-05, Cyril : « le rapport de mouvement entre
+// chaque keyframe… nous permet de mieux identifier »). Le moteur avait une
+// mémoire d'un pas au niveau des GROUPES (TW_MATCH_TRACKING : « même
+// déplacement encore » comme hypothèse), pas par trait. Ici, TROISIÈME
+// canal de position dans le coût unaire : un trait suivi depuis la clé
+// précédente (par strokeId) est aussi évalué à la position que sa vitesse
+// prédit (déplacement précédent reporté tel quel). Comme les deux canaux
+// existants (prédit par le champ, brut), chaque paire prend le moins cher,
+// avec un petit biais TEMPORAL_BIAS pour ne gagner qu'une égalité — le
+// canal ne peut qu'AJOUTER une explication plausible, jamais en retirer.
+// Pondération par la confiance : si la paire précédente de ce trait était
+// mauvaise (_prevPairScore > TEMPORAL_MAX_PREV, posé sur la clé B par la
+// construction des paires), sa vitesse ne vaut rien et le canal est ignoré.
+// Limites assumées : vitesse constante (pas de mise à l'échelle par la
+// durée des portées), et la première portée n'a rien.
+// DÉSACTIVÉ : mesuré strictement NEUTRE sur les six fichiers et le banc
+// (46 = 46, mêmes paires partout). Le canal reçoit bien ses vitesses (24 à
+// 26 traits par portée sur cats) mais ne gagne jamais le minimum : le champ
+// de mouvement de la passe 2 couvre déjà ces positions. Gardé, un drapeau
+// suffit pour le remesurer sur un fichier où le champ se tromperait.
+var TW_TEMPORAL_PRIOR=false;
+var TEMPORAL_BIAS=0.05,TEMPORAL_MAX_PREV=0.35;
+// DÉSACTIVÉ (2026-09-05) après le retour de Cyril sur Untitled (4) : « les
+// deux traits du nez ont du retard par rapport au trait du nez et aux
+// yeux ». Mesuré, avancement le long de la corde de cinq traits du
+// visage, écart max entre traits par portée :
+//   sans arcs            0,1 %   1,3 %   0,3 %
+//   arcs par trait       ~9 %   (le nez, sans chaîne, restait droit)
+//   arcs lissés (région) 1,2 %  16,7 %  13,5 %
+// Quand la tête TOURNE, les cordes des traits d'une même région n'ont pas
+// la même longueur ; une courbure commune appliquée à des cordes
+// différentes désynchronise quand même. La courbure devrait porter sur le
+// mouvement rigide de la région (translation + rotation dans le temps),
+// pas sur le centre de chaque trait. Autre conception, pas un réglage.
+// Gain mesuré du dispositif : ≤ 13 px sur la patte de cats ; pas de quoi
+// justifier un visage qui se désynchronise. Code et lissage conservés.
+var TW_ARC_FROM_CHAIN=false;
+var ARC_TENSION=0.75,ARC_MAX_FRAC=0.6,ARC_REVERSAL_DEG=120,ARC_MIN_PX=4,ARC_COHERENCE_FRAC=0.12;
+var _chainArcs={};
+var TW_ORPHAN_FOLLOW=true;
 // ---- MATCHING ----
 function buildTP(sd){var p=new Path({insert:false});sd.segments.forEach(function(s){p.add(new Segment(new Point(s.point[0],s.point[1]),new Point(s.handleIn[0],s.handleIn[1]),new Point(s.handleOut[0],s.handleOut[1])));});return p;}
 // A stroke's color and fill/stroke "type" are what a viewer actually reads
@@ -196,6 +1053,90 @@ function fourierDescriptor(pts,cx,cy){
   var norm=Math.sqrt(mags.reduce(function(a,b){return a+b*b;},0))||1;
   return mags.map(function(v){return v/norm;});
 }
+// Élongation d'un nuage de points (TW_MATCH_AXIS) : racine du rapport des
+// valeurs propres de la covariance. 1 = isotrope (une boucle, un point),
+// grand = allongé (un trait droit). `scale` = étendue le long de l'axe
+// principal, sert à exempter les micro-traits dont l'élongation est du bruit.
+function pointElongation(pts){
+  var n=pts.length;if(n<3)return null;
+  var cx=0,cy=0;for(var i=0;i<n;i++){cx+=pts[i][0];cy+=pts[i][1];}cx/=n;cy/=n;
+  var sxx=0,syy=0,sxy=0;
+  for(var k=0;k<n;k++){var dx=pts[k][0]-cx,dy=pts[k][1]-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;}
+  sxx/=n;syy/=n;sxy/=n;
+  var tr=sxx+syy,det=sxx*syy-sxy*sxy;
+  var disc=Math.sqrt(Math.max(0,tr*tr/4-det));
+  var l1=tr/2+disc,l2=Math.max(1e-9,tr/2-disc);
+  // enroulement total signé (voir TW_MATCH_TURNING)
+  var T=0,pv=null;
+  for(var q=1;q<n;q++){
+    var ddx=pts[q][0]-pts[q-1][0],ddy=pts[q][1]-pts[q-1][1];
+    if(ddx*ddx+ddy*ddy<1e-6)continue;
+    var th=Math.atan2(ddy,ddx);
+    if(pv!==null)T+=_wrapPI(th-pv);
+    pv=th;
+  }
+  // fermeture : écart bout-à-bout rapporté à la diagonale (voir TW_MATCH_GAP)
+  var gx1=Infinity,gy1=Infinity,gx2=-Infinity,gy2=-Infinity;
+  for(var g=0;g<n;g++){if(pts[g][0]<gx1)gx1=pts[g][0];if(pts[g][0]>gx2)gx2=pts[g][0];if(pts[g][1]<gy1)gy1=pts[g][1];if(pts[g][1]>gy2)gy2=pts[g][1];}
+  var gdiag=Math.hypot(gx2-gx1,gy2-gy1)||1;
+  var gap=Math.min(1,Math.hypot(pts[n-1][0]-pts[0][0],pts[n-1][1]-pts[0][1])/gdiag);
+  return{e:Math.min(AXIS_CAP,Math.sqrt(l1/l2)),scale:Math.sqrt(l1),T:Math.abs(T),gap:gap};
+}
+// Pénalité d'élongation d'UN trait de A contre tous les candidats de B,
+// NORMALISÉE PAR LIGNE : le candidat le plus compatible ne paie rien, les
+// autres paient l'écart. Mesuré : ajouté en valeur absolue (première
+// version), le terme faisait passer des paires CORRECTES au-dessus du seuil
+// de fondu de 0.48 — le banc perdait 8 points, tous en « miss », alors que
+// l'écart d'élongation des paires vraies est de 0.00 à 0.41 (médiane 0.03),
+// donc elles n'étaient pas visées : c'est le niveau absolu du coût qui
+// dérivait. Normalisé par ligne, il réordonne les candidats sans jamais
+// déplacer l'échelle du coût, donc sans toucher au taux de fondu.
+// Écart d'élongation d'UNE paire, en valeur absolue. Sert aux appels
+// DIRECTS à matchSc (acceptation d'une scission, passe d'ordre) : là il n'y
+// a pas de ligne de candidats à normaliser, la question est binaire
+// « cette paire est-elle acceptable », donc la charge absolue est la bonne
+// forme. RÉGRESSION RÉELLE ÉVITÉE ICI (2026-09-04) : en sortant le terme de
+// matchSc pour le mettre dans buildCost, je l'avais retiré de ces chemins —
+// resolveSplitMatches acceptait alors une scission (une patte coupée en
+// deux, dont une moitié étirée sur un long trait du corps) que le matcher
+// principal refusait, ce qui produisait une BOUCLE fermée au milieu de la
+// portée et deux traits partageant un strokeId dans la clé.
+// Les deux termes de forme globale (élongation, enroulement total) vivent
+// ici, sur le même objet `elong` : un seul câblage pour les trois familles
+// d'appelants. Chacun est un drapeau ; voir TW_MATCH_AXIS / TW_MATCH_TURNING.
+function _shapePenalty(eA,eB){
+  var pen=0;
+  if(TW_MATCH_AXIS){
+    var em=Math.abs(Math.log(eA.e/eB.e));
+    pen+=Math.min(1,Math.max(0,em-AXIS_FREE)/(AXIS_FULL-AXIS_FREE))*MATCH_AXIS_W;
+  }
+  if(TW_MATCH_TURNING&&eA.T!==undefined&&eB.T!==undefined){
+    var dT=Math.abs(eA.T-eB.T);
+    pen+=Math.min(1,Math.max(0,dT-TURN_FREE)/(TURN_FULL-TURN_FREE))*MATCH_TURN_W;
+  }
+  if(TW_MATCH_GAP&&eA.gap!==undefined&&eB.gap!==undefined){
+    var dG=Math.abs(eA.gap-eB.gap);
+    pen+=Math.min(1,Math.max(0,dG-GAP_FREE)/(GAP_FULL-GAP_FREE))*MATCH_GAP_W;
+  }
+  return pen;
+}
+function axisPenaltyPair(eA,eB){
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING||TW_MATCH_GAP)||!eA||!eB||eA.scale<AXIS_MIN_PX||eB.scale<AXIS_MIN_PX)return 0;
+  return _shapePenalty(eA,eB);
+}
+function _axisPenaltyRow(eA,featsB,out){
+  var m=featsB.length,i;
+  if(!(TW_MATCH_AXIS||TW_MATCH_TURNING||TW_MATCH_GAP)||!eA||eA.scale<AXIS_MIN_PX){for(i=0;i<m;i++)out[i]=0;return out;}
+  var mn=Infinity;
+  for(i=0;i<m;i++){
+    var eB=featsB[i].elong;
+    if(!eB||eB.scale<AXIS_MIN_PX){out[i]=0;mn=0;continue;}
+    out[i]=_shapePenalty(eA,eB);
+    if(out[i]<mn)mn=out[i];
+  }
+  if(mn>0)for(i=0;i<m;i++)out[i]-=mn;
+  return out;
+}
 function fourierDist(a,b){
   if(!a||!b)return 0;
   var n=Math.min(a.length,b.length),s=0;
@@ -240,7 +1181,12 @@ function strokeFeat(sd){var p=buildTPFeat(sd);var b=p.bounds,len=p.length;var cx
   // both treat a guessed flag as soft evidence, not identity.
   var closedIsGuess=usingCenterline||typeof sd.closed!=='boolean';
   var fourier=fourierDescriptor(pts,cx,cy);
-  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,closedIsGuess:closedIsGuess,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier};}
+  // mean drawn width (TW_MATCH_WIDTH): a pressure stroke carries a width per
+  // centerline point, everything else its strokeWidth
+  var wid=sd.strokeWidth||3;
+  if(usingCenterline){var ws=0,wc=0;for(var wi=0;wi<sd.centerSegments.length;wi++){var sw=sd.centerSegments[wi].width;if(typeof sw==='number'&&sw>0){ws+=sw;wc++;}}if(wc)wid=ws/wc;}
+  var elong=pointElongation(pts); // TW_MATCH_AXIS
+  p.remove();return{cx:cx,cy:cy,length:len,dirX:dx,dirY:dy,bounds:{x:b.x,y:b.y,w:b.width,h:b.height},shape:shape,pts:pts,turn:turn,closed:isClosed,closedIsGuess:closedIsGuess,strokeCol:parseHexColor(realStrokeColor(sd)),fillCol:parseHexColor(sd.fillColor),type:strokeType(sd),fourier:fourier,wid:wid,elong:elong};}
 // Relative position (within the whole frame's own composition bbox) is what
 // actually distinguishes "left eye" from "right eye" — raw absolute centroid
 // distance breaks down whenever the whole drawing translates/scales between
@@ -253,8 +1199,12 @@ function unionBounds(feats){
   return{x:x1,y:y1,w:Math.max(1,x2-x1),h:Math.max(1,y2-y1)};
 }
 var _matchNorm=0;
-function matchSc(fA,fB,sameIndex,aPtsOverride){
+function matchSc(fA,fB,sameIndex,aPtsOverride,opts){
   var pts=aPtsOverride||fA.pts;var K=Math.min(pts.length,fB.pts.length);
+  // opts (TW_MM_ZOOM) : {scale, rel} — le trait A est jugé comme s'il était
+  // à l'échelle `scale` (longueur, aire, diagonale) et à la position relative
+  // `rel` dans les bornes de B. Sans opts, arithmétique strictement identique.
+  var sH=(opts&&opts.scale)||1;var lenA=fA.length*sH;
   // 1. PROXIMITY (dominant): symmetric Chamfer distance — for each sample
   // of one line, distance to the nearest sample of the other. Start-point
   // and direction invariant; directly answers "do these two lines lie in
@@ -281,7 +1231,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
     var dxr=pts[k][0]-fB.pts[K-1-k][0],dyr=pts[k][1]-fB.pts[K-1-k][1];rev+=Math.sqrt(dxr*dxr+dyr*dyr);
   }
   var alg=Math.min(fwd,rev)/K;
-  var da=Math.sqrt(fA.bounds.w*fA.bounds.w+fA.bounds.h*fA.bounds.h);
+  var da=Math.sqrt(fA.bounds.w*fA.bounds.w+fA.bounds.h*fA.bounds.h)*sH;
   var db=Math.sqrt(fB.bounds.w*fB.bounds.w+fB.bounds.h*fB.bounds.h);
   var scaleAB=(da+db)/2+(typeof _matchNorm==='number'?_matchNorm*0.04:0)+1;
   var proxT=cham/(cham+scaleAB*0.5);
@@ -302,8 +1252,9 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // linework of the same underlying shape, not just within one style.
   var fourD=fourierDist(fA.fourier,fB.fourier);
   // 4. secondary cues & hard penalties
-  var rdx=fA.relX-fB.relX,rdy=fA.relY-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
-  var lenRatio=Math.max(fA.length,fB.length)/Math.max(1,Math.min(fA.length,fB.length));
+  var rAx=(opts&&opts.rel)?opts.rel[0]:fA.relX,rAy=(opts&&opts.rel)?opts.rel[1]:fA.relY;
+  var rdx=rAx-fB.relX,rdy=rAy-fB.relY;var rel=Math.min(1,Math.sqrt(rdx*rdx+rdy*rdy));
+  var lenRatio=Math.max(lenA,fB.length)/Math.max(1,Math.min(lenA,fB.length));
   // Arc-length identity penalty, recalibrated 2026-07 (testB, the mouth
   // "X" artifact): a 28px neck tick stole the 57px mouth's match (ratio
   // 2.05) from the true 52px mouth (ratio 1.10) on proximity alone — the
@@ -313,7 +1264,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // difference gate (>15px) keeps micro-strokes exempt: two hand-drawn
   // eye dots measured 7px vs 15px (ratio 2.04!) — at that size the ratio
   // is pure pen noise, and cel features that small legitimately jitter.
-  var ratioPen=(lenRatio>1.6&&Math.abs(fA.length-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
+  var ratioPen=(lenRatio>1.6&&Math.abs(lenA-fB.length)>15)?Math.min(0.7,(lenRatio-1.6)*0.5):0;
   // Smooth length-identity term (2026-09, with TW_MATCH_RELATIONAL —
   // Cyril's turning face, "grosse confusion des traits"): the eye cluster
   // dropped 130 px while the rest of the face barely moved, so proximity
@@ -328,7 +1279,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // chain 0.13 short; 0.35 flipped it but pushed a legitimately-redrawn
   // lip (155 → 82 px, ratio 1.9) over the fade threshold. Same
   // micro-stroke exemption as ratioPen.
-  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(fA.length-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
+  var lenT=(TW_MATCH_RELATIONAL&&Math.abs(lenA-fB.length)>15)?Math.min(1,Math.max(0,Math.log(lenRatio)-Math.log(1.3))/Math.log(2))*MATCH_LEN_W:0;
   // 0.35 only when BOTH closed flags are ground truth. When either side is
   // a heuristic guess (vector-brush centerline — see strokeFeat's
   // closedIsGuess), a disagreement is as likely a drawing accident as a
@@ -337,7 +1288,7 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   // from this penalty, so the limb faded/trimmed as two unrelated strokes
   // instead of swinging. Mirrored in tweenmatch.rs (closed_pen).
   var closedPen=fA.closed!==fB.closed?((fA.closedIsGuess||fB.closedIsGuess)?0.12:0.35):0;
-  var aArea=fA.bounds.w*fA.bounds.h,bArea=fB.bounds.w*fB.bounds.h;
+  var aArea=fA.bounds.w*fA.bounds.h*sH*sH,bArea=fB.bounds.w*fB.bounds.h;
   var szD=Math.abs(aArea-bArea)/Math.max(1,Math.max(aArea,bArea));
   var colD=(colorDist(fA.strokeCol,fB.strokeCol)+colorDist(fA.fillCol,fB.fillCol))/2;
   var typePenalty=fA.type!==fB.type?0.5:0;
@@ -357,7 +1308,18 @@ function matchSc(fA,fB,sameIndex,aPtsOverride){
   var strokeClash=fA.strokeCol&&fB.strokeCol&&colorDist(fA.strokeCol,fB.strokeCol)>0.35;
   var colorPenalty=(fillClash||strokeClash)?0.4:0;
   var idxBonus=sameIndex?-0.03:0;
-  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+lenT+closedPen+idxBonus;
+  // Width identity (TW_MATCH_WIDTH): same shape as lenT — a smooth ramp on
+  // the width ratio from 1.5× (drawing-pressure noise ceiling) to 2.5×,
+  // exempting hairlines where a 1 px difference is already a 2× ratio.
+  var widT=0;
+  if(TW_MATCH_WIDTH&&fA.wid>1.5&&fB.wid>1.5){
+    var wr=Math.max(fA.wid,fB.wid)/Math.min(fA.wid,fB.wid);
+    widT=Math.min(1,Math.max(0,Math.log(wr)-Math.log(1.5))/Math.log(2.5/1.5))*MATCH_WIDTH_W;
+  }
+  // L'élongation (TW_MATCH_AXIS) n'est PAS ajoutée ici : c'est un
+  // DISCRIMINATEUR entre candidats, pas une charge absolue — voir
+  // _axisPenaltyRow, appliqué par buildCost après normalisation par ligne.
+  return proxT*.48+alignT*.15+curveT*.12+fourD*.10+rel*.10+szD*.06+colD*.15+typePenalty+colorPenalty+ratioPen+lenT+closedPen+idxBonus+widT;
 }
 // "Force line" motion model: eyes, chin, and other small close-together
 // features are exactly where independent per-stroke shape/position matching
@@ -408,6 +1370,113 @@ function applySimilarityTransform(t,x,y){
   var rx=t.wRe*dx-t.wIm*dy,ry=t.wIm*dx+t.wRe*dy;
   return{x:rx+t.cb.x,y:ry+t.cb.y};
 }
+// ---- COHERENT MOTION FIELD (TW_MOTION_FIELD / TW_ORPHAN_FOLLOW) ----
+// Regularised thin-plate spline f(p) = a0 + a1·x + a2·y + Σ w_i U(|p − s_i|),
+// U(r) = r² log r, fitted on seed pairs (s_i → d_i). λ smooths: with λ→0 it
+// interpolates every seed exactly, larger λ trades fidelity for coherence
+// (one wrong seed no longer bends the whole neighbourhood). Solved once
+// per coordinate with a dense Gaussian elimination — n ≤ a few dozen.
+function _solveLinear(M,b){
+  var n=M.length,A=M.map(function(r,i){return r.concat([b[i]]);});
+  for(var c=0;c<n;c++){
+    var piv=c,best=Math.abs(A[c][c]);
+    for(var r=c+1;r<n;r++){var v=Math.abs(A[r][c]);if(v>best){best=v;piv=r;}}
+    if(best<1e-12)return null;
+    if(piv!==c){var tmp=A[c];A[c]=A[piv];A[piv]=tmp;}
+    var pv=A[c][c];
+    for(var r2=c+1;r2<n;r2++){
+      var f=A[r2][c]/pv;if(!f)continue;
+      for(var k=c;k<=n;k++)A[r2][k]-=f*A[c][k];
+    }
+  }
+  var x=new Array(n);
+  for(var i=n-1;i>=0;i--){var s=A[i][n];for(var j=i+1;j<n;j++)s-=A[i][j]*x[j];x[i]=s/A[i][i];}
+  return x;
+}
+function _tpsU(r2){return r2>1e-12?r2*Math.log(r2)*0.5:0;} // r² log r, computed from r²
+function fitTpsField(src,dst,lambda){
+  var n=src.length;if(n<3)return null;
+  var N=n+3,L=[];
+  for(var i=0;i<N;i++){L.push(new Array(N).fill(0));}
+  for(var i2=0;i2<n;i2++){
+    for(var j=0;j<n;j++){
+      var dx=src[i2].x-src[j].x,dy=src[i2].y-src[j].y;
+      L[i2][j]=_tpsU(dx*dx+dy*dy)+(i2===j?lambda:0);
+    }
+    L[i2][n]=1;L[i2][n+1]=src[i2].x;L[i2][n+2]=src[i2].y;
+    L[n][i2]=1;L[n+1][i2]=src[i2].x;L[n+2][i2]=src[i2].y;
+  }
+  var bx=new Array(N).fill(0),by=new Array(N).fill(0);
+  for(var k=0;k<n;k++){bx[k]=dst[k].x;by[k]=dst[k].y;}
+  var wx=_solveLinear(L,bx),wy=_solveLinear(L,by);
+  if(!wx||!wy)return null;
+  function ev(x,y,w){
+    var s=w[n]+w[n+1]*x+w[n+2]*y;
+    for(var q=0;q<n;q++){var ddx=x-src[q].x,ddy=y-src[q].y;s+=w[q]*_tpsU(ddx*ddx+ddy*ddy);}
+    return s;
+  }
+  var field={
+    n:n,
+    apply:function(x,y){return{x:ev(x,y,wx),y:ev(x,y,wy)};},
+    // local Jacobian by central differences — the best-fit rotation+scale
+    // of it feeds predVec (the relational pass only needs how the
+    // NEIGHBOURHOOD of a stroke turns/scales, never its translation)
+    jac:function(x,y){
+      var h=2;
+      var px=ev(x+h,y,wx),mx=ev(x-h,y,wx),py=ev(x,y+h,wx),my=ev(x,y-h,wx);
+      var qx=ev(x+h,y,wy),nx=ev(x-h,y,wy),qy=ev(x,y+h,wy),ny=ev(x,y-h,wy);
+      return{a:(px-mx)/(2*h),b:(py-my)/(2*h),c:(qx-nx)/(2*h),d:(qy-ny)/(2*h)};
+    }
+  };
+  return field;
+}
+// Robust fit: fit, drop seeds whose residual is an outlier, refit once.
+// Falls back to a similarity when fewer than MF_MIN_SEEDS seeds remain.
+function fitRobustField(src,dst,scale){
+  if(src.length<MF_MIN_SEEDS){
+    var st=fitSimilarityTransform(src,dst);
+    return st?{n:src.length,similarity:st,apply:function(x,y){return applySimilarityTransform(st,x,y);},jac:function(){return{a:st.wRe,b:-st.wIm,c:st.wIm,d:st.wRe};}}:null;
+  }
+  var lam=Math.pow(Math.max(1,scale*MF_LAMBDA),2);
+  var f=fitTpsField(src,dst,lam);if(!f)return null;
+  var res=src.map(function(s,i){var q=f.apply(s.x,s.y);return Math.hypot(q.x-dst[i].x,q.y-dst[i].y);});
+  var sorted=res.slice().sort(function(a,b){return a-b;});
+  var med=sorted[Math.floor(sorted.length/2)]||0;
+  var cut=Math.max(MF_OUTLIER_K*med,Math.max(4,scale*0.01));
+  var keepI=[];for(var i=0;i<res.length;i++)if(res[i]<=cut)keepI.push(i);
+  if(keepI.length<src.length&&keepI.length>=MF_MIN_SEEDS){
+    var f2=fitTpsField(keepI.map(function(i){return src[i];}),keepI.map(function(i){return dst[i];}),lam);
+    if(f2){f2.dropped=src.length-keepI.length;return f2;}
+  }
+  return f;
+}
+// Similarity (rotation+scale about a point) closest to a field's Jacobian at
+// (x,y) — what predVec/_tfDist consume for a per-stroke local model.
+function _fieldLocalTf(field,x,y){
+  var J=field.jac(x,y);
+  var t=field.apply(x,y);
+  return{wRe:(J.a+J.d)/2,wIm:(J.c-J.b)/2,ca:{x:x,y:y},cb:{x:t.x,y:t.y}};
+}
+// Transports a stored stroke record through a point map (used by
+// TW_ORPHAN_FOLLOW). Handles are relative offsets: map their absolute
+// endpoints and re-derive. Pressure ribbons re-outline from the moved
+// centerline so the ribbon stays consistent with it.
+function _transportStroke(sd,mapPt){
+  var c=JSON.parse(JSON.stringify(sd));
+  function mv(segs){
+    for(var i=0;i<segs.length;i++){
+      var s=segs[i],p=s.point;
+      var P=mapPt(p[0],p[1]);
+      var HI=mapPt(p[0]+s.handleIn[0],p[1]+s.handleIn[1]),HO=mapPt(p[0]+s.handleOut[0],p[1]+s.handleOut[1]);
+      s.point=[P.x,P.y];s.handleIn=[HI.x-P.x,HI.y-P.y];s.handleOut=[HO.x-P.x,HO.y-P.y];
+    }
+  }
+  if(c.isVectorBrush&&c.centerSegments&&c.centerSegments.length>1){
+    mv(c.centerSegments);
+    try{c.segments=outlineFromCenterSegs(c.centerSegments);c.closed=true;}catch(e){if(c.segments)mv(c.segments);}
+  }else if(c.segments){mv(c.segments);}
+  return c;
+}
 // Minimum-cost perfect assignment: the Hungarian (Kuhn-Munkres, O(n^3))
 // solver lives in domain/tween/assignment.js (P23) — NemoTweenAssignment.solve.
 // It replaced the previous greedy "cheapest pair first" assignment, which
@@ -426,11 +1495,165 @@ function _strokeInJson(sd){
   // same input, purely depending on which one happened to run.
   return{segments:sd.segments||[],centerSegments:sd.centerSegments,strokeColor:realStrokeColor(sd)||null,fillColor:sd.fillColor||null,isVectorBrush:!!sd.isVectorBrush,closed:!!sd.closed};
 }
-function autoMatch(sA,sB){
+// ---- MARGE ET ACCORD MUTUEL (plan 2026-09, chantier 1.1) ----
+// Idée reprise d'AnimeInbet (accord mutuel A→B et B→A) et de l'audit (marge
+// entre la solution et sa meilleure alternative). Pour une paire (a,b) d'une
+// matrice de coût : `mutuel` = b est le minimum de la ligne a ET a le minimum
+// de la colonne b ; `marge` = min(meilleure alternative sur la ligne, sur la
+// colonne) − coût. Deux usages, deux drapeaux, mesurés séparément.
+// TW_MARGIN_SEEDS — les graines du champ de mouvement sont les paires
+// MUTUELLES à marge ≥ MARGIN_SEED_MIN de la passe 1, au lieu de la « meilleure
+// moitié » par coût. Le journal sur cats 6→16 montrait la moitié embarquer
+// deux paires fausses à marge ~0 (l'échange 6_862295↔4_829755). Repli sur
+// l'ancienne règle quand moins de MARGIN_SEED_MINCOUNT paires passent.
+// TW_MARGIN_GUARD — la passe d'ordre (croisement de trajectoires) ne peut
+// échanger que si l'une des deux paires est faible (marge < MARGIN_GUARD_MIN
+// en passe 2). Généralise les correctifs e2f30f8 et cd3647f.
+// MESURÉ (2026-09-06, 7 fichiers, 350 paires dont 293 à identifiant identique
+// dans les deux clés — l'oracle de ces fichiers, clés dupliquées puis
+// retouchées) : TW_MARGIN_SEEDS ne gagne jamais. Mutuel seul 284, marge 0,03
+// 287, 0,05 286, 0,10 287, 0,05 avec 8 graines minimum 292 (une seule portée
+// touchée, untitled4 20→32, et c'est une perte). Les paires brisées sont des
+// identités : brasG _7_25294 (64→28 px, retouché, rattrapé à 0,722 par la
+// base), cats 9_190529 et 9_436397, untitled4 1_830364. Vérité terrain par
+// clés retirées strictement identique (les portées K1→K3 ne bougent pas).
+// Le champ robuste rejette déjà les mauvaises graines ; les filtrer en amont
+// n'apporte rien et retire des témoins utiles. DÉSACTIVÉ, code conservé.
+// TW_MARGIN_GUARD : strictement NEUTRE sur les 9 fichiers — les gardes de
+// côté et d'identité de la passe d'ordre bloquent déjà toutes les tentatives
+// (8 sur cats 6→16, toutes refusées). DÉSACTIVÉ, code conservé.
+var TW_MARGIN_SEEDS=false,MARGIN_SEED_MIN=0.03,MARGIN_SEED_MINCOUNT=4;
+var TW_MARGIN_GUARD=false,MARGIN_GUARD_MIN=0.10;
+// TW_ID_BONUS — l'identité comme BONUS de coût plutôt que comme épingle. Un
+// même identifiant d'origine dans les deux clés (clé dupliquée puis
+// retouchée) qui passe les filtres par paire de _identityCandidates voit son
+// coût baissé de ID_BONUS dans les deux passes et dans chaque canal
+// d'hypothèse. À la différence des épingles (tout-ou-rien par portée,
+// désactivées sur cats 6→16 dès qu'une identité échoue la géométrie), le
+// bonus agit paire par paire et ne fait que départager : une forme vraiment
+// différente garde un coût supérieur. Mesure de départ : B.identite — cats
+// 24 paires « croisées » (les deux ids existent en face, pas appariés
+// ensemble), totale 8.
+// MESURÉ (2026-09-06, chemin réel via B.diffReal, 9 fichiers, bonus 0,10 avec
+// la garde par le champ) : NÉGATIF. Ne change que cats 6→16 (trois tics du
+// visage) et 34→46 (quatre), à chaque fois en suivant les identifiants du
+// fichier — or ces identifiants sont un ANCIEN ré-estampillage (pairId = id
+// de A posé sur B par une génération passée, sans origId dans ce fichier),
+// pas l'identité dessinée ; à l'image, la base garde l'ordre des tics et le
+// bonus les fait se croiser. Sans garde, le bonus échangeait aussi les deux
+// bras (cats 34→46). Une identité appliquée à moitié (la garde n'en laisse
+// passer qu'une sur trois) déséquilibre un arbitrage serré : même leçon que
+// TW_ID_PIN_ALL_OR_NONE. Vérité terrain par clés retirées identique. Un
+// même strokeId dans deux clés n'est un oracle QUE dans les fichiers écrits
+// avec origId ou dupOf (untitled4 clés 20/32). DÉSACTIVÉ, code conservé.
+var TW_ID_BONUS=false,ID_BONUS=0.10,ID_BONUS_RESID_F=0.35,ID_BONUS_RESID_PX=15;
+function _matchMargins(cost,matches,n,m){
+  var colMin=new Array(m),colArg=new Array(m);
+  for(var j0=0;j0<m;j0++){colMin[j0]=Infinity;colArg[j0]=-1;}
+  for(var i=0;i<n;i++){var r=cost[i];for(var j=0;j<m;j++){var c=r[j];if(c<colMin[j]){colMin[j]=c;colArg[j]=i;}}}
+  matches.forEach(function(mm){
+    if(mm.a<0||mm.a>=n||mm.b<0||mm.b>=m)return;
+    var row=cost[mm.a],b=mm.b,c=row[b],rowMin=Infinity,rowArg=-1,altL=Infinity;
+    for(var j2=0;j2<m;j2++){var v=row[j2];if(v<rowMin){rowMin=v;rowArg=j2;}if(j2!==b&&v<altL)altL=v;}
+    var altC=Infinity;for(var i2=0;i2<n;i2++){if(i2!==mm.a&&cost[i2][b]<altC)altC=cost[i2][b];}
+    mm.mutuel=(rowArg===b&&colArg[b]===mm.a);
+    var mg=Math.min(altL,altC)-c;mm.marge=isFinite(mg)?mg:1;
+  });
+  return matches;
+}
+// ---- JOURNAL DE DÉCISION DE L'APPARIEMENT (plan 2026-09, chantier 0.3) ----
+// window.__TW_DEBUG_MATCH=true avant generateTweens : chaque portée pousse une
+// entrée dans window.__twMatchLog. Par paire et par passe : coût, meilleure
+// alternative sur la ligne et sur la colonne, marge, accord mutuel (la paire est
+// le minimum de sa ligne ET de sa colonne), marge au fondu ; puis chaque passe
+// qui a modifié l'appariement avec sa raison (relationnel, 2-opt, seuil,
+// rattrapage et ses motifs de refus, complétion de pièce, scission, passe
+// d'ordre et ses gardes) ; enfin la source de chaque paire retenue. Aucun
+// effet quand le drapeau est éteint : _twML reste null et chaque point de
+// journalisation revient immédiatement. Lecture : B.journal() dans le banc.
+var _twML=null;
+// Identifiant d'ORIGINE (origId / _origId, sinon strokeId) : le strokeId d'une
+// clé B est ré-estampillé par la génération selon l'appariement, il change
+// donc d'une exécution à l'autre ; l'identité d'origine, elle, est stable.
+function _mlShort(sd){if(!sd)return '?';var id=(typeof _origIdOf==='function')?_origIdOf(sd):sd.strokeId;if(id===undefined||id===null)return '?';id=String(id);return id.length>8?id.slice(-8):id;}
+function _mlBegin(fA,fB,sA,sB){
+  _twML=null;
+  if(typeof window==='undefined'||!window.__TW_DEBUG_MATCH)return;
+  _twML={fA:fA,fB:fB,n:sA.length,m:sB.length,idsA:sA.map(_mlShort),idsB:sB.map(_mlShort),epingles:[],passes:[],etapes:[],final:null};
+  window.__twMatchLog=window.__twMatchLog||[];window.__twMatchLog.push(_twML);
+}
+function _mlEnd(){_twML=null;}
+function _mlIdA(a){return (_twML&&a>=0&&a<_twML.n)?_twML.idsA[a]:(a<0?'fondu':'pièce');}
+function _mlIdB(b){return (_twML&&b>=0&&b<_twML.m)?_twML.idsB[b]:(b<0?'fondu':'pièce');}
+function _mlPins(forcedPairs){
+  if(!_twML)return;
+  forcedPairs.forEach(function(fp){if(fp.isPiece)return;
+    _twML.epingles.push({type:fp.provenance?'provenance':fp.identity?'identité':fp.twin?'jumeau':'manuel',a:fp.aIdx,b:fp.bIdx,idA:_mlIdA(fp.aIdx),idB:_mlIdB(fp.bIdx)});});
+}
+// Une affectation complète lue dans la matrice augmentée (colonnes >= m = fondu).
+function _mlAssign(nom,cost,matches,n,m,extra){
+  if(!_twML)return;
+  var rows=[],byA={};matches.forEach(function(mm){byA[mm.a]=mm.b;});
+  for(var a=0;a<n;a++){
+    var b=byA[a],row=cost[a];
+    var best1=Infinity,best2=Infinity,arg=-1;
+    for(var j=0;j<m;j++){var c=row[j];if(c<best1){best2=best1;best1=c;arg=j;}else if(c<best2)best2=c;}
+    var fade=row.length>m?row[m]:null;
+    var e={a:a,idA:_mlIdA(a)};
+    if(b===undefined){
+      e.b=-1;e.idB='fondu';e.mutuel=false;e.marge=null;
+      e.meilleur=isFinite(best1)?{b:arg,idB:_mlIdB(arg),cout:+best1.toFixed(3)}:null;
+    }else{
+      e.b=b;e.idB=_mlIdB(b);e.cout=+row[b].toFixed(3);
+      var altL=Infinity;for(var j2=0;j2<m;j2++)if(j2!==b&&row[j2]<altL)altL=row[j2];
+      var altC=Infinity,argC=-1,minC=Infinity;
+      for(var i2=0;i2<n;i2++){var cc=cost[i2][b];if(cc<minC){minC=cc;argC=i2;}if(i2!==a&&cc<altC)altC=cc;}
+      e.altLigne=isFinite(altL)?+altL.toFixed(3):null;e.altCol=isFinite(altC)?+altC.toFixed(3):null;
+      var mg=Math.min(altL-row[b],altC-row[b]);e.marge=isFinite(mg)?+mg.toFixed(3):null;
+      e.mutuel=(arg===b&&argC===a);
+      e.margeFondu=fade===null?null:+(fade-row[b]).toFixed(3);
+    }
+    if(extra)extra(e,a,b);
+    rows.push(e);
+  }
+  _twML.passes.push({passe:nom,paires:rows});
+}
+function _mlSpecs(ps){if(!_twML)return[];return ps.map(function(p){return{a:p.aIdx,b:p.bIdx};});}
+// Différence entre deux affectations ({a,b}[]) : ce qui a changé, côté A.
+function _mlDiff(nom,avant,apres,raison){
+  if(!_twML)return;
+  var bA={},bB={};avant.forEach(function(x){bA[x.a]=x.b;});apres.forEach(function(x){bB[x.a]=x.b;});
+  var ch=[],seen={};
+  avant.concat(apres).forEach(function(x){var a=x.a;if(seen[a])return;seen[a]=1;
+    var d=bA[a],v=bB[a];if(d===undefined)d=-1;if(v===undefined)v=-1;if(d===v)return;
+    ch.push({a:a,idA:_mlIdA(a),de:d,idDe:_mlIdB(d),vers:v,idVers:_mlIdB(v)});});
+  _twML.etapes.push({etape:nom,raison:raison||null,changements:ch});
+}
+function _mlNote(nom,data){
+  if(!_twML)return;
+  var e={etape:nom};for(var k in data)e[k]=data[k];
+  if(e.a!==undefined&&e.idA===undefined)e.idA=_mlIdA(e.a);
+  if(e.b!==undefined&&e.idB===undefined)e.idB=_mlIdB(e.b);
+  if(e.a1!==undefined){e.idA1=_mlIdA(e.a1);e.idA2=_mlIdA(e.a2);}
+  _twML.etapes.push(e);
+}
+function _mlFinal(pairSpecs,unA,unB,th){
+  if(!_twML)return;
+  _twML.final=pairSpecs.map(function(p){
+    var src=p.forced?(p.provenance?'provenance':p.identity?'identité':p.twin?'jumeau':'manuel'):p.isPiece?'scission':p.completion?'complétion':((typeof p.score==='number'&&p.score>th)?'rattrapage':'hongrois');
+    return{a:p.aIdx,b:p.bIdx,idA:_mlIdA(p.aIdx),idB:_mlIdB(p.bIdx),source:src,score:(typeof p.score==='number')?+p.score.toFixed(3):null};});
+  _twML.fondusA=unA.map(function(i){return{a:i,idA:_mlIdA(i)};});
+  _twML.fondusB=unB.map(function(i){return{b:i,idB:_mlIdB(i)};});
+  _twML=null;
+}
+// pins: [{a,b}] pairs imposed inside the solver (TW_PIN_IN_SOLVER) — manual
+// overrides and provenance. Ignored by the wasm twin (bypassed anyway while
+// the relational path is on).
+function autoMatch(sA,sB,hist,pins){
   if(!sA.length||!sB.length)return[];
   // Relational matching lives in JS only (see TW_MATCH_RELATIONAL) — the
   // wasm port is the exact twin of the OLD pipeline and would skip it.
-  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB);
+  if(TW_MATCH_RELATIONAL)return autoMatchJS(sA,sB,hist,pins);
   if(window.GeometryWasm&&window.GeometryWasm.ready){
     try{
       var json=window.GeometryWasm.auto_match(JSON.stringify(sA.map(_strokeInJson)),JSON.stringify(sB.map(_strokeInJson)));
@@ -439,13 +1662,53 @@ function autoMatch(sA,sB){
   }
   return autoMatchJS(sA,sB);
 }
-function autoMatchJS(sA,sB){
+var PIN_COST=-0.2,PIN_BLOCK=5;
+// Imposes the pinned pairs on an augmented cost matrix: the pinned cell is
+// the cheapest of its row and column by a wide margin, every other cell in
+// that row/column (dummy fade columns included) is blocked.
+function _applyPins(cost,pins,n,m){
+  if(!TW_PIN_IN_SOLVER||!pins||!pins.length)return;
+  var N=n+m;
+  pins.forEach(function(p){
+    if(p.a<0||p.a>=n||p.b<0||p.b>=m)return;
+    for(var c=0;c<N;c++)if(c!==p.b)cost[p.a][c]=PIN_BLOCK;
+    for(var r=0;r<N;r++)if(r!==p.a)cost[r][p.b]=PIN_BLOCK;
+    cost[p.a][p.b]=PIN_COST;
+  });
+}
+function autoMatchJS(sA,sB,hist,pins){
+  try{
+    var r=_autoMatchJSCore(sA,sB,hist,pins);
+    if(TW_FIELD_ITER>0&&r&&r.length>=2){
+      var sig=r.map(function(m){return m.a+'>'+m.b;}).join(',');
+      for(var it=0;it<TW_FIELD_ITER;it++){
+        var r2=_autoMatchJSCore(sA,sB,hist,pins,r);
+        if(!r2||r2.length<2)break;
+        var sig2=r2.map(function(m){return m.a+'>'+m.b;}).join(',');
+        r=r2;
+        if(sig2===sig)break;   // point fixe atteint
+        sig=sig2;
+      }
+    }
+    return r;
+  }
+  finally{_relStruct=null;}
+}
+function _autoMatchJSCore(sA,sB,hist,pins,seedOverride){
   if(!sA.length||!sB.length)return[];
   var fA=sA.map(strokeFeat),fB=sB.map(strokeFeat);
   var bA=unionBounds(fA),bB=unionBounds(fB);
   fA.forEach(function(f){f.relX=(f.cx-bA.x)/bA.w;f.relY=(f.cy-bA.y)/bA.h;});
   fB.forEach(function(f){f.relX=(f.cx-bB.x)/bB.w;f.relY=(f.cy-bB.y)/bB.h;});
   _matchNorm=Math.sqrt(Math.pow(Math.max(bA.x+bA.w,bB.x+bB.w)-Math.min(bA.x,bB.x),2)+Math.pow(Math.max(bA.y+bA.h,bB.y+bB.h)-Math.min(bA.y,bB.y),2));
+  // Structural side-channel for the relational pass (contacts, regions) —
+  // computed once per match, read by relationalRefine through _relStruct.
+  _relStruct=null;
+  if(TW_MATCH_RELATIONAL&&(TW_MATCH_TOPOLOGY||TW_MATCH_REGIONS)){
+    _relStruct={};
+    if(TW_MATCH_TOPOLOGY){_relStruct.contA=_contactGraph(fA);_relStruct.contB=_contactGraph(fB);}
+    if(TW_MATCH_REGIONS){_relStruct.regA=_regionMembership(fA,sA);_relStruct.regB=_regionMembership(fB,sB);}
+  }
   var md=1;fA.forEach(function(a){fB.forEach(function(b){var d=Math.sqrt((a.cx-b.cx)*(a.cx-b.cx)+(a.cy-b.cy)*(a.cy-b.cy));if(d>md)md=d;});});
   // Augmented assignment: the matrix is padded so EVERY stroke can opt out
   // into a dummy (= cross-fade) at a fixed cost, instead of only fading via
@@ -455,12 +1718,40 @@ function autoMatchJS(sA,sB){
   // was stolen by a neighbor and it got stuck with garbage.
   var FADE_COST=0.6;
   var n=sA.length,m=sB.length,N=n+m;
+  var idPair=null;
+  if(TW_ID_BONUS){
+    idPair=new Array(n);var icb=_identityCandidates(sA,sB,null,null);
+    icb.cand.forEach(function(c){idPair[c.a]=c.b;});
+    _mlNote('bonus d\'identité',{candidates:icb.cand.length,bonus:ID_BONUS,rejetsGeometrie:icb.rejets.length});
+  }
+  // GARDE PAR LE CHAMP (cats 34→46, vu à l'image) : l'artiste réutilise les
+  // traits d'un bras pour dessiner l'autre et les moustaches changent de côté ;
+  // l'identité y est trompeuse, et une garde par déplacement absolu ne peut
+  // rien (le chat entier marche de 207 px). Le bonus n'est accordé qu'en
+  // passe 2 (et dans chaque canal d'hypothèse), quand la position PRÉDITE du
+  // trait par le modèle de mouvement tombe près de son partenaire d'identité :
+  // même règle de témoin que le rattrapage (résidu ≤ 0,35 × déplacement + 15).
+  var _idBonusGiven=0,_idBonusDenied=[];
+  function idBonusFor(a,b,pts){
+    if(!idPair||idPair[a]!==b||!pts||!pts.length)return 0;
+    var cx=0,cy=0;for(var i=0;i<pts.length;i++){cx+=pts[i][0];cy+=pts[i][1];}cx/=pts.length;cy/=pts.length;
+    var ax=fA[a].cx,ay=fA[a].cy,bx=fB[b].cx,by=fB[b].cy;
+    var disp=Math.hypot(bx-ax,by-ay),pred=Math.hypot(cx-ax,cy-ay),resid=Math.hypot(bx-cx,by-cy);
+    if(resid<=ID_BONUS_RESID_F*Math.max(disp,pred)+ID_BONUS_RESID_PX){_idBonusGiven++;return ID_BONUS;}
+    _idBonusDenied.push(_mlIdA(a)+' (résidu '+Math.round(resid)+' px, déplacement '+Math.round(disp)+')');
+    return 0;
+  }
   function buildCost(ptsT){
-    var c=[];
+    var c=[],axis=new Array(m);
     for(var a=0;a<N;a++){
       var row=[];
+      // élongation : discriminateur normalisé par ligne (voir _axisPenaltyRow).
+      // Côté A on mesure sur les points TRANSPORTÉS quand la passe 2 en
+      // fournit, pour qu'un trait réellement écrasé par la déformation ne
+      // soit pas puni de l'avoir été.
+      if(a<n)_axisPenaltyRow((ptsT&&ptsT[a])?pointElongation(ptsT[a]):fA[a].elong,fB,axis);
       for(var b=0;b<N;b++){
-        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined));
+        if(a<n&&b<m)row.push(matchSc(fA[a],fB[b],a===b,ptsT?ptsT[a]:undefined)+axis[b]-idBonusFor(a,b,ptsT?ptsT[a]:null));
         else if(a>=n&&b>=m)row.push(0);
         else row.push(FADE_COST);
       }
@@ -469,18 +1760,30 @@ function autoMatchJS(sA,sB){
     return c;
   }
   var cost=buildCost(null);
+  _applyPins(cost,pins,n,m);
   var assign=NemoTweenAssignment.solve(cost);
   var matches=[];
   for(var a2=0;a2<n;a2++){var b2=assign[a2];if(b2!==undefined&&b2>=0&&b2<m)matches.push({a:a2,b:b2,score:cost[a2][b2]});}
+  _mlAssign('passe 1 (forme)',cost,matches,n,m);
   if(matches.length<2)return matches;
   // Pass 2: seed the motion model from the best-scoring (least ambiguous)
   // half of pass 1's matches, then re-resolve every pair using how well it
   // agrees with that predicted motion — this is what untangles close/
   // similar features (eyes, chin, parallel hatching on an arm) that pass 1
   // alone can flip.
-  var seeds=matches.slice().sort(function(x,y){return x.score-y.score;});
+  // voir TW_FIELD_ITER : au deuxième tour et aux suivants, les germes du champ
+  // sont les appariements du tour précédent et non ceux de la passe 1.
+  var seedSrc=(seedOverride&&seedOverride.length>=2)?seedOverride:matches;
+  var seeds=seedSrc.slice().sort(function(x,y){return x.score-y.score;});
   var seedCount=Math.max(2,Math.ceil(seeds.length*0.5));
   seeds=seeds.slice(0,seedCount);
+  if(TW_MARGIN_SEEDS&&!seedOverride){
+    _matchMargins(cost,matches,n,m);
+    var confident=matches.filter(function(mm){return mm.mutuel&&mm.marge>=MARGIN_SEED_MIN;}).sort(function(x,y){return x.score-y.score;});
+    if(confident.length>=MARGIN_SEED_MINCOUNT)seeds=confident;
+    _mlNote('graines par marge',{retenues:confident.length,seuil:MARGIN_SEED_MIN,applique:confident.length>=MARGIN_SEED_MINCOUNT});
+  }
+  _mlNote('graines du champ',{n:seeds.length,paires:seeds.map(function(s){return{a:s.a,b:s.b,idA:_mlIdA(s.a),idB:_mlIdB(s.b),score:+s.score.toFixed(3)};})});
   var ptsA=seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};});
   var ptsB=seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};});
   var transform=fitSimilarityTransform(ptsA,ptsB);
@@ -508,8 +1811,34 @@ function autoMatchJS(sA,sB){
   // be the same as global anyway.
   var K_LOCAL=4;
   var localTfs=new Array(fA.length); // per-A-stroke motion model, reused by the relational pass
+  // COHERENT FIELD (TW_MOTION_FIELD): one smooth field on all the seeds
+  // replaces the per-stroke 4-seed similarity. Leave-one-out is kept: a
+  // stroke that seeded the field is predicted by a field fitted WITHOUT
+  // its own pass-1 match (refit cached per seed).
+  var field=null,fieldLOO={};
+  if(TW_MOTION_FIELD&&seeds.length>=MF_MIN_SEEDS){
+    field=fitRobustField(seeds.map(function(s){return{x:fA[s.a].cx,y:fA[s.a].cy};}),seeds.map(function(s){return{x:fB[s.b].cx,y:fB[s.b].cy};}),_matchNorm);
+  }
   var ptsT=fA.map(function(f,ai){
     var tf=transform;
+    if(field){
+      var fld=field,own=-1;
+      if(TW_MATCH_RELATIONAL){for(var si=0;si<seeds.length;si++)if(seeds[si].a===ai){own=si;break;}}
+      if(own>=0){
+        if(fieldLOO[own]===undefined){
+          var sp2=[],dp2=[];
+          seeds.forEach(function(s,k){if(k===own)return;sp2.push({x:fA[s.a].cx,y:fA[s.a].cy});dp2.push({x:fB[s.b].cx,y:fB[s.b].cy});});
+          fieldLOO[own]=fitRobustField(sp2,dp2,_matchNorm)||null;
+        }
+        if(fieldLOO[own])fld=fieldLOO[own];
+      }
+      var flt=_fieldLocalTf(fld,f.cx,f.cy);
+      var fmag=Math.sqrt(flt.wRe*flt.wRe+flt.wIm*flt.wIm);
+      if(fmag>0.15&&fmag<8){
+        localTfs[ai]=flt;
+        return f.pts.map(function(pt){var q=fld.apply(pt[0],pt[1]);return[q.x,q.y];});
+      }
+    }
     // LEAVE-ONE-OUT (2026-09, with TW_MATCH_RELATIONAL — Cyril's cat,
     // "confusion totale"): a stroke's OWN pass-1 match used to be one of
     // the seeds predicting its motion. When that match is a confident
@@ -540,6 +1869,7 @@ function autoMatchJS(sA,sB){
     return f.pts.map(function(pt){var q=applySimilarityTransform(tf,pt[0],pt[1]);return[q.x,q.y];});
   });
   var cost2=buildCost(ptsT);
+  if(idPair)_mlNote('bonus d\'identité en passe 2',{accordes:_idBonusGiven,refuses:_idBonusDenied.slice()});
   // TWO-CHANNEL UNARY (2026-09, with TW_MATCH_RELATIONAL — Cyril's
   // "confusion des 2 yeux" on a turning face): pass 2 used to score every
   // pairing ONLY at the motion-predicted position. When the local motion
@@ -561,11 +1891,307 @@ function autoMatchJS(sA,sB){
       if(rawC<cost2[ra2][rb2])cost2[ra2][rb2]=rawC;
     }
   }
-  var assign2=NemoTweenAssignment.solve(cost2);
-  var matches2=[];
-  for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
-  if(TW_MATCH_RELATIONAL)return relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
-  return uncrossMatches(matches2,fA,fB);
+  // TROISIÈME CANAL : position prédite par la vitesse du trait (voir
+  // TW_TEMPORAL_PRIOR).
+  if(TW_TEMPORAL_PRIOR&&hist&&hist.vel){
+    var axisV=new Array(m);
+    for(var ta=0;ta<n;ta++){
+      var v=hist.vel[ta];if(!v)continue;
+      var prevSc=sA[ta]._prevPairScore;
+      if(prevSc!==undefined&&prevSc>TEMPORAL_MAX_PREV)continue;
+      if(Math.sqrt(v[0]*v[0]+v[1]*v[1])<2)continue; // immobile : le canal brut suffit
+      var ptsV=fA[ta].pts.map(function(pt){return[pt[0]+v[0],pt[1]+v[1]];});
+      _axisPenaltyRow(pointElongation(ptsV),fB,axisV);
+      for(var tb=0;tb<m;tb++){
+        var tC=matchSc(fA[ta],fB[tb],ta===tb,ptsV)+axisV[tb]+TEMPORAL_BIAS;
+        if(tC<cost2[ta][tb])cost2[ta][tb]=tC;
+      }
+    }
+  }
+  _applyPins(cost2,pins,n,m);
+  // MULTI-MOTION channels (see TW_MATCH_MULTI_MOTION): each hypothesis
+  // re-scores every pairing at the position IT predicts; a pairing keeps
+  // the cheapest explanation, and the winning hypothesis becomes that
+  // stroke's local model for the relational pass.
+  var hypOf=null,hyps=null,assign2,matches2=[];
+  if(TW_MATCH_RELATIONAL&&TW_MATCH_MULTI_MOTION)hyps=multiMotionHypotheses(fA,fB,n,m,hist);
+  if(TW_MATCH_RELATIONAL&&TW_MM_ZOOM){var zh=zoomHypotheses(fA,fB,n,m);if(zh.length)hyps=(hyps||[]).concat(zh);}
+  if(hyps&&hyps.length){
+    _mlNote('hypothèses de mouvement',{n:hyps.length,supports:hyps.map(function(h){return h.support;})});
+    // Pre-score every pairing under every hypothesis once; then solve,
+    // count how many matched strokes actually ADOPT each hypothesis, drop
+    // the ones adopted by fewer than MM_MIN_SUPPORT strokes and re-solve.
+    // A hypothesis born from look-alikes (left whiskers onto right
+    // whiskers, a symmetric drawing's mirror) is coherent by itself but
+    // never wins a group in the assignment — this is what removes it,
+    // instead of letting its cheap cross-explanations steal strokes.
+    var base2=cost2.map(function(r){return r.slice();});
+    var localTfs0=localTfs.slice();
+    var lim=Math.min(n,m);
+    var hypCost=hyps.map(function(h){
+      var bias=MM_BIAS+MM_BIAS_SUPPORT*(1-h.support/lim);
+      var mat=new Array(n),hAxis=new Array(m);
+      for(var ha=0;ha<n;ha++){
+        var hpts=fA[ha].pts.map(function(p){var q=applySimilarityTransform(h.tf,p[0],p[1]);return[q.x,q.y];});
+        // Le terme d'élongation doit exister dans CHAQUE canal : cost2 prend
+        // le min sur les canaux, donc un canal d'hypothèse qui l'omettrait
+        // annulerait le terme pour toute paire qu'il explique (mesuré : le
+        // terme était silencieusement sans effet sur ces cellules).
+        _axisPenaltyRow(pointElongation(hpts),fB,hAxis);
+        var row=new Array(m),zo=null;
+        if(h.zoom){var zc=applySimilarityTransform(h.tf,fA[ha].cx,fA[ha].cy);zo={scale:h.scale,rel:[(zc.x-bB.x)/bB.w,(zc.y-bB.y)/bB.h]};}
+        for(var hb=0;hb<m;hb++)row[hb]=matchSc(fA[ha],fB[hb],ha===hb,hpts,zo)+hAxis[hb]+bias-idBonusFor(ha,hb,hpts);
+        mat[ha]=row;
+      }
+      return mat;
+    });
+    var alive=hyps.map(function(){return true;});
+    var zoomPenApplied=false;
+    for(var round=0;round<=hyps.length+1;round++){
+      hypOf=new Array(n*m);
+      for(var ra=0;ra<n;ra++)for(var rb=0;rb<m;rb++){
+        var best=base2[ra][rb],bh=undefined;
+        for(var hi=0;hi<hyps.length;hi++){if(!alive[hi])continue;var hc=hypCost[hi][ra][rb];if(hc<best){best=hc;bh=hi;}}
+        cost2[ra][rb]=best;hypOf[ra*m+rb]=bh;
+      }
+      _applyPins(cost2,pins,n,m); // after the min over channels, or a hypothesis could unblock a pin
+      assign2=NemoTweenAssignment.solve(cost2);
+      matches2=[];
+      for(var a5=0;a5<n;a5++){var b5=assign2[a5];if(b5!==undefined&&b5>=0&&b5<m)matches2.push({a:a5,b:b5,score:cost2[a5][b5]});}
+      _mlAssign('passe 2 tour '+round+' (transport + hypothèses)',cost2,matches2,n,m,function(e,a,b){if(b!==undefined&&b>=0){var hh=hypOf[a*m+b];e.canal=(hh===undefined?'champ ou brut':'hypothèse '+hh);}});
+      // adopters are counted AFTER the relational pass: a hypothesis's
+      // strokes often win only as a group (a chain shifted by one is
+      // individually cheaper on the raw channel), which is exactly what
+      // the arrangement term sees and the unary Hungarian does not.
+      matches2.forEach(function(mm2){var hh=hypOf[mm2.a*m+mm2.b];localTfs[mm2.a]=hh!==undefined?hyps[hh].tf:localTfs0[mm2.a];});
+      var _mlAv=matches2.slice();
+      matches2=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);
+      _mlDiff('relationnel tour '+round,_mlAv,matches2,'voisinage, structure, 2-opt');
+      var adopters=hyps.map(function(){return 0;});
+      matches2.forEach(function(mm3){var h5=hypOf[mm3.a*m+mm3.b];if(h5!==undefined)adopters[h5]++;});
+      var dropped=false;
+      for(var di=0;di<hyps.length;di++)if(alive[di]&&adopters[di]<(hyps[di].minAdopt||MM_MIN_SUPPORT)){alive[di]=false;dropped=true;_mlNote('hypothèse abandonnée',{h:di,adoptants:adopters[di],minimum:(hyps[di].minAdopt||MM_MIN_SUPPORT)});}
+      if(!dropped&&!zoomPenApplied&&TW_MM_ZOOM){
+        // zoom dominant → pénalité hors-cadre (voir ZOOM_DOMINANT_FRAC)
+        var zi=-1,zAd=0;
+        for(var zk=0;zk<hyps.length;zk++)if(alive[zk]&&hyps[zk].zoom&&adopters[zk]>zAd){zAd=adopters[zk];zi=zk;}
+        if(zi>=0&&zAd>=Math.max(MM_MIN_SUPPORT,Math.ceil(ZOOM_DOMINANT_FRAC*lim))){
+          var zt=Math.max(40,_matchNorm*0.08),hors=[];
+          for(var za=0;za<n;za++){
+            var zq=applySimilarityTransform(hyps[zi].tf,fA[za].cx,fA[za].cy);
+            if(zq.x<bB.x-zt||zq.x>bB.x+bB.w+zt||zq.y<bB.y-zt||zq.y>bB.y+bB.h+zt){
+              hors.push(_mlIdA(za));
+              for(var zb=0;zb<m;zb++){base2[za][zb]+=ZOOM_OFFSCREEN_PEN;for(var zh2=0;zh2<hyps.length;zh2++)if(zh2!==zi)hypCost[zh2][za][zb]+=ZOOM_OFFSCREEN_PEN;}
+            }
+          }
+          zoomPenApplied=true;
+          _mlNote('zoom dominant',{h:zi,adoptants:zAd,echelle:+hyps[zi].scale.toFixed(2),horsCadre:hors});
+          if(hors.length)continue;
+        }
+      }
+      if(!dropped)return _matchMargins(cost2,matches2,n,m);
+    }
+    return _matchMargins(cost2,matches2,n,m);
+  }else{
+    assign2=NemoTweenAssignment.solve(cost2);
+    for(var a4=0;a4<n;a4++){var b4=assign2[a4];if(b4!==undefined&&b4>=0&&b4<m)matches2.push({a:a4,b:b4,score:cost2[a4][b4]});}
+    _mlAssign('passe 2 (transport)',cost2,matches2,n,m);
+  }
+  if(TW_MATCH_RELATIONAL){var _mlR=relationalRefine(matches2,fA,fB,cost2,localTfs,n,m,FADE_COST);_mlDiff('relationnel',matches2,_mlR,'voisinage, structure, 2-opt');return _matchMargins(cost2,_mlR,n,m);}
+  return _matchMargins(cost2,uncrossMatches(matches2,fA,fB),n,m);
+}
+// ---- MULTI-MOTION hypotheses (see TW_MATCH_MULTI_MOTION) ----
+function _quickCentroid(sd){
+  var segs=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+  if(!segs||!segs.length)return null;
+  var x=0,y=0;for(var i=0;i<segs.length;i++){x+=segs[i].point[0];y+=segs[i].point[1];}
+  return[x/segs.length,y/segs.length];
+}
+// History for TW_MATCH_TRACKING: per A stroke, its displacement since the
+// previous key (by strokeId) and the co-motion piece it belongs to.
+// Returns null when nothing usable (first pair, no ids, all static).
+function _trackingHistory(sA,prevStrokes){
+  if(!TW_MATCH_TRACKING||!prevStrokes||!prevStrokes.length)return null;
+  var prevById={},dupe={};
+  prevStrokes.forEach(function(sd){if(!sd.strokeId)return;if(prevById[sd.strokeId])dupe[sd.strokeId]=1;else prevById[sd.strokeId]=sd;});
+  var vel=new Array(sA.length),any=false,diag=0;
+  var x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+  sA.forEach(function(sd,i){
+    vel[i]=null;
+    var c=_quickCentroid(sd);if(!c)return;
+    x1=Math.min(x1,c[0]);y1=Math.min(y1,c[1]);x2=Math.max(x2,c[0]);y2=Math.max(y2,c[1]);
+    if(!sd.strokeId||dupe[sd.strokeId])return;
+    var pv=prevById[sd.strokeId];if(!pv)return;
+    var pc=_quickCentroid(pv);if(!pc)return;
+    vel[i]=[c[0]-pc[0],c[1]-pc[1]];any=true;
+  });
+  if(!any)return null;
+  diag=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+  var tol=Math.max(30,diag*0.06);
+  // greedy displacement clustering, static strokes excluded (not moving
+  // says nothing about belonging together)
+  var pieceOf=new Array(sA.length),clusters=[];
+  for(var i=0;i<sA.length;i++){pieceOf[i]=-1;var v=vel[i];if(!v||Math.sqrt(v[0]*v[0]+v[1]*v[1])<tol)continue;
+    var best=-1,bd=tol;
+    clusters.forEach(function(cl,ci){var d=Math.sqrt((cl.mx-v[0])*(cl.mx-v[0])+(cl.my-v[1])*(cl.my-v[1]));if(d<bd){bd=d;best=ci;}});
+    if(best<0){clusters.push({mx:v[0],my:v[1],members:[i]});best=clusters.length-1;}
+    else{var cl=clusters[best];cl.members.push(i);var k=cl.members.length;cl.mx+=(v[0]-cl.mx)/k;cl.my+=(v[1]-cl.my)/k;}
+    pieceOf[i]=best;
+  }
+  var pieces=[],remap={};
+  clusters.forEach(function(cl,ci){if(cl.members.length>=2){remap[ci]=pieces.length;pieces.push({members:cl.members,mx:cl.mx,my:cl.my});}});
+  pieceOf=pieceOf.map(function(ci){return(ci<0||remap[ci]===undefined)?-1:remap[ci];});
+  // vel est conservée même sans « pièce » : le prior temporel (par trait)
+  // n'a pas besoin de groupes.
+  return{vel:vel,pieceOf:pieceOf,pieces:pieces};
+}
+function _tfDist(t1,t2,f){
+  var d=0;
+  [[f.x,f.y],[f.x+f.w,f.y],[f.x,f.y+f.h],[f.x+f.w,f.y+f.h],[f.x+f.w/2,f.y+f.h/2]].forEach(function(p){
+    var q1=applySimilarityTransform(t1,p[0],p[1]),q2=applySimilarityTransform(t2,p[0],p[1]);
+    d=Math.max(d,Math.hypot(q1.x-q2.x,q1.y-q2.y));
+  });
+  return d;
+}
+// Voir TW_MM_ZOOM. Retourne des hypothèses {tf, support, scale, zoom:true}.
+function zoomHypotheses(fA,fB,n,m){
+  if(n<ZOOM_MIN_SUPPORT||m<ZOOM_MIN_SUPPORT)return[];
+  var tol=Math.max(40,_matchNorm*0.08);
+  var cands=[];
+  for(var a=0;a<n;a++)for(var b=0;b<m;b++){
+    var fa=fA[a],fb=fB[b];if(fa.type!==fb.type||fa.length<15||fb.length<15)continue;
+    var s=fb.length/Math.max(1,fa.length);if(s<ZOOM_SCALE_MIN||s>ZOOM_SCALE_MAX)continue;
+    var pts=fa.pts.map(function(p){return[fb.cx+(p[0]-fa.cx)*s,fb.cy+(p[1]-fa.cy)*s];});
+    var sc=matchSc(fa,fb,false,pts,{scale:s,rel:[fb.relX,fb.relY]});
+    if(sc<MM_SHAPE_TH)cands.push({a:a,b:b,s:s,sc:sc});
+  }
+  if(cands.length<ZOOM_MIN_SUPPORT)return[];
+  cands.sort(function(p,q){return p.sc-q.sc;});cands=cands.slice(0,ZOOM_MAX_CANDS);
+  function distinct(members){
+    var byA={},byB={};
+    members.forEach(function(c){if(!byA[c.a]||c.sc<byA[c.a].sc)byA[c.a]=c;});
+    Object.keys(byA).forEach(function(k){var c=byA[k];if(!byB[c.b]||c.sc<byB[c.b].sc)byB[c.b]=c;});
+    return Object.keys(byB).map(function(k){return byB[k];});
+  }
+  function supportOf(tf,s){
+    return distinct(cands.filter(function(c){
+      if(Math.abs(Math.log(c.s/s))>ZOOM_LEN_TOL)return false;
+      var q=applySimilarityTransform(tf,fA[c.a].cx,fA[c.a].cy);
+      return Math.hypot(q.x-fB[c.b].cx,q.y-fB[c.b].cy)<tol;
+    }));
+  }
+  function fitOn(uniq){
+    var pa=uniq.map(function(c){return{x:fA[c.a].cx,y:fA[c.a].cy};}),pb=uniq.map(function(c){return{x:fB[c.b].cx,y:fB[c.b].cy};});
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return null;
+    var mag=Math.sqrt(tf.wRe*tf.wRe+tf.wIm*tf.wIm);
+    // un zoom réel seulement, aussi APRÈS ré-ajustement : mesuré, sans cette
+    // garde l'absorption dérivait vers une échelle 1 sur tout le corpus
+    // (×1,01 à 13 membres sur loup 0→8), doublon des hypothèses existantes
+    if(mag<ZOOM_SCALE_MIN||mag>ZOOM_SCALE_MAX||Math.abs(Math.log(mag))<ZOOM_MIN_LOG)return null;
+    return{tf:tf,mag:mag};
+  }
+  var hyps=[];
+  for(var i=0;i<cands.length;i++)for(var j=i+1;j<cands.length;j++){
+    var ci=cands[i],cj=cands[j];if(ci.a===cj.a||ci.b===cj.b)continue;
+    var dAx=fA[cj.a].cx-fA[ci.a].cx,dAy=fA[cj.a].cy-fA[ci.a].cy,dBx=fB[cj.b].cx-fB[ci.b].cx,dBy=fB[cj.b].cy-fB[ci.b].cy;
+    var dA=Math.hypot(dAx,dAy),dB=Math.hypot(dBx,dBy);if(dA<25||dB<25)continue;
+    var s=dB/dA;if(s<ZOOM_SCALE_MIN||s>ZOOM_SCALE_MAX||Math.abs(Math.log(s))<ZOOM_MIN_LOG)continue;
+    if(Math.abs(Math.log(ci.s/s))>ZOOM_LEN_TOL||Math.abs(Math.log(cj.s/s))>ZOOM_LEN_TOL)continue;
+    var rot=Math.atan2(dBy,dBx)-Math.atan2(dAy,dAx);while(rot>Math.PI)rot-=2*Math.PI;while(rot<-Math.PI)rot+=2*Math.PI;
+    if(Math.abs(rot)>ZOOM_MAX_ROT)continue;
+    var tf0=fitSimilarityTransform([{x:fA[ci.a].cx,y:fA[ci.a].cy},{x:fA[cj.a].cx,y:fA[cj.a].cy}],[{x:fB[ci.b].cx,y:fB[ci.b].cy},{x:fB[cj.b].cx,y:fB[cj.b].cy}]);
+    if(!tf0)continue;
+    var sup=supportOf(tf0,s);if(sup.length<ZOOM_MIN_SUPPORT)continue;
+    hyps.push({tf:tf0,support:sup.length,members:sup,scale:s});
+  }
+  if(!hyps.length)return[];
+  hyps.sort(function(p,q){return q.support-p.support||0;});
+  var ub=unionBounds(fA),kept=[];
+  hyps.forEach(function(h){
+    if(kept.length>=ZOOM_MAX_HYPS)return;
+    // ré-ajustement sur les membres, puis absorption des candidats que la
+    // similitude ajustée prédit, un seul tour
+    var f1=fitOn(h.members);if(!f1)return;
+    var sup2=supportOf(f1.tf,f1.mag);var tf=f1.tf,mag=f1.mag,members=h.members;
+    if(sup2.length>=members.length){var f2=fitOn(sup2);if(f2){tf=f2.tf;mag=f2.mag;members=sup2;}}
+    if(kept.some(function(k){return _tfDist(tf,k.tf,ub)<tol;}))return;
+    kept.push({tf:tf,support:members.length,scale:mag,zoom:true,minAdopt:MM_MIN_SUPPORT,members:members});
+  });
+  _mlNote('hypothèses de zoom',{candidats:cands.length,brutes:hyps.length,retenues:kept.map(function(k){return{echelle:+k.scale.toFixed(2),support:k.support,membres:k.members.map(function(c){return _mlIdA(c.a)+'→'+_mlIdB(c.b);})};})});
+  return kept;
+}
+function multiMotionHypotheses(fA,fB,n,m,hist){
+  if(n<6||m<6)return[];
+  var pieceOf=(hist&&hist.pieceOf)||null;
+  var tol=Math.max(30,_matchNorm*0.06);
+  var cands=[];
+  for(var a=0;a<n;a++)for(var b=0;b<m;b++){
+    if(fA[a].type!==fB[b].type)continue;
+    var dx=fB[b].cx-fA[a].cx,dy=fB[b].cy-fA[a].cy;
+    var pts=fA[a].pts.map(function(p){return[p[0]+dx,p[1]+dy];});
+    var sc=matchSc(fA[a],fB[b],false,pts);
+    if(sc<MM_SHAPE_TH)cands.push({a:a,b:b,dx:dx,dy:dy,sc:sc});
+  }
+  if(cands.length<MM_MIN_SUPPORT)return[];
+  cands.sort(function(p,q){return p.sc-q.sc;});
+  // greedy clustering of displacement vectors, best shape scores first
+  var clusters=[];
+  cands.forEach(function(c){
+    var best=null,bd=tol;
+    clusters.forEach(function(cl){var d=Math.hypot(cl.mx-c.dx,cl.my-c.dy);if(d<bd){bd=d;best=cl;}});
+    if(best){best.members.push(c);var k=best.members.length;best.mx+=(c.dx-best.mx)/k;best.my+=(c.dy-best.my)/k;}
+    else clusters.push({mx:c.dx,my:c.dy,members:[c]});
+  });
+  // one candidate per A stroke and per B stroke inside a cluster (a stroke
+  // can only vote once), then a similarity fit on the survivors' centroids
+  function distinct(members){
+    var byA={},byB={};
+    members.forEach(function(c){if(!byA[c.a]||c.sc<byA[c.a].sc)byA[c.a]=c;});
+    Object.keys(byA).forEach(function(k){var c=byA[k];if(!byB[c.b]||c.sc<byB[c.b].sc)byB[c.b]=c;});
+    return Object.keys(byB).map(function(k){return byB[k];});
+  }
+  function fitOf(uniq){
+    var pa=uniq.map(function(c){return{x:fA[c.a].cx,y:fA[c.a].cy};}),pb=uniq.map(function(c){return{x:fB[c.b].cx,y:fB[c.b].cy};});
+    var tf=fitSimilarityTransform(pa,pb);
+    if(!tf)return null;
+    var mag=Math.sqrt(tf.wRe*tf.wRe+tf.wIm*tf.wIm);
+    if(mag<0.5||mag>2)return null;
+    return tf;
+  }
+  var hyps=[];
+  clusters.forEach(function(cl){
+    var uniq=distinct(cl.members);
+    var known=false;
+    if(uniq.length<MM_MIN_SUPPORT){
+      // a cluster of strokes that already moved together last time
+      // needs less evidence (see TW_MATCH_TRACKING)
+      if(!pieceOf||uniq.length<MM_MIN_SUPPORT_KNOWN)return;
+      var p0=pieceOf[uniq[0].a];if(p0<0)return;
+      for(var ui=1;ui<uniq.length;ui++)if(pieceOf[uniq[ui].a]!==p0)return;
+      known=true;
+    }
+    var tf=fitOf(uniq);if(!tf)return;
+    // absorb every shape-compatible candidate the fit predicts, refit once
+    var absorbed=cands.filter(function(c){var q=applySimilarityTransform(tf,fA[c.a].cx,fA[c.a].cy);return Math.hypot(q.x-fB[c.b].cx,q.y-fB[c.b].cy)<tol;});
+    var uniq2=distinct(absorbed);
+    if(uniq2.length>=uniq.length){var tf2=fitOf(uniq2);if(tf2){tf=tf2;uniq=uniq2;}}
+    hyps.push({tf:tf,support:uniq.length,minAdopt:known?MM_MIN_SUPPORT_KNOWN:MM_MIN_SUPPORT});
+  });
+  // MOMENTUM: each known piece proposes its previous displacement again
+  if(hist&&hist.pieces)hist.pieces.forEach(function(pc){
+    var pa=pc.members.map(function(i){return{x:fA[i].cx,y:fA[i].cy};});
+    var pb=pc.members.map(function(i){return{x:fA[i].cx+pc.mx,y:fA[i].cy+pc.my};});
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return;
+    hyps.push({tf:tf,support:pc.members.length,minAdopt:MM_MIN_SUPPORT_KNOWN,momentum:true});
+  });
+  hyps.sort(function(p,q){return q.support-p.support;});
+  var ub=unionBounds(fA),kept=[];
+  hyps.forEach(function(h){
+    if(kept.length>=MM_MAX_HYPS)return;
+    var dup=kept.some(function(k){return _tfDist(h.tf,k.tf,ub)<tol;});
+    if(!dup)kept.push(h);
+  });
+  return kept;
 }
 // ---- RELATIONAL matching (2026-09, see TW_MATCH_RELATIONAL) ----
 // Quadratic-assignment relaxation: a few rounds of Hungarian on
@@ -589,6 +2215,77 @@ function autoMatchJS(sA,sB){
 // calls "must NOT swap") turned out, seen live, to be the two LEGS
 // swapped; the relational answer is the right one there.
 var REL_K=6,REL_LAMBDA=0.45,REL_ROUNDS=6;
+// Structural side-channel for relationalRefine (contacts, regions), set by
+// autoMatchJS for the duration of one match — same module-global pattern
+// as _matchNorm, so the three call sites keep their signature.
+var _relStruct=null;
+// Contact graph ("fuzzy topology"): stroke i touches stroke j when one of
+// i's endpoints lies within tolerance of j's polyline. Symmetric.
+// Returns {d, tol}: d[i][j] = smallest distance from an endpoint of i to
+// j's polyline OR from an endpoint of j to i's polyline (symmetric, Infinity
+// when the bounding boxes are far apart); tol[i][j] = the pair's contact
+// tolerance. A contact is d <= tol; the relational term reads the DISTANCE
+// on the B side so a contact loosened by redraw jitter costs little and
+// only a clearly broken one costs full — "fuzzy" in FTP-SC's sense.
+function _contactGraph(feats){
+  var n=feats.length,D=[],T=[];
+  for(var i=0;i<n;i++){D.push(new Array(n).fill(Infinity));T.push(new Array(n).fill(1));}
+  function segDist2(px,py,ax,ay,bx,by){
+    var vx=bx-ax,vy=by-ay,wx=px-ax,wy=py-ay,l2=vx*vx+vy*vy;
+    var t=l2>1e-9?Math.max(0,Math.min(1,(wx*vx+wy*vy)/l2)):0;
+    var dx=px-(ax+t*vx),dy=py-(ay+t*vy);return dx*dx+dy*dy;
+  }
+  function polyDist2(px,py,pts){var best=1e18;for(var k=0;k+1<pts.length;k++){var d=segDist2(px,py,pts[k][0],pts[k][1],pts[k+1][0],pts[k+1][1]);if(d<best)best=d;}return best;}
+  function endsToPoly(f,g,reach){
+    if(f.closed)return Infinity; // a loop has no free end to rest on anything
+    var e=[f.pts[0],f.pts[f.pts.length-1]],bb=g.bounds,best=Infinity;
+    for(var ei=0;ei<2;ei++){
+      var p=e[ei];
+      if(p[0]<bb.x-reach||p[0]>bb.x+bb.w+reach||p[1]<bb.y-reach||p[1]>bb.y+bb.h+reach)continue;
+      var d=Math.sqrt(polyDist2(p[0],p[1],g.pts));if(d<best)best=d;
+    }
+    return best;
+  }
+  for(var i2=0;i2<n;i2++){
+    for(var j=i2+1;j<n;j++){
+      var f=feats[i2],g=feats[j];
+      var tol=Math.max(9,2*Math.max(f.wid,g.wid),_matchNorm*0.012);
+      var reach=tol*3;
+      var d=Math.min(endsToPoly(f,g,reach),endsToPoly(g,f,reach));
+      D[i2][j]=D[j][i2]=d;T[i2][j]=T[j][i2]=tol;
+    }
+  }
+  return{d:D,tol:T};
+}
+// Region membership: for each stroke, the index of the SMALLEST closed
+// stroke whose area contains its centroid (−1 = none). Paper's contains()
+// on the stroke's own path; a pressure centerline judged closed is closed
+// for this purpose too.
+function _regionMembership(feats,strokes){
+  var n=feats.length,reg=new Array(n).fill(-1);
+  var loops=[];
+  for(var i=0;i<n;i++){
+    if(!feats[i].closed)continue;
+    var p=buildTPFeat(strokes[i]);p.closed=true;
+    var area=Math.abs(p.area);
+    if(area<1)continue;
+    loops.push({i:i,p:p,area:area,b:feats[i].bounds});
+  }
+  if(!loops.length)return reg;
+  for(var k=0;k<n;k++){
+    var f=feats[k],best=-1,bestArea=Infinity;
+    for(var q=0;q<loops.length;q++){
+      var L=loops[q];if(L.i===k||L.area>=bestArea)continue;
+      var b=L.b;if(f.cx<b.x||f.cx>b.x+b.w||f.cy<b.y||f.cy>b.y+b.h)continue;
+      // the loop must be clearly bigger than what it contains
+      if(feats[k].closed&&L.area<Math.abs(feats[k].bounds.w*feats[k].bounds.h)*1.2)continue;
+      if(L.p.contains(new Point(f.cx,f.cy))){best=L.i;bestArea=L.area;}
+    }
+    reg[k]=best;
+  }
+  loops.forEach(function(L){L.p.remove();});
+  return reg;
+}
 function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
   if(n<3||m<2)return matches;
   var N=n+m;
@@ -602,6 +2299,81 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
   });
   function predVec(i,dx,dy){var t=localTfs[i];if(!t)return[dx,dy];return[t.wRe*dx-t.wIm*dy,t.wIm*dx+t.wRe*dy];}
   function sizeOf(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
+  var S=_relStruct;
+  var useChir=TW_CHIRALITY,useTopo=TW_MATCH_TOPOLOGY&&S&&S.contA&&S.contB,useReg=TW_MATCH_REGIONS&&S&&S.regA&&S.regB;
+  var useRev=TW_REL_REVERSE;
+  // Structural terms for candidate (i→a) under assignment sig — shared by
+  // the Hungarian rounds and the 2-opt objective so both optimise the
+  // same thing.
+  function structTerm(i,a,sig){
+    var t=0,nbi=nb[i];
+    if(useChir){
+      // signed orientation of every neighbour pair around i must survive.
+      // Only WELL-CONDITIONED triangles count (|sin| ≥ 0.3 on both sides):
+      // measured on the synthetic bench, a 0.05 threshold let near-
+      // collinear triplets (consecutive contour strokes) flip under
+      // ordinary redraw jitter and penalised correct pairings (10 → 7
+      // errors with the term OFF). A flip on a wide-open triangle is the
+      // mirror confusion this exists for; a flip on a sliver is noise.
+      var flips=0,tri=0;
+      for(var q1=0;q1<nbi.length;q1++){
+        var j1=nbi[q1].j,b1=sig[j1];if(b1<0||b1===a)continue;
+        for(var q2=q1+1;q2<nbi.length;q2++){
+          var j2=nbi[q2].j,b2=sig[j2];if(b2<0||b2===a||b2===b1)continue;
+          var cA=nbi[q1].dx*nbi[q2].dy-nbi[q1].dy*nbi[q2].dx;
+          var lA=Math.sqrt(nbi[q1].d2*nbi[q2].d2);
+          if(Math.abs(cA)<CHIR_SIN*lA)continue;
+          var ux=fB[b1].cx-fB[a].cx,uy=fB[b1].cy-fB[a].cy,vx=fB[b2].cx-fB[a].cx,vy=fB[b2].cy-fB[a].cy;
+          var cB=ux*vy-uy*vx,lB=Math.sqrt((ux*ux+uy*uy)*(vx*vx+vy*vy));
+          if(Math.abs(cB)<CHIR_SIN*lB)continue;
+          tri++;if((cA>0)!==(cB>0))flips++;
+        }
+      }
+      if(tri)t+=REL_CHIR*flips/tri;
+    }
+    if(useTopo){
+      // a contact in A (endpoint resting on a neighbour) should still be
+      // one in B — graded by how far the B endpoint now sits beyond the
+      // tolerance, so redraw jitter costs little; a contact that only
+      // APPEARS in B is not penalised (spurious touches are common).
+      var acc=0,cnt=0;
+      for(var q=0;q<nbi.length;q++){
+        var j=nbi[q].j,b=sig[j];if(b<0||b===a)continue;
+        if(S.contA.d[i][j]<=S.contA.tol[i][j]){
+          var dB=S.contB.d[a][b],tB=S.contB.tol[a][b];
+          acc+=Math.max(0,Math.min(1,(dB-tB)/(2*tB)));
+        }
+        cnt++;
+      }
+      if(cnt)t+=REL_TOPO*acc/cnt;
+    }
+    if(useRev){
+      // voir TW_REL_REVERSE : échange de côtés entre voisins proches
+      var rv=0,rc=0,szi=sizeOf(fA[i]);
+      for(var q3=0;q3<nbi.length;q3++){
+        var j3=nbi[q3].j,b3=sig[j3];if(b3<0||b3===a)continue;
+        var near=REV_NEAR*Math.min(szi,sizeOf(fA[j3]));
+        if(nbi[q3].d2>near*near)continue;
+        var p3=predVec(i,nbi[q3].dx,nbi[q3].dy);
+        var qx3=fB[b3].cx-fB[a].cx,qy3=fB[b3].cy-fB[a].cy;
+        var lp3=Math.sqrt(p3[0]*p3[0]+p3[1]*p3[1]),lq3=Math.sqrt(qx3*qx3+qy3*qy3);
+        if(lp3<1e-6||lq3<1e-6)continue;
+        var cs3=(p3[0]*qx3+p3[1]*qy3)/(lp3*lq3);
+        rc++;if(cs3<-0.3)rv+=Math.min(1,(-0.3-cs3)/0.5);
+      }
+      if(rc)t+=REL_REVERSE*rv/rc;
+    }
+    if(useReg){
+      var r=0;
+      var kA=S.regA[i];
+      if(kA>=0){var bk=sig[kA];if(bk>=0&&S.regB[a]!==bk)r+=1;}
+      var kB=S.regB[a];
+      if(kB>=0){var iA=S.invSigOf(sig,kB);if(iA>=0&&S.regA[i]!==iA)r+=1;}
+      if(r)t+=REL_REGION*r/2;
+    }
+    return t;
+  }
+  if(S)S.invSigOf=function(sig,b){for(var x=0;x<sig.length;x++)if(sig[x]===b)return x;return -1;};
   var sigma=new Array(n).fill(-1);
   matches.forEach(function(mm){sigma[mm.a]=mm.b;});
   var cur=cost;
@@ -623,6 +2395,7 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
             acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
           }
           if(cnt)row[a]+=REL_LAMBDA*acc/cnt;
+          if(useChir||useTopo||useReg||useRev)row[a]+=structTerm(i,a,sigma);
         }
       }
       aug.push(row);
@@ -631,7 +2404,51 @@ function relationalRefine(matches,fA,fB,cost,localTfs,n,m,fadeCost){
     var changed=false,next=new Array(n).fill(-1);
     for(var a2=0;a2<n;a2++){var b2=assign[a2];next[a2]=(b2!==undefined&&b2>=0&&b2<m)?b2:-1;if(next[a2]!==sigma[a2])changed=true;}
     sigma=next;cur=aug;
+    _mlNote('tour relationnel '+round,{modifie:changed});
     if(!changed)break;
+  }
+  // 2-OPT on the EXACT objective (2026-09, cat's toes): the Hungarian
+  // rounds above score each candidate against the OTHER strokes' previous
+  // assignment, so a simultaneous swap of two neighbours (each is the
+  // other's closest neighbour) is undervalued — the arrangement gain only
+  // exists once BOTH move, and each alone looks worse. Measured: the swap
+  // was worth 0.16 in arrangement vs 0.08 in unary, yet never flipped.
+  // Try every pairwise partner swap on the full objective and keep it when
+  // the total drops.
+  function relTermOf(i,sig){
+    var a=sig[i];if(a<0)return 0;
+    var nbi=nb[i],acc=0,cnt=0;
+    for(var q=0;q<nbi.length;q++){
+      var j=nbi[q].j,b=sig[j];if(b<0)continue;
+      var p=predVec(i,nbi[q].dx,nbi[q].dy);
+      var qx=fB[b].cx-fB[a].cx,qy=fB[b].cy-fB[a].cy;
+      var ex=p[0]-qx,ey=p[1]-qy;
+      var norm=Math.sqrt(p[0]*p[0]+p[1]*p[1])+Math.sqrt(qx*qx+qy*qy)+sizeOf(fA[i]);
+      acc+=Math.min(1,Math.sqrt(ex*ex+ey*ey)/norm*2);cnt++;
+    }
+    var t=cnt?REL_LAMBDA*acc/cnt:0;
+    if(useChir||useTopo||useReg||useRev)t+=structTerm(i,a,sig);
+    return t;
+  }
+  function objective(sig){
+    var t=0;
+    for(var i=0;i<n;i++){t+=(sig[i]>=0?cost[i][sig[i]]:fadeCost)+relTermOf(i,sig);}
+    return t;
+  }
+  var best=TW_REL_2OPT?objective(sigma):0;
+  for(var pass=0;TW_REL_2OPT&&pass<3;pass++){
+    var improved=false;
+    for(var i1=0;i1<n;i1++){
+      if(sigma[i1]<0)continue;
+      for(var i2=i1+1;i2<n;i2++){
+        if(sigma[i2]<0)continue;
+        var t1=sigma[i1];sigma[i1]=sigma[i2];sigma[i2]=t1;
+        var o=objective(sigma);
+        if(o<best-1e-9){_mlNote('2-opt',{a1:i1,a2:i2,objectif:+o.toFixed(3),gain:+(best-o).toFixed(3)});best=o;improved=true;}
+        else{sigma[i2]=sigma[i1];sigma[i1]=t1;}
+      }
+    }
+    if(!improved)break;
   }
   var out=[];
   for(var a3=0;a3<n;a3++){if(sigma[a3]>=0)out.push({a:a3,b:sigma[a3],score:cost[a3][sigma[a3]]});}
@@ -1101,16 +2918,18 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
   // lenB/(gK-1)), so normalizing by it makes the signal comparable
   // between two shapes even if their raw sampling density differs.
   var dsA=lenA/(gK-1),dsB=lenB/(gK-1);
-  var curvA=new Array(gK),curvB=new Array(gK);
+  var curvA=new Array(gK),curvB=new Array(gK),turnA=new Array(gK),turnB=new Array(gK);
   for(var ka=0;ka<gK;ka++){
     var prevA=tanA[ka>0?ka-1:ka],nextA=tanA[ka<gK-1?ka+1:ka];
     var spanA=(ka>0&&ka<gK-1)?2*dsA:dsA;
-    curvA[ka]=_wrapPI(nextA-prevA)/Math.max(1e-6,spanA);
+    turnA[ka]=_wrapPI(nextA-prevA);
+    curvA[ka]=turnA[ka]/Math.max(1e-6,spanA);
   }
   for(var kb=0;kb<gK;kb++){
     var prevB=tanB[kb>0?kb-1:kb],nextB=tanB[kb<gK-1?kb+1:kb];
     var spanB=(kb>0&&kb<gK-1)?2*dsB:dsB;
-    curvB[kb]=_wrapPI(nextB-prevB)/Math.max(1e-6,spanB);
+    turnB[kb]=_wrapPI(nextB-prevB);
+    curvB[kb]=turnB[kb]/Math.max(1e-6,spanB);
   }
   // Rigid motion the correspondence should agree with — same 32-probe
   // whole-stroke fit _matchLandmarks seeds from (already order-consistent:
@@ -1140,7 +2959,13 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     // the "noodle ballooning" failure this file's own history note above
     // already warns a curvature-only cost falls into.
     var cc=TW_CURVATURE_DTW?Math.min(1,Math.abs(curvA[i]-curvB[j])*normScale):0;
-    return posC+0.35*ad+0.08*cc;
+    var sg=0;
+    if(TW_DTW_SIGN){
+      var ta=turnA[i],tb=turnB[j],aa=Math.abs(ta),ab=Math.abs(tb);
+      if(aa>=DTW_SIGN_MIN&&ab>=DTW_SIGN_MIN&&aa<DTW_SIGN_CUSP&&ab<DTW_SIGN_CUSP){if(ta*tb<0)sg=DTW_SIGN_W;else sg=-DTW_SIGN_REWARD;}
+      else if(DTW_LOST_W>0&&((aa>=DTW_SIGN_MIN&&aa<DTW_SIGN_CUSP&&ab<DTW_FLAT)||(ab>=DTW_SIGN_MIN&&ab<DTW_SIGN_CUSP&&aa<DTW_FLAT)))sg=DTW_LOST_W;
+    }
+    return posC+0.35*ad+0.08*cc+sg;
   }
   // Classic DTW DP: monotonic path from (0,0) to (gK-1,gK-1), each step
   // advances i, j, or both — a plateau (several j's per i or vice versa)
@@ -1172,6 +2997,18 @@ function _dtwCorrespondence(pA,lenA,pB,lenB,n){
     path.push([pi,pj]);
   }
   path.reverse();
+  if(typeof window!=='undefined'&&window.__TW_DEBUG_DTW){
+    var _clash=0,_strong=0,_lost=0,_seenA={};
+    path.forEach(function(pr){var ta2=turnA[pr[0]],tb2=turnB[pr[1]],a2=Math.abs(ta2),b2=Math.abs(tb2);
+      if(a2>=DTW_SIGN_MIN&&a2<DTW_SIGN_CUSP){
+        if(!_seenA[pr[0]]){_seenA[pr[0]]=1;_strong++;}
+        if(b2>=DTW_SIGN_MIN&&b2<DTW_SIGN_CUSP&&ta2*tb2<0)_clash++;
+      }});
+    // coins francs de A dont AUCUN partenaire sur le chemin n'est un coin (|virage| < 0,3) : pointe posée sur un plat
+    var _partners={};path.forEach(function(pr){(_partners[pr[0]]||(_partners[pr[0]]=[])).push(pr[1]);});
+    Object.keys(_seenA).forEach(function(ia){var js=_partners[ia]||[];var okc=js.some(function(j){return Math.abs(turnB[j])>=0.3;});if(!okc)_lost++;});
+    window.__twDtwLog=window.__twDtwLog||[];window.__twDtwLog.push({lenA:Math.round(lenA),lenB:Math.round(lenB),coinsFrancsA:_strong,conflitsSigne:_clash,coinsPerdus:_lost,pas:path.length});
+  }
   var prog=path.map(function(pr){return (pr[0]/(gK-1)+pr[1]/(gK-1))/2;});
   var fracA=[0],fracB=[0];
   var pk=0;
@@ -1337,7 +3174,10 @@ function resamplePairFeatureAware(aData,bData,n,isVB){
       _cd+=(ax-bxD)*(ax-bxD)+(ay-byD)*(ay-byD);
       _cr+=(ax-bxR)*(ax-bxR)+(ay-byR)*(ay-byR);
     }
-    if(_cr<_cd){
+    // Conservation de l'enroulement (voir TW_ALIGN_WINDING) : prime sur la
+    // distance quand les deux traits sont franchement courbes.
+    var _wPref=_windingPref(_oPA.map(function(q){return[q.x,q.y];}),_oPB.map(function(q){return[q.x,q.y];}),_cd,_cr);
+    if(_wPref<0||(_wPref===0&&_cr<_cd)){
       bReversed=true;
       srcB=srcB.slice().reverse().map(function(s){return{point:s.point,handleIn:s.handleOut,handleOut:s.handleIn,width:s.width};});
       pB.remove();
@@ -1630,6 +3470,7 @@ function arcKey(fA,fB,i,li){
 // two-handle shape from one point, and this is still ui-ux-experimental.
 function getArcHandles(fA,fB,i,ptA,ptB){
   var k=arcKey(fA,fB,i);var a=state.motionArcs[k];
+  if(!a&&TW_ARC_FROM_CHAIN)a=_chainArcs[k]; // déduit de la chaîne de clés
   var dx=ptB[0]-ptA[0],dy=ptB[1]-ptA[1];
   // Field names match setArcHandle's `which` values ('out'/'in') exactly —
   // confirmed live the hard way: an earlier version read a.hOut/a.hIn here
@@ -1793,6 +3634,41 @@ function _segsSelfXCount(segs){
     }
   }
   return c;
+}
+// SURFACE des boucles d'auto-intersection, relative à la boîte du trait
+// (2026-09-04, « la main droite la shape se retourne »). Le DÉCOMPTE
+// ci-dessus ne distingue pas une boucle visible d'un frisson de resample :
+// mesuré sur le cas signalé, la boucle fermée bien visible au milieu de la
+// portée couvre 9 à 11 % de la boîte du trait, tandis que les intersections
+// parasites en couvrent 0,1 % — et les DEUX comptent pour « 1 ». Pire, la
+// clé B resamplée porte une de ces intersections parasites, ce qui offrait
+// une intersection gratuite à toute la portée (voir xingA/xingB). La
+// surface sépare les deux d'un facteur 100 ; les clés de ce fichier, elles,
+// en ont exactement zéro.
+function _segsSelfLoopArea(segs){
+  var n=segs.length-1;
+  if(n<3)return 0;
+  var x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity,k;
+  for(k=0;k<segs.length;k++){
+    var px=segs[k].point[0],py=segs[k].point[1];
+    if(px<x1)x1=px;if(px>x2)x2=px;if(py<y1)y1=py;if(py>y2)y2=py;
+  }
+  var bbox=Math.max(1,(x2-x1)*(y2-y1));
+  var tot=0;
+  for(var i=0;i<n;i++){
+    var p1={x:segs[i].point[0],y:segs[i].point[1]},p2={x:segs[i+1].point[0],y:segs[i+1].point[1]};
+    for(var j=i+2;j<n;j++){
+      var p3={x:segs[j].point[0],y:segs[j].point[1]},p4={x:segs[j+1].point[0],y:segs[j+1].point[1]};
+      if(_nearPt(p1.x,p1.y,p3.x,p3.y)||_nearPt(p1.x,p1.y,p4.x,p4.y)||_nearPt(p2.x,p2.y,p3.x,p3.y)||_nearPt(p2.x,p2.y,p4.x,p4.y))continue;
+      if(!_segsIntersect(p1,p2,p3,p4))continue;
+      // aire du lacet fermé i+1..j (formule du lacet), en valeur absolue
+      var A=0;
+      for(var q=i+1;q<j;q++)A+=segs[q].point[0]*segs[q+1].point[1]-segs[q+1].point[0]*segs[q].point[1];
+      A+=segs[j].point[0]*segs[i+1].point[1]-segs[i+1].point[0]*segs[j].point[1];
+      tot+=Math.abs(A/2)/bbox;
+    }
+  }
+  return tot;
 }
 // `anchor` (optional) is the rigid-blend result for the SAME et — the
 // candidate the intrinsic reconstruction is an alternative to. When supplied,
@@ -2118,6 +3994,38 @@ function _renderedRipple(segs,closed){
   }
   return(fl/L)*100;
 }
+// MICRO-BOUCLES DE POIGNÉES (2026-09-04). Sur la forme dense (50 points
+// avant réduction), une poignée vaut ~1/3 de sa corde. Quand deux points
+// du mélange convergent en bout de trait (cordes de 0,2 à 0,5 px mesurées
+// sur cats_anim.json, images 10 à 15), les poignées héritées par lerp des
+// clés restent à ~1 px : la cubique fait alors un lacet sous le pixel —
+// les 9 auto-intersections de Bézier qui restaient après le correctif
+// d'enroulement étaient TOUTES de cette nature (portées de 0 à 1 segment,
+// indices 42–48 ou 0–1). Invisible sur un trait fin, mais le ruban d'un
+// pinceau large y fait un nœud. Une cubique dont chaque poignée reste sous
+// HANDLE_MAX_RATIO fois sa corde ne peut pas se recroiser : on borne, sans
+// toucher aux poignées déjà saines (ratio ≤ 0,45), AVANT la réduction de
+// points (qui reconstruit ses propres poignées, légitimement plus longues
+// sur un maillage clairsemé).
+var TW_HANDLE_CLAMP=true,HANDLE_MAX_RATIO=0.45;
+function _clampHandles(segs){
+  if(!TW_HANDLE_CLAMP||!segs||segs.length<2)return segs;
+  var n=segs.length;
+  for(var i=0;i<n;i++){
+    var s=segs[i];
+    if(i<n-1&&s.handleOut){
+      var ex=segs[i+1].point[0]-s.point[0],ey=segs[i+1].point[1]-s.point[1];
+      var cap=Math.hypot(ex,ey)*HANDLE_MAX_RATIO,hl=Math.hypot(s.handleOut[0],s.handleOut[1]);
+      if(hl>cap&&hl>1e-9){var k=cap/hl;s.handleOut=[s.handleOut[0]*k,s.handleOut[1]*k];}
+    }
+    if(i>0&&s.handleIn){
+      var fx=segs[i-1].point[0]-s.point[0],fy=segs[i-1].point[1]-s.point[1];
+      var cap2=Math.hypot(fx,fy)*HANDLE_MAX_RATIO,hl2=Math.hypot(s.handleIn[0],s.handleIn[1]);
+      if(hl2>cap2&&hl2>1e-9){var k2=cap2/hl2;s.handleIn=[s.handleIn[0]*k2,s.handleIn[1]*k2];}
+    }
+  }
+  return segs;
+}
 function _reharmoniseHandles(segs,rA,rB,et){
   if(!TW_HANDLE_REHARMONISE)return segs;
   var A=rA.segments,B=rB.segments;
@@ -2414,7 +4322,8 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   // theta avoids introducing visible spurious spin on ordinary shape
   // morphs where the least-squares fit finds SOME best-fit rotation just
   // by chance even though the two shapes aren't really related by a turn.
-  var theta=0,scaleF=1;
+  var theta=0,scaleF=1,pivot=null;
+  var userArc=!!(state.motionArcs&&state.motionArcs[arcKey(fA,fB,mIdx)]);
   if(n>=2){
     var loA=[],loB=[];
     for(var li=0;li<n;li++){loA.push({x:rA.segments[li].point[0]-cxA,y:rA.segments[li].point[1]-cyA});loB.push({x:rB.segments[li].point[0]-cxB,y:rB.segments[li].point[1]-cyB});}
@@ -2454,6 +4363,34 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         }
         if(Math.abs(th)>=0.06)theta=th; // ~3.4° dead-zone
         scaleF=Math.min(3,Math.max(0.33,mag));
+        // voir TW_PIVOT
+        if(TW_PIVOT&&PIVOT_MODE==='end'&&theta!==0&&!userArc&&Math.abs(theta)>=PIVOT_MIN_DEG*Math.PI/180){
+          var e0A=rA.segments[0].point,e0B=rB.segments[0].point,e1A=rA.segments[n-1].point,e1B=rB.segments[n-1].point;
+          var t0_=Math.hypot(e0B[0]-e0A[0],e0B[1]-e0A[1]),t1_=Math.hypot(e1B[0]-e1A[0],e1B[1]-e1A[1]);
+          var jo=t0_<=t1_?0:n-1,tmin=Math.min(t0_,t1_),tmax=Math.max(t0_,t1_);
+          if(tmin<PIVOT_END_RATIO*Math.max(1,tmax)){
+            var jA=rA.segments[jo].point,jB=rB.segments[jo].point;
+            pivot={mobile:true,ax:jA[0],ay:jA[1],bx:jB[0],by:jB[1]};
+            if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var se_=window.__twPivotStats;se_.rot=(se_.rot||0)+1;se_.used=(se_.used||0)+1;se_.pos=(se_.pos||[]);se_.pos.push({bout:0,ratio:+(tmin/Math.max(1,tmax)).toFixed(2),deg:Math.round(theta*180/Math.PI)});}
+          }else if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var sf_=window.__twPivotStats;sf_.rot=(sf_.rot||0)+1;sf_.far=(sf_.far||0)+1;}
+        }
+        if(TW_PIVOT&&PIVOT_MODE==='fixed'&&theta!==0&&!userArc&&Math.abs(theta)>=PIVOT_MIN_DEG*Math.PI/180){
+          var pa_=scaleF*Math.cos(theta),pb_=scaleF*Math.sin(theta);
+          var pdet=(1-pa_)*(1-pa_)+pb_*pb_;
+          if(pdet>1e-6){
+            var pvx=cxB-(pa_*cxA-pb_*cyA),pvy=cyB-(pb_*cxA+pa_*cyA);
+            var ppx=((1-pa_)*pvx-pb_*pvy)/pdet,ppy=(pb_*pvx+(1-pa_)*pvy)/pdet;
+            var pext=0,pdmin=Infinity;
+            for(var pi_=0;pi_<n;pi_++){
+              pext+=Math.hypot(loA[pi_].x,loA[pi_].y);
+              var pd_=Math.hypot(rA.segments[pi_].point[0]-ppx,rA.segments[pi_].point[1]-ppy);if(pd_<pdmin)pdmin=pd_;
+            }
+            pext=2*pext/n;
+            if(pdmin<=PIVOT_REACH*Math.max(1,pext))pivot=[ppx,ppy];
+            // sonde de mesure (banc) : compte les paires où le pivot s'applique / est refusé
+            if(window.__twPivotStats&&rA._twPivotCounted===undefined){rA._twPivotCounted=1;var st_=window.__twPivotStats;st_.rot=(st_.rot||0)+1;if(pivot){st_.used=(st_.used||0)+1;var pe0=Math.hypot(rA.segments[0].point[0]-ppx,rA.segments[0].point[1]-ppy),pe1=Math.hypot(rA.segments[n-1].point[0]-ppx,rA.segments[n-1].point[1]-ppy),pcd=Math.hypot(cxA-ppx,cyA-ppy);st_.pos=(st_.pos||[]);st_.pos.push({bout:+(Math.min(pe0,pe1)/Math.max(1,pext)).toFixed(2),centre:+(pcd/Math.max(1,pext)).toFixed(2),deg:Math.round(theta*180/Math.PI)});}else{st_.far=(st_.far||0)+1;st_.farRatio=(st_.farRatio||[]);st_.farRatio.push(+(pdmin/Math.max(1,pext)).toFixed(2));}}
+          }
+        }
         // Damp the rotation when the two centroids sit far apart relative
         // to the shape's own size (2026-07, "des lignes de force font des
         // aller-retour" — part of the same fix as the iw-probe stabilizer
@@ -2475,11 +4412,16 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
         // full rotation kept below a 0.6x size:separation ratio, fully
         // suppressed above 2x (falls back to the straight lerp path,
         // still shape-correct via the intrinsic correction above).
+        // voir TW_GROUP_RIGID : le groupe impose rotation, échelle et pivot
+        if(TW_GROUP_RIGID&&rA._group&&!userArc){
+          var gr_=rA._group;theta=gr_.theta;scaleF=gr_.scale;
+          pivot={mobile:true,ax:gr_.pAx,ay:gr_.pAy,bx:gr_.pBx,by:gr_.pBy};
+        }
         var avgR=0;for(var ri=0;ri<n;ri++)avgR+=(Math.hypot(loA[ri].x,loA[ri].y)+Math.hypot(loB[ri].x,loB[ri].y))/2;avgR/=n;
         var centroidDist=Math.hypot(cxB-cxA,cyB-cyA);
         var sepRatio=centroidDist/Math.max(1,avgR);
         var rotTrust=Math.max(0,Math.min(1,1-(sepRatio-0.6)/1.4));
-        theta*=rotTrust;
+        if(!pivot)theta*=rotTrust; // TW_PIVOT : un seul pivot, plus de conflit entre deux arcs à amortir
         // EMPIRICAL rotation-crossing check (2026-07, closed-shape tangle
         // — a re-drawn hand pair measured 13 self-crossings across the
         // span with no safety net catching it): the geometric damping
@@ -2507,6 +4449,13 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
                 var cxx=cxA+(cxB-cxA)*etv,cyy=cyA+(cyB-cyA)*etv;
                 var o=[];
                 for(var bi5=0;bi5<n;bi5++){
+                  if(pivot){
+                    var pA5=pivot.mobile?[pivot.ax,pivot.ay]:pivot,pB5=pivot.mobile?[pivot.bx,pivot.by]:pivot,pT5=[lerp(pA5[0],pB5[0],etv),lerp(pA5[1],pB5[1],etv)];
+                    var fp5=rotScalePt(rA.segments[bi5].point[0]-pA5[0],rA.segments[bi5].point[1]-pA5[1],thT2,scT2);
+                    var bp5=rotScalePt(rB.segments[bi5].point[0]-pB5[0],rB.segments[bi5].point[1]-pB5[1],thB2,scB2);
+                    o.push({point:[pT5[0]+lerp(fp5[0],bp5[0],etv),pT5[1]+lerp(fp5[1],bp5[1],etv)]});
+                    continue;
+                  }
                   var fwd5=rotScalePt(rA.segments[bi5].point[0]-cxA,rA.segments[bi5].point[1]-cyA,thT2,scT2);
                   var bwd5=rotScalePt(rB.segments[bi5].point[0]-cxB,rB.segments[bi5].point[1]-cyB,thB2,scB2);
                   o.push({point:[cxx+lerp(fwd5[0],bwd5[0],etv),cyy+lerp(fwd5[1],bwd5[1],etv)]});
@@ -2536,15 +4485,26 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   function buildLinearSegs(etv,thT,scT,thB,scB,cxx,cyy){
     var o=[];
     for(var i2=0;i2<n;i2++){var sA=rA.segments[i2],sB=rB.segments[i2];
-      var fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thT,scT);
-      var bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thB,scB);
+      var fwd,bwd,ptx,pty;
+      if(pivot){
+        var pA_=pivot.mobile?[pivot.ax,pivot.ay]:pivot,pB_=pivot.mobile?[pivot.bx,pivot.by]:pivot;
+        var pTx=lerp(pA_[0],pB_[0],etv),pTy=lerp(pA_[1],pB_[1],etv);
+        fwd=rotScalePt(sA.point[0]-pA_[0],sA.point[1]-pA_[1],thT,scT);
+        bwd=rotScalePt(sB.point[0]-pB_[0],sB.point[1]-pB_[1],thB,scB);
+        ptx=pTx+lerp(fwd[0],bwd[0],etv);pty=pTy+lerp(fwd[1],bwd[1],etv);
+      }else{
+        fwd=rotScalePt(sA.point[0]-cxA,sA.point[1]-cyA,thT,scT);
+        bwd=rotScalePt(sB.point[0]-cxB,sB.point[1]-cyB,thB,scB);
+        ptx=cxx+lerp(fwd[0],bwd[0],etv);pty=cyy+lerp(fwd[1],bwd[1],etv);
+      }
       var hiF=rotScalePt(sA.handleIn[0],sA.handleIn[1],thT,scT),hiB=rotScalePt(sB.handleIn[0],sB.handleIn[1],thB,scB);
       var hoF=rotScalePt(sA.handleOut[0],sA.handleOut[1],thT,scT),hoB=rotScalePt(sB.handleOut[0],sB.handleOut[1],thB,scB);
-      o.push({point:[cxx+lerp(fwd[0],bwd[0],etv),cyy+lerp(fwd[1],bwd[1],etv)],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]});
+      o.push({point:[ptx,pty],handleIn:[lerp(hiF[0],hiB[0],etv),lerp(hiF[1],hiB[1],etv)],handleOut:[lerp(hoF[0],hoB[0],etv),lerp(hoF[1],hoB[1],etv)]});
     }
     return o;
   }
   segs=buildLinearSegs(et,thetaT,scaleT,thetaB,scaleB,cx2,cy2);
+  if(pivot){var _pc=_segsCentroidXY(segs);cx2=_pc[0];cy2=_pc[1];} // TW_PIVOT : l'intrinsèque se recentre sur le chemin réel
   // ---- intrinsic correction (see _intrinsicSegs) ----
   // Gate 1 (graduated): arc-length deficit of the linear result vs the
   // lerped keyframe lengths — 0 below 2% (translations, rigid rotations
@@ -2749,7 +4709,25 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
           }
           var iwPeak=iwP*rA._twTurnTrust;
           if(iwPeak>0.001){
-            var base=Math.max(_segsSelfXCount(rA.segments),_segsSelfXCount(rB.segments));
+            // ALLOCATION D'AUTO-INTERSECTIONS (2026-09-04, « la main droite
+            // la shape se retourne »). C'était `max(xA,xB)` : un FORFAIT
+            // constant sur toute la portée. Dès qu'UNE des deux clés a une
+            // auto-intersection — un crochet de main qui se recouvre
+            // légèrement, très courant en dessin à la main — chaque image
+            // intermédiaire avait droit à une intersection GRATUITE, où
+            // qu'elle soit et quelle que soit sa taille. Mesuré sur le cas
+            // signalé : xA=0, xB=1, donc la grosse boucle fermée du milieu
+            // coûtait 0 et le candidat linéaire gagnait (5.54 contre 7.44)
+            // en repliant le trait. Le nombre d'intersections doit ÉVOLUER
+            // de A vers B comme le reste : l'allocation est maintenant
+            // interpolée le long de la trajectoire (voir candScore). Un
+            // candidat qui conserve simplement l'intersection légitime de B
+            // paie la même chose dans les quatre candidats — c'est un
+            // décalage constant, sans effet sur le classement ; ce qui
+            // discrimine, c'est d'en inventer une de PLUS ou plus TÔT.
+            var xingA=_segsSelfXCount(rA.segments),xingB=_segsSelfXCount(rB.segments);
+            var base=Math.max(xingA,xingB);
+            var loopA=_segsSelfLoopArea(rA.segments),loopB=_segsSelfLoopArea(rB.segments);
             // Composite score, not crossings alone (2026-07, "des rotations
             // inattendues frame 21" — same-day follow-up): on an arm drawn
             // as an out-and-back contour (shoulder→hand→shoulder), the
@@ -2810,6 +4788,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               var thTs=theta*ets_,scTs=lerp(1,scaleF,ets_),thBs=thTs-theta,scBs=lerp(scaleF>1e-6?1/scaleF:1,1,ets_);
               var cxs=cxA+(cxB-cxA)*ets_,cys=cyA+(cyB-cyA)*ets_;
               var linS=buildLinearSegs(ets_,thTs,scTs,thBs,scBs,cxs,cys);
+              if(pivot){var _pcs=_segsCentroidXY(linS);cxs=_pcs[0];cys=_pcs[1];}
               var intrS=_intrinsicSegs(rA,rB,ets_,cxs,cys,ets_<.5?!!rA.closed:!!rB.closed,linS);
               var iwS=iwPeak*Math.sin(Math.PI*ets_);
               function mixS(w){
@@ -2976,8 +4955,17 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               return tot?fl/tot:0;
             }
             function candScore(traj){
-              var exX=0;
-              for(var st=1;st<traj.length-1;st++)exX+=Math.max(0,_segsSelfXCount(traj[st])-base);
+              var exX=0,exArea=0;
+              for(var st=1;st<traj.length-1;st++){
+                // allocation interpolée A→B (voir le commentaire de xingA) ;
+                // TW_XING_LERP=false restaure le forfait constant d'avant.
+                var allow=TW_XING_LERP?(xingA+(xingB-xingA)*ETS[st-1]):base;
+                exX+=Math.max(0,_segsSelfXCount(traj[st])-allow);
+                if(TW_XING_AREA){
+                  var allowAr=loopA+(loopB-loopA)*ETS[st-1];
+                  exArea+=Math.max(0,_segsSelfLoopArea(traj[st])-allowAr);
+                }
+              }
               var mid=traj[midIdx+1];
               var cd=Math.abs(_wrapPI(chord5(mid)-chordExp));
               var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(mid)-Lexp5)/Lexp5:0;
@@ -3024,10 +5012,46 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
               // the least-folded still wins when every candidate folds.
               var fbFrac=foldBackFrac(mid);
               var fbPen=fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0;
-              return exX*10+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen;
+              // voir TW_XING_HAIRLINE / TW_CAND_ENDS
+              var xW=10;
+              if(TW_XING_HAIRLINE&&exX>0&&exArea<XING_HAIRLINE_AREA*exX)xW=XING_HAIRLINE_W;
+              var endPen=0;
+              if(TW_CAND_ENDS){
+                var exEnd=0;
+                for(var se=1;se<traj.length-1;se++){var ee=ETS[se-1];
+                  for(var kk=0;kk<2;kk++){var k=kk?n-1:0;var lx=rA.segments[k].point[0]+(rB.segments[k].point[0]-rA.segments[k].point[0])*ee,ly=rA.segments[k].point[1]+(rB.segments[k].point[1]-rA.segments[k].point[1])*ee;var dd=Math.hypot(traj[se][k].point[0]-lx,traj[se][k].point[1]-ly);if(dd>exEnd)exEnd=dd;}}
+                endPen=Math.max(0,exEnd-CAND_END_TOL)*CAND_END_W;
+              }
+              var edgePen=0;
+              if(TW_CAND_EDGE){
+                var esum=0;
+                for(var ei=0;ei<n-1;ei++){
+                  var la_=Math.hypot(rA.segments[ei+1].point[0]-rA.segments[ei].point[0],rA.segments[ei+1].point[1]-rA.segments[ei].point[1]);
+                  var lb_=Math.hypot(rB.segments[ei+1].point[0]-rB.segments[ei].point[0],rB.segments[ei+1].point[1]-rB.segments[ei].point[1]);
+                  var lmn=Math.min(la_,lb_);if(lmn<0.5)continue;
+                  var lm_=Math.hypot(mid[ei+1].point[0]-mid[ei].point[0],mid[ei+1].point[1]-mid[ei].point[1]);
+                  var rr=lm_/lmn;if(rr<CAND_EDGE_FLOOR)esum+=CAND_EDGE_FLOOR-rr;
+                }
+                edgePen=esum*CAND_EDGE_W;
+              }
+              return exX*xW+exArea*XING_AREA_W+cd/(Math.PI/6)+ld5*5+back/(n*0.8)+foldErr/(Math.PI/6)+ripExcess*0.15+fbPen+endPen+edgePen;
             }
             var scB5c=candScore(candTraj.b),scU5=candScore(candTraj.u),scL5=candScore(candTraj.l);
             var scM5=mlsPerV?candScore(candTraj.m):Infinity;
+            if(window.__TW_DEBUG_SCORES){
+              function candTerms(traj){
+                var exX=0,exArea=0;
+                for(var st=1;st<traj.length-1;st++){var allow=TW_XING_LERP?(xingA+(xingB-xingA)*ETS[st-1]):base;exX+=Math.max(0,_segsSelfXCount(traj[st])-allow);if(TW_XING_AREA){var allowAr=loopA+(loopB-loopA)*ETS[st-1];exArea+=Math.max(0,_segsSelfLoopArea(traj[st])-allowAr);}}
+                var mid=traj[midIdx+1];var cd=Math.abs(_wrapPI(chord5(mid)-chordExp));var ld5=Lexp5>1e-6?Math.abs(_segPolyLen(mid)-Lexp5)/Lexp5:0;
+                var back=0;for(var pi5=0;pi5<n;pi5++){for(var st2=1;st2<traj.length-1;st2++){var p0=traj[st2-1][pi5].point,p1=traj[st2][pi5].point,p2=traj[st2+1][pi5].point;var v1x=p1[0]-p0[0],v1y=p1[1]-p0[1],v2x=p2[0]-p1[0],v2y=p2[1]-p1[1];var l1=Math.hypot(v1x,v1y),l2=Math.hypot(v2x,v2y);if(l1<0.3||l2<0.3)continue;if((v1x*v2x+v1y*v2y)/(l1*l2)<-0.3)back+=l2;}}
+                var fbFrac=foldBackFrac(mid);
+                // excursion des extrémités par rapport à leur trajet lerp (diagnostic)
+                var exEnd=0;for(var st3=1;st3<traj.length-1;st3++){var e=ETS[st3-1];[0,n-1].forEach(function(k){var lx=rA.segments[k].point[0]+(rB.segments[k].point[0]-rA.segments[k].point[0])*e,ly=rA.segments[k].point[1]+(rB.segments[k].point[1]-rA.segments[k].point[1])*e;exEnd=Math.max(exEnd,Math.hypot(traj[st3][k].point[0]-lx,traj[st3][k].point[1]-ly));});}
+                return {exX:+(exX*10).toFixed(2),exArea:+(exArea*XING_AREA_W).toFixed(2),cd:+(cd/(Math.PI/6)).toFixed(2),ld5:+(ld5*5).toFixed(2),back:+(back/(n*0.8)).toFixed(2),fold:+(foldAngleErr(mid)/(Math.PI/6)).toFixed(2),rip:+(Math.max(0,ripPoly(mid)-ripAllow)*0.15).toFixed(2),fb:+(fbFrac>FOLDBACK_MIN?TW_FOLDBACK_W*(3+fbFrac*10):0).toFixed(2),exEnd:Math.round(exEnd)};
+              }
+              window.__twScoresLog=window.__twScoresLog||[];
+              window.__twScoresLog.push({id:(rA._src&&rA._src.strokeId)?String(rA._src.strokeId).slice(-8):'?',n:n,scores:{b:+scB5c.toFixed(2),u:+scU5.toFixed(2),l:+scL5.toFixed(2),m:isFinite(scM5)?+scM5.toFixed(2):null},termes:{b:candTerms(candTraj.b),u:candTerms(candTraj.u),l:candTerms(candTraj.l),m:mlsPerV?candTerms(candTraj.m):null}});
+            }
             if(window.__TW_DEBUG_SCORES)rA._twDbgScores={
               b:scB5c,u:scU5,l:scL5,m:scM5,
               fb:{b:foldBackFrac(candTraj.b[midIdx+1]),u:foldBackFrac(candTraj.u[midIdx+1]),
@@ -3038,6 +5062,16 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
             else if(scU5-best<0.05)rA._twLocalTrust=null;  // uniform intrinsic
             else if(scM5-best<0.05){rA._twIwProbe=0;rA._twUseMLS=mlsPerV;} // MLS local-rigid (standalone, no intrinsic layered on top — see "coupler" note on buildMLSSegs' own candidate)
             else rA._twIwProbe=0;                          // pure linear
+            // Crochet de débogage (2026-09-04) : window.__TW_FORCE_ENGINE =
+            // 'b'|'u'|'l'|'m' impose un moteur à toutes les paires pour
+            // mesurer chaque candidat sur un fichier réel. Inerte sinon.
+            if(window.__TW_FORCE_ENGINE){
+              var fe=window.__TW_FORCE_ENGINE;
+              rA._twUseMLS=null;rA._twIwProbe=iwPeak;
+              if(fe==='u')rA._twLocalTrust=null;
+              else if(fe==='l')rA._twIwProbe=0;
+              else if(fe==='m'){rA._twIwProbe=0;rA._twUseMLS=mlsPerV;}
+            }
           }
         }
       }
@@ -3102,6 +5136,7 @@ function interpStroke(rA,rB,t,easFn,fA,fB,mIdx){
   // Runs after EVERY pass that moves vertices, and before reduction (which
   // rebuilds handles for its own, sparser point set anyway).
   segs=_reharmoniseHandles(segs,rA,rB,et);
+  segs=_clampHandles(segs);
   if(!(rA.isVectorBrush&&rB.isVectorBrush))segs=_applyPointReduction(segs,rA,rB);
   if(rA.isVectorBrush&&rB.isVectorBrush){
     var widths=[];for(var w=0;w<n;w++)widths.push(lerp(rA.widths[w]||1,rB.widths[w]||1,et));
@@ -3335,7 +5370,11 @@ function alignResampledPairJS(a,b){
   var costFn=function(x,y){return baseFn(x,y)*(1+ALIGN_TURN_W*alignTurnDisagreement(x,y));};
   var best=b,bestC=costFn(a,b);
   var rev=reverseResampled(b);
-  var rc=costFn(a,rev);if(rc<bestC){bestC=rc;best=rev;}
+  var rc=costFn(a,rev);
+  // Conservation de l'enroulement (voir TW_ALIGN_WINDING), traits ouverts
+  // seulement — une boucle fermée passe par la recherche de rotation.
+  var wPref=closed?0:_windingPref(a.segments.map(function(sg){return sg.point;}),b.segments.map(function(sg){return sg.point;}),bestC,rc);
+  if(wPref<0||(wPref===0&&rc<bestC)){bestC=rc;best=rev;}
   if(closed){
     [b,rev].forEach(function(base){
       var n=base.segments.length;
@@ -3383,8 +5422,10 @@ function extractStrokePiece(sd,f0,f1,nOverride){
     segs.push(seg);
   }
   p.remove();
-  if(isVB)return{segments:[],isVectorBrush:true,centerSegments:segs,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1};
-  return{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:null,opacity:sd.opacity!==undefined?sd.opacity:1};
+  var outPiece=isVB?{segments:[],isVectorBrush:true,centerSegments:segs,strokeColor:null,fillColor:sd.fillColor||null,opacity:sd.opacity!==undefined?sd.opacity:1}
+                   :{segments:segs,strokeColor:sd.strokeColor,strokeWidth:sd.strokeWidth,strokeCap:sd.strokeCap,strokeJoin:sd.strokeJoin,fillColor:null,opacity:sd.opacity!==undefined?sd.opacity:1};
+  if(TW_PIECE_TEXTURE)['brushTexturePreset','preTextureStroke','preTextureOpacity','brushGroupId','bitmapBrushSpec','bitmapPressureProfile','strokeWidth','hasRealStroke'].forEach(function(k){if(sd[k]!==undefined&&outPiece[k]===undefined)outPiece[k]=sd[k];});
+  return outPiece;
 }
 // Manual counterpart to resolveSplitMatches' own tryDirection('B') piece-
 // cutting (same extractStrokePiece-at-cumulative-length-fractions recipe),
@@ -3419,8 +5460,101 @@ function boundsOverlapLoose(b1,b2){
   var m=Math.max(20,Math.min(Math.max(b1.w,b1.h),Math.max(b2.w,b2.h))*0.3);
   return b1.x-m<b2.x+b2.w&&b2.x-m<b1.x+b1.w&&b1.y-m<b2.y+b2.h&&b2.y-m<b1.y+b1.h;
 }
+function _limbFollow(sA,sB,pairSpecs,unA,unB){
+  var featA=sA.map(strokeFeat),featB=sB.map(strokeFeat);
+  var bA=unionBounds(featA),bB=unionBounds(featB);
+  featA.forEach(function(f){f.relX=(f.cx-bA.x)/bA.w;f.relY=(f.cy-bA.y)/bA.h;});
+  featB.forEach(function(f){f.relX=(f.cx-bB.x)/bB.w;f.relY=(f.cy-bB.y)/bB.h;});
+  var contA=_contactGraph(featA),contB=_contactGraph(featB);
+  function tA(i,j){return i!==j&&contA.d[i][j]<=contA.tol[i][j];}
+  function tB(i,j){return i!==j&&contB.d[i][j]<=contB.tol[i][j];}
+  function segsOf(sd){return(sd.isVectorBrush&&sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;}
+  // similitude rigide du membre A → membre B (ordre des échantillons choisi
+  // par le meilleur alignement), appliquée ensuite à l'extrémité : « où
+  // serait la main si elle avait suivi le bras d'un bloc ». La position
+  // brute est justement ce qui a fait gagner la ligne de hanche ; une simple
+  // translation ne suffit pas (l'avant-bras tourne quand le bras se lève).
+  function limbTransform(fa,fb){
+    var K=Math.min(fa.pts.length,fb.pts.length),fwd=0,rev=0;
+    for(var k=0;k<K;k++){fwd+=Math.hypot(fa.pts[k][0]-fb.pts[k][0],fa.pts[k][1]-fb.pts[k][1]);rev+=Math.hypot(fa.pts[k][0]-fb.pts[K-1-k][0],fa.pts[k][1]-fb.pts[K-1-k][1]);}
+    var pa=[],pb=[];for(var k2=0;k2<K;k2++){pa.push({x:fa.pts[k2][0],y:fa.pts[k2][1]});var q=fb.pts[fwd<=rev?k2:K-1-k2];pb.push({x:q[0],y:q[1]});}
+    var tf=fitSimilarityTransform(pa,pb);if(!tf)return null;
+    return function(x,y){var ax=x-tf.ca.x,ay=y-tf.ca.y;return[tf.cb.x+tf.wRe*ax-tf.wIm*ay,tf.cb.y+tf.wIm*ax+tf.wRe*ay];};
+  }
+  var byA={},byB={};pairSpecs.forEach(function(ps){if(ps.isPiece)return;byA[ps.aIdx]=ps;byB[ps.bIdx]=ps;});
+  var candB=unB.slice();
+  candB.forEach(function(b){
+    var fb=featB[b];if(fb.type==='fill'||fb.closed||fb.length<LIMB_MIN_LEN)return;
+    var done=false;
+    for(var t=0;t<sB.length&&!done;t++){
+      var tp=byB[t];if(!tp||!tB(b,t))continue;
+      var ta=tp.aIdx,fta=featA[ta],ftb=featB[t];
+      var moveT=Math.hypot(ftb.cx-fta.cx,ftb.cy-fta.cy);if(moveT<LIMB_MOVE_MIN)continue;
+      var T=limbTransform(fta,ftb);if(!T)continue;
+      // quelle extrémité du trait orphelin touche le membre ? la main est à l'autre bout
+      var gb=segsOf(sB[b]);var pathT=buildTPFeat(sB[t]);var e0=gb[0].point,e1=gb[gb.length-1].point;
+      var l0=pathT.getNearestLocation(new Point(e0[0],e0[1])),l1=pathT.getNearestLocation(new Point(e1[0],e1[1]));pathT.remove();
+      var d0=l0?l0.distance:Infinity,d1=l1?l1.distance:Infinity;var handAtEnd=d0<=d1; // attache au début → main à la fin
+      var cands=[];
+      for(var h=0;h<sA.length;h++){
+        if(h===ta||!tA(h,ta))continue;
+        var fh=featA[h];if(fh.type==='fill'||fh.closed||fh.length>=fb.length*0.8||fh.length<15)continue;
+        var hp=byA[h];
+        if(hp){if(hp.forced||hp.provenance||hp.identity)continue;var u=hp.bIdx,fu=featB[u];
+          if(tB(u,t))continue; // son partenaire touche encore le membre : rien à faire
+          // l'extrémité a suivi son partenaire (elle a bougé autant que le membre) : ce n'est pas le cas visé
+          if(Math.hypot(fu.cx-fh.cx,fu.cy-fh.cy)>=moveT*0.5)continue;
+        }
+        // position prédite de l'extrémité : le bloc rigide du membre
+        var ptsP=fh.pts.map(function(q){return T(q[0],q[1]);});var cP=T(fh.cx,fh.cy);
+        var fhP=Object.assign({},fh);fhP.cx=cP[0];fhP.cy=cP[1];fhP.relX=(cP[0]-bB.x)/bB.w;fhP.relY=(cP[1]-bB.y)/bB.h;
+        var best=null;
+        [0.8,1.0,1.3].forEach(function(k){
+          var w=Math.max(0.2,Math.min(0.8,fh.length*k/Math.max(1,fb.length)));
+          var f0=handAtEnd?1-w:0,f1=handAtEnd?1:w;
+          var piece=extractStrokePiece(sB[b],f0,f1);var pf=strokeFeat(piece);pf.relX=(pf.cx-bB.x)/bB.w;pf.relY=(pf.cy-bB.y)/bB.h;
+          var sc=matchSc(fhP,pf,false,ptsP)+axisPenaltyPair(fh.elong,pf.elong);
+          if(!best||sc<best.sc)best={sc:sc,w:w,f0:f0,f1:f1,piece:piece};
+        });
+        // le partenaire actuel, jugé depuis la même position prédite : la fenêtre doit faire mieux
+        var scU=hp?matchSc(fhP,featB[hp.bIdx],false,ptsP)+axisPenaltyPair(fh.elong,featB[hp.bIdx].elong):Infinity;
+        var ok=best.sc<=LIMB_SCORE_MAX&&best.sc<scU;
+        _mlNote('membre qui se lève',{orphelin:_mlIdB(b),membre:_mlIdB(t),extremite:_mlIdA(h),partenaireActuel:hp?_mlIdB(hp.bIdx):'aucun',deplacementMembre:Math.round(moveT),fenetre:+best.w.toFixed(2),score:+best.sc.toFixed(3),scorePartenaireActuel:isFinite(scU)?+scU.toFixed(3):null,verdict:ok?'candidat':(best.sc>LIMB_SCORE_MAX?'refusé (score)':'refusé (partenaire actuel meilleur)')});
+        if(ok)cands.push({h:h,hp:hp,best:best,fh:fh});
+      }
+      if(!cands.length)continue;
+      cands.sort(function(x,y){return x.best.sc-y.best.sc;});var c=cands[0],h2=c.h,hp2=c.hp,best2=c.best,fh2=c.fh;
+      _mlNote('membre qui se lève',{orphelin:_mlIdB(b),retenu:_mlIdA(h2),score:+best2.sc.toFixed(3),candidats:cands.length});
+      // appliquer : l'extrémité quitte son partenaire immobile
+      if(hp2){pairSpecs.splice(pairSpecs.indexOf(hp2),1);delete byA[h2];delete byB[hp2.bIdx];if(unB.indexOf(hp2.bIdx)<0)unB.push(hp2.bIdx);}
+      else{var ia=unA.indexOf(h2);if(ia>=0)unA.splice(ia,1);}
+      pairSpecs.push({aIdx:h2,bIdx:b,aData:sA[h2],bData:best2.piece,mi:9800+b*10,score:best2.sc,isPiece:true,limb:true});
+      // le reste se déploie depuis l'attache : côté A, un point à l'endroit où l'extrémité touchait le membre
+      var rest=extractStrokePiece(sB[b],handAtEnd?0:best2.w,handAtEnd?1-best2.w:1);
+      var pathTA=buildTPFeat(sA[ta]);var gh=segsOf(sA[h2]);
+      var att=null,attD=Infinity;[gh[0].point,gh[gh.length-1].point].forEach(function(e){var l=pathTA.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<attD){attD=l.distance;att=[l.point.x,l.point.y];}});pathTA.remove();
+      if(!att)att=[fh2.cx,fh2.cy];
+      var rc=segsOf(rest);
+      var dirx=fh2.cx-att[0],diry=fh2.cy-att[1],dl=Math.hypot(dirx,diry)||1;dirx/=dl;diry/=dl;
+      var stubA=JSON.parse(JSON.stringify(rest));
+      var mk=function(x,y,wd){return{point:[x,y],handleIn:[0,0],handleOut:[0,0],width:wd};};
+      var wd0=(rc[0]&&rc[0].width)||sB[b].strokeWidth||4;
+      var tiny=[mk(att[0],att[1],wd0),mk(att[0]+dirx*4,att[1]+diry*4,wd0)];
+      if(stubA.isVectorBrush){stubA.centerSegments=tiny;stubA.segments=[];}else{stubA.segments=tiny;}
+      pairSpecs.push({aIdx:h2,bIdx:b,aData:stubA,bData:rest,mi:9800+b*10+1,score:best2.sc,isPiece:true,limb:true,stub:true});
+      var ib=unB.indexOf(b);if(ib>=0)unB.splice(ib,1);
+      done=true;
+    }
+  });
+}
 function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
   var featA=sA.map(strokeFeat),featB=sB.map(strokeFeat);
+  // voir TW_SPLIT_SUBSETS : similitude A→B de la portée, pour prédire où un trait fusionné de A se trouve en B (et inversement)
+  var spanTfAB=null,spanTfBA=null;
+  if(TW_SPLIT_SUBSETS){
+    var scA=[],scB=[];pairSpecs.forEach(function(ps){if(ps.isPiece)return;var ca=_quickCentroid(ps.aData),cb=_quickCentroid(ps.bData);if(ca&&cb){scA.push({x:ca[0],y:ca[1]});scB.push({x:cb[0],y:cb[1]});}});
+    if(scA.length>=3){spanTfAB=fitSimilarityTransform(scA,scB);spanTfBA=fitSimilarityTransform(scB,scA);}
+  }
   var bA=unionBounds(featA),bB=unionBounds(featB);
   featA.forEach(function(f){f.relX=(f.cx-bA.x)/bA.w;f.relY=(f.cy-bA.y)/bA.h;});
   featB.forEach(function(f){f.relX=(f.cx-bB.x)/bB.w;f.relY=(f.cy-bB.y)/bB.h;});
@@ -3455,7 +5589,28 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         var curFeat=featParts[curIdx];
         if(curFeat.type!=='fill'&&!curFeat.closed)cand=cand.concat([curIdx]);
       }
+      if(TW_SPLIT_SUBSETS&&cand.length>=2){
+        var tfP=mergedSide==='B'?spanTfBA:spanTfAB; // le trait fusionné vers le côté des parties
+        if(tfP){
+          var mpP=buildTPFeat(sMerged[mi2]),lenP=mpP.length,predPts=[];
+          for(var kp=0;kp<=40;kp++){var qp=mpP.getPointAt(lenP*kp/40);if(qp){var tq=applySimilarityTransform(tfP,qp.x,qp.y);predPts.push([tq.x,tq.y]);}}
+          mpP.remove();
+          if(predPts.length>=2){
+            var predPath=new Path({insert:false});predPts.forEach(function(q){predPath.add(new Point(q[0],q[1]));});
+            var tolP=Math.max(40,SPLIT_PRED_TOL*fm.length),kept=[],rejetes=[];
+            cand.forEach(function(i){var fp2=featParts[i];var lp=predPath.getNearestLocation(new Point(fp2.cx,fp2.cy));var dP=lp?lp.distance:Infinity;if(dP<=tolP)kept.push(i);else rejetes.push(_mlIdB(i)+' ('+Math.round(dP)+' px)');});
+            predPath.remove();
+            if(rejetes.length)_mlNote('scission : parties hors position prédite',{ecartees:rejetes,tolerance:Math.round(tolP)});
+            cand=kept;
+          }
+        }
+      }
       if(cand.length<2||cand.length>3)continue;
+      var candFull=cand,subsets=[candFull];
+      if(TW_SPLIT_SUBSETS&&candFull.length===3){subsets.push([candFull[0],candFull[1]],[candFull[0],candFull[2]],[candFull[1],candFull[2]]);}
+      var bestSub=null;
+      for(var su=0;su<subsets.length;su++){
+      cand=subsets[su];
       var sumLen=0;cand.forEach(function(i){sumLen+=featParts[i].length;});
       if(sumLen<fm.length*0.55||sumLen>fm.length*1.7)continue;
       // order the part strokes by where they attach along the merged stroke
@@ -3465,16 +5620,99 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
         return{idx:i,off:loc?loc.offset:0};
       }).sort(function(x,y){return x.off-y.off;});
       mp.remove();
+      var orders=[ordered];
+      if(TW_SPLIT_SUBSETS){
+        var permute=function(arr){if(arr.length<=1)return[arr];var outp=[];for(var pi2=0;pi2<arr.length;pi2++){var rest=arr.slice(0,pi2).concat(arr.slice(pi2+1));permute(rest).forEach(function(r){outp.push([arr[pi2]].concat(r));});}return outp;};
+        var baseSig=ordered.map(function(o){return o.idx;}).join(',');
+        permute(cand).forEach(function(perm){if(perm.join(',')===baseSig)return;orders.push(perm.map(function(i,k){return{idx:i,off:k};}));});
+      }
+      for(var po=0;po<orders.length;po++){
+      ordered=orders[po];
+      if(TW_SPLIT_SUBSETS){
+        // contiguïté des parties consécutives en B (extrémité de l'une au tracé de l'autre)
+        var gapOk=true,gapMax=Math.max(40,SPLIT_PART_GAP*fm.length);
+        for(var og=0;og<ordered.length-1&&gapOk;og++){
+          var Pg=sParts[ordered[og].idx],Qg=sParts[ordered[og+1].idx];
+          var pathPg=buildTPFeat(Pg),pathQg=buildTPFeat(Qg),gp=(Pg.isVectorBrush&&Pg.centerSegments&&Pg.centerSegments.length>1)?Pg.centerSegments:Pg.segments,gq=(Qg.isVectorBrush&&Qg.centerSegments&&Qg.centerSegments.length>1)?Qg.centerSegments:Qg.segments;
+          var dmin=Infinity;
+          if(gp&&gp.length&&gq&&gq.length){
+            [gp[0].point,gp[gp.length-1].point].forEach(function(e){var l=pathQg.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<dmin)dmin=l.distance;});
+            [gq[0].point,gq[gq.length-1].point].forEach(function(e){var l=pathPg.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<dmin)dmin=l.distance;});
+          }
+          pathPg.remove();pathQg.remove();
+          if(!(dmin<=gapMax))gapOk=false;
+        }
+        if(!gapOk)continue;
+      }
       // cut fractions = cumulative length share of the ordered parts
       var fr=[],acc=0;
       for(var oi=0;oi<ordered.length-1;oi++){acc+=featParts[ordered[oi].idx].length;fr.push(Math.min(0.95,Math.max(0.05,acc/sumLen)));}
+      // voir TW_SPLIT_JUNCTION_CUT : coupes candidates à la jonction des parties
+      var cutSets=[fr];
+      if(TW_SPLIT_JUNCTION_CUT&&ordered.length>=2){
+        var frJ=[],okJ=true,prevJ=0,mpJ=buildTPFeat(sMerged[mi2]),lenJ=Math.max(1,mpJ.length);
+        for(var oj=0;oj<ordered.length-1&&okJ;oj++){
+          var P_=sParts[ordered[oj].idx],Q_=sParts[ordered[oj+1].idx];
+          var pp=(P_.isVectorBrush&&P_.centerSegments&&P_.centerSegments.length>1)?P_.centerSegments:P_.segments;
+          var qq=(Q_.isVectorBrush&&Q_.centerSegments&&Q_.centerSegments.length>1)?Q_.centerSegments:Q_.segments;
+          if(!pp||!qq||pp.length<2||qq.length<2){okJ=false;break;}
+          // jonction en T comprise : une extrémité de l'une posée n'importe où sur l'autre
+          var eP=[pp[0].point,pp[pp.length-1].point],eQ=[qq[0].point,qq[qq.length-1].point],bestJ=Infinity,J=null;
+          var pathP=buildTPFeat(P_),pathQ=buildTPFeat(Q_);
+          eP.forEach(function(e){var l=pathQ.getNearestLocation(new Point(e[0],e[1]));if(l&&l.distance<bestJ){bestJ=l.distance;J=[(e[0]+l.point.x)/2,(e[1]+l.point.y)/2];}});
+          eQ.forEach(function(g){var l=pathP.getNearestLocation(new Point(g[0],g[1]));if(l&&l.distance<bestJ){bestJ=l.distance;J=[(g[0]+l.point.x)/2,(g[1]+l.point.y)/2];}});
+          pathP.remove();pathQ.remove();
+          if(!J||bestJ>SPLIT_JUNCTION_MAX){okJ=false;break;}
+          var locJ=mpJ.getNearestLocation(new Point(J[0],J[1]));var fJ=locJ?locJ.offset/lenJ:null;
+          if(fJ===null||fJ<=prevJ+0.03||fJ>0.97){okJ=false;break;}
+          frJ.push(fJ);prevJ=fJ;
+        }
+        mpJ.remove();
+        if(okJ&&frJ.length===ordered.length-1)cutSets.unshift(frJ); // la jonction d'abord, le prorata en repli
+      }
+      if(TW_SPLIT_DTW_CUT&&ordered.length>=2){
+        // chemin des parties bout à bout (orientées pour se suivre), en polyligne Paper
+        var chain=[],prevEnd=null,partLens=[];
+        for(var od=0;od<ordered.length;od++){
+          var pd=sParts[ordered[od].idx],ppath=buildTPFeat(pd),plen=ppath.length,K=Math.max(8,Math.round(plen/6)),ptsD=[];
+          for(var kd=0;kd<=K;kd++){var qd=ppath.getPointAt(plen*kd/K);if(qd)ptsD.push([qd.x,qd.y]);}
+          ppath.remove();if(ptsD.length<2)continue;
+          if(prevEnd){var d0=Math.hypot(ptsD[0][0]-prevEnd[0],ptsD[0][1]-prevEnd[1]),d1=Math.hypot(ptsD[ptsD.length-1][0]-prevEnd[0],ptsD[ptsD.length-1][1]-prevEnd[1]);if(d1<d0)ptsD.reverse();}
+          else if(ordered.length>1){ // première partie : orienter vers la suivante
+            var nx=sParts[ordered[1].idx],npath=buildTPFeat(nx),nc=npath.getPointAt(npath.length/2);npath.remove();
+            if(nc){var e0=Math.hypot(ptsD[0][0]-nc.x,ptsD[0][1]-nc.y),e1=Math.hypot(ptsD[ptsD.length-1][0]-nc.x,ptsD[ptsD.length-1][1]-nc.y);if(e0<e1)ptsD.reverse();}
+          }
+          ptsD.forEach(function(q){chain.push(q);});prevEnd=ptsD[ptsD.length-1];partLens.push(plen);
+        }
+        if(chain.length>=4&&partLens.length===ordered.length){
+          var pc=new Path({insert:false});chain.forEach(function(q){pc.add(new Point(q[0],q[1]));});
+          var mpD=buildTPFeat(sMerged[mi2]);
+          var dtwC=null;try{dtwC=_dtwCorrespondence(mpD,mpD.length,pc,pc.length,120);}catch(eD){dtwC=null;}
+          mpD.remove();pc.remove();
+          if(dtwC){
+            var totalC=partLens.reduce(function(a,b){return a+b;},0),frD=[],accD=0,okD=true,prevD=0;
+            for(var bd=0;bd<partLens.length-1;bd++){
+              accD+=partLens[bd];var bound=accD/totalC,idx=-1;
+              for(var q2=0;q2<dtwC.fracB.length;q2++){if(dtwC.fracB[q2]>=bound){idx=q2;break;}}
+              if(idx<0){okD=false;break;}
+              var fD=dtwC.fracA[idx];if(fD<=prevD+0.03||fD>0.97){okD=false;break;}
+              frD.push(fD);prevD=fD;
+            }
+            if(okD&&frD.length===ordered.length-1)cutSets.unshift(frD);
+          }
+        }
+      }
+      var bestEval=null;
+      for(var cs=0;cs<cutSets.length;cs++){
+      var frC=cutSets[cs];
       var pieces=[],scores=[],prevF=0,ok=true;
       for(var oi2=0;oi2<ordered.length;oi2++){
-        var f1=oi2<fr.length?fr[oi2]:1;
+        var f1=oi2<frC.length?frC[oi2]:1;
         var piece=extractStrokePiece(sMerged[mi2],prevF,f1);prevF=f1;
         var pf=strokeFeat(piece);
         pf.relX=(pf.cx-mergedBounds.x)/mergedBounds.w;pf.relY=(pf.cy-mergedBounds.y)/mergedBounds.h;
-        var sc=mergedSide==='B'?matchSc(featParts[ordered[oi2].idx],pf,false):matchSc(pf,featParts[ordered[oi2].idx],false);
+        var sc=(mergedSide==='B'?matchSc(featParts[ordered[oi2].idx],pf,false):matchSc(pf,featParts[ordered[oi2].idx],false))
+              +axisPenaltyPair(featParts[ordered[oi2].idx].elong,pf.elong);
         pieces.push(piece);scores.push(sc);
         if(sc>0.48)ok=false;
         // Geometric self-consistency (2026-07, live-reported hooked/
@@ -3502,15 +5740,43 @@ function resolveSplitMatches(sA,sB,pairSpecs,unA,unB){
               var proj=(pieceSegs[pj].point[0]-pFirst[0])*ux+(pieceSegs[pj].point[1]-pFirst[1])*uy;
               if(proj>maxProj)maxProj=proj;else if(maxProj-proj>worstBack)worstBack=maxProj-proj;
             }
-            if(worstBack>chordLen*0.25)ok=false;
+            if(worstBack>chordLen*0.25){
+              if(TW_SPLIT_BACK_RELATIVE){
+                // Le crochet d'origine venait d'une coupe tombée DANS un
+                // rebroussement du trait fusionné : il est au BORD du morceau.
+                // Un rebroussement au milieu est la forme du dessin (menton,
+                // nez), que le score de forme juge déjà. On ne refuse donc que
+                // si le retour en arrière se produit dans les 20 % de chaque
+                // bout, ou s'il dépasse celui du trait cible de SPLIT_BACK_MARGIN.
+                var partSd=sParts[ordered[oi2].idx];
+                var partBack=_backtrackRatioSd(partSd);
+                var nb=pieceSegs.length,win=Math.max(2,Math.floor(nb*0.2)),edgeBack=0;
+                var scan=function(from,to,step){var mxp=-Infinity,wb2=0;for(var q=from;q!==to;q+=step){var pr2=(pieceSegs[q].point[0]-pFirst[0])*ux+(pieceSegs[q].point[1]-pFirst[1])*uy;if(step<0)pr2=-pr2;if(pr2>mxp)mxp=pr2;else if(mxp-pr2>wb2)wb2=mxp-pr2;}return wb2;};
+                edgeBack=Math.max(scan(0,win,1),scan(nb-1,nb-1-win,-1));
+                var relBad=worstBack/chordLen>partBack+SPLIT_BACK_MARGIN,edgeBad=edgeBack>chordLen*0.25;
+                if(relBad&&edgeBad)ok=false;
+                _mlNote('scission : retour en arrière',{morceau:+(worstBack/chordLen).toFixed(2),auxBords:+(edgeBack/chordLen).toFixed(2),cible:+partBack.toFixed(2),verdict:(relBad&&edgeBad)?'refusé (bord)':'accepté'});
+              }else ok=false;
+            }
           }
         }
       }
       if(!ok)continue;
-      var avg=scores.reduce(function(a,b){return a+b;},0)/scores.length;
-      var baseline=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
-      var baseAvg=baseline.reduce(function(a,b){return a+b;},0)/baseline.length;
-      if(avg>=baseAvg-0.03)continue;
+      var avgC=scores.reduce(function(a,b){return a+b;},0)/scores.length;
+      var coupeNom=(cs===cutSets.length-1)?'prorata':(TW_SPLIT_DTW_CUT&&cs===0&&cutSets.length===3)?'dtw':(cutSets.length===2&&cs===0)?(TW_SPLIT_DTW_CUT&&!(TW_SPLIT_JUNCTION_CUT)?'dtw':'jonction ou dtw'):'jonction';
+      if(!bestEval||avgC<bestEval.avg)bestEval={pieces:pieces,scores:scores,avg:avgC,coupe:coupeNom,fr:frC.map(function(x){return +x.toFixed(3);})};
+      }
+      if(!bestEval)continue;
+      var baselineS=cand.map(function(i){return(curPair&&(mergedSide==='B'?curPair.aIdx:curPair.bIdx)===i)?curPair.score:0.95;});
+      var baseAvgS=baselineS.reduce(function(a,b){return a+b;},0)/baselineS.length;
+      if(bestEval.avg>=baseAvgS-0.03)continue;
+      if(!bestSub||bestEval.avg<bestSub.avg)bestSub={eval:bestEval,cand:cand,ordered:ordered,cutSets:cutSets.length,ordre:po};
+      }
+      }
+      if(!bestSub)continue;
+      cand=bestSub.cand;ordered=bestSub.ordered;bestEval=bestSub.eval;
+      var pieces=bestEval.pieces,scores=bestEval.scores,avg=bestEval.avg;
+      _mlNote('scission : coupe retenue',{coupe:bestEval.coupe,fractions:bestEval.fr,scores:scores.map(function(x){return +x.toFixed(3);}),candidats:bestSub.cutSets,parties:cand.length+'/'+candFull.length,ordre:bestSub.ordre});
       // accept the split
       if(curPair)pairSpecs.splice(pairSpecs.indexOf(curPair),1);
       ordered.forEach(function(o,k){
@@ -3731,6 +5997,65 @@ function dabRecordsForTween(rec,presetKey,colorHexStr,baseWidth,seed,opacityMul)
 // Renames any stroke past the FIRST one in `strokes` that shares a
 // strokeId already claimed earlier in the SAME array — see the call
 // site's comment for why this can happen and why it matters.
+// Piece completion (see TW_PIECE_COMPLETION). pairSpecs: confirmed pairs
+// so far (aIdx/bIdx); unA/unB: unmatched indices (mutated: paired ones are
+// removed). Returns the number of pairs added.
+function _pieceCompletion(sA,sB,pairSpecs,unA,unB){
+  if(!TW_PIECE_COMPLETION||!unA.length||!unB.length||pairSpecs.length<2)return 0;
+  var fa={},fb={};
+  function feat(list,cache,i){if(!cache[i])cache[i]=strokeFeat(list[i]);return cache[i];}
+  var anchors=pairSpecs.map(function(ps,k){return{k:k,a:ps.aIdx,b:ps.bIdx,fa:feat(sA,fa,ps.aIdx),fb:feat(sB,fb,ps.bIdx)};});
+  function nearestTwo(f,side){
+    var arr=anchors.map(function(an){var g=side==='a'?an.fa:an.fb;var dx=g.cx-f.cx,dy=g.cy-f.cy;return{an:an,d2:dx*dx+dy*dy};}).sort(function(p,q){return p.d2-q.d2;});
+    return arr.slice(0,2).map(function(x){return x.an;});
+  }
+  function keyOf(two){return two.map(function(an){return an.k;}).sort(function(x,y){return x-y;}).join('|');}
+  function fits(f,two,side){
+    var g1=side==='a'?two[0].fa:two[0].fb,g2=side==='a'?two[1].fa:two[1].fb;
+    if(f.length>Math.max(g1.length,g2.length))return false;
+    var x1=Math.min(g1.bounds.x,g2.bounds.x),y1=Math.min(g1.bounds.y,g2.bounds.y);
+    var x2=Math.max(g1.bounds.x+g1.bounds.w,g2.bounds.x+g2.bounds.w),y2=Math.max(g1.bounds.y+g1.bounds.h,g2.bounds.y+g2.bounds.h);
+    var mx=(x2-x1)*0.25+10,my=(y2-y1)*0.25+10;
+    return f.cx>=x1-mx&&f.cx<=x2+mx&&f.cy>=y1-my&&f.cy<=y2+my;
+  }
+  // relative position inside the anchor pair, for disambiguation
+  function relPos(f,two,side){
+    var g1=side==='a'?two[0].fa:two[0].fb,g2=side==='a'?two[1].fa:two[1].fb;
+    var ax=g2.cx-g1.cx,ay=g2.cy-g1.cy,l2=ax*ax+ay*ay||1;
+    var px=f.cx-g1.cx,py=f.cy-g1.cy;
+    return{t:(px*ax+py*ay)/l2,s:(px*ay-py*ax)/Math.sqrt(l2)};
+  }
+  var groupsA={},groupsB={};
+  unA.forEach(function(i){var f=feat(sA,fa,i);var two=nearestTwo(f,'a');if(!fits(f,two,'a'))return;(groupsA[keyOf(two)]=groupsA[keyOf(two)]||[]).push({i:i,f:f,two:two});});
+  unB.forEach(function(i){var f=feat(sB,fb,i);var two=nearestTwo(f,'b');if(!fits(f,two,'b'))return;(groupsB[keyOf(two)]=groupsB[keyOf(two)]||[]).push({i:i,f:f,two:two});});
+  var added=0;
+  Object.keys(groupsA).forEach(function(key){
+    var ga=groupsA[key],gb=groupsB[key];if(!gb)return;
+    // same anchor order on both sides
+    ga.forEach(function(ea){
+      if(!gb.length)return;
+      var typeOk=gb.filter(function(eb){return eb.f.type===ea.f.type;});if(!typeOk.length)return;
+      var two=ea.two;var pa=relPos(ea.f,two,'a');
+      var best=null,bd=Infinity;
+      typeOk.forEach(function(eb){
+        var twoB=(eb.two[0].k===two[0].k)?eb.two:[eb.two[1],eb.two[0]];
+        var pb=relPos(eb.f,twoB,'b');
+        var d=Math.abs(pa.t-pb.t)+Math.abs(pa.s-pb.s)/Math.max(1,Math.sqrt(Math.pow(two[1].fa.cx-two[0].fa.cx,2)+Math.pow(two[1].fa.cy-two[0].fa.cy,2)));
+        if(d<bd){bd=d;best=eb;}
+      });
+      // the leftover must sit at the same place relative to its anchors on
+      // both sides (|Δt| + lateral offset / anchor spacing): 0.12 and 0.38
+      // for the two pupils, 0.18 for testG's ticks, 0.89 for a testC
+      // stroke lying OUTSIDE its anchor pair on one side (rejected)
+      if(!best||bd>PC_MAX_D)return;
+      gb.splice(gb.indexOf(best),1);
+      pairSpecs.push({aIdx:ea.i,bIdx:best.i,aData:sA[ea.i],bData:sB[best.i],mi:-1000-added,score:0.7,completion:true});
+      unA.splice(unA.indexOf(ea.i),1);unB.splice(unB.indexOf(best.i),1);
+      added++;
+    });
+  });
+  return added;
+}
 function _dedupeFrameStrokeIds(strokes,frameIdx){
   var seen={};
   for(var i=0;i<strokes.length;i++){
@@ -3740,10 +6065,670 @@ function _dedupeFrameStrokeIds(strokes,frameIdx){
     else seen[sd.strokeId]=1;
   }
 }
+// One span's complete assignment stage (extracted from generateTweens on
+// 2026-09-04 so the bench harness runs EXACTLY the production path):
+// overrides → provenance pins → autoMatch → threshold → rescue → piece
+// completion → split/merge → vanish plans → order-coherence pass.
+// Returns null when the span has nothing to tween. Mutates stroke ids the
+// same way generateTweens always did (dedupe, fade-id stamping).
+function _spanPairSpecs(ld,li,fA,fB,prevKeyStrokes){
+  // 2026-07 feedback ("si je clic droit sur ma sélection et que je tween
+  // il ne va pas faire le tween avec les formes correspondantes de la
+  // frame suivante... comme quand il détecte chaque forme"): manualMode
+  // only restricts the A side's candidate pool (which strokes are even
+  // ELIGIBLE to start a tween) — B always offers its FULL candidate set,
+  // exactly like a normal full auto-tween, so autoMatch's own Hungarian
+  // matching can still automatically find the right corresponding shape
+  // at B. Requiring the SAME strokeId to already exist at B (this
+  // function's first attempt) defeated the whole point of automatic
+  // shape detection.
+  var manualMode=!!ld.frames[fA].tweenManualMode;
+  // Self-healing identity guard (2026-07, live-reported: a KEYFRAME's
+  // own stored strokes already had the SAME strokeId duplicated across
+  // 2 different strokes on a fresh reload, no override involved — a
+  // corruption baked in by an EARLIER generateTweens() run, before the
+  // fadeOutA/fadeInB collision guard below existed). Deduping here, on
+  // the raw keyframe data, BEFORE it feeds sA/sB, both prevents THIS
+  // span's matching from reading an already-ambiguous identity and
+  // self-heals whatever an old run already corrupted — every id-keyed
+  // lookup (continuity, the reassign tool, motion arcs) only ever sees
+  // a strokeId that resolves to exactly one stroke in the frame.
+  _dedupeFrameStrokeIds(ld.frames[fA].strokes,fA);
+  _dedupeFrameStrokeIds(ld.frames[fB].strokes,fB);
+  var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,false);
+  var sA=sAsplit.list,sB=sBsplit.list;
+  _mlBegin(fA,fB,sA,sB);
+  // v16: manual pairing overrides (state.tweenOverrides) take priority
+  // over autoMatch for this specific keyframe pair — resolved here by
+  // stable strokeId, since sA/sB index order isn't stable across edits.
+  // A stroke removed since the override was made just makes that one
+  // override silently inert (falls through to auto-matching again),
+  // rather than erroring the whole tween generation.
+  var ovKey=tweenSpanKey(li,fA,fB);
+  var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
+  var forcedAIdx={},forcedBIdx={},forcedPairs=[];
+  overrides.forEach(function(ov){
+    // Multi-source override (Réparer le tween, tw-reassign — a single
+    // artist-intended line saved as 2+ separate strokes, e.g. "trait uni
+    // qui se mélange avec les cheveux"): ov.aIds is an array instead of
+    // the plain ov.aId. Split the ONE target B stroke into that many
+    // pieces (splitMergedIntoOrderedPieces — same recipe as
+    // resolveSplitMatches' own automatic piece-cutting, just user-
+    // confirmed instead of heuristically detected) so each selected A
+    // stroke gets its own correctly-ordered slice of B to morph into,
+    // instead of every A candidate competing for the whole B stroke.
+    if(ov.aIds){
+      var aIdxs=[];
+      ov.aIds.forEach(function(id){for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===id&&aIdxs.indexOf(ii)<0){aIdxs.push(ii);break;}});
+      var bIdx0=-1;for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId){bIdx0=jj;break;}
+      if(!aIdxs.length||bIdx0<0||forcedBIdx[bIdx0])return;
+      aIdxs=aIdxs.filter(function(ai){return!forcedAIdx[ai];});
+      if(!aIdxs.length)return;
+      forcedBIdx[bIdx0]=1;
+      if(aIdxs.length===1){
+        forcedAIdx[aIdxs[0]]=1;
+        forcedPairs.push({aIdx:aIdxs[0],bIdx:bIdx0,aData:sA[aIdxs[0]],bData:sB[bIdx0],mi:-1-forcedPairs.length,score:0,forced:true});
+        return;
+      }
+      var pieces=splitMergedIntoOrderedPieces(sB[bIdx0],aIdxs.map(function(ai){return sA[ai];}));
+      pieces.forEach(function(pc){
+        var ai=sA.indexOf(pc.part);
+        forcedAIdx[ai]=1;
+        forcedPairs.push({aIdx:ai,bIdx:bIdx0,aData:sA[ai],bData:pc.piece,mi:-1-forcedPairs.length,score:0,forced:true,isPiece:true});
+      });
+      return;
+    }
+    var aIdx=-1,bIdx=-1;
+    // Check BOTH stored ids on BOTH sides, not just ov.aId on A / ov.bId
+    // on B — found live testing tween-arc handles (any drag re-triggers
+    // generateTweens): the very first successful resolution of this
+    // override already stamps the SAME shared pairId onto both
+    // spec.aData AND spec.bData a few lines below (splitTweenables
+    // doesn't clone, so this mutates the real keyframe stroke data) —
+    // meaning ov.bId (B's ORIGINAL id) no longer exists anywhere the
+    // instant after the first call. Every regeneration after that first
+    // one silently failed this lookup, fell through to autoMatch, and —
+    // for exactly the pairs that needed a forced override because they
+    // don't auto-match well (dissimilar/far apart) — got treated as a
+    // fade-out+fade-in instead, ADDING that content into frames that
+    // already held the correctly-tweened result from the first pass
+    // (confirmed: strokes.length 1->2 on a plain second call, no other
+    // change). After a merge, A and B share one identical id, so
+    // matching either stored id against either side is safe pre- and
+    // post-merge: pre-merge it degrades to exactly the old aId-on-A/
+    // bId-on-B check (the ids differ, so the OR's second half never
+    // matches); post-merge both sides already carry the same value, so
+    // either id resolves both.
+    for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId||sA[ii].strokeId===ov.bId){aIdx=ii;break;}
+    for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId||sB[jj].strokeId===ov.aId){bIdx=jj;break;}
+    if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
+    // Stale/ambiguous-override guard (2026-07, live-reported cascade: a
+    // hooked shape at one stroke AND an unrelated stroke silently
+    // falling back to fade at another, both traced to the SAME override).
+    // ov.bId is meant to identify ONE specific B-side stroke, but ids get
+    // reused across UNRELATED strokes over a file's history (every other
+    // 2026-07 fix in this function exists because of exactly that) — if
+    // ov.bId ALSO happens to be some OTHER A-side stroke's own natural,
+    // unrelated identity, this override is stealing that other stroke's
+    // rightful B-side partner out from under it, forcing it into a worse
+    // fallback match (confirmed live: removing the stale override let
+    // BOTH strokes auto-match cleanly with zero unmatched/fading strokes
+    // and zero self-tangling). Skip the whole override in that case
+    // rather than silently mis-resolving it — auto-match still runs.
+    var bIdCollision=false;
+    for(var ci=0;ci<sA.length;ci++)if(ci!==aIdx&&sA[ci].strokeId===ov.bId){bIdCollision=true;break;}
+    if(!bIdCollision)for(var ci2=0;ci2<sB.length;ci2++)if(ci2!==bIdx&&sB[ci2].strokeId===ov.aId){bIdCollision=true;break;}
+    if(bIdCollision)return;
+    forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
+    forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
+  });
+  // Pre-existing bug found by stress-testing (2026-07-17): this used to
+  // `continue` whenever autoMatch returned ZERO pairs (and no forced
+  // overrides) — i.e. exactly when the two keyframes' drawings are so
+  // different that the augmented Hungarian sent EVERY stroke to a fade
+  // dummy (a full cut-away: small shape top-left key A, unrelated big
+  // shape bottom-right key B). Skipping the span meant NO inbetweens at
+  // all were generated — not even the cross-fade that unmatched strokes
+  // are supposed to get — silently leaving whatever frames were there
+  // before. Only skip when there is genuinely nothing to tween on either
+  // side; zero matches with real strokes still flows through so the
+  // fade-out/fade-in machinery below does its job.
+  var hist=_trackingHistory(sA,prevKeyStrokes);
+  // PROVENANCE PINS (TW_PROVENANCE_PINS) + pins imposed in the solver
+    // (TW_PIN_IN_SOLVER): overrides and provenance are resolved BEFORE the
+    // matcher runs and handed to it, so the rest of the assignment settles
+    // around them and they seed the motion field as certain pairs.
+    _provenancePins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){
+      forcedPairs.push({aIdx:pp.a,bIdx:pp.b,aData:sA[pp.a],bData:sB[pp.b],mi:-1-forcedPairs.length,score:0,forced:true,provenance:true});
+    });
+    _identityPins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){
+      forcedPairs.push({aIdx:pp.a,bIdx:pp.b,aData:sA[pp.a],bData:sB[pp.b],mi:-1-forcedPairs.length,score:0,forced:true,identity:true});
+    });
+    var pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
+    _mlPins(forcedPairs);
+    var matches=autoMatch(sA,sB,hist,pins);if(!sA.length&&!sB.length&&!forcedPairs.length){_mlEnd();return null;}
+    _mlNote('sortie du cœur',{paires:matches.map(function(mm){return{a:mm.a,b:mm.b,idA:_mlIdA(mm.a),idB:_mlIdB(mm.b),score:+mm.score.toFixed(3)};})});
+    // ---- GROUPES DE JUMEAUX (voir TW_TWIN_GROUPS) : vote de la première
+    // passe → épingles de groupe → seconde résolution autour d'elles.
+    if(TW_TWIN_GROUPS){
+      var twinPins=_twinGroupPins(sA,sB,matches,forcedAIdx,forcedBIdx);
+      if(twinPins.length){
+        twinPins.forEach(function(tp){forcedPairs.push({aIdx:tp.a,bIdx:tp.b,aData:sA[tp.a],bData:sB[tp.b],mi:-1-forcedPairs.length,score:0,forced:true,twin:true});});
+        pins=forcedPairs.filter(function(fp){return!fp.isPiece;}).map(function(fp){return{a:fp.aIdx,b:fp.bIdx};});
+        matches=autoMatch(sA,sB,hist,pins);
+      }
+    }
+  // Only morph plausible pairs. A stroke whose best assignment still
+  // scores badly (no real counterpart in the other key — count mismatch,
+  // or a shape that genuinely appears/disappears) cross-fades in place
+  // instead of scaling/warping toward an unrelated stroke.
+  var MATCH_TH=(typeof window!=='undefined'&&typeof window.__TW_MATCH_TH==='number')?window.__TW_MATCH_TH:0.48; // surcharge de débogage (banc), défaut 0,48
+  // Bug found by stress-testing (2026-07-17): matchSc's dominant terms
+  // (proxT 0.48 + alignT 0.15) are ABSOLUTE-position Chamfer/ordered
+  // distance, normalized by the strokes' own size — so a single shape
+  // that simply moves far between two keys (a thrown ball, a fast pan,
+  // any large but perfectly ordinary motion) climbs past MATCH_TH purely
+  // from distance, with NOTHING else about it changed, and gets treated
+  // as an "appear/disappear" cross-fade instead of an interpolated move.
+  // Confirmed empirically: identical circles moving ~4.5x their own
+  // diameter already exceed 0.48, scale-invariantly (same ratio at every
+  // tested radius) — a very ordinary distance for anime action, not an
+  // edge case. Generalized (same session, character-pose test): a raised
+  // ARM — one long stroke pivoting ~90° around its shoulder with some
+  // foreshortening, THE textbook limb motion — scored 0.739 while the
+  // character's other 5 strokes all matched confidently, so the arm
+  // cross-faded while the rest of the body moved. The Hungarian had
+  // paired arm↔arm; only the threshold vetoed it. Whenever a rejected
+  // Hungarian pair's two members are BOTH still unmatched after the
+  // threshold pass (in the 1-stroke-per-frame case that's trivially
+  // true — the original soleCandidates form of this fix), there is no
+  // competing candidate the position score could be protecting: fading
+  // is strictly worse than following the assignment the global optimum
+  // already chose — traditional inbetweening prefers motion over a
+  // dissolve whenever the strokes are plausibly the same object. "Same
+  // object" is gated on the identity signals (type, open/closed, and no
+  // hard color clash — same test as matchSc's colorPenalty), NOT on
+  // distance. Position keeps its full weight wherever 2+ candidates
+  // actually compete.
+  var pairSpecs=[],aMatched={},bMatched={};
+  forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
+  matches.forEach(function(m){
+    if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
+    if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score,marge:m.marge,mutuel:m.mutuel});aMatched[m.a]=1;bMatched[m.b]=1;}
+    else _mlNote('seuil',{a:m.a,b:m.b,score:+m.score.toFixed(3),seuil:MATCH_TH,verdict:'au-dessus du seuil, candidat au rattrapage'});
+  });
+  // Second chance for mutually-leftover Hungarian pairs (see comment above).
+  // BOUNDED (2026-07, "grosses déformations... j'ai fait différentes
+  // animations sur la même timeline"): the rescue exists for ONE limb
+  // whose big-but-ordinary motion pushed it past MATCH_TH (the raised
+  // arm measured 0.739) — it must NOT fire across a hard CUT between two
+  // unrelated drawings sharing a timeline. Measured on the reported
+  // file's cut (13 strokes → 1): the leftover pair scored 0.85, and
+  // rescuing it warped an arm into the next scene's first stroke while
+  // 12 siblings faded around it. Two independent guards, both derived
+  // from measured cases, either one blocks: (1) absolute ceiling 0.78
+  // (legitimate rescued limb 0.739 < 0.78 < aberrant cut 0.85); (2) a
+  // heavily-unbalanced stroke count (3x+) says "different drawing, most
+  // of one side HAS to vanish" — there a rescue needs near-threshold
+  // confidence (MATCH_TH+0.1), not benefit-of-the-doubt.
+  var RESCUE_CEIL=0.78;
+  var cntRatio=Math.max(sA.length,sB.length)/Math.max(1,Math.min(sA.length,sB.length));
+  var rescueCeil=cntRatio>=3?MATCH_TH+0.1:RESCUE_CEIL;
+  var rescueCands=[];
+  matches.forEach(function(m){
+    if(m.score<=MATCH_TH)return; // already handled by the first pass
+    if(m.score>rescueCeil){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),plafond:+rescueCeil.toFixed(3),verdict:'refusé : au-dessus du plafond'});return;} // beyond any plausible same-object motion — fade/trim instead
+    if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
+    if(aMatched[m.a]||bMatched[m.b]){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'refusé : un côté déjà pris'});return;} // one side already claimed — real ambiguity, let it fade
+    var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
+    var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
+    // closed-flag agreement only counts as an identity veto when both
+    // flags are ground truth — a guessed flag (VB centerline) flipping
+    // between two drawings of the same limb must not block the rescue
+    // (same rationale as matchSc's softened closedPen above).
+    var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
+    if(fta.type===ftb.type&&closedOk&&!clash)rescueCands.push({m:m,fa:fta,fb:ftb});
+    else _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'refusé : identité ('+(fta.type!==ftb.type?'type':!closedOk?'fermeture':'couleur')+')'});
+  });
+  // MOTION-SUPPORT gate (2026-09, with TW_MATCH_RELATIONAL — Cyril's
+  // turning face: "une pupille qui part sur la bouche"). The ceiling
+  // above was calibrated on ONE raised arm (0.739): a big stroke moving
+  // less than its own length. It let an 87 px eye scoring 0.60 travel
+  // 361 px onto a lip — 4× its size, 9× the drawing's median motion —
+  // because nothing here looked at the displacement at all. The
+  // reference can't be global (testC 16→31: four eye ticks legitimately
+  // ride 240 px with the head while the body moves 60) nor the stroke's
+  // size alone (those ticks are 15 px): what a rescued pair needs is a
+  // NEIGHBOUR that moves the same way — a confident match or another
+  // candidate. The eye→lip has none (brow down 130, lid 30); the ticks
+  // have each other; a big stroke moving less than its own length
+  // (the arm) needs no witness.
+  var refDisp=pairSpecs.map(function(ps){var a=strokeFeat(ps.aData),b=strokeFeat(ps.bData);return{x:a.cx,y:a.cy,dx:b.cx-a.cx,dy:b.cy-a.cy};});
+  rescueCands.forEach(function(c){refDisp.push({x:c.fa.cx,y:c.fa.cy,dx:c.fb.cx-c.fa.cx,dy:c.fb.cy-c.fa.cy,cand:c});});
+  rescueCands.forEach(function(c){
+    var m=c.m;
+    if(TW_MATCH_RELATIONAL){
+      var dx=c.fb.cx-c.fa.cx,dy=c.fb.cy-c.fa.cy,disp=Math.sqrt(dx*dx+dy*dy);
+      var big=disp<=Math.max(c.fa.length,c.fb.length);
+      if(!big){
+        var near=refDisp.filter(function(r){return r.cand!==c;}).map(function(r){return{r:r,d2:(r.x-c.fa.cx)*(r.x-c.fa.cx)+(r.y-c.fa.cy)*(r.y-c.fa.cy)};}).sort(function(p,q){return p.d2-q.d2;}).slice(0,3);
+        var supported=near.some(function(nq){var r=nq.r,rd=Math.sqrt(r.dx*r.dx+r.dy*r.dy);var ddx=r.dx-dx,ddy=r.dy-dy;return Math.sqrt(ddx*ddx+ddy*ddy)<=0.35*Math.max(disp,rd)+15;});
+        if(!supported){_mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),deplacement:Math.round(disp),verdict:'refusé : sans témoin de mouvement'});return;} // moves unlike everything around it — fade instead
+      }
+    }
+    _mlNote('rattrapage',{a:m.a,b:m.b,score:+m.score.toFixed(3),verdict:'rattrapé'});
+    pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score,marge:m.marge,mutuel:m.mutuel});aMatched[m.a]=1;bMatched[m.b]=1;
+  });
+  // voir TW_DOUBT_FADE : sur une portée douteuse, les paires mauvaises redeviennent des fondus
+  if(TW_DOUBT_FADE&&pairSpecs.length){
+    var _dsc=[],_dnh=0;pairSpecs.forEach(function(sp){if(typeof sp.score!=='number')return;_dsc.push(sp.score);if(sp.forced||sp.isPiece||sp.completion||sp.score>MATCH_TH)_dnh++;});
+    if(_dsc.length){
+      var _dmean=_dsc.reduce(function(a,b){return a+b;},0)/_dsc.length,_ddbt=_dsc.filter(function(x){return x>0.3;}).length;
+      var _dind=2*_dmean+_ddbt/_dsc.length+_dnh/_dsc.length;
+      if(_dind>=DOUBT_INDICE){
+        var _kept=[],_dropped=[];
+        pairSpecs.forEach(function(sp){if(!sp.forced&&!sp.isPiece&&typeof sp.score==='number'&&sp.score>DOUBT_SCORE){_dropped.push(sp);aMatched[sp.aIdx]=0;bMatched[sp.bIdx]=0;}else _kept.push(sp);});
+        if(_dropped.length){pairSpecs=_kept;_mlNote('fondu des paires douteuses',{indice:+_dind.toFixed(2),seuil:DOUBT_SCORE,rendues:_dropped.map(function(sp){return _mlIdA(sp.aIdx)+'→'+_mlIdB(sp.bIdx)+' ('+sp.score.toFixed(3)+')';})});}
+      }
+    }
+  }
+  var unA=[],unB=[];
+  for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
+  for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
+  // N:1 rescue pass — may convert fades + a mediocre pair into clean
+  // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
+  var _mlS0=_mlSpecs(pairSpecs);
+  if(unA.length&&unB.length)_pieceCompletion(sA,sB,pairSpecs,unA,unB);
+  _mlDiff('complétion de pièce',_mlS0,_mlSpecs(pairSpecs),'restes encadrés par les mêmes deux paires');
+  var _mlS1=_mlSpecs(pairSpecs);
+  if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
+  _mlDiff('scission N:1',_mlS1,_mlSpecs(pairSpecs),'trait fusionné découpé en morceaux');
+  if(TW_LIMB_FOLLOW&&unB.length){var _mlS2=_mlSpecs(pairSpecs);_limbFollow(sA,sB,pairSpecs,unA,unB);_mlDiff('membre qui se lève',_mlS2,_mlSpecs(pairSpecs),'extrémité rendue au trait orphelin, reste déployé depuis l\'attache');}
+  var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
+  // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
+  // showed a duplicate strokeId on two visually unrelated strokes). A
+  // manual reassign override (state.tweenOverrides) re-stamps its
+  // B-side stroke with the A-side's id — but that exact id can ALREADY
+  // belong to some OTHER, unrelated stroke that this span left
+  // unmatched (fading in/out with its own pre-existing identity
+  // untouched, since the id-less fallback below is a no-op on a stroke
+  // that already has ONE — just not a UNIQUE one anymore). Nothing used
+  // to check for that: two different strokes in the same rendered
+  // frame silently ended up sharing one strokeId, and every id-keyed
+  // lookup downstream (continuity, the reassign tool itself, motion
+  // arcs) picks whichever one it finds first — exactly the "il se
+  // trompe sur la version d'avant" symptom. Precompute the SET of ids
+  // pairSpecs are about to stamp (same formula as the stamping loop
+  // below) and rename any fading stroke that already holds one of them
+  // — a collision is just as much an identity problem as having no id.
+  var pendingPairIds={};
+  pairSpecs.forEach(function(sp){
+    pendingPairIds[sp.aData.strokeId||sp.bData.strokeId||('tw_'+fA+'_'+sp.mi)]=1;
+  });
+  // Same identity-continuity fix as the matched pairs above (see that
+  // comment): a solo fading stroke's id-less keyframe would otherwise
+  // be a different identity from its own generated fade frames.
+  fadeOutA.forEach(function(sd,i2){
+    if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fA+'_a'+i2;
+    if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;
+  });
+  fadeInB.forEach(function(sd,i2){
+    if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fB+'_b'+i2;
+    if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;
+  });
+  if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length){_mlEnd();return null;}
+  // Trim-vs-fade plans, computed ONCE per span (see _vanishPlanFor). The
+  // junction anchors are the strokes that persist through the span:
+  // every matched pair's own keyframe stroke, plus held strokes.
+  var persistA=pairSpecs.map(function(sp){return sp.aData;}).concat(sAsplit.held);
+  var persistB=pairSpecs.map(function(sp){return sp.bData;}).concat(sBsplit.held);
+  var outPlans=fadeOutA.map(function(sd){return _vanishPlanFor(sd,persistA);});
+  var inPlans=fadeInB.map(function(sd){return _vanishPlanFor(sd,persistB);});
+  // ---- OCCLUSION: stacking order interpolated from real authored data ----
+  // The z-order (draw/stack order, front-to-back) of a generated inbetween
+  // used to be frozen on whatever order pairSpecs happened to iterate in —
+  // effectively frame A's own stacking for the WHOLE span. If the artist
+  // deliberately restacked two elements between the keyframes (an arm
+  // drawn BEHIND the torso in A, but drawn IN FRONT of it in B — a common,
+  // intentional way to indicate the arm swinging to the near side), the
+  // frozen order meant the whole tween stayed on A's stacking then POPPED
+  // to B's at the very last frame, instead of crossing at a sensible point.
+  // A true depth-aware solution (recomputing which surface should occlude
+  // which via boolean geometry every generated frame) has no principled
+  // answer for 2D vector art — flat strokes carry no inherent depth, only
+  // the artist's own draw order does, so there's nothing for booleans to
+  // resolve that isn't already expressed by that order. This uses exactly
+  // that real, authored signal instead: each matched pair's stacking RANK
+  // (its position within A's/B's own stroke array, 0=bottom..1=top) is
+  // interpolated the same way its shape and easing already are, and the
+  // whole `tw` array is re-sorted by that interpolated rank every
+  // generated frame — so a restack between keyframes crosses smoothly
+  // in-between (typically right around the shape's own halfway point)
+  // instead of freezing on A then popping to B on the last frame.
+  // ---- ORDER-COHERENCE PASS (2026-07) ----
+  // Cyril, live: two small nearby strokes (a fold/seam detail on each
+  // side of an arm) whose id-based correspondence swaps their left-
+  // right order between keyframes — each stroke tweens smoothly to its
+  // OWN target, but since the two targets are on opposite sides of
+  // where they started, the paths necessarily cross mid-span. Cyril's
+  // own proposal: "une passe qui regarde si c'est cohérent et fait le
+  // bon assignement" — for two CANDIDATE pairs whose A→B motion
+  // segments actually cross, check whether swapping which B-side
+  // stroke each A-side stroke connects to would (a) uncross them and
+  // (b) still be an equally plausible shape match. Deliberately
+  // conservative: a genuinely intended crossing (two limbs swapping
+  // places on purpose) survives untouched whenever the swapped match
+  // would be clearly worse — this only fires when the alternative
+  // pairing is a comparably good substitute, which is exactly the
+  // "these two are easily confused" case it exists for. Pieces and
+  // forced (manual-override) pairs are excluded — their correspondence
+  // isn't a free choice to begin with.
+  function _ocCentroid(sd){
+    var segs=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
+    var cx=0,cy=0,n=segs.length;
+    for(var oi=0;oi<n;oi++){cx+=segs[oi].point[0];cy+=segs[oi].point[1];}
+    return[cx/Math.max(1,n),cy/Math.max(1,n)];
+  }
+  function _ocSegsCross(p1,p2,p3,p4){
+    function cr(o,a,b){return(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);}
+    var d1=cr(p3,p4,p1),d2=cr(p3,p4,p2),d3=cr(p1,p2,p3),d4=cr(p1,p2,p4);
+    return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));
+  }
+  // Trimmed shape-similarity cost — proximity (chamfer) + length ratio
+  // + type/color, deliberately WITHOUT matchSc's whole-frame-relative-
+  // position term (not meaningful here: both candidates are already
+  // known to be near each other, that's how they became candidates).
+  function _ocCost(fX,fY){
+    var K=Math.min(fX.pts.length,fY.pts.length),sumXY=0,sumYX=0;
+    for(var i=0;i<K;i++){var best=1e18;for(var j=0;j<K;j++){var dx=fX.pts[i][0]-fY.pts[j][0],dy=fX.pts[i][1]-fY.pts[j][1];var d=dx*dx+dy*dy;if(d<best)best=d;}sumXY+=Math.sqrt(best);}
+    for(var j2=0;j2<K;j2++){var best2=1e18;for(var i2=0;i2<K;i2++){var dx2=fX.pts[i2][0]-fY.pts[j2][0],dy2=fX.pts[i2][1]-fY.pts[j2][1];var d2=dx2*dx2+dy2*dy2;if(d2<best2)best2=d2;}sumYX+=Math.sqrt(best2);}
+    var scale=Math.sqrt(fX.bounds.w*fX.bounds.w+fX.bounds.h*fX.bounds.h)+Math.sqrt(fY.bounds.w*fY.bounds.w+fY.bounds.h*fY.bounds.h);
+    // Normalisation FLOOR (2026-09, Cyril's cat: "un œil droit qui se
+    // confond avec le museau"). Dividing only by the two strokes' own
+    // size makes an honest displacement explode for tiny strokes: the
+    // 5 px eye dot travels 174 px with the head, scale/2 ≈ 6 px, so its
+    // CORRECT pairing scored 27 while pairing it with the 338 px muzzle
+    // scored ~21 (a big scale in the denominator) — the pass then
+    // "uncrossed" the eye onto the muzzle and the muzzle onto the eye.
+    // Both terms are meant to compare SHAPES here, so the denominator
+    // gets the same drawing-relative floor matchSc uses.
+    var scaleFloor=Math.max(scale*0.5,(typeof _matchNorm==='number'?_matchNorm*0.04:0)+1);
+    var cham=(sumXY+sumYX)/(2*K)/Math.max(1,scaleFloor);
+    var lenRatio=Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));
+    var typePenalty=fX.type!==fY.type?0.5:0;
+    var colD=(colorDist(fX.strokeCol,fY.strokeCol)+colorDist(fX.fillCol,fY.fillCol))/2;
+    // même garde d'élongation que le matcher principal (axisPenaltyPair) :
+    // cette passe échange deux partenaires sur une comparaison de FORMES,
+    // elle doit voir qu'une boucle n'est pas un long trait.
+    return cham+Math.max(0,lenRatio-1.3)*0.3+typePenalty+colD*0.3+axisPenaltyPair(fX.elong,fY.elong);
+  }
+  var _ocCandidates=pairSpecs.filter(function(p){return!p.isPiece&&!p.forced;});
+  var _ocFeatA={},_ocFeatB={};
+  _ocCandidates.forEach(function(p,idx){_ocFeatA[idx]=strokeFeat(p.aData);_ocFeatB[idx]=strokeFeat(p.bData);});
+  for(var oc1=0;oc1<_ocCandidates.length;oc1++){
+    for(var oc2=oc1+1;oc2<_ocCandidates.length;oc2++){
+      var ocP=_ocCandidates[oc1],ocQ=_ocCandidates[oc2];
+      var pA=_ocCentroid(ocP.aData),pB=_ocCentroid(ocP.bData);
+      var qA=_ocCentroid(ocQ.aData),qB=_ocCentroid(ocQ.bData);
+      if(!_ocSegsCross(pA,pB,qA,qB))continue;
+      if(_ocSegsCross(pA,qB,qA,pB)){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,verdict:'trajectoires croisées, échange encore croisé : rien'});continue;} // swap still crosses — not a simple order inversion
+      // GARDE D'ARRANGEMENT (2026-09-04, « entre 26 et 35 confusion au
+      // niveau de son bras droit ») : deux contours parallèles d'un même
+      // membre (20 px d'écart, 100 px de long) qui glissent ensemble ont
+      // des trajectoires de centroïdes qui se croisent pour un rien — un
+      // artefact du mouvement parallèle, pas une inversion d'ordre. Le
+      // matcher relationnel avait choisi l'appariement non croisé
+      // (extérieur → extérieur) ; cette passe, sur son seul critère unaire
+      // où l'écart est de 0,006, le re-croisait, et l'intermédiaire
+      // montrait une grande boucle avec la main dedans. Si le vecteur
+      // relatif des deux traits en A et celui de leurs partenaires en B
+      // pointent déjà du même côté (cosinus > 0,3), l'arrangement est
+      // CONSERVÉ et l'échange le détruirait : on ne touche à rien. Un
+      // arrangement déjà inversé (cosinus < −0,3) reste candidat à
+      // l'échange comme avant.
+      if(TW_OC_SIDE_GUARD){
+        var rAx=qA[0]-pA[0],rAy=qA[1]-pA[1],rBx=qB[0]-pB[0],rBy=qB[1]-pB[1];
+        var rla=Math.sqrt(rAx*rAx+rAy*rAy),rlb=Math.sqrt(rBx*rBx+rBy*rBy);
+        if(rla>1e-6&&rlb>1e-6&&(rAx*rBx+rAy*rBy)/(rla*rlb)>0.3){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,verdict:'garde de côté : arrangement conservé, rien'});continue;}
+      }
+      if(TW_MARGIN_GUARD&&typeof ocP.marge==='number'&&typeof ocQ.marge==='number'&&ocP.marge>=MARGIN_GUARD_MIN&&ocQ.marge>=MARGIN_GUARD_MIN){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,marges:[+ocP.marge.toFixed(3),+ocQ.marge.toFixed(3)],verdict:'garde de marge : deux paires sûres, rien'});continue;}
+      var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
+      var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
+      if(swapCost>curCost+0.15){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'échange plus cher : croisement voulu, rien'});continue;} // meaningfully worse — likely a real intended crossing, leave it
+      // IDENTITY GUARD (2026-09, same cat case): never let this pass
+      // create a pairing the matcher itself would call absurd. A swap
+      // that turns two same-size pairs into two wildly mismatched ones
+      // (a dot onto a muzzle) is not an "equally plausible substitute",
+      // whatever the costs say.
+      function _ocRatio(fX,fY){return Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));}
+      var curWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc1]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc2]));
+      var swapWorst=Math.max(_ocRatio(_ocFeatA[oc1],_ocFeatB[oc2]),_ocRatio(_ocFeatA[oc2],_ocFeatB[oc1]));
+      if(swapWorst>Math.max(2,curWorst*1.5)){_mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'garde d\'identité (rapport de longueurs) : rien'});continue;}
+      var tmpData=ocP.bData,tmpIdx=ocP.bIdx;
+      ocP.bData=ocQ.bData;ocP.bIdx=ocQ.bIdx;
+      ocQ.bData=tmpData;ocQ.bIdx=tmpIdx;
+      _ocFeatB[oc1]=strokeFeat(ocP.bData);_ocFeatB[oc2]=strokeFeat(ocQ.bData);
+      _mlNote('passe d\'ordre',{a1:ocP.aIdx,a2:ocQ.aIdx,cout:+curCost.toFixed(3),coutEchange:+swapCost.toFixed(3),verdict:'ÉCHANGÉ (partenaires B permutés)'});
+    }
+  }
+  _mlFinal(pairSpecs,unA,unB,MATCH_TH);
+  return{sA:sA,sB:sB,sAsplit:sAsplit,sBsplit:sBsplit,pairSpecs:pairSpecs,unA:unA,unB:unB,fadeOutA:fadeOutA,fadeInB:fadeInB,outPlans:outPlans,inPlans:inPlans,forcedPairs:forcedPairs,matches:matches};
+}
+// Provenance pins (TW_PROVENANCE_PINS): a B stroke whose dupOf names
+// exactly one A stroke descends from it (duplicated/pasted key). Paired
+// outright under the same identity gates the rescue pass uses; ambiguous
+// ids (duplicated on either side) are left to the matcher.
+// Identifiant tel que le FICHIER le porte, avant tout ré-estampillage de
+// la génération en cours (voir _origId dans generateTweens).
+function _origIdOf(sd){
+  if(sd.origId!==undefined)return sd.origId;          // persistant (fichier)
+  if(sd._origId!==undefined)return sd._origId;        // instantané de début de génération
+  return sd.strokeId;
+}
+// Un identifiant fabriqué par le moteur (morceau de scission `twc_`,
+// dédoublonnage `twdup_`) n'est jamais une provenance d'artiste.
+function _engineMadeId(id){return !id||/^(twc_|twdup_)/.test(id);}
+function _provenancePins(sA,sB,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_PROVENANCE_PINS)return out;
+  var aById={},aDup={};
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  var bByDup={},bDupDup={};
+  sB.forEach(function(sd,jj){if(!sd.dupOf)return;if(bByDup[sd.dupOf]!==undefined)bDupDup[sd.dupOf]=1;else bByDup[sd.dupOf]=jj;});
+  Object.keys(bByDup).forEach(function(id){
+    if(bDupDup[id]||aDup[id]||aById[id]===undefined)return;
+    var ai=aById[id],bi=bByDup[id];
+    if(forcedAIdx[ai]||forcedBIdx[bi])return;
+    var fa=strokeFeat(sA[ai]),fb=strokeFeat(sB[bi]);
+    if(fa.type!==fb.type)return;
+    var clash=(fa.fillCol&&fb.fillCol&&colorDist(fa.fillCol,fb.fillCol)>0.35)||(fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35);
+    if(clash)return;
+    forcedAIdx[ai]=1;forcedBIdx[bi]=1;
+    out.push({a:ai,b:bi});
+  });
+  return out;
+}
+// Épingles par identité de trait — voir TW_ID_PINS pour le raisonnement et
+// les mesures. Appelée APRÈS _provenancePins, donc elle ne voit que ce que
+// la provenance n'a pas déjà pris.
+// Candidats d'identité, filtres PAR PAIRE seulement (type, couleur, rapport
+// de longueurs, forme) : partagés par les épingles (_identityPins, qui ajoute
+// ses filtres de portée) et par le bonus de coût (TW_ID_BONUS).
+function _identityCandidates(sA,sB,forcedAIdx,forcedBIdx){
+  var aById={},aDup={},bById={},bDup={};
+  sA.forEach(function(sd,ii){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(aById[id]!==undefined)aDup[id]=1;else aById[id]=ii;});
+  sB.forEach(function(sd,jj){var id=_origIdOf(sd);if(_engineMadeId(id))return;if(bById[id]!==undefined)bDup[id]=1;else bById[id]=jj;});
+  var cand=[],geomRejected=0,rejets=[];
+  Object.keys(aById).forEach(function(id){
+    if(aDup[id]||bDup[id]||bById[id]===undefined)return;
+    var ai=aById[id],bi=bById[id];
+    if(forcedAIdx&&forcedBIdx&&(forcedAIdx[ai]||forcedBIdx[bi]))return;
+    var fa=strokeFeat(sA[ai]),fb=strokeFeat(sB[bi]);
+    if(fa.type!==fb.type){rejets.push({a:ai,b:bi,motif:'type'});return;}
+    if((fa.fillCol&&fb.fillCol&&colorDist(fa.fillCol,fb.fillCol)>0.35)||
+       (fa.strokeCol&&fb.strokeCol&&colorDist(fa.strokeCol,fb.strokeCol)>0.35)){rejets.push({a:ai,b:bi,motif:'couleur'});return;}
+    // filtre 1 : longueurs
+    var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+    if(lr>ID_PIN_LEN_RATIO){geomRejected++;rejets.push({a:ai,b:bi,motif:'longueurs '+lr.toFixed(2)});return;}
+    // filtre 0 : forme (voir ID_PIN_SHAPE_MAX)
+    var shp=axisPenaltyPair(fa.elong,fb.elong);
+    if(shp>ID_PIN_SHAPE_MAX){geomRejected++;rejets.push({a:ai,b:bi,motif:'forme '+shp.toFixed(2)});return;}
+    cand.push({a:ai,b:bi,ax:fa.cx,ay:fa.cy,bx:fb.cx,by:fb.cy,
+               d:Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy))});
+  });
+  return{cand:cand,geomRejected:geomRejected,rejets:rejets};
+}
+function _identityPins(sA,sB,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_ID_PINS)return out;
+  var ic=_identityCandidates(sA,sB,forcedAIdx,forcedBIdx);
+  var cand=ic.cand,geomRejected=ic.geomRejected;
+  _mlNote('épingles d\'identité',{candidates:cand.length,rejetsGeometrie:geomRejected,rejets:ic.rejets.map(function(r){return _mlIdA(r.a)+'→'+_mlIdB(r.b)+' ('+r.motif+')';})});
+  // voir TW_ID_PIN_ALL_OR_NONE : une identité vraie écartée par la géométrie
+  // invalide toute la portée, sinon on applique une identité à moitié.
+  if(TW_ID_PIN_ALL_OR_NONE&&geomRejected>0){_mlNote('épingles d\'identité',{verdict:'tout-ou-rien : une identité rejetée par la géométrie, aucune épingle'});return out;}
+  if(cand.length<ID_PIN_MIN){_mlNote('épingles d\'identité',{verdict:'moins de '+ID_PIN_MIN+' candidates, aucune épingle'});return out;}
+  // filtre 4 : tout ou rien sur la portée (voir ID_PIN_SPAN_RATIO)
+  var featB=sB.map(function(sd){return strokeFeat(sd);});
+  var sumPin=0,sumNear=0;
+  cand.forEach(function(c){
+    var fa=strokeFeat(sA[c.a]),best=Infinity;
+    for(var j=0;j<featB.length;j++){
+      var fb=featB[j];
+      if(fb.type!==fa.type)continue;
+      var lr2=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+      if(lr2>ID_PIN_LEN_RATIO)continue;
+      var dj=Math.sqrt((fb.cx-fa.cx)*(fb.cx-fa.cx)+(fb.cy-fa.cy)*(fb.cy-fa.cy));
+      if(dj<best)best=dj;
+    }
+    if(!isFinite(best))best=c.d;
+    sumPin+=c.d;sumNear+=Math.max(best,8);
+  });
+  if(sumPin>ID_PIN_SPAN_RATIO*Math.max(1,sumNear))return out;
+  // filtre 2 : déplacement aberrant vs la médiane des candidates
+  var ds=cand.map(function(c){return c.d;}).sort(function(x,y){return x-y;});
+  var med=ds[Math.floor(ds.length/2)];
+  var lim=Math.max(med*ID_PIN_TRAVEL_K,med+20);
+  cand=cand.filter(function(c){return c.d<=lim;});
+  // filtre 3 : une épingle qui croise une autre épingle est écartée
+  var keep=cand.map(function(){return true;});
+  for(var i=0;i<cand.length;i++)for(var j=i+1;j<cand.length;j++){
+    var p=cand[i],q=cand[j];
+    if(_segsIntersect({x:p.ax,y:p.ay},{x:p.bx,y:p.by},{x:q.ax,y:q.ay},{x:q.bx,y:q.by})){
+      keep[i]=false;keep[j]=false;
+    }
+  }
+  cand.forEach(function(c,k){
+    if(!keep[k])return;
+    if(forcedAIdx[c.a]||forcedBIdx[c.b])return;
+    forcedAIdx[c.a]=1;forcedBIdx[c.b]=1;
+    out.push({a:c.a,b:c.b});
+  });
+  return out;
+}
+// Groupes de jumeaux — voir TW_TWIN_GROUPS.
+function _twinClusters(feats){
+  var n=feats.length,maxLen=(typeof _matchNorm==='number'?_matchNorm:0)*TWIN_MAX_FRAC;
+  function size(f){return Math.sqrt(f.bounds.w*f.bounds.w+f.bounds.h*f.bounds.h)+1;}
+  function twins(a,b){
+    var fa=feats[a],fb=feats[b];
+    if(fa.type!==fb.type||!fa.elong||!fb.elong)return false;
+    if(maxLen>0&&(fa.length>maxLen||fb.length>maxLen))return false;
+    var lr=Math.max(fa.length,fb.length)/Math.max(1,Math.min(fa.length,fb.length));
+    if(lr>TWIN_LEN_RATIO)return false;
+    if(Math.abs(fa.elong.T-fb.elong.T)*180/Math.PI>TWIN_TURN_DEG)return false;
+    if(Math.abs(fa.elong.gap-fb.elong.gap)>TWIN_GAP)return false;
+    var d=Math.sqrt((fa.cx-fb.cx)*(fa.cx-fb.cx)+(fa.cy-fb.cy)*(fa.cy-fb.cy));
+    return d<=TWIN_NEAR*Math.max(size(fa),size(fb));
+  }
+  // cliques gloutonnes : on part de chaque trait libre et on n'ajoute qu'un
+  // trait jumeau de TOUS les membres déjà présents.
+  var used={},out=[];
+  for(var a=0;a<n;a++){
+    if(used[a])continue;
+    var g=[a];
+    for(var b=a+1;b<n;b++){
+      if(used[b]||g.length>=TWIN_MAX)continue;
+      var ok=true;for(var k=0;k<g.length;k++)if(!twins(g[k],b)){ok=false;break;}
+      if(ok)g.push(b);
+    }
+    if(g.length>=2){g.forEach(function(i){used[i]=1;});out.push(g);}
+  }
+  return out;
+}
+function _twinAxis(feats,g){
+  var cx=0,cy=0;g.forEach(function(i){cx+=feats[i].cx;cy+=feats[i].cy;});cx/=g.length;cy/=g.length;
+  var sxx=0,syy=0,sxy=0;g.forEach(function(i){var dx=feats[i].cx-cx,dy=feats[i].cy-cy;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  var th=0.5*Math.atan2(2*sxy,sxx-syy);
+  var tr=sxx+syy,disc=Math.sqrt(Math.max(0,tr*tr/4-(sxx*syy-sxy*sxy)));
+  var l1=tr/2+disc,l2=Math.max(1e-9,tr/2-disc);
+  return{ux:Math.cos(th),uy:Math.sin(th),cx:cx,cy:cy,aniso:Math.sqrt(l1/l2)};
+}
+function _twinGroupPins(sA,sB,matches,forcedAIdx,forcedBIdx){
+  var out=[];
+  if(!TW_TWIN_GROUPS||sA.length<2||sB.length<2)return out;
+  var fA=sA.map(strokeFeat),fB=sB.map(strokeFeat);
+  var GA=_twinClusters(fA),GB=_twinClusters(fB);
+  if(!GA.length||!GB.length)return out;
+  var bGroupOf={};GB.forEach(function(g,gi){g.forEach(function(b){bGroupOf[b]=gi;});});
+  var partner={};matches.forEach(function(m){partner[m.a]=m.b;});
+  GA.forEach(function(ga){
+    if(ga.some(function(a){return forcedAIdx[a];}))return;
+    var votes={};ga.forEach(function(a){var b=partner[a];if(b===undefined)return;var gi=bGroupOf[b];if(gi===undefined)return;votes[gi]=(votes[gi]||0)+1;});
+    var best=-1,bv=0;Object.keys(votes).forEach(function(gi){if(votes[gi]>bv){bv=votes[gi];best=+gi;}});
+    if(best<0||bv<Math.max(2,Math.ceil(ga.length/2)))return;
+    var gb=GB[best];
+    if(gb.length!==ga.length)return;
+    if(gb.some(function(b){return forcedBIdx[b];}))return;
+    // membres déjà cohérents (partenaire dans le groupe de B) : gardés tels
+    // quels ; les autres ("égarés") reçoivent les places restées libres.
+    var inB={};gb.forEach(function(b){inB[b]=1;});
+    var taken={},keep=[],stray=[];
+    ga.forEach(function(a){var b=partner[a];if(b!==undefined&&inB[b]&&!taken[b]){keep.push({a:a,b:b});taken[b]=1;}else stray.push(a);});
+    if(!stray.length)return; // rien à corriger, on ne pose aucune épingle
+    var free=gb.filter(function(b){return!taken[b];});
+    if(free.length!==stray.length)return;
+    var axA=_twinAxis(fA,ga),axB=_twinAxis(fB,gb);
+    var pairsStray=[];
+    if(axA.aniso>=TWIN_ANISO&&axB.aniso>=TWIN_ANISO&&stray.length>1){
+      // groupe à axe net : rang le long de l'axe, sens de B accordé au vote
+      var projA=function(i){return (fA[i].cx-axA.cx)*axA.ux+(fA[i].cy-axA.cy)*axA.uy;};
+      var projB=function(i){return (fB[i].cx-axB.cx)*axB.ux+(fB[i].cy-axB.cy)*axB.uy;};
+      var agreeF=0,agreeR=0;
+      keep.forEach(function(kp){if((projA(kp.a)>0)===(projB(kp.b)>0))agreeF++;else agreeR++;});
+      var sgn=agreeR>agreeF?-1:(agreeR===agreeF&&(axA.ux*axB.ux+axA.uy*axB.uy)<0?-1:1);
+      var sA_=stray.slice().sort(function(i,j){return projA(i)-projA(j);});
+      var sB_=free.slice().sort(function(i,j){return sgn*(projB(i)-projB(j));});
+      sA_.forEach(function(a,r){pairsStray.push({a:a,b:sB_[r]});});
+    }else{
+      // pas d'axe fiable : au plus proche, glouton
+      var rem=free.slice();
+      stray.forEach(function(a){var bi=-1,bd=Infinity;rem.forEach(function(b,k){var d=(fB[b].cx-fA[a].cx)*(fB[b].cx-fA[a].cx)+(fB[b].cy-fA[a].cy)*(fB[b].cy-fA[a].cy);if(d<bd){bd=d;bi=k;}});
+        if(bi>=0){pairsStray.push({a:a,b:rem[bi]});rem.splice(bi,1);}});
+    }
+    keep.concat(pairsStray).forEach(function(pr){forcedAIdx[pr.a]=1;forcedBIdx[pr.b]=1;out.push(pr);});
+  });
+  return out;
+}
+var MATCH_TH_CONF=0.48;
 function generateTweens(explicitRestrictTo,skipUndo){
   saveAllLayerFrames();var li=state.activeLayerIdx;var ld=state.layers[li];
   var keys=[];for(var i=0;i<state.totalFrames;i++){if(ld.frames[i].isKeyframe&&ld.frames[i].strokes.length>0)keys.push(i);}
   if(keys.length<2){showToast(SM.t('toastNeedAtLeast2DrawnKeyframes'));return;}
+  _chainArcs={}; // les arcs de chaîne sont recalculés à chaque génération
+  // IDENTIFIANT D'ORIGINE (2026-09-05, régression trouvée sur un MAINTIEN :
+  // clés 17 et 26 identiques, 5 traits déplacés jusqu'à 57 px). La
+  // construction des paires ré-estampille le strokeId des CLÉS (B prend
+  // l'id de A, pour la continuité des images générées). Dans une même
+  // génération, la portée k+1 lit donc des identifiants réécrits par la
+  // portée k : les épingles de provenance (dupOf → id de A) et d'identité
+  // (même id des deux côtés) se posaient alors sur le mauvais trait, pour
+  // exactement les traits dont l'appariement précédent n'était pas
+  // l'identité. Le banc ne pouvait pas le voir : il apparie sur des données
+  // fraîches. Les épingles lisent maintenant l'identifiant tel qu'il était
+  // au début de la génération (_origId, posé une fois, jamais sérialisé :
+  // serP ne recopie que les champs qu'il connaît).
+  keys.forEach(function(kf){(ld.frames[kf].strokes||[]).forEach(function(sd){if(sd._origId===undefined)sd._origId=(sd.origId!==undefined?sd.origId:sd.strokeId);});});
   // A frame selection on this layer restricts regeneration to just those
   // keyframes' own span (start keyframe -> its next keyframe), instead of
   // silently redoing the whole layer — select the frame to fix, hit Tween,
@@ -3767,360 +6752,31 @@ function generateTweens(explicitRestrictTo,skipUndo){
   // the layer reorder.
   if(!skipUndo)pushUndoLayers();
   var resN=state.resamplePts;var step=state.tweenStep;var total=0;
+  if(typeof window!=='undefined'){window.__twSpanConfidence={};window.__twGroupStats=[];}
   for(var ki=0;ki<keys.length-1;ki++){
     var fA=keys[ki],fB=keys[ki+1];
     if(restrictTo&&!restrictTo[fA])continue;
     // Per-pair override (complements the global curve, see getEasingForPair)
     var easFn=getEasingForPair(li,fA,fB);
-    // 2026-07 feedback ("si je clic droit sur ma sélection et que je tween
-    // il ne va pas faire le tween avec les formes correspondantes de la
-    // frame suivante... comme quand il détecte chaque forme"): manualMode
-    // only restricts the A side's candidate pool (which strokes are even
-    // ELIGIBLE to start a tween) — B always offers its FULL candidate set,
-    // exactly like a normal full auto-tween, so autoMatch's own Hungarian
-    // matching can still automatically find the right corresponding shape
-    // at B. Requiring the SAME strokeId to already exist at B (this
-    // function's first attempt) defeated the whole point of automatic
-    // shape detection.
-    var manualMode=!!ld.frames[fA].tweenManualMode;
-    // Self-healing identity guard (2026-07, live-reported: a KEYFRAME's
-    // own stored strokes already had the SAME strokeId duplicated across
-    // 2 different strokes on a fresh reload, no override involved — a
-    // corruption baked in by an EARLIER generateTweens() run, before the
-    // fadeOutA/fadeInB collision guard below existed). Deduping here, on
-    // the raw keyframe data, BEFORE it feeds sA/sB, both prevents THIS
-    // span's matching from reading an already-ambiguous identity and
-    // self-heals whatever an old run already corrupted — every id-keyed
-    // lookup (continuity, the reassign tool, motion arcs) only ever sees
-    // a strokeId that resolves to exactly one stroke in the frame.
-    _dedupeFrameStrokeIds(ld.frames[fA].strokes,fA);
-    _dedupeFrameStrokeIds(ld.frames[fB].strokes,fB);
-    var sAsplit=splitTweenables(ld.frames[fA].strokes,manualMode),sBsplit=splitTweenables(ld.frames[fB].strokes,false);
-    var sA=sAsplit.list,sB=sBsplit.list;
-    // v16: manual pairing overrides (state.tweenOverrides) take priority
-    // over autoMatch for this specific keyframe pair — resolved here by
-    // stable strokeId, since sA/sB index order isn't stable across edits.
-    // A stroke removed since the override was made just makes that one
-    // override silently inert (falls through to auto-matching again),
-    // rather than erroring the whole tween generation.
-    var ovKey=tweenSpanKey(li,fA,fB);
-    var overrides=(state.tweenOverrides&&state.tweenOverrides[ovKey])||[];
-    var forcedAIdx={},forcedBIdx={},forcedPairs=[];
-    overrides.forEach(function(ov){
-      // Multi-source override (Réparer le tween, tw-reassign — a single
-      // artist-intended line saved as 2+ separate strokes, e.g. "trait uni
-      // qui se mélange avec les cheveux"): ov.aIds is an array instead of
-      // the plain ov.aId. Split the ONE target B stroke into that many
-      // pieces (splitMergedIntoOrderedPieces — same recipe as
-      // resolveSplitMatches' own automatic piece-cutting, just user-
-      // confirmed instead of heuristically detected) so each selected A
-      // stroke gets its own correctly-ordered slice of B to morph into,
-      // instead of every A candidate competing for the whole B stroke.
-      if(ov.aIds){
-        var aIdxs=[];
-        ov.aIds.forEach(function(id){for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===id&&aIdxs.indexOf(ii)<0){aIdxs.push(ii);break;}});
-        var bIdx0=-1;for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId){bIdx0=jj;break;}
-        if(!aIdxs.length||bIdx0<0||forcedBIdx[bIdx0])return;
-        aIdxs=aIdxs.filter(function(ai){return!forcedAIdx[ai];});
-        if(!aIdxs.length)return;
-        forcedBIdx[bIdx0]=1;
-        if(aIdxs.length===1){
-          forcedAIdx[aIdxs[0]]=1;
-          forcedPairs.push({aIdx:aIdxs[0],bIdx:bIdx0,aData:sA[aIdxs[0]],bData:sB[bIdx0],mi:-1-forcedPairs.length,score:0,forced:true});
-          return;
-        }
-        var pieces=splitMergedIntoOrderedPieces(sB[bIdx0],aIdxs.map(function(ai){return sA[ai];}));
-        pieces.forEach(function(pc){
-          var ai=sA.indexOf(pc.part);
-          forcedAIdx[ai]=1;
-          forcedPairs.push({aIdx:ai,bIdx:bIdx0,aData:sA[ai],bData:pc.piece,mi:-1-forcedPairs.length,score:0,forced:true,isPiece:true});
-        });
-        return;
-      }
-      var aIdx=-1,bIdx=-1;
-      // Check BOTH stored ids on BOTH sides, not just ov.aId on A / ov.bId
-      // on B — found live testing tween-arc handles (any drag re-triggers
-      // generateTweens): the very first successful resolution of this
-      // override already stamps the SAME shared pairId onto both
-      // spec.aData AND spec.bData a few lines below (splitTweenables
-      // doesn't clone, so this mutates the real keyframe stroke data) —
-      // meaning ov.bId (B's ORIGINAL id) no longer exists anywhere the
-      // instant after the first call. Every regeneration after that first
-      // one silently failed this lookup, fell through to autoMatch, and —
-      // for exactly the pairs that needed a forced override because they
-      // don't auto-match well (dissimilar/far apart) — got treated as a
-      // fade-out+fade-in instead, ADDING that content into frames that
-      // already held the correctly-tweened result from the first pass
-      // (confirmed: strokes.length 1->2 on a plain second call, no other
-      // change). After a merge, A and B share one identical id, so
-      // matching either stored id against either side is safe pre- and
-      // post-merge: pre-merge it degrades to exactly the old aId-on-A/
-      // bId-on-B check (the ids differ, so the OR's second half never
-      // matches); post-merge both sides already carry the same value, so
-      // either id resolves both.
-      for(var ii=0;ii<sA.length;ii++)if(sA[ii].strokeId===ov.aId||sA[ii].strokeId===ov.bId){aIdx=ii;break;}
-      for(var jj=0;jj<sB.length;jj++)if(sB[jj].strokeId===ov.bId||sB[jj].strokeId===ov.aId){bIdx=jj;break;}
-      if(aIdx<0||bIdx<0||forcedAIdx[aIdx]||forcedBIdx[bIdx])return;
-      // Stale/ambiguous-override guard (2026-07, live-reported cascade: a
-      // hooked shape at one stroke AND an unrelated stroke silently
-      // falling back to fade at another, both traced to the SAME override).
-      // ov.bId is meant to identify ONE specific B-side stroke, but ids get
-      // reused across UNRELATED strokes over a file's history (every other
-      // 2026-07 fix in this function exists because of exactly that) — if
-      // ov.bId ALSO happens to be some OTHER A-side stroke's own natural,
-      // unrelated identity, this override is stealing that other stroke's
-      // rightful B-side partner out from under it, forcing it into a worse
-      // fallback match (confirmed live: removing the stale override let
-      // BOTH strokes auto-match cleanly with zero unmatched/fading strokes
-      // and zero self-tangling). Skip the whole override in that case
-      // rather than silently mis-resolving it — auto-match still runs.
-      var bIdCollision=false;
-      for(var ci=0;ci<sA.length;ci++)if(ci!==aIdx&&sA[ci].strokeId===ov.bId){bIdCollision=true;break;}
-      if(!bIdCollision)for(var ci2=0;ci2<sB.length;ci2++)if(ci2!==bIdx&&sB[ci2].strokeId===ov.aId){bIdCollision=true;break;}
-      if(bIdCollision)return;
-      forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
-      forcedPairs.push({aIdx:aIdx,bIdx:bIdx,aData:sA[aIdx],bData:sB[bIdx],mi:-1-forcedPairs.length,score:0,forced:true});
-    });
-    // Pre-existing bug found by stress-testing (2026-07-17): this used to
-    // `continue` whenever autoMatch returned ZERO pairs (and no forced
-    // overrides) — i.e. exactly when the two keyframes' drawings are so
-    // different that the augmented Hungarian sent EVERY stroke to a fade
-    // dummy (a full cut-away: small shape top-left key A, unrelated big
-    // shape bottom-right key B). Skipping the span meant NO inbetweens at
-    // all were generated — not even the cross-fade that unmatched strokes
-    // are supposed to get — silently leaving whatever frames were there
-    // before. Only skip when there is genuinely nothing to tween on either
-    // side; zero matches with real strokes still flows through so the
-    // fade-out/fade-in machinery below does its job.
-    var matches=autoMatch(sA,sB);if(!sA.length&&!sB.length&&!forcedPairs.length)continue;
-    // Only morph plausible pairs. A stroke whose best assignment still
-    // scores badly (no real counterpart in the other key — count mismatch,
-    // or a shape that genuinely appears/disappears) cross-fades in place
-    // instead of scaling/warping toward an unrelated stroke.
-    var MATCH_TH=0.48;
-    // Bug found by stress-testing (2026-07-17): matchSc's dominant terms
-    // (proxT 0.48 + alignT 0.15) are ABSOLUTE-position Chamfer/ordered
-    // distance, normalized by the strokes' own size — so a single shape
-    // that simply moves far between two keys (a thrown ball, a fast pan,
-    // any large but perfectly ordinary motion) climbs past MATCH_TH purely
-    // from distance, with NOTHING else about it changed, and gets treated
-    // as an "appear/disappear" cross-fade instead of an interpolated move.
-    // Confirmed empirically: identical circles moving ~4.5x their own
-    // diameter already exceed 0.48, scale-invariantly (same ratio at every
-    // tested radius) — a very ordinary distance for anime action, not an
-    // edge case. Generalized (same session, character-pose test): a raised
-    // ARM — one long stroke pivoting ~90° around its shoulder with some
-    // foreshortening, THE textbook limb motion — scored 0.739 while the
-    // character's other 5 strokes all matched confidently, so the arm
-    // cross-faded while the rest of the body moved. The Hungarian had
-    // paired arm↔arm; only the threshold vetoed it. Whenever a rejected
-    // Hungarian pair's two members are BOTH still unmatched after the
-    // threshold pass (in the 1-stroke-per-frame case that's trivially
-    // true — the original soleCandidates form of this fix), there is no
-    // competing candidate the position score could be protecting: fading
-    // is strictly worse than following the assignment the global optimum
-    // already chose — traditional inbetweening prefers motion over a
-    // dissolve whenever the strokes are plausibly the same object. "Same
-    // object" is gated on the identity signals (type, open/closed, and no
-    // hard color clash — same test as matchSc's colorPenalty), NOT on
-    // distance. Position keeps its full weight wherever 2+ candidates
-    // actually compete.
-    var pairSpecs=[],aMatched={},bMatched={};
-    forcedPairs.forEach(function(fp){pairSpecs.push(fp);aMatched[fp.aIdx]=1;bMatched[fp.bIdx]=1;});
-    matches.forEach(function(m){
-      if(forcedAIdx[m.a]||forcedBIdx[m.b])return; // conflicts with a manual override — drop the auto guess
-      if(m.score<=MATCH_TH){pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;}
-    });
-    // Second chance for mutually-leftover Hungarian pairs (see comment above).
-    // BOUNDED (2026-07, "grosses déformations... j'ai fait différentes
-    // animations sur la même timeline"): the rescue exists for ONE limb
-    // whose big-but-ordinary motion pushed it past MATCH_TH (the raised
-    // arm measured 0.739) — it must NOT fire across a hard CUT between two
-    // unrelated drawings sharing a timeline. Measured on the reported
-    // file's cut (13 strokes → 1): the leftover pair scored 0.85, and
-    // rescuing it warped an arm into the next scene's first stroke while
-    // 12 siblings faded around it. Two independent guards, both derived
-    // from measured cases, either one blocks: (1) absolute ceiling 0.78
-    // (legitimate rescued limb 0.739 < 0.78 < aberrant cut 0.85); (2) a
-    // heavily-unbalanced stroke count (3x+) says "different drawing, most
-    // of one side HAS to vanish" — there a rescue needs near-threshold
-    // confidence (MATCH_TH+0.1), not benefit-of-the-doubt.
-    var RESCUE_CEIL=0.78;
-    var cntRatio=Math.max(sA.length,sB.length)/Math.max(1,Math.min(sA.length,sB.length));
-    var rescueCeil=cntRatio>=3?MATCH_TH+0.1:RESCUE_CEIL;
-    var rescueCands=[];
-    matches.forEach(function(m){
-      if(m.score<=MATCH_TH)return; // already handled by the first pass
-      if(m.score>rescueCeil)return; // beyond any plausible same-object motion — fade/trim instead
-      if(forcedAIdx[m.a]||forcedBIdx[m.b])return;
-      if(aMatched[m.a]||bMatched[m.b])return; // one side already claimed — real ambiguity, let it fade
-      var fta=strokeFeat(sA[m.a]),ftb=strokeFeat(sB[m.b]);
-      var clash=(fta.fillCol&&ftb.fillCol&&colorDist(fta.fillCol,ftb.fillCol)>0.35)||(fta.strokeCol&&ftb.strokeCol&&colorDist(fta.strokeCol,ftb.strokeCol)>0.35);
-      // closed-flag agreement only counts as an identity veto when both
-      // flags are ground truth — a guessed flag (VB centerline) flipping
-      // between two drawings of the same limb must not block the rescue
-      // (same rationale as matchSc's softened closedPen above).
-      var closedOk=fta.closed===ftb.closed||fta.closedIsGuess||ftb.closedIsGuess;
-      if(fta.type===ftb.type&&closedOk&&!clash)rescueCands.push({m:m,fa:fta,fb:ftb});
-    });
-    // MOTION-SUPPORT gate (2026-09, with TW_MATCH_RELATIONAL — Cyril's
-    // turning face: "une pupille qui part sur la bouche"). The ceiling
-    // above was calibrated on ONE raised arm (0.739): a big stroke moving
-    // less than its own length. It let an 87 px eye scoring 0.60 travel
-    // 361 px onto a lip — 4× its size, 9× the drawing's median motion —
-    // because nothing here looked at the displacement at all. The
-    // reference can't be global (testC 16→31: four eye ticks legitimately
-    // ride 240 px with the head while the body moves 60) nor the stroke's
-    // size alone (those ticks are 15 px): what a rescued pair needs is a
-    // NEIGHBOUR that moves the same way — a confident match or another
-    // candidate. The eye→lip has none (brow down 130, lid 30); the ticks
-    // have each other; a big stroke moving less than its own length
-    // (the arm) needs no witness.
-    var refDisp=pairSpecs.map(function(ps){var a=strokeFeat(ps.aData),b=strokeFeat(ps.bData);return{x:a.cx,y:a.cy,dx:b.cx-a.cx,dy:b.cy-a.cy};});
-    rescueCands.forEach(function(c){refDisp.push({x:c.fa.cx,y:c.fa.cy,dx:c.fb.cx-c.fa.cx,dy:c.fb.cy-c.fa.cy,cand:c});});
-    rescueCands.forEach(function(c){
-      var m=c.m;
-      if(TW_MATCH_RELATIONAL){
-        var dx=c.fb.cx-c.fa.cx,dy=c.fb.cy-c.fa.cy,disp=Math.sqrt(dx*dx+dy*dy);
-        var big=disp<=Math.max(c.fa.length,c.fb.length);
-        if(!big){
-          var near=refDisp.filter(function(r){return r.cand!==c;}).map(function(r){return{r:r,d2:(r.x-c.fa.cx)*(r.x-c.fa.cx)+(r.y-c.fa.cy)*(r.y-c.fa.cy)};}).sort(function(p,q){return p.d2-q.d2;}).slice(0,3);
-          var supported=near.some(function(nq){var r=nq.r,rd=Math.sqrt(r.dx*r.dx+r.dy*r.dy);var ddx=r.dx-dx,ddy=r.dy-dy;return Math.sqrt(ddx*ddx+ddy*ddy)<=0.35*Math.max(disp,rd)+15;});
-          if(!supported)return; // moves unlike everything around it — fade instead
-        }
-      }
-      pairSpecs.push({aIdx:m.a,bIdx:m.b,aData:sA[m.a],bData:sB[m.b],mi:matches.indexOf(m),score:m.score});aMatched[m.a]=1;bMatched[m.b]=1;
-    });
-    var unA=[],unB=[];
-    for(var ai=0;ai<sA.length;ai++)if(!aMatched[ai])unA.push(ai);
-    for(var bi2=0;bi2<sB.length;bi2++)if(!bMatched[bi2])unB.push(bi2);
-    // N:1 rescue pass — may convert fades + a mediocre pair into clean
-    // piece-wise morphs by splitting a merged stroke (see resolveSplitMatches)
-    if(unA.length||unB.length)resolveSplitMatches(sA,sB,pairSpecs,unA,unB);
-    var fadeOutA=unA.map(function(i){return sA[i];}),fadeInB=unB.map(function(i){return sB[i];});
-    // Identity-COLLISION guard (2026-07, live-reported: 2 real frames
-    // showed a duplicate strokeId on two visually unrelated strokes). A
-    // manual reassign override (state.tweenOverrides) re-stamps its
-    // B-side stroke with the A-side's id — but that exact id can ALREADY
-    // belong to some OTHER, unrelated stroke that this span left
-    // unmatched (fading in/out with its own pre-existing identity
-    // untouched, since the id-less fallback below is a no-op on a stroke
-    // that already has ONE — just not a UNIQUE one anymore). Nothing used
-    // to check for that: two different strokes in the same rendered
-    // frame silently ended up sharing one strokeId, and every id-keyed
-    // lookup downstream (continuity, the reassign tool itself, motion
-    // arcs) picks whichever one it finds first — exactly the "il se
-    // trompe sur la version d'avant" symptom. Precompute the SET of ids
-    // pairSpecs are about to stamp (same formula as the stamping loop
-    // below) and rename any fading stroke that already holds one of them
-    // — a collision is just as much an identity problem as having no id.
-    var pendingPairIds={};
-    pairSpecs.forEach(function(sp){
-      pendingPairIds[sp.aData.strokeId||sp.bData.strokeId||('tw_'+fA+'_'+sp.mi)]=1;
-    });
-    // Same identity-continuity fix as the matched pairs above (see that
-    // comment): a solo fading stroke's id-less keyframe would otherwise
-    // be a different identity from its own generated fade frames.
-    fadeOutA.forEach(function(sd,i2){
-      if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fA+'_a'+i2;
-      if(!sd.strokeId)sd.strokeId='twf_'+fA+'_a'+i2;
-    });
-    fadeInB.forEach(function(sd,i2){
-      if(sd.strokeId&&pendingPairIds[sd.strokeId])sd.strokeId='twc_'+fB+'_b'+i2;
-      if(!sd.strokeId)sd.strokeId='twf_'+fB+'_b'+i2;
-    });
-    if(!pairSpecs.length&&!fadeOutA.length&&!fadeInB.length)continue;
-    // Trim-vs-fade plans, computed ONCE per span (see _vanishPlanFor). The
-    // junction anchors are the strokes that persist through the span:
-    // every matched pair's own keyframe stroke, plus held strokes.
-    var persistA=pairSpecs.map(function(sp){return sp.aData;}).concat(sAsplit.held);
-    var persistB=pairSpecs.map(function(sp){return sp.bData;}).concat(sBsplit.held);
-    var outPlans=fadeOutA.map(function(sd){return _vanishPlanFor(sd,persistA);});
-    var inPlans=fadeInB.map(function(sd){return _vanishPlanFor(sd,persistB);});
-    // ---- OCCLUSION: stacking order interpolated from real authored data ----
-    // The z-order (draw/stack order, front-to-back) of a generated inbetween
-    // used to be frozen on whatever order pairSpecs happened to iterate in —
-    // effectively frame A's own stacking for the WHOLE span. If the artist
-    // deliberately restacked two elements between the keyframes (an arm
-    // drawn BEHIND the torso in A, but drawn IN FRONT of it in B — a common,
-    // intentional way to indicate the arm swinging to the near side), the
-    // frozen order meant the whole tween stayed on A's stacking then POPPED
-    // to B's at the very last frame, instead of crossing at a sensible point.
-    // A true depth-aware solution (recomputing which surface should occlude
-    // which via boolean geometry every generated frame) has no principled
-    // answer for 2D vector art — flat strokes carry no inherent depth, only
-    // the artist's own draw order does, so there's nothing for booleans to
-    // resolve that isn't already expressed by that order. This uses exactly
-    // that real, authored signal instead: each matched pair's stacking RANK
-    // (its position within A's/B's own stroke array, 0=bottom..1=top) is
-    // interpolated the same way its shape and easing already are, and the
-    // whole `tw` array is re-sorted by that interpolated rank every
-    // generated frame — so a restack between keyframes crosses smoothly
-    // in-between (typically right around the shape's own halfway point)
-    // instead of freezing on A then popping to B on the last frame.
-    // ---- ORDER-COHERENCE PASS (2026-07) ----
-    // Cyril, live: two small nearby strokes (a fold/seam detail on each
-    // side of an arm) whose id-based correspondence swaps their left-
-    // right order between keyframes — each stroke tweens smoothly to its
-    // OWN target, but since the two targets are on opposite sides of
-    // where they started, the paths necessarily cross mid-span. Cyril's
-    // own proposal: "une passe qui regarde si c'est cohérent et fait le
-    // bon assignement" — for two CANDIDATE pairs whose A→B motion
-    // segments actually cross, check whether swapping which B-side
-    // stroke each A-side stroke connects to would (a) uncross them and
-    // (b) still be an equally plausible shape match. Deliberately
-    // conservative: a genuinely intended crossing (two limbs swapping
-    // places on purpose) survives untouched whenever the swapped match
-    // would be clearly worse — this only fires when the alternative
-    // pairing is a comparably good substitute, which is exactly the
-    // "these two are easily confused" case it exists for. Pieces and
-    // forced (manual-override) pairs are excluded — their correspondence
-    // isn't a free choice to begin with.
-    function _ocCentroid(sd){
-      var segs=(sd.centerSegments&&sd.centerSegments.length>1)?sd.centerSegments:sd.segments;
-      var cx=0,cy=0,n=segs.length;
-      for(var oi=0;oi<n;oi++){cx+=segs[oi].point[0];cy+=segs[oi].point[1];}
-      return[cx/Math.max(1,n),cy/Math.max(1,n)];
-    }
-    function _ocSegsCross(p1,p2,p3,p4){
-      function cr(o,a,b){return(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);}
-      var d1=cr(p3,p4,p1),d2=cr(p3,p4,p2),d3=cr(p1,p2,p3),d4=cr(p1,p2,p4);
-      return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));
-    }
-    // Trimmed shape-similarity cost — proximity (chamfer) + length ratio
-    // + type/color, deliberately WITHOUT matchSc's whole-frame-relative-
-    // position term (not meaningful here: both candidates are already
-    // known to be near each other, that's how they became candidates).
-    function _ocCost(fX,fY){
-      var K=Math.min(fX.pts.length,fY.pts.length),sumXY=0,sumYX=0;
-      for(var i=0;i<K;i++){var best=1e18;for(var j=0;j<K;j++){var dx=fX.pts[i][0]-fY.pts[j][0],dy=fX.pts[i][1]-fY.pts[j][1];var d=dx*dx+dy*dy;if(d<best)best=d;}sumXY+=Math.sqrt(best);}
-      for(var j2=0;j2<K;j2++){var best2=1e18;for(var i2=0;i2<K;i2++){var dx2=fX.pts[i2][0]-fY.pts[j2][0],dy2=fX.pts[i2][1]-fY.pts[j2][1];var d2=dx2*dx2+dy2*dy2;if(d2<best2)best2=d2;}sumYX+=Math.sqrt(best2);}
-      var scale=Math.sqrt(fX.bounds.w*fX.bounds.w+fX.bounds.h*fX.bounds.h)+Math.sqrt(fY.bounds.w*fY.bounds.w+fY.bounds.h*fY.bounds.h);
-      var cham=(sumXY+sumYX)/(2*K)/Math.max(1,scale*0.5);
-      var lenRatio=Math.max(fX.length,fY.length)/Math.max(1,Math.min(fX.length,fY.length));
-      var typePenalty=fX.type!==fY.type?0.5:0;
-      var colD=(colorDist(fX.strokeCol,fY.strokeCol)+colorDist(fX.fillCol,fY.fillCol))/2;
-      return cham+Math.max(0,lenRatio-1.3)*0.3+typePenalty+colD*0.3;
-    }
-    var _ocCandidates=pairSpecs.filter(function(p){return!p.isPiece&&!p.forced;});
-    var _ocFeatA={},_ocFeatB={};
-    _ocCandidates.forEach(function(p,idx){_ocFeatA[idx]=strokeFeat(p.aData);_ocFeatB[idx]=strokeFeat(p.bData);});
-    for(var oc1=0;oc1<_ocCandidates.length;oc1++){
-      for(var oc2=oc1+1;oc2<_ocCandidates.length;oc2++){
-        var ocP=_ocCandidates[oc1],ocQ=_ocCandidates[oc2];
-        var pA=_ocCentroid(ocP.aData),pB=_ocCentroid(ocP.bData);
-        var qA=_ocCentroid(ocQ.aData),qB=_ocCentroid(ocQ.bData);
-        if(!_ocSegsCross(pA,pB,qA,qB))continue;
-        if(_ocSegsCross(pA,qB,qA,pB))continue; // swap still crosses — not a simple order inversion
-        var curCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc1])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc2]);
-        var swapCost=_ocCost(_ocFeatA[oc1],_ocFeatB[oc2])+_ocCost(_ocFeatA[oc2],_ocFeatB[oc1]);
-        if(swapCost>curCost+0.15)continue; // meaningfully worse — likely a real intended crossing, leave it
-        var tmpData=ocP.bData,tmpIdx=ocP.bIdx;
-        ocP.bData=ocQ.bData;ocP.bIdx=ocQ.bIdx;
-        ocQ.bData=tmpData;ocQ.bIdx=tmpIdx;
-        _ocFeatB[oc1]=strokeFeat(ocP.bData);_ocFeatB[oc2]=strokeFeat(ocQ.bData);
+    var _sp=_spanPairSpecs(ld,li,fA,fB,ki>0?ld.frames[keys[ki-1]].strokes:null);
+    if(!_sp)continue;
+    var sA=_sp.sA,sB=_sp.sB,sAsplit=_sp.sAsplit,sBsplit=_sp.sBsplit,pairSpecs=_sp.pairSpecs,unA=_sp.unA,unB=_sp.unB,fadeOutA=_sp.fadeOutA,fadeInB=_sp.fadeInB,outPlans=_sp.outPlans,inPlans=_sp.inPlans;
+    // SPAN FIELD (TW_ORPHAN_FOLLOW): the deformation the retained pairs
+    // describe, fitted both ways, capped so an unmatched stroke never
+    // travels further than the span's own largest displacement (+margin).
+    var _spanField=null;
+    if(TW_ORPHAN_FOLLOW&&(fadeOutA.length||fadeInB.length)&&pairSpecs.length>=2){
+      var srcC=[],dstC=[];
+      pairSpecs.forEach(function(sp){var ca=_quickCentroid(sp.aData),cb=_quickCentroid(sp.bData);if(ca&&cb){srcC.push({x:ca[0],y:ca[1]});dstC.push({x:cb[0],y:cb[1]});}});
+      if(srcC.length>=2){
+        var fab=fitRobustField(srcC,dstC,_matchNorm||1),fba=fitRobustField(dstC,srcC,_matchNorm||1);
+        var maxD=0;for(var qd=0;qd<srcC.length;qd++)maxD=Math.max(maxD,Math.hypot(dstC[qd].x-srcC[qd].x,dstC[qd].y-srcC[qd].y));
+        var cap=maxD*1.5+20;
+        var clampF=function(f){if(!f)return null;return function(x,y){var q=f.apply(x,y);var dx=q.x-x,dy=q.y-y,d=Math.hypot(dx,dy);if(d>cap){dx*=cap/d;dy*=cap/d;}return{x:x+dx,y:y+dy};};};
+        _spanField={ab:clampF(fab),ba:clampF(fba)};
       }
     }
+    var _usedPairIds={}; // voir l'unicité du pairId ci-dessous
     var pairs=pairSpecs.map(function(spec){
       var isVB=!!(spec.aData.isVectorBrush&&spec.bData.isVectorBrush);
       // Feature-aware (corner/cusp-biased) shared resampling — see
@@ -4190,7 +6846,33 @@ function generateTweens(explicitRestrictTo,skipUndo){
       // keyframe's own stored data, giving keyframe and every
       // interpolated frame in between the exact same identity.
       var pairId=spec.aData.strokeId||spec.bData.strokeId||('tw_'+fA+'_'+spec.mi);
+      // UNICITÉ (2026-09-04) — une scission 1→N (ou une fusion N→1) fait
+      // partager le MÊME aData (resp. bData) à plusieurs specs : la ligne
+      // ci-dessous estampillait alors le même strokeId sur N traits
+      // différents de la clé, et sur N traits de chaque image générée.
+      // Défaut PRÉEXISTANT (mesuré : le moteur d'avant #739 produit deux
+      // doublons sur ce même fichier), simplement masqué tant qu'aucune
+      // scission ne se déclenchait. Or tout ce qui est indexé par
+      // strokeId — continuité entre images, réassignation manuelle, arcs
+      // de mouvement, _dedupeFrameStrokeIds au tour suivant — prend alors
+      // le premier trait trouvé, ce qui change le résultat d'un run à
+      // l'autre. Un suffixe par morceau règle le problème pour toutes les
+      // configurations, pas seulement la mienne.
+      if(_usedPairIds[pairId]){var _k=1;while(_usedPairIds[pairId+'#'+_k])_k++;pairId=pairId+'#'+_k;}
+      _usedPairIds[pairId]=1;
+      // PROVENANCE PERSISTANTE (2026-09-05, Cyril : « n'oublie pas d'enlever
+      // les anciens tweens ») : le ré-estampillage ci-dessous est nécessaire
+      // (Motion par élément, effets, binds du rig suivent un élément par son
+      // strokeId à travers les images), mais il écrasait l'identifiant que
+      // l'artiste avait donné — et un fichier sauvegardé après un tween
+      // portait ensuite les DÉCISIONS du moteur comme si c'était de la
+      // provenance (patte et corps de cats_anim sous le même id). L'id
+      // d'origine est conservé dans `origId`, sérialisé, posé UNE fois : les
+      // épingles ne lisent que lui.
+      if(spec.aData.strokeId!==pairId&&spec.aData.origId===undefined)spec.aData.origId=_origIdOf(spec.aData);
+      if(spec.bData.strokeId!==pairId&&spec.bData.origId===undefined)spec.bData.origId=_origIdOf(spec.bData);
       spec.aData.strokeId=pairId;spec.bData.strokeId=pairId;
+      spec.bData._prevPairScore=spec.forced?0:spec.score; // lu par le prior temporel de la portée suivante (jamais sérialisé)
       // _src set AFTER alignment: the wasm align path rebuilds its output
       // object from JSON, so a field attached to rb before the call would
       // be silently dropped on exactly the (default) wasm path.
@@ -4212,8 +6894,127 @@ function generateTweens(explicitRestrictTo,skipUndo){
         bOp:bBd?(bBd.opacity!==undefined?bBd.opacity:1):0,
       }:null;
       return{a:ra,b:rbAligned,mi:spec.mi,tex:tex,bmpTex:bmpTex,id:pairId,backdrop:backdrop,
-        aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1)};
+        aRank:spec.aIdx/Math.max(1,sA.length-1),bRank:spec.bIdx/Math.max(1,sB.length-1),
+        aId:spec.aData.strokeId,bId:spec.bData.strokeId,cA:_quickCentroid(spec.aData),cB:_quickCentroid(spec.bData)};
     });
+    // ---- CONFIANCE DE PORTÉE (2026-09-06, souris) : indice = 2 × score
+    // moyen + part de paires douteuses (> 0,3) + part de paires hors
+    // appariement direct. Classe les portées que l'œil trouve mauvaises
+    // (cats 34→46 1,56, souris 5→16 1,38) au-dessus des faciles (0,7–0,9).
+    // Lecture : window.__twSpanConfidence, B.confiance() dans le banc.
+    (function(){
+      var sc=[],nonH=0;
+      pairSpecs.forEach(function(sp){if(typeof sp.score!=='number')return;sc.push(sp.score);if(sp.forced||sp.isPiece||sp.completion||sp.score>MATCH_TH_CONF)nonH++;});
+      if(!sc.length)return;
+      var mean=sc.reduce(function(a,b){return a+b;},0)/sc.length,dbt=sc.filter(function(x){return x>0.3;}).length;
+      var conf={fA:fA,fB:fB,paires:sc.length,moyenne:+mean.toFixed(3),douteuses:dbt,horsDirect:nonH,fondus:fadeOutA.length+fadeInB.length,indice:+(2*mean+dbt/sc.length+nonH/sc.length).toFixed(2)};
+      window.__twSpanConfidence=window.__twSpanConfidence||{};window.__twSpanConfidence[tweenSpanKey(li,fA,fB)]=conf;
+      _mlNote('confiance de portée',conf);
+    })();
+    // ---- GROUPES RIGIDES (voir TW_GROUP_RIGID) ----
+    if(TW_GROUP_RIGID&&pairs.length>=GROUP_MIN_MEMBERS){
+      var gmem=[];
+      pairs.forEach(function(pr,i){
+        var sp=pairSpecs[i];if(!sp||sp.isPiece||!pr.cA||!pr.cB||!pr.a||!pr.a.segments||pr.a.segments.length<2)return;
+        gmem.push({i:i,pr:pr,pts:pr.a.segments.map(function(s){return s.point;}),closed:!!pr.a.closed,cA:pr.cA,cB:pr.cB});
+      });
+      if(gmem.length>=GROUP_MIN_MEMBERS){
+        // contacts en A : extrémité (ou tout point d'une boucle) à ≤ tol d'un point de l'autre
+        var cell=32,grids=gmem.map(function(m){var g={};m.pts.forEach(function(p){var k=Math.floor(p[0]/cell)+','+Math.floor(p[1]/cell);(g[k]||(g[k]=[])).push(p);});return g;});
+        function nearGrid(g,p,tol){var cx=Math.floor(p[0]/cell),cy=Math.floor(p[1]/cell);for(var dx=-1;dx<=1;dx++)for(var dy=-1;dy<=1;dy++){var b=g[(cx+dx)+','+(cy+dy)];if(!b)continue;for(var q=0;q<b.length;q++){if(Math.hypot(b[q][0]-p[0],b[q][1]-p[1])<=tol)return true;}}return false;}
+        function touches(a,b){var pa=gmem[a].closed?gmem[a].pts:[gmem[a].pts[0],gmem[a].pts[gmem[a].pts.length-1]];for(var k=0;k<pa.length;k++){if(nearGrid(grids[b],pa[k],GROUP_CONTACT_TOL))return true;}return false;}
+        var parent=gmem.map(function(_,i){return i;});function find(x){while(parent[x]!==x){parent[x]=parent[parent[x]];x=parent[x];}return x;}
+        for(var ga=0;ga<gmem.length;ga++)for(var gb=ga+1;gb<gmem.length;gb++){if(touches(ga,gb)||touches(gb,ga)){var ra_=find(ga),rb_=find(gb);if(ra_!==rb_)parent[ra_]=rb_;}}
+        var comps={};gmem.forEach(function(m,i){var r=find(i);(comps[r]||(comps[r]=[])).push(m);});
+        var gstats=[];var gid=0;
+        Object.keys(comps).forEach(function(k){
+          var mem=comps[k];if(mem.length<GROUP_MIN_MEMBERS)return;
+          var keep=mem.slice(),tf=null;
+          for(var it=0;it<3;it++){
+            if(keep.length<GROUP_MIN_MEMBERS){tf=null;break;}
+            tf=fitSimilarityTransform(keep.map(function(m){return{x:m.cA[0],y:m.cA[1]};}),keep.map(function(m){return{x:m.cB[0],y:m.cB[1]};}));
+            if(!tf)break;
+            var next=keep.filter(function(m){var q=applySimilarityTransform(tf,m.cA[0],m.cA[1]);var resid=Math.hypot(q.x-m.cB[0],q.y-m.cB[1]),disp=Math.hypot(m.cB[0]-m.cA[0],m.cB[1]-m.cA[1]),pred=Math.hypot(q.x-m.cA[0],q.y-m.cA[1]);return resid<=GROUP_RESID_F*Math.max(disp,pred)+GROUP_RESID_PX;});
+            if(next.length===keep.length)break;keep=next;
+          }
+          if(!tf||keep.length<GROUP_MIN_MEMBERS)return;
+          var mag=Math.hypot(tf.wRe,tf.wIm),th=Math.atan2(tf.wIm,tf.wRe);
+          if(mag<0.5||mag>2||Math.abs(th)<GROUP_MIN_DEG*Math.PI/180)return;
+          // point fixe p = (cb − w·ca)/(1 − w) en complexe
+          var wr=tf.wRe,wi=tf.wIm,ar=tf.ca.x,ai=tf.ca.y,br=tf.cb.x,bi=tf.cb.y;
+          var nr=br-(wr*ar-wi*ai),ni=bi-(wr*ai+wi*ar),dr=1-wr,di=-wi,dd=dr*dr+di*di;
+          var ext=0;keep.forEach(function(m){m.pts.forEach(function(p){var d=Math.hypot(p[0]-ar,p[1]-ai);if(d>ext)ext=d;});});
+          var pAx=ar,pAy=ai,pBx=br,pBy=bi,fixed=false;
+          if(dd>1e-9){var px=(nr*dr+ni*di)/dd,py=(ni*dr-nr*di)/dd;if(Math.hypot(px-ar,py-ai)<=GROUP_REACH*Math.max(1,ext)){pAx=pBx=px;pAy=pBy=py;fixed=true;}}
+          gid++;var g={id:gid,theta:th,scale:Math.min(3,Math.max(0.33,mag)),pAx:pAx,pAy:pAy,pBx:pBx,pBy:pBy,n:keep.length};
+          keep.forEach(function(m){m.pr.a._group=g;});
+          gstats.push({n:keep.length,de:mem.length,deg:Math.round(th*180/Math.PI),echelle:+mag.toFixed(2),pivotFixe:fixed,membres:keep.map(function(m){return String(_origIdOf(m.pr.a._src||{})||m.pr.aId).slice(-8);})});
+        });
+        if(gstats.length){window.__twGroupStats=window.__twGroupStats||[];window.__twGroupStats.push({fA:fA,fB:fB,groupes:gstats});_mlNote('groupes rigides',{groupes:gstats});}
+      }
+    }
+    // ---- ARCS DÉDUITS DE LA CHAÎNE DE CLÉS (voir TW_ARC_FROM_CHAIN) ----
+    if(TW_ARC_FROM_CHAIN){
+      var fPrev=ki>0?keys[ki-1]:-1,fNext=ki+2<keys.length?keys[ki+2]:-1;
+      var prevC={},nextC={};
+      if(fPrev>=0)ld.frames[fPrev].strokes.forEach(function(sd){
+        if(!sd.strokeId||prevC[sd.strokeId]!==undefined)return;
+        var c=_quickCentroid(sd);if(c)prevC[sd.strokeId]=c;
+      });
+      if(fNext>=0){
+        var ldLook={frames:{}};
+        ldLook.frames[fB]=JSON.parse(JSON.stringify(ld.frames[fB]));
+        ldLook.frames[fNext]=JSON.parse(JSON.stringify(ld.frames[fNext]));
+        var look=null;
+        try{look=_spanPairSpecs(ldLook,li,fB,fNext,ld.frames[fA].strokes);}catch(e){look=null;}
+        if(look)look.pairSpecs.forEach(function(sp){
+          if(sp.isPiece)return;
+          var id=sp.aData.strokeId,c=_quickCentroid(sp.bData);
+          if(id&&c&&nextC[id]===undefined)nextC[id]=c;
+        });
+      }
+      var _ang=function(u,v){var lu=Math.hypot(u[0],u[1]),lv=Math.hypot(v[0],v[1]);if(lu<1e-6||lv<1e-6)return 0;return Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv))))*180/Math.PI;};
+      // 1) tangentes brutes par paire, depuis la chaîne du trait
+      var raw=[];
+      pairs.forEach(function(pr){
+        var pA=pr.cA,pB=pr.cB;if(!pA||!pB)return;
+        var base=(pr.aId||'').split('#')[0];
+        var pP=prevC[base]||null,pN=nextC[pr.bId]||nextC[base]||null;
+        var dAB=[pB[0]-pA[0],pB[1]-pA[1]],L=Math.hypot(dAB[0],dAB[1]);
+        if(L<ARC_MIN_PX)return;
+        var tA=null,tB=null;
+        if(pP&&_ang([pA[0]-pP[0],pA[1]-pP[1]],dAB)<=ARC_REVERSAL_DEG)tA=[(pB[0]-pP[0])/2,(pB[1]-pP[1])/2];
+        if(pN&&_ang(dAB,[pN[0]-pB[0],pN[1]-pB[1]])<=ARC_REVERSAL_DEG)tB=[(pN[0]-pA[0])/2,(pN[1]-pA[1])/2];
+        raw.push({pr:pr,pA:pA,pB:pB,dAB:dAB,L:L,tA:tA,tB:tB});
+      });
+      // 2) COHÉRENCE DE RÉGION (2026-09-05, Cyril sur Untitled (4) : « les deux
+      // traits du nez ont du retard par rapport au trait du nez et aux
+      // yeux »). Mesuré : sans arcs, nez, narines et yeux avancent EXACTEMENT
+      // en phase (11, 23, 35, 47 %…) ; avec les arcs par trait, le nez —
+      // dont l'identifiant change à la clé suivante, donc sans chaîne —
+      // restait droit pendant que narines et œil suivaient une courbe, et
+      // le visage se désynchronisait à mi-portée. Un arc est une propriété
+      // du mouvement d'une RÉGION, pas d'un trait : les tangentes sont
+      // lissées entre voisins (moyenne pondérée par la distance, rayon
+      // ARC_COHERENCE_FRAC × diagonale du dessin) et un trait sans chaîne
+      // hérite de celles de ses voisins. Une région rigide partage ainsi une
+      // seule courbure et ses traits restent en phase.
+      var R=Math.max(40,(typeof _matchNorm==='number'?_matchNorm:0)*ARC_COHERENCE_FRAC);
+      var smooth=function(field){return raw.map(function(ri){var sx=0,sy=0,sw=0;
+        raw.forEach(function(rj){var t=rj[field];if(!t)return;var d=Math.hypot(rj.pA[0]-ri.pA[0],rj.pA[1]-ri.pA[1]);if(d>R)return;var w=1/(1+d/R);sx+=t[0]*w;sy+=t[1]*w;sw+=w;});
+        return sw>0?[sx/sw,sy/sw]:null;});};
+      var tAs=smooth('tA'),tBs=smooth('tB');
+      raw.forEach(function(ri,k){
+        var tA=tAs[k],tB=tBs[k],dAB=ri.dAB,L=ri.L;
+        if(!tA&&!tB)return;
+        var out=tA?[tA[0]*ARC_TENSION/3,tA[1]*ARC_TENSION/3]:[dAB[0]/3,dAB[1]/3];
+        var inn=tB?[-tB[0]*ARC_TENSION/3,-tB[1]*ARC_TENSION/3]:[-dAB[0]/3,-dAB[1]/3];
+        var cap=ARC_MAX_FRAC*L,lo=Math.hypot(out[0],out[1]),lin=Math.hypot(inn[0],inn[1]);
+        if(lo>cap){out[0]*=cap/lo;out[1]*=cap/lo;}
+        if(lin>cap){inn[0]*=cap/lin;inn[1]*=cap/lin;}
+        _chainArcs[arcKey(fA,fB,ri.pr.mi,li)]={out:out,'in':inn};
+      });
+    }
     var gap=fB-fA;
     for(var fi=fA+1;fi<fB;fi++){
       // A frame flagged isManualEdit was hand-corrected after a previous
@@ -4298,12 +7099,12 @@ function generateTweens(explicitRestrictTo,skipUndo){
         var bd=_backdropFromCenterSegs(geomSrc.centerSegments,bd0.fillColor,op);
         bd.__zKey=rank-1e-4;tw.push(bd);
       }
-      function pushFade(sd,rank,mul,dabsByGroup,backdropsById){
+      function pushFade(sd,rank,mul,dabsByGroup,backdropsById,mapPt){
         var c=JSON.parse(JSON.stringify(sd));c.opacity=(c.opacity!==undefined?c.opacity:1)*mul;c.__zKey=rank;
         if(c.opacity>0.02)tw.push(c);
         var grp=sd.brushTexturePreset&&sd.brushGroupId&&dabsByGroup[sd.brushGroupId];
         if(grp)grp.forEach(function(d){
-          var dc=JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank+1e-4; // see +1e-4 comment above (vector-dab branch)
+          var dc=mapPt?_transportStroke(d,mapPt):JSON.parse(JSON.stringify(d));dc.opacity=(dc.opacity!==undefined?dc.opacity:1)*mul;dc.__zKey=rank+1e-4; // see +1e-4 comment above (vector-dab branch)
           if(dc.opacity>0.02)tw.push(dc);
         });
         if(backdropsById)pushBackdropFor(sd,sd,rank,mul,backdropsById);
@@ -4313,7 +7114,7 @@ function generateTweens(explicitRestrictTo,skipUndo){
       // legacy opacity ramp (see _vanishPlanFor for which strokes get
       // which). Clamped: an overshooting easing curve (back/elastic) can
       // push et2 outside [0,1].
-      function pushVanish(sd,plan,rank,keep,dabsByGroup,backdropsById){
+      function pushVanish(sd,plan,rank,keep,dabsByGroup,backdropsById,mapPt){
         keep=Math.max(0,Math.min(1,keep));
         if(plan.mode==='trim'){
           if(keep<=0.02)return;
@@ -4323,10 +7124,16 @@ function generateTweens(explicitRestrictTo,skipUndo){
           if(backdropsById)pushBackdropFor(sd,pc,rank,1,backdropsById);
           return;
         }
-        pushFade(sd,rank,keep,dabsByGroup,backdropsById);
+        pushFade(sd,rank,keep,dabsByGroup,backdropsById,mapPt);
       }
-      fadeOutA.forEach(function(sd,fi2){pushVanish(sd,outPlans[fi2],unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup,sAsplit.backdropsById);});
-      fadeInB.forEach(function(sd,fi2){pushVanish(sd,inPlans[fi2],unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup,sBsplit.backdropsById);});
+      // TW_ORPHAN_FOLLOW: a vanishing stroke rides the span field — an A
+      // orphan heads toward where the field says it would be in B while it
+      // fades/retracts, a B orphan starts from where it would have been in A.
+      var _u=Math.max(0,Math.min(1,et2));
+      var mapA=(_spanField&&_spanField.ab)?function(x,y){var q=_spanField.ab(x,y);return{x:x+(q.x-x)*_u,y:y+(q.y-y)*_u};}:null;
+      var mapB=(_spanField&&_spanField.ba)?function(x,y){var q=_spanField.ba(x,y);return{x:x+(q.x-x)*(1-_u),y:y+(q.y-y)*(1-_u)};}:null;
+      fadeOutA.forEach(function(sd,fi2){pushVanish((mapA&&!sd.isRaster)?_transportStroke(sd,mapA):sd,outPlans[fi2],unA[fi2]/Math.max(1,sA.length-1),1-et2,sAsplit.dabsByGroup,sAsplit.backdropsById,mapA);});
+      fadeInB.forEach(function(sd,fi2){pushVanish((mapB&&!sd.isRaster)?_transportStroke(sd,mapB):sd,inPlans[fi2],unB[fi2]/Math.max(1,sB.length-1),et2,sBsplit.dabsByGroup,sBsplit.backdropsById,mapB);});
       // Per-element manual tween mode (2026-07): when this pair is in
       // manual mode (ld.frames[fA].tweenManualMode), any stroke NOT
       // flagged data.tweenOn is held — copied UNCHANGED into every
@@ -4445,7 +7252,12 @@ function computeArcMatchBase(){
     forcedAIdx[aIdx]=1;forcedBIdx[bIdx]=1;
     forcedPairs.push({a:aIdx,b:bIdx,mi:-1-forcedPairs.length});
   });
-  var matches=autoMatch(sA,sB);if(!matches.length&&!forcedPairs.length)return null;
+  // same provenance pins + solver pins as _spanPairSpecs, so the arcs and
+  // the reassign badge show exactly what generation will do
+  _provenancePins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){forcedPairs.push({a:pp.a,b:pp.b,mi:-1-forcedPairs.length,provenance:true});});
+  _identityPins(sA,sB,forcedAIdx,forcedBIdx).forEach(function(pp){forcedPairs.push({a:pp.a,b:pp.b,mi:-1-forcedPairs.length,identity:true});});
+  var pins=forcedPairs.map(function(fp){return{a:fp.a,b:fp.b};});
+  var matches=autoMatch(sA,sB,null,pins);if(!matches.length&&!forcedPairs.length)return null;
   return {fA:fA,fB:fB,sA:sA,sB:sB,spA:spA,spB:spB,matches:matches,forcedAIdx:forcedAIdx,forcedBIdx:forcedBIdx,forcedPairs:forcedPairs};
 }
 function computeArcMatchState(){
