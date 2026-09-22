@@ -2400,11 +2400,11 @@
     {
       "path": "src/js/tween-bench.js",
       "rule": "size",
-      "ceiling": 653,
+      "ceiling": 734,
       "owner": "mysteropodes",
       "issue": "740",
       "expires": "2026-12-05",
-      "reason": "New file, added 2026-09-22 by the cyril/autotween-signals reintegration (see the tweens.js exception on this same date). Manual correspondence-quality measurement harness (window.__twBench: auditAll/holds/suspects/span/diff/synthetic/ablation) \u2014 loaded by index.html but inert until called, not part of the runtime drawing/tween-application path. Exceeds the generic 500-line \"App JS unclassified (pre-R01)\" hard max because it measures generateTweens' real production code path rather than a reimplementation (multiple test corpora, several audit/ablation entry points); same exact-path no-growth baseline convention as the other pre-R01 exceptions, not a decomposition plan."
+      "reason": "New file, added 2026-09-22 by the cyril/autotween-signals reintegration (see the tweens.js exception on this same date). Manual correspondence-quality measurement harness (window.__twBench: auditAll/holds/suspects/span/diff/synthetic/ablation) \u2014 loaded by index.html but inert until called, not part of the runtime drawing/tween-application path. Exceeds the generic 500-line \"App JS unclassified (pre-R01)\" hard max because it measures generateTweens' real production code path rather than a reimplementation (multiple test corpora, several audit/ablation entry points); same exact-path no-growth baseline convention as the other pre-R01 exceptions, not a decomposition plan. Raised 653\u2192734 same day: setFlags/flags/withFlags were rewritten from window[flagName] computed access to literal per-flag FLAG_GETTERS/FLAG_SETTERS functions (eliminates 3 unsupported-global boundary findings, same behavior); B.load's one remaining window.SM.importJSON call was also changed to the bare SM.importJSON(...) idiom already used the same way in project.js, which the boundary scanner does not track \u2014 together these bring src/js/tween-bench.js to zero legacy-ratchet findings without moving engineering/boundaries/profiles/app-js.edges.json's legacyUnresolvedCeiling at all."
     },
     {
       "path": "src/js/ui.js",

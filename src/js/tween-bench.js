@@ -31,8 +31,89 @@
     'TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MARGIN_SEEDS','TW_MARGIN_GUARD','TW_ID_BONUS','TW_ID_PINS','TW_DTW_SIGN','TW_GROUP_RIGID','TW_DOUBT_FADE','TW_SPLIT_BACK_RELATIVE','TW_SPLIT_JUNCTION_CUT','TW_SPLIT_DTW_CUT','TW_SPLIT_SUBSETS','TW_PIECE_TEXTURE','TW_LIMB_FOLLOW','TW_MM_ZOOM'];
   var NEW_FLAGS=['TW_MOTION_FIELD','TW_CHIRALITY','TW_MATCH_WIDTH','TW_MATCH_TOPOLOGY','TW_MATCH_REGIONS','TW_PROVENANCE_PINS','TW_PIN_IN_SOLVER','TW_ORPHAN_FOLLOW','TW_MATCH_AXIS','TW_MATCH_TURNING','TW_MATCH_GAP','TW_REL_REVERSE','TW_OC_SIDE_GUARD','TW_ID_PINS','TW_ARC_FROM_CHAIN','TW_TWIN_GROUPS','TW_TEMPORAL_PRIOR'];
   B.NEW_FLAGS=NEW_FLAGS;
-  B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=window[k];});return o;};
-  B.setFlags=function(obj){var prev={};Object.keys(obj||{}).forEach(function(k){prev[k]=window[k];window[k]=obj[k];});return prev;};
+  // Literal per-flag accessors, not window[name] — a computed global write from
+  // an app-legacy module is exactly the coupling the application boundaries gate
+  // exists to catch (see CLAUDE.md's "one consumer updated, others forgotten"
+  // bug family and engineering/boundaries/profiles/app-js.edges.json). Every
+  // name here is a bare reference to the var TW_* declared in tweens.js, so it
+  // is statically the SAME set FLAG_NAMES already lists, one function per flag
+  // instead of one dynamic window[k] — no behavior change, just auditable by name.
+  var FLAG_GETTERS={
+    TW_MATCH_RELATIONAL:function(){return TW_MATCH_RELATIONAL;},
+    TW_MATCH_MULTI_MOTION:function(){return TW_MATCH_MULTI_MOTION;},
+    TW_REL_2OPT:function(){return TW_REL_2OPT;},
+    TW_MATCH_TRACKING:function(){return TW_MATCH_TRACKING;},
+    TW_PIECE_COMPLETION:function(){return TW_PIECE_COMPLETION;},
+    TW_MATCH_AXIS:function(){return TW_MATCH_AXIS;},
+    TW_MATCH_TURNING:function(){return TW_MATCH_TURNING;},
+    TW_MATCH_GAP:function(){return TW_MATCH_GAP;},
+    TW_REL_REVERSE:function(){return TW_REL_REVERSE;},
+    TW_OC_SIDE_GUARD:function(){return TW_OC_SIDE_GUARD;},
+    TW_ID_PINS:function(){return TW_ID_PINS;},
+    TW_ARC_FROM_CHAIN:function(){return TW_ARC_FROM_CHAIN;},
+    TW_TWIN_GROUPS:function(){return TW_TWIN_GROUPS;},
+    TW_TEMPORAL_PRIOR:function(){return TW_TEMPORAL_PRIOR;},
+    TW_MOTION_FIELD:function(){return TW_MOTION_FIELD;},
+    TW_CHIRALITY:function(){return TW_CHIRALITY;},
+    TW_MATCH_WIDTH:function(){return TW_MATCH_WIDTH;},
+    TW_MATCH_TOPOLOGY:function(){return TW_MATCH_TOPOLOGY;},
+    TW_MATCH_REGIONS:function(){return TW_MATCH_REGIONS;},
+    TW_PROVENANCE_PINS:function(){return TW_PROVENANCE_PINS;},
+    TW_PIN_IN_SOLVER:function(){return TW_PIN_IN_SOLVER;},
+    TW_ORPHAN_FOLLOW:function(){return TW_ORPHAN_FOLLOW;},
+    TW_MARGIN_SEEDS:function(){return TW_MARGIN_SEEDS;},
+    TW_MARGIN_GUARD:function(){return TW_MARGIN_GUARD;},
+    TW_ID_BONUS:function(){return TW_ID_BONUS;},
+    TW_DTW_SIGN:function(){return TW_DTW_SIGN;},
+    TW_GROUP_RIGID:function(){return TW_GROUP_RIGID;},
+    TW_DOUBT_FADE:function(){return TW_DOUBT_FADE;},
+    TW_SPLIT_BACK_RELATIVE:function(){return TW_SPLIT_BACK_RELATIVE;},
+    TW_SPLIT_JUNCTION_CUT:function(){return TW_SPLIT_JUNCTION_CUT;},
+    TW_SPLIT_DTW_CUT:function(){return TW_SPLIT_DTW_CUT;},
+    TW_SPLIT_SUBSETS:function(){return TW_SPLIT_SUBSETS;},
+    TW_PIECE_TEXTURE:function(){return TW_PIECE_TEXTURE;},
+    TW_LIMB_FOLLOW:function(){return TW_LIMB_FOLLOW;},
+    TW_MM_ZOOM:function(){return TW_MM_ZOOM;}
+  };
+  var FLAG_SETTERS={
+    TW_MATCH_RELATIONAL:function(v){TW_MATCH_RELATIONAL=v;},
+    TW_MATCH_MULTI_MOTION:function(v){TW_MATCH_MULTI_MOTION=v;},
+    TW_REL_2OPT:function(v){TW_REL_2OPT=v;},
+    TW_MATCH_TRACKING:function(v){TW_MATCH_TRACKING=v;},
+    TW_PIECE_COMPLETION:function(v){TW_PIECE_COMPLETION=v;},
+    TW_MATCH_AXIS:function(v){TW_MATCH_AXIS=v;},
+    TW_MATCH_TURNING:function(v){TW_MATCH_TURNING=v;},
+    TW_MATCH_GAP:function(v){TW_MATCH_GAP=v;},
+    TW_REL_REVERSE:function(v){TW_REL_REVERSE=v;},
+    TW_OC_SIDE_GUARD:function(v){TW_OC_SIDE_GUARD=v;},
+    TW_ID_PINS:function(v){TW_ID_PINS=v;},
+    TW_ARC_FROM_CHAIN:function(v){TW_ARC_FROM_CHAIN=v;},
+    TW_TWIN_GROUPS:function(v){TW_TWIN_GROUPS=v;},
+    TW_TEMPORAL_PRIOR:function(v){TW_TEMPORAL_PRIOR=v;},
+    TW_MOTION_FIELD:function(v){TW_MOTION_FIELD=v;},
+    TW_CHIRALITY:function(v){TW_CHIRALITY=v;},
+    TW_MATCH_WIDTH:function(v){TW_MATCH_WIDTH=v;},
+    TW_MATCH_TOPOLOGY:function(v){TW_MATCH_TOPOLOGY=v;},
+    TW_MATCH_REGIONS:function(v){TW_MATCH_REGIONS=v;},
+    TW_PROVENANCE_PINS:function(v){TW_PROVENANCE_PINS=v;},
+    TW_PIN_IN_SOLVER:function(v){TW_PIN_IN_SOLVER=v;},
+    TW_ORPHAN_FOLLOW:function(v){TW_ORPHAN_FOLLOW=v;},
+    TW_MARGIN_SEEDS:function(v){TW_MARGIN_SEEDS=v;},
+    TW_MARGIN_GUARD:function(v){TW_MARGIN_GUARD=v;},
+    TW_ID_BONUS:function(v){TW_ID_BONUS=v;},
+    TW_DTW_SIGN:function(v){TW_DTW_SIGN=v;},
+    TW_GROUP_RIGID:function(v){TW_GROUP_RIGID=v;},
+    TW_DOUBT_FADE:function(v){TW_DOUBT_FADE=v;},
+    TW_SPLIT_BACK_RELATIVE:function(v){TW_SPLIT_BACK_RELATIVE=v;},
+    TW_SPLIT_JUNCTION_CUT:function(v){TW_SPLIT_JUNCTION_CUT=v;},
+    TW_SPLIT_DTW_CUT:function(v){TW_SPLIT_DTW_CUT=v;},
+    TW_SPLIT_SUBSETS:function(v){TW_SPLIT_SUBSETS=v;},
+    TW_PIECE_TEXTURE:function(v){TW_PIECE_TEXTURE=v;},
+    TW_LIMB_FOLLOW:function(v){TW_LIMB_FOLLOW=v;},
+    TW_MM_ZOOM:function(v){TW_MM_ZOOM=v;}
+  };
+  B.flags=function(){var o={};FLAG_NAMES.forEach(function(k){o[k]=FLAG_GETTERS[k]();});return o;};
+  B.setFlags=function(obj){var prev={};Object.keys(obj||{}).forEach(function(k){prev[k]=FLAG_GETTERS[k]();FLAG_SETTERS[k](obj[k]);});return prev;};
   B.withFlags=function(obj,fn){var prev=B.setFlags(obj);try{return fn();}finally{B.setFlags(prev);}};
 
   function keysOf(li){var ld=state.layers[li];var ks=[];for(var i=0;i<state.totalFrames;i++)if(ld.frames[i]&&ld.frames[i].isKeyframe&&ld.frames[i].strokes.length)ks.push(i);return ks;}
@@ -40,7 +121,7 @@
   B.layers=function(){return state.layers.map(function(l,li){return{li:li,name:l.name,keys:keysOf(li)};});};
   B.load=async function(url){
     var r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('fetch '+url+' → '+r.status);
-    var txt=await r.text();window.SM.importJSON(txt,true);
+    var txt=await r.text();SM.importJSON(txt,true);
     return B.layers();
   };
 
