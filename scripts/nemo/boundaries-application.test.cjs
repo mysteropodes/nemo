@@ -195,7 +195,10 @@ test('every exclusion retains explicit classification, evidence and nested conte
 test('application size enforcement ignores known graph debt but rejects growth and expired exceptions', (t) => {
   const current = checkApplicationSize(read('app-js.profile.json'), { root: ROOT });
   assert.equal(current.ok, true);
-  assert.equal(current.exceptionsApplied.length, 36);
+  // 37, not 36: the 2026-09-22 cyril/autotween-signals reintegration raised the
+  // existing tweens.js ceiling (deliberate growth, not drift) and added a new
+  // exception for tween-bench.js (new file, exceeds the generic pre-R01 hard max).
+  assert.equal(current.exceptionsApplied.length, 37);
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo app size '));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

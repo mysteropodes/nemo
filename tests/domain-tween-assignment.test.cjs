@@ -106,9 +106,15 @@ test('the input matrix is never mutated and the result is a fresh array', () => 
 
 // ---- check 3: production matching invokes the module -----------------------
 
-test('routing guard: the four tweens.js matchers call NemoTweenAssignment.solve and the inline body is gone', () => {
+test('routing guard: the five tweens.js matchers call NemoTweenAssignment.solve and the inline body is gone', () => {
   const calls = tweensSource.match(/NemoTweenAssignment\.solve\(/g) || [];
-  assert.equal(calls.length, 4, 'autoMatchJS cost pass, refinement pass, relational augmentation loop and the second matcher');
+  // Five, not four: the 2026-09-22 cyril/autotween-signals reintegration split the
+  // refinement pass into two branches (multi-motion/zoom hypothesis loop vs. the
+  // plain fallback when fewer than 6 strokes are on either side), each with its
+  // own solve() call — autoMatchJS cost pass, refinement-with-hypotheses,
+  // refinement-without-hypotheses, the relational augmentation loop and the
+  // second matcher.
+  assert.equal(calls.length, 5, 'autoMatchJS cost pass, refinement pass (with and without motion hypotheses), relational augmentation loop and the second matcher');
   assert.doesNotMatch(tweensSource, /function hungarian\(/, 'the facade is retired, not kept as a second copy');
   assert.doesNotMatch(tweensSource, /\bhungarian\(/, 'no call site still reaches a removed function');
   // The reference comment to geometry-wasm's port stays with the matcher; the algorithm itself does not.

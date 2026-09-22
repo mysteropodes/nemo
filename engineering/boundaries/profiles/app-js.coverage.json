@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "95cbdbbca6cc79721333cd6449ac08493faee589",
-    "sourceRootTree": "b691f315f4b2952d09954ef6730242e99ab75c91",
+    "candidateCommit": "a413759f8f5684c19fa37679fb9858d49b5a72fb",
+    "sourceRootTree": "0155ae0c26cfb49a4c57f6b7254897a244c0586e",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "4a631f8a7552b93f4fcbec72a84f2a192dbbb720",
-      "lastChangedCommit": "3eb23ea784a7f5e90d5b56b7f5bfc9d12b7f4300"
+      "gitTree": "da5d27f9523fd96cc9d0614bf8c14def2c07059c",
+      "lastChangedCommit": "a413759f8f5684c19fa37679fb9858d49b5a72fb"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "a3c1c9c2496cbfa0e2a774abba20e561769c51ec",
-      "sha256": "77fe014a42f59d15b94635307ed522fa30da413fb230a9740987d45b4a394de2",
-      "lastChangedCommit": "2d165a87d8ead5cc92226d24c3c227a3fe2cfef6"
+      "gitBlob": "6575adc7724da011d5e38279311f8f2555a81c9d",
+      "sha256": "2111220e1d8963f3fc6c2cd6bd2aa952666b297483689bba046fc21a2d68f2da",
+      "lastChangedCommit": "a413759f8f5684c19fa37679fb9858d49b5a72fb"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "0c988507ec61a72b9fe068dd96ea9ee522e95834c3b0069a8f794b91fc89d4ec"
+      "value": "a63e98031df4046e999b10a269481e92746c7275780f2796baaa6b3be85e8b03"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "f7aa6ff7108e8db865089a4322265dea138b7465",
-        "sha256": "b79f490f87b02ea0c17c22736df7a8d8be326e61bc9d33b1bdf3ad16b2fbeb32",
-        "moduleCount": 168,
-        "basedOnCommit": "95cbdbbca6cc79721333cd6449ac08493faee589"
+        "gitBlob": "ec6c53f68964fc0c7c672aaabceeab751b59af23",
+        "sha256": "36814adc5defaa0c014a0fc65fa8d8f0005bb8095ff72e081dc2061f59261353",
+        "moduleCount": 169,
+        "basedOnCommit": "a413759f8f5684c19fa37679fb9858d49b5a72fb"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -2242,8 +2242,20 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2301,
-          "scriptOrdinal": 7
+          "line": 2314,
+          "scriptOrdinal": 9
+        }
+      ]
+    },
+    {
+      "path": "src/js/tween-bench.js",
+      "moduleId": "app.tween-bench",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2315,
+          "scriptOrdinal": 11
         }
       ]
     },

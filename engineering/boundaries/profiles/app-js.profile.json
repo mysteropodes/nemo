@@ -2015,6 +2015,18 @@
       "publicApi": [
         "project-entry.js"
       ]
+    },
+    {
+      "id": "app.tween-bench",
+      "layer": "app-legacy",
+      "dir": "src/js",
+      "files": [
+        "tween-bench.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "tween-bench.js"
+      ]
     }
   ],
   "layerRules": {
@@ -2379,11 +2391,20 @@
     {
       "path": "src/js/tweens.js",
       "rule": "size",
-      "ceiling": 5270,
-      "owner": "ivg-design",
+      "ceiling": 8050,
+      "owner": "mysteropodes",
       "issue": "901",
       "expires": "2026-12-05",
-      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system."
+      "reason": "Legacy pre-R01 file; one of the six largest, most-central application systems already discussed in this repo's own CLAUDE.md (\u00a73/\u00a75 hybrid Paper.js/Rust pipeline notes) \u2014 ceiling captured as an exact-path no-growth baseline pending real domain/feature/adapter layer classification (R01/#897), not a decomposition plan for a documented central system. Raised 5270\u21928050 on 2026-09-22: reintegration of cyril/autotween-signals (38 commits of correspondence-quality work \u2014 motion-field seeding, identity/provenance pins, DTW sign/lost-weight, split/junction handling, multi-motion and zoom hypotheses, limb-follow), explicitly authorized by Cyrill. Deliberate, reviewed growth, not drift; new exact-path baseline for future no-growth enforcement."
+    },
+    {
+      "path": "src/js/tween-bench.js",
+      "rule": "size",
+      "ceiling": 653,
+      "owner": "mysteropodes",
+      "issue": "740",
+      "expires": "2026-12-05",
+      "reason": "New file, added 2026-09-22 by the cyril/autotween-signals reintegration (see the tweens.js exception on this same date). Manual correspondence-quality measurement harness (window.__twBench: auditAll/holds/suspects/span/diff/synthetic/ablation) \u2014 loaded by index.html but inert until called, not part of the runtime drawing/tween-application path. Exceeds the generic 500-line \"App JS unclassified (pre-R01)\" hard max because it measures generateTweens' real production code path rather than a reimplementation (multiple test corpora, several audit/ablation entry points); same exact-path no-growth baseline convention as the other pre-R01 exceptions, not a decomposition plan."
     },
     {
       "path": "src/js/ui.js",
