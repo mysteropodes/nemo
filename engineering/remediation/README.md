@@ -13,6 +13,10 @@ Use the single execution checklist in [English](EXECUTION_PLAN.en.md) or
 model/effort guidance, tests, check-ins, Git workflow, board updates and completion gate.
 The baseline is the exact observed state, including defects. The goal is modular ownership,
 testing, enforced boundaries and feature contracts served through the bundled Rust MCP.
+Since the 2026-09-22 separation, operational `main` is preserved and remediation task PRs
+target protected `codex/native-remediation`. Intermediate features may be explicitly
+unavailable without old-engine fallback; final promotion requires every agreed baseline
+workflow and applicable surface, not merely completion of the first native slice.
 
 Track execution on [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1)
 and team summaries in the [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062).

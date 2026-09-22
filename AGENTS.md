@@ -21,7 +21,8 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   [English](engineering/remediation/EXECUTION_PLAN.en.md) /
   [français](engineering/remediation/EXECUTION_PLAN.fr.md). Its human-approved
   2026-09-07 scope and workflow, as amended by the approved 2026-09-20
-  native-engine pivot, supersede older plans, phase gates and agent playbooks.
+  native-engine pivot and 2026-09-22 native-only separation, supersede older plans,
+  phase gates and agent playbooks.
   The [short entry point](engineering/remediation/README.md) links the four supporting
   references. The archived handbook is historical context, not a required reading list.
 - Read [current and target architecture](engineering/remediation/reference/01_CURRENT_AND_TARGET.md),
@@ -34,24 +35,30 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   each. Reuse one branch per outcome across sprints; keep at most two writable task
   worktrees plus the primary checkout per machine. Progress and handoffs belong in the
   existing issue, not new report PRs or additional ledgers.
+- Keep operational `main` unchanged by interim remediation. Target remediation task PRs
+  to the shared protected `codex/native-remediation` integration branch; unrelated product
+  work retains its separately approved destination. Only a fully accepted final promotion
+  PR takes the integrated remediation to `main`.
 - The checklist contains portable workflows and the compact claim/handoff format. No
   personal skill installation or Buzz enrollment is required for this remediation.
   Existing packet/receipt templates are reference material, not extra required documents.
 
 ## Remediation scope
 
-- Baseline means the exact observed current state, including identified failures and
-  unavailable checks. Preserve that evidence; do not repair unrelated features first.
+- Distinguish the original agreed functional baseline, the operational preservation
+  point and the remediation starting SHA. Preserve observed defects and unavailable
+  checks; do not repair unrelated features first or silently narrow final parity.
 - Finish module boundaries, one writable state authority, regression tests, enforcement,
   feature declarations and their shared application API/bundled Rust MCP integration.
   Existing broken features need explicit availability and isolated ownership, not a
   product fix as a prerequisite to remediation completion.
 - Execute the approved native-engine migration in bounded, dependency-gated slices:
   keep the Tauri/JavaScript interface, move document revision/evaluation/media/GPU/
-  viewport/export authority into Rust, and retain Paper.js only as a compatibility
-  editor/hit-test adapter until each legacy writer is proven safe to retire. Until a
-  slice is merged and accepted, the observed JavaScript/Paper runtime remains baseline,
-  not evidence that the target architecture is already implemented.
+  viewport/export authority into Rust, and retain Paper.js only for justified geometry,
+  hit-testing or presentation. On the remediation branch, disconnect an obsolete
+  JavaScript/Paper writer before its replacement reaches final parity if necessary; an
+  unmigrated feature must report unavailable and cannot fall back to that writer. Full
+  agreed baseline functionality and surface coverage remain required at final promotion.
 - R03/R05 and the other broad issues are tracking parents. Only named executable leaf
   dependencies block work; their whole-issue closure is not a global extraction gate.
 - New OpenFX effects, full OCIO/EXR/OTIO implementations, expanded Buzz transport/
@@ -71,6 +78,13 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   protections and coordinate actual shared decisions without a routine cross-team gate.
 - Read `CONTRIBUTING.md`, inspect current source, related branches and existing ownership,
   then use a dedicated branch and isolated worktree for tracked changes.
+- For remediation, base task branches on the reviewed integration SHA and use normal
+  protected-branch review. The initial metadata-only policy amendment needs an eligible
+  other-account GitHub approval because the live workflow supports `main` only. Once that
+  amendment is accepted and verified on the protected integration branch, eligible
+  collaborator PRs may use its explicit policy-only manual dispatch at that branch's ref
+  and exact PR; automatic PR events remain `main`-only. Never bypass protection or run
+  hosted product CI to get an approval.
 - Record the outcome, scope, dependencies, base, branch/worktree, acceptance checks,
   reviewer, and publication authority before writing. Repository-relative paths coordinate
   ownership; they are not a user-maintained filesystem permission list.
