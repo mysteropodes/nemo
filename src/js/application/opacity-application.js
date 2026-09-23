@@ -57,11 +57,11 @@ var NemoOpacityApplicationCore = (function () {
         documentId: request.documentId, expectedRevision: request.expectedRevision,
         operation: request.operation, payload: request.payload });
     }
-    function remember(request, body, result) {
+    function remember(request, body, result, stateBefore) {
       if (!WRITES.includes(request.operation)) return;
       retained.set(request.requestId, { body: body, result: clone(result) });
       if (retained.size > 256) retained.delete(retained.keys().next().value);
-      diagnostics.remember(request, result);
+      diagnostics.remember(request, result, stateBefore);
     }
     function property(request) {
       var p = request.payload, state = ports.state();
@@ -140,9 +140,15 @@ var NemoOpacityApplicationCore = (function () {
       if (WRITES.includes(request.operation) && !ports.canMutate()) return fail(request, 'unavailable', 'An interactive gesture owns the document.');
       if (editing) return fail(request, 'unavailable', 'A document edit is already in progress.');
       editing = request.operation !== 'diagnostics.replay';
+      // Snapshot BEFORE performing: the trace records what each command
+      // assumed, which is what makes a reproduction bundle replayable from
+      // the right starting point (T10/#1399). Taken only for writes that are
+      // actually recorded, and only once per write -- reads never reach here
+      // with a WRITES operation, and `perform` mutates the same state object.
+      var stateBefore = WRITES.includes(request.operation) ? clone(ports.state()) : undefined;
       var result;
       try { result = perform(request); } finally { editing = false; }
-      remember(request, body, result);
+      remember(request, body, result, stateBefore);
       return result;
     }
     return { handle: handle, setInstanceId: setInstanceId, documentChanged: documentChanged,
