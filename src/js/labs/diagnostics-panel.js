@@ -69,6 +69,52 @@
       '</tr>';
   }
 
+  // ---- report link (T10/#1399) -------------------------------------------
+  // Turns the trace the panel already shows into T07's reproduction bundle.
+  // The fixture hash is SHA-256 over the recorded pre-state of the OLDEST
+  // RETAINED entry -- the state that window actually replays from, which
+  // stops being wherever the trace began as soon as the ring evicts anything.
+  // crypto.subtle is deliberate: it is the one digest available in both the
+  // webview and Node, and it emits the same bytes as the node `crypto`
+  // sha256 behind T07's fixture hashing, so a bundle reported from the app is
+  // verifiable against a synthetic fixture. Async is fine -- this runs on a
+  // click, never per write.
+  async function sha256Hex(value) {
+    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
+    return Array.from(new Uint8Array(digest)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  async function buildReport(entries) {
+    var codec = window.NemoOpacityReproductionBundle;
+    if (!codec) return { error: 'reproduction bundle codec not loaded' };
+    if (!entries || !entries.length) return { error: 'no recorded commands to report' };
+    // No recorded pre-state means the bundle cannot say what it replays from.
+    // Refuse, rather than hash the CURRENT state and label it "starting" --
+    // that yields a bundle that looks replayable and diverges in silence.
+    if (entries[0].stateBefore === undefined) {
+      return { error: 'trace carries no starting state; cannot build a reproducible bundle' };
+    }
+    try {
+      var identity = window.NemoOpacityApplication.meta();
+      var hash = await sha256Hex(entries[0].stateBefore);
+      return { bundle: codec.buildBundle({ id: identity.documentId, hash: hash }, entries, null) };
+    } catch (error) {
+      return { error: (error && error.message) || 'bundle construction failed' };
+    }
+  }
+
+  function offerDownload(bundle) {
+    var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'opacity-reproduction-' + String(bundle.fixture.hash).slice(0, 12) + '.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function build() {
     if (!SMLabs.isOn('diagnostics-panel')) return;
     if (!panel) {
@@ -97,10 +143,27 @@
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
       '<b style="font-size:11px;">' + t2('labsDiagnosticsTitle') + '</b>' +
+      '<span>' +
+      '<button type="button" data-diag-report style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;margin-right:4px;">' + t2('labsDiagnosticsReport') + '</button>' +
       '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + t2('labsDiagnosticsRefresh') + '</button>' +
-      '</div>' + body;
+      '</span></div>' + body + '<div data-diag-report-status style="padding:2px 8px;color:#888;"></div>';
     var refreshBtn = panel.querySelector('[data-diag-refresh]');
     if (refreshBtn) refreshBtn.addEventListener('click', refresh);
+    var reportBtn = panel.querySelector('[data-diag-report]');
+    if (reportBtn) {
+      reportBtn.addEventListener('click', function () {
+        var status = panel.querySelector('[data-diag-report-status]');
+        // result.entries is the exact window the panel is displaying, so the
+        // bundle reports what the user is looking at -- not a re-fetch that
+        // could have moved on between render and click.
+        buildReport(result.entries).then(function (out) {
+          if (!status) return;
+          if (out.error) { status.textContent = out.error; return; }
+          offerDownload(out.bundle);
+          status.textContent = out.bundle.commands.length + ' command(s), fixture ' + String(out.bundle.fixture.hash).slice(0, 12);
+        });
+      });
+    }
     panel.querySelectorAll('tr[data-layer-idx]').forEach(function (tr) {
       var idx = parseInt(tr.getAttribute('data-layer-idx'), 10);
       if (idx < 0) return;

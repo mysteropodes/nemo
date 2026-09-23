@@ -24,11 +24,29 @@ var NemoOpacityDiagnostics = (function () {
   // and diagnostics.replay itself are deliberately excluded there already).
   function create(replayableOperations) {
     var trace = [];
-    function remember(request, result) {
-      trace.push({ request: clone(request), revision: result.revision, ok: result.ok });
+    // stateBefore: the document state as it stood BEFORE this command ran.
+    // Recorded per entry rather than once per buffer, because the ring evicts
+    // its oldest entry: after LIMIT writes the retained commands no longer
+    // start from wherever the trace began, so a single buffer-wide "starting
+    // state" would silently describe a document the surviving commands never
+    // ran against. Per entry, entries[0].stateBefore stays correct for
+    // whatever window survives eviction.
+    // Optional: a caller that supplies nothing keeps exactly the previous
+    // behaviour, and startingState() then reports undefined rather than a
+    // plausible-looking wrong answer (T10/#1399).
+    function remember(request, result, stateBefore) {
+      var entry = { request: clone(request), revision: result.revision, ok: result.ok };
+      if (stateBefore !== undefined) entry.stateBefore = clone(stateBefore);
+      trace.push(entry);
       if (trace.length > LIMIT) trace.shift();
     }
     function entries() { return clone(trace); }
+    // The state the OLDEST retained command assumed -- the starting point the
+    // entries() window as a whole replays from. undefined when no pre-state
+    // was recorded, so a caller must decide rather than be handed a guess.
+    function startingState() {
+      return trace.length && trace[0].stateBefore !== undefined ? clone(trace[0].stateBefore) : undefined;
+    }
     function clear() { trace.length = 0; }
     // identity: {instanceId, documentId, revision} of the application core
     // at replay time -- the shaped envelope always targets the CURRENT
@@ -43,7 +61,8 @@ var NemoOpacityDiagnostics = (function () {
         documentId: identity.documentId, expectedRevision: identity.revision,
         operation: recorded.operation, payload: clone(recorded.payload) } };
     }
-    return { remember: remember, entries: entries, clear: clear, prepareReplay: prepareReplay };
+    return { remember: remember, entries: entries, startingState: startingState,
+      clear: clear, prepareReplay: prepareReplay };
   }
   return { create: create, LIMIT: LIMIT };
 })();
