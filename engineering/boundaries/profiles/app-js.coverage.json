@@ -19,23 +19,23 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "7ce79b2c6550a1b67e30c8715f3a4c11f3d9bb9c",
-    "sourceRootTree": "8cf540fa3989a78d84da20f27968792e0db85c14",
+    "candidateCommit": "50686ca4158174a1ac427c08f6969d964a0449aa",
+    "sourceRootTree": "57a7b87b77bdd7cc20ba437217f7f29391c6e07d",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "f043b20140c721c1fdd365903a4acc83a46fbb12",
-      "lastChangedCommit": "7ce79b2c6550a1b67e30c8715f3a4c11f3d9bb9c"
+      "gitTree": "850a957365a145b783c769e522f4c4c6effbee41",
+      "lastChangedCommit": "50686ca4158174a1ac427c08f6969d964a0449aa"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "9a5696dfcd721545f1a2339bb21799d08c24ee16",
-      "sha256": "a5ceaf14ea8cae2bfd36fc02a2052b35f17e49b900b556256679d47228023f95",
+      "gitBlob": "44e764b0f582af16e75b0ae87e41f7fe0695408e",
+      "sha256": "ce267afae38eafa76f70fc4d23fd87ea024be290d1498499a3cb1e9529176737",
       "lastChangedCommit": "6a895c16d21a69d8b71111890d39e6834153cb6a"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "98ddfeaa8cbfb3ee1cd893dfe7f640a8ac2688e6dfdd5d9a1452f0b3da6c2b19"
+      "value": "dca3b27315b0274f3ba3fd474cfce7477af9079712be04443200f5a75809333a"
     },
     "profiles": [
       {
@@ -43,14 +43,15 @@
         "gitBlob": "ec956b6e5fd2fe6b1f6bf71202a226ed8e1f18ec",
         "sha256": "ae882235ac9b2a0698aff61d28cfbac52f56a85937d215602c4197ae255e948d",
         "moduleCount": 179,
-        "basedOnCommit": "6a895c16d21a69d8b71111890d39e6834153cb6a"
+        "basedOnCommit": "50686ca4158174a1ac427c08f6969d964a0449aa"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
         "gitBlob": "3528d014efcbcc5c5e8bf4fbe61f1786b6e80dc8",
         "sha256": "c4ae82a1eb45afbdeb148c12d3b1e2f32777cb505f5deed81ddcc1c7ba831312",
         "moduleCount": 140,
-        "preservedFromCommit": "c9ab6342abf62dd8d012c51258556e5123b13756"
+        "preservedFromCommit": "c9ab6342abf62dd8d012c51258556e5123b13756",
+        "basedOnCommit": "50686ca4158174a1ac427c08f6969d964a0449aa"
       }
     ],
     "exclusionSupport": [
