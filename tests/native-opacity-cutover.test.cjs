@@ -990,6 +990,29 @@ function installRetainedAdmission(scope, harness) {
   return releases;
 }
 
+function retainedNativeSnapshot(harness) {
+  const { controller, state } = harness;
+  assert.equal(controller.status(), 'native');
+  assert.equal(typeof controller.persistenceJSON(), 'string');
+  return JSON.stringify({ identity: controller.identity(), admission: state.lifecycle.getNativeIdentity(),
+    persistence: controller.persistenceJSON(), hostIdentity: state.identity, document: state.document,
+    history: state.history, redo: state.redo, releases: state.releases, disconnects: state.disconnects,
+    imports: state.imports, dispatches: state.dispatches });
+}
+
+async function assertRetainedNativeUnchanged(harness, releases, before, label) {
+  function unchanged() {
+    assert.equal(releases.length, 0, label);
+    assert.equal(harness.state.releases, 0, label);
+    assert.equal(harness.state.disconnects, 0, label);
+    assert.equal(harness.state.imports.length, 0, label);
+    assert.equal(retainedNativeSnapshot(harness), before, label);
+  }
+  unchanged();
+  await Promise.resolve();
+  unchanged();
+}
+
 test('18 retained raw Motion callbacks hit the production REQUIRE before their first write', async () => {
   const source = fs.readFileSync(path.join(ROOT, 'src/js/motion.js'), 'utf8');
   const tweens = fs.readFileSync(path.join(ROOT, 'src/js/tweens.js'), 'utf8');
@@ -1029,11 +1052,11 @@ test('18 retained raw Motion callbacks hit the production REQUIRE before their f
     assert.equal(releases.length, 0, 'callback is captured before native activation');
     await harness.controller.activate(harness.prepared);
     const before = JSON.stringify({ state, paper: scope.userLayers });
+    const nativeBefore = retainedNativeSnapshot(harness);
     assert.throws(() => original(...values.map((value) => value === 'holder' ? holder : value)),
       { name: 'NemoNativeReleaseRequired' }, name);
-    assert.equal(releases.length, 1, name);
-    assert.equal(releases[0].kind, 'history-checkpoint', name);
     assert.equal(JSON.stringify({ state, paper: scope.userLayers }), before, name);
+    await assertRetainedNativeUnchanged(harness, releases, nativeBefore, name);
     await harness.controller.releaseCurrent('retained-raw-test-complete');
   }
 });
@@ -1073,9 +1096,10 @@ test('20 production Motion publications protect references captured before nativ
     motion.sandbox.userLayers = [{ opacity: 0.25, children: [] }];
     await harness.controller.activate(harness.prepared);
     const before = JSON.stringify({ state, paper: motion.sandbox.userLayers });
+    const nativeBefore = retainedNativeSnapshot(harness);
     assert.equal(original(...args(holder)), deniedValue, name);
-    assert.equal(releases.length, 1, name);
     assert.equal(JSON.stringify({ state, paper: motion.sandbox.userLayers }), before, name);
+    await assertRetainedNativeUnchanged(harness, releases, nativeBefore, name);
     await harness.controller.releaseCurrent('retained-publication-test-complete');
   }
 });
@@ -1100,10 +1124,11 @@ test('captured production 3D DOM listener resolves the guarded publication dynam
   scope.userLayers = [{ opacity: 0.25, children: [] }];
   await harness.controller.activate(harness.prepared);
   const before = JSON.stringify({ state, paper: scope.userLayers });
+  const nativeBefore = retainedNativeSnapshot(harness);
   callback({ stopPropagation() {} });
-  assert.equal(dynamicCalls, 1); assert.equal(releases.length, 1);
-  assert.equal(releases[0].kind, 'motion-toggle-layer-3d');
+  assert.equal(dynamicCalls, 1);
   assert.equal(JSON.stringify({ state, paper: scope.userLayers }), before);
+  await assertRetainedNativeUnchanged(harness, releases, nativeBefore, 'retained 3D listener');
   await harness.controller.releaseCurrent('retained-3d-test-complete');
 });
 
@@ -1136,11 +1161,52 @@ test('an expression resize begun before activation cannot persist from its retai
   assert.equal(typeof up, 'function'); assert.equal(releases.length, 0);
   await harness.controller.activate(harness.prepared);
   const before = JSON.stringify({ state: scope.state, paper: scope.userLayers });
+  const nativeBefore = retainedNativeSnapshot(harness);
   assert.throws(up, { name: 'NemoNativeReleaseRequired' });
-  assert.equal(releases.length, 1); assert.equal(releases[0].kind, 'motion-expression-editor-height');
   assert.equal(JSON.stringify({ state: scope.state, paper: scope.userLayers }), before);
   assert.equal(documentListeners.size, 0);
+  await assertRetainedNativeUnchanged(harness, releases, nativeBefore, 'retained expression resize');
   await harness.controller.releaseCurrent('retained-resize-test-complete');
+});
+
+test('a real Draw gesture captured before bootstrap cannot commit or release native authority', async () => {
+  const harness = nativeHarness(staticSource());
+  const handlers = {}, calls = { suspend: 0, resume: 0, render: 0, documentAccess: 0 };
+  const target = { addEventListener(type, handler) { handlers[type] = handler; } };
+  const scope = {
+    Date, Math, performance: { now: () => 1 },
+    Point: class Point { constructor(x, y) { this.x = x; this.y = y; } },
+    state: { tool: 'draw', playing: false, stabilizer: 0, brushSize: 8,
+      pressureInvert: false, pressureMin: 0, pressureMax: 100,
+      vectorBrush: false, bitmapBrushOn: false, strokeEnabled: true,
+      fillBrushSize: 8, fillColor: '#000000', strokeColor: '#000000', opacity: 100 },
+    view: { zoom: 1 },
+    document: { readyState: 'complete', addEventListener() {}, getElementById: () => target },
+  };
+  scope.window = scope;
+  const releases = installRetainedAdmission(scope, harness);
+  scope.SMEngineBridge = { isEnabled: () => true, nativeEditGuard: scope.NemoNativeOpacityLegacyAdmission,
+    screenToWorld: (x, y) => [x, y], suspend() { calls.suspend++; },
+    resume() { calls.resume++; }, renderNow() { calls.render++; }, setPressureCursor() {} };
+  Object.defineProperty(scope, 'userLayers', { get() { calls.documentAccess++; return []; } });
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), scope);
+  function event() {
+    return { clientX: 10, clientY: 20, pressure: 0.5, stopped: 0, prevented: 0,
+      stopImmediatePropagation() { this.stopped++; }, preventDefault() { this.prevented++; } };
+  }
+  const down = event();
+  handlers.pointerdown(down);
+  assert.equal(calls.suspend, 1, 'real pre-native gesture began');
+  assert.equal(down.stopped, 1);
+  const finish = handlers.pointerup;
+  await harness.controller.activate(harness.prepared);
+  const nativeBefore = retainedNativeSnapshot(harness), callsBefore = { ...calls };
+  const up = event();
+  finish(up);
+  assert.ok(up.stopped > 0); assert.ok(up.prevented > 0);
+  assert.deepEqual(calls, callsBefore, 'no commit, Paper access, bridge resume or rendering');
+  await assertRetainedNativeUnchanged(harness, releases, nativeBefore, 'retained Draw finish');
+  await harness.controller.releaseCurrent('retained-draw-test-complete');
 });
 
 test('operations owns real resize callbacks and cancels or fences work across release and reentry', async () => {
