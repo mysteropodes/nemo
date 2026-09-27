@@ -43,7 +43,7 @@ function harness({ auto = null, version = null } = {}) {
   const document = { readyState: 'loading', body: element(), addEventListener(type, fn) { if (type === 'DOMContentLoaded') this.ready = fn; },
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element, querySelector() { return null; } };
   let rejectNextImport = false;
-  const window = { addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
+  const window = { NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
@@ -58,7 +58,7 @@ function harness({ auto = null, version = null } = {}) {
   document.body.appendChild = node => downloads.push(node.download);
   vm.runInNewContext(source, context, { filename: 'project.js' });
   document.ready();
-  return { input: document.getElementById('file-input'), downloads, toasts, project: window.SMProject, elements, rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; } };
+  return { window, input: document.getElementById('file-input'), downloads, toasts, project: window.SMProject, elements, rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; } };
 }
 
 function select(app, file) { app.input.listeners.change({ target: { files: file ? [file] : [], value: 'selected' } }); }
@@ -164,4 +164,29 @@ test('closing the first active tab selects a surviving document', () => {
   assert.equal(JSON.parse(app.json).title, 'second');
   app.json = JSON.stringify({ title: 'second', edited: true });
   assert.equal(app.project.isDirty(), true);
+});
+
+test('actual New and blank tab callbacks deny before release or document creation for every blocked phase', async () => {
+  for (const phase of ['native', 'closed', 'indeterminate']) {
+    const app = harness();
+    const tabs = app.elements.get('project-tabs-list');
+    app.project.enterEditor();
+    app.elements.get('project-tab-add').listeners.click();
+    const blank = tabs.children[1];
+    const exportJSON = app.window.SM.exportJSON;
+    app.window.SM.exportJSON = () => null;
+    tabs.children[0].listeners.click();
+    app.window.SM.exportJSON = exportJSON;
+    let releases = 0;
+    app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true };
+    app.window.NemoNativeOpacityProject = { release() { releases++; return Promise.resolve({ owner: 'none', status: 'closed' }); } };
+    const before = { json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, toasts: app.toasts.length };
+    assert.equal(await app.project.newProject({ w: 320, h: 180, fps: 24 }), false, phase);
+    app.elements.get('project-tab-add').listeners.click();
+    blank.listeners.click();
+    tabs.children[0].children.at(-1).listeners.click({ stopPropagation() {} });
+    await Promise.resolve();
+    assert.equal(releases, 0, phase);
+    assert.deepEqual({ json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, toasts: app.toasts.length }, before, phase);
+  }
 });

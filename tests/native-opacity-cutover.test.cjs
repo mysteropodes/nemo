@@ -1251,10 +1251,10 @@ test('operations owns real resize callbacks and cancels or fences work across re
   assert.equal(harness.controller.status(), 'native');
   assert.throws(() => installation.dispose(), /must release/);
   await harness.controller.releaseCurrent('dispose-c');
-  installation.dispose();
-  assert.equal(listeners.size, 0);
-  assert.equal(root.NemoNativeOpacityCutover, undefined);
-  assert.equal(root.NemoApplication.handle(), 'legacy');
+  assert.throws(() => installation.dispose(), /must release/);
+  assert.equal(listeners.size, 2);
+  assert.equal(root.NemoNativeOpacityCutover.blocksLegacy(), true);
+  assert.equal(root.NemoApplication.handle({}).error.code, 'invalid_request');
 });
 
 test('static admission retains one frozen legacy shell and projects 21 immutable geometry resources', () => {
@@ -1397,11 +1397,12 @@ test('native controller atomically owns evaluation, mutation, history, preview, 
 
   const released = await harness.controller.releaseCurrent('replacement');
   assert.deepEqual(released, { documentId: 'native-document-1', generation: 1,
-    owner: 'legacy', status: 'released' });
-  assert.equal(harness.controller.status(), 'legacy');
+    owner: 'none', status: 'closed' });
+  assert.equal(harness.controller.status(), 'closed');
   assert.equal(harness.state.releases, 1);
   assert.equal(harness.state.disconnects, 1);
-  assert.equal(harness.state.imports[0].layers[0].motionStatic.opacity[0], 40);
+  assert.equal(harness.state.imports.length, 0);
+  assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 40);
 });
 
 test('afterChange observes readable post-write caches for UI, v1, and external native mutations', async () => {
@@ -2016,7 +2017,7 @@ test('native v1 semantic failures are retained, transient fences are retryable, 
   assert.equal(applied.ok, true); assert.equal(applied.revision, 1);
 });
 
-test('native v1 validates incompatible edits before one release and preserves exact retries during drain', async () => {
+test('native v1 validates incompatible edits and retains denials without release', async () => {
   const malformed = [
     ['property.key.set', { layerId: 'r08_curve_layer', property: 'opacity', frame: 99, value: 40 }],
     ['diagnostics.replay', { request: { operation: 'property.set', payload: { layerId: 'absent', property: 'opacity', value: 40 } } }],
@@ -2042,9 +2043,7 @@ test('native v1 validates incompatible edits before one release and preserves ex
     [staticSource(), 'start', { frameIdx: 10 }],
   ];
   for (const [source, operation, payload] of incompatible) {
-    let finishRelease;
-    const releaseGate = new Promise((resolve) => { finishRelease = resolve; });
-    const harness = nativeHarness(source, { releaseGate });
+    const harness = nativeHarness(source);
     assert.equal(await harness.controller.activate(harness.prepared), true);
     const current = harness.controller.identity();
     const request = { apiVersion: 1, requestId: `incompatible-${operation}`, instanceId: current.instanceId,
@@ -2054,12 +2053,12 @@ test('native v1 validates incompatible edits before one release and preserves ex
     }
     const denied = harness.controller.handleV1(request);
     assert.equal(denied.error.code, 'unavailable');
-    assert.equal(harness.controller.status(), 'release-requested');
+    assert.equal(harness.controller.status(), 'native');
     if (request.expectedRevision !== undefined) assert.deepEqual(harness.controller.handleV1(clone(request)), denied,
-      'known retry is served while release drains');
+      'known denial retry is retained without changing authority');
     assert.equal(harness.state.releases, 0);
-    finishRelease(); await harness.controller.flush();
-    assert.equal(harness.state.releases, 1); assert.equal(harness.controller.status(), 'legacy');
+    await harness.controller.flush();
+    assert.equal(harness.state.releases, 0); assert.equal(harness.controller.status(), 'native');
   }
 });
 
@@ -2084,7 +2083,8 @@ test('native v1 trace is bounded per lifecycle and cleared on reentry', async ()
 test('activation mismatch rolls host ownership back without exposing a writable mirror', async () => {
   const harness = nativeHarness(staticSource(), { badEvaluation: true });
   assert.equal(await harness.controller.activate(harness.prepared), false);
-  assert.equal(harness.controller.status(), 'legacy');
+  assert.equal(harness.controller.status(), 'closed');
+  assert.equal(harness.controller.blocksLegacy(), true);
   assert.equal(harness.state.releases, 1);
   assert.equal(harness.state.disconnects, 1);
   assert.equal(harness.state.imports.length, 0);
@@ -2101,7 +2101,8 @@ test('transport loss after initial cache I/O cannot publish native activation', 
   } });
   assert.equal(await harness.controller.activate(harness.prepared), false);
   assert.equal(dropped, true);
-  assert.equal(harness.controller.status(), 'legacy');
+  assert.equal(harness.controller.status(), 'closed');
+  assert.equal(harness.controller.blocksLegacy(), true);
   assert.equal(harness.controller.persistenceJSON(), null);
   assert.equal(harness.state.releases, 1, 'the installed host authority is rolled back exactly once');
   assert.equal(harness.state.imports.length, 0);
@@ -2118,70 +2119,20 @@ test('failed release is fail-closed and never reimports the cached shell', async
   assert.throws(() => harness.controller.getNativeIdentity(), /safely observable/);
 });
 
-test('accepted release publishes legacy before synchronous UI materialization and later legacy edits', async () => {
-  const source = keyedSource();
-  let legacyMotion = null;
-  let legacyState = null;
-  let observed = null;
-  const harness = nativeHarness(source, { legacyImport(bytes, silent, controller) {
-    const imported = JSON.parse(bytes);
-    legacyState = defaultState();
-    Object.assign(legacyState, { layers: imported.layers, activeLayerIdx: 0,
-      currentFrame: 10, totalFrames: 21, appMode: 'motion' });
-    const paperLayer = { children: [], bounds: { left: 20, top: 60, right: 40, bottom: 80,
-      width: 20, height: 20, center: { x: 30, y: 70 } } };
-    legacyMotion = loadMotion(legacyState, { beforeMotion(sb) {
-      sb.userLayers = [paperLayer]; sb.view = { zoom: 1 };
-      sb._layerSel = [0]; sb._layerSelAnchor = 0;
-      sb._layerIndexByUid = () => -1;
-      sb.SM.setActiveLayer = () => {};
-      sb.n20AllowLegacyWrite = () => !controller.blocksLegacy();
-      sb.n20RequireLegacyWrite = (kind) => {
-        if (controller.blocksLegacy()) throw new Error(`legacy writer denied: ${kind}`);
-        return true;
-      };
-      sb.NemoNativeOpacityCutover = Object.freeze({
-        blocksLegacy: () => controller.blocksLegacy(),
-        prepared: () => controller.prepared(),
-        identity: () => controller.identity(),
-        projectSelection: () => { throw new Error('native selection must not run during legacy reentry'); },
-      });
-      sb.NemoOpacityApplication = { legacy: (...args) => controller.legacyIntent(...args) };
-    } });
-    const panelBody = legacyMotion.sandbox.document.createElement('div');
-    panelBody.children = [];
-    panelBody.appendChild = function (child) { this.children.push(child); };
-    legacyMotion.sandbox.document.getElementById = (id) => id === 'motion-props-body' ? panelBody : null;
-    legacyMotion.SMMotion.renderMotionPropsPanel();
-    observed = { status: controller.status(), blocksLegacy: controller.blocksLegacy(), silent,
-      position: Array.from(legacyMotion.SMMotion.rawValueAtFrame(imported.layers[0], 'position', 10)),
-      renderedRows: panelBody.children.length };
-    return true;
-  } });
-
-  assert.equal(await harness.controller.activate(harness.prepared), true);
-  await harness.controller.releaseCurrent('production-reentry');
-  assert.deepEqual(observed, { status: 'legacy', blocksLegacy: false, silent: true,
-    position: [64, 0], renderedRows: observed.renderedRows });
-  assert.equal(observed.renderedRows > 1, true, 'legacy UI rendered synchronously during import');
-  assert.equal(harness.controller.legacyIntent('set', legacyState.layers[0], [40]), null);
-  legacyMotion.SMMotion.setLayerValue(0, 'position', [70, 0]);
-  assert.deepEqual(Array.from(legacyMotion.SMMotion.rawValueAtFrame(legacyState.layers[0], 'position', 10)), [70, 0]);
-});
-
-test('failed synchronous legacy materialization returns the released lifecycle to indeterminate', async () => {
-  for (const [label, legacyImport, error] of [
-    ['false', () => false, /could not re-enter legacy/],
-    ['throw', () => { throw new Error('legacy import exploded'); }, /legacy import exploded/],
-  ]) {
-    const harness = nativeHarness(staticSource(), { legacyImport });
-    assert.equal(await harness.controller.activate(harness.prepared), true, label);
-    await assert.rejects(harness.controller.releaseCurrent(`failed-import-${label}`), error, label);
-    assert.equal(harness.controller.status(), 'indeterminate', label);
-    assert.equal(harness.controller.blocksLegacy(), true, label);
-    assert.equal(harness.controller.persistenceJSON(), null, label);
-    assert.equal(harness.controller.legacyIntent('set', staticSource().layers[0], [40]), false, label);
-    assert.equal(harness.state.imports.length, 1, label);
+test('accepted terminal close never calls synchronous legacy materialization or reopens writers', async () => {
+  for (const legacyImport of [() => true, () => false, () => { throw new Error('forbidden legacy import'); }]) {
+    const harness = nativeHarness(keyedSource(), { legacyImport });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const receipt = await harness.controller.releaseCurrent('terminal-close');
+    assert.equal(receipt.owner, 'none'); assert.equal(receipt.status, 'closed');
+    assert.equal(harness.controller.status(), 'closed');
+    assert.equal(harness.controller.blocksLegacy(), true);
+    assert.equal(harness.controller.persistenceJSON(), null);
+    assert.equal(harness.controller.legacyIntent('set', keyedSource().layers[0], [40]), false);
+    assert.equal(harness.state.imports.length, 0);
+    await Promise.resolve();
+    assert.equal(harness.controller.legacyIntent('set', keyedSource().layers[0], [40]), false);
+    assert.equal(harness.state.imports.length, 0);
   }
 });
 
@@ -2224,7 +2175,8 @@ test('external native revision synchronizes every cache atomically and fences ne
   assert.equal(JSON.parse(harness.controller.persistenceJSON()).layers[0].motionStatic.opacity[0], 55);
   assert.equal(harness.controller.identity().contentRevision, 1);
   await harness.controller.releaseCurrent('external-write-release');
-  assert.equal(harness.state.imports[0].layers[0].motionStatic.opacity[0], 55);
+  assert.equal(harness.state.imports.length, 0);
+  assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 55);
 });
 
 test('actual bundled transport refreshes UI, save, and release after an external MCP write', async () => {
@@ -2238,7 +2190,8 @@ test('actual bundled transport refreshes UI, save, and release after an external
   assert.equal(harness.transportBridge.calls.some(([command, args]) => command === 'nemo_native_revision_sync' &&
     args.request.action === 'acknowledge'), true);
   await harness.controller.releaseCurrent('bundled-mcp-release');
-  assert.equal(harness.state.imports[0].layers[0].motionStatic.opacity[0], 55);
+  assert.equal(harness.state.imports.length, 0);
+  assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 55);
 });
 
 test('revision acknowledgment failure passively disconnects and invalidates refreshed controller caches', async () => {
@@ -2354,8 +2307,9 @@ test('release closes admission synchronously, drains only prior work, and reject
   finishMutation();
   await admitted;
   assert.deepEqual(await release, { documentId: firstIdentity.documentId,
-    generation: firstIdentity.generation, owner: 'legacy', status: 'released' });
-  assert.equal(harness.state.imports[0].layers[0].motionStatic.opacity[0], 40);
+    generation: firstIdentity.generation, owner: 'none', status: 'closed' });
+  assert.equal(harness.state.imports.length, 0);
+  assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 40);
 
   assert.equal(await harness.controller.activate(harness.prepared), true);
   const secondIdentity = harness.controller.getNativeIdentity();
@@ -2403,20 +2357,21 @@ test('project replacement waits for installation before one terminal release', a
   finishBootstrap();
   assert.equal(await activation, true);
   assert.deepEqual(await release, { documentId: 'native-document-1', generation: 1,
-    owner: 'legacy', status: 'released' });
+    owner: 'none', status: 'closed' });
   assert.equal(harness.state.releases, 1);
-  assert.equal(harness.controller.status(), 'legacy');
+  assert.equal(harness.controller.status(), 'closed');
 });
 
-test('keyed opacity remains native-read-only and releases before a later legacy edit', async () => {
+test('keyed opacity remains native-read-only without requesting legacy release', async () => {
   const harness = nativeHarness(keyedSource());
   assert.equal(await harness.controller.activate(harness.prepared), true);
   assert.deepEqual([0, 10, 20].map((frame) => harness.controller.valueAtFrame('r08_curve_layer', frame)[0]), [20, 50, 80]);
-  await assert.rejects(harness.controller.setOpacity('r08_curve_layer', 40), /read-only until release completes/);
+  await assert.rejects(harness.controller.setOpacity('r08_curve_layer', 40), /read-only/);
   await harness.controller.flush();
-  assert.equal(harness.controller.status(), 'legacy');
-  assert.equal(harness.state.releases, 1);
-  assert.deepEqual(harness.state.imports[0].layers[0].motion.opacity, keyedSource().layers[0].motion.opacity);
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.state.releases, 0);
+  assert.equal(harness.state.imports.length, 0);
+  assert.deepEqual(harness.state.document.layers[0].motion.opacity, keyedSource().layers[0].motion.opacity);
 });
 
 test('N20 bootstrap stays browser-inert and binds only the accepted desktop host ports', async () => {
@@ -2536,14 +2491,14 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.deepEqual(invokes.slice(2).map(([command]) => command), ['nemo_native_preview', 'nemo_native_bind_output', 'nemo_native_release']);
 
   pluginOpen = 1;
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-open-plugin', false), true);
+  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-open-plugin', false), false);
   assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
   pluginOpen = 0; panelOpen = 1;
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-open-panel', false), true);
+  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-open-panel', false), false);
   assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
   panelOpen = 0;
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported', false), true);
-  assert.deepEqual(events.find(([kind]) => kind === 'activate')[1].resources, [{ resourceId: 'geometry/r08/0' }]);
+  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported', false), false);
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
 
   nativeBlocked = true;
   const documentBytes = JSON.stringify(serializedDocument);
@@ -2570,9 +2525,9 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   desktop.SMPlugin.openFile();
   desktop.SMPlugin.loadArchive({});
   desktop.SMPlugin.loadFiles({});
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), true);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
-    'page-lifetime extension exposure keeps later supported imports legacy-owned');
+  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), false);
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0,
+    'production imports remain unavailable after page-lifetime extension exposure');
   retained.layer(0).set('opacity', [66]);
   delayedScript();
   delayedPlugin();
@@ -2581,7 +2536,6 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     'retained and delayed script/plugin capabilities only run while page stays legacy');
   assert.match(toasts.at(-1), /Reload or restart Nemo/);
 
-  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('unsupported', true), true);
-  assert.deepEqual(imports, [['supported-open-plugin', false], ['supported-open-panel', false],
-    ['supported', false], ['supported-after-extension', false], ['unsupported', true]]);
+  assert.equal(await desktop.NemoNativeOpacityProject.importJSON('unsupported', true), false);
+  assert.deepEqual(imports, []);
 });

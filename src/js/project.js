@@ -20,7 +20,7 @@
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
   function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
-  function releaseNative(kind){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;}
+  function releaseNative(kind){return window.NemoNativeOpacityLegacySurface?window.NemoNativeOpacityLegacySurface.releaseProjectTransition(window,kind):window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
   // mirrored to IndexedDB (async, no practical size ceiling) so a project
   // with embedded media doesn't silently lose its autosave the moment it
@@ -103,7 +103,7 @@
     try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
-  function newProject(cfg){return afterMaybe(releaseNative('new-project'),function(){return newProjectNow(cfg);});}
+  function newProject(cfg){return afterMaybe(releaseNative('new-project'),function(admitted){if(admitted===false)return false;return newProjectNow(cfg);});}
 
   // Last successfully persisted document, for the close-with-unsaved-work
   // guard below. null = "never saved/loaded anything yet" — a brand-new
@@ -388,7 +388,7 @@
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){return afterMaybe(newProject(cfg),function(){hideStartScreen();ensureInitialTab();});},
+  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){return afterMaybe(newProject(cfg),function(admitted){if(admitted===false)return false;hideStartScreen();ensureInitialTab();});},
     // "A project is now open, show the editor" — hideStartScreen +
     // ensureInitialTab, the pair newProject above already runs. Exported
     // (2026-09 QA sweep) because kitsu.js called those two by their bare
@@ -527,6 +527,7 @@
   function switchToTab(id){
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
+    if(!target.json&&window.NemoNativeOpacityLegacySurface&&!window.NemoNativeOpacityLegacySurface.allowProjectTransition(window))return false;
     snapshotActiveIntoTab();
     function entered(){
       currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
@@ -544,13 +545,13 @@
         entered();
       });
     }
-    return afterMaybe(releaseNative('tab-switch'),function(){
-      activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
+    return afterMaybe(releaseNative('tab-switch'),function(admitted){
+      if(admitted===false)return false;activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
     }); // markSaved belongs to the new tab
   }
   function addTab(){
-    return afterMaybe(releaseNative('tab-add'),function(){
-      snapshotActiveIntoTab();
+    return afterMaybe(releaseNative('tab-add'),function(admitted){
+      if(admitted===false)return false;snapshotActiveIntoTab();
       var n=tabs.length+1;
       var id=makeTabId();
       tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
@@ -567,7 +568,7 @@
     function closed(){tabs.splice(idx,1);renderTabBar();}
     if(!wasActive){closed();return;}
     var next=tabs[idx>0?idx-1:1];
-    function enterBlank(){activeTabId=next.id;newProjectNow({w:1920,h:1080,fps:24,name:next.name});
+    function enterBlank(admitted){if(admitted===false)return false;activeTabId=next.id;newProjectNow({w:1920,h:1080,fps:24,name:next.name});
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();}
     if(next.json){
       return afterMaybe(importProjectJSON(next.json,true),function(imported){

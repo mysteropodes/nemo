@@ -1,0 +1,498 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+const { defaultState, extractFunction, loadMotion } = require('./fixtures/lib/sandbox.cjs');
+
+const ProjectDocument = require('../src/js/project-document.js');
+const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
+const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
+const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
+const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
+const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
+const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
+const SelectCanvasIntent = require('../src/js/adapters/select-canvas-intent.js');
+const ComponentExposedProperties = require('../src/js/domain/component/exposed-properties.js');
+const OpacityApplication = require('../src/js/application/opacity-application.js');
+const ApplicationMcp = require('../src/js/adapters/application-mcp.js');
+const NativeApplication = require('../src/js/adapters/native-application.js');
+const NativeEditor = require('../src/js/adapters/native-opacity-editor.js');
+const NativeSelection = require('../src/js/adapters/native-opacity-selection.js');
+const NativePreview = require('../src/js/adapters/native-opacity-preview.js');
+const NativeExport = require('../src/js/adapters/native-opacity-export.js');
+const OpacityCapability = require('../src/js/application/opacity-capability.js');
+const ExportSvgSequence = require('../src/js/adapters/export-svg-sequence.js');
+const ROOT = path.resolve(__dirname, '..');
+const SHELL_PATH = path.join(ROOT, 'tests/animation/fixtures/curve-workflow.json');
+const NATIVE_PATH = path.join(ROOT, 'native-engine/tests/fixtures/opacity-v2/project.json');
+const BOOTSTRAP_PATH = path.join(ROOT, 'src/js/bootstrap/native-opacity-application.js');
+const SHELL_SHA = 'dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d';
+const NATIVE_SHA = '895ca05a43295104301c472287149b1c01aa6ef681db80dcbb79e58a55b36050';
+
+function bytes(file) { return fs.readFileSync(file); }
+function json(file) { return JSON.parse(bytes(file)); }
+function sha(file) { return crypto.createHash('sha256').update(bytes(file)).digest('hex'); }
+function clone(value) { return structuredClone(value); }
+function staticSource(value = 25) {
+  const source = json(SHELL_PATH);
+  source.layers[0].motionStatic = { opacity: [value] };
+  return source;
+}
+
+function keyedSource() {
+  const source = staticSource();
+  source.layers[0].motion.opacity = json(NATIVE_PATH).layers[0].motion.opacity;
+  return source;
+}
+
+function nativeHarness(source, options = {}) {
+  const prepared = ProjectDocument.prepareNativeOpacity(source);
+  const state = {
+    identity: { instanceId: 'instance-a', documentId: 'native-document-1', contentRevision: 0 },
+    document: clone(prepared.projection), history: [], redo: [], releases: 0,
+    disconnects: 0, imports: [], previews: [], outputs: [], evaluations: 0,
+    activations: 0, hostGeneration: 0, connected: false, subscriptions: [], previewConsumers: [], exportConsumers: [],
+    dispatches: [],
+  };
+  function response(request, result) {
+    return { apiVersion: 2, requestId: request.requestId, instanceId: state.identity.instanceId,
+      documentId: state.identity.documentId, contentRevision: state.identity.contentRevision,
+      ok: true, result };
+  }
+  const transport = {
+    async dispatch(request) {
+      const operation = request.operation;
+      state.dispatches.push(clone(request));
+      if (options.dispatchGate) await options.dispatchGate(request, state);
+      if (operation === 'query.document.serialize') return response(request, {
+        atRevision: state.identity.contentRevision,
+        documentSnapshotId: `native-opacity:${state.identity.documentId}:${state.identity.contentRevision}`,
+        document: clone(state.document),
+      });
+      if (operation === 'query.document.evaluate') {
+        state.evaluations++;
+        const keyed = state.document.layers[0].motion;
+        const characterized = request.payload.frame === 0 ? 20
+          : request.payload.frame === 10 ? 50 : request.payload.frame === 20 ? 80
+            : state.document.layers[0].motionStatic.opacity[0];
+        const value = options.badEvaluation && request.payload.frame === 10
+          ? 99 : keyed ? characterized : state.document.layers[0].motionStatic.opacity[0];
+        return response(request, {
+          documentSnapshotId: `native-opacity:${state.identity.documentId}:${state.identity.contentRevision}`,
+          documentId: state.identity.documentId, contentRevision: state.identity.contentRevision,
+          contextId: request.payload.contextId, frame: request.payload.frame,
+          layers: [{ layerUid: 'r08_curve_layer', value }],
+        });
+      }
+      if (operation === 'command.document.apply') {
+        if (options.mutationGate) await options.mutationGate;
+        state.history.push(state.document.layers[0].motionStatic.opacity[0]); state.redo.length = 0;
+        state.document.layers[0].motionStatic.opacity = [request.payload.value];
+        state.identity.contentRevision++;
+        return response(request, { applied: true, historyEntriesAdded: 1 });
+      }
+      if (operation === 'history.undo' || operation === 'history.redo') {
+        const from = operation === 'history.undo' ? state.history : state.redo;
+        const to = operation === 'history.undo' ? state.redo : state.history;
+        const prior = from.pop();
+        if (prior === undefined) return { apiVersion: 2, requestId: request.requestId,
+          instanceId: state.identity.instanceId, documentId: state.identity.documentId,
+          contentRevision: state.identity.contentRevision, ok: false,
+          error: { code: 'not_found', message: 'No history entry is available.' } };
+        to.push(state.document.layers[0].motionStatic.opacity[0]);
+        state.document.layers[0].motionStatic.opacity = [prior];
+        state.identity.contentRevision++;
+        return response(request, { applied: true, historyEntriesAdded: 0 });
+      }
+      if (operation === 'query.document.snapshot.acquire') return response(request, {
+        atRevision: state.identity.contentRevision,
+        documentSnapshotId: `native-opacity:${state.identity.documentId}:${state.identity.contentRevision}`,
+      });
+      if (operation === 'job.export.png.begin') return response(request, {
+        jobId: 'native-job-1', status: 'succeeded', pinnedRevision: request.expectedRevision,
+        documentSnapshotId: `native-opacity:${state.identity.documentId}:${state.identity.contentRevision}`,
+        progress: 1, artifact: { target: request.payload.outputHandle,
+          files: request.payload.frames.map((frame) => `frame-${frame.sourceFrame}.png`) },
+        cleanup: { status: 'complete' }, externalEffectDisposition: 'committed',
+      });
+      throw new Error(`unexpected native operation ${operation}`);
+    },
+  };
+  const transportBridge = options.transportFactory ? options.transportFactory(state, transport) : null;
+  const applicationTransport = transportBridge ? transportBridge.transport : transport;
+  const application = NativeApplication.createNativeApplicationAdapter('n20-test', applicationTransport);
+  function fullReleaseReceipt(request, change = {}) {
+    return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
+      documentId: request.documentId, contentRevision: request.expectedRevision,
+      lifecycleGeneration: state.hostGeneration, status: 'succeeded', retrieved: false,
+      authorityRemovalCompleted: true, cancelledTransactionId: null, cancelledTransaction: null,
+      undoDepth: state.history.length, redoDepth: state.redo.length, reconciledExports: [],
+      cancelledPreviewWorkIds: [], unresolvedPreviewWorkIds: [], disposedViewportWorkIds: [],
+      reconciliationStages: { transaction: 'complete', exports: 'complete', preview: 'complete' },
+      viewportStatus: 'already_absent', reentryAvailable: true, error: null, ...change };
+  }
+  const controller = OpacityApplication.createNative({
+    surface: options.surface,
+    document: ProjectDocument, editor: NativeEditor, selection: NativeSelection,
+    createPreview() {
+      const value = NativePreview.createNativeOpacityPreviewAdapter();
+      state.previewConsumers.push(value); return value;
+    },
+    createExporter() {
+      const value = NativeExport.createNativeOpacityExportAdapter();
+      state.exportConsumers.push(value); return value;
+    },
+    async bootstrap(value) {
+      if (options.bootstrapGate) await options.bootstrapGate;
+      state.activations++;
+      state.hostGeneration = state.activations;
+      state.identity = { instanceId: 'instance-a', documentId: `native-document-${state.activations}`, contentRevision: 0 };
+      state.document = clone(value.projection); state.history.length = 0; state.redo.length = 0;
+      if (options.bootstrapFailure && options.bootstrapFailure(state)) throw new Error('bootstrap reply lost');
+      return { apiVersion: 2, instanceId: state.identity.instanceId,
+        documentId: state.identity.documentId, contentRevision: state.identity.contentRevision,
+        resourceCount: value.resources.length, viewportAvailable: true };
+    },
+    async connect() {
+      if (transportBridge) return transportBridge.transport.connect();
+      state.connected = true; return clone(state.identity);
+    },
+    connectionStatus() {
+      return transportBridge ? transportBridge.transport.status() : state.connected ? clone(state.identity) : null;
+    },
+    application() { return application; },
+    async subscribeRevisions(synchronize) {
+      if (transportBridge) return transportBridge.transport.subscribeRevisions(transportBridge.listen, synchronize);
+      const subscription = { synchronize, hostGeneration: state.hostGeneration, active: true };
+      state.subscriptions.push(subscription);
+      return { ...clone(state.identity), lifecycleGeneration: state.hostGeneration,
+        subscriptionId: `subscription-${state.hostGeneration}` };
+    },
+    async disconnect() {
+      state.disconnects++;
+      state.connected = false;
+      if (transportBridge) return transportBridge.transport.disconnect();
+      const current = state.subscriptions.at(-1); if (current) current.active = false;
+      if (options.disconnectGate) await options.disconnectGate;
+      if (options.disconnectFailure) throw new Error('disconnect failed');
+      if (options.connectionStuck) state.connected = true;
+    },
+    async release(request) {
+      state.releases++;
+      if (options.releaseGate) await options.releaseGate;
+      if (options.releaseFailure) throw new Error('release failed');
+      return options.releaseReceipt ? options.releaseReceipt(fullReleaseReceipt(request), request) : fullReleaseReceipt(request);
+    },
+    legacyImport(bytes, silent) {
+      state.imports.push(JSON.parse(bytes));
+      return options.legacyImport ? options.legacyImport(bytes, silent, controller, state) : true;
+    },
+    capabilities() { return [OpacityCapability.DESCRIPTOR, ExportSvgSequence.DESCRIPTOR].map((descriptor) => ({
+      id: descriptor.id, version: descriptor.version, handlerKey: descriptor.handlerKey,
+      descriptor: clone(descriptor),
+    })); },
+    async previewHost(request) {
+      state.previews.push(request);
+      if (options.previewGate) await options.previewGate;
+      return { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
+        status: 'presented' };
+    },
+    async bindOutput(request) { state.outputs.push(request); },
+    currentFrame() { return 10; },
+    afterChange() {
+      state.afterChanges = (state.afterChanges || 0) + 1;
+      if (options.afterChange) options.afterChange(controller, state);
+    },
+    sleep() { return Promise.resolve(); },
+  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
+  } },
+    operations: NativeOpacityOperations, motionSurface: NativeMotionSurface });
+  async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
+    const fromRevision = state.identity.contentRevision;
+    state.document.layers[0].motionStatic.opacity = [value];
+    state.identity.contentRevision++;
+    if (transportBridge) return transportBridge.emit({ instanceId: state.identity.instanceId,
+      documentId: state.identity.documentId, lifecycleGeneration: state.hostGeneration,
+      fromRevision, toRevision: state.identity.contentRevision, requestId });
+    const subscription = state.subscriptions.at(-1);
+    const event = { instanceId: state.identity.instanceId, documentId: state.identity.documentId,
+      lifecycleGeneration: subscription.hostGeneration, fromRevision,
+      toRevision: state.identity.contentRevision, requestId };
+    return subscription.synchronize(event);
+  }
+  return { prepared, state, controller, fullReleaseReceipt, externalOpacity, transportBridge };
+}
+
+
+function stateBytes(h) {
+  return JSON.stringify({ observation: h.state.lifecycle.inspect(), document: h.state.document,
+    history: h.state.history, redo: h.state.redo, persistence: h.controller.persistenceJSON(),
+    releases: h.state.releases, disconnects: h.state.disconnects, imports: h.state.imports,
+    bootstraps: h.state.activations, dispatches: h.state.dispatches, hostGeneration: h.state.hostGeneration });
+}
+function surfaceHarness(source, options = {}) {
+  let publications, resized;
+  const surface = {
+    installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
+    wrap() { return () => {}; },
+    extensionOpen() { return !!options.extension; }, toast() {},
+    publish(admission, cutover, project, handlers, resize) { publications = { admission, cutover, project, handlers, resize }; return () => {}; },
+    defer(callback) { resized = callback; return 1; }, cancel() {},
+    async resize() { throw new Error('resize failed'); },
+  };
+  const h = nativeHarness(source, { ...options, surface });
+  h.controller.install();
+  return { ...h, published: () => publications, resizeCallback: () => resized };
+}
+
+test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
+  assert.equal(sha(SHELL_PATH), SHELL_SHA);
+  assert.equal(sha(NATIVE_PATH), NATIVE_SHA);
+  const h = nativeHarness(staticSource());
+  await h.controller.activate(h.prepared);
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 10), [25]);
+  await h.controller.setOpacity('r08_curve_layer', 40);
+  await h.controller.setOpacity('r08_curve_layer', 60);
+  await h.controller.history('undo');
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 10), [40]);
+  const k = nativeHarness(keyedSource());
+  await k.controller.activate(k.prepared);
+  assert.deepEqual([0, 10, 20].map(f => k.controller.valueAtFrame('r08_curve_layer', f)[0]), [20, 50, 80]);
+});
+
+test('complete B production admission never changes A or B, including extension and no-A imports', async () => {
+  const unsupported = staticSource(); unsupported.extraContent = { unknown: true };
+  for (const active of [false, true]) for (const extension of [false, true]) {
+    const h = surfaceHarness(staticSource(), { extension });
+    if (active) { await h.controller.activate(h.prepared); await h.controller.setOpacity('r08_curve_layer', 40); }
+    for (const incoming of ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]) {
+      const before = stateBytes(h), input = incoming, session = h.state.lifecycle.inspect().session;
+      assert.equal(await h.published().project.importJSON(incoming, false), false);
+      assert.equal(incoming, input);
+      assert.equal(stateBytes(h), before);
+      assert.strictEqual(h.state.lifecycle.inspect().session, session);
+      await Promise.resolve(); assert.equal(stateBytes(h), before);
+    }
+  }
+});
+
+test('close receipt retrieval is fingerprinted and retains protection after disposal and a microtask', async () => {
+  const h = surfaceHarness(staticSource());
+  await h.controller.activate(h.prepared);
+  const identity = h.controller.getNativeIdentity();
+  const reason = { ...identity, kind: 'explicit-close' };
+  const close = await h.controller.release(reason);
+  assert.deepEqual(close, { ...identity, owner: 'none', status: 'closed' });
+  assert.strictEqual(await h.controller.release(clone(reason)), close);
+  assert.strictEqual(await h.controller.releaseCurrent('explicit-close'), close);
+  await assert.rejects(h.controller.release({ ...reason, kind: 'changed-body' }), /stale or malformed/);
+  assert.equal(h.state.releases, 1); assert.equal(h.state.disconnects, 1); assert.equal(h.state.imports.length, 0);
+  assert.equal(h.controller.blocksLegacy(), true);
+  assert.throws(() => h.controller.install().dispose(), /must release/);
+  const request = { apiVersion: 1, requestId: 'closed-read', operation: 'snapshot', payload: {} };
+  for (let turn = 0; turn < 2; turn++) {
+    assert.equal(h.published().admission.allow('retained-write'), false);
+    assert.equal(h.published().handlers.legacy('set', staticSource().layers[0], [99]), false);
+    assert.equal(h.published().handlers.handle(request).error.code, 'unavailable');
+    await Promise.resolve();
+  }
+  const oldSubscription = h.state.subscriptions[0];
+  const preparedB = ProjectDocument.prepareNativeOpacity(staticSource(60));
+  await h.controller.activate(preparedB);
+  assert.equal(h.state.activations, 2);
+  assert.notEqual(h.controller.getNativeIdentity().generation, identity.generation);
+  assert.equal(h.controller.identity().documentId, 'native-document-2');
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 10), [60]);
+  await assert.rejects(h.controller.release(reason), /stale or malformed/);
+  await assert.rejects(oldSubscription.synchronize({}), /closed lifecycle/);
+  assert.equal(h.controller.status(), 'native'); assert.equal(h.state.releases, 1);
+});
+
+test('resize failure fences the current owner without closing or importing it', async () => {
+  const h = surfaceHarness(staticSource());
+  await h.controller.activate(h.prepared);
+  h.published().resize();
+  await h.resizeCallback()();
+  assert.equal(h.controller.status(), 'indeterminate');
+  assert.equal(h.controller.blocksLegacy(), true);
+  assert.equal(h.state.releases, 0); assert.equal(h.state.imports.length, 0);
+  assert.equal(h.state.disconnects, 0); assert.equal(h.controller.persistenceJSON(), null);
+});
+
+test('failed initial or direct B bootstrap cannot restore legacy or admit another bootstrap', async () => {
+  for (const afterClose of [false, true]) {
+    const h = surfaceHarness(staticSource(), { bootstrapFailure: state => state.activations === (afterClose ? 2 : 1) });
+    if (afterClose) {
+      await h.controller.activate(h.prepared);
+      await h.controller.releaseCurrent('close-before-b');
+    }
+    await assert.rejects(h.controller.activate(h.prepared), /bootstrap reply lost/);
+    assert.equal(h.controller.status(), 'indeterminate');
+    assert.equal(h.controller.blocksLegacy(), true);
+    const before = stateBytes(h);
+    await assert.rejects(async () => h.controller.activate(h.prepared), /activation requires/);
+    assert.equal(stateBytes(h), before);
+    assert.equal(h.state.imports.length, 0);
+  }
+});
+
+test('mutable or mismatched prepared candidates fail before bootstrap and preserve verified closure', async () => {
+  function freeze(value) {
+    if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); }
+    return value;
+  }
+  const h = surfaceHarness(staticSource());
+  await h.controller.activate(h.prepared);
+  const reason = { ...h.controller.getNativeIdentity(), kind: 'candidate-validation' };
+  const close = await h.controller.release(reason);
+  const wrongProjection = clone(h.prepared); wrongProjection.projection.layers[0].motionStatic.opacity = [99];
+  const wrongGeometry = clone(h.prepared); wrongGeometry.resources[0].layers[0].bounds = [0, 0, 1, 1];
+  const wrongShell = clone(h.prepared); wrongShell.shell.layers[0].motionStatic.opacity = [60];
+  const hiddenMismatch = clone(wrongProjection); hiddenMismatch.toJSON = () => h.prepared;
+  const accessor = { ...h.prepared }; Object.defineProperty(accessor, 'projection', { enumerable: true, get: () => h.prepared.projection });
+  let accessed = 0;
+  const hiddenJSON = { ...h.prepared };
+  Object.defineProperty(hiddenJSON, 'toJSON', { value: () => { accessed++; return h.prepared; } });
+  const customPrototype = Object.assign(Object.create({ inherited: true }), h.prepared);
+  const shellAccessor = { ...h.prepared };
+  Object.defineProperty(shellAccessor, 'shell', { enumerable: true, get: () => { accessed++; return h.prepared.shell; } });
+  const symbol = { ...h.prepared, [Symbol('hidden')]: 'forged' };
+  const omittedData = freeze({ ...h.prepared, omitted: undefined });
+  const arrayPrototype = clone(h.prepared);
+  Object.setPrototypeOf(arrayPrototype.resources, Object.create(Array.prototype, {
+    toJSON: { value: () => { accessed++; return h.prepared.resources; } },
+  }));
+  for (const candidate of [null, {}, clone(h.prepared), freeze(wrongProjection), freeze(wrongGeometry), freeze(wrongShell),
+    freeze(hiddenMismatch), Object.freeze(accessor), Object.freeze(hiddenJSON), Object.freeze(customPrototype),
+    Object.freeze(shellAccessor), Object.freeze(symbol), omittedData, freeze(arrayPrototype)]) {
+    const before = stateBytes(h);
+    assert.throws(() => h.controller.activate(candidate));
+    assert.equal(stateBytes(h), before);
+    assert.strictEqual(await h.controller.release(reason), close);
+  }
+  assert.equal(accessed, 0, 'admission rejects hidden serializers and shell accessors before invoking them');
+});
+
+test('actual published and retained handlers never fall back to original meta or reads after close', async () => {
+  let originals = 0;
+  const guardScope = {};
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/application/native-edit-guard.js'), 'utf8'), guardScope);
+  const root = { __TAURI__: { core: { invoke() {} } }, SMEngineBridge: {}, SMNativeEditGuard: guardScope.SMNativeEditGuard,
+    SM: { importJSON() { originals++; return true; } }, SMMotion: {}, addEventListener() {}, removeEventListener() {},
+    NemoApplication: { capabilities: () => [], handle: () => { originals++; return 'original-read'; } },
+    NemoOpacityApplication: { meta: () => { originals++; return { legacy: true }; }, legacy: () => { originals++; return 'original-write'; } } };
+  const h = nativeHarness(staticSource(), { surface: NativeLegacySurface.desktopPorts(root, {}).surface });
+  const installation = h.controller.install();
+  const retainedRead = root.NemoApplication.handle;
+  const retainedMeta = root.NemoOpacityApplication.meta;
+  const retainedWrite = root.NemoOpacityApplication.legacy;
+  await h.controller.activate(h.prepared);
+  await h.controller.releaseCurrent('published-meta-close');
+  for (let turn = 0; turn < 2; turn++) {
+    for (const read of [retainedRead, root.NemoApplication.handle]) {
+      assert.equal(read({ apiVersion: 1, requestId: 'closed-snapshot', operation: 'snapshot', payload: {} }).error.code, 'unavailable');
+    }
+    for (const meta of [retainedMeta, root.NemoOpacityApplication.meta]) assert.throws(meta, /identity/);
+    for (const write of [retainedWrite, root.NemoOpacityApplication.legacy]) assert.equal(write('set', staticSource().layers[0], [99]), false);
+    assert.throws(() => installation.dispose(), /must release/);
+    assert.equal(originals, 0);
+    await Promise.resolve();
+  }
+});
+
+test('in-flight close reserves exactly one request fingerprint and drains to one ownerless receipt', async () => {
+  let finish;
+  const gate = new Promise(resolve => { finish = resolve; });
+  const h = surfaceHarness(staticSource(), { releaseGate: gate });
+  await h.controller.activate(h.prepared);
+  const reason = { ...h.controller.getNativeIdentity(), kind: 'draining-close' };
+  const closing = h.controller.release(reason);
+  assert.strictEqual(h.controller.release(clone(reason)), closing);
+  await assert.rejects(h.controller.release({ ...reason, kind: 'changed-during-drain' }), /stale or malformed/);
+  await assert.rejects(h.controller.release({ ...reason, cancelled: true }), /stale or malformed/);
+  await Promise.resolve();
+  assert.equal(h.state.releases, 1);
+  assert.equal(h.state.disconnects, 0);
+  finish();
+  const receipt = await closing;
+  assert.strictEqual(await h.controller.release(reason), receipt);
+  assert.equal(h.state.releases, 1); assert.equal(h.state.disconnects, 1);
+  assert.equal(h.controller.blocksLegacy(), true); assert.equal(h.state.imports.length, 0);
+});
+
+test('failed, cancelled, changed and disconnected terminal receipts cannot admit any writer or re-entry', async () => {
+  const cases = [
+    { releaseFailure: true },
+    { releaseReceipt: receipt => ({ ...receipt, status: 'cancelled', authorityRemovalCompleted: false }) },
+    { releaseReceipt: receipt => ({ ...receipt, lifecycleGeneration: receipt.lifecycleGeneration + 1 }) },
+    { releaseReceipt: receipt => ({ ...receipt, requestId: 'changed-request' }) },
+    { disconnectFailure: true },
+    { connectionStuck: true },
+  ];
+  for (const options of cases) {
+    const h = surfaceHarness(staticSource(), options);
+    await h.controller.activate(h.prepared);
+    const reason = { ...h.controller.getNativeIdentity(), kind: 'failed-terminal' };
+    await assert.rejects(h.controller.release(reason));
+    assert.equal(h.controller.status(), 'indeterminate');
+    assert.equal(h.controller.blocksLegacy(), true);
+    const before = stateBytes(h);
+    await assert.rejects(h.controller.release(reason), /stale or malformed/);
+    assert.throws(() => h.controller.activate(h.prepared), /activation requires/);
+    assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource(60))), false);
+    assert.equal(h.published().handlers.legacy('set', staticSource().layers[0], [99]), false);
+    await Promise.resolve(); assert.equal(stateBytes(h), before);
+    assert.equal(h.state.imports.length, 0);
+  }
+});
+
+test('unsupported keyed and Motion edits preserve exact authoritative state immediately and after a microtask', async () => {
+  const h = surfaceHarness(keyedSource());
+  await h.controller.activate(h.prepared);
+  const before = stateBytes(h), identity = h.controller.identity();
+  await assert.rejects(h.controller.setOpacity('r08_curve_layer', 99), /read-only/);
+  assert.equal(h.controller.legacyIntent('set', keyedSource().layers[0], [99]), false);
+  assert.equal(h.controller.legacyIntent('key', keyedSource().layers[0], [99]), false);
+  const request = { apiVersion: 1, requestId: 'unsupported-keyed', ...identity,
+    expectedRevision: identity.contentRevision, operation: 'property.set',
+    payload: { layerId: 'r08_curve_layer', property: 'opacity', value: 99 } };
+  const denied = h.controller.handleV1(request);
+  assert.equal(denied.error.code, 'unavailable');
+  assert.deepEqual(h.controller.handleV1(clone(request)), denied);
+  assert.equal(h.controller.handleV1({ ...request, payload: { ...request.payload, value: 70 } }).error.code, 'invalid_request');
+  assert.equal(stateBytes(h), before);
+  await Promise.resolve(); assert.equal(stateBytes(h), before);
+});
+
+test('retained actual raw and published Motion writers remain denied after ownerless close', async () => {
+  const h = surfaceHarness(staticSource());
+  const holder = clone(staticSource().layers[0]);
+  const state = { ...defaultState(), layers: [holder], activeLayerIdx: 0 };
+  const motion = loadMotion(state, { beforeMotion(scope) {
+    scope.NemoNativeOpacityLegacySurface = NativeLegacySurface;
+    scope.NemoNativeOpacityMotionSurface = NativeMotionSurface;
+    scope.n20AllowLegacyWrite = () => !h.controller.blocksLegacy();
+    scope.n20RequireLegacyWrite = kind => NativeLegacySurface.requireLegacyWrite(scope, kind, scope.n20AllowLegacyWrite);
+  } });
+  const published = motion.SMMotion.toggleLayer3D;
+  const source = fs.readFileSync(path.join(ROOT, 'src/js/motion.js'), 'utf8');
+  const scope = { state, n20RequireLegacyWrite: motion.sandbox.n20RequireLegacyWrite };
+  const tweens = fs.readFileSync(path.join(ROOT, 'src/js/tweens.js'), 'utf8');
+  vm.runInNewContext(extractFunction(source, 'setExpressionCode') + '\n' + extractFunction(tweens, 'pushUndo'), scope);
+  const raw = scope.setExpressionCode;
+  await h.controller.activate(h.prepared);
+  await h.controller.releaseCurrent('retained-motion-close');
+  const before = JSON.stringify(state), nativeBefore = stateBytes(h);
+  for (let turn = 0; turn < 2; turn++) {
+    assert.equal(published(0), false);
+    assert.throws(() => raw(holder, 'position', '99'), { name: 'NemoNativeReleaseRequired' });
+    assert.equal(JSON.stringify(state), before);
+    assert.equal(stateBytes(h), nativeBefore);
+    await Promise.resolve();
+  }
+});

@@ -11,7 +11,7 @@
     var v1ByLifecycle = new WeakMap();
     // Extension capabilities can outlive a document; this latch lasts for the page.
     // All retry/trace and pending resize work, in contrast, belongs to one session.
-    var extensionExposed = false, reentryDepth = 0, resize = null, installation = null;
+    var extensionExposed = false, resize = null, installation = null;
 
     function ensureActive() {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
@@ -28,8 +28,7 @@
     function setOpacity(layerUid, value, requestId, mode) {
       var current = ensureActive();
       if (current.prepared.opacityMode === 'keyed') {
-        lifecycle.releaseFor('keyed-opacity-edit').catch(function () {});
-        return Promise.reject(new Error('keyed native opacity is read-only until release completes'));
+        return Promise.reject(new Error('keyed native opacity is read-only; editing is unavailable'));
       }
       return lifecycle.performMutation(function (identity) {
         return ports.editor.setOpacity(identity, requestId || lifecycle.id(mode === 'ui' ? 'n20-ui-set' : 'n20-set'),
@@ -48,8 +47,6 @@
       if (current.phase !== 'native') return false;
       if (kind === 'set' && current.prepared.opacityMode === 'static') {
         setOpacity(holder.layerUid, values[0], null, 'ui').catch(function () {});
-      } else {
-        lifecycle.releaseFor('opacity-' + kind).catch(function () {});
       }
       return false;
     }
@@ -199,19 +196,14 @@
         return work;
       }
       if (write || contract.registered(operation, listed)) {
-        var released = failure('unavailable', 'Native authority must release before this edit.');
+        var released = failure('unavailable', 'Native authority does not admit this edit.');
         if (write) retainCompleted(released);
-        lifecycle.releaseFor('mcp-' + operation).catch(function () {});
         return released;
       }
       return unavailable();
     }
 
-    function reenterLegacy(bytes, silent) {
-      reentryDepth++;
-      try { return ports.legacyImport(bytes, silent); }
-      finally { reentryDepth--; }
-    }
+    function reenterLegacy() { return false; }
     function disposeSession(session) {
       v1ByLifecycle.delete(session);
       if (resize && resize.session === session) {
@@ -220,26 +212,20 @@
       }
     }
     function allowLegacy(kind) {
-      if (reentryDepth) return true;
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
     }
-    async function importJSON(json, silent) {
-      if (lifecycle.blocksLegacy()) await lifecycle.releaseCurrent('document-replacement');
-      var candidate;
-      try { candidate = ports.document.prepareNativeOpacity(json); }
-      catch (_) { return ports.legacyImport(json, silent); }
+    async function importJSON(json) {
+      try { ports.document.prepareNativeOpacity(json); }
+      catch (_) { return false; }
       if (extensionExposed || ports.surface.extensionOpen()) {
         ports.surface.toast(extensionExposed
           ? 'Reload or restart Nemo before enabling native opacity after using scripts or plugins.'
           : 'Close every script panel and plugin, then retry native opacity.');
-        return ports.legacyImport(json, silent);
+        return false;
       }
-      var imported = ports.legacyImport(json, silent);
-      if (imported && !await lifecycle.activate(candidate)) {
-        ports.surface.toast('Native opacity activation failed; this document remains legacy-owned.');
-      }
-      return imported;
+      ports.surface.toast('Native document presentation installation is unavailable.');
+      return false;
     }
     function resizeViewport() {
       var observed = lifecycle.inspect(), token;
@@ -256,10 +242,8 @@
         if (!currentToken || currentToken.documentId !== token.documentId ||
             currentToken.generation !== token.generation) return;
         try { await ports.surface.resize(lifecycle.identity()); }
-        catch (_) {
-          if (lifecycle.inspect().session === job.session) lifecycle.requestRelease({
-            kind: 'viewport-resize-failed', documentId: token.documentId,
-            generation: token.generation }).catch(function () {});
+        catch (error) {
+          if (lifecycle.inspect().session === job.session) lifecycle.fence(error);
         }
       }, 50);
     }
