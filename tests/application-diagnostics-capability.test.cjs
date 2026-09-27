@@ -319,3 +319,67 @@ test('routing guard: no trace field is interpolated into the panel markup withou
   assert.match(code, /esc\(req\.requestId\)/);
   assert.match(code, /esc\(req\.operation\)/);
 });
+
+// ---- T12/#1405 — request ids are unique by construction --------------------
+//
+// Not a repair of an observed collision: nothing was seen in the wild. This is
+// correctness of construction. requestId is the application's idempotency key
+// (`retained.set(request.requestId, …)`, bounded at 256), and a collision does
+// not error — with an identical body it returns the MEMOISED earlier result,
+// which for these two read paths means quietly serving a stale trace.
+//
+// Both tests assert uniqueness across N calls rather than "the string changed",
+// because a generator that varies but repeats is exactly the defect: a single
+// inequality passes with Math.random() still in place.
+
+const MINT_CALLS = 200;
+
+test('T12: every inspect mints a distinct request id, derived from the application identity', () => {
+  const win = opacityWindow();
+  const seen = [];
+  const inner = win.NemoApplication.handle;
+  win.NemoApplication.handle = (request) => { seen.push(request.requestId); return inner(request); };
+
+  const handler = capability.handlerFor(win);
+  for (let i = 0; i < MINT_CALLS; i++) {
+    assert.equal(handler({ operation: 'inspect', payload: {} }).ok, true, `inspect #${i} failed`);
+  }
+
+  const minted = seen.filter((id) => id.startsWith('diagnostics-inspect:'));
+  assert.equal(minted.length, MINT_CALLS, 'each inspect reaches diagnostics.trace exactly once');
+  assert.equal(new Set(minted).size, MINT_CALLS,
+    'a repeated requestId would hit the retained map and return a memoised trace');
+  const instanceId = win.NemoOpacityApplication.meta().instanceId;
+  assert.ok(minted.every((id) => id.startsWith(`diagnostics-inspect:${instanceId}:`)),
+    'the id must be derived from the identity the application itself uses, not from a fresh random source');
+  assert.ok(minted.every((id) => id.length <= 128),
+    'validate() rejects a requestId longer than 128 characters');
+});
+
+test('T12: every panel fetch mints a distinct request id — its body is identical each time', () => {
+  const { ctx, layerA } = panelWindow();
+  const response = ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'seed', ...ctx.NemoOpacityApplication.meta(),
+    expectedRevision: ctx.NemoOpacityApplication.meta().revision,
+    operation: 'property.set', payload: { layerId: layerA, property: 'opacity', value: 37 } });
+  assert.equal(response.ok, true, JSON.stringify(response));
+
+  const seen = [];
+  const inner = ctx.NemoApplication.handle;
+  ctx.NemoApplication.handle = (request) => { seen.push(request.requestId); return inner(request); };
+
+  // Each enable runs the shipped panel's own fetch; the module-scoped counter
+  // survives the cycle, which is the property under test.
+  for (let i = 0; i < MINT_CALLS; i++) {
+    ctx.SMLabs.enable('diagnostics-panel');
+    ctx.SMLabs.disable('diagnostics-panel');
+  }
+
+  const minted = seen.filter((id) => id.startsWith('diagnostics-panel:'));
+  assert.equal(minted.length, MINT_CALLS, 'each open fetches the trace exactly once');
+  assert.equal(new Set(minted).size, MINT_CALLS,
+    'a repeated requestId would make the panel render the memoised, stale trace');
+  const instanceId = ctx.NemoOpacityApplication.meta().instanceId;
+  assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId}:`)),
+    'the panel keys off the same application identity as the capability');
+  assert.ok(minted.every((id) => id.length <= 128));
+});

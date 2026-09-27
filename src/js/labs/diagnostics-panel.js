@@ -45,10 +45,27 @@
     return -1;
   }
 
+  // T12/#1405 -- see the matching note in application/diagnostics-capability.js
+  // for why requestId has to be unique by CONSTRUCTION, not probably unique.
+  // The panel's case is the sharper of the two: its request body is IDENTICAL
+  // on every fetch, so a collision takes the memoised branch and the inspector
+  // silently shows a STALE trace instead of the current one.
+  //
+  // Minted locally rather than shared with the capability module on purpose:
+  // diagnostics-capability.js carries no script tag (it is declared
+  // classic-without-load-site), so window.NemoDiagnosticsCapability does not
+  // exist in the browser and cannot be depended on from here. What keeps the
+  // two sites consistent is that both key off the same application identity.
+  var minted = 0;
+  function mintRequestId(identity) {
+    minted += 1;
+    return 'diagnostics-panel:' + identity.instanceId + ':' + minted;
+  }
+
   function fetchEntries() {
     if (!window.NemoApplication || !window.NemoOpacityApplication) return { error: 'diagnostics application not loaded' };
     var identity = window.NemoOpacityApplication.meta();
-    var response = window.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-panel:' + Math.random(),
+    var response = window.NemoApplication.handle({ apiVersion: 1, requestId: mintRequestId(identity),
       ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
     if (!response.ok) return { error: (response.error && response.error.message) || 'diagnostics.trace failed' };
     return { entries: response.result.entries };

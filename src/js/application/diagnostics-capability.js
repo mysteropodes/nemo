@@ -17,6 +17,27 @@ var NemoDiagnosticsCapability = (function () {
       && win.NemoOpacityApplication && typeof win.NemoOpacityApplication.meta === 'function');
   }
 
+  // T12/#1405 -- requestId is the application's idempotency key
+  // (`retained.set(request.requestId, ...)`, bounded at 256), so it has to be
+  // unique by CONSTRUCTION rather than probably-unique. The two failure modes
+  // a collision produces are both bad and neither is a crash: with an
+  // identical body the application returns the MEMOISED earlier result (the
+  // inspector would show a stale trace), and with a changed body it fails
+  // `invalid_request`. Math.random() offers no uniqueness guarantee at all.
+  //
+  // The identity used here is the application's own -- instanceId comes from
+  // ports.newId(), which bootstrap/opacity-application.js implements as
+  // crypto.randomUUID() -- and the counter makes every id minted within that
+  // instance distinct. Module-scoped deliberately: the counter must keep
+  // rising across every handler built over the same application instance.
+  // Composed as a suffix, never parsed: opacity-diagnostics.js appends
+  // ':replay' to a requestId, and nothing anywhere splits one.
+  var minted = 0;
+  function mintRequestId(prefix, identity) {
+    minted += 1;
+    return prefix + ':' + identity.instanceId + ':' + minted;
+  }
+
   // Live environment check for a caller to pass into register()'s optional
   // third argument at actual boot time. Same "not re-evaluated after
   // registration" limitation documented in timelapse-capability.js: a
@@ -92,7 +113,7 @@ var NemoDiagnosticsCapability = (function () {
       if (operation !== 'inspect') return { ok: false, error: { code: 'unknown_operation', message: 'Unsupported operation: ' + operation } };
       var limit = request.payload && request.payload.limit;
       var identity = win.NemoOpacityApplication.meta();
-      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-inspect:' + Math.random(),
+      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: mintRequestId('diagnostics-inspect', identity),
         ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
       if (!traced.ok) return { ok: false, error: traced.error };
       // The bound is the application's to declare, not ours to restate: the
