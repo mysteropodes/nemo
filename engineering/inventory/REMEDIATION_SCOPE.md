@@ -11,7 +11,9 @@ post-census `main` so the 50 census supplements merged after P03C-a (C19s–C19a
 C21a–C21q) are pinned and the residual gap is published from facts, and
 [P03C-c / #1362](https://github.com/mysteropodes/nemo/issues/1362) reconciled C02:10 to the
 eleven accepted C20g–C20i census packets without admitting or implementing them. None of
-these leaves completes P03 or admits the extraction queue; that is the rest of P03C.
+these leaves completes P03 or admits the extraction queue. P03C-d / #1401 reconciles C08:1
+against the accepted, pinned C19 timeline census series; it changes no packet admission or
+frozen source identity. The rest of P03C remains open.
 
 [remediation-scope.json](remediation-scope.json) (schema `nemo.remediation-scope/2`) freezes
 all **756 Git-tracked paths** at `3f6eed2a500f2ce868b711e063816029eb8fefa5`. Every path has one
@@ -123,13 +125,16 @@ Every reviewed claim carries its evidence and is validated by shape:
   (issue) or `deferred` (reason). No delivered leaf matched an entire packet: P20, P21, P22, P23,
   P26, P28, A01, P17 and P18 each extracted part of a larger packet, so all 762 stay pending
   until P03C splits them (the 292 packets pinned by P03C-b enter as `pending`).
-- **Uncovered-responsibility notes** — 35 verbatim notes: **15 `covered-by-packet`** (cite
+- **Uncovered-responsibility notes** — 35 verbatim notes: **16 `covered-by-packet`** (cite
   existing packets — P03C-a closed C20a:1, C20a:2 and C20b:1 by amending the C02 packet ranges
-  they pointed at), 3 `resolved` (measured), 14 `boundary` (scope statements, cross-checked
-  against the spans), 2 `human-decision` (C03:3 unwired selection API, C08:3 `40min-checkins/`),
-  and **1 `needs-reconciliation`**: C08:1 — kept verbatim from P03C-a. P03C-c reconciled
-  C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets;
-  their admissions remain pending and this records census ownership only, not implementation.
+  they pointed at; P03C-d reconciled C08:1 to pinned C19 timeline packets), 3 `resolved`
+  (measured), 14 `boundary` (scope statements, cross-checked against the spans), and 2
+  `human-decision` (C03:3 unwired selection API, C08:3 `40min-checkins/`). No note remains
+  `needs-reconciliation`. C08:1's original note is verbatim; its evidence now identifies the
+  59a5a38c source pin and C19 packet ranges. This is census ownership only: the timeline still
+  has 27 uncovered code lines in spans 2002–2011, 2027–2048, 2247 and 7449. P03C-c reconciled
+  C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
+  admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 40, all dispositioned: 32 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
@@ -164,10 +169,12 @@ completed the `app.js`, `timeline.js` and `motion.js` censuses (C21a–C21q, C19
 C20g–C20s) at `3f6eed2…` and published the residual gap above; it changed no packet range, owner
 or disposition. P03C-c/#1362 reconciled only C02:10 to the eleven accepted C20g–C20i census
 packets; all eleven packet admissions remain pending and no implementation is claimed.
+P03C-d/#1401 reconciled C08:1 to the C19 census evidence without changing the frozen source,
+packet admissions, or implementation state. The old whole-file gap is stale; the four current
+timeline spans and 27 uncovered code lines remain undispositioned.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
-packets, 1 note needing reconciliation, 6 unmapped paths and 151 undispositioned spans.
-What remains, in order: reconcile C08:1 against the now-covered span; disposition
-the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
+packets, no notes needing reconciliation, 6 unmapped paths and 151 undispositioned spans.
+What remains, in order: disposition the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
 pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`

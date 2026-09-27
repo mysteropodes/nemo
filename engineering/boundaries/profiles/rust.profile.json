@@ -409,7 +409,8 @@
       "layer": "engine",
       "dir": "geometry-wasm/src",
       "files": [
-        "engine.rs"
+        "engine.rs",
+        "engine/color_adjust.rs"
       ],
       "publicApi": [
         "engine.rs"
@@ -473,6 +474,7 @@
       "layer": "tests",
       "dir": "geometry-wasm/tests",
       "files": [
+        "color_adjust_extraction.rs",
         "dab_dense_overlap_repro.rs",
         "effect_layer_overlay_repro.rs",
         "shader_library_validation.rs"
