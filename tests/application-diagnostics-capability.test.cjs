@@ -331,8 +331,31 @@ test('routing guard: no trace field is interpolated into the panel markup withou
 // Both tests assert uniqueness across N calls rather than "the string changed",
 // because a generator that varies but repeats is exactly the defect: a single
 // inequality passes with Math.random() still in place.
+//
+// Honey's review of #1413 sharpened this, and it is worth stating so nobody
+// mistakes which assertion carries the weight: a Set-of-N check does NOT have
+// teeth against Math.random() -- among 200 draws a collision is vanishingly
+// improbable, so that assertion would pass with the defect in place. Uniqueness
+// by CONSTRUCTION is a structural property, so it is asserted structurally: the
+// trailing component must be consecutive integers. A random suffix fails that
+// deterministically, on every run, independently of the identity prefix.
+// The Set check stays as the statement of what the counter is FOR.
 
 const MINT_CALLS = 200;
+
+// The id is `<prefix>:<instanceId>:<counter>`; instanceId is a UUID and carries
+// no ':' of its own, so the counter is the last segment. Asserted as a run of
+// consecutive integers rather than "all different": the starting value depends
+// on how many times the module-scoped counter was already used in this process.
+function assertConsecutiveCounters(ids, label) {
+  const counters = ids.map((id) => id.slice(id.lastIndexOf(':') + 1));
+  assert.ok(counters.every((value) => /^[0-9]+$/.test(value)),
+    `${label}: every id must end in an integer counter, not a random component`);
+  const numbers = counters.map(Number);
+  const expected = numbers.map((_, index) => numbers[0] + index);
+  assert.deepEqual(numbers, expected,
+    `${label}: the counter must advance by exactly one per mint -- that is what makes the id unique by construction rather than unlikely to repeat`);
+}
 
 test('T12: every inspect mints a distinct request id, derived from the application identity', () => {
   const win = opacityWindow();
@@ -354,6 +377,7 @@ test('T12: every inspect mints a distinct request id, derived from the applicati
     'the id must be derived from the identity the application itself uses, not from a fresh random source');
   assert.ok(minted.every((id) => id.length <= 128),
     'validate() rejects a requestId longer than 128 characters');
+  assertConsecutiveCounters(minted, 'inspect');
 });
 
 test('T12: every panel fetch mints a distinct request id — its body is identical each time', () => {
@@ -382,4 +406,5 @@ test('T12: every panel fetch mints a distinct request id — its body is identic
   assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId}:`)),
     'the panel keys off the same application identity as the capability');
   assert.ok(minted.every((id) => id.length <= 128));
+  assertConsecutiveCounters(minted, 'panel fetch');
 });
