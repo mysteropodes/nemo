@@ -20,7 +20,7 @@
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
   function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
-  function releaseNative(kind){return window.NemoNativeOpacityLegacySurface?window.NemoNativeOpacityLegacySurface.releaseProjectTransition(window,kind):window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.release(kind):null;}
+  function releaseNative(kind){var surface=window.NemoNativeOpacityLegacySurface;if(surface===undefined)return window.NemoNativeOpacityCutover===undefined&&window.NemoNativeOpacityProject===undefined?null:false;try{return surface&&typeof surface.allowProjectTransition==='function'&&typeof surface.releaseProjectTransition==='function'?surface.releaseProjectTransition(window,kind):false;}catch(e){return false;}}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
   // mirrored to IndexedDB (async, no practical size ceiling) so a project
   // with embedded media doesn't silently lose its autosave the moment it
@@ -527,7 +527,7 @@
   function switchToTab(id){
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
-    if(!target.json&&window.NemoNativeOpacityLegacySurface&&!window.NemoNativeOpacityLegacySurface.allowProjectTransition(window))return false;
+    var blankAdmission=target.json?null:releaseNative('tab-switch');if(blankAdmission===false)return false;
     snapshotActiveIntoTab();
     function entered(){
       currentPath=target.path||null;currentName=target.name;updateCurrentLabel();
@@ -545,7 +545,7 @@
         entered();
       });
     }
-    return afterMaybe(releaseNative('tab-switch'),function(admitted){
+    return afterMaybe(blankAdmission,function(admitted){
       if(admitted===false)return false;activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
     }); // markSaved belongs to the new tab
   }
