@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "c1f1e495332420e41a6951ab877fab20ad2ac4be",
-    "sourceRootTree": "87ad8c33cee5593a25c45dbbbc7fb8afea074d41",
+    "candidateCommit": "658f5f7f36c3080823bfb7b68d3f168b8fc82e23",
+    "sourceRootTree": "afa5f5990ff73cb1f56f64659b0286fe9d8b6167",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "8b4eb61eae142245c616a826f8ffdd718e178f96",
-      "lastChangedCommit": "c1f1e495332420e41a6951ab877fab20ad2ac4be"
+      "gitTree": "8ea06c875f45572fa62042f56430c79ff83f6970",
+      "lastChangedCommit": "658f5f7f36c3080823bfb7b68d3f168b8fc82e23"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "ec8d6fc485ac7bca400a58fd2f6a86f9e2cc0c12",
-      "sha256": "023c8b1f01e8aad2a716b52c09143c953633d58abad4f50c872c6547c2a86c48",
-      "lastChangedCommit": "f4707a35422aecbabe17aca459681d2868adebd5"
+      "gitBlob": "a8f6449c16eacd7ba502b5fc4017138857b38371",
+      "sha256": "3dc8e795251be9766854078f400ded11e2070b9cecb048153294fa995fb282e2",
+      "lastChangedCommit": "613b6049e29a8a5b064e13b23a6f30c0548f9ebe"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "bda7c3b527c4f5451cfb19644062533ae8f82cdd6930504ec77c43b81fa32d69"
+      "value": "e917301eb7238dc1e6159a5ae49cf9e048418d396fdca5c16f6abf9a27b0eca0"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ca3e44a98604ef9d7d40e07c94099b6cb111a83e",
-        "sha256": "ec2892a3436ae61903db35af046fdd46744bc9124be5081fb202cb86728fa82b",
-        "moduleCount": 179,
-        "basedOnCommit": "86a6152970d4b44738af0fcc8654ff122f44679a"
+        "gitBlob": "1cda56c4fd7d58509b0b2142cf1a86ccc68cfa09",
+        "sha256": "f1e8b6f3c5e2b7e33922422ee5f43afbbde22e334e15de15c712e3498ea056e4",
+        "moduleCount": 181,
+        "basedOnCommit": "613b6049e29a8a5b064e13b23a6f30c0548f9ebe"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -224,8 +224,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2514,
-          "scriptOrdinal": 168
+          "line": 2515,
+          "scriptOrdinal": 169
         }
       ]
     },
@@ -260,8 +260,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2396,
-          "scriptOrdinal": 74
+          "line": 2397,
+          "scriptOrdinal": 75
         }
       ]
     },
@@ -272,8 +272,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 160
+          "line": 2507,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -284,8 +284,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 161
+          "line": 2508,
+          "scriptOrdinal": 162
         }
       ]
     },
@@ -296,8 +296,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 164
+          "line": 2511,
+          "scriptOrdinal": 165
         }
       ]
     },
@@ -332,8 +332,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 163
+          "line": 2510,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -344,8 +344,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 162
+          "line": 2509,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -381,8 +381,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2494,
-          "scriptOrdinal": 150
+          "line": 2495,
+          "scriptOrdinal": 151
         }
       ]
     },
@@ -465,8 +465,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 165
+          "line": 2512,
+          "scriptOrdinal": 166
         }
       ]
     },
@@ -647,8 +647,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 167
+          "line": 2514,
+          "scriptOrdinal": 168
         }
       ]
     },
@@ -659,8 +659,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 166
+          "line": 2513,
+          "scriptOrdinal": 167
         }
       ]
     },
@@ -863,8 +863,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2393,
-          "scriptOrdinal": 71
+          "line": 2394,
+          "scriptOrdinal": 72
         }
       ]
     },
@@ -1713,8 +1713,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2351,
-          "scriptOrdinal": 36
+          "line": 2358,
+          "scriptOrdinal": 43
         }
       ]
     },
