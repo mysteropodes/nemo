@@ -374,7 +374,7 @@ test('T12: every inspect mints a distinct request id, derived from the applicati
   const minted = seen.filter((id) => id.startsWith('diagnostics-inspect:'));
   assert.equal(minted.length, MINT_CALLS, 'each inspect reaches diagnostics.trace exactly once');
   assert.equal(new Set(minted).size, MINT_CALLS,
-    'the counter must make every minted id distinct; a repeat is what could collide with a retained write id');
+    'the counter must make every minted id distinct -- reads are never retained, so this pins the construction rather than guarding a reachable failure');
   const instanceId = win.NemoOpacityApplication.meta().instanceId;
   assert.ok(minted.every((id) => id.startsWith(`diagnostics-inspect:${instanceId}:`)),
     'the id must be derived from the identity the application itself uses, not from a fresh random source');
@@ -404,7 +404,7 @@ test('T12: every panel fetch mints a distinct request id — its body is identic
   const minted = seen.filter((id) => id.startsWith('diagnostics-panel:'));
   assert.equal(minted.length, MINT_CALLS, 'each open fetches the trace exactly once');
   assert.equal(new Set(minted).size, MINT_CALLS,
-    'the panel must mint a distinct id per fetch; a repeat is what could collide with a retained write id');
+    'the panel must mint a distinct id per fetch -- same construction pin as the capability, not a guard against a reachable failure');
   const instanceId = ctx.NemoOpacityApplication.meta().instanceId;
   assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId}:`)),
     'the panel keys off the same application identity as the capability');
