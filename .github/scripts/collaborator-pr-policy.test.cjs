@@ -169,3 +169,60 @@ test('automatic policy workflow cannot execute PR code or gain unrelated write s
     ['actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8']);
   assert.doesNotMatch(workflow, /^\s*(?:- )?run:|secrets\.|pull_request\.head|actions\/checkout/m);
 });
+
+for (const eventName of ['workflow_dispatch']) {
+  test(`native remediation policy works from its trusted base: ${eventName}`, async () => {
+    const f = fixture({ pr: { base: { ref: 'codex/native-remediation' } } });
+    const failures = [];
+    await run({ github: f.github, context: { repo, ref: 'refs/heads/codex/native-remediation',
+      eventName, payload: { pull_request: { number: 42 }, inputs: { pull_request: '42' } } },
+      core: { info() {}, error() {}, setFailed: message => failures.push(message) } });
+    assert.deepEqual(failures, []);
+    assert.equal(f.calls.approvals.length, 1);
+    assert.equal(f.calls.approvals[0].commit_id, SHA);
+    assert.match(f.calls.approvals[0].body, /blob\/codex\/native-remediation\//);
+  });
+}
+
+test('trusted run never approves a different base branch', async () => {
+  const f = fixture();
+  await run({ github: f.github, context: { repo, ref: 'refs/heads/codex/native-remediation',
+    eventName: 'workflow_dispatch', payload: { inputs: { pull_request: '42' } } },
+    core: { info() {}, error() {}, setFailed() { assert.fail('unexpected failure'); } } });
+  assert.equal(f.calls.approvals.length, 0);
+  assert.equal(f.calls.dismissals.length, 0);
+});
+
+test('retargeting between allowed branches during review prevents approval', async () => {
+  const f = fixture({ prAfter: { base: { ref: 'codex/native-remediation' } } });
+  await f.invoke();
+  assert.equal(f.calls.approvals.length, 0);
+});
+
+test('manual reconciliation lists only the trusted execution base', async () => {
+  const f = fixture({ pr: { base: { ref: 'codex/native-remediation' } } });
+  const original = f.github.paginate;
+  const bases = [];
+  f.github.paginate = async (method, args) => {
+    if (method === 'pulls') bases.push(args.base);
+    return original(method, args);
+  };
+  await run({ github: f.github, context: { repo, ref: 'refs/heads/codex/native-remediation',
+    eventName: 'workflow_dispatch', payload: { inputs: {} } },
+    core: { info() {}, error() {}, setFailed() { assert.fail('unexpected failure'); } } });
+  assert.deepEqual(bases, ['codex/native-remediation']);
+  assert.equal(f.calls.approvals.length, 1);
+});
+
+test('similarly named feature branch is not a trusted policy source', async () => {
+  await assert.rejects(run({ ...fixture(), context: { repo,
+    ref: 'refs/heads/codex/native-remediation-fix', eventName: 'workflow_dispatch' }, core: {} }));
+});
+
+test('automatic event cannot execute policy from a non-default branch', async () => {
+  const f = fixture({ pr: { base: { ref: 'codex/native-remediation' } } });
+  await assert.rejects(run({ github: f.github, context: { repo,
+    ref: 'refs/heads/codex/native-remediation', eventName: 'pull_request_target',
+    payload: { pull_request: { number: 42 } } }, core: {} }), /default main/);
+  assert.equal(f.calls.approvals.length, 0);
+});

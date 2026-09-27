@@ -8,7 +8,7 @@
 
 # Current architecture and target direction
 
-> **Architecture reference — 2026-09-07.** The
+> **Architecture reference — 2026-09-07, updated for 2026-09-22 separation.** The
 > [English execution checklist](../EXECUTION_PLAN.en.md) / [French copy](../EXECUTION_PLAN.fr.md)
 > governs scope and completion. The architectural snapshot below originated on 2026-09-04;
 > it does not assert that every listed feature currently works. Characterize exact current
@@ -74,16 +74,21 @@ dependency-aware evaluation and scheduling
 vector rendering + image composition + media + encoding
 ```
 
-Recommended ownership:
+Target ownership on `codex/native-remediation`:
 
-- Rust for reusable document/evaluation kernels where beneficial, geometry, scheduling,
-  native media, diagnostics transport and the MCP adapter.
+- Rust for the sole persistent document/revision/history and evaluation authority,
+  scheduling, media/resource/GPU lifetime, viewport and export production, geometry
+  where appropriate, diagnostics transport and the bundled MCP adapter.
 - TypeScript/ESM for UI, inspectors, tools and SDK bindings.
-- Paper.js as an editing/hit-test adapter during migration, not the sole render-time model.
+- Paper.js only for justified geometry, hit-testing or presentation; it is not an
+  alternative persistent editor, evaluator or fallback writer.
 - Native desktop and worker/WASM browser adapters with explicit capability differences.
 
-Each migrated aggregate has exactly one writable authority. A legacy adapter may bridge old
-callers, but JavaScript and Rust must not become concurrent editable mirrors.
+Each migrated aggregate has exactly one writable native authority. An unmigrated feature
+may be explicitly unavailable on the integration branch and must not invoke an old
+writable engine. Existing UI/scripting consumers are adapted to the shared application
+API. Full agreed baseline behavior, project import and covered browser capabilities remain
+mandatory before final promotion; temporary unavailability is not a completion disposition.
 
 ## Future performance direction
 

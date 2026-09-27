@@ -1,6 +1,6 @@
 # Nemo — liste de contrôle pour l’exécution de la remédiation
 
-Stratégie approuvée : **7 septembre 2026** ; amendement sur le moteur natif approuvé le **20 septembre 2026**. Responsables humains : **Ilya** (`ivg-design`) et **Cyrill** (`mysteropodes`). [Version anglaise](EXECUTION_PLAN.en.md).
+Stratégie approuvée : **7 septembre 2026** ; amendement sur le moteur natif approuvé le **20 septembre 2026** ; séparation native approuvée le **22 septembre 2026**. Responsables humains : **Ilya** (`ivg-design`) et **Cyrill** (`mysteropodes`). [Version anglaise](EXECUTION_PLAN.en.md).
 
 ## Avant-propos — Ilya
 
@@ -10,9 +10,82 @@ Aucun de ces efforts n’a été perdu. Les corrections, les tests, les investig
 
 Ce document est le plan opérationnel unique de la remédiation en cours. Il remplace l’ordre d’exécution, les prévisions, les validations globales bloquantes, les hypothèses sur les agents distants et les exigences de compte rendu de l’ancien plan R00–R22 et des guides d’agents locaux. Les documents d’architecture et de code existants restent des références ; en cas de conflit, le présent document régit le périmètre et le fonctionnement. Les issues GitHub consignent les prises en charge et les transmissions en cours ; cette liste définit les résultats attendus. Le [journal horaire partagé de progression #1062](https://github.com/mysteropodes/nemo/issues/1062) est l’unique destination centrale des comptes rendus ; ne créez pas de registres de sprint concurrents ni de PR de compte rendu.
 
-## 0. Pivot approuvé vers le moteur natif et admission ordonnée — 20 septembre 2026
+## 0. Séparation native actuellement applicable — 22 septembre 2026
 
-Le pivot approuvé conserve l’interface Tauri/JavaScript tout en faisant d’un moteur Rust natif l’autorité unique sur les révisions du document, l’application des commandes et de l’historique, l’évaluation et l’ordonnancement, le cycle de vie des médias/ressources/GPU, la production des images du viewport et les jobs d’export. Paper.js devient un adaptateur de compatibilité pour l’édition, la sélection et le hit-test à la frontière de l’interface ; il ne doit pas rester un second propriétaire des écritures ou de l’évaluation. Le navigateur/WASM reste un adaptateur déclaré séparément avec des limites explicites de capacité et de disponibilité. Il s’agit d’une migration progressive, pas de l’affirmation que l’exécution actuelle a déjà changé d’un seul coup.
+**Cet amendement est la règle opérationnelle actuelle.** Il remplace tout texte transitoire
+plus bas qui exige une libération du document natif vers legacy, un ancien writer dormant
+et passant, ou une parité complète avant la déconnexion de ce writer. Les implémentations
+et reçus déjà acceptés restent des preuves, pas une obligation de faire fonctionner deux
+moteurs d’édition ensemble. Mettre à jour les issues concernées et Project #2 avant de
+reprendre un résultat modifié ; ne pas compter le travail de coexistence annulé comme
+une fonctionnalité finale livrée.
+
+- Préserver le `main` opérationnel au SHA de séparation
+  `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` pendant la remédiation sur la branche
+  d’intégration commune et protégée `codex/native-remediation`. Ce SHA identifie le code,
+  pas un artefact opérationnel installé et vérifié indépendamment. Les branches de tâche
+  ciblent l’intégration par PR revues ; seule une PR finale entièrement acceptée promeut
+  le résultat vers `main`. Une correction opérationnelle autorisée séparément peut rester
+  sur `main`, puis être évaluée une fois pour l’intégration sans fusionner sans cesse les
+  deux lignes.
+- Distinguer trois références : la base fonctionnelle convenue d’origine et ses défauts
+  caractérisés ; le code/build opérationnel préservé pour récupération ; et le code de
+  remédiation accepté avec ses travaux inachevés sous responsabilité. P03 et les issues
+  liées rapprochent les workflows de référence du recensement des sources figé. Un nombre
+  de paquets ou d’issues fermées n’est pas un pourcentage de parité fonctionnelle.
+- Rust est l’unique autorité du runtime de remédiation pour documents/révisions persistants,
+  commandes/historique, évaluation, cycle de vie médias/ressources/GPU, production du
+  viewport et export. JavaScript reste la couche UI/scripts/présentation ; Paper.js peut
+  fournir géométrie, hit-test ou présentation justifiés, jamais un second document
+  modifiable ou évaluateur d’autorité. UI, SDK, MCP et scripts applicables utilisent l’API
+  commune de commandes/requêtes/jobs. Les capacités navigateur couvertes emploient
+  l’adaptateur WASM/hôte déclaré, non une ancienne autorité JavaScript indépendante.
+- Une opération non migrée peut être visiblement indisponible sur la branche d’intégration
+  et doit être refusée avant toute mutation du document ; elle ne peut se replier sur
+  l’ancien moteur modifiable. Déconnecter ou retirer le code runtime remplacé à mesure que
+  sa responsabilité migre, même avant la parité finale de cette fonctionnalité. Ses
+  fixtures et son obligation en attente restent visibles. À la promotion finale,
+  **100 % des fonctionnalités de référence convenues et des surfaces applicables** doivent
+  être acceptées ou disposer d’une décision précise sur un défaut déjà présent dans la
+  base. Cela comprend l’import des anciens projets, les expressions et la sémantique
+  publique des scripts/plugins ; une indisponibilité temporaire ne ferme jamais une tâche.
+- Préserver les issues, propriétaires, modules natifs acceptés, modules UI/domaine extraits,
+  fixtures, diagnostics et tests. Requalifier N19B pour fermeture/réentrée natives ;
+  N19C/N19D pour refus ou déconnexion des anciennes entrées ; N19G pour intention de
+  sélection pure, commandes natives des opérations implémentées et refus des gestes non
+  migrés ; N19E pour remplacement natif attendu ; N19F pour synchronisation révision/UI ;
+  N20 pour le premier workflow d’édition continûment natif ; N21 pour l’acceptation réelle
+  bureau/navigateur sans aller-retour legacy. L’issue propriétaire consigne précisément
+  les critères conservés, remplacés et encore ouverts avant la reprise de son writer.
+
+La suite utilise les tâches bornées existantes : **A** préserver `main`, isoler l’app et
+les données de développement et connecter un premier shell/viewport natif ; **B** achever
+document/édition/historique/persistance natifs ; **C** animation et édition directe ;
+**D** familles de scènes complexes ; **E** médias/sortie et tous les consommateurs
+UI/API/navigateur ; **F** clôture structurelle, parité à dénominateur fixe, acceptation
+installée/client et promotion finale protégée. Les contrôles du renderer/viewport,
+de sauvegarde/historique et d’export pertinent commencent dès la première fonctionnalité
+utilisable, pas seulement à la fin de la vague E. Paralléliser les propriétaires
+indépendants après le contrat commun commande/révision ; garder un writer par fichier
+entier et une seule prévision intégrée.
+Réutiliser l’isolation existante des données par tâche et les outils de build natif pour
+l’application de développement ; vérifier identité et chemins réels plutôt que créer un
+second système d’isolation. La [prévision du travail restant du 22 septembre](https://github.com/mysteropodes/nemo/issues/1062#issuecomment-5785104824)
+est une allocation de planification datée, pas un pourcentage de fonctionnalités livrées
+ni un remplacement du dénominateur fixe des workflows de référence.
+
+Pour chaque test modifié, conserver les oracles indépendants de comportement, adapter les
+assertions couplées à l’ancienne structure d’appels, retirer les tests portant uniquement
+sur le transfert d’autorité supprimé et garder visiblement en attente tout comportement
+requis temporairement indisponible. Un sous-ensemble de développement réussi n’est pas
+une acceptation complète. Chaque branche de tâche acceptée s’intègre progressivement
+dans la branche protégée avec ses contrôles réels ; la promotion finale exige la matrice
+complète de parité, les preuves à partir d’un clone propre, installé, visuel, navigateur
+et client, ainsi que la revue humaine normale.
+
+### Pivot antérieur vers le moteur natif et admission ordonnée — 20 septembre 2026
+
+Le pivot du 20 septembre conservait l’interface Tauri/JavaScript tout en visant un moteur Rust natif comme autorité unique sur les révisions du document, l’application des commandes et de l’historique, l’évaluation et l’ordonnancement, le cycle de vie des médias/ressources/GPU, la production des images du viewport et les jobs d’export. Il préparait Paper.js comme adaptateur de compatibilité pour l’édition, la sélection et le hit-test à la frontière de l’interface et conservait le navigateur/WASM comme adaptateur déclaré séparément. Le contrat du 22 septembre ci-dessus supprime l’éditeur de compatibilité modifiable du runtime de remédiation ; ce paragraphe rappelle l’admission antérieure et n’exige pas un repli actuel.
 
 **La phase 0 est le réalignement de Project #2 et du plan ; elle précède l’implémentation du moteur.** Exécuter le travail admis dans cet ordre de dépendances :
 
@@ -23,7 +96,7 @@ Le pivot approuvé conserve l’interface Tauri/JavaScript tout en faisant d’u
 - [x] **[N03 / #1330](https://github.com/mysteropodes/nemo/issues/1330)** et **[N04 / #1332](https://github.com/mysteropodes/nemo/issues/1332) :** après N02, démontrer indépendamment l’évaluation Rust headless et un viewport Tauri natif sur des jeux d’essai représentatifs. Consigner honnêtement les échecs mesurés et les résultats non pris en charge ; une simple compilation ne vaut pas acceptation de faisabilité.
 - [x] **[N05 / #1333](https://github.com/mysteropodes/nemo/issues/1333) :** seulement après les deux jalons de faisabilité, inscrire la file bornée d’implémentation de production avec fichiers, responsables, SHA prédécesseurs, fixtures de parité, matrices de consommateurs, conditions de retrait et commandes de validation locale exacts.
 
-La migration de production progresse ensuite par tranches verticales caractérisées via les mêmes commandes, requêtes et jobs applicatifs versionnés qu’utilisent l’interface et le MCP Rust livré. Commencer par la fixture d’opacité acceptée et déplacer derrière les contrats figés la propriété des révisions persistantes, l’évaluation immuable, l’ordonnancement et les ressources natifs, la présentation bureau et l’export à révision fixe. Ne retirer un ancien propriétaire des écritures qu’après réussite, sur le même candidat, des preuves applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur et application bureau installée. L’acceptation du paquet bureau, celle de l’adaptateur navigateur et la parité du code source restent des jalons distincts.
+La migration de production progresse par responsabilités caractérisées via les mêmes commandes, requêtes et jobs applicatifs versionnés qu’utilisent l’interface et le MCP Rust livré. Commencer par la fixture d’opacité acceptée et déplacer derrière les contrats figés la propriété des révisions persistantes, l’évaluation immuable, l’ordonnancement et les ressources natifs, la présentation bureau et l’export à révision fixe. Sur la branche séparée, un ancien writer obsolète peut être déconnecté ou retiré avant la parité finale de son remplacement ; marquer alors la fonctionnalité manquante en attente et refuser son opération sans repli. Les preuves applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur et application bureau installée restent requises pour l’acceptation finale sur des candidats identifiés.
 
 Cet amendement préserve le travail de remédiation accepté et les responsabilités existantes. En particulier, [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005), [P16 / #1018](https://github.com/mysteropodes/nemo/issues/1018), [#1316](https://github.com/mysteropodes/nemo/issues/1316) et sa [PR #1323](https://github.com/mysteropodes/nemo/pull/1323) actuelle ne sont ni réassignés ni fermés silencieusement. R23 est un parent de suivi ; seules les tâches exécutables nommées et leurs relations natives de blocage conditionnent le travail.
 
@@ -55,10 +128,10 @@ Les issues de départ ci-dessous sont des tâches d’entrée concrètes, sans p
 | Poste | Ilya | Cyrill |
 |---|---|---|
 | **O — orchestrateur** | `gpt-6-astra`, **high**. Responsable des contrats partagés, des règles sur le code et la couverture, de l’ordre d’intégration, de la validation combinée et du tableau canonique. | `opus`, **high**. Responsable de la validation technique, des fusions et de la clôture au tableau de son équipe. Revue aux jalons ; responsable des prises en charge de l’équipe, des transmissions Fizz/Honey existantes, de l’acceptation Claude/native et des décisions de quota. |
-| **D1 — délégué** | `gpt-5.6-sol`, **medium**. Extraction de fonctionnalités, services applicatifs et travaux de persistance circonscrits. Passer à high en cas d’ambiguïté sur l’autorité ou l’historique. | `sonnet`, **medium**. Tests ciblés, fonctions utilitaires pures, analyseurs/adaptateurs natifs et enregistrement des fonctionnalités. |
-| **D2 — délégué** | `gpt-5.6-terra`, **medium**. Frontières, adaptateurs Rust/rendu et implémentation indépendante. Utiliser high pour la concurrence ou la propriété des ressources. | `sonnet`, **medium**. Couverture et rapports, tests navigateur isolés, préférences/Labs et interface de diagnostic. |
+| **D1 — délégué** | Préférer `gpt-6-sol`, **medium** pour une implémentation bornée ; augmenter l’effort si l’autorité/l’historique est ambigu. | `sonnet`, **medium**. Tests ciblés, fonctions utilitaires pures, analyseurs/adaptateurs natifs et enregistrement des fonctionnalités. |
+| **D2 — délégué** | Préférer `gpt-6-luna`, **low/medium** pour revue, tests et inventaire ciblés ; utiliser Sol ou Astra si la complexité l’exige. | `sonnet`, **medium**. Couverture et rapports, tests navigateur isolés, préférences/Labs et interface de diagnostic. |
 
-Ces réglages de session sont des recommandations, pas des garanties de quota. Vérifier le modèle et l’effort réels lors de la première prise en charge. Si un modèle indiqué est indisponible, choisir un équivalent disponible et consigner la substitution ; ne pas utiliser silencieusement un modèle moins capable sur un problème d’autorité non résolu. `gpt-5.6-luna` / medium peut remplacer un délégué d’Ilya pour des vérifications mécaniques d’inventaire ou de liens ; cela ne crée pas un quatrième poste.
+Ces réglages de session sont des préférences, pas des garanties de quota ni des capacités rigides des postes. Utiliser `gpt-6-astra` quand la tâche le justifie. Vérifier le modèle et l’effort réels lors de la première prise en charge ; choisir un modèle disponible et capable si la préférence ne l’est pas, puis consigner la substitution. Aucun choix de modèle ne crée un quatrième poste.
 
 Pour chaque agent lancé dans la tâche Codex actuelle, inclure le modèle et l’effort de raisonnement choisis dans le nom local de sa tâche. Ne pas renommer les agents Buzz ; Buzz affiche leur modèle séparément.
 
@@ -68,13 +141,13 @@ Exemples de lancement depuis des copies de travail déjà allouées ; ces comman
 
 ```sh
 codex --model gpt-6-astra -c 'model_reasoning_effort="high"'
-codex --model gpt-5.6-sol -c 'model_reasoning_effort="medium"'
-codex --model gpt-5.6-terra -c 'model_reasoning_effort="medium"'
+codex --model gpt-6-sol -c 'model_reasoning_effort="medium"'
+codex --model gpt-6-luna -c 'model_reasoning_effort="low"'
 claude --model opus --effort high
 claude --model sonnet --effort medium
 ```
 
-Pour les sessions dans l’application, utiliser ses réglages de modèle et d’effort. Les alias Claude se résolvent selon le compte et le fournisseur ; consigner la version réelle de la session. Cette recommandation suit les métadonnées des modèles Codex disponibles et les recommandations officielles actuelles sur [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), les [modèles Claude](https://code.claude.com/docs/en/model-config) et l’[utilisation de Claude](https://code.claude.com/docs/en/costs). Les niveaux d’effort des différents fournisseurs ne sont pas des mesures équivalentes.
+Pour les sessions dans l’application, utiliser ses réglages de modèle et d’effort. Les alias Claude se résolvent selon le compte et le fournisseur ; consigner la version réelle de la session. Vérifier la disponibilité actuelle des modèles dans l’application plutôt que de l’inférer des anciennes prises en charge. Les niveaux d’effort des différents fournisseurs ne sont pas des mesures équivalentes.
 
 ### Compétences portables : appliquer directement ces procédures
 
@@ -100,7 +173,7 @@ Utiliser les sous-issues natives sous R03/R05/etc. pour mesurer l’avancement. 
 
 ### Démarrage et points de contrôle de l’orchestrateur
 
-- [ ] Lire ce plan, la vue filtrée du tableau de l’équipe et la dernière transmission de chaque tâche active. Récupérer main, examiner les PR et les worktrees, préserver les prises en charge actives. Le silence ne libère jamais une prise en charge.
+- [ ] Lire ce plan, la vue filtrée du tableau de l’équipe et la dernière transmission de chaque tâche active. Récupérer la branche protégée d’intégration de remédiation et vérifier le `main` préservé, examiner les PR et les worktrees, préserver les prises en charge actives. Le silence ne libère jamais une prise en charge.
 - [ ] Réserver au maximum deux worktrees de tâches en écriture par machine, en plus de la copie principale. Les revues en lecture seule, mises à jour du tableau et notes ne créent pas de worktree. L’orchestrateur effectue les intégrations en série dans une copie de tâche propre et disponible ; ne pas ajouter une quatrième copie uniquement pour l’intégration.
 - [ ] Allouer uniquement des tâches Ready dont les prédécesseurs sont intégrés/acceptés et dont les **fichiers entiers** ne se chevauchent pas. Un partage par fonctions dans `motion.js`, `timeline.js`, `tweens.js`, `tools.js` ou `engine-bridge.js` n’autorise pas plusieurs rédacteurs simultanés.
 - [ ] Laisser à l’orchestrateur d’Ilya le câblage partagé de `package.json`, du fichier de verrouillage, du bootstrap/index, des profils, du manifeste généré et de `scripts/nemo/ci.cjs`. Les délégués fournissent des modifications ciblées dans leur branche de tâche ; l’orchestrateur intègre ces portions partagées en série.
@@ -173,7 +246,7 @@ Références principales des outils : [exécuteur de tests Node](https://nodejs.
 - [ ] Découvrir d’abord des résumés compacts ; charger les contrats détaillés à la demande. Les médias et géométries volumineux circulent via des handles ou des références d’artefacts. Les agents peuvent inspecter des images ou états ciblés ; ne pas exposer des milliers d’outils au niveau des widgets ni sérialiser des buffers entiers dans les prompts.
 - [ ] Appliquer la politique de modification et d’accès dans les gestionnaires applicatifs. Les descriptions d’outils expliquent les règles sans les faire respecter. Utiliser des instances, documents et révisions explicites, rejeter les écritures périmées et réconcilier les requêtes interrompues avant de réessayer.
 - [ ] Séparer les versions du protocole et des schémas de fonctionnalités, avec des règles explicites de compatibilité et de dépréciation. Exécuter la migration Rust approuvée derrière ces contrats, par tranches verticales bornées ; ne pas tenter une réécriture d’un seul coup. Un framework universel de plugins et un ordonnanceur distribué restent hors périmètre.
-- [ ] Une fonctionnalité existante défaillante reste reliée à sa véritable implémentation et annonce précisément sa disponibilité ou son échec. Un descripteur seul ne prouve pas un comportement opérationnel. Les noyaux internes sont associés à une capacité fonctionnelle utile au lieu de devenir des outils publics sans intérêt.
+- [ ] Une fonctionnalité existante défaillante annonce précisément sa disponibilité ou son échec. Sur la branche de remédiation, une opération non migrée peut être indisponible mais ne peut pas invoquer un ancien writer retiré. Un descripteur seul ne prouve pas un comportement opérationnel et ne ferme pas une fonctionnalité requise ; les noyaux internes sont associés à une capacité fonctionnelle utile au lieu de devenir des outils publics sans intérêt.
 
 ## 6. Règles du tableau et supervision humaine
 
@@ -210,16 +283,16 @@ Utiliser les ID de projet/élément/champ/option retournés avec `gh project ite
 
 ## 7. Intégration et nettoyage des branches
 
-**Politique de fusion approuvée par Ilya et Cyrill le 9 septembre 2026 :** chaque équipe de collaborateurs prend en charge sa revue technique, sa validation locale et ses fusions ordinaires de PR. Aucune approbation systématique de l’autre équipe humaine n’est nécessaire. Cette règle remplace l’ancienne instruction d’approbation entre comptes.
+**Politique de fusion approuvée par Ilya et Cyrill le 9 septembre 2026 :** chaque équipe de collaborateurs prend en charge sa revue technique et sa validation locale. La nouvelle branche d’intégration protégée conserve les exigences GitHub normales de revue et de fusion ; sa première PR d’extension de politique exige une approbation GitHub ordinaire d’un autre compte éligible, car la politique actuellement déployée ne couvre que `main`. Cette approbation n’est pas une seconde revue technique par l’autre équipe. Après acceptation et vérification de l’extension sur la branche d’intégration protégée, une PR éligible peut demander l’accusé au SHA exact par un `workflow_dispatch` explicite, limité aux métadonnées, avec `--ref codex/native-remediation -f pull_request=<NUMÉRO_PR>`. GitHub ne déclenche pas automatiquement `pull_request_target` sur cette branche non principale ; vérifier la référence, la base de PR et l’approbation obtenue avant de s’y fier.
 
 - [ ] Conserver une seule branche et une seule PR de tâche d’un sprint à l’autre. Un orchestrateur peut intégrer plusieurs tâches relues successivement, mais chacune conserve son acceptation et sa responsabilité propres. Ne pas regrouper des changements sans rapport uniquement pour réduire le nombre de PR.
 - [ ] Publier le candidat dans la PR existante de la tâche. L’orchestrateur de l’équipe relit le SHA exact et le diff délimité, vérifie les preuves locales et d’exécution requises, puis consigne dans cette PR le relecteur, le candidat, les commandes/résultats, les défauts connus de la baseline et la décision d’acceptation. Les agents partageant le compte GitHub de l’auteur peuvent effectuer cette revue technique ; ne pas tenter une auto-approbation GitHub ni inventer une autre identité de relecteur.
-- [ ] Pour une PR dont l’auteur est un **collaborateur actuel du dépôt disposant d’un accès write, maintain ou admin**, l’équipe responsable peut fusionner après cette revue et cette validation. Le workflow `Collaborator PR policy`, limité aux métadonnées, fournit l’approbation exigée par GitHub sous forme d’un accusé explicite de la politique, lié au SHA actuel. Cet accusé n’est ni une revue de code, ni un résultat de test, ni une instruction de fusion ; les preuves de l’équipe doivent être complètes avant de fusionner. Les accès read/triage, l’appartenance au tableau et l’inscription Buzz ne suffisent pas.
+- [ ] Pour une PR dont l’auteur est un **collaborateur actuel du dépôt disposant d’un accès write, maintain ou admin**, l’équipe responsable ne peut fusionner qu’après sa revue technique, sa validation et l’approbation GitHub requise au SHA actuel. Le workflow automatique `Collaborator PR policy`, limité aux métadonnées, s’applique aux PR vers `main`. Avant la fusion et la vérification de son extension d’intégration, obtenir une approbation ordinaire d’un autre compte éligible pour une PR d’intégration. Ensuite, déclencher uniquement la politique manuellement depuis la référence d’intégration protégée pour le numéro exact de PR ; ne pas supposer d’événement d’intégration automatique. Un accusé de politique n’est ni une revue de code, ni un résultat de test, ni une instruction de fusion. Les accès read/triage, l’appartenance au tableau et l’inscription Buzz ne suffisent pas.
 - [ ] Pour une **PR d’un contributeur externe**, obtenir une revue GitHub favorable d’un collaborateur du dépôt après revue et validation locale du candidat actuel. Le workflow de politique n’approuve pas ces PR, même si un collaborateur y pousse des commits ou clique sur Merge. Conserver l’exigence d’une revue et d’approbation du dernier push, l’annulation des approbations périmées et la résolution des conversations.
 - [ ] Résoudre les demandes de modifications et les conversations ouvertes. Coordonner avec l’autre équipe en cas de responsabilités qui se chevauchent, de contrats partagés, de conflits ou de décision produit réelle ; ce sont des besoins précis de coordination, pas une condition systématique de fusion. L’acceptation des prédécesseurs nommés reste nécessaire.
 - [ ] Juste avant de fusionner, relire le SHA distant et l’état des revues ; si le SHA a changé, refaire la revue et la validation concernées. Utiliser la fusion GitHub normale, puis consigner le SHA intégré, effectuer les contrôles d’intégration applicables et mettre à jour la tâche. Une PR ouverte ou un accusé de politique ne suffit pas pour passer à Done.
-- [ ] Si le workflow de politique a échoué ou si une PR existante n’a pas son accusé, inspecter l’exécution et relancer uniquement la politique de métadonnées depuis main de confiance : `gh workflow run collaborator-pr-policy.yml --repo mysteropodes/nemo --ref main -f pull_request=<number>`. Ne pas solliciter l’autre équipe uniquement pour contourner ce problème de politique. Résoudre un problème d’accès/API avec un administrateur du dépôt ; ne jamais fabriquer une approbation technique.
-- [ ] Aucun push direct sur main ni contournement habituel des protections. Builds, tests, versions et déploiements restent locaux sauf demande humaine explicite pour l’exécution hébergée précise. Le workflow de politique limité aux métadonnées est la seule exception automatique Actions approuvée ; il n’exécute aucun code de PR et ne fusionne rien. Garder les quatre workflows produit désactivés. Les rappels de coordination restent en pause hors exécution active.
+- [ ] Si le workflow de politique échoue sur une PR dont il couvre effectivement la base, inspecter l’exécution et ne relancer que la politique de métadonnées depuis cette base de confiance. Ne jamais lancer la politique actuellement déployée, réservée à `main`, pour approuver une PR d’intégration ni ajouter une revue technique systématique entre équipes pour compenser une politique défaillante. Résoudre un problème d’accès/API avec un administrateur du dépôt ; ne jamais fabriquer une approbation.
+- [ ] Aucun push direct sur `main` ou `codex/native-remediation` protégés, ni contournement habituel des protections. Builds, tests, versions et déploiements restent locaux sauf demande humaine explicite pour l’exécution hébergée précise. Le workflow de politique limité aux métadonnées est la seule exception automatique Actions approuvée ; il n’exécute aucun code de PR et ne fusionne rien. Garder les quatre workflows produit désactivés. Les rappels de coordination restent en pause hors exécution active.
 - [ ] Après fusion et acceptation, vérifier que le travail est bien contenu dans le dépôt distant, que l’état suivi/non suivi est propre et qu’aucun processus détenu ne reste actif avant de supprimer branche et worktree de tâche. Ne pas retirer la copie de travail d’un autre flux. Une branche incomplète encore utile reste sous responsabilité ou est archivée avec une procédure de restauration testée.
 - [ ] Préserver la branche distante protégée `archive`. Les bundles archivés possèdent des manifestes nom-original→SHA, des sommes de contrôle et une vérification de restauration dans un dépôt vide. Ne jamais supprimer une branche uniquement à cause de son âge ou de l’absence de PR. Les têtes/bases de PR ouvertes, versions, worktrees et responsabilités non résolues restent protégés du nettoyage.
 - [ ] Les nouvelles branches ne doivent pas s’accumuler après clôture. L’orchestrateur effectue le nettoyage dans le cadre de la transmission et du passage à Done ; l’humain ne doit pas hériter d’une corvée de nettoyage de worktrees après chaque session.
@@ -232,7 +305,7 @@ Les dépendances déterminent ce qui est prêt, pas l’ordre numérique des ID.
 2. Après l’acceptation de N00, N01 réconcilie la file en direct pendant que N02 fige les contrats d’autorité native et de transition.
 3. Après l’acceptation de N02, N03 et N04 exécutent les jalons indépendants de faisabilité pour l’évaluateur headless et le viewport natif.
 4. Après les deux jalons, N05 admet N06–N21 sous les parents de famille R18.1–R18.6, coordonnés par R23 ; aucune issue générale de moteur ne constitue une mission d’écriture.
-5. Les tâches d’implémentation migrent une tranche verticale caractérisée à la fois et ne retirent l’ancien propriétaire des écritures correspondant qu’après réussite des contrôles nommés de parité, de consommateurs et de surfaces installées.
+5. Les tâches d’implémentation migrent les responsabilités caractérisées directement vers l’autorité native. Sur la branche séparée, elles peuvent déconnecter l’ancien writer obsolète avant la parité finale ; déclarer toute opération manquante indisponible et garder son obligation de parité ouverte. La promotion finale attend tous les contrôles applicables nommés de consommateurs et de surfaces installées.
 
 C08 a réparti la couverture restante dans les tâches de recensement supplémentaires acceptées C09, C13, C15, C17 et C18. P03 doit consolider C01–C08 ainsi que C09, C13, C15, C17 et C18, puis créer les petites tâches d’extraction restantes et les rattacher aux mêmes parents de famille. Réutiliser le protocole de tâche ci-dessous : symboles/responsable/dépendances exacts, trois contrôles observables, exclusions de défauts connus, mêmes labels d’assigné/flux et liens natifs de parent/blocage. Étendre cette liste dans la même modification ordinaire que celle qui adopte le recensement. L’empreinte de l’ensemble de sources figé et les contrôles d’absence d’éléments non cartographiés empêchent de déclarer silencieusement la remédiation terminée après ces seules tâches de départ.
 
@@ -246,7 +319,7 @@ N00–N05 disposent de reçus d’acceptation terminaux : fusion N00 `2bd3da7f7e
 
 À l’instantané d’acceptation de N05, le registre des issues contenait **171 tâches élémentaires = 143 acceptées + 28 ouvertes (83.63%)**. Ce sont des résultats d’issues acceptés, préparation et validation comprises ; la première tranche native comptait séparément **0/16 acceptations runtime**. La revue de N16 a ensuite admis N18A/#1367 comme dix-septième tâche runtime. Le préflight de N20 a ensuite prouvé l’absence des lectures d’autorité pour sérialisation/évaluation et d’un contrat terminal de libération/réentrée native ; N19A/#1373 et N19B/#1374 ont donc été admises comme dix-huitième et dix-neuvième tâches runtime avant N20. La revue ultérieure de l’atteignabilité des callbacks a admis N19C/#1377, N19D/#1378 et N19E/#1379 comme tâches runtime vingt à vingt-deux : N19C installe la barrière dormante d’édition legacy avant mutation, N19D étend cette barrière de façon sérialisée aux mutations de sélection et de repli après N19C, et N19E fait indépendamment attendre à des appelants externes de remplacement de projet leur résultat terminal après N19B. L’état courant des issues et du Project #2 prévaut sur ces comptes historiques. Les dossiers du recensement P03 ne constituent pas ce dénominateur ; ni leur nombre ni cette première tranche ne définissent le dénominateur complet de la migration du moteur. La revue du candidat exact de N20 a admis N19F/#1384 comme vingt-troisième tâche runtime pour imposer l’acquittement avant le succès réseau du MCP embarqué. La découverte ultérieure du flux pointeur de N21 a admis N19G/#1393 après N19D comme vingt-quatrième tâche runtime afin de préserver l’intention de sélection du canevas détenue par le natif grâce à une libération différée.
 
-Les vingt-quatre tâches natives admises appartiennent à **Ilya (`ivg-design`)**, avec **Ilya/O comme Validation owner**. O utilise `gpt-6-astra/high`, D1 `gpt-5.6-sol/high`, D2 `gpt-5.6-terra/high` ; consigner les réglages effectifs à la prise en charge. L’équipe responsable nomme un relecteur indépendant avant toute écriture. Le nom des nouveaux agents locaux inclut modèle/effort. À l’instantané N05, N06 conservait un empêchement actif sur des fichiers partagés et N07–N21 restaient planifiées ; N18A a été admise ensuite par la revue de N16, N19A/N19B lors du préflight de N20, N19C/N19D/N19E lors de la revue de l’atteignabilité des callbacks, et N19G après N19D par la découverte du flux pointeur de N21. N’avancer chaque tâche qu’à partir des preuves d’acceptation de ses prédécesseurs et utiliser son issue ainsi que les champs du Project #2 pour l’état courant. À chaque prise en charge, consigner les SHA de fusion réels, jamais des empreintes prospectives. L’ordre numérique ne définit pas l’état prêt.
+Les vingt-quatre tâches natives admises avaient été attribuées à **Ilya (`ivg-design`)**, avec **Ilya/O comme Validation owner**. La préférence actuelle des délégués est GPT-6 Sol/Luna, Astra lorsque justifié ; consigner les réglages réels dans chaque nom d’agent local et chaque prise en charge. L’équipe responsable nomme un relecteur indépendant avant toute écriture. À l’instantané N05, N06 conservait un empêchement sur des fichiers partagés et N07–N21 restaient planifiées ; les tâches suivantes ont été admises à partir de découvertes précises. Le tableau ci-dessous conserve ces ID d’issues et dépendances initiales, sans affirmer que tous les anciens critères de coexistence restent actuels. N’avancer chaque tâche révisée qu’à partir de son issue en direct, des preuves d’acceptation de ses prédécesseurs et des champs de Project #2 ; consigner les SHA de fusion réels, jamais prospectifs. L’ordre numérique ne définit pas l’état prêt.
 
 | Tâche | Résultat observable | Famille / poste | Prédécesseurs effectifs |
 |---|---|---|---|
@@ -266,16 +339,16 @@ Les vingt-quatre tâches natives admises appartiennent à **Ilya (`ivg-design`)*
 | [N18A / #1367](https://github.com/mysteropodes/nemo/issues/1367) | Préparer le bootstrap de l’application native et les ports de l’hôte bureau | R18.6 / O | N16, N17, N18 |
 | [N19 / #1351](https://github.com/mysteropodes/nemo/issues/1351) | Appliquer les frontières natives et la validation locale | R18.3 / O | N13, N15, N16, N17, N18, N18A |
 | [N19A / #1373](https://github.com/mysteropodes/nemo/issues/1373) | Exposer la sérialisation native figée par révision et les lectures de sélection évaluées | R18.1 / O | N19 |
-| [N19B / #1374](https://github.com/mysteropodes/nemo/issues/1374) | Préparer la libération atomique de l’autorité native et la réentrée de l’hôte | R18.6 / O | N19A |
-| [N19C / #1377](https://github.com/mysteropodes/nemo/issues/1377) | Installer la barrière dormante d’édition legacy avant mutation | R18.4 / D2 | N19B |
-| [N19D / #1378](https://github.com/mysteropodes/nemo/issues/1378) | Garder les mutations de sélection et de repli avant libération native | R18.4 / D2 | N19C |
-| [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393) | Préserver l’intention de sélection du canevas détenue par le natif grâce à une libération différée | R18.4 / D2 | N19D |
-| [N19E / #1379](https://github.com/mysteropodes/nemo/issues/1379) | Attendre la libération native avant de poursuivre le remplacement externe du projet | R18.1 / D1 | N19B |
+| [N19B / #1374](https://github.com/mysteropodes/nemo/issues/1374) | Préserver fermeture, nettoyage et réentrée natifs ; aucun transfert vers legacy | R18.6 / O | N19A |
+| [N19C / #1377](https://github.com/mysteropodes/nemo/issues/1377) | Refuser ou déconnecter les anciennes entrées directes d’édition avant mutation | R18.4 / D2 | N19B |
+| [N19D / #1378](https://github.com/mysteropodes/nemo/issues/1378) | Refuser ou déconnecter les anciennes mutations de sélection/repli | R18.4 / D2 | N19C |
+| [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393) | Intention pure de sélection canevas ; opération native implémentée ou indisponibilité sûre | R18.4 / D2 | N19D |
+| [N19E / #1379](https://github.com/mysteropodes/nemo/issues/1379) | Attendre le remplacement natif du projet avant de poursuivre l’appelant | R18.1 / D1 | N19B |
 | [N19F / #1384](https://github.com/mysteropodes/nemo/issues/1384) | Synchroniser les révisions MCP embarquées avant le succès réseau | R18.6 / O | N16, N18A, N19A, N19B |
-| [N20 / #1352](https://github.com/mysteropodes/nemo/issues/1352) | Basculer atomiquement le sous-ensemble d’opacité admis | R18.1 / O | N17, N18, N18A, N19, N19A, N19B, N19C, N19D, N19E, N19F, N19G |
-| [N21 / #1353](https://github.com/mysteropodes/nemo/issues/1353) | Accepter les frontières natives installées et navigateur | R18.4 / O | N20 |
+| [N20 / #1352](https://github.com/mysteropodes/nemo/issues/1352) | Maintenir le premier workflow d’opacité continûment natif | R18.1 / O | N17, N18, N18A, N19, N19A, N19B, N19C, N19D, N19E, N19F, N19G |
+| [N21 / #1353](https://github.com/mysteropodes/nemo/issues/1353) | Accepter les workflows natifs installés et navigateur déclaré sans aller-retour legacy | R18.4 / O | N20 |
 
-**N19F / #1384 est la vingt-troisième feuille native admise, possédée par Ilya/O.** La revue de N20 a prouvé que les commits MCP embarqués directs contournent le consommateur webview. Avant la reprise de N20, N19F prépare un abonné de la webview principale lié à l’instance, au document et à la génération du cycle de vie. Un abonné absent/périmé refuse les avancées externes avant commit. Une avancée validée émet exactement `{instanceId, documentId, lifecycleGeneration, fromRevision, toRevision, requestId}` ; le succès réseau attend un acquittement exact après blocage des lectures périmées et synchronisation de `toRevision` par le consommateur. Lectures, échecs, annulation, travail non validé et relecture de reçu n’émettent rien. Une seule avancée en attente bloque les suivantes UI/externes, tout en permettant les lectures immuables ; échec d’écoute ou délai dépassé conserve une barrière indéterminée jusqu’à libération/réentrée, sans réexécution. Déconnexion, libération admise et réservation réussie de réinstallation drainent les anciens abonnés/attentes. Les sources privées du protocole/tests restent dans les modules MCP existants, sans changement de limites, baseline ou politique d’arêtes. Le périmètre exact est #1384 ; la transmission sérialisée des fichiers partagés suit N19F→N20. N19F n’active aucun document, n’implémente pas le cache N20 et ne revendique aucune parité UI/sauvegarde. N20 doit consommer ce callback accepté et prouver séparément la parité écriture MCP directe→UI/persistance/historique/libération.
+**N19F / #1384 préserve la synchronisation des révisions MCP embarquées directes.** Son abonné accepté de la webview principale est lié à l’instance, au document et à la génération du cycle de vie. Un abonné absent/périmé refuse les avancées externes avant commit ; une avancée validée émet exactement `{instanceId, documentId, lifecycleGeneration, fromRevision, toRevision, requestId}` et le succès réseau attend un acquittement exact après blocage des lectures périmées et synchronisation de `toRevision`. Lectures, échecs, annulation, travail non validé et relecture de reçu n’émettent rien. Une avancée en attente bloque les suivantes UI/externes tout en permettant les lectures immuables ; échec d’écoute ou délai dépassé conserve une barrière indéterminée jusqu’à fermeture/réentrée natives, sans réexécution. Déconnexion, fermeture native et réservation réussie de réinstallation drainent les anciens abonnés/attentes. Les sources privées du protocole conservent leurs limites MCP acceptées. N20 doit consommer ce callback et prouver la parité écriture MCP directe→UI/persistance/historique ; aucun transfert vers l’ancien propriétaire n’est requis.
 
 **Les prises en charge des fichiers entiers passent par des transmissions explicitement sérialisées.** Chaque issue liée contient sa liste exacte de chemins nouveaux/existants, sa matrice de consommateurs, ses contrôles et sa condition de bascule. N06 exige à la fois N05 acceptée et la transmission terminale de propriété de #1316/PR #1323. L’enregistrement des sources Rust suit **N06→N07→N08→N09→N10→N11→N12→N13→N14→N15→N16**, puis la transmission sérialisée **N18A→N19→N19A→N19B→N19C→N19D→N19G→N20** après acceptation de N17/N18 ; N19E avance en parallèle après N19B et rejoint N20 seulement après sa propre acceptation. N19F avance après N19B acceptée et la transmission des fichiers partagés, et constitue un prédécesseur accepté obligatoire de N20. Celui des applications/adaptateurs JS suit **N13→N15→N17→N18→N18A→N19A→N19C→N19D→N19G**, avec les dépendances intermédiaires du tableau. Les écritures partagées de provenance app-JS et d’inventaire généré se sérialisent **N19E→N19C** : N19E les rafraîchit d’abord pour ses sources d’appelants acceptées, puis les libère pour la source de garde de N19C. Un prédécesseur doit libérer sa prise en charge du fichier entier avant le démarrage du writer suivant ; des fichiers de modules différents n’autorisent pas des modifications concurrentes des profils partagés.
 
@@ -289,23 +362,23 @@ N06 possède seule `native-engine/Cargo.toml`, `Cargo.lock`, `src/lib.rs` et `RE
 
 **N19A possède l’interface de lecture manquante découverte pendant le préflight de N20.** Elle déclare `query.document.serialize` et `query.document.evaluate` dans la capacité v2 appartenant à la fonctionnalité, implémente dans l’application native des lectures immuables figées par révision, puis les transporte par le dispatcher d’application générique existant, l’adaptateur JavaScript et le MCP Rust embarqué. Le résultat sérialisé conserve les identifiants stables et les pistes à images clés ; le résultat évalué porte l’identité exacte document/snapshot/révision/contexte/image et satisfait la projection de sélection préparée. N19A reste indisponible en production et n’ajoute ni writer, ni fallback, ni activation au démarrage. Ses fichiers exacts et contrôles négatifs sont figés dans #1373.
 
-**N19B possède l’interface terminale de cycle de vie manquante découverte pendant le préflight de N20.** Elle prépare une commande de libération contrôlée par identité qui arrête les nouveaux dispatchs, réconcilie les transactions/export/aperçu en cours, détruit le viewport et les ressources, retire l’unique application installée, conserve un reçu terminal explicite et autorise exactement un bootstrap ultérieur pris en charge. Un échec de nettoyage n’autorise jamais une seconde autorité. N19B n’a aucun appelant de production avant N20 ; ses fichiers native-engine/Tauri exacts et ses contrôles de course/panne sont figés dans #1374.
+**N19B préserve la sûreté du cycle de vie natif.** Sa commande terminale acceptée, contrôlée par identité, arrête les nouveaux dispatchs, réconcilie les transactions/export/aperçu en cours, détruit viewport et ressources, retire l’unique application native installée, conserve un reçu explicite et autorise un bootstrap natif ultérieur. Un échec de nettoyage n’autorise jamais une seconde autorité. Sur la branche séparée, cela sert à fermer/remplacer/réentrer côté natif, jamais à transférer vers un document legacy modifiable. La source et les contrôles de course/panne acceptés restent dans #1374.
 
-**N19C possède l’interface de garde d’édition legacy neutre vis-à-vis des fonctionnalités.** Elle possède `src/js/application/native-edit-guard.js`, les bridges dessin/remplissage/pen/forme/gomme, son test de garde par callback direct et le contrôle négatif de frontière de source conservée, ainsi que les paragraphes synchronisés du plan. Après l’acceptation de N19E et la libération des chemins partagés, N19C prend l’enregistrement exact du module dormant dans `app-js.profile.json`, la provenance véridique du module dormant et toute régénération d’inventaire requise par le générateur pour la source de garde ; elle ne change ni baseline, règle de couche, exception, plancher ni plafond. Avant la première mutation Paper/document, chaque point d’entrée possédé, callback direct et helper de commit consulte la garde par le port de compatibilité optionnel et étroit `SMEngineBridge.nativeEditGuard` ; N20 seule attache la garde acceptée à cette dépendance de bridge déjà déclarée. Tant que JavaScript est propriétaire et que le port est absent, elle laisse passer. Un port présent mais mal formé ou levant une erreur reste fermé. Pendant que l’autorité native est active, elle arrête synchroniquement la pile courante, demande au plus une libération via un contrôleur installable et reste fermée en cas d’échec ou d’indétermination ; aucune mutation ou relecture dans la même pile n’est autorisée, et seul un appel ultérieur/rejoué après un reçu exact de succès peut passer. N19C ne crée ni miroir de document ni activation, comportement MCP spécifique à une fonctionnalité ou câblage de cycle de vie N20.
+**N19C préserve la couverture des entrées directes de mutation.** Sa garde acceptée et ses tests des callbacks dessin/remplissage/pen/forme/gomme identifient les anciennes entrées avant mutation Paper/document. Sur la branche séparée, déconnecter ces writers ou faire refuser par leurs entrées les opérations indisponibles avant mutation ; ne pas installer leur ancien contrôleur de libération vers legacy ni considérer le mode dormant passant comme une acceptation. Conserver l’enregistrement véridique des sources, les contrôles négatifs de frontière et les limites de non-croissance jusqu’au retrait du writer. Une opération implémentée utilise l’API applicative native ; une opération non implémentée reste visiblement indisponible. L’issue #1377 conserve sa preuve historique acceptée et les obligations exactes de déconnexion restantes.
 
-**N19D possède l’extension sérialisée de la garde N19C aux sélections/replis.** Après l’acceptation de N19C et la libération de son périmètre de fichiers entiers, N19D possède les points d’entrée de mutation de sélection, sous-sélection, callbacks Paper de repli et panneau Shapes listés dans #1378, y compris les contrôles directs/programmatiques. Elle ne peut contourner la décision de libération avant mutation de N19C et doit rester fermée jusqu’à ce qu’une invocation ultérieure/rejouée suive une libération exacte réussie. Sa prise en charge de `tools.js`/`select-bridge.js` attend en outre la sérialisation explicite PR #4/P25 consignée dans #1378.
+**N19D préserve la couverture des entrées de sélection et de repli.** Ses contrôles directs/programmatiques acceptés identifient les chemins de sélection, sous-sélection, callbacks Paper de repli et panneau Shapes dans #1378. Sur la branche séparée, ces chemins envoient une commande implémentée au propriétaire natif ou refusent l’opération indisponible avant mutation ; ils ne libèrent jamais vers un ancien propriétaire modifiable et ne rejouent pas un geste différé. Préserver la sérialisation des fichiers entiers `tools.js`/`select-bridge.js` et la prise en charge distincte PR #4/P25.
 
-**N19G possède l’interface d’intention de sélection du canevas à libération différée.** Après que N19D acceptée a libéré son périmètre de fichiers entiers, N19G factorise une sonde de canevas pure Motion/Select à partir de la précédence de hit existante et prépare une intention de pointeur en attente transitoire dans Select ; aucune ne peut pousser l’undo, sauvegarder, allouer un geste, conserver des références Paper mutables ni modifier l’état de sélection/document. La sélection, resélection et désélection par clic seul (y compris la sélection Shift, les pressions de poignée non déplacées et le jitter sous seuil) préservent l’identité/la révision natives et ne demandent aucune libération. Au premier mouvement réel, les writers Motion/Select de corps, poignée, transformation, marquee/lasso et autre glissé doivent demander la libération terminale avant undo, promotion, allocation Paper, modification de métadonnées, initialisation de writer ou toute autre mutation ; duplication Alt, placement d’ancre et entrée dans un composant restent gardés avant leur premier effet persistant. Pointer-up/cancel, perte de capture, identité périmée d’outil/image/document et libération retardée, rejetée ou indéterminée refusent la pile courante sans relecture ; seule une nouvelle pression après un reçu exact réussi peut continuer. Tant que legacy possède le document, ce comportement reste dormant et compatible avec legacy ; N19G n’active ni l’autorité native ni le câblage du cycle de vie, et N20 seule active l’interface acceptée. Son périmètre exact est [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393) ; toute nouvelle implémentation de sélection découverte doit être découpée et préparée avant que N20 soit Ready.
+**N19G possède la première interface de sélection du canevas native seule.** Ne réutiliser du prototype arrêté et non accepté que la précédence pure des hits Motion/Select et l’intention transitoire scalaire du pointeur qui servent le résultat final. Une sonde ne peut pousser l’undo, sauvegarder, allouer une baseline de geste, retenir des références Paper mutables ni modifier document/sélection. Sélection par clic, resélection, désélection et Shift conservent identité/révision natives ; seuil de mouvement, annulation, perte de capture et identité périmée d’outil/image/document ne doivent pas lancer une action obsolète. Pour le premier workflow d’opacité, une action de sélection/édition implémentée atteint sa commande native ; une géométrie, transformation, marquee/lasso ou autre action glissée non migrée est indisponible et s’arrête avant mutation par un ancien writer. N19G n’implémente **pas** toute la future famille native de dessin/transformation, ne demande pas de libération vers legacy et ne rejoue pas un geste. W05/W10 et leurs tâches propriétaires conservent ces obligations plus larges. Le périmètre révisé et la transmission du writer appartiennent à [#1393](https://github.com/mysteropodes/nemo/issues/1393) ; le prototype arrêté n’est pas un candidat accepté.
 
-**N19E possède l’interface parallèle de sûreté des appelants externes de remplacement de projet.** Après N19B, elle seule modifie les appelants Kitsu et tutoriel listés dans #1379 afin qu’ils attendent le résultat de remplacement avant toute mutation ultérieure de layer/frame/setup, rendu, entrée dans l’éditeur ou continuation de succès. Elle préserve le retour legacy synchrone/indéfini sous `await`, s’arrête sur remplacement/libération rejeté, échoué ou indéterminé et ne modifie pas le cycle de vie du projet, n’implémente pas la libération, n’active pas N20 et n’élargit pas le comportement Kitsu/tutoriel. N19E possède la provenance app-JS et la régénération d’inventaire requises pour ces sources d’appelants, puis libère explicitement ces chemins partagés à N19C pour la source de garde ; elle ne modifie pas les chemins du plan pendant cette sérialisation.
+**N19E préserve la sûreté des appelants externes du remplacement de projet.** Ses appelants Kitsu/tutoriel acceptés attendent le résultat terminal avant toute mutation ultérieure de layer/frame/setup, rendu, entrée dans l’éditeur ou continuation de succès. Sur la branche séparée, ils attendent le remplacement natif et s’arrêtent après rejet, échec ou résultat indéterminé ; ils ne reprennent pas un ancien projet modifiable. Conserver la provenance acceptée et la transmission des fichiers partagés de #1379, mais ne pas compter la compatibilité avec l’ancien retour synchrone comme acceptation native finale.
 
-N20 conserve les fichiers existants de bascule projet/document, tween, bootstrap/domaine/capacité d’opacité, motion/timeline, app, rendu/export et `src/index.html` listés dans #1352, ainsi que la déclaration de fonctionnalité dont elle active la disponibilité. N20 installe le contrôleur de libération N19C/N19D accepté, attache `SMEngineBridge.nativeEditGuard` avant toute activation de l’autorité native et câble uniquement les ports de lecture N19A acceptés, le port de libération/réentrée N19B, l’interface de garde N19C/N19D, l’interface de sélection différée N19G et les appelants N19E attendus ; les tests de bascule figent cet ordre. Elle ne doit ni ajouter un comportement fonctionnel Rust/hôte manquant, ni retirer le contenu non pris en charge pour fabriquer une projection faussement compatible, ni affaiblir l’admission. N21 possède uniquement ses nouveaux tests d’acceptation bureau et navigateur. Toute implémentation fonctionnelle supplémentaire découverte pendant la bascule doit être découpée et préparée avant que N20 soit Ready.
+N20 réutilise son implémentation native d’opacité acceptée, ses ports de lecture, son cycle de vie, sa synchronisation MCP et la correction de sélection de ligne présentes sur `main`, mais son résultat rouvert est le **premier workflow d’édition continûment natif** sur la branche d’intégration. Elle doit maintenir un propriétaire natif unique pendant la sélection Motion et les vraies modifications d’opacité ; un contenu non pris en charge ou une action indisponible est refusé sans mutation ni transfert vers un propriétaire legacy. Elle peut déconnecter tôt les anciens writers, sans retirer du contenu pour fabriquer une projection faussement prise en charge ni revendiquer la parité finale d’une fonctionnalité à partir d’un sous-ensemble de développement. L’interface étroite de sélection/refus N19G précède l’acceptation N20 concernée ; N21 possède séparément les preuves réelles bureau installé et navigateur déclaré. Les fichiers restants exacts et les critères natifs/tests appartiennent à #1352 ; la migration plus large est répartie dans les paquets déjà possédés, pas cachée dans ce premier workflow.
 
 **Oracle indépendant et consommateurs.** Préserver `tests/animation/fixtures/curve-workflow.json`, SHA-256 `dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d`, et les attentes indépendantes actuellement vérifiées dans `tests/browser/opacity-consumers.spec.cjs` : l’opacité statique 25 survit à la sauvegarde/réouverture avec un `layerUid` stable ; les images clés 0/10/20 s’évaluent à 20/50/80. La sortie 320×180 comporte 400 pixels colorés et les bornes `[20,60,40,80]`, `[84,60,104,80]`, `[148,60,168,80]` ; rouge/alpha valent 255 et vert/bleu valent `255 × (1-opacity/100)` à un octet près. Le rendu/export ne modifie pas les calques stockés. N09/N19A/N20 doivent en plus figer et vérifier l’oracle de résultat manquant selon lequel 40→60→annulation rend l’opacité d’autorité à 40 ; le test navigateur actuel vérifie la longueur des piles d’historique, pas cette valeur résultante. Figer toutes les valeurs attendues indépendantes avant l’implémentation ; ne pas les régénérer depuis le candidat.
 
-N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, répétition, transactions et historique ; N10 couvre l’évaluation avec temps/contexte explicites ; N11–N14 couvrent ordonnancement, cycle de vie GPU/ressources, entrée/présentation et export figé ; N15–N18 couvrent le même dispatch UI/MCP et les ports consommateurs préparés ; N18A compose ces ports derrière un unique hôte dormant de l’application bureau. N19 fournit des contrôles réellement défaillants pour source non enregistrée, dépendance interdite et job absent. N19A expose les lectures d’autorité de sérialisation/évaluation par le chemin commun application/MCP déclaré par la fonctionnalité ; N19B prépare la libération terminale et la réentrée propre ; N19C/N19D prouvent le refus par callback direct/programmatique d’une édition legacy avant mutation Paper/document ; N19G prouve la sonde pure et l’intention en attente, la sélection par clic seul sans libération et la libération avant mutation au premier mouvement réel, avec contrôles cancel/périmé/retardé/refusé ; et N19E prouve l’arrêt de continuation de l’appelant après un remplacement non réussi. N20/N21 couvrent la matrice combinée sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur et bureau installé sur un candidat identifié. Révisions périmées, répétitions au corps modifié, remplacement, contenu non pris en charge, générations obsolètes et échecs d’annulation/nettoyage restent des contrôles négatifs explicites.
+N07–N19A ont fourni les interfaces natives acceptées de sauvegarde/chargement, identité, commandes/historique, évaluation, ordonnancement/ressources, viewport/export, transport UI/MCP et lecture ; N19 a fourni de vrais contrôles négatifs de frontière. Sur la branche séparée, N19B fournit fermeture/réentrée natives sûres, N19C/N19D protègent ou déconnectent les anciennes mutations directes/programmatiques, N19G fournit intention pure de sélection et comportement sûr natif ou indisponible, N19E arrête la continuation de l’appelant après échec du remplacement natif et N19F synchronise les révisions MCP directes avec l’UI. N20/N21 établissent uniquement le premier workflow natif d’opacité et ses preuves réelles bureau installé/navigateur ; ils ne ferment pas les autres familles de référence. Révisions périmées, répétitions au corps modifié, remplacement, contenu non pris en charge, générations obsolètes et échecs d’annulation/nettoyage restent des contrôles négatifs explicites. Les paquets plus larges cartographiés par P03 portent leur propre parité sauvegarde/chargement, historique, sélection, animation, rendu et export jusqu’à l’acceptation finale.
 
-**Activation et validation.** Avant N20, les documents de production conservent leur propriétaire existant ; modules et transports préparés ne forment pas un second document modifiable. N18A prépare le bootstrap/remplacement et les ports concrets de l’hôte sans les invoquer depuis la production. N19A et N19B restent elles aussi préparées et indisponibles. N19C/N19D/N19G restent passantes et dormantes tant que legacy possède le document et ne peuvent pas elles-mêmes activer l’autorité native ; lorsqu’une installation N20 ultérieure marque l’autorité native, chaque pile courante gardée doit s’arrêter avant mutation et attendre un appel ultérieur/rejoué après une libération exacte réussie. N19E attend mais n’active pas le cycle de vie de remplacement. N20 admet atomiquement le seul sous-ensemble caractérisé pris en charge et rend ses anciens writers/évaluateur JS inaccessibles dans le même résultat. Un document pris en charge n’abandonne l’autorité native qu’après le reçu de libération accepté de N19B ; un document non pris en charge échoue à l’admission avant transfert et conserve un unique propriétaire explicitement legacy. Aucun repli silencieux ni miroir modifiable n’est autorisé. Les autres familles de documents restent un travail de migration ouvert. Chaque tâche exécute ses tests Cargo verrouillés/Node nommés, le formatage et `npm run check` ; N06 fige les commandes exactes de features/cibles. N16 ajoute les contrôles combinés des transports natifs/MCP ; N18A ajoute les contrôles d’hôte de même instance et de ports par module ; N19 enregistre l’application normale des règles ; N19A ajoute les contrôles de lecture immuable et de parité MCP ; N19B ajoute les contrôles terminaux de cycle de vie/course ; N19C/N19D ajoutent les contrôles négatifs pré-mutation directs/programmatiques ; N19G ajoute les contrôles de sonde pure/intention en attente, clic/désélection/Shift, poignée/corps, transformation, marquee, pointer-cancel/perte de capture, identité périmée et libération/relecture ; N19E ajoute les contrôles d’appelant immédiat/différé/rejeté ; et N21 consigne séparément l’exécutable installé identifié et le résultat du navigateur réel. Tests unitaires, hôte de fixture, compilation, captures ou fusion seuls ne démontrent pas l’acceptation installée. Aucun build hébergé n’est autorisé.
+**Activation et validation.** Le `main` opérationnel conserve son propriétaire observé ; ce n’est pas une preuve pour le runtime de remédiation séparé. Sur `codex/native-remediation`, un document admis a un propriétaire natif unique et aucun autre writer JavaScript/Paper. N20 n’admet que le sous-ensemble caractérisé sans perte de contenu ; un contenu non pris en charge échoue sûrement, laissant le document natif précédent inchangé ou l’ouverture tentée indisponible, sans transfert vers un propriétaire legacy. Les anciennes entrées N19C/N19D/N19G sont déconnectées ou refusées avant mutation, tandis que les opérations implémentées utilisent les commandes natives. N19B peut fermer/remplacer le propriétaire natif et permettre une réentrée native sûre, jamais une édition de repli. Les autres familles requises restent visiblement en attente de migration, pas Done. Chaque tâche modifiée exécute ses contrôles ciblés Cargo/Node, les contrôles normaux d’enregistrement/frontières/taille et les consommateurs réels concernés ; les jalons intégrés utilisent les validations locales plus larges. N21 consigne séparément l’exécutable installé identifié et le résultat du navigateur réel pour le premier workflow. Tests unitaires, hôte de fixture, compilation, captures ou fusion seuls ne démontrent pas l’acceptation installée. Aucun build produit hébergé n’est autorisé.
 
 **Graphe final et travail préservé.** N21 → [P32/#1034](https://github.com/mysteropodes/nemo/issues/1034) → [P33/#1035](https://github.com/mysteropodes/nemo/issues/1035) → [R22/#930](https://github.com/mysteropodes/nemo/issues/930). P32 conserve ses prédécesseurs existants, dont P16 et sa question d’acceptation contrôlée par son propriétaire. P33 conserve P03/P08/P32 et exige toutes les tâches natives admises ; R22 reste un suivi et une acceptation structurelle humaine, pas une tâche d’écriture. [R23/#1327](https://github.com/mysteropodes/nemo/issues/1327) attend N21 ainsi que N00–N05. **P03 reste l’autorité de recensement/admission des sources et n’est pas bloquée par l’exécution des tâches qu’elle admet.** Elle continue à classer les familles restantes et peut ajouter des tâches bornées sans prétendre qu’elles sont implémentées. P24/#1026 et toutes les autres prises en charge/périmètres existants restent inchangés ; N10 est une tâche d’évaluateur distincte. Aucune clôture de parent de suivi ne crée un verrou global d’extraction.
 
@@ -360,7 +433,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037) — Cartographier l’animation et le temps en dossiers d’extraction circonscrits**
 
-  Responsable **Ilya/D1** · compétence `inventory` · `gpt-5.6-sol` / **medium**. Prédécesseurs : aucun ; réserver les fichiers et l’environnement d’exécution.
+  Responsable **Ilya/D1** · compétence `inventory` · `gpt-6-sol` / **medium**. Prédécesseurs : aucun ; réserver les fichiers et l’environnement d’exécution.
 
   Périmètre : `src/js/motion.js`; `src/js/tweens.js`; `src/js/timeline.js`; `src/js/animation/**`; `src/js/domain/animation/**`; `src/js/expr-*.js`; `src/js/layer-inout.js`; `src/js/camera.js`; `src/js/text-animator*.js`; `src/js/markers.js`; `src/js/bpm-grid.js`; `engineering/inventory/remediation-scope.json (partition soumise à l’orchestrateur)`.
 
@@ -372,7 +445,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038) — Cartographier le rendu et la propriété des ressources en dossiers d’extraction circonscrits**
 
-  Responsable **Ilya/D2** · compétence `inventory` · `gpt-5.6-terra` / **medium**. Prédécesseurs : aucun ; réserver les fichiers et l’environnement d’exécution.
+  Responsable **Ilya/D2** · compétence `inventory` · `gpt-6-luna` / **medium**. Prédécesseurs : aucun ; réserver les fichiers et l’environnement d’exécution.
 
   Périmètre : `src/js/engine-bridge.js`; `src/js/render-manager.js`; `src/js/playback-cache.js`; `src/js/color-manager.js`; `src/js/path-fx.js`; `src/js/custom-effects.js`; `src/js/shader-effects-library.js`; `geometry-wasm/src/**`; `engineering/inventory/remediation-scope.json (partition soumise à l’orchestrateur)`.
 
@@ -558,7 +631,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007) — Créer l’enregistrement déterministe des fonctionnalités et la validation des descripteurs**
 
-  Responsable **Ilya/D1** · compétence `capabilities` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Responsable **Ilya/D1** · compétence `capabilities` · `gpt-6-sol` / **medium**. Prédécesseurs : [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Périmètre : `nouveau src/js/application/capability-registry.js`; `nouveau schéma de descripteur de fonctionnalité et tests du registre`.
 
@@ -570,7 +643,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008) — Déplacer les métadonnées et le routage de l’opacité dans son module fonctionnel**
 
-  Responsable **Ilya/D1** · compétence `capabilities` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007).
+  Responsable **Ilya/D1** · compétence `capabilities` · `gpt-6-sol` / **medium**. Prédécesseurs : [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007).
 
   Périmètre : `src/js/application/opacity-application.js`; `src/js/domain/animation/opacity.js`; `src/js/bootstrap/opacity-application.js`; `nouvel enregistrement de fonctionnalité d’opacité`; `tests/application-opacity*.cjs`.
 
@@ -582,7 +655,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009) — Faire consommer les contrats de fonctionnalités par la découverte et le routage MCP Rust**
 
-  Responsable **Ilya/D2** · compétence `capabilities` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007), [F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048).
+  Responsable **Ilya/D2** · compétence `capabilities` · `gpt-6-luna` / **medium**. Prédécesseurs : [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007), [F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048).
 
   Périmètre : `nemo-mcp/src/server.rs`; `nemo-mcp/src/contract.rs`; `nemo-mcp/src/schema.rs`; `src/js/adapters/application-mcp.js`; `tests de protocole MCP`.
 
@@ -606,7 +679,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P10 / #1012](https://github.com/mysteropodes/nemo/issues/1012) — Faire respecter les dépendances applicatives par le contrôle normal**
 
-  Responsable **Ilya/D2** · compétence `validation` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D2** · compétence `validation` · `gpt-6-luna` / **medium**. Prédécesseurs : [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `scripts/nemo/ci.cjs`; `scripts/nemo/lib/boundaries*.cjs`; `engineering/boundaries/profiles/app-js.profile.json`; `tests de contrôles négatifs de frontières`.
 
@@ -630,7 +703,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014) — Faire respecter la frontière de dépendances du module public du moteur géométrique**
 
-  Responsable **Ilya/D2** · compétence `validation` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D2** · compétence `validation` · `gpt-6-luna` / **medium**. Prédécesseurs : [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `geometry-wasm/Cargo.toml`; `geometry-wasm/src/engine.rs`; `politique de dépendances Rust et tests du vérificateur`.
 
@@ -642,7 +715,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[B01 / #1046](https://github.com/mysteropodes/nemo/issues/1046) — Faire respecter la frontière du module public applicatif/MCP natif**
 
-  Responsable **Ilya/D2** · compétence `validation` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Responsable **Ilya/D2** · compétence `validation` · `gpt-6-luna` / **medium**. Prédécesseurs : [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Périmètre : `src-tauri/src/application_mcp.rs`; `src-tauri/Cargo.toml`; `politique de frontières Rust natives et tests du vérificateur`.
 
@@ -678,7 +751,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[T02 / #1051](https://github.com/mysteropodes/nemo/issues/1051) — Distinguer les échecs exacts de référence des nouvelles régressions**
 
-  Responsable **Ilya/D2** · compétence `validation` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004).
+  Responsable **Ilya/D2** · compétence `validation` · `gpt-6-luna` / **medium**. Prédécesseurs : [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004).
 
   Périmètre : `scripts/nemo/lib/ comparateur de référence (nouveau)`; `manifeste de jeu d’essai/référence`; `tests de comparaison`.
 
@@ -748,7 +821,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) — Extraire l’adaptateur existant d’export SVG d’une seule image**
 
-  Responsable **Ilya/D1** · compétence `extraction` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [D01 / #1044](https://github.com/mysteropodes/nemo/issues/1044), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Responsable **Ilya/D1** · compétence `extraction` · `gpt-6-sol` / **medium**. Prédécesseurs : [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [D01 / #1044](https://github.com/mysteropodes/nemo/issues/1044), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Périmètre : `src/js/export.js: exportFrameSVGString`; `nouveau src/js/adapters/export-svg-frame.js`.
 
@@ -760,7 +833,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058) — Cartographier les entrées immuables de séquence SVG avant l’extraction du job**
 
-  Responsable **Ilya/D1** · compétence `architecture` · `gpt-5.6-sol` / **high**. Prédécesseurs : [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Responsable **Ilya/D1** · compétence `architecture` · `gpt-6-sol` / **high**. Prédécesseurs : [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Périmètre : `src/js/export.js: exportSVGSequenceToDir / exportFrameRange / exportBuildFrame`; `src/js/render-manager.js appelants (en lecture seule)`.
 
@@ -772,7 +845,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P18 / #1020](https://github.com/mysteropodes/nemo/issues/1020) — Ajouter un cycle de vie de job borné à cet exportateur**
 
-  Responsable **Ilya/D1** · compétence `extraction` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058).
+  Responsable **Ilya/D1** · compétence `extraction` · `gpt-6-sol` / **medium**. Prédécesseurs : [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058).
 
   Périmètre : `nouveau module applicatif de job d’export`; `src/js/export.js`; `tests de cycle de vie du job`.
 
@@ -808,7 +881,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) — Extraire les diagnostics applicatifs bornés à partir de l’opacité**
 
-  Responsable **Ilya/D1** · compétence `diagnostics` · `gpt-5.6-sol` / **high**. Prédécesseurs : [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008).
+  Responsable **Ilya/D1** · compétence `diagnostics` · `gpt-6-sol` / **high**. Prédécesseurs : [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008).
 
   Périmètre : `src/js/application/opacity-application.js section de trace/rejeu`; `nouvelle interface/service applicatif de diagnostic`; `tests/application-opacity-replay.test.cjs`.
 
@@ -820,7 +893,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[T06 / #1055](https://github.com/mysteropodes/nemo/issues/1055) — Corréler une requête MCP Rust avec les diagnostics applicatifs**
 
-  Responsable **Ilya/D2** · compétence `diagnostics` · `gpt-5.6-terra` / **high**. Prédécesseurs : [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009), [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054).
+  Responsable **Ilya/D2** · compétence `diagnostics` · `gpt-6-luna` / **high**. Prédécesseurs : [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009), [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054).
 
   Périmètre : `nemo-mcp/src instrumentation du transport`; `nemo-mcp/Cargo.toml`; `tests stdio MCP`.
 
@@ -870,7 +943,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022) — Extraire la sérialisation des métadonnées de dossiers**
 
-  Responsable **Ilya/D1** · compétence `extraction` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D1** · compétence `extraction` · `gpt-6-sol` / **medium**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `src/js/timeline.js: SM.exportJSON / SM.importJSON champs de dossier`; `src/js/tweens.js: capture/restauration de dossier`; `nouveau src/js/domain/document/folder-codec.js`.
 
@@ -882,7 +955,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059) — Cartographier la responsabilité de capture et restauration de l’historique limité à une image**
 
-  Responsable **Ilya/D1** · compétence `architecture` · `gpt-5.6-sol` / **high**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036).
+  Responsable **Ilya/D1** · compétence `architecture` · `gpt-6-sol` / **high**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036).
 
   Périmètre : `src/js/tweens.js: _cloneStrokesForUndo / pushUndoActiveFrame / undo / redo (en lecture seule)`.
 
@@ -894,7 +967,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P21 / #1023](https://github.com/mysteropodes/nemo/issues/1023) — Extraire l’entrée d’historique caractérisée limitée à une image**
 
-  Responsable **Ilya/D1** · compétence `extraction` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059).
+  Responsable **Ilya/D1** · compétence `extraction` · `gpt-6-sol` / **medium**. Prédécesseurs : [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059).
 
   Périmètre : `src/js/tweens.js section d’annulation`; `nouveau module application/history`; `tests de contrat d’historique`.
 
@@ -930,7 +1003,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P23 / #1025](https://github.com/mysteropodes/nemo/issues/1025) — Extraire le solveur pur d’affectation hongrois**
 
-  Responsable **Ilya/D2** · compétence `extraction` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D2** · compétence `extraction` · `gpt-6-luna` / **medium**. Prédécesseurs : [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `src/js/tweens.js: hungarian(cost)`; `nouveau src/js/domain/tween/assignment.js`.
 
@@ -942,7 +1015,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P24 / #1026](https://github.com/mysteropodes/nemo/issues/1026) — Extraire le noyau de transition d’image de lecture**
 
-  Responsable **Ilya/D1** · compétence `extraction` · `gpt-5.6-sol` / **medium**. Prédécesseurs : [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D1** · compétence `extraction` · `gpt-6-sol` / **medium**. Prédécesseurs : [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `src/js/timeline.js: advancePlayFrame`; `nouveau noyau domaine de pas de lecture et enveloppe existante`.
 
@@ -954,7 +1027,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060) — Cartographier un geste de rotation de sélection et sa frontière d’annulation**
 
-  Responsable **Ilya/D2** · compétence `architecture` · `gpt-5.6-terra` / **high**. Prédécesseurs : [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039).
+  Responsable **Ilya/D2** · compétence `architecture` · `gpt-6-luna` / **high**. Prédécesseurs : [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039).
 
   Périmètre : `src/js/tools.js: rotate onMouseDown / onMouseDrag / onMouseUp / rotateCenterSegments (en lecture seule)`.
 
@@ -966,7 +1039,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P25 / #1027](https://github.com/mysteropodes/nemo/issues/1027) — Extraire le geste de rotation de sélection caractérisé**
 
-  Responsable **Ilya/D2** · compétence `extraction` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060).
+  Responsable **Ilya/D2** · compétence `extraction` · `gpt-6-luna` / **medium**. Prédécesseurs : [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060).
 
   Périmètre : `src/js/tools.js section de transformation`; `src/js/select-bridge.js liaison concernée`; `nouveau module applicatif de geste de sélection`.
 
@@ -978,7 +1051,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P26 / #1028](https://github.com/mysteropodes/nemo/issues/1028) — Extraire le suivi LRU des images et la politique d’éviction**
 
-  Responsable **Ilya/D2** · compétence `extraction` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Responsable **Ilya/D2** · compétence `extraction` · `gpt-6-luna` / **medium**. Prédécesseurs : [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Périmètre : `src/js/engine-bridge.js: _noteImageRegistered / _touchImage / _imgTotalBytes / enforceImageBudget`; `nouveau module applicatif de rendu image-budget`.
 
@@ -990,7 +1063,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [ ] **[P27 / #1029](https://github.com/mysteropodes/nemo/issues/1029) — Extraire la passe Rust existante de luminosité/contraste**
 
-  Responsable **Ilya/D2** · compétence `extraction` · `gpt-5.6-terra` / **medium**. Prédécesseurs : [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014).
+  Responsable **Ilya/D2** · compétence `extraction` · `gpt-6-luna` / **medium**. Prédécesseurs : [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014).
 
   Périmètre : `geometry-wasm/src/engine.rs: create_color_adjust_pipeline / color_adjust_pass`; `nouveau geometry-wasm/src/engine/color_adjust.rs`.
 
@@ -1073,7 +1146,7 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
   Périmètre : `recensement figé de remédiation et tous les comptes rendus liés des tâches terminées (en lecture seule)`; `contrôles finaux d’exhaustivité du code et des capacités`.
 
   1. Chaque responsabilité recensée possède une implémentation fusionnée ou une décision hors code relue ; toutes les tâches d’extraction créées dynamiquement sont terminées.
-  2. Aucun ancien propriétaire des écritures, façade obsolète ou exception de code hérité expirée ne subsiste ; le retrait d’une façade fait partie de sa tâche d’extraction, jamais d’un travail caché dans cet audit.
+  2. Aucun ancien propriétaire des écritures, façade obsolète ou exception de code hérité expirée ne subsiste ; le retrait relève de la tâche de migration propriétaire, jamais d’un travail caché dans cet audit.
   3. Les contrôles normaux de couverture, de frontières, d’enregistrement manquant et de schémas passent leurs contrôles négatifs ; les défauts produit connus restent séparés et acceptés par les humains.
 
   Limite : Il s’agit d’une tâche d’acceptation finale, pas d’un substitut aux migrations inachevées. Terminer uniquement P04-P32 ne prouve pas la disparition de tous les monolithes.
@@ -1082,14 +1155,15 @@ N07 couvre sauvegarde/chargement et identité ; N08–N09 couvrent commandes, r�
 
 - [x] N00–N05 possèdent des preuves d’acceptation exactes : installation du tableau et du plan, réconciliation de la file sur le main actuel, contrats figés d’autorité et de transition, faisabilité de l’évaluation headless, faisabilité du viewport natif et file bornée d’implémentation de production. Le pourcentage d’un parent de suivi ou un prototype de faisabilité ne vaut pas achèvement de production.
 - [ ] Le moteur Rust natif est l’unique autorité d’écriture pour les chemins convenus de révision du document, commande/historique, évaluation/ordonnancement, médias/ressources/GPU, production du viewport et export. Tauri/JavaScript reste l’interface ; Paper.js et navigateur/WASM sont des adaptateurs de frontière aux capacités déclarées, pas des autorités concurrentes.
-- [ ] Chaque famille migrée possède un oracle de parité à révision fixe et passe ses contrôles applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur réel et bureau installé avant le retrait de l’ancien propriétaire des écritures correspondant. L’acceptation du paquet, l’acceptation navigateur et la parité du code source sont consignées séparément aux SHA exacts.
+- [ ] Chaque famille de référence requise possède un oracle indépendant de parité à révision fixe et passe ses contrôles applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur réel et bureau installé sur le candidat final identifié. Un ancien writer peut avoir été retiré plus tôt sur la branche d’intégration, mais la famille reste en attente jusqu’à ces réussites. L’acceptation du paquet, l’acceptation navigateur et la parité du code source sont consignées séparément aux SHA exacts.
+- [ ] Le dénominateur fixe des workflows de référence atteint 100 % de couverture acceptée sur les surfaces convenues, hormis les décisions précises relatives aux défauts déjà présents. Les anciens formats de projet s’importent sans perte silencieuse de contenu ; expressions et comportement public des scripts/plugins sont pris en compte. Une fonctionnalité requise temporairement indisponible ne peut pas être comptée Done.
 - [ ] Le recensement figé du code et des consommateurs de P03 est complet, y compris les petites tâches inscrites ensuite. Aucun monolithe écrit manuellement ne reste caché derrière une exception héritée ; les fichiers légitimes générés/tiers/de données ont des décisions explicites.
 - [ ] Chaque fonctionnalité possède une API publique cohérente, une seule autorité d’état, les contrats applicables de cycle de vie/ressources et un enregistrement de capacité. Les consommateurs existants interface/API/MCP utilisent la même implémentation ; les anciens propriétaires d’écritures et chemins de contournement sont retirés.
 - [ ] Les contrôles pertinents unitaires, de non-régression, navigateur et natifs protègent le comportement migré. Les rapports de couverture et d’échec sont inspectables au SHA final du code. Les défauts connus sont une dette produit explicite, pas des prérequis de réparation ni des tests présentés à tort comme réussis.
 - [ ] La validation locale normale impose les frontières adoptées, les profils de taille, la fraîcheur des schémas et l’exhaustivité des enregistrements. Chaque vérificateur possède un contrôle négatif pertinent qui échoue.
 - [ ] Un nouvel agent peut ajouter une déclaration de fonctionnalité selon la convention documentée et l’exercer via le MCP Rust livré sans modifier un répartiteur central. Les deux véritables clients disposent de preuves identifiées d’acceptation de l’installation pour la tranche macOS prise en charge.
 - [ ] Le débogage fournit une inspection corrélée bornée et un chemin reproductible de jeu d’essai isolé. Stdout du protocole, propriété des documents et données utilisateur restent intacts.
-- [ ] Ilya et Cyrill acceptent le résultat structurel et ses limites explicites de produit/plateforme. Fermer les parents de suivi restants, réconcilier le tableau principal et le compte rendu central final, et libérer les responsabilités terminées de branche/worktree/exécution.
+- [ ] Ilya et Cyrill acceptent le résultat fonctionnel et structurel complet et ses limites préexistantes explicites de produit/plateforme. Préserver un code/artefact opérationnel récupérable, réconcilier le diff final de l’intégration avec le `main` actuel et ne promouvoir que par PR normalement protégée et revue. Fermer les parents de suivi restants, réconcilier le tableau principal et le compte rendu central final, et libérer les responsabilités terminées de branche/worktree/exécution.
 
 Aucune affirmation ci-dessus n’exige de réparer tous les bugs produit préexistants. Aucune extraction ouverte, aucun propriétaire d’écritures d’état manquant ni aucune preuve architecturale absente ne peut être renommé dette produit uniquement pour déclarer la remédiation terminée.
 
@@ -1154,7 +1228,7 @@ Préparer les déclencheurs en état **paused**. Ne les activer qu’au démarra
 
 | Ilya | Cyrill |
 |---|---|
-| Utiliser la liste anglaise. O=`gpt-6-astra` high ; D1=`gpt-5.6-sol` medium ; D2=`gpt-5.6-terra` medium. | Utiliser la liste française. O=`opus` high aux jalons ; commencer avec un délégué `sonnet` medium et n’activer le second qu’avec du travail indépendant et un quota suffisant. |
+| Utiliser la liste anglaise. O=`gpt-6-astra` high ; D1=`gpt-6-sol` medium ; D2=`gpt-6-luna` medium. | Utiliser la liste française. O=`opus` high aux jalons ; commencer avec un délégué `sonnet` medium et n’activer le second qu’avec du travail indépendant et un quota suffisant. |
 | Le heartbeat Codex **Nemo — Ilya hourly coordination** (`nemo-ilya-hourly-coordination`) est préparé et **PAUSED**. Au démarrage effectif de l’exécution, cibler la tâche réelle de l’orchestrateur et l’activer ; le garder en pause pendant la planification et l’inactivité. | Préparer le rappel horaire rédigé manuellement en état **paused** sur votre propre compte, ciblant votre orchestrateur réel ; ne l’activer qu’au démarrage de l’exécution. Ce dossier ne prétend pas qu’un minuteur a été créé ou livré sur votre Mac. |
 | Consigner la destination du heartbeat et son premier compte rendu réellement livré dans #1062. En cas de passage à un workflow Buzz, suspendre d’abord ce heartbeat. | Buzz expose l’option de workflow **Schedule → Every hour**. Choisir la conversation Nemo désignée comme destination du message et s’adresser explicitement à l’orchestrateur réel. Vérifier une livraison réelle avant de déclarer la planification opérationnelle. |
 | Suspendre le déclencheur en fin de session ; publier les prises en charge conservées/libérées. Reprendre uniquement avec un nouvel avis de début de session. | Suspendre le déclencheur en fin de session ou lors d’une transmission liée au quota. Un compte rendu manquant est un problème de configuration à signaler, pas une autorisation de lancer un agent de remplacement. |

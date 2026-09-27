@@ -1,6 +1,8 @@
 name: Collaborator PR policy
 
 # Sole automatic Actions exception: repository/review metadata only, no PR code or builds.
+# Remediation PRs use workflow_dispatch at the protected remediation ref;
+# pull_request_target reads the default-branch workflow, so main stays unchanged.
 on:
   pull_request_target:
     branches: [main]
@@ -8,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       pull_request:
-        description: 'PR number; leave empty to reconcile all open main PRs (also after collaborator access changes)'
+        description: 'PR number; leave empty to reconcile open PRs targeting the selected trusted branch (also after collaborator access changes)'
         required: false
         type: string
 
@@ -16,12 +18,12 @@ permissions: {}
 
 # Keep the newest event per PR; unrelated PR events must not replace each other.
 concurrency:
-  group: nemo-collaborator-pr-policy-${{ github.event.pull_request.number || github.event.inputs.pull_request || 'reconcile-all' }}
+  group: nemo-collaborator-pr-policy-${{ github.event.pull_request.number || github.event.inputs.pull_request || github.ref }}
   cancel-in-progress: false
 
 jobs:
   acknowledge-policy:
-    if: github.repository == 'mysteropodes/nemo' && github.ref == 'refs/heads/main'
+    if: github.repository == 'mysteropodes/nemo' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/native-remediation')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

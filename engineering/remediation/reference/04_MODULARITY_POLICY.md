@@ -93,12 +93,19 @@ controlled regression fixtures in the test harness; leave no violation in produc
    The complete frozen census must eventually migrate every handwritten monolith; a temporary
    ceiling is not a permanent remediation-completion exemption.
 2. Characterize one responsibility through real behavior fixtures.
-3. Extract it behind a narrow compatibility facade with one state owner.
+3. Move its final responsibility behind a narrow native application API and one state
+   owner; do not build a facade whose purpose is handing edits back to the old engine.
 4. Migrate from classic global script order toward ESM with a bootstrap that waits for required
    modules. Do not assume changing a script tag or package type solves load order.
 5. Add JSDoc/checkJs or TypeScript incrementally at boundaries.
-6. Route every caller and consumer, validate the real app, then retire the legacy writer.
+6. Route available callers to native commands/queries/jobs and make unmigrated operations
+   explicitly unavailable. Disconnect or remove an obsolete writer early if needed;
+   retain its behavior fixtures and mark the feature pending until real-app parity passes.
 7. Avoid broad formatting/renames while others work in the same legacy region.
+
+On the separated remediation branch, temporary no-growth exceptions remain a migration
+tracking device, not permission to finish with a handwritten monolith or hidden writer.
+Operational `main` is preserved until the full accepted result is promoted.
 
 Suggested order: key lookup/easing → track evaluation → document codecs/identity → command/
 undo transactions → timeline UI → renderer adapters → media/export.

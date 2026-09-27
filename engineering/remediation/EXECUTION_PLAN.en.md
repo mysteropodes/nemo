@@ -1,12 +1,78 @@
 # Nemo — remediation execution checklist
 
-Approved strategy: **7 September 2026**; native-engine amendment approved **20 September 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
+Approved strategy: **7 September 2026**; native-engine amendment approved **20 September 2026**; native-only separation approved **22 September 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
 
 This is the single operating plan for the current remediation. It supersedes the execution order, forecasts, global blocking gates, remote-agent assumptions and reporting requirements in the older R00–R22 plan and local-agent playbooks. Existing architecture and source documentation remain references; this document governs scope and workflow where they conflict. GitHub issues hold live claims and handoffs; the checklist defines outcomes. The [shared hourly progress log #1062](https://github.com/mysteropodes/nemo/issues/1062) is the one central report destination; do not create competing sprint ledgers or report PRs.
 
-## 0. Approved native-engine pivot and ordered admission — 20 September 2026
+## 0. Current native-only separation — 22 September 2026
 
-The approved pivot keeps the Tauri/JavaScript interface while making a native Rust engine the sole authority for document revisions, command/history application, evaluation and scheduling, media/resource/GPU lifetime, viewport frame production and export jobs. Paper.js becomes a compatibility editor, selection and hit-test adapter at the interface edge; it must not remain a concurrent document writer or evaluator. Browser/WASM support remains a separately declared adapter with explicit capability and availability limits. This is a staged migration, not a flag-day claim that the current runtime has already changed.
+**This is the current operating amendment.** It supersedes later transitional text that
+requires native-to-legacy document release, a dormant pass-through old writer, or complete
+feature parity before disconnecting that writer. Accepted earlier implementation and
+receipts remain evidence, not instructions to keep two editing engines working together.
+Update affected existing issues and Project #2 before resuming a changed outcome; do not
+count canceled coexistence work as delivered final functionality.
+
+- Preserve operational `main` at the separation source SHA
+  `1065e9d8d9c48e66d9b44bb4de446e8f4e887040` while remediation proceeds on the
+  shared protected `codex/native-remediation` integration branch. This SHA identifies
+  source, not an independently verified installed operational artifact. Task branches
+  target the integration branch through reviewed PRs; only a fully accepted final
+  promotion PR goes to `main`. An independently authorized operational fix can still be
+  made on `main` and assessed for integration without repeatedly merging both lines.
+- Keep three references distinct: the original agreed functional baseline and its
+  characterized defects; the operational source/build preserved for recovery; and the
+  accepted remediation source plus owned unfinished work. P03 and linked issues reconcile
+  baseline workflows against the frozen source census. A packet count or closed-issue
+  count is not a percentage of functional parity.
+- Rust is the sole remediation-runtime authority for persistent documents/revisions,
+  commands/history, evaluation, media/resource/GPU lifetime, viewport production and
+  export. JavaScript remains the UI/scripting/presentation layer; Paper.js may supply
+  justified geometry, hit-testing or presentation, never a second writable document or
+  authoritative evaluator. UI, SDK, MCP and applicable scripting consumers use the
+  shared command/query/job API. Covered browser behavior uses the declared WASM/host
+  adapter, not an independent old JavaScript authority.
+- An unmigrated operation may be visibly unavailable on the integration branch and must
+  reject before mutating a document; it cannot fall back to an old writable engine.
+  Disconnect or remove superseded runtime code as its responsibility migrates, even
+  before that feature reaches final parity. Its fixtures and pending obligation remain
+  visible. At final promotion, **100% of agreed baseline functionality and applicable
+  surfaces** must be accepted or have an exact documented baseline-defect disposition.
+  This includes old-project import, expression behavior and public scripting/plugin
+  semantics; temporary unavailability never closes a feature obligation.
+- Preserve the existing issues, owners, accepted native modules, extracted UI/domain
+  modules, fixtures, diagnostics and tests. Re-scope N19B lifecycle to native close and
+  re-entry; N19C/N19D to old-entry denial or disconnection; N19G to pure selection intent,
+  native commands for implemented operations and denial of unmigrated gestures; N19E to awaited native replacement;
+  N19F to shared revision/UI synchronization; N20 to the first continuously native
+  editing workflow; and N21 to actual installed/browser acceptance without legacy
+  round-trip expectations. The owning issue records exact retained, superseded and
+  still-open criteria before its writer resumes.
+
+The remaining sequence uses existing bounded leaves: **A** preserve `main`, isolate the
+development app/data and connect a first native shell/viewport; **B** complete native
+document/edit/history/persistence; **C** animation and direct editing; **D** complex scene
+families; **E** media/output and all UI/API/browser consumers; **F** structural closure,
+fixed-denominator parity, installed/client acceptance and protected final promotion.
+Renderer/viewport, save/history and relevant export checks start with the first usable
+feature, not at the end of Wave E. Parallelize independent owners after the common
+command/revision contract; keep one writer per whole file and one integrated forecast.
+Reuse the existing task-runtime data isolation and native build tooling for the development
+app; verify its actual identity and paths rather than building a second isolation system.
+The [22 September remaining-work forecast](https://github.com/mysteropodes/nemo/issues/1062#issuecomment-5785104824)
+is a dated planning allowance, not a delivered-feature percentage or a replacement for
+the fixed baseline-workflow denominator.
+
+For each changed test, retain independent behavior oracles, adapt obsolete call-structure
+assertions, retire tests solely of removed ownership handoff and keep required temporarily
+unavailable behavior visibly pending. A passing development subset is not full acceptance.
+Each accepted task branch integrates progressively into the protected branch with its
+actual checks; final promotion requires the complete baseline parity matrix, clean
+checkout/installed/visual/browser/client evidence and normal human review.
+
+### Earlier native-engine pivot and ordered admission — 20 September 2026
+
+The 20 September pivot kept the Tauri/JavaScript interface while making a native Rust engine the sole target authority for document revisions, command/history application, evaluation and scheduling, media/resource/GPU lifetime, viewport frame production and export jobs. It staged Paper.js as a compatibility editor, selection and hit-test adapter at the interface edge and kept browser/WASM as a separately declared adapter. The 22 September contract above removes the writable compatibility editor from the remediation runtime; this paragraph records the earlier admission, not a current fallback requirement.
 
 **Phase 0 is the Project #2 and plan realignment; it precedes engine implementation.** Execute the admitted work in this dependency order:
 
@@ -17,7 +83,7 @@ The approved pivot keeps the Tauri/JavaScript interface while making a native Ru
 - [x] **[N03 / #1330](https://github.com/mysteropodes/nemo/issues/1330)** and **[N04 / #1332](https://github.com/mysteropodes/nemo/issues/1332):** after N02, independently prove headless Rust evaluation and a native Tauri viewport on representative fixtures. Record measured failure/unsupported outcomes honestly; a compile-only result is not feasibility acceptance.
 - [x] **[N05 / #1333](https://github.com/mysteropodes/nemo/issues/1333):** only after both feasibility gates, admit the bounded production implementation queue with exact owners, files, predecessor SHAs, parity fixtures, consumer matrices, retirement conditions and local validation commands.
 
-The production migration then proceeds one characterized vertical slice at a time through the same versioned application commands, queries and jobs used by the UI and bundled Rust MCP. Start from the accepted opacity fixture and move persistent revision ownership, immutable evaluation, native scheduling/resources, desktop presentation and fixed-revision export behind the frozen contracts. Retire a legacy writer only after applicable save/load, undo/redo, selection, animation, render, export, native bridge, browser and installed-desktop evidence passes at the same candidate. Packaged desktop acceptance, browser adapter acceptance and source-level parity remain distinct gates.
+The production migration proceeds through characterized responsibilities and the same versioned application commands, queries and jobs used by the UI and bundled Rust MCP. Start from the accepted opacity fixture and move persistent revision ownership, immutable evaluation, native scheduling/resources, desktop presentation and fixed-revision export behind the frozen contracts. On the separated branch, an obsolete legacy writer may be disconnected or removed before its replacement reaches final parity; mark the missing feature pending and deny its operation without fallback. Applicable save/load, undo/redo, selection, animation, render, export, native bridge, browser and installed-desktop evidence remains required for final acceptance at identified candidates.
 
 This amendment preserves accepted remediation work and existing ownership. In particular, [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005), [P16 / #1018](https://github.com/mysteropodes/nemo/issues/1018), [#1316](https://github.com/mysteropodes/nemo/issues/1316) and its current [PR #1323](https://github.com/mysteropodes/nemo/pull/1323) are not silently reassigned or closed. R23 is a tracking parent; only the named executable leaves and native blocked-by relations gate work.
 
@@ -49,10 +115,10 @@ The starting issues below are concrete entry tasks, not a claim that their count
 | Slot | Ilya | Cyrill |
 |---|---|---|
 | **O — orchestrator** | `gpt-6-astra`, **high**. Own shared contracts, source/coverage policy, integration order, combined validation and the canonical board. | `opus`, **high**. Review at milestones; own team claims, technical validation, PR merges, board closure, existing Fizz/Honey handoffs, Claude/native acceptance and quota decisions. |
-| **D1 — delegate** | `gpt-5.6-sol`, **medium**. Feature extraction, application services and bounded persistence work. Escalate to high for authority/history ambiguity. | `sonnet`, **medium**. Focused tests, pure helpers, native parsers/adapters and feature registration. |
-| **D2 — delegate** | `gpt-5.6-terra`, **medium**. Boundaries, Rust/render adapters and independent implementation. Use high for concurrency/resource ownership. | `sonnet`, **medium**. Coverage/reporting, isolated browser tests, preferences/Labs and diagnostics UI. |
+| **D1 — delegate** | Prefer `gpt-6-sol`, **medium** for bounded implementation; raise effort for authority/history ambiguity. | `sonnet`, **medium**. Focused tests, pure helpers, native parsers/adapters and feature registration. |
+| **D2 — delegate** | Prefer `gpt-6-luna`, **low/medium** for focused review, tests and inventory; use Sol or Astra when complexity warrants it. | `sonnet`, **medium**. Coverage/reporting, isolated browser tests, preferences/Labs and diagnostics UI. |
 
-These are recommended session settings, not quota guarantees. Check the actual model and effort at first claim. If a listed model is unavailable, choose an available equivalent and record the substitution; do not silently run a less capable model on an unresolved authority problem. `gpt-5.6-luna` / medium may replace an Ilya delegate for mechanical inventory/link checks; it is not a fourth slot.
+These are preferred session settings, not quota guarantees or rigid slot capabilities. Use `gpt-6-astra` when the task warrants it. Check the actual model and effort at first claim; choose a capable available model when a preference is unavailable and record the substitution. No model choice creates a fourth slot.
 
 For every agent spawned inside the current Codex task, include the selected model and reasoning effort in its local task name. Do not rename Buzz agents; Buzz displays their model separately.
 
@@ -62,13 +128,13 @@ Launch examples from already allocated checkouts; these commands create sessions
 
 ```sh
 codex --model gpt-6-astra -c 'model_reasoning_effort="high"'
-codex --model gpt-5.6-sol -c 'model_reasoning_effort="medium"'
-codex --model gpt-5.6-terra -c 'model_reasoning_effort="medium"'
+codex --model gpt-6-sol -c 'model_reasoning_effort="medium"'
+codex --model gpt-6-luna -c 'model_reasoning_effort="low"'
 claude --model opus --effort high
 claude --model sonnet --effort medium
 ```
 
-Use the app's model/effort controls for app sessions. Claude aliases resolve according to account/provider; record the actual session version. The recommendation follows the available Codex model metadata and current official [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Claude model](https://code.claude.com/docs/en/model-config) and [Claude usage](https://code.claude.com/docs/en/costs) guidance. Effort levels across providers are not equivalent measurements.
+Use the app's model/effort controls for app sessions. Claude aliases resolve according to account/provider; record the actual session version. Current model availability is checked in the running app rather than inferred from historical claims. Effort levels across providers are not equivalent measurements.
 
 ### Portable skills: use these workflows directly
 
@@ -94,7 +160,7 @@ Use native sub-issues under R03/R05/etc to count progress. Those old issues are 
 
 ### Orchestrator startup and check-ins
 
-- [ ] Read this plan, the team's filtered board view and the latest handoff of each active leaf. Fetch main, inspect PRs/worktrees and preserve active ownership. Silence never releases a claim.
+- [ ] Read this plan, the team's filtered board view and the latest handoff of each active leaf. Fetch the protected remediation integration branch and check preserved `main`, inspect PRs/worktrees and preserve active ownership. Silence never releases a claim.
 - [ ] Reserve at most two writable task worktrees per machine, plus the primary checkout. Read-only review, board updates and notes create no worktree. The orchestrator serializes integration in a clean, available task checkout; do not add a fourth checkout just for integration.
 - [ ] Allocate only Ready leaves whose predecessors are integrated/accepted and whose **whole files** do not overlap. A function-level split inside `motion.js`, `timeline.js`, `tweens.js`, `tools.js` or `engine-bridge.js` is not permission for concurrent writers.
 - [ ] Keep shared `package.json`, lockfile, bootstrap/index, profiles, generated manifest and `scripts/nemo/ci.cjs` wiring with Ilya's orchestrator. Delegates supply focused changes in their task branch; the orchestrator integrates these shared hunks serially.
@@ -167,7 +233,7 @@ Primary tool references: [Node test runner](https://nodejs.org/api/test.html), [
 - [ ] Discover compact summaries first; load detailed contracts on demand. Large media/geometry travels by handles/artifact references. Agents can inspect targeted frames/state; do not expose thousands of widget-level tools or serialize entire buffers into prompts.
 - [ ] Enforce mutation/access policy in application handlers. Tool descriptions are explanatory, not enforcement. Use explicit instances/documents/revisions, reject stale writes and reconcile interrupted requests before retrying.
 - [ ] Keep protocol and feature-schema versions separate, with explicit compatibility and deprecation. Execute the approved Rust migration behind these contracts in bounded vertical slices; do not attempt a flag-day rewrite. A universal plugin framework and distributed scheduler remain out of scope.
-- [ ] A broken existing feature remains connected to its real implementation and advertises its precise availability/failure. A descriptor alone does not establish working behavior. Internal kernels associate with a useful feature capability instead of becoming meaningless public tools.
+- [ ] A broken existing feature advertises its precise availability/failure. On the remediation branch an unmigrated operation can be unavailable but cannot invoke a retired old writer. A descriptor alone does not establish working behavior or close a required feature; internal kernels associate with a useful feature capability instead of becoming meaningless public tools.
 
 ## 6. Board rules and human oversight
 
@@ -204,16 +270,16 @@ Use the returned project/item/field/option IDs with `gh project item-edit --id <
 
 ## 7. Integration and branch cleanup
 
-**Merge policy agreed by Ilya and Cyrill on 9 September 2026:** each collaborator team owns its technical review, local validation and ordinary PR merges. No routine approval from the other human team is required. This replaces the earlier cross-account approval instruction.
+**Merge policy agreed by Ilya and Cyrill on 9 September 2026:** each collaborator team owns its technical review and local validation. The new protected integration branch preserves normal GitHub review and merge requirements; its initial policy-amendment PR needs an ordinary eligible other-account GitHub approval because the currently deployed metadata-only policy supports `main` only. This approval is not a second team's technical review. After the separately reviewed extension is accepted and verified on the protected integration branch, eligible collaborator PRs may request its exact-head acknowledgement by explicit metadata-only `workflow_dispatch` at `--ref codex/native-remediation -f pull_request=<PR_NUMBER>`. GitHub does not run `pull_request_target` automatically on the non-default integration branch; verify the dispatch ref, PR base and review result before relying on it.
 
 - [ ] Keep one task branch/PR across sprints. An orchestrator may integrate several reviewed leaves sequentially, but each leaf keeps its own acceptance and ownership. Do not bundle unrelated changes just to reduce PR count.
 - [ ] Publish the candidate in the existing task PR. The team's orchestrator reviews the exact SHA and scoped diff, checks the leaf's local validation/runtime receipts, and records the reviewer, candidate, commands/results, known baseline failures and acceptance decision in that PR. Agents sharing the author's GitHub account can perform this technical review; do not attempt GitHub self-approval or invent another review identity.
-- [ ] For a PR authored by a **current repository collaborator with write, maintain or admin access**, the owning team may merge after that review and validation. The metadata-only `Collaborator PR policy` workflow supplies GitHub's required approval as an explicitly labeled policy acknowledgement at the current SHA. This acknowledgement is not a code review, test pass or instruction to merge; the team's evidence must be complete first. Read/triage access, board membership and Buzz enrollment do not qualify.
+- [ ] For a PR authored by a **current repository collaborator with write, maintain or admin access**, the owning team may merge only after its technical review, validation and the required GitHub approval at the current SHA. The existing automatic metadata-only `Collaborator PR policy` applies to `main` PRs. Before its integration extension is merged and verified, obtain an ordinary eligible other-account approval for an integration PR. Afterwards, invoke only its explicit manual metadata-policy dispatch from the protected integration ref for that exact PR; do not assume an automatic integration event. A policy acknowledgement is not code review, a test pass or an instruction to merge. Read/triage access, board membership and Buzz enrollment do not qualify.
 - [ ] For an **external-author PR**, obtain an approving GitHub review from a repository collaborator after reviewing and locally validating the current candidate. The policy workflow does not approve these PRs, even if a collaborator pushes commits to them or presses Merge. Keep the one-review and latest-push requirements, stale-review dismissal and conversation resolution enabled.
 - [ ] Resolve outstanding change requests and conversations. Coordinate with the other team for overlapping ownership, shared contracts, conflicts or an actual product decision; these are specific coordination needs, not a routine merge gate. Named predecessor acceptance still applies.
 - [ ] Immediately before merging, re-read the remote head and review state; if the SHA changed, repeat affected review/validation. Use the normal GitHub merge route, then record the integrated SHA, perform applicable integration checks and update the owning leaf. An open PR or policy acknowledgement alone is not Done.
-- [ ] If the policy workflow failed or an existing PR lacks its acknowledgement, inspect the run and retry only the metadata policy from trusted main: `gh workflow run collaborator-pr-policy.yml --repo mysteropodes/nemo --ref main -f pull_request=<number>`. Do not request approval from the other team solely to work around this policy. Resolve an access/API failure with a repository admin; never manufacture a technical approval.
-- [ ] No direct main push or routine protection bypass. Builds, tests, releases and deployments remain local unless a human explicitly requests the specific hosted run. The agreed metadata-only policy workflow is the sole automatic Actions exception; it executes no PR code and does not merge anything. Keep the four product workflows disabled. Timed coordination reminders remain paused outside active work.
+- [ ] If the policy workflow fails on a PR whose actual base it supports, inspect the run and retry only its trusted metadata policy on that base. Never dispatch the currently deployed main-only policy to approve an integration PR or use a routine cross-team technical gate to compensate for a broken policy. Resolve access/API failure with a repository admin; never manufacture approval.
+- [ ] No direct push to protected `main` or `codex/native-remediation`, and no routine protection bypass. Builds, tests, releases and deployments remain local unless a human explicitly requests the specific hosted run. The agreed metadata-only policy workflow is the sole automatic Actions exception; it executes no PR code and does not merge anything. Keep the four product workflows disabled. Timed coordination reminders remain paused outside active work.
 - [ ] After merge/acceptance, verify remote containment, clean tracked/untracked state and absence of owned processes before deleting the task branch/worktree. Do not remove another lane's checkout. An incomplete useful branch stays owned or is archived with a tested restoration path.
 - [ ] Preserve the protected remote `archive` branch. Archived bundles have original-name→SHA manifests, checksums and empty-repository restore verification. Never delete a branch solely because of age or absence of a PR. Open PR heads/bases, releases, worktrees and unresolved ownership remain protected from cleanup.
 - [ ] New branches should not accumulate after closure. The orchestrator performs cleanup as part of the handoff/Done workflow; the human should not inherit a worktree-cleaning chore after every session.
@@ -226,7 +292,7 @@ Dependencies determine readiness, not the numeric order of IDs. The 20 September
 2. After N00 acceptance, N01 reconciles the live queue while N02 freezes native authority and transition contracts.
 3. After N02 acceptance, N03 and N04 run the independent headless-evaluator and native-viewport feasibility gates.
 4. After both gates, N05 admits N06–N21 under the R18.1–R18.6 family parents, coordinated by R23; no broad engine implementation issue is a writable assignment.
-5. Implementation leaves migrate one characterized vertical slice at a time and retire the corresponding legacy writer only after their named parity, consumer and installed-surface checks pass.
+5. Implementation leaves migrate characterized responsibilities directly into the native authority. On the separated branch they may disconnect the obsolete old writer before final feature parity; declare any missing operation unavailable and retain its open parity obligation. Final promotion waits for every named applicable consumer and installed-surface check.
 
 C08 split its remaining coverage into the accepted supplemental census leaves C09, C13, C15, C17 and C18. P03 must consolidate C01–C08 plus C09, C13, C15, C17 and C18, then create the remaining small extraction leaves and attach them to the same family parents. Reuse the leaf protocol below: exact symbols/owner/dependencies, three observable checks, known-defect exclusions, same assignee/lane labels and native parent/blocking links. Extend this checklist in the same ordinary change that adopts the census. The fixed source-set digest and zero-unmapped checks prevent silently declaring remediation complete after only the starting tasks.
 
@@ -240,7 +306,7 @@ N00–N05 have terminal acceptance receipts: N00 merge `2bd3da7f7e7811b51150bcf9
 
 At the N05 acceptance snapshot, the live issue ledger contained **171 leaves = 143 accepted + 28 open (83.63%)**. These are accepted issue outcomes, including preparation and validation; the first native slice was separately **0/16 runtime accepted**. The N16 review later admitted N18A/#1367 as a seventeenth runtime leaf. N20 preflight then proved that authoritative serialization/evaluation reads and a terminal native release/re-entry contract were missing, so N19A/#1373 and N19B/#1374 were admitted as the eighteenth and nineteenth runtime leaves before N20. The subsequent callback-reachability review admitted N19C/#1377, N19D/#1378 and N19E/#1379 as runtime leaves twenty through twenty-two: N19C installs the dormant pre-mutation legacy-edit barrier, N19D serially extends that barrier to selection and fallback mutations after N19C, and N19E independently makes external project-replacement callers await their terminal result after N19B. Live issue and Project #2 state supersede these historical snapshot counts. P03 census packets are not this denominator, and neither packet counts nor this first slice establish a complete whole-engine migration denominator. The N20 exact-candidate review admitted N19F/#1384 as runtime leaf twenty-three to require acknowledgment before bundled MCP wire success. The subsequent N21 pointer-workflow discovery admitted N19G/#1393 after N19D as runtime leaf twenty-four to preserve native-owned canvas selection intent through deferred release.
 
-All twenty-four admitted native leaves belong to **Ilya (`ivg-design`)**, with **Ilya/O as Validation owner**. O uses `gpt-6-astra/high`, D1 `gpt-5.6-sol/high`, D2 `gpt-5.6-terra/high`; record actual settings at claim. The owning team assigns an independent reviewer before writing. New local agent names include model/effort. At the N05 snapshot, N06 retained one active shared-file impediment and N07–N21 remained planned; N18A was admitted later from the N16 review, N19A/N19B were admitted from N20 preflight, N19C/N19D/N19E were admitted from callback-reachability review, and N19G was admitted after N19D from the N21 pointer-workflow discovery. Advance each leaf only from accepted predecessor evidence and use its live issue and Project #2 fields for current state. At each claim record the actual predecessor merge SHAs, not prospective hashes. Numeric order is not readiness.
+The twenty-four admitted native leaves were allocated to **Ilya (`ivg-design`)**, with **Ilya/O as Validation owner**. Current delegate preference is GPT-6 Sol/Luna, with Astra where warranted; record actual settings in every local agent name and claim. The owning team assigns an independent reviewer before writing. At the N05 snapshot, N06 retained one active shared-file impediment and N07–N21 remained planned; later leaves were admitted from specific review findings. The table below preserves those issue IDs and initial dependencies, not a claim that every old coexistence criterion remains current. Advance each revised leaf only from its live issue, accepted predecessor evidence and Project #2 fields; record actual predecessor merge SHAs, not prospective hashes. Numeric order is not readiness.
 
 | Leaf | Observable outcome | Family / lane | Actual predecessors |
 |---|---|---|---|
@@ -260,16 +326,16 @@ All twenty-four admitted native leaves belong to **Ilya (`ivg-design`)**, with *
 | [N18A / #1367](https://github.com/mysteropodes/nemo/issues/1367) | Stage the native application bootstrap and desktop host ports | R18.6 / O | N16, N17, N18 |
 | [N19 / #1351](https://github.com/mysteropodes/nemo/issues/1351) | Enforce native boundaries and local validation | R18.3 / O | N13, N15, N16, N17, N18, N18A |
 | [N19A / #1373](https://github.com/mysteropodes/nemo/issues/1373) | Expose revision-pinned native serialization and evaluated selection reads | R18.1 / O | N19 |
-| [N19B / #1374](https://github.com/mysteropodes/nemo/issues/1374) | Stage atomic native authority release and host re-entry | R18.6 / O | N19A |
-| [N19C / #1377](https://github.com/mysteropodes/nemo/issues/1377) | Install the dormant pre-mutation legacy-edit barrier | R18.4 / D2 | N19B |
-| [N19D / #1378](https://github.com/mysteropodes/nemo/issues/1378) | Guard selection and fallback mutations before native release | R18.4 / D2 | N19C |
-| [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393) | Preserve native-owned canvas selection intent through deferred release | R18.4 / D2 | N19D |
-| [N19E / #1379](https://github.com/mysteropodes/nemo/issues/1379) | Await native release before external project replacement continues | R18.1 / D1 | N19B |
+| [N19B / #1374](https://github.com/mysteropodes/nemo/issues/1374) | Preserve native close, cleanup and safe re-entry; no legacy transfer | R18.6 / O | N19A |
+| [N19C / #1377](https://github.com/mysteropodes/nemo/issues/1377) | Deny or disconnect old direct edit entries before mutation | R18.4 / D2 | N19B |
+| [N19D / #1378](https://github.com/mysteropodes/nemo/issues/1378) | Deny or disconnect old selection/fallback mutation entries | R18.4 / D2 | N19C |
+| [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393) | Pure canvas selection intent; native implemented operations or safe unavailability | R18.4 / D2 | N19D |
+| [N19E / #1379](https://github.com/mysteropodes/nemo/issues/1379) | Await native project replacement before caller continuation | R18.1 / D1 | N19B |
 | [N19F / #1384](https://github.com/mysteropodes/nemo/issues/1384) | Synchronize direct bundled MCP revisions before wire success | R18.6 / O | N16, N18A, N19A, N19B |
-| [N20 / #1352](https://github.com/mysteropodes/nemo/issues/1352) | Atomically cut over the supported opacity subset | R18.1 / O | N17, N18, N18A, N19, N19A, N19B, N19C, N19D, N19E, N19F, N19G |
-| [N21 / #1353](https://github.com/mysteropodes/nemo/issues/1353) | Accept installed native and browser boundaries | R18.4 / O | N20 |
+| [N20 / #1352](https://github.com/mysteropodes/nemo/issues/1352) | Keep the first supported opacity workflow continuously native | R18.1 / O | N17, N18, N18A, N19, N19A, N19B, N19C, N19D, N19E, N19F, N19G |
+| [N21 / #1353](https://github.com/mysteropodes/nemo/issues/1353) | Accept installed native and declared browser workflows without legacy round-trip | R18.4 / O | N20 |
 
-**N19F / #1384 is the twenty-third admitted native runtime leaf, owned by Ilya/O.** The N20 review proved that direct bundled MCP commits bypass the webview consumer. Before N20 resumes, N19F stages one main-webview subscriber bound to instance, document and lifecycle generation. An absent/stale subscriber rejects external advances before commit. A committed advance emits exactly `{instanceId, documentId, lifecycleGeneration, fromRevision, toRevision, requestId}`; wire success waits for an exact acknowledgment after the consumer fences stale reads and synchronizes `toRevision`. Reads, failures, cancellation, uncommitted work and receipt replay emit nothing. One outstanding advance blocks later UI/external advances while immutable reads remain available; listener failure or timeout retains an indeterminate barrier until release/re-entry, without re-execution. Disconnect, admitted release and successful reinstall reservation drain old listeners/waiters. The private protocol/test sources remain in the existing MCP boundary modules with unchanged limits, baseline and edge policy. The exact scope is #1384; the serialized shared-file handoff is N19F→N20. N19F does not activate a document, implement the N20 cache or claim UI/save parity. N20 must consume this accepted callback and prove direct MCP write→UI/persistence/history/release parity separately.
+**N19F / #1384 preserves direct bundled MCP revision synchronization.** Its accepted main-webview subscriber is bound to instance, document and lifecycle generation. An absent/stale subscriber rejects external advances before commit; a committed advance emits exactly `{instanceId, documentId, lifecycleGeneration, fromRevision, toRevision, requestId}` and wire success waits for an exact acknowledgment after the consumer fences stale reads and synchronizes `toRevision`. Reads, failures, cancellation, uncommitted work and receipt replay emit nothing. One outstanding advance blocks later UI/external advances while immutable reads remain available; listener failure or timeout retains an indeterminate barrier until native close/re-entry, without re-execution. Disconnect, native close and successful reinstall reservation drain old listeners/waiters. The private protocol/test sources keep their accepted MCP boundary limits. N20 must consume the callback and prove direct MCP write→UI/persistence/history parity; no old-owner transfer is required.
 
 **Whole-file claims pass through explicit serialized handoffs.** Each linked issue contains its exact new/existing path list, consumer matrix, checks and cutover condition. N06 requires both accepted N05 and the terminal ownership handoff of #1316/PR #1323. Rust source registration follows **N06→N07→N08→N09→N10→N11→N12→N13→N14→N15→N16**, then the serialized **N18A→N19→N19A→N19B→N19C→N19D→N19G→N20** handoff after accepted N17/N18; N19E proceeds in parallel after N19B and joins N20 only after its own acceptance. N19F proceeds after accepted N19B and the shared-file handoff, and is a required accepted predecessor of N20. JS/application registration follows **N13→N15→N17→N18→N18A→N19A→N19C→N19D→N19G**, with the intervening dependencies in the table. Shared app-JS provenance and generated-inventory writes serialize **N19E→N19C**: N19E refreshes them for its accepted caller sources first, then releases them for N19C's guard source after handoff. A predecessor must release its full-file claim before the next writer starts; different module files do not permit concurrent edits to shared profiles.
 
@@ -283,23 +349,23 @@ N06 alone owns `native-engine/Cargo.toml`, `Cargo.lock`, `src/lib.rs` and `READM
 
 **N19A owns the missing read seam discovered during N20 preflight.** It declares `query.document.serialize` and `query.document.evaluate` in the feature-owned v2 capability, implements immutable revision-pinned reads in the native application, and carries them through the existing generic application dispatcher, JavaScript adapter and bundled Rust MCP. The serialized result preserves stable IDs and keyed tracks; the evaluated result carries exact document/snapshot/revision/context/frame identity and satisfies the staged selection projection. N19A remains unavailable to production and adds no writer, fallback or startup activation. Its exact files and negative controls are frozen in #1373.
 
-**N19B owns the missing terminal lifecycle seam discovered during N20 preflight.** It stages one identity-checked release command that stops new dispatch, reconciles in-flight transactions/export/preview work, disposes viewport/resources, removes the single installed application, retains an explicit terminal receipt and permits exactly one later supported bootstrap. Cleanup failure never authorizes a second owner. N19B has no production caller before N20; its exact native-engine/Tauri files and race/fault controls are frozen in #1374.
+**N19B preserves native lifecycle safety.** Its accepted identity-checked terminal command stops new dispatch, reconciles in-flight transactions/export/preview work, disposes viewport/resources, removes the single installed native application, retains an explicit receipt and permits one later supported native bootstrap. Cleanup failure never authorizes a second owner. On the separated branch this is native close/replacement/re-entry, never a transfer to a writable legacy document. The accepted source and race/fault controls remain in #1374.
 
-**N19C owns the feature-neutral legacy-edit guard seam.** It owns `src/js/application/native-edit-guard.js`, the draw/fill/pen/shape/eraser bridges, its direct-callback guard test and retained-source boundary negative control, plus the synchronized plan paragraphs. After N19E accepts and releases the shared paths, N19C takes the exact `app-js.profile.json` dormant-module registration, truthful dormant-module provenance and any generator-required inventory refresh for the guard source; it changes neither baseline, layer rule, exception, floor nor ceiling. Before the first Paper/document mutation, every owned entry point, direct callback and commit helper consults the guard through the narrow optional `SMEngineBridge.nativeEditGuard` compatibility port; N20 alone attaches the accepted guard to that already-declared bridge dependency. While JavaScript remains owner and the port is absent it is pass-through. A present malformed or throwing port is fail-closed. While native ownership is active it synchronously stops the current stack, requests at most one release through an installable controller and remains fail-closed on failed or indeterminate release; no same-stack mutation or replay is authorized, and only a later/replayed call after an exact successful receipt may pass. N19C creates neither a document mirror nor activation, feature-specific MCP behavior or N20 lifecycle wiring.
+**N19C preserves direct-entry mutation coverage.** Its accepted guard and draw/fill/pen/shape/eraser callback tests identify old entry points before Paper/document mutation. On the separated branch, disconnect those old writers or make their entry points deny unavailable operations before mutation; do not install their old release-to-legacy controller or treat dormant pass-through as acceptance. Retain the truthful source registration, boundary negative controls and no-growth limits until the writer is removed. An implemented operation must use the native application API; an unimplemented one remains visibly unavailable. The issue #1377 keeps its accepted historical receipt and the exact remaining disconnection obligations.
 
-**N19D owns the serialized selection/fallback extension of N19C's guard.** After N19C accepts and releases its whole-file scope, N19D owns the selection, sub-selection, fallback Paper callbacks and Shapes-panel mutation entry points listed in #1378, including direct/programmatic controls. It cannot bypass N19C's release-before-mutation decision, and it must remain fail-closed until a later/replayed invocation follows an exact successful release. Its `tools.js`/`select-bridge.js` claim additionally waits for the explicit PR #4/P25 serialization recorded in #1378.
+**N19D preserves selection and fallback entry-point coverage.** Its accepted direct/programmatic controls identify selection, sub-selection, Paper fallback callbacks and Shapes-panel mutation paths in #1378. On the separated branch, those paths either route an implemented command to the native owner or deny the unavailable operation before mutation; they never release back to a writable old owner or replay a deferred gesture. Preserve the explicit whole-file serialization for `tools.js`/`select-bridge.js` and the unrelated PR #4/P25 claim.
 
-**N19G owns the deferred-release canvas-selection intent seam.** After accepted N19D releases its whole-file scope, N19G factors one shared pure Motion/Select canvas probe from existing hit precedence and stages one transient pending pointer intent in Select; neither may push undo, save, allocate a gesture, retain mutable Paper references or change selection/document state. Click-only selection, reselection and deselection (including Shift selection, unmoved-handle presses and sub-threshold jitter) preserve native identity/revision and request no release. At first real movement, Motion/Select body, handle, transform, marquee/lasso and other drag writers must request terminal release before undo, promotion, Paper allocation, metadata change, writer initialization or any other mutation; Alt duplication, anchor placement and component entry remain guarded before their first persistent effect. Pointer-up/cancel, lost capture, stale tool/frame/document identity and delayed, rejected or indeterminate release deny the current stack without replay; only a fresh press after an exact successful receipt may proceed. While legacy owns the document this behavior remains dormant and legacy-compatible; N19G neither activates native ownership nor changes lifecycle wiring, and N20 alone activates the accepted seam. Its exact scope is [N19G / #1393](https://github.com/mysteropodes/nemo/issues/1393); newly discovered selection implementation must be separately staged before N20 is Ready.
+**N19G owns the first native-only canvas selection seam.** Reuse only the useful pure Motion/Select hit precedence and transient scalar pointer intent from its paused, unaccepted prototype. A probe cannot push undo, save, allocate a gesture baseline, retain mutable Paper references or change document/selection state. Click-only selection, reselection, deselection and Shift keep native identity/revision; movement thresholds, cancellation, lost capture and stale tool/frame/document identity must not launch a stale action. For the initial opacity workflow, an implemented selection/edit action reaches its native command; an unmigrated geometry, transform, marquee/lasso or other drag action is unavailable and stops before any old writer mutation. N19G does **not** implement the whole future native drawing/transform family, request release to legacy or replay a gesture. W05/W10 and their owned leaves retain those wider migration obligations. The revised exact scope and writer handoff belong in [#1393](https://github.com/mysteropodes/nemo/issues/1393); the paused prototype is not an accepted candidate.
 
-**N19E owns the parallel external project-replacement caller safety seam.** After N19B, it alone changes the Kitsu and tutorial callers listed in #1379 so they await the replacement result before later layer/frame/setup mutation, rendering, editor entry or success continuation. It preserves the synchronous/undefined legacy return under `await`, stops on rejected, failed or indeterminate replacement/release, and does not modify project lifecycle, implement release, activate N20 or broaden Kitsu/tutorial behavior. N19E owns the required app-JS provenance and generated-inventory refresh for those caller sources, then explicitly releases those shared paths to N19C for the guard source; it does not edit the plan paths during that serialization.
+**N19E preserves external project-replacement caller safety.** Its accepted Kitsu/tutorial callers await terminal replacement before later layer/frame/setup mutation, rendering, editor entry or success continuation. On the separated branch they await native replacement and stop after rejected, failed or indeterminate results; they do not resume an old writable project. Keep the accepted provenance and shared-file handoff in #1379, but do not count the old synchronous legacy-return compatibility as final native acceptance.
 
-N20 retains the existing project/document, tween, opacity bootstrap/domain/capability, motion/timeline, app, render/export and `src/index.html` cutover files listed in #1352, plus the feature declaration whose availability it activates. N20 installs the accepted N19C/N19D release controller, attaches `SMEngineBridge.nativeEditGuard` before any native-authority activation, and wires only the accepted N19A read ports, N19B release/re-entry port, N19C/N19D guard seam, N19G deferred-selection seam and N19E awaited callers; the cutover tests freeze that ordering. It must not add missing Rust/host feature behavior, strip unsupported content into a falsely supported projection or weaken admission. N21 owns only its new desktop and browser acceptance tests. Any additional feature implementation discovered during cutover must be split and staged before N20 is Ready.
+N20 reuses its accepted native opacity implementation, read ports, lifecycle, MCP synchronization and row-selection correction from `main`, but its reopened outcome is the **first continuously native editing workflow** on the integration branch. It must keep one native owner through Motion selection and actual opacity edits; unsupported content or unavailable actions reject without mutating or transferring to a legacy owner. It may disconnect superseded writers early, but cannot strip content into a falsely supported projection or claim final feature parity from a development subset. N19G's narrowly revised selection/denial seam precedes the relevant N20 acceptance; N21 separately owns installed desktop and declared browser evidence. The exact remaining files, native operation and test criteria belong in #1352; wider feature migration is split into its existing owned packages, not smuggled into this first workflow.
 
 **Independent oracle and consumers.** Preserve `tests/animation/fixtures/curve-workflow.json`, SHA-256 `dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4badedf08d`, and the currently asserted independent expectations in `tests/browser/opacity-consumers.spec.cjs`: static opacity 25 survives save/reopen with stable `layerUid`; keyed frames 0/10/20 evaluate to 20/50/80. The 320×180 output has 400 colored pixels and bounds `[20,60,40,80]`, `[84,60,104,80]`, `[148,60,168,80]`; red/alpha are 255 and green/blue equal `255 × (1-opacity/100)` within one byte. Rendering/export leave stored layers unchanged. N09/N19A/N20 must additionally freeze and assert the missing result oracle that 40→60→undo returns authoritative opacity 40; the current browser test checks history-stack lengths but not that resulting value. Freeze all independent expected values before implementation; do not regenerate them from the candidate.
 
-N07 covers save/load and identity; N08–N09 cover commands, retry, transactions and history; N10 covers explicit time/context evaluation; N11–N14 cover scheduling, GPU/resource lifetime, input/presentation and pinned export; N15–N18 cover the same UI/MCP dispatch and staged consumer ports; N18A composes those ports behind one dormant desktop application host. N19 supplies meaningful failing unregistered-source, forbidden-dependency and missing-job controls. N19A exposes authoritative serialization/evaluation reads through the common feature-declared application/MCP path; N19B stages terminal release and clean re-entry; N19C/N19D prove direct callback/programmatic legacy-edit denial before Paper/document mutation; N19G proves pure-probe and pending-intent click-only no-release selection plus first-real-movement release-before-mutation, cancel/stale/delayed/denied controls; and N19E proves caller continuation stops after a non-successful replacement. N20/N21 cover the combined save/load, undo/redo, selection, animation, render, export, native bridge, browser and installed-desktop matrix at one identified candidate. Stale revisions, changed-body retries, replacement, unsupported content, stale generations and cancellation/cleanup failures remain explicit negative controls.
+N07–N19A supplied accepted native save/load, identity, command/history, evaluation, scheduling/resource, viewport/export, UI/MCP transport and read seams; N19 supplied meaningful boundary negatives. On the separated branch N19B supplies safe native close/re-entry, N19C/N19D protect or disconnect old callback/programmatic mutation, N19G supplies pure selection intent and safe native-or-unavailable behavior, N19E stops caller continuation after failed native replacement, and N19F synchronizes direct MCP revisions with the UI. N20/N21 establish only the first native opacity workflow and its actual installed/browser evidence; they do not close other baseline families. Stale revisions, changed-body retries, replacement, unsupported content, stale generations and cancellation/cleanup failure remain explicit negative controls. The wider P03-mapped packages carry their own save/load, history, selection, animation, render and export parity to final acceptance.
 
-**Activation and validation.** Before N20, production documents keep their existing owner; staged modules and transports are not a second writable document. N18A stages bootstrap/replacement and concrete host ports but does not invoke them from production. N19A and N19B likewise remain staged and unavailable. N19C/N19D/N19G are dormant pass-through while legacy owns the document and cannot themselves activate native ownership; when a later N20 installation marks native ownership, each guarded current stack must stop before mutation and wait for a later/replayed call after an exact successful release. N19E awaits but does not activate the replacement lifecycle. N20 admits only the characterized supported subset atomically and makes its former JS writers/evaluator unreachable in the same outcome. A native-supported document may leave native ownership only after the accepted N19B release receipt; an unsupported document fails admission before transfer and retains one explicitly legacy owner. No silent fallback or editable mirror is allowed. Other document families remain open migration work. Each leaf runs its named locked Cargo/Node tests, formatting and `npm run check`; N06 freezes the exact feature/target commands. N16 adds combined native/MCP transport checks; N18A adds same-instance host and per-module port controls; N19 registers normal enforcement; N19A adds immutable read and MCP parity controls; N19B adds terminal lifecycle/race controls; N19C/N19D add direct-callback/programmatic pre-mutation negative controls; N19G adds pure-probe/pending-intent, click/deselect/Shift, handle/body, transform, marquee, pointer-cancel/lost-capture, stale-identity and release/replay controls; N19E adds immediate/delayed/rejected caller controls; and N21 records the identified installed executable and real-browser result separately. Unit tests, a fixture host, compilation, screenshots or merge alone do not establish installed acceptance. No hosted build is authorized.
+**Activation and validation.** Operational `main` retains its observed current owner; this is not evidence for the separated remediation runtime. On `codex/native-remediation`, an admitted document has one native owner and no alternate JavaScript/Paper writer. N20 admits only the characterized supported subset without dropping content; unsupported content fails safely, leaving the prior native document unchanged or the attempted open unavailable, never transferred to a legacy owner. N19C/N19D/N19G old-entry paths are disconnected or deny before mutation, while implemented operations use native commands. N19B native close/replacement may dispose that owner and permit a safe native re-entry, never a fallback edit. Other required families remain visibly pending migration, not Done. Each changed leaf runs its named focused Cargo/Node checks, normal registration/boundary/size checks and affected real consumers; broader local gates are run at integrated milestones. N21 records separately the identified installed executable and real-browser result for the first workflow. Unit tests, a fixture host, compilation, screenshots or merge alone do not establish installed acceptance. No hosted product build is authorized.
 
 **Final dependency graph and preserved work.** N21 → [P32/#1034](https://github.com/mysteropodes/nemo/issues/1034) → [P33/#1035](https://github.com/mysteropodes/nemo/issues/1035) → [R22/#930](https://github.com/mysteropodes/nemo/issues/930). P32 retains its existing predecessors, including P16 and its owner-controlled acceptance question. P33 retains P03/P08/P32 and requires all admitted native leaves; R22 remains a rollup and human structural acceptance, not a writable task. [R23/#1327](https://github.com/mysteropodes/nemo/issues/1327) waits for N21 as well as N00–N05. **P03 remains the source-census/admission authority and is not blocked on executing the leaves it admits.** It continues classifying the remaining families and may add bounded leaves without claiming they are implemented. P24/#1026 and all other existing claims/scopes remain unchanged; N10 is a distinct evaluator leaf. No tracking-parent closure creates a global extraction gate.
 
@@ -354,7 +420,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037) — Map animation and time into bounded extraction packets**
 
-  Owner **Ilya/D1** · skill `inventory` · `gpt-5.6-sol` / **medium**. Predecessors: none; claim the file/runtime slot.
+  Owner **Ilya/D1** · skill `inventory` · `gpt-6-sol` / **medium**. Predecessors: none; claim the file/runtime slot.
 
   Scope: `src/js/motion.js`; `src/js/tweens.js`; `src/js/timeline.js`; `src/js/animation/**`; `src/js/domain/animation/**`; `src/js/expr-*.js`; `src/js/layer-inout.js`; `src/js/camera.js`; `src/js/text-animator*.js`; `src/js/markers.js`; `src/js/bpm-grid.js`; `engineering/inventory/remediation-scope.json (partition submitted to orchestrator)`.
 
@@ -366,7 +432,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038) — Map rendering and resource ownership into bounded extraction packets**
 
-  Owner **Ilya/D2** · skill `inventory` · `gpt-5.6-terra` / **medium**. Predecessors: none; claim the file/runtime slot.
+  Owner **Ilya/D2** · skill `inventory` · `gpt-6-luna` / **medium**. Predecessors: none; claim the file/runtime slot.
 
   Scope: `src/js/engine-bridge.js`; `src/js/render-manager.js`; `src/js/playback-cache.js`; `src/js/color-manager.js`; `src/js/path-fx.js`; `src/js/custom-effects.js`; `src/js/shader-effects-library.js`; `geometry-wasm/src/**`; `engineering/inventory/remediation-scope.json (partition submitted to orchestrator)`.
 
@@ -552,7 +618,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007) — Create deterministic feature registration and descriptor validation**
 
-  Owner **Ilya/D1** · skill `capabilities` · `gpt-5.6-sol` / **medium**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Owner **Ilya/D1** · skill `capabilities` · `gpt-6-sol` / **medium**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Scope: `new src/js/application/capability-registry.js`; `new feature descriptor schema and registry tests`.
 
@@ -564,7 +630,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008) — Move opacity metadata and routing into its feature module**
 
-  Owner **Ilya/D1** · skill `capabilities` · `gpt-5.6-sol` / **medium**. Predecessors: [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007).
+  Owner **Ilya/D1** · skill `capabilities` · `gpt-6-sol` / **medium**. Predecessors: [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007).
 
   Scope: `src/js/application/opacity-application.js`; `src/js/domain/animation/opacity.js`; `src/js/bootstrap/opacity-application.js`; `new opacity feature registration`; `tests/application-opacity*.cjs`.
 
@@ -576,7 +642,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009) — Make Rust MCP discovery/dispatch consume feature contracts**
 
-  Owner **Ilya/D2** · skill `capabilities` · `gpt-5.6-terra` / **medium**. Predecessors: [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007), [F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048).
+  Owner **Ilya/D2** · skill `capabilities` · `gpt-6-luna` / **medium**. Predecessors: [P05 / #1007](https://github.com/mysteropodes/nemo/issues/1007), [F02 / #1048](https://github.com/mysteropodes/nemo/issues/1048).
 
   Scope: `nemo-mcp/src/server.rs`; `nemo-mcp/src/contract.rs`; `nemo-mcp/src/schema.rs`; `src/js/adapters/application-mcp.js`; `MCP protocol tests`.
 
@@ -600,7 +666,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P10 / #1012](https://github.com/mysteropodes/nemo/issues/1012) — Enforce application dependency edges through the normal gate**
 
-  Owner **Ilya/D2** · skill `validation` · `gpt-5.6-terra` / **medium**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D2** · skill `validation` · `gpt-6-luna` / **medium**. Predecessors: [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `scripts/nemo/ci.cjs`; `scripts/nemo/lib/boundaries*.cjs`; `engineering/boundaries/profiles/app-js.profile.json`; `boundary negative-control tests`.
 
@@ -624,7 +690,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014) — Enforce the geometry engine public-module dependency boundary**
 
-  Owner **Ilya/D2** · skill `validation` · `gpt-5.6-terra` / **medium**. Predecessors: [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D2** · skill `validation` · `gpt-6-luna` / **medium**. Predecessors: [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `geometry-wasm/Cargo.toml`; `geometry-wasm/src/engine.rs`; `Rust dependency policy/checker tests`.
 
@@ -636,7 +702,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[B01 / #1046](https://github.com/mysteropodes/nemo/issues/1046) — Enforce the native application/MCP public-module boundary**
 
-  Owner **Ilya/D2** · skill `validation` · `gpt-5.6-terra` / **medium**. Predecessors: [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Owner **Ilya/D2** · skill `validation` · `gpt-6-luna` / **medium**. Predecessors: [P11 / #1013](https://github.com/mysteropodes/nemo/issues/1013), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Scope: `src-tauri/src/application_mcp.rs`; `src-tauri/Cargo.toml`; `native Rust boundary policy/checker tests`.
 
@@ -672,7 +738,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[T02 / #1051](https://github.com/mysteropodes/nemo/issues/1051) — Distinguish exact baseline failures from new regressions**
 
-  Owner **Ilya/D2** · skill `validation` · `gpt-5.6-terra` / **medium**. Predecessors: [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004).
+  Owner **Ilya/D2** · skill `validation` · `gpt-6-luna` / **medium**. Predecessors: [P02 / #1004](https://github.com/mysteropodes/nemo/issues/1004).
 
   Scope: `scripts/nemo/lib/ baseline comparator (new)`; `fixture/baseline manifest`; `comparison tests`.
 
@@ -742,7 +808,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) — Extract the existing single-frame SVG export adapter**
 
-  Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [D01 / #1044](https://github.com/mysteropodes/nemo/issues/1044), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Owner **Ilya/D1** · skill `extraction` · `gpt-6-sol` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [D01 / #1044](https://github.com/mysteropodes/nemo/issues/1044), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Scope: `src/js/export.js: exportFrameSVGString`; `new src/js/adapters/export-svg-frame.js`.
 
@@ -754,7 +820,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058) — Map immutable SVG sequence inputs before job extraction**
 
-  Owner **Ilya/D1** · skill `architecture` · `gpt-5.6-sol` / **high**. Predecessors: [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
+  Owner **Ilya/D1** · skill `architecture` · `gpt-6-sol` / **high**. Predecessors: [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [D02 / #1045](https://github.com/mysteropodes/nemo/issues/1045).
 
   Scope: `src/js/export.js: exportSVGSequenceToDir / exportFrameRange / exportBuildFrame`; `src/js/render-manager.js callers (read-only)`.
 
@@ -766,7 +832,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P18 / #1020](https://github.com/mysteropodes/nemo/issues/1020) — Add bounded job lifecycle to that exporter**
 
-  Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058).
+  Owner **Ilya/D1** · skill `extraction` · `gpt-6-sol` / **medium**. Predecessors: [C05 / #1040](https://github.com/mysteropodes/nemo/issues/1040), [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019), [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058).
 
   Scope: `new export application job module`; `src/js/export.js`; `job lifecycle tests`.
 
@@ -802,7 +868,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) — Extract bounded application diagnostics from opacity**
 
-  Owner **Ilya/D1** · skill `diagnostics` · `gpt-5.6-sol` / **high**. Predecessors: [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008).
+  Owner **Ilya/D1** · skill `diagnostics` · `gpt-6-sol` / **high**. Predecessors: [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008).
 
   Scope: `src/js/application/opacity-application.js trace/replay section`; `new application diagnostics port/service`; `tests/application-opacity-replay.test.cjs`.
 
@@ -814,7 +880,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[T06 / #1055](https://github.com/mysteropodes/nemo/issues/1055) — Correlate one Rust MCP request with application diagnostics**
 
-  Owner **Ilya/D2** · skill `diagnostics` · `gpt-5.6-terra` / **high**. Predecessors: [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009), [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054).
+  Owner **Ilya/D2** · skill `diagnostics` · `gpt-6-luna` / **high**. Predecessors: [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009), [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054).
 
   Scope: `nemo-mcp/src transport instrumentation`; `nemo-mcp/Cargo.toml`; `MCP stdio tests`.
 
@@ -864,7 +930,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] **[P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022) — Extract folder metadata serialization**
 
-  Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D1** · skill `extraction` · `gpt-6-sol` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `src/js/timeline.js: SM.exportJSON / SM.importJSON folder fields`; `src/js/tweens.js: folder snapshot/restore`; `new src/js/domain/document/folder-codec.js`.
 
@@ -876,7 +942,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059) — Map frame-only history capture and restore ownership**
 
-  Owner **Ilya/D1** · skill `architecture` · `gpt-5.6-sol` / **high**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036).
+  Owner **Ilya/D1** · skill `architecture` · `gpt-6-sol` / **high**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036).
 
   Scope: `src/js/tweens.js: _cloneStrokesForUndo / pushUndoActiveFrame / undo / redo (read-only)`.
 
@@ -888,7 +954,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P21 / #1023](https://github.com/mysteropodes/nemo/issues/1023) — Extract the characterized frame-only history entry**
 
-  Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059).
+  Owner **Ilya/D1** · skill `extraction` · `gpt-6-sol` / **medium**. Predecessors: [C01 / #1036](https://github.com/mysteropodes/nemo/issues/1036), [P20 / #1022](https://github.com/mysteropodes/nemo/issues/1022), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H02 / #1059](https://github.com/mysteropodes/nemo/issues/1059).
 
   Scope: `src/js/tweens.js undo section`; `new application/history module`; `history contract tests`.
 
@@ -924,7 +990,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P23 / #1025](https://github.com/mysteropodes/nemo/issues/1025) — Extract the pure Hungarian assignment solver**
 
-  Owner **Ilya/D2** · skill `extraction` · `gpt-5.6-terra` / **medium**. Predecessors: [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D2** · skill `extraction` · `gpt-6-luna` / **medium**. Predecessors: [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `src/js/tweens.js: hungarian(cost)`; `new src/js/domain/tween/assignment.js`.
 
@@ -936,7 +1002,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P24 / #1026](https://github.com/mysteropodes/nemo/issues/1026) — Extract the playback frame-transition kernel**
 
-  Owner **Ilya/D1** · skill `extraction` · `gpt-5.6-sol` / **medium**. Predecessors: [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D1** · skill `extraction` · `gpt-6-sol` / **medium**. Predecessors: [C02 / #1037](https://github.com/mysteropodes/nemo/issues/1037), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `src/js/timeline.js: advancePlayFrame`; `new domain playback-step kernel and existing wrapper`.
 
@@ -948,7 +1014,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060) — Map one rotate-selection gesture and cancellation boundary**
 
-  Owner **Ilya/D2** · skill `architecture` · `gpt-5.6-terra` / **high**. Predecessors: [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039).
+  Owner **Ilya/D2** · skill `architecture` · `gpt-6-luna` / **high**. Predecessors: [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039).
 
   Scope: `src/js/tools.js: rotate onMouseDown / onMouseDrag / onMouseUp / rotateCenterSegments (read-only)`.
 
@@ -960,7 +1026,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P25 / #1027](https://github.com/mysteropodes/nemo/issues/1027) — Extract the characterized rotate-selection gesture**
 
-  Owner **Ilya/D2** · skill `extraction` · `gpt-5.6-terra` / **medium**. Predecessors: [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060).
+  Owner **Ilya/D2** · skill `extraction` · `gpt-6-luna` / **medium**. Predecessors: [C04 / #1039](https://github.com/mysteropodes/nemo/issues/1039), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006), [P06 / #1008](https://github.com/mysteropodes/nemo/issues/1008), [H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060).
 
   Scope: `src/js/tools.js transform section`; `src/js/select-bridge.js affected binding`; `new selection gesture application module`.
 
@@ -972,7 +1038,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P26 / #1028](https://github.com/mysteropodes/nemo/issues/1028) — Extract image LRU bookkeeping and eviction policy**
 
-  Owner **Ilya/D2** · skill `extraction` · `gpt-5.6-terra` / **medium**. Predecessors: [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
+  Owner **Ilya/D2** · skill `extraction` · `gpt-6-luna` / **medium**. Predecessors: [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P04 / #1006](https://github.com/mysteropodes/nemo/issues/1006).
 
   Scope: `src/js/engine-bridge.js: _noteImageRegistered / _touchImage / _imgTotalBytes / enforceImageBudget`; `new application render image-budget module`.
 
@@ -984,7 +1050,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [ ] **[P27 / #1029](https://github.com/mysteropodes/nemo/issues/1029) — Extract the existing Rust brightness/contrast pass**
 
-  Owner **Ilya/D2** · skill `extraction` · `gpt-5.6-terra` / **medium**. Predecessors: [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014).
+  Owner **Ilya/D2** · skill `extraction` · `gpt-6-luna` / **medium**. Predecessors: [C03 / #1038](https://github.com/mysteropodes/nemo/issues/1038), [P12 / #1014](https://github.com/mysteropodes/nemo/issues/1014).
 
   Scope: `geometry-wasm/src/engine.rs: create_color_adjust_pipeline / color_adjust_pass`; `new geometry-wasm/src/engine/color_adjust.rs`.
 
@@ -1067,7 +1133,7 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
   Scope: `fixed remediation census and all linked completed leaf receipts (read-only)`; `final source and capability completeness checks`.
 
   1. Every census responsibility has a merged implementation or a reviewed non-code disposition; all dynamically created extraction leaves are complete.
-  2. No obsolete writer/facade or expired legacy code exception remains; facade removal is part of its extraction leaf, never hidden work inside this audit.
+  2. No obsolete writer/facade or expired legacy code exception remains; removal belongs to its owning migration leaf, never hidden work inside this audit.
   3. Normal coverage, boundaries, missing-registration and schema gates pass their negative controls; known product defects remain separate and human-accepted.
 
   Limit: This is a final acceptance task, not a substitute for unfinished migrations. Finishing P04-P32 alone does not establish all-monolith completion.
@@ -1076,14 +1142,15 @@ N07 covers save/load and identity; N08–N09 cover commands, retry, transactions
 
 - [x] N00–N05 have exact accepted receipts: board/plan installation, current-main queue reconciliation, frozen authority/transition contracts, headless-evaluation feasibility, native-viewport feasibility and the admitted bounded production queue. A tracking-parent percentage or feasibility prototype alone is not production completion.
 - [ ] The native Rust engine is the sole writable authority for the agreed document revision, command/history, evaluation/scheduling, media/resource/GPU, viewport-production and export paths. Tauri/JavaScript remains the interface; Paper.js and browser/WASM are capability-declared edge adapters, not concurrent authorities.
-- [ ] Every migrated family has a fixed-revision parity oracle and passes its applicable save/load, undo/redo, selection, animation, render, export, native-bridge, real-browser and installed-desktop checks before the corresponding legacy writer is removed. Packaged acceptance, browser acceptance and source-level parity are recorded separately at exact SHAs.
+- [ ] Every required baseline family has an independent fixed-revision parity oracle and passes its applicable save/load, undo/redo, selection, animation, render, export, native-bridge, real-browser and installed-desktop checks at the identified final candidate. A legacy writer may have been removed earlier on the integration branch, but that family remains pending until these checks pass. Packaged acceptance, browser acceptance and source-level parity are recorded separately at exact SHAs.
+- [ ] The fixed baseline-workflow denominator reaches 100% accepted coverage on agreed surfaces, apart from exact documented baseline-defect dispositions. Older project formats import without silently dropping content; expressions and public scripting/plugin behavior are accounted for. A temporarily unavailable required feature cannot be counted Done.
 - [ ] P03's frozen source/consumer census is complete, including subsequently admitted small leaves. No handwritten monolith remains hidden under a legacy exception; legitimate generated/vendor/data files have explicit dispositions.
 - [ ] Each feature has a coherent public API, one state authority, applicable lifecycle/resource contracts and a capability registration. Existing UI/API/MCP consumers use the same implementation; obsolete writers and bypasses are removed.
 - [ ] Relevant unit, regression, browser and native checks protect migrated behavior. Coverage and failure reports are inspectable at the final source SHA. Known defects are explicit product debt, not repair prerequisites or concealed passing tests.
 - [ ] Normal local validation enforces adopted boundaries, size profiles, schema freshness and registration completeness. Each checker has a meaningful failing negative control.
 - [ ] A fresh agent can add a feature declaration using the documented convention and exercise it through the bundled Rust MCP without editing a central dispatcher. Both real clients have identified installed acceptance evidence for the supported macOS slice.
 - [ ] Debugging provides bounded correlated inspection and a reproducible isolated fixture path. Protocol stdout, document ownership and user data remain intact.
-- [ ] Ilya and Cyrill accept the structural result and its explicit product/platform limitations. Close the remaining tracking parents, reconcile the primary board and final central report, and release completed branch/worktree/runtime ownership.
+- [ ] Ilya and Cyrill accept the full functional and structural result and its explicit pre-existing product/platform limitations. Preserve a recoverable operational source/artifact, reconcile the final integration diff against current `main`, and promote only through a normally protected reviewed PR. Close the remaining tracking parents, reconcile the primary board and final central report, and release completed branch/worktree/runtime ownership.
 
 No assertion above requires all pre-existing product bugs to be fixed. No open extraction, unowned state writer or missing architecture evidence may be renamed product debt just to declare remediation finished.
 
@@ -1148,7 +1215,7 @@ Prepare triggers **paused**. Activate them only when actual execution work start
 
 | Ilya | Cyrill |
 |---|---|
-| Use the English checklist. O=`gpt-6-astra` high; D1=`gpt-5.6-sol` medium; D2=`gpt-5.6-terra` medium. | Use the French checklist. O=`opus` high at milestones; start with one `sonnet` medium delegate and enable the second only with independent work and sufficient quota. |
+| Use the English checklist. O=`gpt-6-astra` high; D1=`gpt-6-sol` medium; D2=`gpt-6-luna` medium. | Use the French checklist. O=`opus` high at milestones; start with one `sonnet` medium delegate and enable the second only with independent work and sufficient quota. |
 | The Codex heartbeat **Nemo — Ilya hourly coordination** (`nemo-ilya-hourly-coordination`) is prepared and **PAUSED**. At actual execution kickoff, target the real orchestrator task and activate it; keep it paused during planning and inactivity. | Prepare the manually authored hourly reminder **paused** on your own account, targeting your actual orchestrator; activate it only at execution kickoff. This packet does not claim a timer has been created or delivered on your Mac. |
 | Record the heartbeat destination and its first real report receipt in #1062. If moving to a Buzz workflow, pause this heartbeat first. | Buzz exposes a workflow **Schedule → Every hour** option. Configure its message destination as the designated Nemo conversation and explicitly address your actual orchestrator. Verify one real delivery before calling the schedule operational. |
 | Pause the trigger at session end; post retained/released claims. Resume only with a new session-start notice. | Pause the trigger at session end or a quota handoff. A missing receipt is a setup problem to report, not permission to launch a replacement agent. |

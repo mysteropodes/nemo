@@ -15,8 +15,12 @@ say so in the PR before it's merged, not after.
   JS libs, Rust crates) — it documents why things are built the way they are
   license-wise, and what NOT to reintroduce (GPL/patent-encumbered codecs in
   particular).
-- Nemo is a hybrid Paper.js (document model) + Rust/wasm (`geometry-wasm/`,
-  stateless WebGPU renderer via vello) app running in Tauri. The root
+- Operational `main` currently contains a hybrid Paper.js document model and Rust/wasm
+  (`geometry-wasm/`, stateless WebGPU renderer via vello) app running in Tauri. The
+  protected `codex/native-remediation` branch migrates persistent document, evaluation,
+  media/GPU, viewport and export authority to Rust without a writable Paper.js fallback.
+  Its intermediate builds may declare unmigrated features unavailable; final acceptance
+  still requires the full agreed baseline functionality. The root
   [CLAUDE.md](CLAUDE.md) is the real engineering guide — it documents
   invariants and past-bug postmortems that aren't obvious from reading the
   code once (e.g. the "new item type/tag handled in one consumer but not
@@ -55,16 +59,23 @@ Each job reports `pass`, `fail`, `blocked` or `not-run` with a reason; a missing
 
 ## Workflow
 
-- Branch per change (`your-topic`), PR against `main`. No direct pushes to
-  `main`.
+- Branch per change (`your-topic`). Remediation PRs target the shared protected
+  `codex/native-remediation` branch; unrelated work follows its separately approved
+  destination. Preserve operational `main` until a fully accepted final promotion PR.
+  No direct pushes to either protected branch.
 - Current repository collaborators with write/maintain/admin access may merge their own
   PRs after their team's technical review and local validation. Record the reviewed SHA
   and evidence in the PR. Agents sharing one account can review each other's code; they
   do not need approval from the other human team for routine work.
 - External-author PRs require a collaborator's approving GitHub review. The metadata-only
-  `Collaborator PR policy` automation acknowledges eligible collaborator authors without
-  claiming technical review or test success. Human change requests, conversations and
-  exact-head validation still apply. Follow [the integration checklist](engineering/remediation/EXECUTION_PLAN.en.md#7-integration-and-branch-cleanup).
+  `Collaborator PR policy` automation currently acknowledges eligible collaborator authors
+  automatically only for `main` PRs, without claiming technical review or test success.
+  The initial integration-branch policy amendment needs an ordinary eligible other-account
+  approval. After that amendment is accepted and verified, eligible integration PRs may
+  use an explicit policy-only manual dispatch from the protected integration ref at their
+  exact PR. Do not dispatch the current main-only policy there or bypass review. Human
+  change requests, conversations and exact-head validation still apply. Follow
+  [the integration checklist](engineering/remediation/EXECUTION_PLAN.en.md#7-integration-and-branch-cleanup).
 - Keep PRs scoped — one feature/fix per PR is much easier to review than a
   pile of unrelated changes.
 - If you're fixing a bug, a short repro (or a failing test if the area has

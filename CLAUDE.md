@@ -16,12 +16,14 @@
 Tauri v2, hybride Paper.js (modèle de document, source de vérité) + Rust/vello WebGPU
 (`geometry-wasm/`, moteur de rendu **sans état** JSON→JSON, bridgé via `src/js/engine-bridge.js`).
 
-Ce paragraphe décrit l’état actuel à caractériser, pas l’architecture cible approuvée le
-20 septembre 2026. La cible conserve l’interface Tauri/JavaScript mais transfère à un
+Ce paragraphe décrit l’état de `main` à caractériser, pas l’architecture cible approuvée les
+20 et 22 septembre 2026. La cible conserve l’interface Tauri/JavaScript mais transfère à un
 moteur Rust natif l’autorité unique sur les révisions du document, l’évaluation, les
-médias/ressources GPU, la production du viewport et l’export. Paper.js devient un
-adaptateur temporaire d’édition et de hit-test ; il ne doit jamais devenir une seconde
-autorité pendant la migration. Suivre les jalons N00–N05 du plan avant d’écrire le moteur.
+médias/ressources GPU, la production du viewport et l’export. Sur la branche protégée
+`codex/native-remediation`, Paper.js ne peut servir qu’à la géométrie, au hit-test ou à la
+présentation justifiés, jamais de propriétaire alternatif d’un document éditable. Une
+fonction non migrée peut être temporairement indisponible sans repli vers l’ancien writer ;
+la parité fonctionnelle convenue reste obligatoire avant la promotion finale vers `main`.
 
 Ces guidelines viennent d'un audit complet (bugs, perf, cohérence Rust/JS) après plusieurs
 tours de régressions sur l'éraseur/les booléennes/le brush preset — toutes causées par la
@@ -644,25 +646,33 @@ politique ; il n’atteste aucun test ni revue technique. Conserver les autres p
 les demandes de modifications et la coordination des conflits/contrats partagés.
 
 Pour la remédiation, suivre le [plan d’exécution actuel](engineering/remediation/EXECUTION_PLAN.fr.md)
-(2026-09-07) : une branche et une PR par résultat délimité, conservées entre les sessions ;
+(amendé le 2026-09-22) : une branche et une PR par résultat délimité, conservées entre les sessions ;
 worktrees limités aux rédacteurs réellement concurrents ; tâches et preuves sur le Projet #2,
 rapports partagés dans l’issue #1062. Les rappels restent en pause jusqu’au début de
-l’exécution et sont suspendus à l’arrêt de l’équipe.
+l’exécution et sont suspendus à l’arrêt de l’équipe. Les PR de remédiation ciblent la branche
+protégée commune `codex/native-remediation` ; `main` reste l’application opérationnelle
+jusqu’à une PR finale de promotion entièrement acceptée. La politique automatique
+`Collaborator PR policy` ne couvre que `main`. La première PR étendant cette politique
+exige une approbation GitHub ordinaire par un autre compte éligible. Une fois cette
+extension acceptée et vérifiée sur la branche d’intégration protégée, les PR éligibles
+peuvent déclencher manuellement cette politique limitée aux métadonnées depuis cette
+branche pour leur numéro exact ; aucun déclenchement PR automatique n’y est prévu.
 
 Depuis l'arrivée d'un collaborateur (pencilpark), ce dossier n'est plus le seul endroit où le
 code vit — `origin` pointe vers un vrai repo GitHub (public depuis 2026-08-26), et il faut éviter de s'écraser
 mutuellement. Règles à suivre **sans qu'on ait besoin de le redemander** :
 
-- **Jamais de commit direct sur `main`.** Toujours une branche dédiée par résultat délimité, réutilisée entre les sessions :
+- **Jamais de commit direct sur `main` ni sur la branche d’intégration protégée.** Toujours une branche dédiée par résultat délimité, réutilisée entre les sessions :
   `git checkout -b claude/<sujet-court>` pour le travail fait avec Claude (préfixe qui
   identifie la provenance dans l'historique), branches sans préfixe particulier pour le
-  travail humain direct. Une fois la tâche terminée, ouvrir une Pull Request vers `main`
-  plutôt que de merger en local en douce.
+  travail humain direct. Pour la remédiation, ouvrir une Pull Request vers
+  `codex/native-remediation` ; les autres travaux suivent leur destination approuvée.
+  Ne pas fusionner en local en douce.
 - **`git fetch origin` puis vérifier l’état local, la base et les propriétaires avant d’éditer**
   à chaque nouvelle session. Intégrer les mises à jour nécessaires sur une branche propre,
   sans écraser les modifications d’un autre agent ; reprendre la branche du résultat actif.
 - **Pousser la branche dès qu'un morceau cohérent est fini**, ne pas laisser des commits
-  locaux non poussés s'accumuler sur plusieurs sessions — plus l'écart avec `main` grandit,
+  locaux non poussés s'accumuler sur plusieurs sessions — plus l'écart avec sa base protégée grandit,
   plus les conflits de merge sont douloureux à résoudre.
 - **Ne jamais toucher à `main` en écriture directe** même pour un "petit" fix — même une
   correction d'une ligne passe par une branche + PR, pour rester cohérent et laisser une

@@ -95,6 +95,14 @@ handlers pass.
 - Apply targeted mutation/fuzz tests to critical parsers and migrated kernels, not every edit.
 - Test the combined integration candidate. Separate green branches do not prove their merge.
 
+On `codex/native-remediation`, classify affected tests explicitly: keep independent
+behavior/parity oracles and native correctness; adapt tests coupled only to old call
+structure; retire tests solely of removed old/new ownership handoff; and keep a visible
+pending-migration record for required temporarily unavailable features. A green native
+subset is not full baseline acceptance. Test the available workflow at each integration,
+then require the complete applicable browser, installed-client and visual matrix at the
+identified final promotion candidate. Never turn a required pending test into a silent skip.
+
 ## Target built-in Diagnostics surface
 
 Extend the existing opacity trace/replay seed under T05–T08. The proposed general panel,
