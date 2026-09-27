@@ -323,10 +323,13 @@ test('routing guard: no trace field is interpolated into the panel markup withou
 // ---- T12/#1405 — request ids are unique by construction --------------------
 //
 // Not a repair of an observed collision: nothing was seen in the wild. This is
-// correctness of construction. requestId is the application's idempotency key
-// (`retained.set(request.requestId, …)`, bounded at 256), and a collision does
-// not error — with an identical body it returns the MEMOISED earlier result,
-// which for these two read paths means quietly serving a stale trace.
+// correctness of construction. requestId is the application's idempotency key,
+// and for these two READ paths a collision costs a spurious hard failure, not
+// silent staleness — `remember()` stores WRITES only (opacity-application.js:61)
+// while the lookup is unconditional (:136), so a read id equal to one of the
+// up-to-256 retained write ids fails `invalid_request`. Probed both ways
+// against the real core; an earlier revision of this comment claimed the
+// memoised-stale-trace mechanism, which is wrong for a read.
 //
 // Both tests assert uniqueness across N calls rather than "the string changed",
 // because a generator that varies but repeats is exactly the defect: a single
@@ -407,4 +410,35 @@ test('T12: every panel fetch mints a distinct request id — its body is identic
     'the panel keys off the same application identity as the capability');
   assert.ok(minted.every((id) => id.length <= 128));
   assertConsecutiveCounters(minted, 'panel fetch');
+});
+
+// Pins the claim the two comments above rest on, so it cannot rot into folklore:
+// what a requestId collision costs on a READ path. Probed rather than reasoned.
+test('T12: a read is never retained, so a collision costs a hard failure and not a stale trace', () => {
+  const win = opacityWindow();
+  const layerId = win._f.state.layers[0].layerUid;
+  const call = (id, operation, payload) => {
+    const identity = win.NemoOpacityApplication.meta();
+    return win.NemoApplication.handle({ apiVersion: 1, requestId: id, ...identity,
+      expectedRevision: identity.revision, operation, payload });
+  };
+
+  // One id, two DIFFERENT read bodies: both execute. If reads were retained,
+  // the second would fail 'requestId was reused with a changed body'.
+  assert.equal(call('same-read-id', 'diagnostics.trace', {}).ok, true);
+  assert.equal(call('same-read-id', 'snapshot', {}).ok, true,
+    'reads are not stored in the retained map, so repeating a read id is not itself a hazard');
+
+  // A read whose id collides with a retained WRITE id is what actually breaks:
+  // the lookup is unconditional, the bodies differ, and it fails.
+  assert.equal(call('W', 'property.set', { layerId, property: 'opacity', value: 12 }).ok, true);
+  const clash = call('W', 'diagnostics.trace', {});
+  assert.equal(clash.ok, false, 'a read reusing a retained write id must not be served');
+  assert.equal(clash.error.code, 'invalid_request');
+
+  // And a read does not grow the trace, so nothing here is revision-driven.
+  const before = call('t-a', 'diagnostics.trace', {}).result.entries.length;
+  call('t-b', 'snapshot', {});
+  assert.equal(call('t-c', 'diagnostics.trace', {}).result.entries.length, before,
+    'reads are not recorded, so a revision-keyed read id would not go stale either');
 });

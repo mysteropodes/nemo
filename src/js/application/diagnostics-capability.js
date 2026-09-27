@@ -17,13 +17,23 @@ var NemoDiagnosticsCapability = (function () {
       && win.NemoOpacityApplication && typeof win.NemoOpacityApplication.meta === 'function');
   }
 
-  // T12/#1405 -- requestId is the application's idempotency key
-  // (`retained.set(request.requestId, ...)`, bounded at 256), so it has to be
-  // unique by CONSTRUCTION rather than probably-unique. The two failure modes
-  // a collision produces are both bad and neither is a crash: with an
-  // identical body the application returns the MEMOISED earlier result (the
-  // inspector would show a stale trace), and with a changed body it fails
-  // `invalid_request`. Math.random() offers no uniqueness guarantee at all.
+  // T12/#1405 -- requestId is the application's idempotency key, and it has to
+  // be unique by CONSTRUCTION rather than probably-unique. What a collision
+  // actually costs here, measured against the real core rather than assumed:
+  //
+  //   * `remember()` returns early for anything that is not a WRITE
+  //     (opacity-application.js:61), so a READ -- which is all this file and
+  //     the panel ever send -- is NEVER stored in `retained`. Repeating a read
+  //     id therefore does not serve a memoised answer: probed with one id and
+  //     two different read bodies, both execute.
+  //   * The LOOKUP, however, is unconditional (opacity-application.js:136), so
+  //     a read id that happens to equal one of the up-to-256 retained WRITE
+  //     ids is rejected: bodies differ, and the request fails
+  //     `invalid_request` -- the inspector stops working rather than lying.
+  //
+  // So the hazard is a spurious hard failure, not silent staleness. Small
+  // probability, visible symptom, and no reason to keep: Math.random() offers
+  // no uniqueness guarantee at all, and the fix removes the case entirely.
   //
   // The identity used here is the application's own -- instanceId comes from
   // ports.newId(), which bootstrap/opacity-application.js implements as

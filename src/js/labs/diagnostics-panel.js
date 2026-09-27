@@ -46,10 +46,10 @@
   }
 
   // T12/#1405 -- see the matching note in application/diagnostics-capability.js
-  // for why requestId has to be unique by CONSTRUCTION, not probably unique.
-  // The panel's case is the sharper of the two: its request body is IDENTICAL
-  // on every fetch, so a collision takes the memoised branch and the inspector
-  // silently shows a STALE trace instead of the current one.
+  // for why requestId has to be unique by CONSTRUCTION, not probably unique,
+  // and for what a collision actually costs: a read is never retained, so the
+  // risk is not a stale memoised trace but a spurious `invalid_request` when a
+  // read id collides with one of the retained WRITE ids.
   //
   // Minted locally rather than shared with the capability module on purpose:
   // diagnostics-capability.js carries no script tag (it is declared
