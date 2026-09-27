@@ -39,6 +39,8 @@ test('opacity application slice declares contract, lifecycle, operations, bootst
     ['app.opacity.application', 'application', 'src/js/application/opacity-application.js', 'Domain/application'],
     ['app.native.opacity.legacy-surface.adapter', 'adapters', 'src/js/adapters/native-opacity-legacy-surface.js', 'Platform/engine adapter'],
     ['app.native.opacity.motion-surface.adapter', 'adapters', 'src/js/adapters/native-opacity-motion-surface.js', 'Platform/engine adapter'],
+    ['app.motion.canvas-intent.adapter', 'adapters', 'src/js/adapters/motion-canvas-intent.js', 'Platform/engine adapter'],
+    ['app.select.canvas-intent.adapter', 'adapters', 'src/js/adapters/select-canvas-intent.js', 'Platform/engine adapter'],
     ['app.opacity.bootstrap', 'bootstrap', 'src/js/bootstrap/opacity-application.js', 'Handwritten config/bootstrap'],
     ['app.native.opacity.bootstrap', 'bootstrap', 'src/js/bootstrap/native-opacity-application.js', 'Handwritten config/bootstrap'],
     ['app.application.mcp.adapter', 'adapters', 'src/js/adapters/application-mcp.js', 'Platform/engine adapter'],

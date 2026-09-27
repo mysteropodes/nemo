@@ -13,6 +13,8 @@ const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lif
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
+const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
+const SelectCanvasIntent = require('../src/js/adapters/select-canvas-intent.js');
 const ComponentExposedProperties = require('../src/js/domain/component/exposed-properties.js');
 const OpacityApplication = require('../src/js/application/opacity-application.js');
 const ApplicationMcp = require('../src/js/adapters/application-mcp.js');
@@ -1392,10 +1394,29 @@ test('afterChange observes readable post-write caches for UI, v1, and external n
 test('rendered opacity input callbacks preserve rapid no-await values and immediate undo ordering', async () => {
   const source = staticSource();
   const legacyBytes = JSON.stringify(source);
+  class CanvasPoint {
+    constructor(x, y) { this.x = x; this.y = y; }
+    clone() { return new CanvasPoint(this.x, this.y); }
+    add(point) { return new CanvasPoint(this.x + point.x, this.y + point.y); }
+    subtract(point) { return new CanvasPoint(this.x - point.x, this.y - point.y); }
+    multiply(value) { return new CanvasPoint(this.x * value, this.y * value); }
+    dot(point) { return this.x * point.x + this.y * point.y; }
+    get length() { return Math.hypot(this.x, this.y); }
+    normalize() { return this.multiply(1 / (this.length || 1)); }
+    getDistance(point) { return Math.hypot(this.x - point.x, this.y - point.y); }
+    rotate() { return this.clone(); }
+  }
+  const canvasEvents = {}, canvasTarget = { addEventListener(type, callback) { canvasEvents[type] = callback; },
+    setPointerCapture(id) { this.captured = id; }, hasPointerCapture(id) { return this.captured === id; },
+    releasePointerCapture() { delete this.captured; } };
   const paperLayer = { opacity: 0.25, children: [], bounds: {
     left: 20, top: 60, right: 40, bottom: 80, width: 20, height: 20,
     center: { x: 30, y: 70 },
   } };
+  const paperItem = { data: { strokeId: 'r08_curve_rect' } };
+  paperLayer.children.push(paperItem);
+  paperLayer.hitTest = (point) => point.x >= 20 && point.x <= 40 && point.y >= 60 && point.y <= 80
+    ? { item: paperItem } : null;
   const paperProject = { activeLayer: paperLayer, itemCount: 1 };
   const paperBytes = JSON.stringify(paperProject);
   let motion = null;
@@ -1409,11 +1430,21 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   } });
   const motionState = defaultState();
   Object.assign(motionState, { layers: source.layers, activeLayerIdx: 0,
-    currentFrame: 10, totalFrames: 21, appMode: 'motion' });
+    currentFrame: 10, totalFrames: 21, appMode: 'motion', tool: 'select', selectedStrokeIndices: [] });
   motion = loadMotion(motionState, { beforeMotion(sb) {
     sb.userLayers = [paperLayer]; sb.view = { zoom: 1 };
+    sb.Point = CanvasPoint;
+    sb.addEventListener = () => {};
+    sb.NemoMotionCanvasIntent = MotionCanvasIntent;
+    sb.NemoSelectCanvasIntent = SelectCanvasIntent;
+    sb.selectedPaths = [];
+    sb.pushUndo = () => { throw new Error('native canvas must not push JS undo'); };
+    sb.getSI = (item) => paperLayer.children.indexOf(item);
+    sb.hitTestPosed = (_layer, point) => paperLayer.hitTest(point);
+    sb.renderArcs = () => {};
+    sb.SMEngineBridge = { isEnabled: () => true, screenToWorld: (x, y) => [x, y], renderNow() {} };
     sb.SM.setActiveLayer = () => {};
-    sb._layerSel = [0]; sb._layerSelAnchor = 0;
+    sb._layerSel = []; sb._layerSelAnchor = null;
     sb._layerIndexByUid = () => -1;
     sb.n20AllowLegacyWrite = () => false;
     sb.n20RequireLegacyWrite = (kind) => { throw new Error(`legacy writer denied: ${kind}`); };
@@ -1446,7 +1477,8 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   Object.defineProperty(panelBody, 'innerHTML', {
     configurable: true, get() { return ''; }, set() { this.children.length = 0; },
   });
-  motion.sandbox.document.getElementById = (id) => id === 'motion-props-body' ? panelBody : null;
+  motion.sandbox.document.getElementById = (id) => id === 'motion-props-body' ? panelBody
+    : id === 'canvas-area' ? canvasTarget : null;
   motion.sandbox.renderLayerList = function () {
     if (inInputCallback) synchronousRenders++;
     motion.SMMotion.renderMotionPropsPanel();
@@ -1454,6 +1486,18 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   motion.sandbox.renderTimeline = function () { if (inInputCallback) synchronousRenders++; };
 
   assert.equal(await harness.controller.activate(harness.prepared), true);
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/select-bridge.js'), 'utf8'), motion.sandbox,
+    { filename: 'select-bridge.js' });
+  function canvasPointer(type) {
+    const event = { pointerId: 1, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+      clientX: 30, clientY: 70, stopImmediatePropagation() {}, preventDefault() {} };
+    canvasEvents[type](event);
+  }
+  canvasPointer('pointerdown'); canvasPointer('pointerup');
+  assert.equal(motion.sandbox.selectedPaths[0], paperItem, 'canvas click selects the native layer');
+  assert.deepEqual(Array.from(motion.sandbox._layerSel), [0]);
+  assert.equal(harness.state.releases, 0, 'canvas selection never releases native ownership');
+  motion.sandbox.renderLayerList();
   const opacityRow = created.filter((element) => element._smProp === 'opacity').at(-1);
   assert.ok(opacityRow, 'production renderer emitted the opacity property row');
   function descendants(element) {
@@ -1486,6 +1530,7 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   assert.equal(JSON.parse(harness.controller.persistenceJSON()).layers[0].motionStatic.opacity[0], 40);
   assert.deepEqual(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply')
     .map((request) => request.payload.value), [40, 60]);
+  assert.equal(harness.state.releases, 0, 'first opacity commands remain native after canvas selection');
   assert.deepEqual(harness.state.history, [25]);
   assert.deepEqual(harness.state.redo, [60]);
   assert.equal(synchronousRenders, 0, 'native input callbacks defer cache-reading renders to afterChange');

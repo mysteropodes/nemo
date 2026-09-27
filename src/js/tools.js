@@ -1,6 +1,6 @@
 // ---- TOOLS ----
 var currentPath=null,selectedPaths=[],stabQueue=[],shapeStart=null;
-function allowLegacySelectionEdit(e,k){var b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){}if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
+function allowLegacySelectionEdit(e,k){var c=window.NemoNativeOpacityCutover,b=window.SMEngineBridge,a=!b||!Object.prototype.hasOwnProperty.call(b,'nativeEditGuard');try{if(c!==undefined&&(!c||typeof c.blocksLegacy!=='function'||c.blocksLegacy()!==false))a=false;else a=a||!!b.nativeEditGuard&&b.nativeEditGuard.allow(k||'select')===true;}catch(_){a=false;}if(!a&&e){if(e.stopImmediatePropagation)e.stopImmediatePropagation();if(e.preventDefault)e.preventDefault();if(e.stop)e.stop();}return a;}
 function selectionGestureActive(){return state.tool==='select'?!!(_xform.active||_marquee.active||draggingArc||_moveDragStarted):state.tool==='subselect'?!!(_nodeDrag.active||_nmq.active):state.tool==='fsselect'?!!(_fsPromoteDrag||_marquee.active||_fsBreak):false;}
 function motionGestureActive(){try{return!!(window.SMMotion&&SMMotion.debugMotionDrag&&SMMotion.debugMotionDrag());}catch(_){return false;}}
 var _textDragStart=null,_textDragRect=null;

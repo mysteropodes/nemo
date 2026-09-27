@@ -36,6 +36,7 @@ function bootSelect(guard, motion) {
     Point: function Point(x, y) { this.x = x; this.y = y; }, window: null,
   };
   context.window = context;
+  context.addEventListener = () => {};
   context.SMEngineBridge = { isEnabled: () => true, screenToWorld: (x, y) => [x, y], nativeEditGuard: guard };
   context.SMMotion = motion;
   vm.runInNewContext(source('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
@@ -93,6 +94,7 @@ function bootTools(guard, state, motion) {
     SMEngineBridge: { nativeEditGuard: guard, isEnabled: () => true, screenToWorld: (x, y) => [x, y] }, SMMotion: motion,
   };
   context.window = context;
+  context.addEventListener = () => {};
   vm.runInNewContext(source('src/js/tools.js'), context, { filename: 'tools.js' });
   return { context, stage };
 }
@@ -133,6 +135,23 @@ test('Motion forwards no down, drag, or up callback on the denied stack', () => 
   const drag = event(); drag.clientX = 3; drag.clientY = 4; handlers.pointermove(drag);
   const up = event(); up.clientX = 3; up.clientY = 4; handlers.pointerup(up);
   assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
+});
+
+test('Paper view down denies native Select and Motion before the release guard', () => {
+  for (const tool of ['select', 'draw']) {
+    const active = { value: true }, releases = [], guard = installGuard(active, releases);
+    let motionDown = 0;
+    const { context } = bootTools(guard, { tool, appMode: 'motion' }, {
+      onDown() { motionDown++; return true; },
+    });
+    context.NemoNativeOpacityCutover = { blocksLegacy: () => true };
+    const nativeEvent = event();
+    context.view.onMouseDown({ event: nativeEvent, modifiers: {}, point: { x: 2, y: 3 } });
+    assert.equal(nativeEvent.stopped, 1, tool);
+    assert.equal(nativeEvent.prevented, 1, tool);
+    assert.equal(motionDown, 0, tool);
+    assert.deepEqual(releases, [], tool);
+  }
 });
 
 test('a Shapes combine menu retained from legacy cannot mutate after activation', () => {
