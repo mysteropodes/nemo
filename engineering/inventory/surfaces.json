@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "658f5f7f36c3080823bfb7b68d3f168b8fc82e23",
-  "describe": "v0.7.0-alpha.4-568-g658f5f7-dirty"
+  "head": "d3af128321db67e830c8cfc3fba019d74e16ac3a",
+  "describe": "v0.7.0-alpha.4-571-gd3af128"
  },
- "inputsDigest": "8d221f0c93fcd9cb10eee5316ab96609651bd5e40605eefc737f7eb3c8af70b5",
+ "inputsDigest": "365cd39392313333657248ba96b60c2d9eb533993b402fad3277a04bb775d50e",
  "states": [
   "inventoried",
   "characterized",
@@ -21508,7 +21508,7 @@
    "capability": "labsDescribeDiagnosticsPanel",
    "area": "labs",
    "handler": [
-    "src/js/labs/diagnostics-panel.js:113"
+    "src/js/labs/diagnostics-panel.js:176"
    ],
    "events": [],
    "exposure": [
@@ -21523,7 +21523,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/diagnostics-panel.js:113",
+   "source": "src/js/labs/diagnostics-panel.js:176",
    "meta": {
     "functionsVisited": 23
    },
