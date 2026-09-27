@@ -11,7 +11,7 @@
     var phase = 'legacy', prepared = null, identity = null, generation = 0;
     var serializeResponse = null, evaluations = new Map(), persistence = null;
     var application = null, pending = Promise.resolve(), releasePromise = null, activationPromise = null;
-    var cycle = null, sequence = 0, cacheFences = 0;
+    var cycle = null, sequence = 0, cacheFences = 0, terminal = null;
     var output = Object.freeze({ kind: 'frame', format: 'rgba8', width: 320, height: 180,
       colorInterpretation: 'srgb', alphaMode: 'straight' });
 
@@ -94,7 +94,7 @@
     function disposeConsumers(target) { if (!target) return;
       if (target.preview) target.preview.dispose(); if (target.exporter) target.exporter.dispose();
       target.preview = null; target.exporter = null; target.active = false; }
-    function clearInstalled(target) { disposeConsumers(target);
+    function closeInstalled(target) { disposeConsumers(target);
       if (target && ports.onDisposed) ports.onDisposed(target.session);
       identity = null; application = null; prepared = null; serializeResponse = null;
       evaluations = new Map(); persistence = null; cacheFences = 0;
@@ -133,25 +133,32 @@
     }
     async function rollbackBootstrap() {
       var target = cycle;
-      if (!identity) {
-        disposeConsumers(target);
-        phase = 'legacy';
-        prepared = null;
-        cycle = null;
-        return;
-      }
       try {
+        if (!identity) throw new Error('bootstrap authority removal is unverified');
         await releaseInstalled(copyIdentity(), target);
         await ports.disconnect();
-        clearInstalled(target);
-        phase = 'legacy';
+        if (ports.connectionStatus() !== null) throw new Error('native transport remains connected');
+        closeInstalled(target);
+        phase = 'closed';
       } catch (_) {
         disposeConsumers(target);
         phase = 'indeterminate';
       }
     }
+    function frozen(value) {
+      if (!value || typeof value !== 'object') return value === null || ['string', 'boolean'].includes(typeof value) || typeof value === 'number' && Number.isFinite(value);
+      return (Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype || contract.plain(value)) && Object.isFrozen(value) &&
+        Reflect.ownKeys(value).every(function (key) { var field = Object.getOwnPropertyDescriptor(value, key);
+          return typeof key === 'string' && contract.has(field, 'value') &&
+            (field.enumerable || Array.isArray(value) && key === 'length') && frozen(field.value); });
+    }
     function activate(nextPrepared) {
-      if (phase !== 'legacy') throw new Error('native opacity activation requires legacy ownership');
+      if (!['legacy', 'closed'].includes(phase)) throw new Error('native opacity activation requires verified closed ownership');
+      var canonical = nextPrepared && frozen(nextPrepared) && ports.document.prepareNativeOpacity(nextPrepared.shell);
+      if (!canonical || JSON.stringify(nextPrepared) !== JSON.stringify(canonical)) {
+        throw new Error('native opacity prepared candidate is not immutable canonical admission');
+      }
+      terminal = null; releasePromise = null;
       prepared = nextPrepared;
       phase = 'installing';
       var work = (async function () {
@@ -231,22 +238,22 @@
         finally { if (fenced) cacheFences--; }
       });
     }
-    function validReleaseReason(reason) {
-      return contract.plain(reason) && Object.keys(reason).sort().join(',') === 'documentId,generation,kind' &&
-        contract.bounded(reason.kind) && reason.documentId === identity.documentId && reason.generation === generation;
-    }
     function requestRelease(reason) {
-      if (phase === 'release-requested' || phase === 'releasing') {
-        if (identity && validReleaseReason(reason) && releasePromise) return releasePromise;
+      if (!contract.plain(reason) || Object.keys(reason).sort().join(',') !== 'documentId,generation,kind' ||
+          !Object.keys(reason).every(function (key) { return contract.has(Object.getOwnPropertyDescriptor(reason, key), 'value'); }) ||
+          !contract.bounded(reason.kind)) return Promise.reject(new Error('native release request is stale or malformed'));
+      if (['closed', 'release-requested', 'releasing'].includes(phase)) {
+        if (terminal && JSON.stringify([reason.documentId, reason.generation, reason.kind]) === terminal.fingerprint) return releasePromise;
         return Promise.reject(new Error('native release request is stale or malformed'));
       }
-      if (phase !== 'native' || !identity || !validReleaseReason(reason)) {
+      if (phase !== 'native' || !identity || reason.documentId !== identity.documentId || reason.generation !== generation) {
         return Promise.reject(new Error('native release request is stale or malformed'));
       }
       try { requireConnected(cycle); } catch (error) { return Promise.reject(error); }
       var target = cycle, drain = pending;
+      terminal = { fingerprint: JSON.stringify([reason.documentId, reason.generation, reason.kind]), reason: contract.clone(reason), receipt: null };
       phase = 'release-requested';
-      releasePromise = (async function () {
+      return releasePromise = (async function () {
         try {
           await drain;
           if (target.failure || cycle !== target || !target.active) {
@@ -256,39 +263,32 @@
           if (cacheFences || target.synchronizing || !persistence) {
             throw new Error('native release cache is not synchronized');
           }
-          var current = copyIdentity(), legacyBytes = persistence;
+          var current = copyIdentity();
           phase = 'releasing';
-          await releaseInstalled(current, target);
+          terminal.receipt = contract.clone(await releaseInstalled(current, target));
           await ports.disconnect();
-          clearInstalled(target);
-          phase = 'legacy';
-          if (!ports.legacyImport(legacyBytes, true)) {
-            throw new Error('composed native document could not re-enter legacy');
-          }
-          var mapped = Object.freeze({ documentId: current.documentId, generation: generation,
-            owner: 'legacy', status: 'released' });
-          releasePromise = null;
-          return mapped;
+          if (ports.connectionStatus() !== null) throw new Error('native transport remains connected');
+          closeInstalled(target);
+          phase = 'closed';
+          return Object.freeze({ documentId: current.documentId, generation: generation,
+            owner: 'none', status: 'closed' });
         } catch (error) {
           disposeConsumers(target);
           phase = 'indeterminate';
           throw error;
         }
       })();
-      return releasePromise;
-    }
-    function releaseFor(kind) {
-      requireAdmission();
-      return requestRelease({ kind: kind, documentId: identity.documentId, generation: generation });
     }
     function releaseCurrent(kind) {
       if (phase === 'legacy') return Promise.resolve(null);
       if (phase === 'installing' && activationPromise) {
-        return activationPromise.then(function (active) { return active ? releaseCurrent(kind) : null; });
+        return activationPromise.then(function () { return releaseCurrent(kind); });
       }
-      if (phase === 'release-requested' || phase === 'releasing') return releasePromise;
+      if (['closed', 'release-requested', 'releasing'].includes(phase) && terminal) {
+        return requestRelease({ kind: kind, documentId: terminal.reason.documentId, generation: terminal.reason.generation });
+      }
       if (phase !== 'native') return Promise.reject(new Error('native opacity ownership cannot release safely'));
-      return releaseFor(kind);
+      return requestRelease({ kind: kind, documentId: identity.documentId, generation: generation });
     }
     function getNativeIdentity() {
       if (phase === 'legacy') return null;
@@ -381,7 +381,7 @@
     }
 
     return Object.freeze({ activate: activate, requestRelease: requestRelease,
-      releaseCurrent: releaseCurrent, releaseFor: releaseFor, getNativeIdentity: getNativeIdentity,
+      releaseCurrent: releaseCurrent, getNativeIdentity: getNativeIdentity,
       isActive: function () {
         if (phase !== 'native') return false;
         try { requireAdmission(); return true; } catch (_) { return false; }
@@ -396,7 +396,8 @@
       },
       prepared: function () { requireReadable(); return prepared; },
       flush: function () { return releasePromise || pending; }, inspect: inspect, id: id,
-      performMutation: performMutation });
+      performMutation: performMutation,
+      fence: function (error) { return failLifecycle(cycle, error); } });
   }
 
   return Object.freeze({ create: create });

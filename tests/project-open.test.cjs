@@ -31,7 +31,7 @@ function realImportJSON() {
 function harness({ auto = null, version = null } = {}) {
   const elements = new Map();
   const downloads = [], toasts = [];
-  let repaints = 0;
+  let repaints = 0, mutations = 0;
   let json = JSON.stringify({ title: 'boot' });
   function element() {
     const el = { style: {}, dataset: {}, value: '', files: [], children: [], classList: { add() {}, remove() {}, toggle() {} },
@@ -43,14 +43,14 @@ function harness({ auto = null, version = null } = {}) {
   const document = { readyState: 'loading', body: element(), addEventListener(type, fn) { if (type === 'DOMContentLoaded') this.ready = fn; },
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element, querySelector() { return null; } };
   let rejectNextImport = false;
-  const window = { addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
+  const window = { NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
   class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem() {}, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
-    requestAnimationFrame(fn) { fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() {}, createUserLayer() {}, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
+    requestAnimationFrame(fn) { fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() { mutations++; }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
   if (version !== null) window.__TAURI__ = { fs: { readTextFile: async () => version } };
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });
@@ -58,7 +58,7 @@ function harness({ auto = null, version = null } = {}) {
   document.body.appendChild = node => downloads.push(node.download);
   vm.runInNewContext(source, context, { filename: 'project.js' });
   document.ready();
-  return { input: document.getElementById('file-input'), downloads, toasts, project: window.SMProject, elements, rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; } };
+  return { window, input: document.getElementById('file-input'), downloads, toasts, project: window.SMProject, elements, rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; }, get mutations() { return mutations; } };
 }
 
 function select(app, file) { app.input.listeners.change({ target: { files: file ? [file] : [], value: 'selected' } }); }
@@ -164,4 +164,86 @@ test('closing the first active tab selects a surviving document', () => {
   assert.equal(JSON.parse(app.json).title, 'second');
   app.json = JSON.stringify({ title: 'second', edited: true });
   assert.equal(app.project.isDirty(), true);
+});
+
+test('actual New and blank tab callbacks deny before release or document creation for every blocked phase', async () => {
+  for (const phase of ['native', 'closed', 'indeterminate']) {
+    const app = harness();
+    const tabs = app.elements.get('project-tabs-list');
+    app.project.enterEditor();
+    app.elements.get('project-tab-add').listeners.click();
+    const blank = tabs.children[1];
+    const exportJSON = app.window.SM.exportJSON;
+    app.window.SM.exportJSON = () => null;
+    tabs.children[0].listeners.click();
+    app.window.SM.exportJSON = exportJSON;
+    let releases = 0;
+    app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true };
+    app.window.NemoNativeOpacityProject = { release() { releases++; return Promise.resolve({ owner: 'none', status: 'closed' }); } };
+    const before = { json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, toasts: app.toasts.length };
+    assert.equal(await app.project.newProject({ w: 320, h: 180, fps: 24 }), false, phase);
+    app.elements.get('project-tab-add').listeners.click();
+    blank.listeners.click();
+    tabs.children[0].children.at(-1).listeners.click({ stopPropagation() {} });
+    await Promise.resolve();
+    assert.equal(releases, 0, phase);
+    assert.deepEqual({ json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, toasts: app.toasts.length }, before, phase);
+  }
+});
+
+test('missing or malformed legacy surface denies actual blank transitions with any remaining native publication', async () => {
+  const surfaces = [undefined, null, {}, { allowProjectTransition() { return true; } },
+    { allowProjectTransition() { return true; }, releaseProjectTransition: false },
+    { allowProjectTransition() { return true; }, releaseProjectTransition() { throw new Error('broken surface'); } }];
+  for (const surface of surfaces) for (const publications of ['cutover', 'project', 'both']) {
+    const app = harness();
+    app.project.enterEditor();
+    const tabs = app.elements.get('project-tabs-list');
+    app.elements.get('project-tab-add').listeners.click();
+    const blank = tabs.children[1];
+    const exportJSON = app.window.SM.exportJSON;
+    app.window.SM.exportJSON = () => null;
+    tabs.children[0].listeners.click();
+    app.window.SM.exportJSON = exportJSON;
+    let releases = 0;
+    app.window.NemoNativeOpacityLegacySurface = surface;
+    if (publications !== 'project') app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true };
+    if (publications !== 'cutover') app.window.NemoNativeOpacityProject = {
+      release() { releases++; return Promise.resolve({ owner: 'none', status: 'closed' }); },
+    };
+    const observed = () => ({ json: app.json, label: app.project.getCurrentLabel(), dirty: app.project.isDirty(),
+      count: tabs.children.length, toasts: app.toasts.length, repaints: app.repaints, mutations: app.mutations });
+    const before = observed();
+    const result = app.project.newProject({ w: 320, h: 180, fps: 24 });
+    assert.equal(result, false);
+    app.elements.get('project-tab-add').listeners.click();
+    blank.listeners.click();
+    tabs.children[0].children.at(-1).listeners.click({ stopPropagation() {} });
+    assert.equal(releases, 0, publications);
+    assert.deepEqual(observed(), before, publications);
+    await Promise.resolve();
+    assert.equal(releases, 0, publications);
+    assert.deepEqual(observed(), before, publications);
+  }
+});
+
+test('always-dormant absence of all native publications preserves actual New and blank tab transitions', async () => {
+  const app = harness();
+  delete app.window.NemoNativeOpacityLegacySurface;
+  assert.equal(await app.project.newProject({ w: 320, h: 180, fps: 24, name: 'Dormant' }), undefined);
+  assert.equal(app.project.getCurrentLabel(), 'Dormant (not saved)');
+  const tabs = app.elements.get('project-tabs-list');
+  const before = app.mutations;
+  app.elements.get('project-tab-add').listeners.click();
+  assert.equal(tabs.children.length, 2);
+  assert.ok(app.mutations > before);
+  const exportJSON = app.window.SM.exportJSON;
+  app.window.SM.exportJSON = () => null;
+  tabs.children[0].listeners.click();
+  app.window.SM.exportJSON = exportJSON;
+  tabs.children[1].listeners.click();
+  assert.equal(app.project.getCurrentLabel(), 'Untitled 2 (not saved)');
+  tabs.children[1].children.at(-1).listeners.click({ stopPropagation() {} });
+  assert.equal(tabs.children.length, 1);
+  assert.equal(app.toasts.filter(value => value === 'New project created').length, 3);
 });

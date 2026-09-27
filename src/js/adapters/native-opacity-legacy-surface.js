@@ -28,6 +28,23 @@
     error.name = 'NemoNativeReleaseRequired';
     throw error;
   }
+  function allowProjectTransition(root) {
+    var controller = root && root.NemoNativeOpacityCutover;
+    if (controller === undefined) return true;
+    try {
+      return !!controller && typeof controller.blocksLegacy === 'function' &&
+        controller.blocksLegacy() === false;
+    } catch (_) { return false; }
+  }
+  function releaseProjectTransition(root, kind) {
+    if (!allowProjectTransition(root)) return false;
+    var project = root && root.NemoNativeOpacityProject;
+    var result = project ? project.release(kind) : null;
+    function continued(receipt) {
+      return allowProjectTransition(root) && receipt == null ? receipt : false;
+    }
+    return result && typeof result.then === 'function' ? result.then(continued) : continued(result);
+  }
   function wrapWriter(target, name, allow, kind, admitted) {
     var original = target && target[name];
     if (typeof original !== 'function') return function () {};
@@ -61,7 +78,7 @@
       return result === null ? original.handle(request) : result;
     };
     var meta = root.NemoOpacityApplication.meta = function () {
-      return handlers.meta() || original.meta();
+      return allowProjectTransition(root) ? handlers.meta() || original.meta() : handlers.meta();
     };
     var legacy = root.NemoOpacityApplication.legacy = function () {
       var result = handlers.legacy.apply(null, arguments);
@@ -154,6 +171,8 @@
   }
 
   return Object.freeze({ allowLegacyWrite: allowLegacyWrite, requireLegacyWrite: requireLegacyWrite,
+    allowProjectTransition: allowProjectTransition,
+    releaseProjectTransition: releaseProjectTransition,
     wrapWriter: wrapWriter,
     desktopPorts: desktopPorts, defer: function (root, callback) { return root.setTimeout(callback, 0); } });
 }));
