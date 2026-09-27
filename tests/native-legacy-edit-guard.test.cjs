@@ -18,6 +18,39 @@ function exactReceipt() {
   return { documentId: 'document-1', generation: 4, owner: 'legacy', status: 'released' };
 }
 
+test('native, malformed, and unreadable authority deny without release and stay latched', () => {
+  for (const mode of ['native', 'malformed', 'throws', 'documentId-getter', 'generation-getter', 'ownKeys']) {
+    const guard = freshGuard();
+    let identity = mode === 'native' ? { documentId: 'document-1', generation: 4 }
+      : mode === 'malformed' ? { documentId: '', generation: -1 }
+        : mode === 'documentId-getter' ? Object.defineProperties({}, {
+          documentId: { enumerable: true, get() { throw new Error('documentId unavailable'); } },
+          generation: { enumerable: true, value: 4 },
+        })
+          : mode === 'generation-getter' ? Object.defineProperties({}, {
+            documentId: { enumerable: true, value: 'document-1' },
+            generation: { enumerable: true, get() { throw new Error('generation unavailable'); } },
+          })
+            : mode === 'ownKeys' ? new Proxy({}, { ownKeys() { throw new Error('identity keys unavailable'); } })
+              : { documentId: 'document-1', generation: 4 };
+    let throwRead = mode === 'throws';
+    let releases = 0;
+    guard.install({
+      getNativeIdentity() {
+        if (throwRead) throw new Error('identity unavailable');
+        return identity;
+      },
+      requestRelease() { releases++; return exactReceipt(); },
+    });
+    assert.equal(guard.allow('draw'), false, `${mode} authority denies synchronously`);
+    assert.equal(releases, 0, `${mode} authority never requests release`);
+    throwRead = false;
+    identity = null;
+    assert.equal(guard.allow('draw'), false, `${mode} denial cannot later reopen legacy writes`);
+    assert.equal(releases, 0);
+  }
+});
+
 test('legacy ownership is pass-through without installing a native controller', () => {
   const guard = freshGuard();
   assert.equal(guard.allow('draw'), true);
@@ -25,7 +58,15 @@ test('legacy ownership is pass-through without installing a native controller', 
   assert.equal(guard.isExactReleaseReceipt({ ...exactReceipt(), extra: true }), false);
 });
 
-test('native ownership synchronously denies the current call and releases at most once', () => {
+test('an installed guard preserves legacy writes while native identity is dormant', () => {
+  const guard = freshGuard();
+  let releases = 0;
+  guard.install({ getNativeIdentity: () => null, requestRelease() { releases++; } });
+  assert.equal(guard.allow('draw'), true);
+  assert.equal(releases, 0);
+});
+
+test('native ownership synchronously denies every legacy call without requesting release', () => {
   const guard = freshGuard();
   let calls = 0;
   let native = true;
@@ -33,30 +74,34 @@ test('native ownership synchronously denies the current call and releases at mos
     getNativeIdentity: () => native ? { documentId: 'document-1', generation: 4 } : null,
     requestRelease: () => { calls++; return exactReceipt(); },
   });
-  assert.equal(guard.allow('draw'), false, 'the release-requesting stack cannot mutate');
-  assert.equal(calls, 1);
+  assert.equal(guard.allow('draw'), false, 'the native-owned stack cannot mutate');
+  assert.equal(calls, 0);
   assert.equal(guard.allow('draw'), false, 'the current native owner remains fail-closed after a receipt');
-  assert.equal(calls, 1);
+  assert.equal(calls, 0);
   native = false;
-  assert.equal(guard.allow('draw'), true, 'only a later/replayed legacy-owned call may enter');
+  assert.equal(guard.allow('draw'), false, 'native-to-legacy identity transition stays denied');
+  assert.equal(calls, 0);
 });
 
-test('failed and indeterminate releases remain fail-closed without another request', async () => {
-  for (const result of [null, { status: 'released' }, Promise.reject(new Error('cleanup failed'))]) {
+test('malformed and throwing identity reads remain fail-closed without release', () => {
+  for (const getNativeIdentity of [
+    () => ({ documentId: '', generation: -1 }),
+    () => { throw new Error('identity unavailable'); },
+  ]) {
     const guard = freshGuard();
     let calls = 0;
     guard.install({
-      getNativeIdentity: () => ({ documentId: 'document-1', generation: 4 }),
-      requestRelease: () => { calls++; return result; },
+      getNativeIdentity,
+      requestRelease: () => { calls++; return exactReceipt(); },
     });
     assert.equal(guard.allow('fill'), false);
-    await Promise.resolve();
+    assert.equal(calls, 0);
     assert.equal(guard.allow('fill'), false);
-    assert.equal(calls, 1);
+    assert.equal(calls, 0);
   }
 });
 
-test('wrong receipts and a second native admission cannot authorize a bypass', () => {
+test('native identity changes and release-shaped results cannot authorize a bypass', () => {
   const guard = freshGuard();
   let identity = { documentId: 'document-1', generation: 4 };
   let calls = 0;
@@ -64,15 +109,15 @@ test('wrong receipts and a second native admission cannot authorize a bypass', (
     getNativeIdentity: () => identity,
     requestRelease: () => {
       calls++;
-      return { documentId: 'other-document', generation: 4, owner: 'legacy', status: 'released' };
+      return exactReceipt();
     },
   });
   assert.equal(guard.allow('shape'), false);
   identity = null;
-  assert.equal(guard.allow('shape'), false, 'a mismatched receipt remains fail-closed even after reported legacy ownership');
+  assert.equal(guard.allow('shape'), false, 'a release-shaped result cannot reopen legacy writes');
   identity = { documentId: 'document-2', generation: 5 };
   assert.equal(guard.allow('shape'), false, 'a later native authority begins a distinct denied cycle');
-  assert.equal(calls, 2);
+  assert.equal(calls, 0);
 });
 
 function event() {
@@ -106,12 +151,12 @@ function directCallback(file, tool) {
   assert.equal(typeof callback, 'function', `${file} did not register its direct pointerdown callback`);
   const first = event();
   callback(first);
-  assert.equal(releases, 1, `${file} must request exactly one release before its first mutation`);
+  assert.equal(releases, 0, `${file} must never request a native release`);
   assert.ok(first.stopped >= 1, `${file} must stop the native-owned callback stack`);
   assert.ok(first.prevented >= 1, `${file} must prevent the native-owned callback default`);
   const second = event();
   callback(second);
-  assert.equal(releases, 1, `${file} must not retry an indeterminate release`);
+  assert.equal(releases, 0, `${file} must never request a native release`);
   assert.ok(second.stopped >= 1);
   assert.ok(second.prevented >= 1);
 }
@@ -193,6 +238,59 @@ test('idle pointer events and brush-resize gestures do not request native releas
   assert.equal(hoverRenders, 1, 'eraser hover preserves its render request');
 });
 
+test('a retained draw gesture cannot finish after native authority activates', () => {
+  const handlers = {};
+  const target = { addEventListener(type, handler) { handlers[type] = handler; } };
+  const guard = freshGuard();
+  let identity = null;
+  let releases = 0;
+  let resumes = 0;
+  let renders = 0;
+  const nativeIdentity = { documentId: 'native-document', generation: 9 };
+  guard.install({
+    getNativeIdentity: () => identity,
+    requestRelease: () => { releases++; return exactReceipt(); },
+  });
+  const bridge = {
+    isEnabled: () => true,
+    nativeEditGuard: guard,
+    screenToWorld: (x, y) => [x, y],
+    suspend() {},
+    resume() { resumes++; },
+    setPressureCursor() {},
+    renderNow() { renders++; },
+  };
+  const context = {
+    Date, Math, Point: class Point { constructor(x, y) { this.x = x; this.y = y; } },
+    performance: { now: () => 1 },
+    state: {
+      tool: 'draw', playing: false, stabilizer: 0, brushSize: 8,
+      pressureInvert: false, pressureMin: 0, pressureMax: 100,
+      vectorBrush: false, bitmapBrushOn: false, strokeEnabled: true,
+      fillBrushSize: 8, fillColor: '#000000', strokeColor: '#000000', opacity: 100,
+    },
+    view: { zoom: 1 },
+    document: { readyState: 'complete', addEventListener() {}, getElementById: () => target },
+    window: null,
+    editRefusalReason: null,
+  };
+  context.window = context;
+  context.SMEngineBridge = bridge;
+  vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'src/js/draw-bridge.js'), 'utf8'), context);
+
+  const down = event(); down.clientX = 10; down.clientY = 20; down.pressure = 0.5;
+  handlers.pointerdown(down);
+  identity = nativeIdentity;
+  const up = event(); up.clientX = 12; up.clientY = 22; up.pressure = 0.5;
+  handlers.pointerup(up);
+
+  assert.equal(releases, 0, 'completing the retained gesture must not request native release');
+  assert.equal(resumes, 0, 'the denied pointerup must return before legacy gesture completion');
+  assert.equal(renders, 0, 'the denied pointerup must not run post-commit rendering');
+  assert.strictEqual(identity, nativeIdentity, 'the controller keeps the same native identity');
+  assert.equal(guard.allow('draw'), false, 'the retained gesture cannot reopen after pointerup');
+});
+
 test('direct programmatic commit helpers deny before downstream Paper/document access', () => {
   for (const [file, helper, args] of [
     ['src/js/draw-bridge.js', 'commitStroke', []],
@@ -216,10 +314,10 @@ test('direct programmatic commit helpers deny before downstream Paper/document a
     assert.notEqual(source, fs.readFileSync(path.join(ROOT, file), 'utf8'), `${file} helper hook was not installed`);
     vm.runInNewContext(source, context, { filename: file });
     context.__n19cHelper(...args);
-    assert.equal(releases, 1, `${file}:${helper} must request release`);
+    assert.equal(releases, 0, `${file}:${helper} must not request release`);
     assert.equal(downstream, 0, `${file}:${helper} must not reach Paper/document state before release`);
     context.__n19cHelper(...args);
-    assert.equal(releases, 1, `${file}:${helper} must not retry an indeterminate release`);
+    assert.equal(releases, 0, `${file}:${helper} must not request release`);
     assert.equal(downstream, 0, `${file}:${helper} must stay closed after an indeterminate release`);
   }
 });

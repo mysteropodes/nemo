@@ -7,7 +7,9 @@
   'use strict';
 
   var controller = null;
-  var cycle = null;
+  // Once native or indeterminate authority has been observed, this dormant
+  // compatibility guard can never reopen a legacy writer in this session.
+  var denied = false;
 
   function isExactReleaseReceipt(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -25,52 +27,26 @@
 
   function nativeIdentity() {
     if (!controller) return null;
-    var identity;
-    try { identity = controller.getNativeIdentity(); }
-    catch (_) { return undefined; }
-    if (identity === null) return null;
-    if (!identity || typeof identity !== 'object' || Array.isArray(identity)
-      || Object.keys(identity).length !== 2
-      || typeof identity.documentId !== 'string' || identity.documentId.length === 0
-      || !Number.isSafeInteger(identity.generation) || identity.generation < 0) return undefined;
-    return { documentId: identity.documentId, generation: identity.generation };
+    try {
+      var identity = controller.getNativeIdentity();
+      if (identity === null) return null;
+      if (!identity || typeof identity !== 'object' || Array.isArray(identity)
+        || Object.keys(identity).length !== 2) return undefined;
+      var documentId = identity.documentId;
+      var generation = identity.generation;
+      if (typeof documentId !== 'string' || documentId.length === 0
+        || !Number.isSafeInteger(generation) || generation < 0) return undefined;
+      return { documentId: documentId, generation: generation };
+    } catch (_) { return undefined; }
   }
 
-  function sameIdentity(left, right) {
-    return left.documentId === right.documentId && left.generation === right.generation;
-  }
-
-  function receiveRelease(value, identity) {
-    if (cycle && sameIdentity(cycle.identity, identity) && isExactReleaseReceipt(value)
-      && sameIdentity(value, identity)) cycle.receipt = value;
-  }
-
-  function requestRelease(kind, identity) {
-    if (cycle.requested) return;
-    cycle.requested = true;
-    var result;
-    try { result = controller.requestRelease({ kind: kind, documentId: identity.documentId, generation: identity.generation }); }
-    catch (_) { return; }
-    if (result && typeof result.then === 'function') {
-      result.then(function (value) { receiveRelease(value, identity); }, function () {});
-      return;
-    }
-    receiveRelease(result, identity);
-  }
-
-  // A release never admits its own current stack. Native ownership always denies;
-  // only a later call after matching receipt + reported legacy ownership may enter.
+  // This helper is only a synchronous denial gate. It does not request a
+  // release or replay an edit; N20 owns any future explicit transition policy.
   function allow(kind) {
+    if (denied) return false;
     var identity = nativeIdentity();
-    if (identity === null) {
-      if (!cycle) return true;
-      if (!cycle.receipt) return false;
-      cycle = null;
-      return true;
-    }
-    if (identity === undefined) return false;
-    if (!cycle || !sameIdentity(cycle.identity, identity)) cycle = { identity: identity, requested: false, receipt: null };
-    requestRelease(kind, identity);
+    if (identity === null) return true;
+    denied = true;
     return false;
   }
 
@@ -78,7 +54,7 @@
     if (!next || typeof next.getNativeIdentity !== 'function' || typeof next.requestRelease !== 'function') {
       throw new TypeError('native edit guard controller requires getNativeIdentity and requestRelease');
     }
-    if (controller || cycle) throw new Error('native edit guard controller is already installed');
+    if (controller) throw new Error('native edit guard controller is already installed');
     controller = next;
     return api;
   }

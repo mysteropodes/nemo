@@ -99,18 +99,18 @@ function bootTools(guard, state, motion) {
   return { context, stage };
 }
 
-test('native ownership requests one exact release and admits only a later replay', () => {
+test('native ownership denies retained menu actions without release or later replay', () => {
   const active = { value: true }, releases = [], guard = installGuard(active, releases), context = selectionGuardContext(guard);
   let mutations = 0;
   const retained = context.__selectionGuard.guardMenuItems([{ action() { mutations++; } }]);
   retained[0].action();
   assert.equal(mutations, 0);
-  assert.deepEqual(releases, [{ kind: 'select', documentId: 'document-1', generation: 4 }]);
+  assert.deepEqual(releases, []);
   retained[0].action();
-  assert.equal(releases.length, 1);
+  assert.equal(releases.length, 0);
   active.value = false;
   retained[0].action();
-  assert.equal(mutations, 1);
+  assert.equal(mutations, 0);
 });
 
 test('absent ports pass through; malformed and throwing ports fail closed', () => {
@@ -123,18 +123,21 @@ test('absent ports pass through; malformed and throwing ports fail closed', () =
   }
 });
 
-test('Motion forwards no down, drag, or up callback on the denied stack', () => {
+test('Motion stays denied after native ownership without requesting release', () => {
   const active = { value: true }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
-  const { handlers } = bootSelect(guard, { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; }, onHoverMove() { return false; } });
+  const { handlers, context } = bootSelect(guard, { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; }, onHoverMove() { return false; } });
+  context.selectedPaths = [];
+  context.canvasEl = { dataset: {}, style: {} };
   const denied = event(); denied.clientX = 2; denied.clientY = 3; denied.button = 0;
   handlers.pointerdown(denied);
   assert.deepEqual(calls, { down: 0, drag: 0, up: 0 });
-  assert.equal(releases.length, 1);
+  assert.equal(releases.length, 0);
   active.value = false;
   const down = event(); down.clientX = 2; down.clientY = 3; down.button = 0; handlers.pointerdown(down);
   const drag = event(); drag.clientX = 3; drag.clientY = 4; handlers.pointermove(drag);
   const up = event(); up.clientX = 3; up.clientY = 4; handlers.pointerup(up);
-  assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
+  assert.deepEqual(calls, { down: 0, drag: 0, up: 0 });
+  assert.equal(releases.length, 0);
 });
 
 test('Paper view down denies native Select and Motion before the release guard', () => {
@@ -154,7 +157,7 @@ test('Paper view down denies native Select and Motion before the release guard',
   }
 });
 
-test('a Shapes combine menu retained from legacy cannot mutate after activation', () => {
+test('a Shapes combine menu retained from legacy stays denied after activation and later null', () => {
   const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = [];
   const { context, list } = bootShapes(undefined, calls);
   let menu;
@@ -166,10 +169,11 @@ test('a Shapes combine menu retained from legacy cannot mutate after activation'
   active.value = true;
   unite.action();
   assert.equal(calls.length, 0);
-  assert.equal(releases.length, 1);
+  assert.equal(releases.length, 0);
   active.value = false;
   unite.action();
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 0);
+  assert.equal(releases.length, 0);
 });
 
 test('public selection helpers deny before undo or Paper mutation', () => {
@@ -210,29 +214,40 @@ test('full Paper tools guards selected-item drag and up before their mutations',
   context.selectedPaths = [{ position: { add() { throw new Error('Paper move must not run'); } } }];
   context.onMouseDrag({ event: event(), delta: {} });
   context.onMouseUp({ event: event() });
-  assert.equal(releases.length, 1);
+  assert.equal(releases.length, 0);
+  active.value = false;
+  context.onMouseDrag({ event: event(), delta: {} });
+  context.onMouseUp({ event: event() });
+  assert.equal(releases.length, 0);
 });
 
-test('full Paper Motion forwarding guards an active gesture but leaves idle drag/up passive', () => {
-  const active = { value: true }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
-  const motion = { onDown() { calls.down++; return true; }, onDrag() { calls.drag++; return true; }, onUp() { calls.up++; return true; } };
+test('full Paper Motion blocks a retained gesture after activation and keeps idle forwarding passive', () => {
+  const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
+  let drag = null;
+  const motion = {
+    onDown() { calls.down++; drag = { mode: 'point' }; return true; },
+    onDrag() { if (!drag) return false; calls.drag++; return true; },
+    onUp() { if (!drag) return false; calls.up++; drag = null; return true; },
+    debugMotionDrag() { return drag; },
+  };
   const { context } = bootTools(guard, { tool: 'draw', appMode: 'motion' }, motion);
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
   assert.equal(releases.length, 0, 'idle Motion forwarding must not request release');
   context.onMouseDown({ event: event(), modifiers: {} });
-  assert.equal(calls.down, 0);
-  assert.equal(releases.length, 1);
-  active.value = false;
-  context.onMouseDown({ event: event(), modifiers: {} });
   assert.equal(calls.down, 1);
+  assert.ok(motion.debugMotionDrag(), 'dormant down starts a real Motion gesture');
   active.value = true;
   context.onMouseDrag({ event: event() });
-  assert.equal(calls.drag, 1, 'the denied active drag must not reach Motion');
+  context.onMouseUp({ event: event() });
+  assert.deepEqual(calls, { down: 1, drag: 0, up: 0 });
+  assert.ok(motion.debugMotionDrag(), 'native activation leaves the captured gesture unforwarded');
+  assert.equal(releases.length, 0);
   active.value = false;
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
-  assert.deepEqual(calls, { down: 1, drag: 2, up: 2 });
+  assert.deepEqual(calls, { down: 1, drag: 0, up: 0 }, 'later null identity does not replay the gesture');
+  assert.equal(releases.length, 0);
 });
 
 test('complete Select bridge and Paper tools share a debug-visible Motion gesture', () => {
@@ -255,9 +270,32 @@ test('complete Select bridge and Paper tools share a debug-visible Motion gestur
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
   assert.deepEqual(calls, { down: 1, drag: 0, up: 0 });
-  assert.equal(releases.length, 1);
+  assert.equal(releases.length, 0);
   active.value = false;
   context.onMouseDrag({ event: event() });
   context.onMouseUp({ event: event() });
+  assert.deepEqual(calls, { down: 1, drag: 0, up: 0 });
+  assert.equal(releases.length, 0);
+});
+
+test('a fresh dormant Select gesture still forwards down, drag, and up', () => {
+  const active = { value: false }, releases = [], guard = installGuard(active, releases), calls = { down: 0, drag: 0, up: 0 };
+  let drag = null;
+  const motion = {
+    onDown() { calls.down++; drag = { mode: 'point' }; return true; },
+    onDrag() { if (!drag) return false; calls.drag++; return true; },
+    onUp() { if (!drag) return false; calls.up++; drag = null; return true; },
+    debugMotionDrag() { return drag; }, onHoverMove() { return false; },
+  };
+  const { context, stage } = bootTools(guard, { tool: 'select', appMode: 'motion', layers: [{ locked: false }] }, motion);
+  context.Point = function Point(x, y) { this.x = x; this.y = y; };
+  context.document.readyState = 'complete';
+  vm.runInNewContext(source('src/js/select-bridge.js'), context, { filename: 'select-bridge.js' });
+  const down = event(); down.button = 0; down.clientX = 1; down.clientY = 2;
+  stage.events.pointerdown(down);
+  context.onMouseDrag({ event: event() });
+  context.onMouseUp({ event: event() });
   assert.deepEqual(calls, { down: 1, drag: 1, up: 1 });
+  assert.equal(motion.debugMotionDrag(), null);
+  assert.equal(releases.length, 0);
 });
