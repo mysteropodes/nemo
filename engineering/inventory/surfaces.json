@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "571da35cef3b69bf4030a210d38c0c6405d679d7",
-  "describe": "v0.7.0-alpha.4-573-g571da35"
+  "head": "9e0cb1fff6fc50ef274dbecc2ef27ef4cc941d3c",
+  "describe": "v0.7.0-alpha.4-575-g9e0cb1f"
  },
- "inputsDigest": "8e44fafb69d331e7e0d89a713c28d272b15d50e4c98982f0c6d6e1ad4e46f0cd",
+ "inputsDigest": "cb24a15fa74ff74b5603f0dc3aef8b5611b4a4a4ea0991abfc0e15016f7ea65f",
  "states": [
   "inventoried",
   "characterized",
@@ -21508,7 +21508,7 @@
    "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; a row click selects the layer it touched, Report produces a reproduction bundle",
    "area": "labs",
    "handler": [
-    "src/js/labs/diagnostics-panel.js:176"
+    "src/js/labs/diagnostics-panel.js:193"
    ],
    "events": [],
    "exposure": [
@@ -21523,7 +21523,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/diagnostics-panel.js:176",
+   "source": "src/js/labs/diagnostics-panel.js:193",
    "meta": {
     "functionsVisited": 23
    },
