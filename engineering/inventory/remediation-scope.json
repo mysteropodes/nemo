@@ -4979,6 +4979,16 @@
           1,
           9
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            9
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.eraser-boolean-subtract starts at eraser.rs:10; lines 1-9 are its explanatory tool-port preamble."
+        }
       ]
     },
     {
@@ -4995,6 +5005,16 @@
           1000,
           1037
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.fill-region-tracer starts at fill.rs:34; lines 1-33 are explanatory design comments and imports preceding fill_find."
+        }
       ]
     },
     {
@@ -5038,6 +5058,16 @@
           1,
           7
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            7
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.basic-shape-segments starts at shapes.rs:8; lines 1-7 are the tool-scope header and imports."
+        }
       ]
     },
     {
@@ -5050,6 +5080,16 @@
           1,
           13
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.stroke-input-modeler starts at strokemodeler.rs:14; lines 1-13 are model provenance, parity, and state-boundary comments."
+        }
       ]
     },
     {
@@ -5078,6 +5118,16 @@
           345,
           432
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            21
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.pyramidal-point-tracker starts at track.rs:22; lines 1-21 are algorithm provenance and overview comments plus imports."
+        }
       ]
     },
     {
@@ -5102,6 +5152,16 @@
           1,
           14
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            14
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.auto-match-correspondence starts at tweenmatch.rs:15; lines 1-14 are the port-scope rationale and imports before shared types."
+        }
       ]
     },
     {
@@ -5726,6 +5786,128 @@
           13896,
           13908
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1562,
+            1566
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 1562-1566 are comment-only explanation of the extracted NemoExpressionRandomDomain.hashUnit; the adjacent hashNoise1D/hashNoise2D implementation is owned by C02.expressions.expression-runtime (#1037), and C20k/#1235 routes the pre-1769 noise helpers to that C02 responsibility. No separate executable responsibility begins in this span."
+        },
+        {
+          "span": [
+            1571,
+            1571
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1571 is hashNoise1D's two lattice lookups through NemoExpressionRandomDomain.hashUnit. C02.expressions.expression-runtime (#1037) names hashNoise1D; C20k/#1235 records hashNoise1D at 1569 and retains pre-1769 noise helpers with C02. The C02 packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1578,
+            1578
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1578 is hashNoise2D's nested g helper, which forwards a lattice coordinate to NemoExpressionRandomDomain.hashUnit. C02.expressions.expression-runtime (#1037) names hashNoise2D; C20k/#1235 records hashNoise2D at 1576 and retains pre-1769 noise helpers with C02. The C02 packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1712,
+            1712
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1712 is exprStepTime forwarding the current frame and interval to NemoExpressionTimeDomain.stepTime; adjacent lines update the expression context time. C02.expressions.expression-runtime (#1037) explicitly names exprStepTime, and C20k/#1235 defines its expression-helper slice as beginning at 1769, leaving this pre-1769 wrapper with C02. Its packet remains pending; no code coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1719,
+            1719
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1719 is exprToFrames forwarding seconds and the expression-context FPS to NemoExpressionTimeDomain.toFrames. C02.expressions.expression-runtime (#1037) explicitly names exprToFrames; C20k/#1235 begins its expression-helper slice at 1769, so this pre-1769 wrapper remains with C02. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1724,
+            1724
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1724 is exprToSeconds forwarding frames and the expression-context FPS to NemoExpressionTimeDomain.toSeconds. C02.expressions.expression-runtime (#1037) explicitly names exprToSeconds; C20k/#1235 begins its expression-helper slice at 1769, so this pre-1769 wrapper remains with C02. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1743,
+            1745
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1743-1745 are _rand01's draw through NemoExpressionRandomDomain.rand01FromInputs followed by the expression-context rngCounter increment and return. C02.expressions.expression-runtime (#1037) names _rand01; C20k/#1235 records _rand01 and seeded-counter random wrappers at 1739-1768 as pre-1769 C02 ownership. The C02 packet remains pending; no computed coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1748,
+            1750
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 1748-1750 are only the Box-Muller lead-in comments immediately before _gauss01 at 1751; they contain no executable responsibility. C02.expressions.expression-runtime (#1037) owns the adjacent named helper, and C20k/#1235 places the pre-1769 random-wrapper family with C02."
+        },
+        {
+          "span": [
+            1752,
+            1753
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1752-1753 are _gauss01's two _rand01 draws forwarded to NemoExpressionRandomDomain.gaussFromUniforms. C02.expressions.expression-runtime (#1037) names _gauss01; C20k/#1235 records _gauss01 and seeded-counter random wrappers at 1739-1768 as pre-1769 C02 ownership. The C02 packet remains pending; no computed coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1759,
+            1759
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1759 is _randomWith forwarding its generator and optional bounds to NemoExpressionRandomDomain.randomWith. C02.expressions.expression-runtime (#1037) owns the expression random wrapper family; C20k/#1235 places _randomWith at 1735-1768 in the pre-1769 C02 responsibility. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            8435,
+            8438
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 8435-8438 are comment-only cycle-refusal rationale immediately before timeLinkWouldCycle at 8439. C02.motion-advanced.canvas-drag-interactions (#1037) owns the helper at its actual location; C20c/#1137 records the corrected 8435-8452 C02 ownership. This preamble adds no separate executable responsibility."
+        },
+        {
+          "span": [
+            8530,
+            8553
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 8530-8553 are keysLockedTo, the reader that finds exact in/out/layer lock modes on propsFor-addressed layer and element-holder tracks. C02.properties-and-curves.key-selection-and-clipboard (#1037) names keysLockedTo; C20c/#1137 explicitly distinguishes this adjacent C02 reader at 8530-8553 from its own menu builders and records its exclusions. The C02 packet remains pending; this adds no computed range coverage or implementation acceptance."
+        },
+        {
+          "span": [
+            9429,
+            9435
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 9429-9435 are comment-only Elements explanation immediately before layerElements at 9436. C02 component-shape-tree owns the adjoining responsibility; C20f/#1156 explicitly excludes these leading comments and the function start. No executable responsibility is in this span."
+        },
+        {
+          "span": [
+            13256,
+            13321
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 13256-13321 are blank/comment-only Motion-grid marquee rationale preceding initGridMarquee. C02.motion-advanced.canvas-drag-interactions (#1037) owns the grid pointer-capture registration at 13337-13365, and C20q/#1247 owns the key-marquee selection behavior it dispatches to. This preamble has no standalone executable responsibility."
+        },
+        {
+          "span": [
+            13854,
+            13879
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 13858 exports selectKeys to the shared key-selection state; lines 13859-13879 are comment-only lead-in describing the shared curve-widget contract for the adjacent onEaseSegChanged export, which begins at 13880 outside this span. C02.properties-and-curves.key-selection-and-clipboard and C02.properties-and-curves.curves-and-easing (#1037) own those adjacent selection and easing responsibilities; C20o/#1245 documents the key/property-selection and shared curve-widget caller wiring, while the C02 curves-and-easing packet names onEaseSegChanged. Both C02 packets remain pending; this adds no computed range coverage or implementation acceptance."
+        }
       ]
     },
     {
@@ -5803,6 +5985,72 @@
           634,
           635
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            11,
+            19
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 11 and 18 declare currentPath/currentName and tabs/activeTabId respectively. C01.project.document-io-and-dirty-tracking (#1036) names and owns the current-path/name closure state; C01.project.project-tabs (#1036) owns the tabs and activeTabId closure state. Both packets remain pending; this adds no numeric range coverage, packet admission, implementation acceptance or product-behavior claim."
+        },
+        {
+          "span": [
+            21,
+            24
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 21-24 are comment-only browser-autosave explanation immediately before autosaveWrite begins at 25, within pending C01.project.document-io-and-dirty-tracking (#1036). This preamble has no separate executable responsibility."
+        },
+        {
+          "span": [
+            51,
+            53
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 51-53 are blank/comment-only New / Open / Save section lead-in; newProject begins at 54 in pending C01.project.document-io-and-dirty-tracking (#1036). No executable responsibility begins within this span."
+        },
+        {
+          "span": [
+            220,
+            227
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 220-227 are comment-only version-history lead-in; HISTORY_MAX begins at 228 in pending C01.project.version-history (#1036). The comments add no separate executable responsibility."
+        },
+        {
+          "span": [
+            311,
+            321
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 311-321 are comment-only team-sync section lead-in; SYNC_MAX_PER_PROFILE begins at 322 in pending C01.project.team-sync (#1036). This boundary records adjacency only, not team-sync implementation acceptance."
+        },
+        {
+          "span": [
+            412,
+            432
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 421-425 define the read-only getOpenTabs API named by pending C01.project.document-io-and-dirty-tracking (#1036). Lines 427-432 are comment-only lead-in to initCloseGuard at 433, outside this span and assigned to the separate pending C01.project.close-unsaved-work-guard packet. The span does not claim executable close-guard code, numeric range coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            486,
+            497
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 486-497 are blank/comment-only project-tabs section lead-in; makeTabId begins at 498 in pending C01.project.project-tabs (#1036). This preamble has no separate executable responsibility."
+        },
+        {
+          "span": [
+            634,
+            635
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 634-635 are a blank line and the comment-only Start screen section header; hideStartScreen begins at 636 in pending C01.project.start-screen (#1036). No executable responsibility starts in this span."
+        }
       ]
     },
     {
@@ -5917,6 +6165,40 @@
           7449,
           7449
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            2002,
+            2011
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen flipPreview (timeline.js:2002-2011) is assigned to C02.playback-integration.playback-transport (#1037); C19f/#1135 explicitly excludes it as a reference-only responsibility owned by C02 playback plus C06/P30 shortcut integration. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            2027,
+            2048
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen flipHorizontal/flipVertical (timeline.js:2027-2048) are assigned by C19f/#1135 to C04a.tools.transform-box-oriented and C04a vector-brush geometry owners; C04a/#1039 inventories the selection transform and brush geometry responsibilities. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            2247,
+            2247
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen SM.mergeRemoteSnapshot is a one-line facade to app.js mergeRemoteSnapshot. C01.project.team-sync assigns the collaboration caller to the C01 team-sync chain; C21d/#1190 traces timeline.js:2247 <- project.js:389 <- the Team Sync UI and retains the merge implementation in app.js. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            7449,
+            7449
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, line 7449 is only the `// ---- KEYBOARD ----` section header; the next C06 shortcut range starts at timeline.js:7450. It introduces no separate executable responsibility."
+        }
       ]
     },
     {
@@ -5989,6 +6271,48 @@
           4992,
           5016
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            411,
+            415
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 411-415 are comment-only explanation that the Hungarian assignment solver was extracted to domain/tween/assignment.js. Accepted P23/#1025 (PR #1166, merged as 579bfe8) records that bounded solver extraction; the adjacent matching implementation remains C02.tween-engine.feature-extraction-and-matching (#1037). This comment preamble has no separate executable responsibility and grants no code coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            472,
+            472
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 472 calls NemoTweenAssignment.solve for autoMatchJS's first cost matrix. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction and matching context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            564,
+            564
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 564 calls NemoTweenAssignment.solve for autoMatchJS's second-pass cost matrix. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction and matching context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            630,
+            630
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 630 calls NemoTweenAssignment.solve inside autoMatchJS's relational-refinement assignment loop. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction, assignment and relational-refinement context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            1020,
+            1020
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1020 in _matchLandmarks calls NemoTweenAssignment.solve on its augmented landmark-correspondence cost matrix. C02.tween-engine.resampling-and-nonrigid-warping (#1037) names _matchLandmarks and owns the feature-aware resampling/nonrigid-warping context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted only the generic assignment solver. The C02 packet remains pending; this does not add numeric coverage, packet admission, warp behavior acceptance or a parity claim."
+        }
       ]
     },
     {
@@ -6975,7 +7299,14 @@
       "blob": "bb1cf50f43228324eea5b21a8c88671259cbf835",
       "classification": "configuration",
       "censusRefs": [],
-      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; adopted Rust crate boundary policy for layers, exported ports, Cargo cfg/features and exceptions. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "engineering/boundaries/profiles/mcp-rust.profile.json",
@@ -9379,7 +9710,14 @@
       "blob": "83d14161e87e1956098d36800e1f1684cdca2841",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; exercises positive and negative controls for the Rust boundary scanner. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/boundaries-size.test.cjs",
@@ -9667,7 +10005,14 @@
       "blob": "95c0878df0efd6ce113a270f7fbf1b9688a0c92e",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust-aware boundary analyzer. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/boundaries-size.cjs",
@@ -9875,7 +10220,14 @@
       "blob": "b3dbb5ca2070ffef02dcc56188e49a473da0ad18",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; builds and refreezes the remediation-scope index. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/remediation-scope-census.cjs",
@@ -9883,7 +10235,14 @@
       "blob": "41164827eeea8c765db117ce21ea591a415e91c3",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; parses census declarations and maps source ranges. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/remediation-scope-verify.cjs",
@@ -9891,7 +10250,14 @@
       "blob": "8b685b840b2141e817c8b9e6e5bf9b86fc4452db",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; verifies frozen-source integrity, dispositions and completeness. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/util.cjs",
