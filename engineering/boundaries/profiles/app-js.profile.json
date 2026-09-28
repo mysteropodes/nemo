@@ -1873,6 +1873,18 @@
       ]
     },
     {
+      "id": "app.opacity.diagnostics.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/diagnostics",
+      "files": [
+        "opacity-diagnostics.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "opacity-diagnostics.js"
+      ]
+    },
+    {
       "id": "app.expression.random.domain",
       "layer": "domain",
       "dir": "src/js/domain/animation",

@@ -351,6 +351,18 @@
       "sizeProfile": "Domain/application JS or TS"
     },
     {
+      "id": "nemo.lib.rustTestJobs",
+      "layer": "tooling-application",
+      "dir": "scripts/nemo/lib",
+      "files": [
+        "rust-test-jobs.cjs"
+      ],
+      "publicApi": [
+        "rust-test-jobs.cjs"
+      ],
+      "sizeProfile": "Domain/application JS or TS"
+    },
+    {
       "id": "nemo.lib.cli",
       "layer": "tooling-application",
       "dir": "scripts/nemo/lib",
