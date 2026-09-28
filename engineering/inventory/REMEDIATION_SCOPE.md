@@ -336,8 +336,18 @@ These are responsibility mappings only: all four packets remain pending, and no 
 migration, packet admission or numeric coverage is claimed. The 48 previously undispositioned
 spans become 44; all 762 packets remain pending, computed uncovered lines remain 7 185, and the
 scope remains incomplete.
+P03C-ad/#1480 maps frozen `src-tauri/src/lib.rs:1-13` to the pending C05 composition-root
+responsibility and `178-284` to `run()`'s plugin, command, menu and setup wiring. The `run()`
+call to `start_tablet_pressure_monitor` does not map the monitor implementation. Lines 49-89
+are a boundary because they mix historical comments about removed feedback-token routing with
+Google-font command rationale; they are not assigned to one packet. Lines 131-137 are the
+comment/blank preamble before the tablet-pressure monitor function at 138. These records are
+responsibility/boundary mappings only: C05 remains pending, no implementation or runtime
+acceptance is claimed, the frozen `lib.rs` computed uncovered code lines remain 151, and global
+computed uncovered code lines remain 7 185. The 44 previously undispositioned spans become 40;
+all 762 packets remain pending and the scope remains incomplete.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 44
+pending packets, no notes needing reconciliation, 0 unmapped paths and 40
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

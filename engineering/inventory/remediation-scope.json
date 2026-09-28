@@ -5672,6 +5672,40 @@
           178,
           284
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ad/#1480 responsibility mapping only: at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lib.rs:1-13 supplies Tauri/shell imports and module registrations used by the composition root assigned to pending C05.native-rust.bootstrap in the pinned C05 census (blob 725d7875da509cd99a77bc404fc62296280399a0; census source 419f192631b715b3a6c763575dac29162aefa2d9). The packet remains pending; this adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            49,
+            89
+          ],
+          "kind": "boundary",
+          "evidence": "P03C-ad/#1480 boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 49 is blank; lines 50-64 are historical comments about removed feedback-token routing; lines 65-89 explain the adjacent Google-font command, whose executable attribute begins at line 90. This mixed-topic comment span is not assigned to a single packet and adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            131,
+            137
+          ],
+          "kind": "boundary",
+          "evidence": "P03C-ad/#1480 boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: lib.rs:131-137 is the blank/comment preamble describing the macOS tablet-pressure monitor; start_tablet_pressure_monitor begins at line 138 and belongs to pending C05.native-rust.tablet-pressure-monitor in pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0. The boundary claims no monitor implementation, packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            178,
+            284
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ad/#1480 responsibility mapping only: at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lib.rs:178-284 is run(), composing task-runtime isolation, plugins, invoke commands, update menu and setup, assigned to pending C05.native-rust.bootstrap in pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0. Its call to start_tablet_pressure_monitor does not map or accept that monitor's implementation, which remains a separate pending packet. No packet admission, runtime acceptance or computed line coverage is claimed."
+        }
       ]
     },
     {
