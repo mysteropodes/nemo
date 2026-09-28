@@ -1,6 +1,8 @@
 //! Canonical typed host-request fingerprints and bounded identity admission.
 
-use super::{bounded_id, host_error, HostResult, NativeReleaseRequest, NativeReplacementRequest};
+use crate::native_application_contract::{
+    bounded_id, host_error, HostResult, NativeReleaseRequest, NativeReplacementRequest,
+};
 use nemo_mcp::contract::NATIVE_API_VERSION;
 use std::io::{self, Write};
 

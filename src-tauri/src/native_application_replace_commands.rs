@@ -191,9 +191,9 @@ pub(super) fn retained_executor_error(
 
 #[cfg(test)]
 mod tests {
-    use super::super::replace_replay::replay_result;
     use super::acceptance_tests::{geometry_b, project, setup};
     use super::*;
+    use crate::native_application_commands::replace_replay::replay_result;
     use crate::{
         native_application::{admit_release_request, complete_release},
         native_application_commands::{

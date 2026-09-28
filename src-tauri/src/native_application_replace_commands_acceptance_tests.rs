@@ -29,7 +29,7 @@ use tokio::{
     sync::oneshot,
 };
 
-use super::super::replace_replay::replay_result;
+use crate::native_application_commands::replace_replay::replay_result;
 
 #[test]
 fn response_loss_identical_a_to_b_retry_replays_completed_receipt() {

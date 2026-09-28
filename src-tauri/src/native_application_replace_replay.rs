@@ -1,7 +1,15 @@
 //! Request-identity admission and non-reexecuting host replacement retrieval.
 
-use super::*;
 use crate::native_dispatch::{ReplacementAdmission, ReplacementIdentity, ReplacementReplay};
+use crate::{
+    application_mcp::ApplicationMcp,
+    native_application::DesktopNativeApplication,
+    native_application_commands::{replace_commands, viewport_host},
+    native_application_contract::{
+        admit_project, host_error, replacement_fingerprint, require_api_instance, HostResult,
+        NativeReplacementReceipt, NativeReplacementRequest,
+    },
+};
 
 pub(super) fn replay_result(replay: ReplacementReplay) -> HostResult<NativeReplacementReceipt> {
     match replay {
