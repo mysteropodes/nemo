@@ -495,6 +495,22 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn replacement_prequeue_window_denies_old_generation_dispatch() {
+        let mut authority = NativeAuthority::default();
+        let generation = authority.reserve_install().unwrap();
+        authority
+            .install(
+                generation,
+                Box::new(TerminalPump(Arc::new(AtomicUsize::new(0)))),
+            )
+            .unwrap();
+        // Current nemo_native_replace reads this generation before it queues its callback.
+        let captured = authority.active_generation().unwrap();
+        assert!(authority.active_mut(captured).is_err(),
+            "old-generation dispatch must close before replacement is queued");
+    }
+
+    #[test]
     fn generation_exhaustion_preserves_released_reentry_tombstone() {
         let tombstone = ReleaseTombstone {
             generation: u64::MAX,
