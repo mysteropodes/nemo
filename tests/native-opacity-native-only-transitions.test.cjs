@@ -313,6 +313,74 @@ test('close receipt retrieval is fingerprinted and retains protection after disp
   assert.equal(h.controller.status(), 'native'); assert.equal(h.state.releases, 1);
 });
 
+test('release drains pending preview work while denying its late awaited presentation', async () => {
+  let finishHost;
+  const gate = new Promise((resolve) => { finishHost = resolve; });
+  const h = nativeHarness(staticSource(), { previewGate: gate });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const awaited = h.state.lifecycle.presentPreview(10);
+  for (let spin = 0; spin < 5 && h.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(h.state.previews.length, 1);
+  const closing = h.controller.releaseCurrent('preview-drain');
+  assert.equal(h.controller.status(), 'release-requested');
+  finishHost();
+  await assert.rejects(awaited, /not active/);
+  assert.equal((await closing).status, 'closed');
+  assert.equal(h.state.releases, 1);
+  assert.equal(h.state.disconnects, 1);
+  await assert.rejects(h.state.lifecycle.presentPreview(10), /not active/);
+  assert.equal(h.state.imports.length, 0);
+});
+
+test('late preview calls during and after release cannot poison closure or reentry', async () => {
+  let finishPreview;
+  const previewGate = new Promise((resolve) => { finishPreview = resolve; });
+  let finishRelease;
+  const releaseGate = new Promise((resolve) => { finishRelease = resolve; });
+  const h = nativeHarness(staticSource(), { previewGate, releaseGate });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const admitted = h.state.lifecycle.presentPreview(0);
+  const admittedDenial = assert.rejects(admitted, /not active/);
+  for (let spin = 0; spin < 5 && h.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(h.state.previews.length, 1);
+  const closing = h.controller.releaseCurrent('late-preview');
+  assert.equal(h.controller.status(), 'release-requested');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.controller.status(), 'release-requested');
+  assert.equal(h.state.previews.length, 1, 'late request cannot reach the host');
+  finishPreview();
+  await admittedDenial;
+  for (let spin = 0; spin < 5 && h.controller.status() !== 'releasing'; spin++) await Promise.resolve();
+  assert.equal(h.controller.status(), 'releasing');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.controller.status(), 'releasing');
+  assert.equal(h.state.previews.length, 1);
+  finishRelease();
+  assert.equal((await closing).status, 'closed');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  await Promise.resolve();
+  assert.equal(h.controller.status(), 'closed');
+  assert.equal(h.state.previews.length, 1);
+  assert.equal(await h.controller.activate(h.prepared), true);
+  assert.equal((await h.state.lifecycle.presentPreview(0)).status, 'presented');
+});
+
+test('preview calls in legacy and installing phases reject before host admission', async () => {
+  let finishBootstrap;
+  const bootstrapGate = new Promise((resolve) => { finishBootstrap = resolve; });
+  const h = nativeHarness(staticSource(), { bootstrapGate });
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.controller.status(), 'legacy');
+  const activating = h.controller.activate(h.prepared);
+  assert.equal(h.controller.status(), 'installing');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.controller.status(), 'installing');
+  assert.equal(h.state.previews.length, 0);
+  finishBootstrap();
+  assert.equal(await activating, true);
+  assert.equal(h.controller.status(), 'native');
+});
+
 test('resize failure fences the current owner without closing or importing it', async () => {
   const h = surfaceHarness(staticSource());
   await h.controller.activate(h.prepared);
