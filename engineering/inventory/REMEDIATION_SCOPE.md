@@ -321,9 +321,10 @@ export/runtime parity acceptance. The frozen `export.js` uncovered count remains
 global count remains 7 185. P03C-ab/#1476 maps frozen `src/js/bootstrap/opacity-application.js`
 spans 30, 40-41 and 44-54 to the still-pending `C07.application-service.bootstrap-bindings`:
 line 30 reuses or creates the capability registry; 40-41 supply the `afterMutation` and
-`capabilities` ports; 44-45 resolve and register the opacity handler; and 51-54 begin
-operation-based handler selection. P05 registry and P06 opacity-registration provenance do not
-accept C07. The separate SVG-sequence registration at 46-50 remains its own responsibility.
+`capabilities` ports; 44-48 are P06 comments describing opacity self-registration and per-request
+registry dispatch; 49 registers `NemoOpacityCapability`; 50 opens `root.NemoApplication`; 51
+dispatches by the opacity descriptor ID; 52-53 expose `setInstanceId` and `capabilities`; and 54
+closes the object. P05 registry and P06 opacity-registration provenance do not accept C07.
 These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, the 51
 total undispositioned spans (48 after these three records), 762 pending packets and global 7 185
 computed uncovered code lines are unchanged.

@@ -5772,7 +5772,7 @@
             54
           ],
           "kind": "covered",
-          "evidence": "Frozen source lines 44-45 resolve/register the opacity handler through the live registry (the P06 registration path), and lines 51-54 begin operation-based capability selection while excluding the opacity descriptor; this bootstrap routing maps to pending C07.application-service.bootstrap-bindings. P05/P06 provenance does not accept C07; lines 46-50 separately register the SVG-sequence capability."
+          "evidence": "Frozen source lines 44-48 are P06 comments describing opacity self-registration and per-request registry dispatch; line 49 registers NemoOpacityCapability with app.handle; line 50 opens root.NemoApplication; line 51 dispatches through registry.handlerFor using the opacity descriptor ID; lines 52-53 expose setInstanceId and capabilities, and line 54 closes the object. This bootstrap binding maps to pending C07.application-service.bootstrap-bindings. P05/P06 provenance does not accept C07."
         }
       ]
     },
