@@ -61,10 +61,9 @@ impl NativeInstallReservation {
 
 impl Drop for NativeInstallReservation {
     fn drop(&mut self) {
-        let Ok(mut native) = self.native.lock() else {
-            return;
-        };
-        native.rollback_install(self.generation);
+        if let Ok(mut native) = self.native.lock() {
+            native.rollback_install(self.generation);
+        }
     }
 }
 
@@ -101,6 +100,24 @@ impl ApplicationMcp {
 
     pub(crate) fn native_state(&self) -> NativeState {
         Arc::clone(&self.native)
+    }
+
+    pub(crate) fn reserve_native_replacement(
+        &self,
+        instance_id: &str,
+        document_id: &str,
+        expected_revision: u64,
+        preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
+    ) -> Result<u64, String> {
+        // Native -> revision is the same lock order used by dispatch and acknowledgment.
+        let mut native = self
+            .native
+            .lock()
+            .map_err(|_| "unavailable:native application lock unavailable")?;
+        let generation =
+            native.admit_replace(instance_id, document_id, expected_revision, preflight)?;
+        self.revisions.invalidate();
+        Ok(generation)
     }
 
     pub(crate) fn install_dispatch(
@@ -147,13 +164,41 @@ impl ApplicationMcp {
         native_status(&self.instance_id, &self.native, request)
     }
 
-    fn dispatch_native(
+    pub(crate) fn dispatch_native(
         &self,
         request: NativeApplicationRequest,
     ) -> Result<NativeApplicationResponse, String> {
         self.revisions
             .dispatch(&self.instance_id, &self.native, request, false)
             .map(|delivery| delivery.response)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn control_revision_for_test(
+        &self,
+        request: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let request = serde_json::from_value(request).map_err(|error| error.to_string())?;
+        self.revisions.control(&self.native, request)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn serve_external_for_test(
+        &self,
+        stream: &mut TcpStream,
+        request: NativeApplicationRequest,
+        emit: impl FnOnce(revision_sync::RevisionEvent) -> Result<(), String>,
+    ) -> Result<(), String> {
+        revision_sync::serve_native(
+            stream,
+            &self.instance_id,
+            &self.native,
+            &self.revisions,
+            request,
+            emit,
+            Duration::from_secs(5),
+        )
+        .await
     }
 
     pub(crate) fn invalidate_native_subscriber(&self, app: &tauri::AppHandle) {
@@ -188,11 +233,9 @@ struct RequestEvent {
 }
 
 fn require_main(window: &tauri::Window) -> Result<(), String> {
-    if window.label() == "main" {
-        Ok(())
-    } else {
-        Err("application MCP requires the main window".into())
-    }
+    (window.label() == "main")
+        .then_some(())
+        .ok_or_else(|| "application MCP requires the main window".into())
 }
 
 #[tauri::command]
@@ -292,48 +335,34 @@ fn native_status(
     let authority = native
         .lock()
         .map_err(|_| "native application lock unavailable")?;
-    let Some((_, application)) = authority.active() else {
-        return Ok(NativeHostStatus {
-            api_version: NATIVE_API_VERSION,
-            request_id: request.request_id,
-            instance_id: instance_id.to_owned(),
-            available: false,
-            document_id: None,
-            content_revision: None,
-            reason: Some(authority.unavailable_reason().into()),
-        });
-    };
-    if request.instance_id != instance_id || application.instance_id() != instance_id {
-        return Ok(NativeHostStatus {
-            api_version: NATIVE_API_VERSION,
-            request_id: request.request_id,
-            instance_id: instance_id.to_owned(),
-            available: false,
-            document_id: None,
-            content_revision: None,
-            reason: Some("native application instance mismatch".into()),
-        });
-    }
+    let active = authority.active();
+    let current = active.filter(|(_, application)| {
+        request.instance_id == instance_id && application.instance_id() == instance_id
+    });
+    let reason = current.is_none().then(|| {
+        active.map_or(authority.unavailable_reason(), |_| {
+            "native application instance mismatch"
+        })
+    });
     Ok(NativeHostStatus {
         api_version: NATIVE_API_VERSION,
         request_id: request.request_id,
         instance_id: instance_id.to_owned(),
-        available: true,
-        document_id: Some(application.document_id().to_owned()),
-        content_revision: Some(application.content_revision()),
-        reason: None,
+        available: reason.is_none(),
+        document_id: current.map(|(_, application)| application.document_id().into()),
+        content_revision: current.map(|(_, application)| application.content_revision()),
+        reason: reason.map(str::to_owned),
     })
 }
 
 fn advertise_native(mut response: ApplicationResponse) -> ApplicationResponse {
-    if response.ok {
-        if let Some(result) = response
-            .result
-            .as_mut()
-            .and_then(serde_json::Value::as_object_mut)
-        {
-            result.insert("nativeApiVersion".into(), NATIVE_API_VERSION.into());
-        }
+    if let Some(result) = response
+        .result
+        .as_mut()
+        .filter(|_| response.ok)
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        result.insert("nativeApiVersion".into(), NATIVE_API_VERSION.into());
     }
     response
 }
