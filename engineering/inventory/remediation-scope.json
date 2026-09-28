@@ -5798,6 +5798,78 @@
         },
         {
           "span": [
+            1571,
+            1571
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1571 is hashNoise1D's two lattice lookups through NemoExpressionRandomDomain.hashUnit. C02.expressions.expression-runtime (#1037) names hashNoise1D; C20k/#1235 records hashNoise1D at 1569 and retains pre-1769 noise helpers with C02. The C02 packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1578,
+            1578
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1578 is hashNoise2D's nested g helper, which forwards a lattice coordinate to NemoExpressionRandomDomain.hashUnit. C02.expressions.expression-runtime (#1037) names hashNoise2D; C20k/#1235 records hashNoise2D at 1576 and retains pre-1769 noise helpers with C02. The C02 packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1712,
+            1712
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1712 is exprStepTime forwarding the current frame and interval to NemoExpressionTimeDomain.stepTime; adjacent lines update the expression context time. C02.expressions.expression-runtime (#1037) explicitly names exprStepTime, and C20k/#1235 defines its expression-helper slice as beginning at 1769, leaving this pre-1769 wrapper with C02. Its packet remains pending; no code coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1719,
+            1719
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1719 is exprToFrames forwarding seconds and the expression-context FPS to NemoExpressionTimeDomain.toFrames. C02.expressions.expression-runtime (#1037) explicitly names exprToFrames; C20k/#1235 begins its expression-helper slice at 1769, so this pre-1769 wrapper remains with C02. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1724,
+            1724
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1724 is exprToSeconds forwarding frames and the expression-context FPS to NemoExpressionTimeDomain.toSeconds. C02.expressions.expression-runtime (#1037) explicitly names exprToSeconds; C20k/#1235 begins its expression-helper slice at 1769, so this pre-1769 wrapper remains with C02. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
+            1743,
+            1745
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1743-1745 are _rand01's draw through NemoExpressionRandomDomain.rand01FromInputs followed by the expression-context rngCounter increment and return. C02.expressions.expression-runtime (#1037) names _rand01; C20k/#1235 records _rand01 and seeded-counter random wrappers at 1739-1768 as pre-1769 C02 ownership. The C02 packet remains pending; no computed coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1748,
+            1750
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 1748-1750 are only the Box-Muller lead-in comments immediately before _gauss01 at 1751; they contain no executable responsibility. C02.expressions.expression-runtime (#1037) owns the adjacent named helper, and C20k/#1235 places the pre-1769 random-wrapper family with C02."
+        },
+        {
+          "span": [
+            1752,
+            1753
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1752-1753 are _gauss01's two _rand01 draws forwarded to NemoExpressionRandomDomain.gaussFromUniforms. C02.expressions.expression-runtime (#1037) names _gauss01; C20k/#1235 records _gauss01 and seeded-counter random wrappers at 1739-1768 as pre-1769 C02 ownership. The C02 packet remains pending; no computed coverage or acceptance is implied."
+        },
+        {
+          "span": [
+            1759,
+            1759
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1759 is _randomWith forwarding its generator and optional bounds to NemoExpressionRandomDomain.randomWith. C02.expressions.expression-runtime (#1037) owns the expression random wrapper family; C20k/#1235 places _randomWith at 1735-1768 in the pre-1769 C02 responsibility. Its packet remains pending; computed range coverage and implementation acceptance do not change."
+        },
+        {
+          "span": [
             8435,
             8438
           ],
