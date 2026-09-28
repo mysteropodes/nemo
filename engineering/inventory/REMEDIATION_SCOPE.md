@@ -106,9 +106,12 @@ P03C-i/#1430 dispositioned nine expression-runtime spans: eight `covered` respon
 mappings for the named C02 expression wrappers (1571, 1578, 1712, 1719, 1724, 1743-1745,
 1752-1753 and 1759), plus the comment-only Box-Muller lead-in at 1748-1750 as `boundary`.
 The eight mappings remain pending C02 packet responsibilities; none adds computed range
-coverage or implementation acceptance. The remaining nine `motion.js` spans (561-580,
-8530-8553, 13351-13352, 13372-13394, 13455-13476, 13565-13621, 13808-13825, 13854-13879,
-13896-13908) are gaps between adjacent census slices —
+coverage or implementation acceptance. P03C-j/#1433 maps `keysLockedTo` at 8530-8553 to the
+pending C02 key-selection responsibility with C20c evidence, and the `selectKeys`/curve-widget
+bridge at 13854-13879 jointly to pending C02 key-selection and curves/easing responsibilities
+with C20o evidence. These are responsibility mappings only. The remaining seven `motion.js`
+spans (561-580, 13351-13352, 13372-13394, 13455-13476, 13565-13621, 13808-13825, 13896-13908)
+are gaps between adjacent census slices —
 C20s's own boundary note names 12406-12684 and 13125+ as the two gaps it leaves unassigned;
 the refrozen coverage shows 12406-12684 fully covered by the original C02 packets, while 13125
 onward keeps the seven open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
@@ -153,8 +156,9 @@ Every reviewed claim carries its evidence and is validated by shape:
   `needs-reconciliation`. C08:1's original note is verbatim; its evidence now identifies the
   59a5a38c source pin and C19 packet ranges. P03C-g mapped the four `timeline.js` spans without
   changing its 27 uncovered code lines. P03C-h marked four `motion.js` comment/blank preambles
-  as boundaries and P03C-i mapped eight C02 expression responsibilities plus one comment
-  boundary; the 293 Motion uncovered code lines and computed totals are unchanged. P03C-c reconciled
+  as boundaries, P03C-i mapped eight C02 expression responsibilities plus one comment
+  boundary, and P03C-j mapped two key-selection/curve-widget spans to pending C02
+  responsibilities; the 293 Motion uncovered code lines and computed totals are unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
@@ -162,8 +166,9 @@ Every reviewed claim carries its evidence and is validated by shape:
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
   evidence. P03C-f/#1421 dispositioned six preambles, P03C-g/#1424 dispositioned four timeline
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
-  four Motion comment/blank preambles, and P03C-i/#1430 dispositioned nine Motion expression
-  spans; 128 spans remain undispositioned.
+  four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
+  and P03C-j/#1433 mapped two Motion key-selection/curve-widget spans; 126 spans remain
+  undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -200,9 +205,11 @@ boundaries against C03/#1038's exact packet start lines. P03C-g/#1424 maps three
 responsibilities to existing C02/C04a/C01/C21d evidence and marks the adjacent keyboard header
 as a boundary. P03C-h/#1427 marks four comment/blank Motion preambles as boundaries against
 existing C02/C20 evidence. P03C-i/#1430 maps eight C02 expression wrappers and marks one comment
-boundary, with C20k evidence; packet admissions and computed range coverage remain unchanged.
-**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
-packets, no notes needing reconciliation, 0 unmapped paths and 128
+boundary, with C20k evidence. P03C-j/#1433 maps frozen `keysLockedTo` to pending C02 key-selection
+with C20c evidence and the `selectKeys`/curve-widget bridge jointly to pending C02 key-selection
+and curves/easing with C20o evidence. Packet admissions and computed range coverage remain
+unchanged. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 126
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
