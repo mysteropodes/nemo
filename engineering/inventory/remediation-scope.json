@@ -4967,6 +4967,24 @@
           2741,
           2771
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1056,
+            1059
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, engine.rs:1057-1059 is the blend compositor heading and BLEND_SCRATCH_FORMAT at the opening of the pending C03.gpu-engine-core.effect-pipeline-library census responsibility (constructor/pipeline toolbox). The packet remains pending; this adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            2741,
+            2771
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, engine.rs:2741-2771 is the non-wasm-bindgen impl lead-in and atlas keepalive documentation immediately before push_atlas_keepalive at 2772, within the pending C03.gpu-engine-core.composite-scene-pipeline responsibility. The packet remains pending; this adds no packet admission or computed line coverage."
+        }
       ]
     },
     {
@@ -5014,6 +5032,14 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.fill-region-tracer starts at fill.rs:34; lines 1-33 are explanatory design comments and imports preceding fill_find."
+        },
+        {
+          "span": [
+            1000,
+            1037
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, fill.rs:1000-1037 is the #[cfg(test)] circle_lens_tests oracle explicitly named by pending C03.wasm-tween-matching.fill-region-tracer in the pinned C03 census (including two_crossing_circles_lens_is_traced and its captured feedback #116 input/bounds assertions). This maps a test responsibility only; it does not admit the packet, claim production behavior migrated, or add computed line coverage."
         }
       ]
     },
@@ -5049,6 +5075,16 @@
           1,
           33
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, interp.rs:1-33 contains the motion-flow design preamble, executable crate::track and wasm_bindgen imports at 27-28, and FLOW_MAX_SIDE at 32, which support the implementation beginning at 34 assigned to pending C03.wasm-geometry-ops.motion-flow-interp. This maps file support responsibility only; it does not admit the packet or add computed line coverage."
+        }
       ]
     },
     {
