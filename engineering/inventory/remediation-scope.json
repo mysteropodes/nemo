@@ -5939,6 +5939,32 @@
           1255,
           1389
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            353,
+            361
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 353-361 are exportFrameSVGString's adapter delegation and live-document buildFrame/dimensions/Rectangle port binding. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 names exportFrameSVGString in C05.export.frame-compositor (#1040), with source range export.js:1-369. Accepted P17/#1019 PR #1160 is narrow provenance for extraction of the single-frame SVG wrapper only; exportBuildFrame evaluation and cross-format parity remain open. No numeric source coverage, packet admission or export/runtime parity acceptance is claimed."
+        },
+        {
+          "span": [
+            1194,
+            1202
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1194-1202 declare and create the SVG sequence job, binding exportFrameSVGString, frame naming and Tauri filesystem ports. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 assigns src/js/export.js:1176-1251 and batch siblings to pending C05.export.tauri-io-ffmpeg (#1040). Accepted P18/#1020 PR #1163 is narrow provenance for extracting a bounded job boundary only, not full C05 or format/runtime/export parity acceptance. No numeric source coverage or packet admission is added."
+        },
+        {
+          "span": [
+            1206,
+            1206
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1206 delegates the SVG sequence call to exportSvgSequenceJob().run with directory, frame range, request identity and progress. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 assigns this export.js batch path to pending C05.export.tauri-io-ffmpeg (#1040); accepted P18/#1020 PR #1163 supplies only narrow job-boundary provenance. This claims no packet admission, numeric source coverage or format/runtime/export parity acceptance."
+        }
       ]
     },
     {
