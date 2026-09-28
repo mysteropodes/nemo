@@ -285,8 +285,16 @@ pending C02 key-selection/clipboard responsibility: executable exports at 13896-
 `hasKeyClipboard`; 13902 closes the export object. Lines 13903-13908 are comment-only lead-in for
 the separate workspace-continuity packet, whose `restoreLastAppMode` starts at 13909 outside this
 span. This is a responsibility mapping only; C02 remains pending and numeric coverage is unchanged.
+P03C-v/#1462 maps frozen `src/js/layer-inout.js` tail spans 1601-1646 and 1648-1660 to pending
+C02 bar-rendering, selection-and-marquee and drag-and-batch-ops responsibilities. The first span
+records Alt-reveal wiring (1601-1606), empty-grid marquee registration (1620-1626), exported bar
+API (1629), drag/batch API (1633-1634) and marquee/selection API (1640-1641); 1642-1646 are only
+comments. In the second, 1648-1653 are the `retimeLayers` body/close under the declaration at 1647
+outside the span; getter/setter bar-selection exports are at 1654/1658 with comment-only anchor
+notes at 1655-1657. The opener 1-22 remains unresolved. These are responsibility mappings only:
+C02 remains pending and layer-inout/global computed uncovered counts remain 74/7 185.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 62
+pending packets, no notes needing reconciliation, 0 unmapped paths and 60
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
