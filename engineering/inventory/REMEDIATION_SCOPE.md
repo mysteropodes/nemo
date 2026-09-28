@@ -204,7 +204,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   P03C-m/#1440 dispositioned eleven MCP contract spans, and P03C-ae/#1482 dispositioned three
   `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
   `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
-  dispositions the final two C03 module headers; 31 spans remain undispositioned.
+  dispositions the final two C03 module headers; 31 spans remained undispositioned at that
+  snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remain.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -379,11 +380,24 @@ cite source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and pinned C03 census blo
 packet admission, numeric coverage, or native/browser/Tauri/render/export acceptance. The 33
 previously undispositioned spans become 31, with zero C03 spans remaining; all 762 packets stay
 pending and global computed uncovered code remains 7 185.
+P03C-ah/#1489 dispositions all six remaining frozen `src/js/motion.js` spans. `561-580` maps
+the time-link reload helper and `PROP_DIM_LABELS` to pending C02 property metadata while its
+duplicator comments lead into the separate C02 duplicator packet at 581. `13351-13352` is
+the structural `window.SMMotion` API opening. The four interleaved export spans
+`13372-13394`, `13455-13476`, `13565-13621`, and `13808-13825` map their exact operations
+to pending C02/C20 expression, property, transform, selection, Motion UI, text animator,
+element-style and key-writing packets as recorded beside each span in the JSON index. These
+responsibility mappings cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+motion blob `6617bac29042c22399cac202bf054c09e4fdf30e`, and pinned C02/C20 census
+packets. Historical C02 numeric-range drift is left untouched. No packet is admitted and no
+code, browser, Tauri, native, render or export behavior is accepted. The 31 previously
+undispositioned spans become 25, with zero `motion.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `motion.js` retains 293
+computed uncovered code lines and 190 overlapping lines.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 31
+pending packets, no notes needing reconciliation, 0 unmapped paths and 25
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
-`covered`/`boundary` or one last census slice, the remaining small remainders in other
+What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
 `boundary`; split each pending packet into ≤90-minute leaves under its family parent or mark it
 `covered`/`deferred`
