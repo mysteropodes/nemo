@@ -5945,8 +5945,32 @@
       "dispositions": [
         {
           "span": [
-            628,
-            632
+            1,
+            10
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 1-10 are the module-header comments; the executable IIFE begins at line 11. This boundary has no separate executable responsibility or numeric coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+        {
+          "span": [
+            91,
+            224
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, with C03 census blob 337c9035f94f5290b2adf898d406550558560bfa. This is a mixed span, not one packet: suspended render/engine scheduling maps to pending C03.js-engine-bridge.render-entry-points and C03.js-engine-bridge.engine-lifecycle; cssColorToRgba and r2/roundSegs serialization map to pending C03.js-engine-bridge.build-scene-json and C03.js-engine-bridge.editor-overlay-builders; registeredImageIds maps to pending C03.js-engine-bridge.bounded-image-store; and the retained-path-store rationale maps to pending C03.js-engine-bridge.retained-path-store. All six packets remain pending. No packet admission, numeric range coverage, or runtime/render acceptance is claimed."
+        },
+        {
+          "span": [
+            260,
+            260
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 260 is the final Paper ChangeFlag probe comment; installGeometryHook begins at line 261. This boundary has no separate executable responsibility or numeric coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+      {
+        "span": [
+          628,
+          632
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen lines 628-632 describe the engine-side upload/retirement gate retained beside the P26 image-budget policy, instantiate _imageBudget and define _noteImageRegistered. Pending C03.js-engine-bridge.bounded-image-store (#1038) owns the broader image-store bridge responsibility; accepted P26/#1028 PR #1168 is narrower policy/bookkeeping provenance, not completion of C03 or runtime/pixel acceptance. No numeric range coverage or packet admission is added."
@@ -6025,8 +6049,16 @@
         },
         {
           "span": [
-            4257,
-            4274
+            4618,
+            4628
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 4618-4628 are blank/comment-only legacy autoEnable rationale; the executable autoEnable function begins at line 4629 and belongs to pending C03.js-engine-bridge.engine-lifecycle. The comments have no separate executable responsibility or numeric coverage. The C03 census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+      {
+        "span": [
+          4257,
+          4274
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 lines 4257-4274 contain the renderNow comment and viewportRafId declaration that precede renderNow(); this render-entry responsibility belongs to pending C03.js-engine-bridge.render-entry-points (#1038), whose census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa. No packet admission, numeric coverage or runtime/render acceptance is claimed."
