@@ -6022,6 +6022,30 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 4565 exposes setImageBudgetBytes as a public image-budget setter. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        },
+        {
+          "span": [
+            4257,
+            4274
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 lines 4257-4274 contain the renderNow comment and viewportRafId declaration that precede renderNow(); this render-entry responsibility belongs to pending C03.js-engine-bridge.render-entry-points (#1038), whose census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa. No packet admission, numeric coverage or runtime/render acceptance is claimed."
+        },
+        {
+          "span": [
+            4355,
+            4381
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 lines 4355-4381 give the effects-aware export rationale and saved frame/engine-size state immediately before beginEffectsExport(). This is within pending C03.js-engine-bridge.render-entry-points (#1038), whose census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa. No packet admission, numeric coverage or export/runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            4482,
+            4492
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 4482-4492 are the comment-only second-viewer explanation; the executable window.SMEngineBridge public API starts at 4493. The preamble has no separate executable responsibility and is not packet coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
         }
       ]
     },
