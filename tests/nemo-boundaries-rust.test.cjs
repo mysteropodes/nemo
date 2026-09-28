@@ -181,6 +181,15 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N20R3 registers private host replay and dispatch-test children without an edge or size waiver', [
+    'src-tauri/src/native_application_contract_fingerprints.rs',
+    'src-tauri/src/native_application_replace_replay.rs',
+    'src-tauri/src/native_dispatch_tests.rs']],
+  ['N20R2 registers private host replacement children without an edge or size waiver', [
+    'src-tauri/src/native_application_replace_commands.rs',
+    'src-tauri/src/native_application_replace_commands_acceptance_tests.rs',
+    'src-tauri/src/native_application_replacement.rs',
+    'src-tauri/src/native_dispatch_replacement.rs']],
   ['N20R1 registers private core replacement containment and its oracle without exceptions', [
     'native-engine/src/application_replacement.rs', 'native-engine/tests/application_replacement.rs']],
   ['N19F registers private revision synchronization under ordinary MCP limits without a baseline waiver', [
@@ -211,6 +220,8 @@ const REGISTERED_LEAVES = [
     'native-engine/src/application.rs', 'native-engine/src/protocol.rs', 'native-engine/tests/application.rs']],
   ['N16 registers the native desktop host and focused MCP host test without exclusions or a frozen-baseline waiver', [
     'src-tauri/src/application_mcp_tests.rs', 'src-tauri/src/native_viewport.rs']],
+  ['N20R4 registers the AppKit viewport and replacement quarantine test children without a size waiver', [
+    'src-tauri/src/native_application_replace_viewport_tests.rs', 'src-tauri/src/native_viewport_appkit.rs']],
   ['N18A registers the dormant native host split without exclusions or a frozen-baseline waiver', [
     'src-tauri/src/native_application.rs', 'src-tauri/src/native_application_commands.rs',
     'src-tauri/src/native_application_contract.rs', 'src-tauri/src/native_application_ports.rs',
@@ -219,6 +230,66 @@ const REGISTERED_LEAVES = [
 ];
 
 for (const [name, required] of REGISTERED_LEAVES) test(name, () => assertRegisteredLeaf(required));
+
+function rustMethodBody(source, signature, from = 0) {
+  const start = source.indexOf(signature, from);
+  assert.notEqual(start, -1, `missing ${signature}`);
+  const open = source.indexOf('{', start);
+  assert.notEqual(open, -1);
+  let depth = 1;
+  for (let at = open + 1; at < source.length; at += 1) {
+    if (source[at] === '{') depth += 1;
+    if (source[at] === '}') depth -= 1;
+    if (depth === 0) return source.slice(open + 1, at);
+  }
+  assert.fail(`unclosed ${signature}`);
+}
+
+function assertProductionViewportQuarantine(source) {
+  const native = source.indexOf('impl NativeViewport {');
+  const retire = rustMethodBody(source, 'pub(crate) fn retire_replacement(', native);
+  const dispose = rustMethodBody(source, 'pub(crate) fn dispose(', native);
+  const rebind = rustMethodBody(source, 'pub(crate) fn rebind_existing(', native);
+  const port = rustMethodBody(source, 'fn dispose(&mut self)', source.indexOf('impl SurfacePort for MacOsSurfacePort'));
+  assert.match(retire, /self\.dispose\(\)/, 'retirement must invoke host disposal');
+  assert.match(dispose, /self\.host\s*\.take\(\)[\s\S]*host\.dispose\(\)/,
+    'disposal must take and dispose the retained host');
+  assert.ok(port.indexOf('self.surface.take()') < port.indexOf('self.view.dispose()')
+    && port.includes('self.surface.take()') && port.includes('self.view.dispose()'),
+  'the production surface must drop before its AppKit view');
+  assert.match(rebind, /create_surface\(compositor\.instance\(\),\s*&view\)/,
+    'rebind must reuse the retained compositor instance');
+  assert.match(rebind, /MacOsSurfacePort::new\(surface,\s*view,\s*compositor,\s*self\.mapping\)/,
+    'rebind must configure the fresh surface on that compositor');
+  assert.match(rebind, /self\.host\s*=\s*Some\(DesktopViewportHost::new\(port,\s*self\.mapping\)\)/,
+    'rebind must install a fresh blank host');
+  assert.doesNotMatch(rebind, /from_window\(/, 'rebind must not make a new compositor');
+}
+
+function assertProductionViewportOwner(source) {
+  const retire = rustMethodBody(source, 'pub(crate) fn retire_replacement(');
+  const rebind = rustMethodBody(source, 'pub(crate) fn rebind_replacement(');
+  assert.match(retire, /MAIN_VIEWPORT\.with\([\s\S]*value\.viewport\.retire_replacement\(\)/,
+    'production owner must retire the retained viewport');
+  assert.match(rebind, /MAIN_VIEWPORT\.with\([\s\S]*value[\s\S]*\.viewport[\s\S]*\.rebind_existing\(compositor\)/,
+    'production owner must rebind the retained viewport');
+}
+
+test('N20R4 production AppKit quarantine wiring rejects no-op retirement and fresh compositor', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport_appkit.rs'), 'utf8');
+  const owner = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application_viewport.rs'), 'utf8');
+  assertProductionViewportQuarantine(source);
+  assertProductionViewportOwner(owner);
+  const noRetirement = source.replace('self.dispose()\n    }\n\n    /// Build', 'Vec::new()\n    }\n\n    /// Build');
+  const newCompositor = source.replace('create_surface(compositor.instance(), &view)', 'create_surface(CompositorInstance::new().instance(), &view)');
+  const noOwnerRetirement = owner.replaceAll('value.viewport.retire_replacement()', 'Vec::new()');
+  assert.notEqual(noRetirement, source);
+  assert.notEqual(newCompositor, source);
+  assert.notEqual(noOwnerRetirement, owner);
+  assert.throws(() => assertProductionViewportQuarantine(noRetirement));
+  assert.throws(() => assertProductionViewportQuarantine(newCompositor));
+  assert.throws(() => assertProductionViewportOwner(noOwnerRetirement));
+});
 
 test('N16 records the accepted viewport warning without a size waiver', () => {
   assert.deepEqual(coverage.sizePolicy.warnOnlyAtAdoption.find((entry) => entry.path === 'src-tauri/src/native_viewport.rs'),

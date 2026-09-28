@@ -130,6 +130,20 @@ responsibilities, while marking six comment/blank preambles (21-24, 51-53, 220-2
 486-497 and 634-635) as boundaries before their adjacent C01 owners. The executable module opener
 1-9 stays unresolved; these are responsibility/boundary records only, not packet admission or
 implementation acceptance. Project.js's 70 computed uncovered code lines and global 7 185 are unchanged.
+P03C-m/#1440 dispositioned eleven frozen `nemo-mcp/src/contract.rs` spans: ten `covered`
+responsibility mappings to pending C07 Operation/wire-contract responsibilities and the
+comment-only 205-207 `boundary`. In particular, 131-146 is the plural `Operation::labels()` helper,
+which the older C07 symbol list does not name (it names singular `Operation::label`); accepted
+P07/#1009 source commit `bd907d230` / PR #1113 is cited only as the added-helper provenance. C07
+remains pending; contract.rs's 134 and global 7 185 computed uncovered code lines are unchanged.
+P03C-n/#1443 dispositioned the twelve remaining frozen `nemo-mcp/src/contract.rs` spans: eleven
+`covered` mappings and the comment-only 37-39 `boundary`. The mappings reference C07's broader,
+still-pending request/response contract, not packet acceptance or numeric source coverage. C07's
+older symbol list does not name `RequestError` or the test-only module registration; P07/#1009
+commits `35d7eac66`, `bd907d230` and `5aa8026ef` provide the later typed-error/import/test-wiring
+provenance. The 337-340 span is specifically `cfg(test)` / `contract_tests.rs` / `mod tests`, not
+`NativeApplicationRequest`. contract.rs's 134 and global 7 185 computed uncovered code lines remain
+unchanged.
 (4)
 The 40 previously dispositioned executable paths without a packet
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
@@ -173,7 +187,10 @@ Every reviewed claim carries its evidence and is validated by shape:
   resampling responsibilities while citing the narrower accepted P23 assignment extraction;
   P03C-l maps Project lifecycle declarations/API and six preambles to pending C01 owners, leaving
   opener 1-9 unresolved. The 70 Project, 293 Motion, 516 Tweens and global computed uncovered code
-  totals are unchanged. P03C-c reconciled
+  totals are unchanged. P03C-m maps eleven contract.rs spans to pending C07 wire-contract ownership;
+  the plural `Operation::labels()` helper is attributed to accepted P07/#1009 PR #1113 rather than
+  misrepresented as a symbol named in the older C07 census. The 134 Contract and global computed
+  uncovered line totals remain unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
@@ -183,8 +200,13 @@ Every reviewed claim carries its evidence and is validated by shape:
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
   P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
-  five Tween assignment-seam spans, and P03C-l/#1438 dispositioned eight Project lifecycle spans;
-  113 spans remain undispositioned.
+  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans,
+  P03C-m/#1440 dispositioned eleven MCP contract spans, and P03C-ae/#1482 dispositioned three
+  `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
+  `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
+  dispositions the final two C03 module headers; 31 spans remained undispositioned at that
+  snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remained
+  at that snapshot. P03C-ai/#1491 dispositions six frozen `tweens.js` spans; 19 remain.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -230,13 +252,173 @@ Hungarian solver extraction; 516 Tweens and 7 185 global computed uncovered co
 unchanged. P03C-l/#1438 maps frozen project.js declarations and getOpenTabs to pending C01
 document-I/O/project-tabs responsibilities, with six comment/blank preambles marked as boundaries
 to adjacent C01 owners; executable opener 1-9 remains unresolved. This changes no coverage or
-packet admission, and project.js stays at 70 computed uncovered code lines. **P03 is not complete
-and no extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes needing
-reconciliation, 0 unmapped paths and 113
+packet admission, and project.js stays at 70 computed uncovered code lines. P03C-m/#1440 maps
+eleven frozen contract.rs spans to pending C07 responsibilities; C07's older symbol list names
+singular `Operation::label`, while accepted P07/#1009 PR #1113 is cited only for the added plural
+`Operation::labels()` helper. C07 remains pending, and contract.rs's 134 computed uncovered code
+lines are unchanged. P03C-o/#1446 dispositioned ten frozen `engine-bridge.js` image-budget spans:
+eight responsibility mappings to pending C03 image-store, scene-build and public-API packets, and
+comment-only boundaries at 640-643 and 2621. Accepted P26/#1028 PR #1168 provides narrower
+image-budget policy provenance, not C03 completion or runtime/pixel acceptance. The 226 Engine
+Bridge and global 7 185 computed uncovered code lines are unchanged. P03C-p/#1448 maps six frozen
+`nemo-mcp/src/server.rs` spans to the pending C07 tool-router responsibility. C07's census pins
+`server.rs:1-177` at source `ded641bd763379f36d629bf1686fcce8a6137a66`; the exact source diff maps its
+command-validation lines 169-170 to frozen 179-180. P07/#1009 PR #1113 is cited narrowly for
+registered-capability discovery provenance, not whole-packet or runtime/protocol acceptance.
+The computed uncovered counts (18 in server.rs; 7 185 globally) remain unchanged. P03C-q/#1451
+maps three frozen `src/js/export.js` spans to pending C05 frame-compositor and Tauri-I/O
+responsibilities. The C05 census at `419f1926` names the source ranges; accepted P17/#1019 PR #1160
+and P18/#1020 PR #1163 provide narrow SVG-wrapper and job-boundary provenance only, not full
+packet, export-format, runtime or parity acceptance. The 186 computed uncovered lines in export.js
+and global 7 185 remain unchanged. P03C-r/#1454 maps the frozen `geometry-wasm/src/track.rs:345-432`
+test-module tail to the pending C03 pyramidal point-tracker packet's test-oracle responsibility.
+The census oracle is specifically the four tests at 388-429; this disposition does not claim the
+whole module is covered, test correctness, or packet acceptance. The tracker and global computed
+uncovered counts remain 88 and 7 185. P03C-s/#1456 marks frozen `src/js/export.js:1161-1174` as a
+boundary: line 1161 is blank and lines 1162-1174 are Render Manager batch-export lead-in comments;
+the first executable begins at 1175. The comments describe adjacent pending C05 Tauri-I/O batch
+export responsibility but implement none. The export.js uncovered count remains 186 and global
+7 185. P03C-t/#1458 dispositions six frozen `src/js/select-bridge.js` seams against pending C04a
+selection packets: comment-only boundaries at 271-279 (combine hit confirmation), 759-763
+(motion-arc hit test), 2905-2914 (context menu) and 3293-3308 (per-element tween toggle), plus
+covered responsibility mappings at 461-464 (`ROTATE_CURSOR` at 463) and 772-773 (`lastPt` at 773).
+The executable opener 1-23 remains unresolved. C04a packet admissions, selection behavior parity
+and numeric coverage are unchanged; select-bridge.js retains 64 and the global report 7 185
+computed uncovered code lines. P03C-u/#1461 maps frozen `src/js/motion.js:13896-13908` to the
+pending C02 key-selection/clipboard responsibility: executable exports at 13896-13901 name
+`nudgeSelectedKeys`, `deleteSelectedKeys`, `copySelectedKeys`, `pasteKeys`, `hasKeySelection` and
+`hasKeyClipboard`; 13902 closes the export object. Lines 13903-13908 are comment-only lead-in for
+the separate workspace-continuity packet, whose `restoreLastAppMode` starts at 13909 outside this
+span. This is a responsibility mapping only; C02 remains pending and numeric coverage is unchanged.
+P03C-v/#1462 maps frozen `src/js/layer-inout.js` tail spans 1601-1646 and 1648-1660 to pending
+C02 bar-rendering, selection-and-marquee and drag-and-batch-ops responsibilities. The first span
+records Alt-reveal wiring (1601-1606), empty-grid marquee registration (1620-1626), exported bar
+API (1629), drag/batch API (1633-1634) and marquee/selection API (1640-1641); 1642-1646 are only
+comments. In the second, 1648-1653 are the `retimeLayers` body/close under the declaration at 1647
+outside the span; getter/setter bar-selection exports are at 1654/1658 with comment-only anchor
+notes at 1655-1657. The opener 1-22 remains unresolved. These are responsibility mappings only:
+C02 remains pending and layer-inout/global computed uncovered counts remain 74/7 185.
+P03C-w/#1464 marks frozen `geometry-wasm/src/hit.rs:1-8` as a boundary: all eight lines
+are explanatory comments; the executable import and pending C03 hit-test responsibility start
+at line 9, outside the span. This does not admit C03 or change numeric coverage.
+P03C-x/#1466 maps frozen `src/js/tweens.js:4860` (folder-map snapshot field) and `:4925`
+(guarded folder-map restore field) to pending `C01.tweens.undo-redo-engine`. Adjacent folder
+comments and distinct link-group fields are outside these singleton spans. This is responsibility
+mapping only; C01 remains pending and tweens.js/global uncovered counts remain 516/7 185.
+P03C-y/#1468 marks frozen `geometry-wasm/src/tween.rs:1-16` as a structural preamble/import
+boundary before pending `C03.wasm-geometry-ops.tween-interpolation-math` at line 17: lines 1-13
+are comments, 14-15 are executable imports, and 16 is blank. It does not extend the boundary into
+the packet or accept it; tween.rs/global computed uncovered counts remain 15/7 185.
+P03C-z/#1470 marks frozen `src/js/playback-cache.js:1-19` as a comment-only boundary: the
+descriptive playback-bake header ends before the executable module IIFE and pending
+`C03.js-effects-and-playback.playback-bake-cache` packet begins at line 20. It claims no covered
+playback behavior or packet acceptance; playback-cache.js/global uncovered counts remain 19/7 185.
+P03C-aa/#1474 maps frozen `src/js/export.js:369-376` (`exportFrameRange`) to pending
+`C05.export.frame-compositor`, and `570-598` (`exportRenderPNGsToDir`) to pending
+`C05.export.tauri-io-ffmpeg`, with its separate engine-routing branch accounted for by the
+pending routing-gate packet. It marks `873-883` as the Lottie comment boundary before
+`lottieHexToRGBA` at 884, then maps line 1255 (blank), 1256 (section heading) and the
+`window.SMExport` facade at 1257-1389 to the applicable pending C05 frame-compositor, Tauri-I/O,
+browser fallback and Lottie packets; the Rive exporter separately augments that facade from
+`rive-export.js`. Accepted P17/#1019 and P18/#1020 remain narrow wrapper/job provenance only.
+These are responsibility and boundary records, not packet admission, numeric coverage or
+export/runtime parity acceptance. The frozen `export.js` uncovered count remains 186 and the
+global count remains 7 185. P03C-ab/#1476 maps frozen `src/js/bootstrap/opacity-application.js`
+spans 30, 40-41 and 44-54 to the still-pending `C07.application-service.bootstrap-bindings`:
+line 30 reuses or creates the capability registry; 40-41 supply the `afterMutation` and
+`capabilities` ports; 44-48 are P06 comments describing opacity self-registration and per-request
+registry dispatch; 49 registers `NemoOpacityCapability`; 50 opens `root.NemoApplication`; 51
+dispatches by the opacity descriptor ID; 52-53 expose `setInstanceId` and `capabilities`; and 54
+closes the object. P05 registry and P06 opacity-registration provenance do not accept C07.
+These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, 762
+pending packets and global 7 185 computed uncovered code lines are unchanged.
+P03C-ac/#1478 maps four frozen C03 spans to pending census responsibilities: `engine.rs:1056-1059`
+to `C03.gpu-engine-core.effect-pipeline-library`, `engine.rs:2741-2771` to
+`C03.gpu-engine-core.composite-scene-pipeline`, the explicitly named `circle_lens_tests` oracle
+at `fill.rs:1000-1037` to `C03.wasm-tween-matching.fill-region-tracer`, and `interp.rs:1-33`
+(including its imports and `FLOW_MAX_SIDE`) to `C03.wasm-geometry-ops.motion-flow-interp`.
+These are responsibility mappings only: all four packets remain pending, and no production
+migration, packet admission or numeric coverage is claimed. The 48 previously undispositioned
+spans become 44; all 762 packets remain pending, computed uncovered lines remain 7 185, and the
+scope remains incomplete.
+P03C-ad/#1480 maps frozen `src-tauri/src/lib.rs:1-13` to the pending C05 composition-root
+responsibility and `178-284` to `run()`'s plugin, command, menu and setup wiring. The `run()`
+call to `start_tablet_pressure_monitor` does not map the monitor implementation. Lines 49-89
+are a boundary because they mix historical comments about removed feedback-token routing with
+Google-font command rationale; they are not assigned to one packet. Lines 131-137 are the
+comment/blank preamble before the tablet-pressure monitor function at 138. These records are
+responsibility/boundary mappings only: C05 remains pending, no implementation or runtime
+acceptance is claimed, the frozen `lib.rs` computed uncovered code lines remain 151, and global
+computed uncovered code lines remain 7 185. The 44 previously undispositioned spans become 40;
+all 762 packets remain pending and the scope remains incomplete.
+P03C-ae/#1482 maps frozen `src/js/engine-bridge.js:4257-4274` (renderNow preamble and
+`viewportRafId`) and `4355-4381` (effects-export rationale and saved render state) to the still-
+pending `C03.js-engine-bridge.render-entry-points` responsibility. It marks `4482-4492` as the
+comment-only second-viewer boundary before the public `window.SMEngineBridge` API at 4493. These
+records cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`; they add no packet admission, numeric range
+coverage or runtime/render/export acceptance. The engine-bridge uncovered count remains 226 and
+global computed uncovered code lines remain 7 185. The 40 previously undispositioned spans become
+37; all 762 packets remain pending and the scope remains incomplete. P03C-af/#1484 dispositions
+the remaining frozen `src/js/engine-bridge.js` spans: `1-10`, `260`, and `4618-4628` are
+comment-only boundaries (the last immediately precedes `autoEnable` at 4629); `91-224` maps
+jointly to pending `C03.js-engine-bridge.render-entry-points` and `engine-lifecycle` for suspended
+render scheduling, `build-scene-json` and `editor-overlay-builders` for color/coordinate rounding
+and scene/overlay serialization, `bounded-image-store` for `registeredImageIds`, and
+`retained-path-store` for its rationale. This explicitly mixed span is not assigned wholesale to
+one packet. The frozen source and C03 census pins remain unchanged; all six cited packets remain
+pending, and no packet admission, computed coverage, or runtime/render acceptance is claimed.
+Engine-bridge retains 226 computed uncovered code lines but has zero undispositioned spans; global
+computed uncovered code remains 7 185. The 37 previously undispositioned spans become 33; all 762
+packets remain pending and the scope remains incomplete.
+P03C-ag/#1486 marks frozen `geometry-wasm/src/timeline.rs:1-13` as a structural boundary:
+lines 1-10 document frame-resolution provenance, 11-12 import `serde`/`wasm_bindgen`, and 13 is
+blank; pending `C03.wasm-geometry-ops.timeline-frame-resolution` starts its implementation at 14.
+It marks frozen `src/js/render-manager.js:1-33` as a comment-only boundary before the batch-queue
+IIFE starts at 34 under pending `C03.js-effects-and-playback.render-manager-queue`. Both records
+cite source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and pinned C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`. The two spans add no separate responsibility,
+packet admission, numeric coverage, or native/browser/Tauri/render/export acceptance. The 33
+previously undispositioned spans become 31, with zero C03 spans remaining; all 762 packets stay
+pending and global computed uncovered code remains 7 185.
+P03C-ah/#1489 dispositions all six remaining frozen `src/js/motion.js` spans. `561-580` maps
+the time-link reload helper and `PROP_DIM_LABELS` to pending C02 property metadata while its
+duplicator comments lead into the separate C02 duplicator packet at 581. `13351-13352` is
+the structural `window.SMMotion` API opening. The four interleaved export spans
+`13372-13394`, `13455-13476`, `13565-13621`, and `13808-13825` map their exact operations
+to pending C02/C20 expression, property, transform, selection, Motion UI, text animator,
+element-style and key-writing packets as recorded beside each span in the JSON index. These
+responsibility mappings cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+motion blob `6617bac29042c22399cac202bf054c09e4fdf30e`, and pinned C02/C20 census
+packets. Historical C02 numeric-range drift is left untouched. No packet is admitted and no
+code, browser, Tauri, native, render or export behavior is accepted. The 31 previously
+undispositioned spans become 25, with zero `motion.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `motion.js` retains 293
+computed uncovered code lines and 190 overlapping lines.
+P03C-ai/#1491 dispositions all six remaining frozen `src/js/tweens.js` spans. `1-103` maps
+the feature flags to the pending C02 matching, resampling and interpolation packets by their
+actual read sites; notably `TW_CORRECTION_PASS` is read in `_applyFoldCorrection` under the
+resampling packet. The mixed `1564-1958` span maps UID-keyed easing, shared scalar `lerp`,
+persistent tween-arc handles/rekey, style and intrinsic interpolation, crossing probes and
+MLS preparation to separate C02 generation, arc, interpolation and resampling
+responsibilities using frozen `generateTweens`, `renderArcs` and `interpStroke` callers.
+`3735-3742` maps keyframe stroke-ID deduplication used by tween generation. `4810-4811` and
+`4977-4979` map the frame-only capture/apply seams to pending C01 undo/redo, with P21's
+extracted entry as context only. `4992-5016` splits the redo branch from manual reassignment
+lead-in and `_reassign` state. The JSON records the exact subrange evidence against frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, tweens blob
+`6eca7339bbd608b98676b600c9e2f42ca9ce1863`, and pinned C01/C02 censuses. Their
+older numeric-range drift is unchanged. These responsibility mappings admit no packet and
+accept no code, browser, Tauri, native, render, export or history behavior. The 25 previously
+undispositioned spans become 19, with zero `tweens.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `tweens.js` retains 516
+computed uncovered code lines and 158 overlapping lines.
+**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 19
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
-`covered`/`boundary` or one last census slice, the small remainders in the original-partition
-files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
-pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`
+What remains, in order: disposition the remaining small remainders in other
+original-partition files, and `style.css`/`index.html` once Ilya decides census versus
+`boundary`; split each pending packet into ≤90-minute leaves under its family parent or mark it
+`covered`/`deferred`
 with evidence. The execution plan and leaf issues remain the queue and ownership authority;
 D01 and T05 keep their reservations. No application behavior changes in this index.

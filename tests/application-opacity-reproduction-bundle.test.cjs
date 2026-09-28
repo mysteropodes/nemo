@@ -118,6 +118,17 @@ for (const [name, bundle] of malformedBundles) {
   });
 }
 
+test('parseBundle rejects a cyclic command payload without throwing', () => {
+  const payload = {};
+  payload.self = payload;
+  const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h' },
+    commands: [{ operation: 'property.set', payload }] };
+  let result;
+  assert.doesNotThrow(() => { result = bundleCodec.parseBundle(bundle); });
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
 test('a rejected bundle never reaches the active document -- parseBundle fails before any replay is attempted', () => {
   const active = fixture.build('opacity-repro-active', 42);
   send(active, 'seed-write', 'property.set', opacity(active.state.layers[0].layerUid, 77));
@@ -201,6 +212,15 @@ test('clock and seed survive a build/parse round-trip instead of being silently 
   const parsed = bundleCodec.parseBundle(bundle);
   assert.equal(parsed.clock, 1234, 'a replayer must receive the clock the recording was made under');
   assert.equal(parsed.seed, 99, 'a replayer must receive the seed the recording was made under');
+});
+
+test('object-valued clock and seed in a built bundle cannot mutate caller metadata', () => {
+  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const meta = { clock: { ticks: [1] }, seed: { source: { value: 99 } } };
+  const bundle = bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, meta);
+  bundle.clock.ticks.push(2);
+  bundle.seed.source.value = 0;
+  assert.deepEqual(meta, { clock: { ticks: [1] }, seed: { source: { value: 99 } } });
 });
 
 test('an absent clock/seed round-trips as null, not undefined', () => {
