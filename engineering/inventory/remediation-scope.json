@@ -5906,7 +5906,7 @@
             13879
           ],
           "kind": "covered",
-          "evidence": "Responsibility mapping only: frozen lines 13854-13879 export selectKeys to the shared key-selection state and onEaseSegChanged to the curve widget, which updates/repaints curvePoints and propagates the curve to selected keys. C02.properties-and-curves.key-selection-and-clipboard and C02.properties-and-curves.curves-and-easing (#1037) own those adjacent selection and easing responsibilities; C20o/#1245 documents the key/property-selection and shared curve-widget caller wiring, while the C02 curves-and-easing packet names onEaseSegChanged. Both C02 packets remain pending; this adds no computed range coverage or implementation acceptance."
+          "evidence": "Responsibility mapping only: frozen line 13858 exports selectKeys to the shared key-selection state; lines 13859-13879 are comment-only lead-in describing the shared curve-widget contract for the adjacent onEaseSegChanged export, which begins at 13880 outside this span. C02.properties-and-curves.key-selection-and-clipboard and C02.properties-and-curves.curves-and-easing (#1037) own those adjacent selection and easing responsibilities; C20o/#1245 documents the key/property-selection and shared curve-widget caller wiring, while the C02 curves-and-easing packet names onEaseSegChanged. Both C02 packets remain pending; this adds no computed range coverage or implementation acceptance."
         }
       ]
     },
