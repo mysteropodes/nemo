@@ -5748,6 +5748,32 @@
           44,
           54
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            30,
+            30
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source line 30 reuses window.NemoCapabilities or creates the registry through NemoCapabilityRegistry.create(); this bootstrap registry binding maps to pending C07.application-service.bootstrap-bindings. P05 registry provenance is not C07 acceptance."
+        },
+        {
+          "span": [
+            40,
+            41
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source lines 40-41 bind afterMutation to refresh and capabilities to registry.list() in the NemoOpacityApplicationCore.create ports; these bootstrap callbacks map to pending C07.application-service.bootstrap-bindings."
+        },
+        {
+          "span": [
+            44,
+            54
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source lines 44-45 resolve/register the opacity handler through the live registry (the P06 registration path), and lines 51-54 begin operation-based capability selection while excluding the opacity descriptor; this bootstrap routing maps to pending C07.application-service.bootstrap-bindings. P05/P06 provenance does not accept C07; lines 46-50 separately register the SVG-sequence capability."
+        }
       ]
     },
     {
