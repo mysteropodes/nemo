@@ -5972,6 +5972,14 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 1206 delegates the SVG sequence call to exportSvgSequenceJob().run with directory, frame range, request identity and progress. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 assigns this export.js batch path to pending C05.export.tauri-io-ffmpeg (#1040); accepted P18/#1020 PR #1163 supplies only narrow job-boundary provenance. This claims no packet admission, numeric source coverage or format/runtime/export parity acceptance."
+        },
+        {
+          "span": [
+            1161,
+            1174
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 1161 is blank and lines 1162-1174 are comments introducing Render Manager batch exporters; the first executable function, exportPNGSequenceToDir, begins at 1175. The comments describe the adjacent pending C05.export.tauri-io-ffmpeg responsibility (C05 census source 419f192631b715b3a6c763575dac29162aefa2d9 declares export.js:1176-1251 and batch siblings), but contain no executable responsibility themselves. This is a boundary only, not packet ownership, admission, extraction, export parity or runtime acceptance; numeric range coverage is unchanged."
         }
       ]
     },
