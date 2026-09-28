@@ -325,11 +325,19 @@ line 30 reuses or creates the capability registry; 40-41 supply the `afterMutati
 registry dispatch; 49 registers `NemoOpacityCapability`; 50 opens `root.NemoApplication`; 51
 dispatches by the opacity descriptor ID; 52-53 expose `setInstanceId` and `capabilities`; and 54
 closes the object. P05 registry and P06 opacity-registration provenance do not accept C07.
-These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, the 51
-total undispositioned spans (48 after these three records), 762 pending packets and global 7 185
-computed uncovered code lines are unchanged.
+These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, 762
+pending packets and global 7 185 computed uncovered code lines are unchanged.
+P03C-ac/#1478 maps four frozen C03 spans to pending census responsibilities: `engine.rs:1056-1059`
+to `C03.gpu-engine-core.effect-pipeline-library`, `engine.rs:2741-2771` to
+`C03.gpu-engine-core.composite-scene-pipeline`, the explicitly named `circle_lens_tests` oracle
+at `fill.rs:1000-1037` to `C03.wasm-tween-matching.fill-region-tracer`, and `interp.rs:1-33`
+(including its imports and `FLOW_MAX_SIDE`) to `C03.wasm-geometry-ops.motion-flow-interp`.
+These are responsibility mappings only: all four packets remain pending, and no production
+migration, packet admission or numeric coverage is claimed. The 48 previously undispositioned
+spans become 44; all 762 packets remain pending, computed uncovered lines remain 7 185, and the
+scope remains incomplete.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 48
+pending packets, no notes needing reconciliation, 0 unmapped paths and 44
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
