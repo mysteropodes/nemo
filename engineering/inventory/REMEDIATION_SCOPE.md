@@ -93,8 +93,12 @@ and the input of the next P03C leaf:
 | `geometry-wasm/src/fill.rs` | 1 037 | 67 | 2 |
 
 The remaining spans fall in four groups. (1) `style.css` (2 707) and `index.html`
-(2 250) are presentation files awaiting Ilya's census-versus-`boundary` decision. (2) The
-`timeline.js` orphans 2002-2011, 2027-2048, 2247, 7449 and the 22 `motion.js` remainders
+(2 250) are presentation files awaiting Ilya's census-versus-`boundary` decision. (2) P03C-g/#1424
+dispositioned the four `timeline.js` spans: 2002-2011 maps to C02 playback; 2027-2048 maps to
+C04a transform/brush geometry; 2247 maps to the C01 team-sync facade and C21d merge-caller
+chain; 7449 is the keyboard section comment adjoining C06. The three `covered` entries record
+responsibility ownership only: they add no packet or computed-range coverage and assert no
+implementation acceptance. The 22 `motion.js` remainders
 (561-580, 1562-1566, 1571, 1578, 1712, 1719, 1724, 1743-1745, 1748-1750, 1752-1753, 1759,
 8435-8438, 8530-8553, 9429-9435, 13256-13321, 13351-13352, 13372-13394, 13455-13476,
 13565-13621, 13808-13825, 13854-13879, 13896-13908) are gaps between adjacent census slices —
@@ -141,13 +145,16 @@ Every reviewed claim carries its evidence and is validated by shape:
   `human-decision` (C03:3 unwired selection API, C08:3 `40min-checkins/`). No note remains
   `needs-reconciliation`. C08:1's original note is verbatim; its evidence now identifies the
   59a5a38c source pin and C19 packet ranges. This is census ownership only: the timeline still
-  has 27 uncovered code lines in spans 2002–2011, 2027–2048, 2247 and 7449. P03C-c reconciled
+  had 27 uncovered code lines in those four `timeline.js` spans before P03C-g mapped their
+  responsibilities; the computed 7,185 uncovered-code total is unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
-  evidence. P03C-f/#1421 dispositions six preambles; 145 spans remain undispositioned.
+  evidence. P03C-f/#1421 dispositioned six preambles and P03C-g/#1424 dispositioned four
+  timeline spans (three responsibility mappings and one comment boundary); 141 spans remain
+  undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -180,13 +187,13 @@ or disposition. P03C-c/#1362 reconciled only C02:10 to the eleven accepted C20g�
 packets; all eleven packet admissions remain pending and no implementation is claimed.
 P03C-d/#1401 reconciled C08:1 to the C19 census evidence without changing the frozen source,
 packet admissions, or implementation state. P03C-f/#1421 records six geometry-WASM preamble
-boundaries against C03/#1038's exact packet start lines; it changes neither the census ranges
-nor packet admissions. The old whole-file gap is stale; the four current timeline spans and 27
-uncovered code lines remain undispositioned.
-**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
-packets, no notes needing reconciliation, 0 unmapped paths and 145 undispositioned spans; the
-computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
+boundaries against C03/#1038's exact packet start lines. P03C-g/#1424 maps three timeline
+responsibilities to existing C02/C04a/C01/C21d evidence and marks the adjacent keyboard header
+as a boundary. Neither leaf changes the frozen source, packet admissions or computed range
+coverage. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 141 undispositioned
+spans; the computed range report still has 7 185 uncovered code lines.
+What remains, in order: disposition the residual spans — the `motion.js` orphans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
 pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`
