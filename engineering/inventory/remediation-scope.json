@@ -5977,6 +5977,40 @@
           7449,
           7449
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            2002,
+            2011
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen flipPreview (timeline.js:2002-2011) is assigned to C02.playback-integration.playback-transport (#1037); C19f/#1135 explicitly excludes it as a reference-only responsibility owned by C02 playback plus C06/P30 shortcut integration. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            2027,
+            2048
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen flipHorizontal/flipVertical (timeline.js:2027-2048) are assigned by C19f/#1135 to C04a.tools.transform-box-oriented and C04a vector-brush geometry owners; C04a/#1039 inventories the selection transform and brush geometry responsibilities. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            2247,
+            2247
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen SM.mergeRemoteSnapshot is a one-line facade to app.js mergeRemoteSnapshot. C01.project.team-sync assigns the collaboration caller to the C01 team-sync chain; C21d/#1190 traces timeline.js:2247 <- project.js:389 <- the Team Sync UI and retains the merge implementation in app.js. This does not add packet coverage or claim implementation acceptance."
+        },
+        {
+          "span": [
+            7449,
+            7449
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, line 7449 is only the `// ---- KEYBOARD ----` section header; the next C06 shortcut range starts at timeline.js:7450. It introduces no separate executable responsibility."
+        }
       ]
     },
     {
