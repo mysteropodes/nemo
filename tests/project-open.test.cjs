@@ -28,13 +28,17 @@ function realImportJSON() {
   return { calls, importJSON, state };
 }
 
-function harness({ auto = null, version = null } = {}) {
+function harness({ auto = null, version = null, deferFrames = false } = {}) {
   const elements = new Map();
-  const downloads = [], toasts = [];
+  const downloads = [], toasts = [], frames = [];
   let repaints = 0, mutations = 0;
   let json = JSON.stringify({ title: 'boot' });
   function element() {
-    const el = { style: {}, dataset: {}, value: '', files: [], children: [], classList: { add() {}, remove() {}, toggle() {} },
+    const classes = new Set();
+    const el = { style: {}, dataset: {}, value: '', files: [], children: [], classList: {
+      add(name) { classes.add(name); }, remove(name) { classes.delete(name); },
+      toggle(name) { if (classes.has(name)) classes.delete(name); else classes.add(name); },
+      contains(name) { return classes.has(name); } },
       addEventListener(type, fn) { this.listeners ||= {}; this.listeners[type] = fn; }, appendChild(child) { this.children.push(child); },
       removeChild() {}, click() { this.clicked = true; } };
     Object.defineProperty(el, 'innerHTML', { get() { return ''; }, set() { this.children = []; } });
@@ -47,10 +51,11 @@ function harness({ auto = null, version = null } = {}) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
+  window.NemoNativeOpacityProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
   class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem() {}, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
-    requestAnimationFrame(fn) { fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() { mutations++; }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
+    requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() { mutations++; }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
   if (version !== null) window.__TAURI__ = { fs: { readTextFile: async () => version } };
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });
@@ -58,10 +63,39 @@ function harness({ auto = null, version = null } = {}) {
   document.body.appendChild = node => downloads.push(node.download);
   vm.runInNewContext(source, context, { filename: 'project.js' });
   document.ready();
-  return { window, input: document.getElementById('file-input'), downloads, toasts, project: window.SMProject, elements, rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; }, get mutations() { return mutations; } };
+  return { window, input: document.getElementById('file-input'), startScreen: document.getElementById('start-screen'),
+    downloads, toasts, project: window.SMProject, elements,
+    flushFrame() { assert.ok(frames.length, 'an animation frame is queued'); frames.shift()(); },
+    get pendingFrames() { return frames.length; },
+    rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; }, get mutations() { return mutations; } };
 }
 
 function select(app, file) { app.input.listeners.change({ target: { files: file ? [file] : [], value: 'selected' } }); }
+test('production loads the native project-entry adapter before its project consumer', () => {
+  const html = fs.readFileSync('src/index.html', 'utf8');
+  const adapter = html.indexOf('js/adapters/native-opacity-project-entry.js');
+  const project = html.indexOf('js/project.js', adapter);
+  assert.ok(adapter >= 0 && project > adapter);
+});
+function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
+function installNativeOpen(app) {
+  const first = deferred(), visible = deferred();
+  const receipt = { owner: 'native', status: 'presented', frame: 0,
+    instanceId: 'instance-a', documentId: 'document-a', contentRevision: 0,
+    lifecycleGeneration: 1, documentSnapshotId: 'snapshot-a' };
+  let active = false, presentations = 0;
+  app.window.NemoNativeOpacityCutover = {
+    blocksLegacy() { return active; }, isActive() { return active; },
+    identity() { return { instanceId: receipt.instanceId, documentId: receipt.documentId,
+      contentRevision: receipt.contentRevision }; },
+    persistenceJSON() { return '{"native":true}'; },
+    presentPreview(frame) { assert.equal(frame, 0); presentations++; return visible.promise; },
+  };
+  app.window.NemoNativeOpacityProject = { importJSON() { return first.promise.then(value => {
+    if (value) active = true; return value;
+  }); } };
+  return { receipt, first, visible, get presentations() { return presentations; } };
+}
 
 test('browser Open keeps the file name and normalized clean baseline for later Save', async () => {
   const app = harness();
@@ -75,6 +109,43 @@ test('browser Open keeps the file name and normalized clean baseline for later S
   assert.equal(app.project.isDirty(), true, 'an actual edit is dirty');
   await app.project.save();
   assert.equal(app.downloads.at(-1), 'Story.json', 'edited browser Save still retains opened basename');
+});
+
+test('native browser Open publishes success only after both frame-0 presentation boundaries', async () => {
+  const app = harness({ deferFrames: true }), native = installNativeOpen(app);
+  select(app, { name: 'Native.json', text: '{"supported":true}' });
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)', 'no early metadata publication');
+  app.flushFrame(); app.flushFrame(); app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(native.presentations, 1, 'the current viewport is presented after reveal');
+  assert.equal(app.toasts.includes('Opened: Native'), false);
+  native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.project.getCurrentLabel(), 'Native (not saved)');
+  assert.equal(app.project.isDirty(), false);
+  assert.equal(app.toasts.at(-1), 'Opened: Native');
+  assert.equal(app.mutations, 0, 'Paper writers never run during native Open');
+});
+
+test('stale post-reveal native frame leaves desktop Open unpublished and returns to start screen', async () => {
+  const app = harness({ version: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  const opening = app.project.openPath('/tmp/Native.json');
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  app.flushFrame(); app.flushFrame(); app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  native.visible.resolve({ ...native.receipt, lifecycleGeneration: 2 });
+  await opening;
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  assert.equal(app.mutations, 0);
 });
 
 test('rejected project transitions preserve the active document and suppress success signals', async () => {

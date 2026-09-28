@@ -215,6 +215,31 @@
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
     }
+    async function presentPreview(frame) {
+      var observed = ensureActive(), current = lifecycle.identity();
+      try {
+        var presented = await lifecycle.presentPreview(frame);
+        var latest = lifecycle.inspect();
+        if (presented.status !== 'presented' || presented.frame !== frame ||
+            presented.lifecycleGeneration !== observed.generation ||
+            presented.instanceId !== current.instanceId ||
+            presented.documentId !== current.documentId ||
+            presented.contentRevision !== current.contentRevision ||
+            latest.phase !== 'native' || latest.session !== observed.session ||
+            latest.generation !== observed.generation ||
+            !latest.identity || latest.identity.instanceId !== current.instanceId ||
+            latest.identity.documentId !== current.documentId ||
+            latest.identity.contentRevision !== current.contentRevision ||
+            typeof lifecycle.persistenceJSON() !== 'string') {
+          throw new Error('native opacity frame was not presented at the admitted revision');
+        }
+        return Object.freeze(Object.assign({ owner: 'native' }, presented));
+      } catch (error) {
+        var failed = lifecycle.inspect();
+        if (failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
+        throw error;
+      }
+    }
     async function importJSON(json) {
       var candidate;
       try { candidate = ports.document.prepareNativeOpacity(json); }
@@ -227,60 +252,12 @@
         return false;
       }
       opening = true;
-      var activated = false, preview = null;
       try {
         if (await lifecycle.activate(candidate) !== true) return false;
-        activated = true;
-        var observed = lifecycle.inspect();
-        var current = lifecycle.identity();
-        if (observed.phase !== 'native' || !observed.session || !current ||
-            observed.identity.instanceId !== current.instanceId ||
-            observed.identity.documentId !== current.documentId ||
-            observed.identity.contentRevision !== current.contentRevision) {
-          throw new Error('native first-open identity is unavailable');
-        }
-        var snapshotRequest = { apiVersion: 2, requestId: lifecycle.id('n20-first-open'),
-          instanceId: current.instanceId, documentId: current.documentId,
-          operation: 'query.document.snapshot.acquire',
-          payload: { atRevision: current.contentRevision } };
-        var snapshot = contract.successful(await ports.application().dispatch(snapshotRequest), 'native first-open snapshot');
-        if (snapshot.instanceId !== current.instanceId || snapshot.documentId !== current.documentId ||
-            snapshot.contentRevision !== current.contentRevision ||
-            snapshot.result.atRevision !== current.contentRevision) {
-          throw new Error('native first-open snapshot identity mismatch');
-        }
-        var metadata = { documentSnapshotId: snapshot.result.documentSnapshotId,
-          documentId: current.documentId, contentRevision: current.contentRevision,
-          contextId: 'scene-root', frame: 0, quality: 'final',
-          outputSpec: { kind: 'frame', format: 'rgba8', width: 320, height: 180,
-            colorInterpretation: 'srgb', alphaMode: 'straight' },
-          geometryHandle: candidate.frames[0].geometryHandle };
-        preview = ports.createPreview();
-        var hostReceipt = await ports.previewHost(Object.assign({ apiVersion: 2,
-          instanceId: current.instanceId }, metadata));
-        preview.register(metadata, { workId: hostReceipt.workId,
-          viewGeneration: hostReceipt.viewGeneration });
-        var presented = preview.receive(hostReceipt);
-        var latest = lifecycle.inspect();
-        if (presented.status !== 'presented' || latest.phase !== 'native' ||
-            latest.session !== observed.session || latest.generation !== observed.generation ||
-            !latest.identity || latest.identity.instanceId !== current.instanceId ||
-            latest.identity.documentId !== current.documentId ||
-            latest.identity.contentRevision !== current.contentRevision ||
-            lifecycle.persistenceJSON() === null) {
-          throw new Error('native first-open frame was not presented at the admitted revision');
-        }
-        return Object.freeze({ owner: 'native', status: 'presented',
-          instanceId: current.instanceId, documentId: current.documentId,
-          contentRevision: current.contentRevision, documentSnapshotId: presented.documentSnapshotId,
-          opacityMode: candidate.opacityMode, frame: presented.frame,
-          workId: presented.workId, viewGeneration: presented.viewGeneration,
-          geometryHandle: presented.geometryHandle });
+        return await presentPreview(0);
       } catch (error) {
-        if (activated && typeof lifecycle.fence === 'function') lifecycle.fence(error);
         return false;
       } finally {
-        if (preview && typeof preview.dispose === 'function') preview.dispose();
         opening = false;
       }
     }
@@ -363,6 +340,7 @@
         blocksLegacy: lifecycle.blocksLegacy, isActive: lifecycle.isActive,
         prepared: lifecycle.prepared, identity: lifecycle.identity, projectSelection: lifecycle.projectSelection,
         persistenceJSON: lifecycle.persistenceJSON, renderPreview: lifecycle.renderPreview,
+        presentPreview: presentPreview,
         exportPng: lifecycle.exportPng, releaseCurrent: lifecycle.releaseCurrent,
         historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); }
       }), Object.freeze({ importJSON: importJSON,

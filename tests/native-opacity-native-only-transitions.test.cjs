@@ -198,8 +198,9 @@ function nativeHarness(source, options = {}) {
     async previewHost(request) {
       state.previews.push(request);
       if (options.previewGate) await options.previewGate;
-      return { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
-        status: 'presented' };
+      const receipt = { workId: `preview-${state.previews.length}`,
+        viewGeneration: state.previews.length, status: 'presented' };
+      return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
     },
     async bindOutput(request) { state.outputs.push(request); },
     currentFrame() { return 10; },
@@ -270,7 +271,10 @@ test('complete B production admission never changes A or B, including extension 
   for (const active of [false, true]) for (const extension of [false, true]) {
     const h = surfaceHarness(staticSource(), { extension });
     if (active) { await h.controller.activate(h.prepared); await h.controller.setOpacity('r08_curve_layer', 40); }
-    for (const incoming of ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]) {
+    const incomingFiles = active || extension
+      ? ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]
+      : ['{', JSON.stringify(unsupported)];
+    for (const incoming of incomingFiles) {
       const before = stateBytes(h), input = incoming, session = h.state.lifecycle.inspect().session;
       assert.equal(await h.published().project.importJSON(incoming, false), false);
       assert.equal(incoming, input);
@@ -278,6 +282,50 @@ test('complete B production admission never changes A or B, including extension 
       assert.strictEqual(h.state.lifecycle.inspect().session, session);
       await Promise.resolve(); assert.equal(stateBytes(h), before);
     }
+  }
+});
+
+test('first static and keyed native opens await the lifecycle-owned frame-0 presentation', async () => {
+  for (const source of [staticSource(60), keyedSource()]) {
+    let present;
+    const gate = new Promise(resolve => { present = resolve; });
+    const h = surfaceHarness(source, { previewGate: gate });
+    const incoming = JSON.stringify(source);
+    let settled = false;
+    const opening = h.published().project.importJSON(incoming, true).then(value => {
+      settled = true; return value;
+    });
+    while (h.state.previews.length < 1) await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, 'the host has not confirmed presentation');
+    assert.equal(h.state.imports.length, 0, 'no legacy import');
+    assert.equal(h.state.previewConsumers.length, 1, 'one lifecycle-owned preview consumer');
+    present();
+    const receipt = await opening;
+    assert.equal(receipt.owner, 'native');
+    assert.equal(receipt.status, 'presented');
+    assert.equal(receipt.frame, 0);
+    assert.equal(receipt.documentId, h.controller.identity().documentId);
+    assert.equal(receipt.contentRevision, h.controller.identity().contentRevision);
+    assert.equal(receipt.lifecycleGeneration, h.state.lifecycle.inspect().generation);
+    assert.deepEqual(receipt.geometryHandle, h.prepared.frames[0].geometryHandle,
+      'frame-0 presentation uses the admitted immutable geometry');
+    assert.deepEqual(h.state.previews[0].geometryHandle, h.prepared.frames[0].geometryHandle);
+    assert.equal(h.state.previews.length, 1);
+    assert.equal(h.controller.blocksLegacy(), true);
+    assert.equal(incoming, JSON.stringify(source), 'source bytes remain unchanged');
+  }
+});
+
+test('failed, deferred and malformed first presentations cannot publish an open or reenter Paper', async () => {
+  for (const status of ['failed-validation', 'deferred-timeout', 'stale-discarded', 'malformed']) {
+    const h = surfaceHarness(staticSource(), { previewReceipt(receipt) {
+      return status === 'malformed' ? { ...receipt, workId: '' } : { ...receipt, status };
+    } });
+    assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource()), true), false, status);
+    assert.equal(h.controller.blocksLegacy(), true, status);
+    assert.equal(h.state.imports.length, 0, status);
+    assert.equal(h.state.activations, 1, status);
+    assert.equal(h.state.previews.length, 1, status);
   }
 });
 

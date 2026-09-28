@@ -2005,6 +2005,18 @@
       ]
     },
     {
+      "id": "adapter.native.opacity.project.entry",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-project-entry.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-project-entry.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.selection.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

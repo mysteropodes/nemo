@@ -2777,7 +2777,7 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(Object.isFrozen(desktop.NemoNativeOpacityCutover), true);
   assert.deepEqual(Object.keys(desktop.NemoNativeOpacityCutover).sort(), [
     'blocksLegacy', 'exportPng', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
-    'prepared', 'projectSelection', 'releaseCurrent', 'renderPreview',
+    'prepared', 'presentPreview', 'projectSelection', 'releaseCurrent', 'renderPreview',
   ]);
   for (const authorityKey of ['activate', 'requestRelease', 'getNativeIdentity', 'handleV1',
     'legacyIntent', 'setOpacity', 'history']) {
@@ -2803,7 +2803,10 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
   panelOpen = 0;
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
+    'eligible first-open reaches activation, but cannot succeed without the awaited lifecycle receipt');
+  assert.equal(invokes.filter(([command]) => command === 'nemo_native_preview').length, 1,
+    'the import does not use a second direct preview host');
 
   nativeBlocked = true;
   const documentBytes = JSON.stringify(serializedDocument);
@@ -2831,8 +2834,8 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   desktop.SMPlugin.loadArchive({});
   desktop.SMPlugin.loadFiles({});
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0,
-    'production imports remain unavailable after page-lifetime extension exposure');
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
+    'page-lifetime extension exposure prevents another activation attempt');
   retained.layer(0).set('opacity', [66]);
   delayedScript();
   delayedPlugin();
