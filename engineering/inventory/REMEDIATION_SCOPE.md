@@ -490,8 +490,23 @@ computed uncovered code remains 7 185 and frozen `layer-inout.js` retains 74
 computed uncovered code lines. No numeric range coverage, layer behavior,
 browser/Tauri/export or runtime acceptance is claimed.
 
+P03C-ao/#1510 marks frozen `src/js/select-bridge.js:1-23` as a structural and
+documentary `boundary`: lines 1-22 are comments, but line 23 is the executable
+`(function () {` IIFE opener enclosing all pending C04a Select responsibilities.
+It is not comment-only or assigned solely to `C04a.select.hover-helpers`, whose
+first census range starts at line 24. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, select-bridge blob
+`a831eb065ed611f70a77692c61846eaddcd97a5a` and pinned C04a census blob
+`8ffb669c5018190bd448b787a09ade35bd594b30`. The current protected
+`select-bridge.js` has a different blob, so this disposition classifies only
+the frozen span. The 13 previously undispositioned spans become 12, with zero
+frozen `select-bridge.js` spans remaining. All 762 packets stay pending,
+global computed uncovered code remains 7 185 and frozen `select-bridge.js`
+retains 64 computed uncovered code lines. No numeric range coverage, Select
+behavior, browser/native parity or runtime acceptance is claimed.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 13
+pending packets, no notes needing reconciliation, 0 unmapped paths and 12
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
