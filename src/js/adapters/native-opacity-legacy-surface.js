@@ -137,6 +137,13 @@
       },
       sleep: function (ms) { return new Promise(function (resolve) { root.setTimeout(resolve, ms); }); },
       surface: Object.freeze({
+        setAdmissionFrameZero: function () {
+          // The playhead is transient UI state. Native document/cache ownership
+          // has already been admitted before this port runs; do not navigate or
+          // write any Paper frame while establishing its first visible frame.
+          root.state.currentFrame = 0;
+          root._curFrame = 0;
+        },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');

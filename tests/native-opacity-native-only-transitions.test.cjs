@@ -12,7 +12,9 @@ const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
+const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
+const NativeProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
 const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
 const SelectCanvasIntent = require('../src/js/adapters/select-canvas-intent.js');
@@ -37,6 +39,11 @@ function bytes(file) { return fs.readFileSync(file); }
 function json(file) { return JSON.parse(bytes(file)); }
 function sha(file) { return crypto.createHash('sha256').update(bytes(file)).digest('hex'); }
 function clone(value) { return structuredClone(value); }
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
 function staticSource(value = 25) {
   const source = json(SHELL_PATH);
   source.layers[0].motionStatic = { opacity: [value] };
@@ -197,12 +204,14 @@ function nativeHarness(source, options = {}) {
     })); },
     async previewHost(request) {
       state.previews.push(request);
-      if (options.previewGate) await options.previewGate;
-      return { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
-        status: 'presented' };
+      if (options.previewGate) await (typeof options.previewGate === 'function'
+        ? options.previewGate(request, state) : options.previewGate);
+      const receipt = { workId: `preview-${state.previews.length}`,
+        viewGeneration: state.previews.length, status: 'presented' };
+      return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
     },
     async bindOutput(request) { state.outputs.push(request); },
-    currentFrame() { return 10; },
+    currentFrame() { return options.ui ? options.ui.state.currentFrame : 10; },
     afterChange() {
       state.afterChanges = (state.afterChanges || 0) + 1;
       if (options.afterChange) options.afterChange(controller, state);
@@ -211,7 +220,7 @@ function nativeHarness(source, options = {}) {
   }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
     return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
   } },
-    operations: NativeOpacityOperations, motionSurface: NativeMotionSurface });
+    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -237,17 +246,21 @@ function stateBytes(h) {
 }
 function surfaceHarness(source, options = {}) {
   let publications, resized;
+  const ui = options.ui || { state: { currentFrame: 10 }, _curFrame: 10,
+    __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
+  const presentationFrame = NativeLegacySurface.desktopPorts(ui, {}).surface.setAdmissionFrameZero;
   const surface = {
+    setAdmissionFrameZero: presentationFrame,
     installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
     wrap() { return () => {}; },
     extensionOpen() { return !!options.extension; }, toast() {},
     publish(admission, cutover, project, handlers, resize) { publications = { admission, cutover, project, handlers, resize }; return () => {}; },
     defer(callback) { resized = callback; return 1; }, cancel() {},
-    async resize() { throw new Error('resize failed'); },
+    resize(current) { return options.resize ? options.resize(current) : Promise.reject(new Error('resize failed')); },
   };
-  const h = nativeHarness(source, { ...options, surface });
+  const h = nativeHarness(source, { ...options, ui, surface });
   h.controller.install();
-  return { ...h, published: () => publications, resizeCallback: () => resized };
+  return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
 
 test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
@@ -270,7 +283,10 @@ test('complete B production admission never changes A or B, including extension 
   for (const active of [false, true]) for (const extension of [false, true]) {
     const h = surfaceHarness(staticSource(), { extension });
     if (active) { await h.controller.activate(h.prepared); await h.controller.setOpacity('r08_curve_layer', 40); }
-    for (const incoming of ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]) {
+    const incomingFiles = active || extension
+      ? ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]
+      : ['{', JSON.stringify(unsupported)];
+    for (const incoming of incomingFiles) {
       const before = stateBytes(h), input = incoming, session = h.state.lifecycle.inspect().session;
       assert.equal(await h.published().project.importJSON(incoming, false), false);
       assert.equal(incoming, input);
@@ -278,6 +294,50 @@ test('complete B production admission never changes A or B, including extension 
       assert.strictEqual(h.state.lifecycle.inspect().session, session);
       await Promise.resolve(); assert.equal(stateBytes(h), before);
     }
+  }
+});
+
+test('first static and keyed native opens await the lifecycle-owned frame-0 presentation', async () => {
+  for (const source of [staticSource(60), keyedSource()]) {
+    let present;
+    const gate = new Promise(resolve => { present = resolve; });
+    const h = surfaceHarness(source, { previewGate: gate });
+    const incoming = JSON.stringify(source);
+    let settled = false;
+    const opening = h.published().project.importJSON(incoming, true).then(value => {
+      settled = true; return value;
+    });
+    while (h.state.previews.length < 1) await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, 'the host has not confirmed presentation');
+    assert.equal(h.state.imports.length, 0, 'no legacy import');
+    assert.equal(h.state.previewConsumers.length, 1, 'one lifecycle-owned preview consumer');
+    present();
+    const receipt = await opening;
+    assert.equal(receipt.owner, 'native');
+    assert.equal(receipt.status, 'presented');
+    assert.equal(receipt.frame, 0);
+    assert.equal(receipt.documentId, h.controller.identity().documentId);
+    assert.equal(receipt.contentRevision, h.controller.identity().contentRevision);
+    assert.equal(receipt.lifecycleGeneration, h.state.lifecycle.inspect().generation);
+    assert.deepEqual(receipt.geometryHandle, h.prepared.frames[0].geometryHandle,
+      'frame-0 presentation uses the admitted immutable geometry');
+    assert.deepEqual(h.state.previews[0].geometryHandle, h.prepared.frames[0].geometryHandle);
+    assert.equal(h.state.previews.length, 1);
+    assert.equal(h.controller.blocksLegacy(), true);
+    assert.equal(incoming, JSON.stringify(source), 'source bytes remain unchanged');
+  }
+});
+
+test('failed, deferred and malformed first presentations cannot publish an open or reenter Paper', async () => {
+  for (const status of ['failed-validation', 'deferred-timeout', 'stale-discarded', 'malformed']) {
+    const h = surfaceHarness(staticSource(), { previewReceipt(receipt) {
+      return status === 'malformed' ? { ...receipt, workId: '' } : { ...receipt, status };
+    } });
+    assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource()), true), false, status);
+    assert.equal(h.controller.blocksLegacy(), true, status);
+    assert.equal(h.state.imports.length, 0, status);
+    assert.equal(h.state.activations, 1, status);
+    assert.equal(h.state.previews.length, 1, status);
   }
 });
 
@@ -390,6 +450,156 @@ test('resize failure fences the current owner without closing or importing it', 
   assert.equal(h.controller.blocksLegacy(), true);
   assert.equal(h.state.releases, 0); assert.equal(h.state.imports.length, 0);
   assert.equal(h.state.disconnects, 0); assert.equal(h.controller.persistenceJSON(), null);
+});
+
+for (const [mode, makeSource, frameZeroOpacity] of [
+  ['static', staticSource, 25], ['keyed', keyedSource, 20],
+]) {
+  for (const previousFrame of [10, 59]) {
+    test(`${mode} native Open resets old UI frame ${previousFrame} before refresh and later renders`, async () => {
+      const source = makeSource(), paperCalls = [], observed = [];
+      const ui = { state: { currentFrame: previousFrame }, _curFrame: previousFrame,
+        __TAURI__: { core: { invoke() {} } },
+        SM: { importJSON() { paperCalls.push('import'); } },
+        goToFrame() { paperCalls.push('navigate'); },
+        loadFrame() { paperCalls.push('load'); },
+        saveAllLayerFrames() { paperCalls.push('save-frame'); },
+        pushUndo() { paperCalls.push('undo'); } };
+      let h;
+      h = surfaceHarness(source, { ui, resize: async () => {}, afterChange() {
+        observed.push([ui.state.currentFrame, ui._curFrame]);
+        // Real afterChange asks SMEngineBridge to render the UI playhead.
+        h.published().cutover.renderPreview(ui.state.currentFrame);
+      } });
+      const first = await h.published().project.importJSON(JSON.stringify(source));
+      assert.equal(first.status, 'presented');
+      assert.deepEqual(observed, [[0, 0]], 'both UI frame fields are current before refresh');
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+      assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [frameZeroOpacity]);
+      assert.equal(typeof h.controller.persistenceJSON(), 'string', 'native snapshot remains readable');
+      const snapshot = h.controller.handleV1({ apiVersion: 1, requestId: `frame-zero-${mode}-${previousFrame}`,
+        operation: 'snapshot', payload: { frame: null } });
+      assert.equal(snapshot.ok, true);
+      assert.equal(snapshot.result.frame, 0);
+      assert.equal(snapshot.result.totalFrames, 21);
+      assert.equal(snapshot.result.layers[0].opacity, frameZeroOpacity);
+      const property = h.controller.handleV1({ apiVersion: 1, requestId: `opacity-zero-${mode}-${previousFrame}`,
+        operation: 'property.get', payload: { layerId: 'r08_curve_layer', property: 'opacity', frame: null } });
+      assert.equal(property.ok, true);
+      assert.equal(property.result.value, frameZeroOpacity);
+      const root = { NemoNativeOpacityProject: h.published().project,
+        NemoNativeOpacityCutover: h.published().cutover };
+      assert.equal(await NativeProjectEntry.reveal(root, first, {
+        hide() {}, show() { throw new Error('unexpected failed reveal'); },
+        repaint() { throw new Error('legacy repaint ran during native Open'); },
+        raf(callback) { callback(); },
+      }), true);
+      h.published().cutover.renderPreview(ui.state.currentFrame);
+      await h.controller.flush();
+      h.published().resize();
+      await h.resizeCallback()();
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0]);
+      assert.deepEqual([ui.state.currentFrame, ui._curFrame], [0, 0]);
+      assert.deepEqual(paperCalls, []);
+      assert.equal(h.controller.status(), 'native');
+    });
+  }
+}
+
+test('unsupported and preactivation failed imports retain the previous UI playhead', async () => {
+  const source = staticSource();
+  for (const failsBootstrap of [false, true]) {
+    const ui = { state: { currentFrame: 59 }, _curFrame: 59,
+      __TAURI__: { core: { invoke() {} } }, SM: { importJSON() { throw new Error('Paper import'); } } };
+    const h = surfaceHarness(source, { ui, bootstrapFailure: () => failsBootstrap });
+    const result = await h.published().project.importJSON(failsBootstrap ? JSON.stringify(source) : '{invalid');
+    assert.equal(result, false);
+    assert.deepEqual([ui.state.currentFrame, ui._curFrame], [59, 59]);
+    assert.equal(h.state.previews.length, 0);
+  }
+});
+
+for (const fails of [false, true]) {
+  test(`first-open reveal joins a delayed host resize before ${fails ? 'failure' : 'success'}`, async () => {
+    const source = staticSource(), gate = deferred();
+    const h = surfaceHarness(source, { resize: () => gate.promise });
+    const first = await h.published().project.importJSON(JSON.stringify(source));
+    let shown = 0, settled = false;
+    const root = { NemoNativeOpacityProject: h.published().project,
+      NemoNativeOpacityCutover: h.published().cutover };
+    const revealed = NativeProjectEntry.reveal(root, first, {
+      hide() { h.published().resize(); }, show() { shown++; }, repaint() {},
+      raf(callback) { callback(); },
+    }).finally(() => { settled = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, 'Open must wait for the pending host resize');
+    assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+    if (fails) {
+      gate.reject(new Error('resize failed during reveal'));
+      await assert.rejects(revealed, /resize failed during reveal/);
+      assert.equal(h.controller.status(), 'indeterminate');
+      assert.equal(shown, 1, 'failed reveal restores the start screen');
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+    } else {
+      gate.resolve();
+      assert.equal(await revealed, true);
+      assert.equal(shown, 0);
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+      assert.equal(h.controller.status(), 'native');
+    }
+  });
+}
+
+test('first-open reveal joins an already-running resize without a duplicate presentation', async () => {
+  const source = staticSource(), gate = deferred();
+  const h = surfaceHarness(source, { resize: () => gate.promise });
+  const first = await h.published().project.importJSON(JSON.stringify(source));
+  h.published().resize();
+  const resizing = h.resizeCallback()();
+  let settled = false;
+  const root = { NemoNativeOpacityProject: h.published().project,
+    NemoNativeOpacityCutover: h.published().cutover };
+  const revealed = NativeProjectEntry.reveal(root, first, {
+    hide() {}, show() {}, repaint() {}, raf(callback) { callback(); },
+  }).finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  gate.resolve();
+  await Promise.all([resizing, revealed]);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  assert.equal(h.controller.status(), 'native');
+});
+
+test('a resize arriving during presentation is applied before the final receipt', async () => {
+  const source = staticSource(), hostGate = deferred();
+  const h = surfaceHarness(source, { resize: async () => {},
+    previewGate(_request, state) {
+      if (state.previews.length === 2) return hostGate.promise;
+    } });
+  await h.published().project.importJSON(JSON.stringify(source));
+  let settled = false;
+  const presenting = h.published().cutover.presentPreview(0).finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  h.published().resize();
+  const resizing = h.resizeCallback()();
+  hostGate.resolve();
+  await Promise.all([presenting, resizing]);
+  assert.equal(settled, true);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0]);
+  assert.equal(h.controller.status(), 'native');
+});
+
+test('a later successful viewport resize presents the latest native frame again', async () => {
+  const source = staticSource();
+  const h = surfaceHarness(source, { resize: async () => {} });
+  await h.published().project.importJSON(JSON.stringify(source));
+  h.published().cutover.renderPreview(10);
+  await h.controller.flush();
+  h.published().resize();
+  await h.resizeCallback()();
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 10, 10]);
+  assert.equal(h.controller.status(), 'native');
 });
 
 test('failed initial or direct B bootstrap cannot restore legacy or admit another bootstrap', async () => {
