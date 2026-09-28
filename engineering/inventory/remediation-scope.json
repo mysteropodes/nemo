@@ -5541,6 +5541,16 @@
           2,
           3
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            2,
+            3
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen nemo-mcp/src/lib.rs lines 2-3 declare the capabilities and capability_contract modules at the crate root. The pinned C07 census assigns lib.rs:1-7 to pending C07.mcp-server.binary-entrypoint (#1042) as the module-root responsibility; P07/#1009 source commits 35d7eac66 and bd907d230 establish narrow declaration provenance, not admission of that packet or its module bodies. Evidence uses frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / lib.rs blob 2d8f0dd07102d3b2aa1df154b84fcba7eeae5247 and pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51; current lib.rs has a later native_contract declaration and a different blob. No numeric source coverage, MCP behavior or runtime acceptance is claimed."
+        }
       ]
     },
     {
@@ -5794,6 +5804,24 @@
           96,
           96
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            78,
+            93
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen opacity-application.js lines 78-93 define capabilitySummary, which reads ports.capabilities(), clones all registered descriptors, derives the legacy properties projection only from descriptors advertising property.get, and includes operations, retry/trace retention and document identity in the response. P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a added this registered-capability discovery seam; bootstrap binds the port to registry.list(), and the production capability test checks full export.svg.frame plus opacity descriptors, opacity-only properties, and a fresh registry read. The older pinned C07.application-service.command-core packet (#1042) covers the surrounding perform route but describes only hard-coded opacity and remains pending; this disposition does not admit it. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core has a different blob. No numeric source coverage, capability runtime, native/browser/Tauri/client or installed behavior acceptance is claimed."
+        },
+        {
+          "span": [
+            96,
+            96
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 96 is the perform capabilities branch that returns capabilitySummary() through response(). P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a replaced the earlier inline hard-coded opacity response with this registered-capability discovery call. The surrounding perform command/query routing belongs to pending C07.application-service.command-core (#1042), not to an accepted whole C07 packet. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core differs; no packet admission, numeric source coverage, runtime or installed behavior acceptance is claimed."
+        }
       ]
     },
     {
@@ -6207,6 +6235,16 @@
           572,
           596
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            572,
+            596
+          ],
+          "kind": "covered",
+          "evidence": "Mixed public-facade responsibility mapping at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (feedback-bridge blob b87a6fc24b20f136c05df123d772b224e81ba212): line 572 is blank, 573 opens window.SMFeedback, and 595-596 close the object/IIFE. Action/click trail exports at 574-579 (defined at 72-157), readAllLocal at 581 (defined at 210), and local approve/resolve/delete at 585-587 (defined at 553-571) map to pending C04b.content-tools.feedback-local-log-storage (#1039). submitFeedback at 580 (defined at 281-341) spans that local-write responsibility and pending C04b.content-tools.feedback-worker-publish: it writes locally, then best-effort publishes to the team Sync folder at 316-327 and Worker at 328-340. The Sync write is functionally paired with the pending triage-sync flow but remains inside the worker-publish packet's declared 279-341 range. checkIncomingFeedback/importIncoming/pullAllIncoming at 582-584 (defined at 506-551), plus GitHub token, fetch and issue mutation exports at 588-594 (defined at 433-503), map to pending C04b.content-tools.feedback-triage-sync; incoming import uses the local store but belongs to the triage-sync flow. The pinned C04b census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 and its older range declarations remain unchanged. No single packet owns this whole facade; no packet admission, numeric source coverage, feedback delivery or browser/Tauri behavior acceptance is claimed."
+        }
       ]
     },
     {
@@ -6250,6 +6288,14 @@
         ]
       ],
       "dispositions": [
+        {
+          "span": [
+            1,
+            22
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only: frozen src/js/layer-inout.js lines 1-11 and 13-22 are explanatory comments about the UI bar and raw-versus-clamped render gate. Line 12 is executable (function () { opening the IIFE around all three pending C02.layer-inout responsibilities; it is not a comment and does not own a separate feature writer. The first feature functions inPointOf/outPointOf begin at line 23 in C02.layer-inout.bar-rendering, while later C02 packets own selection/marquee and drag/batch operations. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / layer-inout.js blob 131156e2f419e17e8669c1980c3ae0f77164e786; pinned C02 census blob 3e920d4f112028ed486df697b5885aa4c67df316. This does not assign the entire preamble solely to bar-rendering or admit any C02 packet, numeric source coverage, runtime behavior or browser/Tauri/export acceptance."
+        },
         {
           "span": [
             1601,
@@ -6665,6 +6711,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            9
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / project.js blob e2248533b47b0a067a61e4b641f83c7d24b00e79: lines 1-8 are New/Open/Save/Recent project-management header comments, while line 9 is executable (function(){ opening the IIFE around the whole project module. The opener is not comment-only and is not a separate feature writer or solely one C01 responsibility. First feature data RECENTS_KEY/MAX_RECENTS begins at line 10 in pending C01.project.start-screen; other pending C01 packets own document I/O, close guard, tabs, history and team sync. Pinned C01 census blob d81b618308f9f4849b0ba24fa512af6be90aa72c. Current project.js has a different blob under native work, so this classifies only the frozen span. No packet admission, numeric source coverage, project/save/load/browser/Tauri/native behavior or runtime acceptance is claimed."
+        },
+        {
+          "span": [
             11,
             19
           ],
@@ -6801,6 +6855,14 @@
         ]
       ],
       "dispositions": [
+        {
+          "span": [
+            1,
+            23
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / select-bridge.js blob a831eb065ed611f70a77692c61846eaddcd97a5a: lines 1-22 are architecture and behavior comments, while line 23 is the executable (function () { IIFE opener around the Select bridge. It is not comment-only and does not own a separate feature; the opener structurally encloses all pending C04a.select responsibilities, not solely C04a.select.hover-helpers, whose first census range begins at line 24. Pinned C04a census blob 8ffb669c5018190bd448b787a09ade35bd594b30. Current select-bridge.js has a different blob, so this disposition classifies only the frozen span. No packet admission, numeric source coverage, selection behavior, browser/native parity or runtime acceptance is claimed."
+        },
         {
           "span": [
             271,
@@ -6947,6 +7009,16 @@
           3370,
           3372
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            3370,
+            3372
+          ],
+          "kind": "boundary",
+          "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / tools.js blob 3c25962dbe314d5e791489da30b2b642ff899357: lines 3370-3372 explain gapThr as a plain world-space distance, the stroke-end gap still counted as one closed shape, and Gap Size presets without scale/resolution conversion. The separate WASM-path comment starts at 3373 in pending C04a.fill.find-wasm-js-raster (#1039), and executable _wallSegments starts at 3381; neither is in this disposition. Pinned C04a census blob 8ffb669c5018190bd448b787a09ade35bd594b30. Current tools.js has a different blob, so this classifies only the frozen span. No packet admission, numeric source coverage, fill behavior, JS/Rust parity or runtime acceptance is claimed."
+        }
       ]
     },
     {
@@ -7139,6 +7211,16 @@
           72,
           77
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            72,
+            77
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (vectorize-bridge blob 3d1e3f817e981cdebc86919502515da64663157e), line 72 is blank and lines 73-77 only explain how splineToSegments converts vtracer's absolute cubic control-point chain into relative Paper.js Segment handles. The executable splineToSegments declaration begins at line 78 in pending C04b.content-tools.vectorize-shape-fitting (#1039), whose pinned census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 declares lines 78-395 for that responsibility. This preamble has no separate executable owner; the original C04b range, packet admission and numeric computed coverage remain unchanged. No vectorize feature or browser/Tauri/runtime acceptance is claimed."
+        }
       ]
     }
   ],
