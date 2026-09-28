@@ -300,8 +300,12 @@ P03C-x/#1466 maps frozen `src/js/tweens.js:4860` (folder-map snapshot field) and
 (guarded folder-map restore field) to pending `C01.tweens.undo-redo-engine`. Adjacent folder
 comments and distinct link-group fields are outside these singleton spans. This is responsibility
 mapping only; C01 remains pending and tweens.js/global uncovered counts remain 516/7 185.
+P03C-y/#1468 marks frozen `geometry-wasm/src/tween.rs:1-16` as a structural preamble/import
+boundary before pending `C03.wasm-geometry-ops.tween-interpolation-math` at line 17: lines 1-13
+are comments, 14-15 are executable imports, and 16 is blank. It does not extend the boundary into
+the packet or accept it; tween.rs/global computed uncovered counts remain 15/7 185.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 57
+pending packets, no notes needing reconciliation, 0 unmapped paths and 56
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

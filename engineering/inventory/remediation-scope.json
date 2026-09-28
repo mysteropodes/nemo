@@ -5158,6 +5158,16 @@
           1,
           16
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            16
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, geometry-wasm/src/tween.rs:1-16 is a structural module preamble/import seam before pending C03.wasm-geometry-ops.tween-interpolation-math at lines 17-164: lines 1-13 are scope comments, lines 14-15 are executable serde and wasm_bindgen imports, and line 16 is blank. This boundary does not extend into the packet or accept its implementation."
+        }
       ]
     },
     {
