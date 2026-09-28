@@ -269,8 +269,12 @@ and global 7 185 remain unchanged. P03C-r/#1454 maps the frozen `geometry-wasm
 test-module tail to the pending C03 pyramidal point-tracker packet's test-oracle responsibility.
 The census oracle is specifically the four tests at 388-429; this disposition does not claim the
 whole module is covered, test correctness, or packet acceptance. The tracker and global computed
-uncovered counts remain 88 and 7 185. **P03 is not complete and no extraction is admitted**: the gate
-still exits 1 with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 70
+uncovered counts remain 88 and 7 185. P03C-s/#1456 marks frozen `src/js/export.js:1161-1174` as a
+boundary: line 1161 is blank and lines 1162-1174 are Render Manager batch-export lead-in comments;
+the first executable begins at 1175. The comments describe adjacent pending C05 Tauri-I/O batch
+export responsibility but implement none. The export.js uncovered count remains 186 and global
+7 185. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 69
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
