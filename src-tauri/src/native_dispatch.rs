@@ -15,6 +15,10 @@ use std::{
 
 pub(crate) type NativeState = Arc<Mutex<NativeAuthority>>;
 
+#[path = "native_dispatch_replacement.rs"]
+mod replacement;
+pub(crate) use replacement::{ReplacementProgress, ReplacementStage};
+
 pub(crate) struct NativeAuthority {
     generation: u64,
     retained_releases: BTreeMap<String, ReleaseTombstone>,
@@ -30,6 +34,11 @@ pub(crate) enum NativePhase {
     Active {
         generation: u64,
         application: Box<dyn NativeDispatch>,
+    },
+    Replacing {
+        generation: u64,
+        application: Box<dyn NativeDispatch>,
+        progress: ReplacementProgress,
     },
     Releasing {
         generation: u64,
@@ -127,6 +136,7 @@ impl NativeAuthority {
             NativePhase::Vacant => "native application is staged but not active",
             NativePhase::Installing { .. } => "native application installation is in progress",
             NativePhase::Active { .. } => "native application is active",
+            NativePhase::Replacing { .. } => "native replacement is in progress or indeterminate",
             NativePhase::Releasing { .. } => "native application release is in progress",
             NativePhase::Released(ref tombstone) if tombstone.succeeded => {
                 "native application authority was released"
@@ -144,6 +154,9 @@ impl NativeAuthority {
             }
             NativePhase::Releasing { .. } => {
                 return Err("native application release is in progress".into());
+            }
+            NativePhase::Replacing { .. } => {
+                return Err("native application replacement blocks bootstrap".into());
             }
             NativePhase::Active { .. } => {
                 return Err(
@@ -260,6 +273,9 @@ impl NativeAuthority {
             }
             NativePhase::Releasing { .. } => {
                 return Err("unavailable:native application release is in progress".into());
+            }
+            NativePhase::Replacing { .. } => {
+                return Err("unavailable:native application replacement is in progress".into());
             }
             NativePhase::Released(_) => {
                 return Err("unavailable:native application authority was already released".into());
@@ -492,22 +508,6 @@ pub(crate) mod tests {
             .unwrap_err()
             .contains("generation exhausted"));
         assert_eq!(authority.active_generation().unwrap(), u64::MAX);
-    }
-
-    #[test]
-    fn replacement_prequeue_window_denies_old_generation_dispatch() {
-        let mut authority = NativeAuthority::default();
-        let generation = authority.reserve_install().unwrap();
-        authority
-            .install(
-                generation,
-                Box::new(TerminalPump(Arc::new(AtomicUsize::new(0)))),
-            )
-            .unwrap();
-        // Current nemo_native_replace reads this generation before it queues its callback.
-        let captured = authority.active_generation().unwrap();
-        assert!(authority.active_mut(captured).is_err(),
-            "old-generation dispatch must close before replacement is queued");
     }
 
     #[test]

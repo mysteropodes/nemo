@@ -62,6 +62,26 @@ pub(crate) async fn on_main_thread_committed<T: Send + 'static>(
         .map_err(|_| host_error("unavailable", "native release callback was dropped"))?
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReplacementCallbackFailure {
+    SchedulingUnavailable,
+    CallbackDropped,
+}
+
+/// Replacement is committed at generation reservation. Unlike ordinary preview
+/// work, its callback must run even when the invoking waiter is cancelled.
+pub(crate) async fn on_main_thread_replacement<T: Send + 'static>(
+    app: &tauri::AppHandle,
+    operation: impl FnOnce() -> HostResult<T> + Send + 'static,
+) -> Result<HostResult<T>, ReplacementCallbackFailure> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || complete_committed_operation(sender, operation))
+        .map_err(|_| ReplacementCallbackFailure::SchedulingUnavailable)?;
+    receiver
+        .await
+        .map_err(|_| ReplacementCallbackFailure::CallbackDropped)
+}
+
 fn complete_committed_operation<T>(
     sender: tokio::sync::oneshot::Sender<HostResult<T>>,
     operation: impl FnOnce() -> HostResult<T>,
@@ -270,6 +290,19 @@ mod cancellation_tests {
 
     #[test]
     fn committed_release_operation_runs_after_waiter_is_cancelled() {
+        let (sender, receiver) = tokio::sync::oneshot::channel::<HostResult<()>>();
+        let began = Arc::new(AtomicBool::new(false));
+        let began_in_operation = Arc::clone(&began);
+        drop(receiver);
+        complete_committed_operation(sender, move || {
+            began_in_operation.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        assert!(began.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn committed_replacement_operation_runs_after_waiter_is_cancelled() {
         let (sender, receiver) = tokio::sync::oneshot::channel::<HostResult<()>>();
         let began = Arc::new(AtomicBool::new(false));
         let began_in_operation = Arc::clone(&began);

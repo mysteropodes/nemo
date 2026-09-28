@@ -103,6 +103,24 @@ impl ApplicationMcp {
         Arc::clone(&self.native)
     }
 
+    pub(crate) fn reserve_native_replacement(
+        &self,
+        instance_id: &str,
+        document_id: &str,
+        expected_revision: u64,
+        preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
+    ) -> Result<u64, String> {
+        // Native -> revision is the same lock order used by dispatch and acknowledgment.
+        let mut native = self
+            .native
+            .lock()
+            .map_err(|_| "unavailable:native application lock unavailable")?;
+        let generation =
+            native.admit_replace(instance_id, document_id, expected_revision, preflight)?;
+        self.revisions.invalidate();
+        Ok(generation)
+    }
+
     pub(crate) fn install_dispatch(
         &self,
         generation: u64,
@@ -147,13 +165,22 @@ impl ApplicationMcp {
         native_status(&self.instance_id, &self.native, request)
     }
 
-    fn dispatch_native(
+    pub(crate) fn dispatch_native(
         &self,
         request: NativeApplicationRequest,
     ) -> Result<NativeApplicationResponse, String> {
         self.revisions
             .dispatch(&self.instance_id, &self.native, request, false)
             .map(|delivery| delivery.response)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn control_revision_for_test(
+        &self,
+        request: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let request = serde_json::from_value(request).map_err(|error| error.to_string())?;
+        self.revisions.control(&self.native, request)
     }
 
     pub(crate) fn invalidate_native_subscriber(&self, app: &tauri::AppHandle) {

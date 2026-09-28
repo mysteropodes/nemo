@@ -17,6 +17,9 @@ use nemo_mcp::contract::NATIVE_API_VERSION;
 use std::path::PathBuf;
 use tauri::Manager;
 
+#[path = "native_application_replace_commands.rs"]
+mod replace_commands;
+
 #[tauri::command]
 pub(crate) async fn nemo_native_bootstrap(
     app: tauri::AppHandle,
@@ -146,32 +149,34 @@ pub(crate) async fn nemo_native_replace(
         state.instance_id(),
     )?;
     let admitted = admit_project(&request.projection, &request.resources)?;
-    let resource_count = admitted.resources.len();
+    let prepared = DesktopNativeApplication::prepare_replacement(admitted)?;
     let native = state.native_state();
-    let generation = active_generation(&native)?;
-    let instance = request.instance_id.clone();
-    viewport_host::on_main_thread(&app, move || {
-        viewport_host::require_instance_or_absent(&instance)?;
-        let mut guard = native
-            .lock()
-            .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-        let application = desktop_mut(&mut guard, generation)?;
-        application.require_identity(
+    let generation = state
+        .reserve_native_replacement(
             &request.instance_id,
             &request.document_id,
             request.expected_revision,
-        )?;
-        let (exports, preview) = application.replace_project(admitted)?;
-        viewport_host::reconcile_replaced(&instance, &preview)?;
-        Ok(NativeReplacementReceipt {
-            document_id: application.document_id().to_owned(),
-            content_revision: application.content_revision(),
-            resource_count,
-            cancelled_preview_work_ids: preview.into_iter().map(work_label).collect(),
-            reconciled_exports: exports.iter().map(reconcile_export).collect(),
-        })
+            |application| {
+                if application.as_any_mut().is::<DesktopNativeApplication>() {
+                    Ok(())
+                } else {
+                    Err("unavailable:native desktop host is unavailable".into())
+                }
+            },
+        )
+        .map_err(|message| replace_commands::admission_error(&native, message))?;
+    let instance = request.instance_id.clone();
+    let committed = native.clone();
+    match viewport_host::on_main_thread_replacement(&app, move || {
+        replace_commands::complete_replacement(&committed, generation, &instance, prepared)
     })
     .await
+    {
+        Ok(result) => result,
+        Err(failure) => Err(replace_commands::fence_executor_failure(
+            &native, generation, failure,
+        )),
+    }
 }
 
 #[tauri::command]
