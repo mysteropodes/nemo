@@ -26,6 +26,10 @@ use std::{collections::BTreeSet, path::PathBuf};
 mod release;
 pub(crate) use release::{admit_release_request, complete_release};
 
+#[path = "native_application_replacement.rs"]
+mod replacement;
+pub(crate) use replacement::PreparedDesktopReplacement;
+
 #[cfg(test)]
 pub(crate) use crate::native_dispatch::run_export_pump_interleaved;
 
@@ -115,35 +119,6 @@ impl DesktopNativeApplication {
 
     pub(crate) fn content_revision(&self) -> u64 {
         self.core.content_revision()
-    }
-
-    pub(crate) fn replace_project(
-        &mut self,
-        admitted: AdmittedProject,
-    ) -> HostResult<(Vec<JobReceipt>, Vec<WorkId>)> {
-        let resources = DesktopResourceResolver::new(admitted.resources)
-            .map_err(|message| host_error("invalid_request", message))?;
-        let exports = self
-            .core
-            .replace_document(admitted.document)
-            .map_err(|message| host_error("internal", message))?;
-        let document_id = self.core.document_id().to_owned();
-        let preview = self
-            .preview_scheduler
-            .replace_document(document_id)
-            .map_err(|error| host_error("internal", error.to_string()))?;
-        for receipt in &preview {
-            self.preview_work.remove(&receipt.work_id());
-        }
-        *self.core.resource_resolver_mut() = resources.clone();
-        self.preview_resources = resources;
-        Ok((
-            exports,
-            preview
-                .into_iter()
-                .map(|receipt| receipt.work_id())
-                .collect(),
-        ))
     }
 
     pub(crate) fn bind_output(&self, handle: String, destination: PathBuf) -> HostResult<()> {
