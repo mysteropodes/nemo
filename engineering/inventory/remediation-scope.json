@@ -6975,7 +6975,14 @@
       "blob": "bb1cf50f43228324eea5b21a8c88671259cbf835",
       "classification": "configuration",
       "censusRefs": [],
-      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation."
+      "reason": "Tracked configuration, schema, lock or metadata consumer; retained explicitly rather than excluded as documentation.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust geometry boundary profile and adapter inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "engineering/boundaries/profiles/mcp-rust.profile.json",
@@ -9379,7 +9386,14 @@
       "blob": "83d14161e87e1956098d36800e1f1684cdca2841",
       "classification": "test",
       "censusRefs": [],
-      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed."
+      "reason": "Test code or fixture supporting named consumer checks; not proof that those checks passed.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust boundary tooling test inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/boundaries-size.test.cjs",
@@ -9667,7 +9681,14 @@
       "blob": "95c0878df0efd6ce113a270f7fbf1b9688a0c92e",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P12",
+        "issue": 1014,
+        "pullRequest": 1176,
+        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust boundary tooling inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/boundaries-size.cjs",
@@ -9875,7 +9896,14 @@
       "blob": "b3dbb5ca2070ffef02dcc56188e49a473da0ad18",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-build tooling inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/remediation-scope-census.cjs",
@@ -9883,7 +9911,14 @@
       "blob": "41164827eeea8c765db117ce21ea591a415e91c3",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-census tooling inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/remediation-scope-verify.cjs",
@@ -9891,7 +9926,14 @@
       "blob": "8b685b840b2141e817c8b9e6e5bf9b86fc4452db",
       "classification": "handwritten-tooling",
       "censusRefs": [],
-      "reason": "Tracked executable tool; requires explicit boundary/admission coverage."
+      "reason": "Tracked executable tool; requires explicit boundary/admission coverage.",
+      "coverage": {
+        "kind": "leaf",
+        "leaf": "P03B",
+        "issue": 1170,
+        "pullRequest": 1175,
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-verification tooling inventory only, not native runtime feature acceptance."
+      }
     },
     {
       "path": "scripts/nemo/lib/util.cjs",
