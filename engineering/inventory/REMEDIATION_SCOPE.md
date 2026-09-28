@@ -346,8 +346,17 @@ responsibility/boundary mappings only: C05 remains pending, no implementation or
 acceptance is claimed, the frozen `lib.rs` computed uncovered code lines remain 151, and global
 computed uncovered code lines remain 7 185. The 44 previously undispositioned spans become 40;
 all 762 packets remain pending and the scope remains incomplete.
+P03C-ae/#1482 maps frozen `src/js/engine-bridge.js:4257-4274` (renderNow preamble and
+`viewportRafId`) and `4355-4381` (effects-export rationale and saved render state) to the still-
+pending `C03.js-engine-bridge.render-entry-points` responsibility. It marks `4482-4492` as the
+comment-only second-viewer boundary before the public `window.SMEngineBridge` API at 4493. These
+records cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`; they add no packet admission, numeric range
+coverage or runtime/render/export acceptance. The engine-bridge uncovered count remains 226 and
+global computed uncovered code lines remain 7 185. The 40 previously undispositioned spans become
+37; all 762 packets remain pending and the scope remains incomplete.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 40
+pending packets, no notes needing reconciliation, 0 unmapped paths and 37
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
