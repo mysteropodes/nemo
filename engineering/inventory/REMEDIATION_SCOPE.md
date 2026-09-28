@@ -279,8 +279,14 @@ selection packets: comment-only boundaries at 271-279 (combine hit confirmation)
 covered responsibility mappings at 461-464 (`ROTATE_CURSOR` at 463) and 772-773 (`lastPt` at 773).
 The executable opener 1-23 remains unresolved. C04a packet admissions, selection behavior parity
 and numeric coverage are unchanged; select-bridge.js retains 64 and the global report 7 185
-computed uncovered code lines. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 63
+computed uncovered code lines. P03C-u/#1461 maps frozen `src/js/motion.js:13896-13908` to the
+pending C02 key-selection/clipboard responsibility: executable exports at 13896-13901 name
+`nudgeSelectedKeys`, `deleteSelectedKeys`, `copySelectedKeys`, `pasteKeys`, `hasKeySelection` and
+`hasKeyClipboard`; 13902 closes the export object. Lines 13903-13908 are comment-only lead-in for
+the separate workspace-continuity packet, whose `restoreLastAppMode` starts at 13909 outside this
+span. This is a responsibility mapping only; C02 remains pending and numeric coverage is unchanged.
+**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 62
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

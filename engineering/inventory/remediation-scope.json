@@ -6267,6 +6267,14 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 13858 exports selectKeys to the shared key-selection state; lines 13859-13879 are comment-only lead-in describing the shared curve-widget contract for the adjacent onEaseSegChanged export, which begins at 13880 outside this span. C02.properties-and-curves.key-selection-and-clipboard and C02.properties-and-curves.curves-and-easing (#1037) own those adjacent selection and easing responsibilities; C20o/#1245 documents the key/property-selection and shared curve-widget caller wiring, while the C02 curves-and-easing packet names onEaseSegChanged. Both C02 packets remain pending; this adds no computed range coverage or implementation acceptance."
+        },
+        {
+          "span": [
+            13896,
+            13908
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 13896-13901 are the six executable SMMotion key-selection/clipboard exports nudgeSelectedKeys, deleteSelectedKeys, copySelectedKeys, pasteKeys, hasKeySelection, and hasKeyClipboard; line 13902 closes the export object. The pinned C02.properties-and-curves.key-selection-and-clipboard packet (#1037) explicitly names all six symbols and this public API responsibility. Lines 13903-13908 are only comment lead-in for separate workspace continuity; restoreLastAppMode begins at frozen line 13909 outside this span and belongs to the separate pending C02.motion-advanced.mode-toggle-and-workspace-continuity packet. The historical C02 citation 13924-13929 is shifted and is not used as this frozen location. The C02 packet remains pending; no computed range coverage or implementation acceptance is implied."
         }
       ]
     },
