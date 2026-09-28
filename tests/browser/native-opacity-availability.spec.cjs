@@ -87,6 +87,14 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
       return { before, after, afterLegacy, refused, discovery, legacy, read, owner: owner(), handlers,
         stored: JSON.parse(SM.exportJSON()), userAgent: navigator.userAgent };
     });
+    await testInfo.attach('native-opacity-browser-observation', { contentType: 'application/json',
+      body: Buffer.from(JSON.stringify({ sourceSha: identity.source.startup.head,
+        browserVersion: browser.version(), nativeRequest: observed.refused,
+        legacyWrite: observed.legacy,
+        beforeOpacity: JSON.parse(observed.before.serialized).layers[0].motionStatic.opacity,
+        afterOpacity: JSON.parse(observed.afterLegacy.serialized).layers[0].motionStatic.opacity,
+        beforeRevision: observed.before.meta.revision,
+        afterRevision: observed.afterLegacy.meta.revision }, null, 2)) });
     expect(observed.owner).toEqual({ tauri: 'undefined', cutover: 'undefined',
       project: 'undefined', admission: 'undefined' });
     expect(observed.refused.ok).toBe(false);
