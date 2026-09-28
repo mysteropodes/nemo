@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "5cc998734b669e689dbdfa60019b7718b4969933",
-    "sourceRootTree": "7bc57b4d9b6c7da181cdb2b5a38b8d2d36699c48",
+    "candidateCommit": "0220f48e7d9bed2195a2d923dcea62aa5db40b6e",
+    "sourceRootTree": "fda2d0b214b6986b119f0e6d7765049be824500b",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "05984fb5b65854298c087eddf143b4f4b28a59b5",
-      "lastChangedCommit": "5cc998734b669e689dbdfa60019b7718b4969933"
+      "gitTree": "08dcb8ee1507c98e34a7819ed449b797dfd27421",
+      "lastChangedCommit": "c302c9ac0dcbb23f23bc39ec82d59262322be7b5"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "ec8d6fc485ac7bca400a58fd2f6a86f9e2cc0c12",
-      "sha256": "023c8b1f01e8aad2a716b52c09143c953633d58abad4f50c872c6547c2a86c48",
-      "lastChangedCommit": "f4707a35422aecbabe17aca459681d2868adebd5"
+      "gitBlob": "cf09c658d8cc45d018cd186e2b9da287ffc5e2a2",
+      "sha256": "c0541930a2c1b7cf378debb07afb33ebaf437a308fb074bbc2dcb83f184f7293",
+      "lastChangedCommit": "887a40507eeaed023210309a11baee1820658d68"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "1f4ab4693768a70484c100acfdfdf1364ca2774be2d62eebbfe48ab1156a3346"
+      "value": "13904aea1d6715ebf1bc59d33eefe64b7d8464b204b5478014cf36724002ee7f"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ca3e44a98604ef9d7d40e07c94099b6cb111a83e",
-        "sha256": "ec2892a3436ae61903db35af046fdd46744bc9124be5081fb202cb86728fa82b",
-        "moduleCount": 179,
-        "basedOnCommit": "5cc998734b669e689dbdfa60019b7718b4969933"
+        "gitBlob": "ce1401380c9dfbcfe64cc3c323d28116560802a3",
+        "sha256": "0c1eaff52f43d37084dd22f3a31e0ea7bb118dd283b198a1347f37fe53e90c59",
+        "moduleCount": 180,
+        "basedOnCommit": "887a40507eeaed023210309a11baee1820658d68"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 168,
-    "externalClassicTags": 165,
+    "totalScriptTags": 170,
+    "externalClassicTags": 167,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 161,
+    "retainedClassicTags": 163,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 164,
+    "classicTagsUnderSrcJsIncludingVendors": 166,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -204,2254 +204,6 @@
       "activation": "dependency evaluation of imported ag-psd bundle"
     }
   ],
-  "retainedSources": [
-    {
-      "path": "src/js/abr-import.js",
-      "moduleId": "app.abr.import",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2487,
-          "scriptOrdinal": 143
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/application-mcp.js",
-      "moduleId": "app.application.mcp.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2514,
-          "scriptOrdinal": 168
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/export-svg-frame.js",
-      "moduleId": "app.export.svgframe.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2330,
-          "scriptOrdinal": 25
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/export-svg-sequence.js",
-      "moduleId": "app.export.svgsequence.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2332,
-          "scriptOrdinal": 26
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/motion-canvas-intent.js",
-      "moduleId": "app.motion.canvas-intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2396,
-          "scriptOrdinal": 74
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-application.js",
-      "moduleId": "app.native.application.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 160
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-editor.js",
-      "moduleId": "app.native.opacity.editor.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 161
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-export.js",
-      "moduleId": "app.native.opacity.export.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 164
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-legacy-surface.js",
-      "moduleId": "app.native.opacity.legacy-surface.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2308,
-          "scriptOrdinal": 10
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-motion-surface.js",
-      "moduleId": "app.native.opacity.motion-surface.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2309,
-          "scriptOrdinal": 11
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-preview.js",
-      "moduleId": "app.native.opacity.preview.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 163
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-opacity-selection.js",
-      "moduleId": "app.native.opacity.selection.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 162
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/native-viewport.js",
-      "moduleId": "app.native.viewport.adapter",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/adapters/native-viewport.js",
-          "line": 1,
-          "role": "N13 pure injected-transport metadata adapter; no bootstrap or production registration before N16"
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/project-native-save.js",
-      "moduleId": "app.project.nativesave.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2454,
-          "scriptOrdinal": 114
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/select-canvas-intent.js",
-      "moduleId": "app.select.canvas-intent.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2494,
-          "scriptOrdinal": 150
-        }
-      ]
-    },
-    {
-      "path": "src/js/ae-camera-export.js",
-      "moduleId": "app.ae.camera.export",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2336,
-          "scriptOrdinal": 30
-        }
-      ]
-    },
-    {
-      "path": "src/js/animation/curve.js",
-      "moduleId": "app.animation.curve",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2384,
-          "scriptOrdinal": 69
-        }
-      ]
-    },
-    {
-      "path": "src/js/app.js",
-      "moduleId": "app.app",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2311,
-          "scriptOrdinal": 13
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/capability-registry.js",
-      "moduleId": "app.capability.registry",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2400,
-          "scriptOrdinal": 76
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/export-job.js",
-      "moduleId": "app.export.job.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2403,
-          "scriptOrdinal": 78
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/history/frame-entry.js",
-      "moduleId": "app.history.frameentry.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2320,
-          "scriptOrdinal": 16
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/native-edit-guard.js",
-      "moduleId": "app.native.edit.guard.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 165
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/native-opacity-contract.js",
-      "moduleId": "app.native.opacity.contract",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2304,
-          "scriptOrdinal": 6
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/native-opacity-lifecycle.js",
-      "moduleId": "app.native.opacity.lifecycle",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2305,
-          "scriptOrdinal": 7
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/native-opacity-operations.js",
-      "moduleId": "app.native.opacity.operations",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2306,
-          "scriptOrdinal": 8
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/opacity-application.js",
-      "moduleId": "app.opacity.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2307,
-          "scriptOrdinal": 9
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/opacity-capability.js",
-      "moduleId": "app.opacity.capability",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2401,
-          "scriptOrdinal": 77
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/render/image-budget.js",
-      "moduleId": "app.render.imagebudget.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2479,
-          "scriptOrdinal": 135
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/shortcut-registry.js",
-      "moduleId": "app.shortcuts.application",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2377,
-          "scriptOrdinal": 62
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/timelapse-capability.js",
-      "moduleId": "app.timelapse.capability",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/application/timelapse-capability.js",
-          "line": 1,
-          "role": "capability descriptor/registration helper; not wired into a script tag (P31/#1033, bootstrap integration out of scope)"
-        }
-      ]
-    },
-    {
-      "path": "src/js/asset-tree.js",
-      "moduleId": "app.asset.tree",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2471,
-          "scriptOrdinal": 128
-        }
-      ]
-    },
-    {
-      "path": "src/js/assets-panel.js",
-      "moduleId": "app.assets.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2475,
-          "scriptOrdinal": 132
-        }
-      ]
-    },
-    {
-      "path": "src/js/audio-bridge.js",
-      "moduleId": "app.audio.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2433,
-          "scriptOrdinal": 96
-        }
-      ]
-    },
-    {
-      "path": "src/js/bitmap-brush.js",
-      "moduleId": "app.bitmap.brush",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2488,
-          "scriptOrdinal": 144
-        }
-      ]
-    },
-    {
-      "path": "src/js/bitmap-tip-picker.js",
-      "moduleId": "app.bitmap.tip.picker",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2489,
-          "scriptOrdinal": 145
-        }
-      ]
-    },
-    {
-      "path": "src/js/bootstrap/native-opacity-application.js",
-      "moduleId": "app.native.opacity.bootstrap",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 167
-        }
-      ]
-    },
-    {
-      "path": "src/js/bootstrap/opacity-application.js",
-      "moduleId": "app.opacity.bootstrap",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 166
-        }
-      ]
-    },
-    {
-      "path": "src/js/bpm-grid.js",
-      "moduleId": "app.bpm.grid",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2430,
-          "scriptOrdinal": 93
-        }
-      ]
-    },
-    {
-      "path": "src/js/brush-editor.js",
-      "moduleId": "app.brush.editor",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2328,
-          "scriptOrdinal": 24
-        }
-      ]
-    },
-    {
-      "path": "src/js/brush-menu-bridge.js",
-      "moduleId": "app.brush.menu.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2490,
-          "scriptOrdinal": 146
-        }
-      ]
-    },
-    {
-      "path": "src/js/brush-preset-picker.js",
-      "moduleId": "app.brush.preset.picker",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2326,
-          "scriptOrdinal": 22
-        }
-      ]
-    },
-    {
-      "path": "src/js/brush-tool-presets.js",
-      "moduleId": "app.brush.tool.presets",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2327,
-          "scriptOrdinal": 23
-        }
-      ]
-    },
-    {
-      "path": "src/js/camera.js",
-      "moduleId": "app.camera",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2382,
-          "scriptOrdinal": 67
-        }
-      ]
-    },
-    {
-      "path": "src/js/color-manager.js",
-      "moduleId": "app.color.manager",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2443,
-          "scriptOrdinal": 103
-        }
-      ]
-    },
-    {
-      "path": "src/js/color-picker.js",
-      "moduleId": "app.color.picker",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2303,
-          "scriptOrdinal": 5
-        }
-      ]
-    },
-    {
-      "path": "src/js/comp-preview.js",
-      "moduleId": "app.comp.preview",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2448,
-          "scriptOrdinal": 108
-        }
-      ]
-    },
-    {
-      "path": "src/js/custom-effects.js",
-      "moduleId": "app.custom.effects",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2451,
-          "scriptOrdinal": 111
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/expression-random.js",
-      "moduleId": "app.expression.random.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2395,
-          "scriptOrdinal": 73
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/expression-time.js",
-      "moduleId": "app.expression.time.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2394,
-          "scriptOrdinal": 72
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/animation/opacity.js",
-      "moduleId": "app.opacity.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2385,
-          "scriptOrdinal": 70
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/component/exposed-properties.js",
-      "moduleId": "app.component.exposed-properties.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2310,
-          "scriptOrdinal": 12
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/diagnostics/opacity-diagnostics.js",
-      "moduleId": "app.opacity.diagnostics.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2393,
-          "scriptOrdinal": 71
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
-      "moduleId": "app.opacity.reproduction.bundle.domain",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "activation": "T07: no production load site at this head; required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs. T10 adds its production load site."
-    },
-    {
-      "path": "src/js/domain/document/folder-codec.js",
-      "moduleId": "app.folder.codec.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2316,
-          "scriptOrdinal": 14
-        }
-      ]
-    },
-    {
-      "path": "src/js/domain/tween/assignment.js",
-      "moduleId": "app.tween.assignment.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2318,
-          "scriptOrdinal": 15
-        }
-      ]
-    },
-    {
-      "path": "src/js/draw-bridge.js",
-      "moduleId": "app.draw.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2492,
-          "scriptOrdinal": 148
-        }
-      ]
-    },
-    {
-      "path": "src/js/drop-import.js",
-      "moduleId": "app.drop.import",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2441,
-          "scriptOrdinal": 101
-        }
-      ]
-    },
-    {
-      "path": "src/js/effector-layer.js",
-      "moduleId": "app.effector.layer",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2420,
-          "scriptOrdinal": 83
-        }
-      ]
-    },
-    {
-      "path": "src/js/effects-panel.js",
-      "moduleId": "app.effects.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2444,
-          "scriptOrdinal": 104
-        }
-      ]
-    },
-    {
-      "path": "src/js/engine-bridge.js",
-      "moduleId": "app.engine.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2480,
-          "scriptOrdinal": 136
-        }
-      ]
-    },
-    {
-      "path": "src/js/eraser-bridge.js",
-      "moduleId": "app.eraser.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2498,
-          "scriptOrdinal": 154
-        }
-      ]
-    },
-    {
-      "path": "src/js/export.js",
-      "moduleId": "app.export",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2333,
-          "scriptOrdinal": 27
-        }
-      ]
-    },
-    {
-      "path": "src/js/expr-bake.js",
-      "moduleId": "app.expr.bake",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2417,
-          "scriptOrdinal": 82
-        }
-      ],
-      "additionalContexts": [
-        {
-          "format": "commonjs",
-          "context": "node-test",
-          "exportSite": {
-            "path": "src/js/expr-bake.js",
-            "line": 338
-          },
-          "importSite": {
-            "path": "tests/expr-bake.test.cjs",
-            "line": 12
-          },
-          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
-        }
-      ]
-    },
-    {
-      "path": "src/js/expr-code-panel.js",
-      "moduleId": "app.expr.code.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2412,
-          "scriptOrdinal": 81
-        }
-      ]
-    },
-    {
-      "path": "src/js/expr-examples.js",
-      "moduleId": "app.expr.examples",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2407,
-          "scriptOrdinal": 79
-        }
-      ]
-    },
-    {
-      "path": "src/js/expr-functions.js",
-      "moduleId": "app.expr.functions",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2408,
-          "scriptOrdinal": 80
-        }
-      ]
-    },
-    {
-      "path": "src/js/feedback-bridge.js",
-      "moduleId": "app.feedback.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2456,
-          "scriptOrdinal": 116
-        }
-      ]
-    },
-    {
-      "path": "src/js/figma-import.js",
-      "moduleId": "app.figma.import",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2470,
-          "scriptOrdinal": 127
-        }
-      ]
-    },
-    {
-      "path": "src/js/fill-bridge.js",
-      "moduleId": "app.fill.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2500,
-          "scriptOrdinal": 156
-        }
-      ]
-    },
-    {
-      "path": "src/js/geometry-wasm-loader.js",
-      "moduleId": "app.geometry.wasm.loader",
-      "executionClass": "document-module",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2476,
-          "scriptOrdinal": 133
-        }
-      ]
-    },
-    {
-      "path": "src/js/gpu-gate.js",
-      "moduleId": "app.gpu.gate",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 9,
-          "scriptOrdinal": 1
-        }
-      ]
-    },
-    {
-      "path": "src/js/gradient-bridge.js",
-      "moduleId": "app.gradient.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2485,
-          "scriptOrdinal": 141
-        }
-      ]
-    },
-    {
-      "path": "src/js/group-bridge.js",
-      "moduleId": "app.group.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2493,
-          "scriptOrdinal": 149
-        }
-      ]
-    },
-    {
-      "path": "src/js/history-panel.js",
-      "moduleId": "app.history.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2457,
-          "scriptOrdinal": 117
-        }
-      ]
-    },
-    {
-      "path": "src/js/i18n.js",
-      "moduleId": "app.i18n",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2379,
-          "scriptOrdinal": 64
-        }
-      ]
-    },
-    {
-      "path": "src/js/idb-store.js",
-      "moduleId": "app.idb.store",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2374,
-          "scriptOrdinal": 59
-        }
-      ]
-    },
-    {
-      "path": "src/js/image-mesh-bridge.js",
-      "moduleId": "app.image.mesh.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2466,
-          "scriptOrdinal": 123
-        }
-      ]
-    },
-    {
-      "path": "src/js/image-mesh.js",
-      "moduleId": "app.image.mesh",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2465,
-          "scriptOrdinal": 122
-        }
-      ]
-    },
-    {
-      "path": "src/js/images.js",
-      "moduleId": "app.images",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2460,
-          "scriptOrdinal": 120
-        }
-      ]
-    },
-    {
-      "path": "src/js/kitsu.js",
-      "moduleId": "app.kitsu",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2459,
-          "scriptOrdinal": 119
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/auto-actions.js",
-      "moduleId": "app.labs.auto.actions",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/auto-actions.js",
-          "line": 20,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/auto-actions.js",
-          "line": 98,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/boil-effect.js",
-      "moduleId": "app.labs.boil.effect",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2366,
-          "scriptOrdinal": 51
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/canvas-grid.js",
-      "moduleId": "app.labs.canvas.grid",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2352,
-          "scriptOrdinal": 37
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/clip-mask-bake.js",
-      "moduleId": "app.labs.clip.mask.bake",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/clip-mask-bake.js",
-          "line": 23,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/clip-mask-bake.js",
-          "line": 86,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/command-palette.js",
-      "moduleId": "app.labs.command.palette",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/command-palette.js",
-          "line": 10,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/command-palette.js",
-          "line": 111,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/flip-roll.js",
-      "moduleId": "app.labs.flip.roll",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2354,
-          "scriptOrdinal": 39
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/follow-path.js",
-      "moduleId": "app.labs.follow.path",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2367,
-          "scriptOrdinal": 52
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/french-curve.js",
-      "moduleId": "app.labs.french.curve",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2369,
-          "scriptOrdinal": 54
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/interval-assistant.js",
-      "moduleId": "app.labs.interval.assistant",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2356,
-          "scriptOrdinal": 41
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/labs-core.js",
-      "moduleId": "app.labs.labs.core",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2346,
-          "scriptOrdinal": 31
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/labs-float-panel.js",
-      "moduleId": "app.labs.labs.float.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2371,
-          "scriptOrdinal": 56
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/labs-panel.js",
-      "moduleId": "app.labs.labs.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2370,
-          "scriptOrdinal": 55
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/lagoon-menu.js",
-      "moduleId": "app.labs.lagoon.menu",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2349,
-          "scriptOrdinal": 34
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/layer-effects-bake.js",
-      "moduleId": "app.labs.layer.effects.bake",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/layer-effects-bake.js",
-          "line": 21,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/layer-effects-bake.js",
-          "line": 91,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/lipsync-assistant.js",
-      "moduleId": "app.labs.lipsync.assistant",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/lipsync-assistant.js",
-          "line": 23,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/lipsync-assistant.js",
-          "line": 75,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/mirror-check.js",
-      "moduleId": "app.labs.mirror.check",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2359,
-          "scriptOrdinal": 44
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/move-to-layer.js",
-      "moduleId": "app.labs.move.to.layer",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2351,
-          "scriptOrdinal": 36
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/multiframe-draw.js",
-      "moduleId": "app.labs.multiframe.draw",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2348,
-          "scriptOrdinal": 33
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/oca-export.js",
-      "moduleId": "app.labs.oca.export",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/oca-export.js",
-          "line": 19,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/oca-export.js",
-          "line": 175,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/out-of-pegs.js",
-      "moduleId": "app.labs.out.of.pegs",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2358,
-          "scriptOrdinal": 43
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/pingpong-cycle.js",
-      "moduleId": "app.labs.pingpong.cycle",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2350,
-          "scriptOrdinal": 35
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/pose-library.js",
-      "moduleId": "app.labs.pose.library",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2364,
-          "scriptOrdinal": 49
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/predictive-stroke.js",
-      "moduleId": "app.labs.predictive.stroke",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2347,
-          "scriptOrdinal": 32
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/reference-3d.js",
-      "moduleId": "app.labs.reference.3d",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2365,
-          "scriptOrdinal": 50
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/reference-fill.js",
-      "moduleId": "app.labs.reference.fill",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2363,
-          "scriptOrdinal": 48
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/retime-exposure.js",
-      "moduleId": "app.labs.retime.exposure",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2355,
-          "scriptOrdinal": 40
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/rig-deform.js",
-      "moduleId": "app.labs.rig.deform",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/rig-deform.js",
-          "line": 41,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/rig-deform.js",
-          "line": 254,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/screentone-bake.js",
-      "moduleId": "app.labs.screentone.bake",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/screentone-bake.js",
-          "line": 22,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/screentone-bake.js",
-          "line": 160,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/shader-effects-bake.js",
-      "moduleId": "app.labs.shader.effects.bake",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/shader-effects-bake.js",
-          "line": 29,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/shader-effects-bake.js",
-          "line": 306,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/speed-lines.js",
-      "moduleId": "app.labs.speed.lines",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2362,
-          "scriptOrdinal": 47
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/storyboard-mode.js",
-      "moduleId": "app.labs.storyboard.mode",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/storyboard-mode.js",
-          "line": 39,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/storyboard-mode.js",
-          "line": 354,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/timelapse.js",
-      "moduleId": "app.labs.timelapse",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/timelapse.js",
-          "line": 13,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/timelapse.js",
-          "line": 81,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/timeline-markers.js",
-      "moduleId": "app.labs.timeline.markers",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2353,
-          "scriptOrdinal": 38
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/timeline-zoom.js",
-      "moduleId": "app.labs.timeline.zoom",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/labs/timeline-zoom.js",
-          "line": 38,
-          "role": "browser IIFE"
-        },
-        {
-          "path": "src/js/labs/timeline-zoom.js",
-          "line": 220,
-          "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/vector-sculpt.js",
-      "moduleId": "app.labs.vector.sculpt",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2368,
-          "scriptOrdinal": 53
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/vector-trim.js",
-      "moduleId": "app.labs.vector.trim",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2360,
-          "scriptOrdinal": 45
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/view-filter.js",
-      "moduleId": "app.labs.view.filter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2361,
-          "scriptOrdinal": 46
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/xsheet-panel.js",
-      "moduleId": "app.labs.xsheet.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2357,
-          "scriptOrdinal": 42
-        }
-      ]
-    },
-    {
-      "path": "src/js/layer-inout.js",
-      "moduleId": "app.layer.inout",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2427,
-          "scriptOrdinal": 90
-        }
-      ]
-    },
-    {
-      "path": "src/js/layer-kind.js",
-      "moduleId": "app.layer.kind",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2380,
-          "scriptOrdinal": 65
-        }
-      ]
-    },
-    {
-      "path": "src/js/layer-scroll-sync.js",
-      "moduleId": "app.layer.scroll.sync",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2428,
-          "scriptOrdinal": 91
-        }
-      ]
-    },
-    {
-      "path": "src/js/linked-media.js",
-      "moduleId": "app.linked.media",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2375,
-          "scriptOrdinal": 60
-        }
-      ]
-    },
-    {
-      "path": "src/js/lipsync.js",
-      "moduleId": "app.lipsync",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2447,
-          "scriptOrdinal": 107
-        }
-      ]
-    },
-    {
-      "path": "src/js/lottie-preview.js",
-      "moduleId": "app.lottie.preview",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2373,
-          "scriptOrdinal": 58
-        }
-      ]
-    },
-    {
-      "path": "src/js/markers.js",
-      "moduleId": "app.markers",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2429,
-          "scriptOrdinal": 92
-        }
-      ]
-    },
-    {
-      "path": "src/js/media-library.js",
-      "moduleId": "app.media.library",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2472,
-          "scriptOrdinal": 129
-        }
-      ]
-    },
-    {
-      "path": "src/js/motion-graph.js",
-      "moduleId": "app.motion.graph",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2423,
-          "scriptOrdinal": 86
-        }
-      ]
-    },
-    {
-      "path": "src/js/motion-preset-picker.js",
-      "moduleId": "app.motion.preset.picker",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2474,
-          "scriptOrdinal": 131
-        }
-      ]
-    },
-    {
-      "path": "src/js/motion.js",
-      "moduleId": "app.motion",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2397,
-          "scriptOrdinal": 75
-        }
-      ]
-    },
-    {
-      "path": "src/js/native-video-bridge.js",
-      "moduleId": "app.native.video.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2439,
-          "scriptOrdinal": 99
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-panel.js",
-      "moduleId": "app.nemo.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2424,
-          "scriptOrdinal": 87
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-plugin.js",
-      "moduleId": "app.nemo.plugin",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2426,
-          "scriptOrdinal": 89
-        }
-      ]
-    },
-    {
-      "path": "src/js/nemo-script.js",
-      "moduleId": "app.nemo.script",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2425,
-          "scriptOrdinal": 88
-        }
-      ]
-    },
-    {
-      "path": "src/js/p2p-contacts.js",
-      "moduleId": "app.p2p.contacts",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2432,
-          "scriptOrdinal": 95
-        }
-      ]
-    },
-    {
-      "path": "src/js/palette-panel.js",
-      "moduleId": "app.palette.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2442,
-          "scriptOrdinal": 102
-        }
-      ]
-    },
-    {
-      "path": "src/js/path-fx.js",
-      "moduleId": "app.path.fx",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2446,
-          "scriptOrdinal": 106
-        }
-      ]
-    },
-    {
-      "path": "src/js/pen-bridge.js",
-      "moduleId": "app.pen.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2501,
-          "scriptOrdinal": 157
-        }
-      ]
-    },
-    {
-      "path": "src/js/perspective-bridge.js",
-      "moduleId": "app.perspective.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2483,
-          "scriptOrdinal": 139
-        }
-      ]
-    },
-    {
-      "path": "src/js/playback-cache.js",
-      "moduleId": "app.playback.cache",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2482,
-          "scriptOrdinal": 138
-        }
-      ]
-    },
-    {
-      "path": "src/js/project-document.js",
-      "moduleId": "app.project.document",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2376,
-          "scriptOrdinal": 61
-        }
-      ]
-    },
-    {
-      "path": "src/js/project-entry.js",
-      "moduleId": "app.project.entry",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2453,
-          "scriptOrdinal": 113
-        }
-      ]
-    },
-    {
-      "path": "src/js/project.js",
-      "moduleId": "app.project",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2455,
-          "scriptOrdinal": 115
-        }
-      ]
-    },
-    {
-      "path": "src/js/psd-import-bridge.js",
-      "moduleId": "app.psd.import.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2469,
-          "scriptOrdinal": 126
-        }
-      ]
-    },
-    {
-      "path": "src/js/reference-bridge.js",
-      "moduleId": "app.reference.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2434,
-          "scriptOrdinal": 97
-        }
-      ]
-    },
-    {
-      "path": "src/js/render-manager.js",
-      "moduleId": "app.render.manager",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2334,
-          "scriptOrdinal": 28
-        }
-      ]
-    },
-    {
-      "path": "src/js/rig-bridge.js",
-      "moduleId": "app.rig.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2502,
-          "scriptOrdinal": 158
-        }
-      ]
-    },
-    {
-      "path": "src/js/rig-widget.js",
-      "moduleId": "app.rig.widget",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2467,
-          "scriptOrdinal": 124
-        }
-      ]
-    },
-    {
-      "path": "src/js/rive-export.js",
-      "moduleId": "app.rive.export",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2335,
-          "scriptOrdinal": 29
-        }
-      ]
-    },
-    {
-      "path": "src/js/rulers-bridge.js",
-      "moduleId": "app.rulers.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2499,
-          "scriptOrdinal": 155
-        }
-      ]
-    },
-    {
-      "path": "src/js/second-viewer.js",
-      "moduleId": "app.second.viewer",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2481,
-          "scriptOrdinal": 137
-        }
-      ]
-    },
-    {
-      "path": "src/js/select-bridge.js",
-      "moduleId": "app.select.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2495,
-          "scriptOrdinal": 151
-        }
-      ]
-    },
-    {
-      "path": "src/js/shader-effects-library.js",
-      "moduleId": "app.shader.effects.library",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2445,
-          "scriptOrdinal": 105
-        }
-      ]
-    },
-    {
-      "path": "src/js/shadow-brush-bridge.js",
-      "moduleId": "app.shadow.brush.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2491,
-          "scriptOrdinal": 147
-        }
-      ]
-    },
-    {
-      "path": "src/js/shape-bridge.js",
-      "moduleId": "app.shape.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2497,
-          "scriptOrdinal": 153
-        }
-      ]
-    },
-    {
-      "path": "src/js/shapes-panel.js",
-      "moduleId": "app.shapes.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2421,
-          "scriptOrdinal": 84
-        }
-      ]
-    },
-    {
-      "path": "src/js/storyboard.js",
-      "moduleId": "app.storyboard",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2440,
-          "scriptOrdinal": 100
-        }
-      ]
-    },
-    {
-      "path": "src/js/stroke-modeler.js",
-      "moduleId": "app.stroke.modeler",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2322,
-          "scriptOrdinal": 18
-        }
-      ]
-    },
-    {
-      "path": "src/js/subselect-bridge.js",
-      "moduleId": "app.subselect.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2496,
-          "scriptOrdinal": 152
-        }
-      ]
-    },
-    {
-      "path": "src/js/svg-import.js",
-      "moduleId": "app.svg.import",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2381,
-          "scriptOrdinal": 66
-        }
-      ]
-    },
-    {
-      "path": "src/js/symmetry-bridge.js",
-      "moduleId": "app.symmetry.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2484,
-          "scriptOrdinal": 140
-        }
-      ]
-    },
-    {
-      "path": "src/js/text-animator-panel.js",
-      "moduleId": "app.text.animator.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2468,
-          "scriptOrdinal": 125
-        }
-      ]
-    },
-    {
-      "path": "src/js/text-animator.js",
-      "moduleId": "app.text.animator",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2422,
-          "scriptOrdinal": 85
-        }
-      ]
-    },
-    {
-      "path": "src/js/text-selector.js",
-      "moduleId": "app.text.selector",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2383,
-          "scriptOrdinal": 68
-        }
-      ],
-      "additionalContexts": [
-        {
-          "format": "commonjs",
-          "context": "node-test",
-          "exportSite": {
-            "path": "src/js/text-selector.js",
-            "line": 229
-          },
-          "importSite": {
-            "path": "tests/text-selector.test.cjs",
-            "line": 12
-          },
-          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
-        }
-      ]
-    },
-    {
-      "path": "src/js/timeline-zoom.js",
-      "moduleId": "app.timeline.zoom",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2431,
-          "scriptOrdinal": 94
-        }
-      ]
-    },
-    {
-      "path": "src/js/timeline.js",
-      "moduleId": "app.timeline",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2378,
-          "scriptOrdinal": 63
-        }
-      ]
-    },
-    {
-      "path": "src/js/tools-panel-dock.js",
-      "moduleId": "app.tools.panel.dock",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2372,
-          "scriptOrdinal": 57
-        }
-      ]
-    },
-    {
-      "path": "src/js/tools.js",
-      "moduleId": "app.tools",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2323,
-          "scriptOrdinal": 19
-        }
-      ]
-    },
-    {
-      "path": "src/js/tracker-panel.js",
-      "moduleId": "app.tracker.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2450,
-          "scriptOrdinal": 110
-        }
-      ]
-    },
-    {
-      "path": "src/js/tracker.js",
-      "moduleId": "app.tracker",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2449,
-          "scriptOrdinal": 109
-        }
-      ]
-    },
-    {
-      "path": "src/js/transplant.js",
-      "moduleId": "app.transplant",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2473,
-          "scriptOrdinal": 130
-        }
-      ]
-    },
-    {
-      "path": "src/js/tutorial.js",
-      "moduleId": "app.tutorial",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2503,
-          "scriptOrdinal": 159
-        }
-      ]
-    },
-    {
-      "path": "src/js/tweens.js",
-      "moduleId": "app.tweens",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2321,
-          "scriptOrdinal": 17
-        }
-      ]
-    },
-    {
-      "path": "src/js/ui.js",
-      "moduleId": "app.ui",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2302,
-          "scriptOrdinal": 4
-        }
-      ]
-    },
-    {
-      "path": "src/js/updater-bridge.js",
-      "moduleId": "app.updater.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2458,
-          "scriptOrdinal": 118
-        }
-      ]
-    },
-    {
-      "path": "src/js/vector-text-bridge.js",
-      "moduleId": "app.vector.text.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2325,
-          "scriptOrdinal": 21
-        }
-      ]
-    },
-    {
-      "path": "src/js/vectorize-bridge.js",
-      "moduleId": "app.vectorize.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2452,
-          "scriptOrdinal": 112
-        }
-      ]
-    },
-    {
-      "path": "src/js/vectorize-wasm-loader.js",
-      "moduleId": "app.vectorize.wasm.loader",
-      "executionClass": "document-module",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2477,
-          "scriptOrdinal": 134
-        }
-      ]
-    },
-    {
-      "path": "src/js/vectorize-worker.js",
-      "moduleId": "app.vectorize.worker",
-      "executionClass": "module-worker",
-      "loadSites": [
-        {
-          "path": "src/js/vectorize-wasm-loader.js",
-          "line": 29
-        }
-      ]
-    },
-    {
-      "path": "src/js/viewtools-bridge.js",
-      "moduleId": "app.viewtools.bridge",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2486,
-          "scriptOrdinal": 142
-        }
-      ]
-    }
-  ],
   "exclusions": [
     {
       "path": "src/js/ag-psd.vendor.mjs",
@@ -2510,8 +262,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2464,
-          "scriptOrdinal": 121
+          "line": 2465,
+          "scriptOrdinal": 122
         }
       ]
     },
@@ -2539,8 +291,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2438,
-          "scriptOrdinal": 98
+          "line": 2439,
+          "scriptOrdinal": 99
         }
       ]
     },
@@ -2600,8 +352,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2324,
-          "scriptOrdinal": 20
+          "line": 2325,
+          "scriptOrdinal": 21
         }
       ]
     },
@@ -2930,5 +682,2277 @@
       "Reviewed architecture layers/APIs and complete global provider/consumer boundaries.",
       "Parsed bootstrap-order evidence and runtime readiness remain separate from source coverage and size enforcement."
     ]
-  }
+  },
+  "retainedSources": [
+    {
+      "path": "src/js/abr-import.js",
+      "moduleId": "app.abr.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2489,
+          "scriptOrdinal": 145
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/application-mcp.js",
+      "moduleId": "app.application.mcp.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2516,
+          "scriptOrdinal": 170
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/export-svg-frame.js",
+      "moduleId": "app.export.svgframe.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2331,
+          "scriptOrdinal": 26
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/export-svg-sequence.js",
+      "moduleId": "app.export.svgsequence.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2333,
+          "scriptOrdinal": 27
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/motion-canvas-intent.js",
+      "moduleId": "app.motion.canvas-intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2397,
+          "scriptOrdinal": 75
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-application.js",
+      "moduleId": "app.native.application.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2508,
+          "scriptOrdinal": 162
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-editor.js",
+      "moduleId": "app.native.opacity.editor.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2509,
+          "scriptOrdinal": 163
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-export.js",
+      "moduleId": "app.native.opacity.export.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2512,
+          "scriptOrdinal": 166
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-legacy-surface.js",
+      "moduleId": "app.native.opacity.legacy-surface.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2309,
+          "scriptOrdinal": 11
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-motion-surface.js",
+      "moduleId": "app.native.opacity.motion-surface.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2310,
+          "scriptOrdinal": 12
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-preview.js",
+      "moduleId": "app.native.opacity.preview.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2511,
+          "scriptOrdinal": 165
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-project-entry.js",
+      "moduleId": "adapter.native.opacity.project.entry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2456,
+          "scriptOrdinal": 116
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-opacity-selection.js",
+      "moduleId": "app.native.opacity.selection.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2510,
+          "scriptOrdinal": 164
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-viewport.js",
+      "moduleId": "app.native.viewport.adapter",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/adapters/native-viewport.js",
+          "line": 1,
+          "role": "N13 pure injected-transport metadata adapter; no bootstrap or production registration before N16"
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-native-save.js",
+      "moduleId": "app.project.nativesave.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2455,
+          "scriptOrdinal": 115
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/select-canvas-intent.js",
+      "moduleId": "app.select.canvas-intent.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2496,
+          "scriptOrdinal": 152
+        }
+      ]
+    },
+    {
+      "path": "src/js/ae-camera-export.js",
+      "moduleId": "app.ae.camera.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2337,
+          "scriptOrdinal": 31
+        }
+      ]
+    },
+    {
+      "path": "src/js/animation/curve.js",
+      "moduleId": "app.animation.curve",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2385,
+          "scriptOrdinal": 70
+        }
+      ]
+    },
+    {
+      "path": "src/js/app.js",
+      "moduleId": "app.app",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2312,
+          "scriptOrdinal": 14
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/capability-registry.js",
+      "moduleId": "app.capability.registry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2401,
+          "scriptOrdinal": 77
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/export-job.js",
+      "moduleId": "app.export.job.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2404,
+          "scriptOrdinal": 79
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/history/frame-entry.js",
+      "moduleId": "app.history.frameentry.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2321,
+          "scriptOrdinal": 17
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-edit-guard.js",
+      "moduleId": "app.native.edit.guard.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2513,
+          "scriptOrdinal": 167
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-opacity-contract.js",
+      "moduleId": "app.native.opacity.contract",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2304,
+          "scriptOrdinal": 6
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-opacity-lifecycle.js",
+      "moduleId": "app.native.opacity.lifecycle",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2305,
+          "scriptOrdinal": 7
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-opacity-operations.js",
+      "moduleId": "app.native.opacity.operations",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2307,
+          "scriptOrdinal": 9
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-opacity-viewport.js",
+      "moduleId": "app.native.opacity.viewport",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2306,
+          "scriptOrdinal": 8
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/opacity-application.js",
+      "moduleId": "app.opacity.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2308,
+          "scriptOrdinal": 10
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/opacity-capability.js",
+      "moduleId": "app.opacity.capability",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2402,
+          "scriptOrdinal": 78
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/render/image-budget.js",
+      "moduleId": "app.render.imagebudget.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2481,
+          "scriptOrdinal": 137
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/shortcut-registry.js",
+      "moduleId": "app.shortcuts.application",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2378,
+          "scriptOrdinal": 63
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/timelapse-capability.js",
+      "moduleId": "app.timelapse.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/timelapse-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (P31/#1033, bootstrap integration out of scope)"
+        }
+      ]
+    },
+    {
+      "path": "src/js/asset-tree.js",
+      "moduleId": "app.asset.tree",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2473,
+          "scriptOrdinal": 130
+        }
+      ]
+    },
+    {
+      "path": "src/js/assets-panel.js",
+      "moduleId": "app.assets.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2477,
+          "scriptOrdinal": 134
+        }
+      ]
+    },
+    {
+      "path": "src/js/audio-bridge.js",
+      "moduleId": "app.audio.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2434,
+          "scriptOrdinal": 97
+        }
+      ]
+    },
+    {
+      "path": "src/js/bitmap-brush.js",
+      "moduleId": "app.bitmap.brush",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2490,
+          "scriptOrdinal": 146
+        }
+      ]
+    },
+    {
+      "path": "src/js/bitmap-tip-picker.js",
+      "moduleId": "app.bitmap.tip.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2491,
+          "scriptOrdinal": 147
+        }
+      ]
+    },
+    {
+      "path": "src/js/bootstrap/native-opacity-application.js",
+      "moduleId": "app.native.opacity.bootstrap",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2515,
+          "scriptOrdinal": 169
+        }
+      ]
+    },
+    {
+      "path": "src/js/bootstrap/opacity-application.js",
+      "moduleId": "app.opacity.bootstrap",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2514,
+          "scriptOrdinal": 168
+        }
+      ]
+    },
+    {
+      "path": "src/js/bpm-grid.js",
+      "moduleId": "app.bpm.grid",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2431,
+          "scriptOrdinal": 94
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-editor.js",
+      "moduleId": "app.brush.editor",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2329,
+          "scriptOrdinal": 25
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-menu-bridge.js",
+      "moduleId": "app.brush.menu.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2492,
+          "scriptOrdinal": 148
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-preset-picker.js",
+      "moduleId": "app.brush.preset.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2327,
+          "scriptOrdinal": 23
+        }
+      ]
+    },
+    {
+      "path": "src/js/brush-tool-presets.js",
+      "moduleId": "app.brush.tool.presets",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2328,
+          "scriptOrdinal": 24
+        }
+      ]
+    },
+    {
+      "path": "src/js/camera.js",
+      "moduleId": "app.camera",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2383,
+          "scriptOrdinal": 68
+        }
+      ]
+    },
+    {
+      "path": "src/js/color-manager.js",
+      "moduleId": "app.color.manager",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2444,
+          "scriptOrdinal": 104
+        }
+      ]
+    },
+    {
+      "path": "src/js/color-picker.js",
+      "moduleId": "app.color.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2303,
+          "scriptOrdinal": 5
+        }
+      ]
+    },
+    {
+      "path": "src/js/comp-preview.js",
+      "moduleId": "app.comp.preview",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2449,
+          "scriptOrdinal": 109
+        }
+      ]
+    },
+    {
+      "path": "src/js/custom-effects.js",
+      "moduleId": "app.custom.effects",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2452,
+          "scriptOrdinal": 112
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/expression-random.js",
+      "moduleId": "app.expression.random.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2396,
+          "scriptOrdinal": 74
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/expression-time.js",
+      "moduleId": "app.expression.time.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2395,
+          "scriptOrdinal": 73
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/animation/opacity.js",
+      "moduleId": "app.opacity.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2386,
+          "scriptOrdinal": 71
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/component/exposed-properties.js",
+      "moduleId": "app.component.exposed-properties.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2311,
+          "scriptOrdinal": 13
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/diagnostics/opacity-diagnostics.js",
+      "moduleId": "app.opacity.diagnostics.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2394,
+          "scriptOrdinal": 72
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/document/folder-codec.js",
+      "moduleId": "app.folder.codec.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2317,
+          "scriptOrdinal": 15
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/tween/assignment.js",
+      "moduleId": "app.tween.assignment.domain",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2319,
+          "scriptOrdinal": 16
+        }
+      ]
+    },
+    {
+      "path": "src/js/draw-bridge.js",
+      "moduleId": "app.draw.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2494,
+          "scriptOrdinal": 150
+        }
+      ]
+    },
+    {
+      "path": "src/js/drop-import.js",
+      "moduleId": "app.drop.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2442,
+          "scriptOrdinal": 102
+        }
+      ]
+    },
+    {
+      "path": "src/js/effector-layer.js",
+      "moduleId": "app.effector.layer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2421,
+          "scriptOrdinal": 84
+        }
+      ]
+    },
+    {
+      "path": "src/js/effects-panel.js",
+      "moduleId": "app.effects.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2445,
+          "scriptOrdinal": 105
+        }
+      ]
+    },
+    {
+      "path": "src/js/engine-bridge.js",
+      "moduleId": "app.engine.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2482,
+          "scriptOrdinal": 138
+        }
+      ]
+    },
+    {
+      "path": "src/js/eraser-bridge.js",
+      "moduleId": "app.eraser.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2500,
+          "scriptOrdinal": 156
+        }
+      ]
+    },
+    {
+      "path": "src/js/export.js",
+      "moduleId": "app.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2334,
+          "scriptOrdinal": 28
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-bake.js",
+      "moduleId": "app.expr.bake",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2418,
+          "scriptOrdinal": 83
+        }
+      ],
+      "additionalContexts": [
+        {
+          "format": "commonjs",
+          "context": "node-test",
+          "exportSite": {
+            "path": "src/js/expr-bake.js",
+            "line": 338
+          },
+          "importSite": {
+            "path": "tests/expr-bake.test.cjs",
+            "line": 12
+          },
+          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-code-panel.js",
+      "moduleId": "app.expr.code.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2413,
+          "scriptOrdinal": 82
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-examples.js",
+      "moduleId": "app.expr.examples",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2408,
+          "scriptOrdinal": 80
+        }
+      ]
+    },
+    {
+      "path": "src/js/expr-functions.js",
+      "moduleId": "app.expr.functions",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2409,
+          "scriptOrdinal": 81
+        }
+      ]
+    },
+    {
+      "path": "src/js/feedback-bridge.js",
+      "moduleId": "app.feedback.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2458,
+          "scriptOrdinal": 118
+        }
+      ]
+    },
+    {
+      "path": "src/js/figma-import.js",
+      "moduleId": "app.figma.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2472,
+          "scriptOrdinal": 129
+        }
+      ]
+    },
+    {
+      "path": "src/js/fill-bridge.js",
+      "moduleId": "app.fill.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2502,
+          "scriptOrdinal": 158
+        }
+      ]
+    },
+    {
+      "path": "src/js/geometry-wasm-loader.js",
+      "moduleId": "app.geometry.wasm.loader",
+      "executionClass": "document-module",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2478,
+          "scriptOrdinal": 135
+        }
+      ]
+    },
+    {
+      "path": "src/js/gpu-gate.js",
+      "moduleId": "app.gpu.gate",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 9,
+          "scriptOrdinal": 1
+        }
+      ]
+    },
+    {
+      "path": "src/js/gradient-bridge.js",
+      "moduleId": "app.gradient.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2487,
+          "scriptOrdinal": 143
+        }
+      ]
+    },
+    {
+      "path": "src/js/group-bridge.js",
+      "moduleId": "app.group.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2495,
+          "scriptOrdinal": 151
+        }
+      ]
+    },
+    {
+      "path": "src/js/history-panel.js",
+      "moduleId": "app.history.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2459,
+          "scriptOrdinal": 119
+        }
+      ]
+    },
+    {
+      "path": "src/js/i18n.js",
+      "moduleId": "app.i18n",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2380,
+          "scriptOrdinal": 65
+        }
+      ]
+    },
+    {
+      "path": "src/js/idb-store.js",
+      "moduleId": "app.idb.store",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2375,
+          "scriptOrdinal": 60
+        }
+      ]
+    },
+    {
+      "path": "src/js/image-mesh-bridge.js",
+      "moduleId": "app.image.mesh.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2468,
+          "scriptOrdinal": 125
+        }
+      ]
+    },
+    {
+      "path": "src/js/image-mesh.js",
+      "moduleId": "app.image.mesh",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2467,
+          "scriptOrdinal": 124
+        }
+      ]
+    },
+    {
+      "path": "src/js/images.js",
+      "moduleId": "app.images",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2462,
+          "scriptOrdinal": 122
+        }
+      ]
+    },
+    {
+      "path": "src/js/kitsu.js",
+      "moduleId": "app.kitsu",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2461,
+          "scriptOrdinal": 121
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/auto-actions.js",
+      "moduleId": "app.labs.auto.actions",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/auto-actions.js",
+          "line": 20,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/auto-actions.js",
+          "line": 98,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/boil-effect.js",
+      "moduleId": "app.labs.boil.effect",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2367,
+          "scriptOrdinal": 52
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/canvas-grid.js",
+      "moduleId": "app.labs.canvas.grid",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2353,
+          "scriptOrdinal": 38
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/clip-mask-bake.js",
+      "moduleId": "app.labs.clip.mask.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/clip-mask-bake.js",
+          "line": 23,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/clip-mask-bake.js",
+          "line": 86,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/command-palette.js",
+      "moduleId": "app.labs.command.palette",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/command-palette.js",
+          "line": 10,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/command-palette.js",
+          "line": 111,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/flip-roll.js",
+      "moduleId": "app.labs.flip.roll",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2355,
+          "scriptOrdinal": 40
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/follow-path.js",
+      "moduleId": "app.labs.follow.path",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2368,
+          "scriptOrdinal": 53
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/french-curve.js",
+      "moduleId": "app.labs.french.curve",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2370,
+          "scriptOrdinal": 55
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/interval-assistant.js",
+      "moduleId": "app.labs.interval.assistant",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2357,
+          "scriptOrdinal": 42
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-core.js",
+      "moduleId": "app.labs.labs.core",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2347,
+          "scriptOrdinal": 32
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-float-panel.js",
+      "moduleId": "app.labs.labs.float.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2372,
+          "scriptOrdinal": 57
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/labs-panel.js",
+      "moduleId": "app.labs.labs.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2371,
+          "scriptOrdinal": 56
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/lagoon-menu.js",
+      "moduleId": "app.labs.lagoon.menu",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2350,
+          "scriptOrdinal": 35
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/layer-effects-bake.js",
+      "moduleId": "app.labs.layer.effects.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/layer-effects-bake.js",
+          "line": 21,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/layer-effects-bake.js",
+          "line": 91,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/lipsync-assistant.js",
+      "moduleId": "app.labs.lipsync.assistant",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/lipsync-assistant.js",
+          "line": 23,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/lipsync-assistant.js",
+          "line": 75,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/mirror-check.js",
+      "moduleId": "app.labs.mirror.check",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2360,
+          "scriptOrdinal": 45
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/move-to-layer.js",
+      "moduleId": "app.labs.move.to.layer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2352,
+          "scriptOrdinal": 37
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/multiframe-draw.js",
+      "moduleId": "app.labs.multiframe.draw",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2349,
+          "scriptOrdinal": 34
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/oca-export.js",
+      "moduleId": "app.labs.oca.export",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/oca-export.js",
+          "line": 19,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/oca-export.js",
+          "line": 175,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/out-of-pegs.js",
+      "moduleId": "app.labs.out.of.pegs",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2359,
+          "scriptOrdinal": 44
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/pingpong-cycle.js",
+      "moduleId": "app.labs.pingpong.cycle",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2351,
+          "scriptOrdinal": 36
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/pose-library.js",
+      "moduleId": "app.labs.pose.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2365,
+          "scriptOrdinal": 50
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/predictive-stroke.js",
+      "moduleId": "app.labs.predictive.stroke",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2348,
+          "scriptOrdinal": 33
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/reference-3d.js",
+      "moduleId": "app.labs.reference.3d",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2366,
+          "scriptOrdinal": 51
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/reference-fill.js",
+      "moduleId": "app.labs.reference.fill",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2364,
+          "scriptOrdinal": 49
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/retime-exposure.js",
+      "moduleId": "app.labs.retime.exposure",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2356,
+          "scriptOrdinal": 41
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/rig-deform.js",
+      "moduleId": "app.labs.rig.deform",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/rig-deform.js",
+          "line": 41,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/rig-deform.js",
+          "line": 254,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/screentone-bake.js",
+      "moduleId": "app.labs.screentone.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/screentone-bake.js",
+          "line": 22,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/screentone-bake.js",
+          "line": 160,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/shader-effects-bake.js",
+      "moduleId": "app.labs.shader.effects.bake",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/shader-effects-bake.js",
+          "line": 29,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/shader-effects-bake.js",
+          "line": 306,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/speed-lines.js",
+      "moduleId": "app.labs.speed.lines",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2363,
+          "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/storyboard-mode.js",
+      "moduleId": "app.labs.storyboard.mode",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/storyboard-mode.js",
+          "line": 39,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/storyboard-mode.js",
+          "line": 354,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timelapse.js",
+      "moduleId": "app.labs.timelapse",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/timelapse.js",
+          "line": 13,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/timelapse.js",
+          "line": 81,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timeline-markers.js",
+      "moduleId": "app.labs.timeline.markers",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2354,
+          "scriptOrdinal": 39
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/timeline-zoom.js",
+      "moduleId": "app.labs.timeline.zoom",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/labs/timeline-zoom.js",
+          "line": 38,
+          "role": "browser IIFE"
+        },
+        {
+          "path": "src/js/labs/timeline-zoom.js",
+          "line": 220,
+          "role": "Labs registration if explicitly loaded"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/vector-sculpt.js",
+      "moduleId": "app.labs.vector.sculpt",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2369,
+          "scriptOrdinal": 54
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/vector-trim.js",
+      "moduleId": "app.labs.vector.trim",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2361,
+          "scriptOrdinal": 46
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/view-filter.js",
+      "moduleId": "app.labs.view.filter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2362,
+          "scriptOrdinal": 47
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/xsheet-panel.js",
+      "moduleId": "app.labs.xsheet.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2358,
+          "scriptOrdinal": 43
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-inout.js",
+      "moduleId": "app.layer.inout",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2428,
+          "scriptOrdinal": 91
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-kind.js",
+      "moduleId": "app.layer.kind",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2381,
+          "scriptOrdinal": 66
+        }
+      ]
+    },
+    {
+      "path": "src/js/layer-scroll-sync.js",
+      "moduleId": "app.layer.scroll.sync",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2429,
+          "scriptOrdinal": 92
+        }
+      ]
+    },
+    {
+      "path": "src/js/linked-media.js",
+      "moduleId": "app.linked.media",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2376,
+          "scriptOrdinal": 61
+        }
+      ]
+    },
+    {
+      "path": "src/js/lipsync.js",
+      "moduleId": "app.lipsync",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2448,
+          "scriptOrdinal": 108
+        }
+      ]
+    },
+    {
+      "path": "src/js/lottie-preview.js",
+      "moduleId": "app.lottie.preview",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2374,
+          "scriptOrdinal": 59
+        }
+      ]
+    },
+    {
+      "path": "src/js/markers.js",
+      "moduleId": "app.markers",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2430,
+          "scriptOrdinal": 93
+        }
+      ]
+    },
+    {
+      "path": "src/js/media-library.js",
+      "moduleId": "app.media.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2474,
+          "scriptOrdinal": 131
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion-graph.js",
+      "moduleId": "app.motion.graph",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2424,
+          "scriptOrdinal": 87
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion-preset-picker.js",
+      "moduleId": "app.motion.preset.picker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2476,
+          "scriptOrdinal": 133
+        }
+      ]
+    },
+    {
+      "path": "src/js/motion.js",
+      "moduleId": "app.motion",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2398,
+          "scriptOrdinal": 76
+        }
+      ]
+    },
+    {
+      "path": "src/js/native-video-bridge.js",
+      "moduleId": "app.native.video.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2440,
+          "scriptOrdinal": 100
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-panel.js",
+      "moduleId": "app.nemo.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2425,
+          "scriptOrdinal": 88
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-plugin.js",
+      "moduleId": "app.nemo.plugin",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2427,
+          "scriptOrdinal": 90
+        }
+      ]
+    },
+    {
+      "path": "src/js/nemo-script.js",
+      "moduleId": "app.nemo.script",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2426,
+          "scriptOrdinal": 89
+        }
+      ]
+    },
+    {
+      "path": "src/js/p2p-contacts.js",
+      "moduleId": "app.p2p.contacts",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2433,
+          "scriptOrdinal": 96
+        }
+      ]
+    },
+    {
+      "path": "src/js/palette-panel.js",
+      "moduleId": "app.palette.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2443,
+          "scriptOrdinal": 103
+        }
+      ]
+    },
+    {
+      "path": "src/js/path-fx.js",
+      "moduleId": "app.path.fx",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2447,
+          "scriptOrdinal": 107
+        }
+      ]
+    },
+    {
+      "path": "src/js/pen-bridge.js",
+      "moduleId": "app.pen.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2503,
+          "scriptOrdinal": 159
+        }
+      ]
+    },
+    {
+      "path": "src/js/perspective-bridge.js",
+      "moduleId": "app.perspective.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2485,
+          "scriptOrdinal": 141
+        }
+      ]
+    },
+    {
+      "path": "src/js/playback-cache.js",
+      "moduleId": "app.playback.cache",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2484,
+          "scriptOrdinal": 140
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-document.js",
+      "moduleId": "app.project.document",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2377,
+          "scriptOrdinal": 62
+        }
+      ]
+    },
+    {
+      "path": "src/js/project-entry.js",
+      "moduleId": "app.project.entry",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2454,
+          "scriptOrdinal": 114
+        }
+      ]
+    },
+    {
+      "path": "src/js/project.js",
+      "moduleId": "app.project",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2457,
+          "scriptOrdinal": 117
+        }
+      ]
+    },
+    {
+      "path": "src/js/psd-import-bridge.js",
+      "moduleId": "app.psd.import.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2471,
+          "scriptOrdinal": 128
+        }
+      ]
+    },
+    {
+      "path": "src/js/reference-bridge.js",
+      "moduleId": "app.reference.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2435,
+          "scriptOrdinal": 98
+        }
+      ]
+    },
+    {
+      "path": "src/js/render-manager.js",
+      "moduleId": "app.render.manager",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2335,
+          "scriptOrdinal": 29
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-bridge.js",
+      "moduleId": "app.rig.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2504,
+          "scriptOrdinal": 160
+        }
+      ]
+    },
+    {
+      "path": "src/js/rig-widget.js",
+      "moduleId": "app.rig.widget",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2469,
+          "scriptOrdinal": 126
+        }
+      ]
+    },
+    {
+      "path": "src/js/rive-export.js",
+      "moduleId": "app.rive.export",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2336,
+          "scriptOrdinal": 30
+        }
+      ]
+    },
+    {
+      "path": "src/js/rulers-bridge.js",
+      "moduleId": "app.rulers.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2501,
+          "scriptOrdinal": 157
+        }
+      ]
+    },
+    {
+      "path": "src/js/second-viewer.js",
+      "moduleId": "app.second.viewer",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2483,
+          "scriptOrdinal": 139
+        }
+      ]
+    },
+    {
+      "path": "src/js/select-bridge.js",
+      "moduleId": "app.select.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2497,
+          "scriptOrdinal": 153
+        }
+      ]
+    },
+    {
+      "path": "src/js/shader-effects-library.js",
+      "moduleId": "app.shader.effects.library",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2446,
+          "scriptOrdinal": 106
+        }
+      ]
+    },
+    {
+      "path": "src/js/shadow-brush-bridge.js",
+      "moduleId": "app.shadow.brush.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2493,
+          "scriptOrdinal": 149
+        }
+      ]
+    },
+    {
+      "path": "src/js/shape-bridge.js",
+      "moduleId": "app.shape.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2499,
+          "scriptOrdinal": 155
+        }
+      ]
+    },
+    {
+      "path": "src/js/shapes-panel.js",
+      "moduleId": "app.shapes.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2422,
+          "scriptOrdinal": 85
+        }
+      ]
+    },
+    {
+      "path": "src/js/storyboard.js",
+      "moduleId": "app.storyboard",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2441,
+          "scriptOrdinal": 101
+        }
+      ]
+    },
+    {
+      "path": "src/js/stroke-modeler.js",
+      "moduleId": "app.stroke.modeler",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2323,
+          "scriptOrdinal": 19
+        }
+      ]
+    },
+    {
+      "path": "src/js/subselect-bridge.js",
+      "moduleId": "app.subselect.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2498,
+          "scriptOrdinal": 154
+        }
+      ]
+    },
+    {
+      "path": "src/js/svg-import.js",
+      "moduleId": "app.svg.import",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2382,
+          "scriptOrdinal": 67
+        }
+      ]
+    },
+    {
+      "path": "src/js/symmetry-bridge.js",
+      "moduleId": "app.symmetry.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2486,
+          "scriptOrdinal": 142
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-animator-panel.js",
+      "moduleId": "app.text.animator.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2470,
+          "scriptOrdinal": 127
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-animator.js",
+      "moduleId": "app.text.animator",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2423,
+          "scriptOrdinal": 86
+        }
+      ]
+    },
+    {
+      "path": "src/js/text-selector.js",
+      "moduleId": "app.text.selector",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2384,
+          "scriptOrdinal": 69
+        }
+      ],
+      "additionalContexts": [
+        {
+          "format": "commonjs",
+          "context": "node-test",
+          "exportSite": {
+            "path": "src/js/text-selector.js",
+            "line": 229
+          },
+          "importSite": {
+            "path": "tests/text-selector.test.cjs",
+            "line": 12
+          },
+          "note": "Guarded CommonJS export consumed by committed tests; production entry remains a classic document script."
+        }
+      ]
+    },
+    {
+      "path": "src/js/timeline-zoom.js",
+      "moduleId": "app.timeline.zoom",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2432,
+          "scriptOrdinal": 95
+        }
+      ]
+    },
+    {
+      "path": "src/js/timeline.js",
+      "moduleId": "app.timeline",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2379,
+          "scriptOrdinal": 64
+        }
+      ]
+    },
+    {
+      "path": "src/js/tools-panel-dock.js",
+      "moduleId": "app.tools.panel.dock",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2373,
+          "scriptOrdinal": 58
+        }
+      ]
+    },
+    {
+      "path": "src/js/tools.js",
+      "moduleId": "app.tools",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2324,
+          "scriptOrdinal": 20
+        }
+      ]
+    },
+    {
+      "path": "src/js/tracker-panel.js",
+      "moduleId": "app.tracker.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2451,
+          "scriptOrdinal": 111
+        }
+      ]
+    },
+    {
+      "path": "src/js/tracker.js",
+      "moduleId": "app.tracker",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2450,
+          "scriptOrdinal": 110
+        }
+      ]
+    },
+    {
+      "path": "src/js/transplant.js",
+      "moduleId": "app.transplant",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2475,
+          "scriptOrdinal": 132
+        }
+      ]
+    },
+    {
+      "path": "src/js/tutorial.js",
+      "moduleId": "app.tutorial",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2505,
+          "scriptOrdinal": 161
+        }
+      ]
+    },
+    {
+      "path": "src/js/tweens.js",
+      "moduleId": "app.tweens",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2322,
+          "scriptOrdinal": 18
+        }
+      ]
+    },
+    {
+      "path": "src/js/ui.js",
+      "moduleId": "app.ui",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2302,
+          "scriptOrdinal": 4
+        }
+      ]
+    },
+    {
+      "path": "src/js/updater-bridge.js",
+      "moduleId": "app.updater.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2460,
+          "scriptOrdinal": 120
+        }
+      ]
+    },
+    {
+      "path": "src/js/vector-text-bridge.js",
+      "moduleId": "app.vector.text.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2326,
+          "scriptOrdinal": 22
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-bridge.js",
+      "moduleId": "app.vectorize.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2453,
+          "scriptOrdinal": 113
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-wasm-loader.js",
+      "moduleId": "app.vectorize.wasm.loader",
+      "executionClass": "document-module",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2479,
+          "scriptOrdinal": 136
+        }
+      ]
+    },
+    {
+      "path": "src/js/vectorize-worker.js",
+      "moduleId": "app.vectorize.worker",
+      "executionClass": "module-worker",
+      "loadSites": [
+        {
+          "path": "src/js/vectorize-wasm-loader.js",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "path": "src/js/viewtools-bridge.js",
+      "moduleId": "app.viewtools.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2488,
+          "scriptOrdinal": 144
+        }
+      ]
+    },
+    {
+      "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
+      "moduleId": "app.opacity.reproduction.bundle.domain",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "activation": "T07: no production load site at this head; required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs. T10 adds its production load site."
+    }
+  ]
 }
