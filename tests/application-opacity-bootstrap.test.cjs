@@ -37,7 +37,7 @@ function application() {
     'domain/document/folder-codec.js',
     'domain/tween/assignment.js',
     'application/history/frame-entry.js',
-    'tweens.js', 'application/opacity-application.js',
+    'tweens.js', 'domain/diagnostics/opacity-diagnostics.js', 'application/opacity-application.js',
     'application/capability-registry.js', 'application/opacity-capability.js',
     // P19: the bootstrap also registers the export capability and routes by it.
     'application/export-job.js', 'adapters/export-svg-sequence.js',

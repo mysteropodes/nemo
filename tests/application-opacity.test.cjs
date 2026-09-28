@@ -19,7 +19,7 @@ function app() {
   // P19 added application/export-job.js + adapters/export-svg-sequence.js: the
   // bootstrap registers the export capability alongside opacity and routes by
   // capability, so both are load-order dependencies of it now.
-  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/application/opacity-application.js', 'src/js/application/capability-registry.js', 'src/js/application/opacity-capability.js', 'src/js/application/export-job.js', 'src/js/adapters/export-svg-sequence.js', 'src/js/bootstrap/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
+  for (const f of ['src/js/domain/animation/opacity.js', 'src/js/domain/diagnostics/opacity-diagnostics.js', 'src/js/application/opacity-application.js', 'src/js/application/capability-registry.js', 'src/js/application/opacity-capability.js', 'src/js/application/export-job.js', 'src/js/adapters/export-svg-sequence.js', 'src/js/bootstrap/opacity-application.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), context, { filename: f });
   return context;
 }
 function request(ctx, id, operation, payload) { const m = ctx.NemoOpacityApplication.meta(); return { apiVersion: 1, requestId: id, instanceId: m.instanceId, documentId: m.documentId, expectedRevision: m.revision, operation, payload: payload || {} }; }
