@@ -6034,6 +6034,24 @@
           1648,
           1660
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1601,
+            1646
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 1601-1606 continue setTimeLinkAltReveal (declared at 1600) and install Alt/blur listeners that reveal Parent-in-Time anchors, mapping to pending C02.layer-inout.bar-rendering (#1037). Lines 1608-1619 are comment-only marquee rationale; lines 1620-1626 register initEmptyGridMarquee for loading and already-ready documents, mapping to pending C02.layer-inout.selection-and-marquee. In the SMLayerInOut export object, line 1629 exposes the bar-rendering API, mapping to C02.layer-inout.bar-rendering; lines 1633-1634 expose onDown and bar batch operations, mapping to C02.layer-inout.drag-and-batch-ops; lines 1640-1641 expose marqueeSelect/clearSelection, mapping to C02.layer-inout.selection-and-marquee. Lines 1642-1646 are comments only; the retimeLayers declaration starts at 1647 outside this span. These C02 packets remain pending; this mapping adds no computed range coverage or implementation acceptance."
+        },
+        {
+          "span": [
+            1648,
+            1660
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 1648-1653 are the executable body and close of retimeLayers, whose declaration is line 1647 outside this span; the body shifts layer frames and Motion keys together and maps to pending C02.layer-inout.drag-and-batch-ops (#1037). Line 1654 exports getBarSelection and line 1658 exports setBarSelection, mapping to pending C02.layer-inout.selection-and-marquee. Lines 1655-1657 are anchor comments only; lines 1659-1660 close the export object and IIFE. The C02 packets remain pending; this mapping adds no computed range coverage or implementation acceptance."
+        }
       ]
     },
     {
