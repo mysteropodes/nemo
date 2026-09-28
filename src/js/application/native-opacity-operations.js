@@ -6,12 +6,15 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function create(lifecycle, ports, contract) {
+  function create(lifecycle, ports, contract, viewportModule) {
     if (!contract) throw new TypeError('native opacity operations require the pure contract');
+    if (!viewportModule || typeof viewportModule.create !== 'function') {
+      throw new Error('native opacity viewport scheduler is unavailable');
+    }
     var v1ByLifecycle = new WeakMap();
-    // Extension capabilities can outlive a document; this latch lasts for the page.
-    // All retry/trace and pending resize work, in contrast, belongs to one session.
-    var extensionExposed = false, resize = null, installation = null;
+    // Extension capabilities outlive a document; opening is one import at a time.
+    var extensionExposed = false, installation = null, opening = false;
+    var viewport = viewportModule.create(lifecycle, ports, function () { return opening; });
 
     function ensureActive() {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
@@ -206,46 +209,42 @@
     function reenterLegacy() { return false; }
     function disposeSession(session) {
       v1ByLifecycle.delete(session);
-      if (resize && resize.session === session) {
-        ports.surface.cancel(resize.timer);
-        resize = null;
+      viewport.disposeSession(session);
+    }
+    function afterChange() {
+      if (opening) {
+        if (!ports.surface || typeof ports.surface.setAdmissionFrameZero !== 'function') {
+          throw new Error('native admission presentation-frame port is unavailable');
+        }
+        ports.surface.setAdmissionFrameZero();
       }
+      if (ports.afterChange) ports.afterChange();
     }
     function allowLegacy(kind) {
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
     }
     async function importJSON(json) {
-      try { ports.document.prepareNativeOpacity(json); }
+      var candidate;
+      try { candidate = ports.document.prepareNativeOpacity(json); }
       catch (_) { return false; }
+      if (opening || !['legacy', 'closed'].includes(lifecycle.inspect().phase)) return false;
       if (extensionExposed || ports.surface.extensionOpen()) {
         ports.surface.toast(extensionExposed
           ? 'Reload or restart Nemo before enabling native opacity after using scripts or plugins.'
           : 'Close every script panel and plugin, then retry native opacity.');
         return false;
       }
-      ports.surface.toast('Native document presentation installation is unavailable.');
-      return false;
-    }
-    function resizeViewport() {
-      var observed = lifecycle.inspect(), token;
-      try { token = lifecycle.getNativeIdentity(); } catch (_) { return; }
-      if (!token || !observed.session) return;
-      if (resize) ports.surface.cancel(resize.timer);
-      var job = { session: observed.session, timer: null };
-      resize = job;
-      job.timer = ports.surface.defer(async function () {
-        if (resize !== job || lifecycle.inspect().session !== job.session) return;
-        resize = null;
-        var currentToken;
-        try { currentToken = lifecycle.getNativeIdentity(); } catch (_) { return; }
-        if (!currentToken || currentToken.documentId !== token.documentId ||
-            currentToken.generation !== token.generation) return;
-        try { await ports.surface.resize(lifecycle.identity()); }
-        catch (error) {
-          if (lifecycle.inspect().session === job.session) lifecycle.fence(error);
-        }
-      }, 50);
+      opening = true;
+      viewport.reset();
+      try {
+        if (await lifecycle.activate(candidate) !== true) return false;
+        return await viewport.presentPreview(0);
+      } catch (error) {
+        return false;
+      } finally {
+        opening = false;
+      }
     }
     function install() {
       if (installation) return installation;
@@ -305,7 +304,8 @@
       disposers.push(surface.publish(Object.freeze({ allow: allowLegacy }), Object.freeze({
         blocksLegacy: lifecycle.blocksLegacy, isActive: lifecycle.isActive,
         prepared: lifecycle.prepared, identity: lifecycle.identity, projectSelection: lifecycle.projectSelection,
-        persistenceJSON: lifecycle.persistenceJSON, renderPreview: lifecycle.renderPreview,
+        persistenceJSON: lifecycle.persistenceJSON, renderPreview: viewport.renderPreview,
+        presentPreview: viewport.presentPreview,
         exportPng: lifecycle.exportPng, releaseCurrent: lifecycle.releaseCurrent,
         historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); }
       }), Object.freeze({ importJSON: importJSON,
@@ -314,7 +314,7 @@
         var current = lifecycle.identity();
         return current ? { instanceId: current.instanceId, documentId: current.documentId,
           revision: current.contentRevision } : null;
-      } }), resizeViewport));
+      } }), viewport.resizeViewport));
       installation = Object.freeze({ dispose: function () {
         if (lifecycle.blocksLegacy()) throw new Error('native opacity must release before surface disposal');
         disposers.slice().reverse().forEach(function (dispose) { dispose(); });
@@ -333,7 +333,8 @@
       history: function (action, requestId) { return history(action, requestId, 'direct'); },
       historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); },
       legacyIntent: legacyIntent, handleV1: handleV1,
-      reenterLegacy: reenterLegacy, disposeSession: disposeSession, install: install
+      reenterLegacy: reenterLegacy, disposeSession: disposeSession,
+      afterChange: afterChange, install: install
     });
   }
 
