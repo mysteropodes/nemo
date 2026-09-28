@@ -124,7 +124,13 @@ files carry small remainders (module headers, export blocks, trailing helpers) l
 original partitions. P03C-f/#1421 marks six frozen geometry-WASM module preambles as
 `boundary`: the comment/import lines before C03/#1038 packet starts at eraser.rs:10, fill.rs:34,
 shapes.rs:8, strokemodeler.rs:14, track.rs:22 and tweenmatch.rs:15. This accounts for six spans
-without changing the computed 7 185 uncovered code lines, frozen source or packet state. (4)
+without changing the computed 7 185 uncovered code lines, frozen source or packet state. P03C-l/#1438
+maps project.js:11-19 and the getOpenTabs API in 412-432 to pending C01 document-I/O/project-tab
+responsibilities, while marking six comment/blank preambles (21-24, 51-53, 220-227, 311-321,
+486-497 and 634-635) as boundaries before their adjacent C01 owners. The executable module opener
+1-9 stays unresolved; these are responsibility/boundary records only, not packet admission or
+implementation acceptance. Project.js's 70 computed uncovered code lines and global 7 185 are unchanged.
+(4)
 The 40 previously dispositioned executable paths without a packet
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
 the total to 46 and the unmapped count to zero.
@@ -164,8 +170,10 @@ Every reviewed claim carries its evidence and is validated by shape:
   as boundaries, P03C-i mapped eight C02 expression responsibilities plus one comment
   boundary, and P03C-j mapped two key-selection/curve-widget spans to pending C02
   responsibilities; P03C-k maps four frozen Tween solver call sites to pending C02 matching and
-  resampling responsibilities while citing the narrower accepted P23 assignment extraction.
-  The 293 Motion, 516 Tweens and global computed uncovered code totals are unchanged. P03C-c reconciled
+  resampling responsibilities while citing the narrower accepted P23 assignment extraction;
+  P03C-l maps Project lifecycle declarations/API and six preambles to pending C01 owners, leaving
+  opener 1-9 unresolved. The 70 Project, 293 Motion, 516 Tweens and global computed uncovered code
+  totals are unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
@@ -175,7 +183,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
   P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
-  five Tween assignment-seam spans; 121 spans remain undispositioned.
+  five Tween assignment-seam spans, and P03C-l/#1438 dispositioned eight Project lifecycle spans;
+  113 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -218,8 +227,12 @@ and curves/easing with C20o evidence. Packet admissions and computed range cover
 unchanged. P03C-k/#1436 records the frozen Tween assignment call sites against pending C02
 matching/resampling responsibilities, while P23/#1025 (PR #1166) remains limited to its accepted
 Hungarian solver extraction; 516 Tweens and 7 185 global computed uncovered code lines are
-unchanged. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 121
+unchanged. P03C-l/#1438 maps frozen project.js declarations and getOpenTabs to pending C01
+document-I/O/project-tabs responsibilities, with six comment/blank preambles marked as boundaries
+to adjacent C01 owners; executable opener 1-9 remains unresolved. This changes no coverage or
+packet admission, and project.js stays at 70 computed uncovered code lines. **P03 is not complete
+and no extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes needing
+reconciliation, 0 unmapped paths and 113
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
