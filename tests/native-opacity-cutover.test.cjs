@@ -547,7 +547,7 @@ test('Motion surface is frozen and stateless with live native reads, detached vi
     const seedFailure = new Error('seed failure');
     assert.throws(() => api.detachedElementView(item, () => { throw seedFailure; }), (error) => error === seedFailure);
   }
-  const plan = NativeMotionSurface.renderedOpacityRoute(harness.controller, holder, 'opacity');
+  const plan = NativeMotionSurface.renderedOpacityRoute(harness.controller, holder, 'opacity', 10);
   assert.equal(Object.isFrozen(plan), true); assert.equal(plan.layerUid, holder.layerUid);
   const first = { legacy: (...args) => harness.controller.legacyIntent(...args) };
   assert.equal(NativeMotionSurface.routeDimension(plan, first, [25], 0, 40, 10), true);
@@ -1429,6 +1429,7 @@ test('afterChange observes readable post-write caches for UI, v1, and external n
       isActive: () => harness.controller.isActive(),
       prepared: () => harness.controller.prepared(),
       identity: () => harness.controller.identity(),
+      persistenceJSON: () => harness.controller.persistenceJSON(),
       projectSelection: (selection, frame) => harness.controller.projectSelection(
         JSON.parse(JSON.stringify(selection)), frame),
     });
@@ -1520,6 +1521,7 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
       isActive: () => harness.controller.isActive(),
       prepared: () => harness.controller.prepared(),
       identity: () => harness.controller.identity(),
+      persistenceJSON: () => harness.controller.persistenceJSON(),
       projectSelection: (selection, frame) => harness.controller.projectSelection(
         JSON.parse(JSON.stringify(selection)), frame),
     });
@@ -1595,6 +1597,11 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   assert.deepEqual(Array.from(motion.SMMotion.valueAtFrame(source.layers[0], 'opacity', 10)), [40]);
   assert.deepEqual(Array.from(motion.SMMotion.rawValueAtFrame(source.layers[0], 'opacity', 10)), [40]);
   assert.equal(JSON.parse(harness.controller.persistenceJSON()).layers[0].motionStatic.opacity[0], 40);
+  motion.sandbox.renderLayerList();
+  const currentRow = created.filter((element) => element._smProp === 'opacity').at(-1);
+  const currentInput = descendants(currentRow).find((element) => element.type === 'number' &&
+    String(element.className).includes('motion-val'));
+  assert.equal(Number(currentInput.value), 40, 'the production Motion field reads the current native undo value');
   assert.deepEqual(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply')
     .map((request) => request.payload.value), [40, 60]);
   assert.equal(harness.state.releases, 0, 'first opacity commands remain native after canvas selection');
@@ -1712,6 +1719,7 @@ test('keyed graph reads use native opacity and never evaluate or mutate the froz
       isActive: () => harness.controller.isActive(),
       prepared: () => harness.controller.prepared(),
       identity: () => harness.controller.identity(),
+      persistenceJSON: () => harness.controller.persistenceJSON(),
       projectSelection(selection, frame) {
         calls.push([selection.activeLayerUid, frame]);
         return harness.controller.projectSelection(JSON.parse(JSON.stringify(selection)), frame);
@@ -2372,6 +2380,183 @@ test('keyed opacity remains native-read-only without requesting legacy release',
   assert.equal(harness.state.releases, 0);
   assert.equal(harness.state.imports.length, 0);
   assert.deepEqual(harness.state.document.layers[0].motion.opacity, keyedSource().layers[0].motion.opacity);
+});
+
+test('native Motion metadata follows current persistence across static undo and keyed revision acknowledgment', async () => {
+  const staticHarness = nativeHarness(staticSource());
+  await staticHarness.controller.activate(staticHarness.prepared);
+  const staticHolder = { layerUid: 'r08_curve_layer', motionStatic: { opacity: [25] } };
+  await staticHarness.controller.setOpacity(staticHolder.layerUid, 40);
+  await staticHarness.controller.setOpacity(staticHolder.layerUid, 60);
+  await staticHarness.controller.history('undo');
+  const model = NativeMotionSurface.opacityReadModel(staticHarness.controller, staticHolder, 10);
+  assert.equal(model.staticValue, 40);
+  assert.equal(model.contentRevision, staticHarness.controller.identity().contentRevision);
+  assert.equal(JSON.parse(staticHarness.controller.persistenceJSON()).layers[0].motionStatic.opacity[0], 40);
+  assert.equal(staticHarness.prepared.shell.layers[0].motionStatic.opacity[0], 25);
+  assert.equal(Object.isFrozen(model), true);
+  assert.equal(Object.isFrozen(model.keys), true);
+  assert.deepEqual(Array.from(model.keys), []);
+
+  const keyed = nativeHarness(keyedSource());
+  await keyed.controller.activate(keyed.prepared);
+  const keyedHolder = { layerUid: 'r08_curve_layer' };
+  await keyed.externalOpacity(60);
+  const keyedModel = NativeMotionSurface.opacityReadModel(keyed.controller, keyedHolder, 10);
+  assert.equal(keyedModel.contentRevision, keyed.controller.identity().contentRevision);
+  assert.equal(keyedModel.staticValue, 60);
+  assert.deepEqual(keyedModel.keys.map((key) => [key.frame, key.value]), [[0, 20], [20, 80]]);
+  assert.deepEqual([0, 10, 20].map((frame) => keyed.controller.valueAtFrame(keyedHolder.layerUid, frame)[0]), [20, 50, 80]);
+  assert.notStrictEqual(keyedModel.keys[0], keyed.prepared.shell.layers[0].motion.opacity.keys[0]);
+  assert.equal(Object.isFrozen(keyedModel.keys[0]), true);
+});
+
+test('native Motion read model denies fenced, closed, mismatched and malformed persistence', async () => {
+  const harness = nativeHarness(staticSource());
+  await harness.controller.activate(harness.prepared);
+  const holder = { layerUid: 'r08_curve_layer' };
+  const controller = harness.controller;
+  const base = { blocksLegacy: () => true, prepared: () => controller.prepared(),
+    identity: () => controller.identity(), persistenceJSON: () => controller.persistenceJSON() };
+  assert.throws(() => NativeMotionSurface.opacityReadModel(base, { layerUid: 'wrong' }, 10), /identity/);
+  assert.throws(() => NativeMotionSurface.opacityReadModel({ ...base, persistenceJSON: () => null }, holder, 10), /fenced/);
+  let reads = 0;
+  assert.throws(() => NativeMotionSurface.opacityReadModel({ ...base, identity() {
+    const value = controller.identity(); return { ...value, contentRevision: value.contentRevision + reads++ };
+  } }, holder, 10), /stale/);
+  for (const change of [
+    (doc) => { doc.layers[0].layerUid = 'wrong'; },
+    (doc) => { doc.layers[0].motionStatic.opacity = [101]; },
+    (doc) => { doc.layers = []; },
+  ]) {
+    const malformed = JSON.parse(controller.persistenceJSON()); change(malformed);
+    assert.throws(() => NativeMotionSurface.opacityReadModel({ ...base,
+      persistenceJSON: () => JSON.stringify(malformed) }, holder, 10), /malformed|unsupported/);
+  }
+  const pending = controller.setOpacity(holder.layerUid, 40);
+  assert.throws(() => NativeMotionSurface.opacityReadModel(controller, holder, 10), /pending|fenced/);
+  await pending;
+  await controller.releaseCurrent('test-close');
+  assert.throws(() => NativeMotionSurface.opacityReadModel(controller, holder, 10), /not active|indeterminate|unavailable|closed/);
+});
+
+test('native opacity track builder emits passive keys and connector without generic callbacks', async () => {
+  const harness = nativeHarness(keyedSource());
+  await harness.controller.activate(harness.prepared);
+  const source = fs.readFileSync(path.join(ROOT, 'src/js/motion.js'), 'utf8');
+  const nodes = [];
+  function element(tag) {
+    const node = { tag, children: [], attributes: {}, listeners: {}, style: {}, dataset: {},
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute(name, value) { this.attributes[name] = value; },
+      addEventListener(name, callback) { (this.listeners[name] ||= []).push(callback); } };
+    nodes.push(node); return node;
+  }
+  const scope = { state: { totalFrames: 21, currentFrame: 10 }, FC: 20, ROW_H: 24,
+    PROP_LABEL: { opacity: 'Opacity' }, document: { createElement: element, createElementNS: (_ns, tag) => element(tag) },
+    nativeOwns: () => true,
+    nativeOpacityModel: () => NativeMotionSurface.opacityReadModel(harness.controller, { layerUid: 'r08_curve_layer' }, 10),
+    trackFor() { throw new Error('generic trackFor reached'); },
+    pushUndo() { throw new Error('JS undo reached'); } };
+  vm.runInNewContext(extractFunction(source, 'trackRowHtml'), scope);
+  const row = element('row'); row.innerHTML = '';
+  scope.trackRowHtml({ layerUid: 'r08_curve_layer', motion: { opacity: { keys: [{ frame: 10 }] } } }, 'opacity', row);
+  assert.equal(row.style.pointerEvents, 'none');
+  assert.equal(row._smHolder, undefined);
+  assert.equal(nodes.filter((node) => node.className === 'native-opacity-diamond').length, 2);
+  assert.equal(nodes.filter((node) => node.attributes.class === 'native-opacity-connector').length, 1);
+  assert.equal(nodes.some((node) => /\bmotion-key\b/.test(String(node.className || node.attributes.class || ''))), false);
+  for (const node of nodes) {
+    for (const name of ['mousedown', 'mousemove', 'mouseup', 'dblclick', 'contextmenu', 'dragstart']) {
+      assert.equal(node.listeners[name], undefined, `${node.tag} ${name} must be passive`);
+    }
+  }
+  assert.equal(harness.state.releases, 0);
+  assert.equal(harness.state.document.layers[0].motion.opacity.keys[0].frame, 0);
+});
+
+test('native keyed opacity without a shell track stays aligned in the production hidden-unanimated panel and grid', async () => {
+  const harness = nativeHarness(keyedSource());
+  await harness.controller.activate(harness.prepared);
+  const holder = clone(keyedSource().layers[0]);
+  delete holder.motion.opacity;
+  const state = { ...defaultState(), layers: [holder], activeLayerIdx: 0,
+    currentFrame: 10, totalFrames: 21, appMode: 'motion' };
+  const nodes = [], documentListeners = {};
+  function element(tag) {
+    const node = { tag, children: [], dataset: {}, style: {}, attributes: {}, listeners: {},
+      classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+      addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); },
+      appendChild(child) { child.parentElement = this; this.children.push(child); return child; },
+      setAttribute(name, value) { this.attributes[name] = value; },
+      closest(selector) {
+        const parts = selector.split(',').map((part) => part.trim());
+        for (let current = this; current; current = current.parentElement) {
+          if (parts.some((part) => part[0] === '.' &&
+            String(current.className || current.attributes.class || '').split(/\s+/).includes(part.slice(1)))) return current;
+        }
+        return null;
+      },
+      querySelector() { return null; }, querySelectorAll() { return []; },
+      getBoundingClientRect() { return { height: 24, width: 24, left: 0, right: 24, top: 0, bottom: 24 }; } };
+    nodes.push(node); return node;
+  }
+  const wrap = element('wrap');
+  const motion = loadMotion(state, { beforeMotion(sb) {
+    sb.NemoNativeOpacityCutover = Object.freeze({ blocksLegacy: () => true,
+      prepared: () => harness.controller.prepared(), identity: () => harness.controller.identity(),
+      persistenceJSON: () => harness.controller.persistenceJSON(),
+      projectSelection: (selection, frame) => harness.controller.projectSelection(
+        JSON.parse(JSON.stringify(selection)), frame) });
+    sb.document.createElement = element;
+    sb.document.createElementNS = (_ns, tag) => element(tag);
+    sb.document.readyState = 'complete';
+    sb.document.getElementById = (id) => id === 'fg-wrap' ? wrap : null;
+    sb.document.addEventListener = (type, listener) => { (documentListeners[type] ||= []).push(listener); };
+    sb._layerSel = [0];
+    sb._layerIndexByUid = () => -1;
+    sb.FC = 20;
+    sb.pushUndo = () => { throw new Error('passive native keys must not push JS undo'); };
+  } });
+  const panel = element('panel'), grid = element('grid');
+  Object.defineProperty(panel, 'innerHTML', { set() { this.children.length = 0; } });
+  motion.sandbox.document.getElementById = (id) => id === 'motion-props-body' ? panel
+    : id === 'fg-wrap' ? wrap : null;
+  assert.equal(motion.SMMotion.revealAnimated(), true);
+  motion.SMMotion.renderMotionPropsPanel();
+  motion.SMMotion.renderTimelineMotion(grid);
+  function descendants(node) { return [node].concat(node.children.flatMap(descendants)); }
+  const panelOpacity = descendants(panel).filter((node) => node._smProp === 'opacity' &&
+    String(node.className).includes('motion-prop-row'));
+  const gridOpacity = descendants(grid).filter((node) => String(node.className).includes('motion-track-row') &&
+    descendants(node).some((child) => child.className === 'native-opacity-diamond'));
+  assert.equal(panelOpacity.length, 1);
+  assert.equal(gridOpacity.length, 1);
+  assert.equal(descendants(panel).filter((node) => node._smProp &&
+    String(node.className).includes('motion-prop-row')).length,
+    descendants(grid).filter((node) => String(node.className).includes('motion-track-row')).length);
+  assert.equal(holder.motion.opacity, undefined, 'rendering does not materialize an old track');
+  const passiveTargets = descendants(grid).filter((node) => node.className === 'native-opacity-diamond' ||
+    node.attributes.class === 'native-opacity-connector');
+  assert.equal(passiveTargets.length, 3);
+  const beforeDocument = JSON.stringify(harness.state.document);
+  const beforeDispatches = harness.state.dispatches.length;
+  let delegatedStops = 0;
+  for (const target of passiveTargets) {
+    for (const type of ['mousedown', 'mousemove', 'mouseup', 'dblclick', 'contextmenu', 'dragstart']) {
+      const event = { target, button: 0, clientX: 10, clientY: 10,
+        stopPropagation() { delegatedStops++; }, preventDefault() { delegatedStops++; } };
+      for (const listener of target.listeners[type] || []) listener(event);
+      if (type === 'mousedown') for (const listener of wrap.listeners.mousedown || []) listener(event);
+      if (type === 'mousemove' || type === 'mouseup') {
+        for (const listener of documentListeners[type] || []) listener(event);
+      }
+    }
+  }
+  assert.equal(delegatedStops, 0);
+  assert.equal(JSON.stringify(harness.state.document), beforeDocument);
+  assert.equal(harness.state.dispatches.length, beforeDispatches, 'no native edit command was dispatched');
+  assert.equal(harness.state.releases, 0);
 });
 
 test('N20 bootstrap stays browser-inert and binds only the accepted desktop host ports', async () => {
