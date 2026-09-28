@@ -456,8 +456,25 @@ source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, vectorize blob
 spans become 15, with zero vectorize-bridge spans remaining. All 762 packets stay
 pending, global computed uncovered code remains 7 185 and frozen vectorize-bridge
 retains 5 computed uncovered code lines. No packet or runtime behavior is accepted.
+
+P03C-am/#1506 maps frozen `nemo-mcp/src/lib.rs:2-3` to the pending
+`C07.mcp-server.binary-entrypoint` module-root responsibility: the executable
+`capabilities` and `capability_contract` declarations were added by P07 source
+commits `35d7eac66` and `bd907d230`. C07's pinned `lib.rs:1-7` range and
+module-root description support the `covered` responsibility disposition;
+neither module body nor the packet is admitted. The JSON pins this finding to
+frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, `lib.rs` blob
+`2d8f0dd07102d3b2aa1df154b84fcba7eeae5247` and C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. The current protected
+`lib.rs` contains a later `native_contract` declaration and has a different
+blob; this disposition does not classify the current whole file. The 15
+previously undispositioned spans become 14, with zero frozen `lib.rs` spans
+remaining. All 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen `lib.rs` retains 2 computed uncovered code lines. No MCP
+functionality, numeric range coverage or runtime behavior is accepted.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 15
+pending packets, no notes needing reconciliation, 0 unmapped paths and 14
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus

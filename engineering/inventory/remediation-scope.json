@@ -5541,6 +5541,16 @@
           2,
           3
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            2,
+            3
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen nemo-mcp/src/lib.rs lines 2-3 declare the capabilities and capability_contract modules at the crate root. The pinned C07 census assigns lib.rs:1-7 to pending C07.mcp-server.binary-entrypoint (#1042) as the module-root responsibility; P07/#1009 source commits 35d7eac66 and bd907d230 establish narrow declaration provenance, not admission of that packet or its module bodies. Evidence uses frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / lib.rs blob 2d8f0dd07102d3b2aa1df154b84fcba7eeae5247 and pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51; current lib.rs has a later native_contract declaration and a different blob. No numeric source coverage, MCP behavior or runtime acceptance is claimed."
+        }
       ]
     },
     {
