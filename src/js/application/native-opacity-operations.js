@@ -11,7 +11,7 @@
     var v1ByLifecycle = new WeakMap();
     // Extension capabilities can outlive a document; this latch lasts for the page.
     // All retry/trace and pending resize work, in contrast, belongs to one session.
-    var extensionExposed = false, resize = null, installation = null;
+    var extensionExposed = false, resize = null, installation = null, opening = false;
 
     function ensureActive() {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
@@ -216,16 +216,73 @@
       catch (_) { return false; }
     }
     async function importJSON(json) {
-      try { ports.document.prepareNativeOpacity(json); }
+      var candidate;
+      try { candidate = ports.document.prepareNativeOpacity(json); }
       catch (_) { return false; }
+      if (opening || !['legacy', 'closed'].includes(lifecycle.inspect().phase)) return false;
       if (extensionExposed || ports.surface.extensionOpen()) {
         ports.surface.toast(extensionExposed
           ? 'Reload or restart Nemo before enabling native opacity after using scripts or plugins.'
           : 'Close every script panel and plugin, then retry native opacity.');
         return false;
       }
-      ports.surface.toast('Native document presentation installation is unavailable.');
-      return false;
+      opening = true;
+      var activated = false, preview = null;
+      try {
+        if (await lifecycle.activate(candidate) !== true) return false;
+        activated = true;
+        var observed = lifecycle.inspect();
+        var current = lifecycle.identity();
+        if (observed.phase !== 'native' || !observed.session || !current ||
+            observed.identity.instanceId !== current.instanceId ||
+            observed.identity.documentId !== current.documentId ||
+            observed.identity.contentRevision !== current.contentRevision) {
+          throw new Error('native first-open identity is unavailable');
+        }
+        var snapshotRequest = { apiVersion: 2, requestId: lifecycle.id('n20-first-open'),
+          instanceId: current.instanceId, documentId: current.documentId,
+          operation: 'query.document.snapshot.acquire',
+          payload: { atRevision: current.contentRevision } };
+        var snapshot = contract.successful(await ports.application().dispatch(snapshotRequest), 'native first-open snapshot');
+        if (snapshot.instanceId !== current.instanceId || snapshot.documentId !== current.documentId ||
+            snapshot.contentRevision !== current.contentRevision ||
+            snapshot.result.atRevision !== current.contentRevision) {
+          throw new Error('native first-open snapshot identity mismatch');
+        }
+        var metadata = { documentSnapshotId: snapshot.result.documentSnapshotId,
+          documentId: current.documentId, contentRevision: current.contentRevision,
+          contextId: 'scene-root', frame: 0, quality: 'final',
+          outputSpec: { kind: 'frame', format: 'rgba8', width: 320, height: 180,
+            colorInterpretation: 'srgb', alphaMode: 'straight' },
+          geometryHandle: candidate.frames[0].geometryHandle };
+        preview = ports.createPreview();
+        var hostReceipt = await ports.previewHost(Object.assign({ apiVersion: 2,
+          instanceId: current.instanceId }, metadata));
+        preview.register(metadata, { workId: hostReceipt.workId,
+          viewGeneration: hostReceipt.viewGeneration });
+        var presented = preview.receive(hostReceipt);
+        var latest = lifecycle.inspect();
+        if (presented.status !== 'presented' || latest.phase !== 'native' ||
+            latest.session !== observed.session || latest.generation !== observed.generation ||
+            !latest.identity || latest.identity.instanceId !== current.instanceId ||
+            latest.identity.documentId !== current.documentId ||
+            latest.identity.contentRevision !== current.contentRevision ||
+            lifecycle.persistenceJSON() === null) {
+          throw new Error('native first-open frame was not presented at the admitted revision');
+        }
+        return Object.freeze({ owner: 'native', status: 'presented',
+          instanceId: current.instanceId, documentId: current.documentId,
+          contentRevision: current.contentRevision, documentSnapshotId: presented.documentSnapshotId,
+          opacityMode: candidate.opacityMode, frame: presented.frame,
+          workId: presented.workId, viewGeneration: presented.viewGeneration,
+          geometryHandle: presented.geometryHandle });
+      } catch (error) {
+        if (activated && typeof lifecycle.fence === 'function') lifecycle.fence(error);
+        return false;
+      } finally {
+        if (preview && typeof preview.dispose === 'function') preview.dispose();
+        opening = false;
+      }
     }
     function resizeViewport() {
       var observed = lifecycle.inspect(), token;

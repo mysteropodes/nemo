@@ -19,6 +19,31 @@
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
+  function projectJSON(){
+    var native=window.NemoNativeOpacityCutover;
+    if(native&&typeof native.blocksLegacy==='function'&&native.blocksLegacy()){
+      var json=typeof native.persistenceJSON==='function'?native.persistenceJSON():null;
+      if(typeof json!=='string')throw new Error('Native document is not ready for persistence');
+      return json;
+    }
+    return window.SM.exportJSON();
+  }
+  function nativeOpenReady(receipt){
+    if(!window.NemoNativeOpacityProject)return receipt===true;
+    if(!receipt||receipt.owner!=='native')return false;
+    var native=window.NemoNativeOpacityCutover;
+    if(receipt.status!=='presented'||receipt.frame!==0||!native||
+       typeof native.isActive!=='function'||!native.isActive()||
+       typeof native.identity!=='function')return false;
+    var current=native.identity();
+    return !!current&&current.instanceId===receipt.instanceId&&
+      current.documentId===receipt.documentId&&current.contentRevision===receipt.contentRevision&&
+      typeof projectJSON()==='string';
+  }
+  function saveFramesIfLegacy(){
+    var native=window.NemoNativeOpacityCutover;
+    if(!native||typeof native.blocksLegacy!=='function'||!native.blocksLegacy())saveAllLayerFrames();
+  }
   function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
   function releaseNative(kind){var surface=window.NemoNativeOpacityLegacySurface;if(surface===undefined)return window.NemoNativeOpacityCutover===undefined&&window.NemoNativeOpacityProject===undefined?null:false;try{return surface&&typeof surface.allowProjectTransition==='function'&&typeof surface.releaseProjectTransition==='function'?surface.releaseProjectTransition(window,kind):false;}catch(e){return false;}}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
@@ -117,12 +142,12 @@
     renderTabBar();
   }
   function isDirty(){
-    try{return lastSavedJson!==null&&window.SM.exportJSON()!==lastSavedJson;}
+    try{return lastSavedJson!==null&&projectJSON()!==lastSavedJson;}
     catch(e){return true;} // can't serialize → assume dirty, never skip the warning
   }
 
   async function writeProjectTo(path){
-    var json=window.SM.exportJSON();
+    var json=projectJSON();
     // Atomic save (temp sibling + rename) and its historical direct-write
     // fallback live in the adapter now; everything below — path/name, recents,
     // dirty tracking, autosave — stays here. The JSON handed to the adapter is
@@ -158,8 +183,8 @@
     setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }
   function saveAsDownload(){
-    saveAllLayerFrames();
-    var json=window.SM.exportJSON();
+    saveFramesIfLegacy();
+    var json=projectJSON();
     downloadJson((currentName||'Untitled')+'.json',json);
     markSaved(json);
     autosaveWrite(json);
@@ -167,7 +192,7 @@
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
-    saveAllLayerFrames();
+    saveFramesIfLegacy();
     var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
     // A failed write MUST be loud — without this catch there was no error
@@ -181,7 +206,7 @@
   async function save(){
     if(!tauriOk()){saveAsDownload();return;}
     if(!currentPath){await saveAs();return;}
-    saveAllLayerFrames();
+    saveFramesIfLegacy();
     try{await writeProjectTo(currentPath);}
     catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved');
@@ -190,13 +215,14 @@
     if(!tauriOk())return;
     try{
       var json=await window.__TAURI__.fs.readTextFile(path);
-      if(!await importProjectJSON(json,true))throw new Error('Invalid project');
+      var opened=await importProjectJSON(json,true);
+      if(!opened||!nativeOpenReady(opened))throw new Error('Invalid or unpresented project');
       // Re-export rather than keeping the file's own text: importJSON
       // normalizes (fills defaults, pads frames), so the round-tripped
       // form is what future exportJSON calls will actually produce —
       // comparing against the raw file text would flag a just-opened
       // untouched project as dirty forever.
-      try{markSaved(window.SM.exportJSON());}catch(e){}
+      markSaved(projectJSON());
       currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
       touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
       renderRecents();
@@ -204,7 +230,6 @@
       showToast('Opened: '+currentName);
     }catch(e){
       showToast('Could not open file — it may have moved or been deleted');
-      removeRecent(path);renderRecents();
     }
   }
   async function openDialog(){
@@ -734,7 +759,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true),function(imported){if(!imported)throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true),function(imported){if(!imported||!nativeOpenReady(imported))throw new Error('Invalid or unpresented project');markSaved(projectJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });
