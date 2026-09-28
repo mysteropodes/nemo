@@ -102,12 +102,17 @@ C20s's own boundary note names 12406-12684 and 13125+ as the two gaps it leaves 
 the refrozen coverage shows 12406-12684 fully covered by the original C02 packets, while 13125
 onward keeps the eight open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
 files carry small remainders (module headers, export blocks, trailing helpers) left by the
-original partitions. (4) The 40 dispositioned executable paths without a packet
-(`leaf`/`oracle`) are unchanged from P03C-a; **6 paths are unmapped** (no census reference, no
-disposition) — the checker's own `remediation-scope-build/census/verify.cjs` (already unmapped at
-P03C-a) plus the three Rust boundary tooling paths added since (`geometry-wasm.edges.json`,
-`boundaries-rust.cjs` and its test, from P12's merged PR #1176). Dispositioning them as
-`leaf` is a reviewed field for the next P03C leaf; this refreeze only records them.
+original partitions. (4) The 40 previously dispositioned executable paths without a packet
+(`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
+the total to 46 and the unmapped count to zero.
+The three Rust boundary tooling paths (`geometry-wasm.edges.json`, `boundaries-rust.cjs` and its
+test) cite P12/#1014, merged as PR #1176: adopted crate boundary policy, a Rust-aware analyzer,
+and positive/negative scanner controls. The three inventory checker modules
+(`remediation-scope-build.cjs`, `remediation-scope-census.cjs` and
+`remediation-scope-verify.cjs`) cite P03B/#1170, merged as PR #1175: index build/refreeze,
+census declaration/range mapping, and integrity/disposition/completeness verification. The
+P03C-e inventory disposition records these path roles and provenance; it does not itself prove
+native runtime feature acceptance.
 
 Overlaps are unchanged by this refreeze — **1 832 lines** in total, identical to P03C-a:
 `shader-effects-library.js` (1 311, claimed twice), `motion.js` (190, C02-internal), `tweens.js`
@@ -135,7 +140,7 @@ Every reviewed claim carries its evidence and is validated by shape:
   has 27 uncovered code lines in spans 2002–2011, 2027–2048, 2247 and 7449. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
-- **Executable paths without a packet** — 40, all dispositioned: 32 `leaf` (module, test or
+- **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
   evidence. None is dispositioned yet.
@@ -173,7 +178,7 @@ P03C-d/#1401 reconciled C08:1 to the C19 census evidence without changing the fr
 packet admissions, or implementation state. The old whole-file gap is stale; the four current
 timeline spans and 27 uncovered code lines remain undispositioned.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
-packets, no notes needing reconciliation, 6 unmapped paths and 151 undispositioned spans.
+packets, no notes needing reconciliation, 0 unmapped paths and 151 undispositioned spans.
 What remains, in order: disposition the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
