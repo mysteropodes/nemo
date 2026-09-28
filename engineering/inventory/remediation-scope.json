@@ -6983,6 +6983,16 @@
           3370,
           3372
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            3370,
+            3372
+          ],
+          "kind": "boundary",
+          "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / tools.js blob 3c25962dbe314d5e791489da30b2b642ff899357: lines 3370-3372 explain gapThr as a plain world-space distance, the stroke-end gap still counted as one closed shape, and Gap Size presets without scale/resolution conversion. The separate WASM-path comment starts at 3373 in pending C04a.fill.find-wasm-js-raster (#1039), and executable _wallSegments starts at 3381; neither is in this disposition. Pinned C04a census blob 8ffb669c5018190bd448b787a09ade35bd594b30. Current tools.js has a different blob, so this classifies only the frozen span. No packet admission, numeric source coverage, fill behavior, JS/Rust parity or runtime acceptance is claimed."
+        }
       ]
     },
     {
