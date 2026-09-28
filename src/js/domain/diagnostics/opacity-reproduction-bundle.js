@@ -38,8 +38,8 @@ var NemoOpacityReproductionBundle = (function () {
       formatVersion: FORMAT_VERSION,
       fixture: { id: fixture.id, hash: fixture.hash },
       commands: commands,
-      clock: (meta && meta.clock) != null ? meta.clock : null,
-      seed: (meta && meta.seed) != null ? meta.seed : null,
+      clock: (meta && meta.clock) != null ? clone(meta.clock) : null,
+      seed: (meta && meta.seed) != null ? clone(meta.seed) : null,
     };
   }
 
@@ -53,25 +53,29 @@ var NemoOpacityReproductionBundle = (function () {
   // recording instead of failing. They stay opaque here -- this codec does
   // not interpret them, it only refuses to lose them.
   function parseBundle(bundle) {
-    if (!object(bundle)) return { error: 'Bundle must be an object.' };
-    if (bundle.formatVersion !== FORMAT_VERSION) return { error: 'Unsupported or missing bundle format version.' };
-    if (!object(bundle.fixture) || typeof bundle.fixture.id !== 'string' || !bundle.fixture.id
-        || typeof bundle.fixture.hash !== 'string' || !bundle.fixture.hash) {
-      return { error: 'Bundle fixture is missing or malformed.' };
-    }
-    if (!Array.isArray(bundle.commands) || !bundle.commands.length) return { error: 'Bundle must contain at least one command.' };
-    for (var i = 0; i < bundle.commands.length; i++) {
-      var c = bundle.commands[i];
-      if (!object(c) || typeof c.operation !== 'string' || !c.operation || !object(c.payload)) {
-        return { error: 'Bundle command ' + i + ' is malformed.' };
+    try {
+      if (!object(bundle)) return { error: 'Bundle must be an object.' };
+      if (bundle.formatVersion !== FORMAT_VERSION) return { error: 'Unsupported or missing bundle format version.' };
+      if (!object(bundle.fixture) || typeof bundle.fixture.id !== 'string' || !bundle.fixture.id
+          || typeof bundle.fixture.hash !== 'string' || !bundle.fixture.hash) {
+        return { error: 'Bundle fixture is missing or malformed.' };
       }
+      if (!Array.isArray(bundle.commands) || !bundle.commands.length) return { error: 'Bundle must contain at least one command.' };
+      for (var i = 0; i < bundle.commands.length; i++) {
+        var c = bundle.commands[i];
+        if (!object(c) || typeof c.operation !== 'string' || !c.operation || !object(c.payload)) {
+          return { error: 'Bundle command ' + i + ' is malformed.' };
+        }
+      }
+      return {
+        fixture: clone(bundle.fixture),
+        commands: clone(bundle.commands),
+        clock: bundle.clock != null ? clone(bundle.clock) : null,
+        seed: bundle.seed != null ? clone(bundle.seed) : null,
+      };
+    } catch (_) {
+      return { error: 'Bundle contains malformed or non-serializable data.' };
     }
-    return {
-      fixture: clone(bundle.fixture),
-      commands: clone(bundle.commands),
-      clock: bundle.clock != null ? clone(bundle.clock) : null,
-      seed: bundle.seed != null ? clone(bundle.seed) : null,
-    };
   }
 
   return { FORMAT_VERSION: FORMAT_VERSION, buildBundle: buildBundle, parseBundle: parseBundle };
