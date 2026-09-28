@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "4262de6d83921ec13d5c1201df66e6202c36760b",
-    "sourceRootTree": "e14c0d77eb95c02cc582bfe7343a25eb59d5a880",
+    "candidateCommit": "df6cdeef3389d321d01eab7cd46830fab8e59589",
+    "sourceRootTree": "0c6b995cc000e7bb2c0521f97562dab7fbd07364",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "3d0a9b0f0e7c46840fbd5bf858ec3b323ed63e43",
-      "lastChangedCommit": "4262de6d83921ec13d5c1201df66e6202c36760b"
+      "gitTree": "33bb235ff679a941a93eb7b8118a99be1c87e67f",
+      "lastChangedCommit": "df6cdeef3389d321d01eab7cd46830fab8e59589"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "cf26f977a842321ba775d8923006b7d4a26bfe9b81630ce0130a13fa768baff4"
+      "value": "36eb004fb31e67e0b5e55ee7aeefa15e448bc47c70b0f152699b550847c8b1fc"
     },
     "profiles": [
       {
