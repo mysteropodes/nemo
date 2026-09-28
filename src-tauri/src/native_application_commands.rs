@@ -19,6 +19,8 @@ use tauri::Manager;
 
 #[path = "native_application_replace_commands.rs"]
 mod replace_commands;
+#[path = "native_application_replace_replay.rs"]
+mod replace_replay;
 
 #[tauri::command]
 pub(crate) async fn nemo_native_bootstrap(
@@ -143,45 +145,7 @@ pub(crate) async fn nemo_native_replace(
     request: NativeReplacementRequest,
 ) -> HostResult<NativeReplacementReceipt> {
     require_main(&window)?;
-    require_api_instance(
-        request.api_version,
-        &request.instance_id,
-        state.instance_id(),
-    )?;
-    let admitted = admit_project(&request.projection, &request.resources)?;
-    let prepared = DesktopNativeApplication::prepare_replacement(admitted)?;
-    let native = state.native_state();
-    let generation = state
-        .reserve_native_replacement(
-            &request.instance_id,
-            &request.document_id,
-            request.expected_revision,
-            |application| {
-                if application.as_any_mut().is::<DesktopNativeApplication>() {
-                    Ok(())
-                } else {
-                    Err("unavailable:native desktop host is unavailable".into())
-                }
-            },
-        )
-        .map_err(|message| replace_commands::admission_error(&native, message))?;
-    let instance = request.instance_id.clone();
-    let committed = native.clone();
-    let fallback = native.clone();
-    match viewport_host::on_main_thread_replacement(
-        &app,
-        move || replace_commands::complete_replacement(&committed, generation, &instance, prepared),
-        move |failure| {
-            let _ = replace_commands::fence_executor_failure(&fallback, generation, failure);
-        },
-    )
-    .await
-    {
-        Ok(result) => result,
-        Err(_) => Err(replace_commands::retained_executor_error(
-            &native, generation,
-        )),
-    }
+    replace_replay::replace(&app, &state, request).await
 }
 
 #[tauri::command]

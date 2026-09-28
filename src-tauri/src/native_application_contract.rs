@@ -34,10 +34,11 @@ pub(crate) struct NativeBootstrapRequest {
     pub(crate) viewport: Option<ViewportInput>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct NativeReplacementRequest {
     pub(crate) api_version: u32,
+    pub(crate) request_id: String,
     pub(crate) instance_id: String,
     pub(crate) document_id: String,
     pub(crate) expected_revision: u64,
@@ -98,7 +99,7 @@ pub(crate) struct NativeDisposeRequest {
     pub(crate) instance_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct GeometryResourceInput {
     resource_id: String,
@@ -106,7 +107,7 @@ pub(crate) struct GeometryResourceInput {
     layers: Vec<GeometryLayerInput>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct GeometryLayerInput {
     layer_uid: String,
@@ -115,7 +116,7 @@ struct GeometryLayerInput {
     paint: PaintInput,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PaintInput {
     red: u8,
@@ -187,6 +188,8 @@ pub(crate) struct NativeBootstrapReceipt {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NativeReplacementReceipt {
+    pub(crate) request_id: String,
+    pub(crate) retrieved: bool,
     pub(crate) document_id: String,
     pub(crate) content_revision: u64,
     pub(crate) resource_count: usize,
@@ -450,25 +453,9 @@ pub(crate) fn require_api_instance(version: u32, requested: &str, actual: &str) 
     Ok(())
 }
 
-pub(crate) fn release_fingerprint(request: &NativeReleaseRequest) -> HostResult<Vec<u8>> {
-    if request.api_version != NATIVE_API_VERSION
-        || !bounded_id(&request.request_id)
-        || !bounded_id(&request.instance_id)
-        || !bounded_id(&request.document_id)
-        || request.expected_revision > 9_007_199_254_740_991
-    {
-        return Err(host_error(
-            "invalid_request",
-            "invalid native release request identity",
-        ));
-    }
-    serde_json::to_vec(request).map_err(|_| {
-        host_error(
-            "invalid_request",
-            "native release request is not serializable",
-        )
-    })
-}
+#[path = "native_application_contract_fingerprints.rs"]
+mod fingerprints;
+pub(crate) use fingerprints::{release_fingerprint, replacement_fingerprint};
 
 pub(crate) fn require_main(window: &tauri::Window) -> HostResult<()> {
     if window.label() == "main" {

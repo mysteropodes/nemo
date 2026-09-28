@@ -17,11 +17,15 @@ pub(crate) type NativeState = Arc<Mutex<NativeAuthority>>;
 
 #[path = "native_dispatch_replacement.rs"]
 mod replacement;
-pub(crate) use replacement::{ReplacementProgress, ReplacementStage};
+pub(crate) use replacement::{
+    ReplacementAdmission, ReplacementIdentity, ReplacementProgress, ReplacementReplay,
+    ReplacementStage,
+};
 
 pub(crate) struct NativeAuthority {
     generation: u64,
     retained_releases: BTreeMap<String, ReleaseTombstone>,
+    retained_replacements: BTreeMap<String, replacement::ReplacementRecord>,
     pub(crate) phase: NativePhase,
 }
 
@@ -79,6 +83,7 @@ impl Default for NativeAuthority {
         Self {
             generation: 0,
             retained_releases: BTreeMap::new(),
+            retained_replacements: BTreeMap::new(),
             phase: NativePhase::Vacant,
         }
     }
@@ -307,6 +312,7 @@ impl NativeAuthority {
     }
 
     pub(crate) fn finish_release(&mut self, tombstone: ReleaseTombstone) {
+        self.expire_replacements();
         self.retained_releases
             .insert(tombstone.request_id.clone(), tombstone.clone());
         self.phase = NativePhase::Released(tombstone);
@@ -434,100 +440,5 @@ pub(crate) fn run_export_pump_interleaved(
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    pub(crate) struct TerminalPump(pub(crate) Arc<AtomicUsize>);
-
-    impl NativeDispatch for TerminalPump {
-        fn instance_id(&self) -> &str {
-            "pump-fixture"
-        }
-        fn document_id(&self) -> &str {
-            "document-fixture"
-        }
-        fn content_revision(&self) -> u64 {
-            0
-        }
-        fn dispatch(&mut self, _: OpacityRequest) -> ResponseEnvelope {
-            unreachable!("pump test does not dispatch transport requests")
-        }
-        fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
-            unreachable!("pump test does not replace documents")
-        }
-        fn start_next_export_frame(&mut self, _: &str) -> Result<Option<PendingFrame>, String> {
-            self.0.fetch_add(1, Ordering::SeqCst);
-            Ok(None)
-        }
-        fn finish_export_frame(&mut self, _: PendingFrame) -> Result<JobReceipt, String> {
-            unreachable!("terminal pump has no pending frame")
-        }
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-    }
-
-    #[test]
-    fn thread_allocation_failure_runs_the_accepted_job_synchronously() {
-        let advances = Arc::new(AtomicUsize::new(0));
-        let native: NativeState = Arc::new(Mutex::new(NativeAuthority {
-            generation: 1,
-            retained_releases: BTreeMap::new(),
-            phase: NativePhase::Active {
-                generation: 1,
-                application: Box::new(TerminalPump(Arc::clone(&advances))),
-            },
-        }));
-        let asynchronous = spawn_export_pump_with(native, 1, "job-1".into(), |_| {
-            Err(io::Error::other("simulated thread exhaustion"))
-        });
-        assert!(!asynchronous);
-        assert_eq!(advances.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn generation_exhaustion_preserves_active_authority_during_release_admission() {
-        let mut authority = NativeAuthority {
-            generation: u64::MAX,
-            retained_releases: BTreeMap::new(),
-            phase: NativePhase::Active {
-                generation: u64::MAX,
-                application: Box::new(TerminalPump(Arc::new(AtomicUsize::new(0)))),
-            },
-        };
-        assert!(authority
-            .admit_release(
-                "release",
-                "pump-fixture",
-                "document-fixture",
-                0,
-                b"body",
-                false,
-            )
-            .unwrap_err()
-            .contains("generation exhausted"));
-        assert_eq!(authority.active_generation().unwrap(), u64::MAX);
-    }
-
-    #[test]
-    fn generation_exhaustion_preserves_released_reentry_tombstone() {
-        let tombstone = ReleaseTombstone {
-            generation: u64::MAX,
-            request_id: "release".into(),
-            fingerprint: b"body".to_vec(),
-            receipt: serde_json::json!({"status":"succeeded"}),
-            succeeded: true,
-        };
-        let mut authority = NativeAuthority {
-            generation: u64::MAX,
-            retained_releases: BTreeMap::new(),
-            phase: NativePhase::Released(tombstone),
-        };
-        assert!(authority
-            .reserve_install()
-            .unwrap_err()
-            .contains("generation exhausted"));
-        assert!(matches!(authority.phase, NativePhase::Released(_)));
-    }
-}
+#[path = "native_dispatch_tests.rs"]
+pub(crate) mod tests;

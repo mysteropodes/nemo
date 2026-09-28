@@ -3,6 +3,36 @@
 use crate::native_dispatch::{NativeAuthority, NativeDispatch, NativePhase};
 use serde::Serialize;
 
+pub(crate) const MAX_RETAINED_REPLACEMENTS: usize = 16;
+
+pub(crate) struct ReplacementIdentity<'a> {
+    pub(crate) request_id: &'a str,
+    pub(crate) fingerprint: &'a [u8],
+    pub(crate) instance_id: &'a str,
+    pub(crate) document_id: &'a str,
+    pub(crate) expected_revision: u64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum ReplacementReplay {
+    Pending(ReplacementProgress),
+    Succeeded(serde_json::Value),
+    Fenced(ReplacementProgress),
+    Expired,
+}
+
+#[derive(Debug)]
+pub(crate) enum ReplacementAdmission {
+    Execute(u64),
+    Replay(ReplacementReplay),
+}
+
+pub(super) struct ReplacementRecord {
+    generation: u64,
+    fingerprint: Vec<u8>,
+    outcome: ReplacementReplay,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ReplacementStage {
@@ -64,6 +94,87 @@ impl ReplacementProgress {
 }
 
 impl NativeAuthority {
+    pub(crate) fn admit_replace_identity(
+        &mut self,
+        identity: ReplacementIdentity<'_>,
+        preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
+    ) -> Result<ReplacementAdmission, String> {
+        self.admit_replace_request(
+            identity.request_id,
+            identity.fingerprint,
+            identity.instance_id,
+            identity.document_id,
+            identity.expected_revision,
+            preflight,
+        )
+    }
+    pub(crate) fn lookup_replace_replay(
+        &self,
+        request_id: &str,
+        fingerprint: &[u8],
+    ) -> Result<Option<ReplacementReplay>, String> {
+        if let Some(record) = self.retained_replacements.get(request_id) {
+            if record.fingerprint != fingerprint {
+                return Err(
+                    "invalid_request:requestId was reused with a changed replacement body".into(),
+                );
+            }
+            return Ok(Some(record.outcome.clone()));
+        }
+        if self.retained_replacements.len() >= MAX_RETAINED_REPLACEMENTS {
+            return Err("unavailable:native replacement receipt capacity exhausted".into());
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn admit_replace_request(
+        &mut self,
+        request_id: &str,
+        fingerprint: &[u8],
+        instance_id: &str,
+        document_id: &str,
+        expected_revision: u64,
+        preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
+    ) -> Result<ReplacementAdmission, String> {
+        if let Some(replay) = self.lookup_replace_replay(request_id, fingerprint)? {
+            return Ok(ReplacementAdmission::Replay(replay));
+        }
+        let generation =
+            self.admit_replace(instance_id, document_id, expected_revision, preflight)?;
+        self.retained_replacements.insert(
+            request_id.into(),
+            ReplacementRecord {
+                generation,
+                fingerprint: fingerprint.to_vec(),
+                outcome: ReplacementReplay::Pending(ReplacementProgress::default()),
+            },
+        );
+        Ok(ReplacementAdmission::Execute(generation))
+    }
+
+    pub(crate) fn record_replace_success(&mut self, generation: u64, receipt: serde_json::Value) {
+        if let Some(record) = self
+            .retained_replacements
+            .values_mut()
+            .find(|record| record.generation == generation)
+        {
+            record.outcome = ReplacementReplay::Succeeded(receipt);
+        }
+    }
+
+    pub(crate) fn replacement_request_id(&self, generation: u64) -> Option<String> {
+        self.retained_replacements
+            .iter()
+            .find(|(_, record)| record.generation == generation)
+            .map(|(request_id, _)| request_id.clone())
+    }
+
+    pub(crate) fn expire_replacements(&mut self) {
+        for record in self.retained_replacements.values_mut() {
+            record.outcome = ReplacementReplay::Expired;
+        }
+    }
+
     pub(crate) fn admit_replace(
         &mut self,
         instance_id: &str,
@@ -132,7 +243,7 @@ impl NativeAuthority {
         kind: &'static str,
         message: impl Into<String>,
     ) -> Result<ReplacementProgress, String> {
-        match &mut self.phase {
+        let result = match &mut self.phase {
             NativePhase::Replacing {
                 generation,
                 progress,
@@ -144,7 +255,17 @@ impl NativeAuthority {
                 Ok(progress.clone())
             }
             _ => Err("native replacement generation is stale or unavailable".into()),
+        };
+        if let Ok(progress) = &result {
+            if let Some(record) = self
+                .retained_replacements
+                .values_mut()
+                .find(|record| record.generation == expected)
+            {
+                record.outcome = ReplacementReplay::Fenced(progress.clone());
+            }
         }
+        result
     }
 
     pub(crate) fn activate_replace(&mut self, expected: u64) -> Result<(), String> {

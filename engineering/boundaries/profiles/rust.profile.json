@@ -275,7 +275,8 @@
       "layer": "host-contract",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_contract.rs"
+        "native_application_contract.rs",
+        "native_application_contract_fingerprints.rs"
       ],
       "publicApi": [
         "native_application_contract.rs"
@@ -316,7 +317,8 @@
       "files": [
         "native_application_commands.rs",
         "native_application_replace_commands_acceptance_tests.rs",
-        "native_application_replace_commands.rs"
+        "native_application_replace_commands.rs",
+        "native_application_replace_replay.rs"
       ],
       "publicApi": [
         "native_application_commands.rs"
@@ -329,7 +331,8 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_tests.rs",
-        "native_application_release_tests.rs"
+        "native_application_release_tests.rs",
+        "native_dispatch_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
