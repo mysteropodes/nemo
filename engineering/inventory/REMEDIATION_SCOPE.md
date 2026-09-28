@@ -251,8 +251,13 @@ packet admission, and project.js stays at 70 computed uncovered code lines. P03C
 eleven frozen contract.rs spans to pending C07 responsibilities; C07's older symbol list names
 singular `Operation::label`, while accepted P07/#1009 PR #1113 is cited only for the added plural
 `Operation::labels()` helper. C07 remains pending, and contract.rs's 134 computed uncovered code
-lines are unchanged. **P03 is not complete and no extraction is admitted**: the gate still exits 1
-with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 102
+lines are unchanged. P03C-o/#1446 dispositioned ten frozen `engine-bridge.js` image-budget spans:
+eight responsibility mappings to pending C03 image-store, scene-build and public-API packets, and
+comment-only boundaries at 640-643 and 2621. Accepted P26/#1028 PR #1168 provides narrower
+image-budget policy provenance, not C03 completion or runtime/pixel acceptance. The 226 Engine
+Bridge and global 7 185 computed uncovered code lines are unchanged. **P03 is not complete and no
+extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes needing
+reconciliation, 0 unmapped paths and 80
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

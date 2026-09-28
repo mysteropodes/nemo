@@ -5767,6 +5767,88 @@
           4618,
           4628
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            628,
+            632
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 628-632 describe the engine-side upload/retirement gate retained beside the P26 image-budget policy, instantiate _imageBudget and define _noteImageRegistered. Pending C03.js-engine-bridge.bounded-image-store (#1038) owns the broader image-store bridge responsibility; accepted P26/#1028 PR #1168 is narrower policy/bookkeeping provenance, not completion of C03 or runtime/pixel acceptance. No numeric range coverage or packet admission is added."
+        },
+        {
+          "span": [
+            634,
+            638
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 634-638 define _touchImage's LRU touch and _retireImages' engine retirement bridge, within pending C03.js-engine-bridge.bounded-image-store (#1038). P26/#1028 PR #1168 supplies narrower extracted image-budget-policy provenance; this does not complete C03, establish runtime/pixel acceptance, or add numeric coverage."
+        },
+        {
+          "span": [
+            640,
+            643
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 640-643 are comment-only explanation of the end-of-build image-budget gate; the enforceImageBudget function begins at 644, outside this span. This preamble has no separate executable responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            645,
+            646
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 645-646 call the image budget's endBuild eviction decision and clear registeredImageIds for retired images, within pending C03.js-engine-bridge.bounded-image-store (#1038). The function declaration and preceding comments are outside this span. P26/#1028 PR #1168 is narrower policy provenance, not packet completion or runtime/pixel acceptance; no numeric coverage is added."
+        },
+        {
+          "span": [
+            777,
+            777
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 777 starts image-budget build accounting inside buildSceneJson. It maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.build-scene-json (#1038); no packet admission, numeric source coverage or runtime/pixel acceptance is implied."
+        },
+        {
+          "span": [
+            2621,
+            2621
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, line 2621 is the first comment line of the build-closing explanation. The following comment at 2622 and enforceImageBudget() call at 2623 are outside this singleton span; the comment has no separate executable responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            4556,
+            4556
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 4556 reads _imageBudget.stats() within imageStoreStats, a public image-budget stats API. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        },
+        {
+          "span": [
+            4558,
+            4558
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 4558 returns the jsBytes member of imageStoreStats. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        },
+        {
+          "span": [
+            4561,
+            4562
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 4561-4562 return budgetBytes and evictions in imageStoreStats. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        },
+        {
+          "span": [
+            4565,
+            4565
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 4565 exposes setImageBudgetBytes as a public image-budget setter. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        }
       ]
     },
     {
