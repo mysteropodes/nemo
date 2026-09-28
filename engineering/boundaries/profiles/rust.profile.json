@@ -132,7 +132,7 @@
       "id": "rust.native.engine.application",
       "layer": "native-application",
       "dir": "native-engine/src",
-      "files": ["application.rs"],
+      "files": ["application.rs", "application_replacement.rs"],
       "publicApi": ["application.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
@@ -241,7 +241,8 @@
       "layer": "viewport-adapter",
       "dir": "src-tauri/src",
       "files": [
-        "native_viewport.rs"
+        "native_viewport.rs",
+        "native_viewport_appkit.rs"
       ],
       "publicApi": [
         "native_viewport.rs"
@@ -275,7 +276,8 @@
       "layer": "host-contract",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_contract.rs"
+        "native_application_contract.rs",
+        "native_application_contract_fingerprints.rs"
       ],
       "publicApi": [
         "native_application_contract.rs"
@@ -300,6 +302,7 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application.rs",
+        "native_application_replacement.rs",
         "native_application_release.rs"
       ],
       "publicApi": [
@@ -313,7 +316,11 @@
       "layer": "command-adapter",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_commands.rs"
+        "native_application_commands.rs",
+        "native_application_replace_commands_acceptance_tests.rs",
+        "native_application_replace_commands.rs",
+        "native_application_replace_replay.rs",
+        "native_application_replace_viewport_tests.rs"
       ],
       "publicApi": [
         "native_application_commands.rs"
@@ -336,7 +343,9 @@
       "layer": "host-seam",
       "dir": "src-tauri/src",
       "files": [
-        "native_dispatch.rs"
+        "native_dispatch.rs",
+        "native_dispatch_replacement.rs",
+        "native_dispatch_tests.rs"
       ],
       "publicApi": [
         "native_dispatch.rs"

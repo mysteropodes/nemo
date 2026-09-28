@@ -17,6 +17,11 @@ use nemo_mcp::contract::NATIVE_API_VERSION;
 use std::path::PathBuf;
 use tauri::Manager;
 
+#[path = "native_application_replace_commands.rs"]
+mod replace_commands;
+#[path = "native_application_replace_replay.rs"]
+mod replace_replay;
+
 #[tauri::command]
 pub(crate) async fn nemo_native_bootstrap(
     app: tauri::AppHandle,
@@ -140,38 +145,7 @@ pub(crate) async fn nemo_native_replace(
     request: NativeReplacementRequest,
 ) -> HostResult<NativeReplacementReceipt> {
     require_main(&window)?;
-    require_api_instance(
-        request.api_version,
-        &request.instance_id,
-        state.instance_id(),
-    )?;
-    let admitted = admit_project(&request.projection, &request.resources)?;
-    let resource_count = admitted.resources.len();
-    let native = state.native_state();
-    let generation = active_generation(&native)?;
-    let instance = request.instance_id.clone();
-    viewport_host::on_main_thread(&app, move || {
-        viewport_host::require_instance_or_absent(&instance)?;
-        let mut guard = native
-            .lock()
-            .map_err(|_| host_error("unavailable", "native application lock unavailable"))?;
-        let application = desktop_mut(&mut guard, generation)?;
-        application.require_identity(
-            &request.instance_id,
-            &request.document_id,
-            request.expected_revision,
-        )?;
-        let (exports, preview) = application.replace_project(admitted)?;
-        viewport_host::reconcile_replaced(&instance, &preview)?;
-        Ok(NativeReplacementReceipt {
-            document_id: application.document_id().to_owned(),
-            content_revision: application.content_revision(),
-            resource_count,
-            cancelled_preview_work_ids: preview.into_iter().map(work_label).collect(),
-            reconciled_exports: exports.iter().map(reconcile_export).collect(),
-        })
-    })
-    .await
+    replace_replay::replace(&app, &state, request).await
 }
 
 #[tauri::command]

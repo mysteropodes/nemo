@@ -57,7 +57,7 @@ function coldSession() {
   vm.createContext(ctx);
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
     'domain/document/folder-codec.js', 'domain/tween/assignment.js',
-    'application/history/frame-entry.js', 'tweens.js', 'application/opacity-application.js',
+    'application/history/frame-entry.js', 'tweens.js', 'domain/diagnostics/opacity-diagnostics.js', 'application/opacity-application.js',
     'application/capability-registry.js', 'application/opacity-capability.js',
     'application/export-job.js', 'adapters/export-svg-sequence.js',
     'bootstrap/opacity-application.js']) {

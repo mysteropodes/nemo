@@ -170,15 +170,28 @@
       if (received.viewGeneration < newest && projected.status !== 'stale-discarded') {
         throw new Error('older generation must be stale-discarded');
       }
-      if (received.viewGeneration === newest && projected.status === 'stale-discarded') {
-        throw new Error('newest generation cannot be stale-discarded');
-      }
       if (!deferred.has(projected.status)) receipts.set(received.workId, projected);
       return projected;
+    }
+    async function present(instanceId, lifecycleGeneration, value, host, verify) {
+      active();
+      const meta = metadata(value);
+      const context = freeze({ instanceId: id(instanceId, 'instanceId'),
+        lifecycleGeneration: revision(lifecycleGeneration, 'lifecycleGeneration', true) });
+      if (typeof host !== 'function') throw new TypeError('native preview host is unavailable');
+      if (typeof verify !== 'function') throw new TypeError('native preview lifecycle verifier is unavailable');
+      const received = receipt(await host(freeze({ apiVersion: 2, instanceId: context.instanceId, ...meta })));
+      verify();
+      active();
+      if (receipts.has(received.workId)) throw new Error('terminal preview receipt cannot satisfy a new presentation');
+      register(meta, { workId: received.workId, viewGeneration: received.viewGeneration });
+      const observed = receive(received);
+      return freeze({ ...context, ...observed });
     }
     return freeze({
       register,
       receive,
+      present,
       dispose() { closed = true; },
     });
   }
