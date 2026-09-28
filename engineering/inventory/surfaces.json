@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f095739b60ee78f0f7e8e40610df428c70d91c7c",
-  "describe": "v0.7.0-alpha.4-582-gf095739"
+  "head": "d011f0e344f575346bd31c8fc56da35faa06c50f",
+  "describe": "v0.7.0-alpha.4-588-gd011f0e"
  },
- "inputsDigest": "29ffbfd8406a103db169a2c91b5410258a0d7e219b70caaa0129fdd8d49732a6",
+ "inputsDigest": "95e5cd3998ccac7669fb0d445db96be4b799325100fae2ae6e0824cd2ed57305",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 903,
+  "total": 904,
   "byKind": {
    "dom": 484,
-   "labs": 35,
+   "labs": 36,
    "menu": 261,
    "sdk": 73,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 876,
+   "inventoried": 877,
    "unmapped": 26,
    "unavailable-with-reason": 1
   },
@@ -48,7 +48,7 @@
    "effects-masks": 10,
    "preferences-workspace": 39,
    "unclassified": 6,
-   "labs": 60,
+   "labs": 61,
    "storyboard": 17
   },
   "byConsumer": {
@@ -56,7 +56,7 @@
    "export": 5,
    "render": 527,
    "persist": 420,
-   "animation": 465,
+   "animation": 466,
    "history": 358,
    "selection": 383
   }
@@ -21498,6 +21498,34 @@
    "source": "src/js/labs/command-palette.js:111",
    "meta": {
     "functionsVisited": 0
+   },
+   "fixtures": []
+  },
+  {
+   "id": "labs:diagnostics-panel",
+   "kind": "labs",
+   "surface": "Settings > Labs / SMLabs.diagnostics-panel",
+   "capability": "labsDescribeDiagnosticsPanel",
+   "area": "labs",
+   "handler": [
+    "src/js/labs/diagnostics-panel.js:113"
+   ],
+   "events": [],
+   "exposure": [
+    "Labs panel (opt-in prototype)",
+    "script (window.SMLabs)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "SMLabs",
+   "consumers": {
+    "animation": 2
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
+   "source": "src/js/labs/diagnostics-panel.js:113",
+   "meta": {
+    "functionsVisited": 23
    },
    "fixtures": []
   },
