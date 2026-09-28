@@ -310,6 +310,7 @@
       return ports.selection.projectSelection(evaluations.get(frame), descriptor);
     }
     function presentPreview(frame) {
+      if (phase !== 'native') return Promise.reject(new Error('native opacity authority is not active'));
       var target = cycle;
       function verify() { requireAdmission(); if (target !== cycle || target.synchronizing) throw new Error('native opacity preview lifecycle changed or synchronization is pending'); }
       return enqueue(async function () {
