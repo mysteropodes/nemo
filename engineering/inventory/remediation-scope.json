@@ -6207,6 +6207,16 @@
           572,
           596
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            572,
+            596
+          ],
+          "kind": "covered",
+          "evidence": "Mixed public-facade responsibility mapping at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (feedback-bridge blob b87a6fc24b20f136c05df123d772b224e81ba212): line 572 is blank, 573 opens window.SMFeedback, and 595-596 close the object/IIFE. Action/click trail exports at 574-579 (defined at 72-157), readAllLocal at 581 (defined at 210), and local approve/resolve/delete at 585-587 (defined at 553-571) map to pending C04b.content-tools.feedback-local-log-storage (#1039). submitFeedback at 580 (defined at 281-341) spans that local-write responsibility and pending C04b.content-tools.feedback-worker-publish: it writes locally, then best-effort publishes to the team Sync folder at 316-327 and Worker at 328-340. The Sync write is functionally paired with the pending triage-sync flow but remains inside the worker-publish packet's declared 279-341 range. checkIncomingFeedback/importIncoming/pullAllIncoming at 582-584 (defined at 506-551), plus GitHub token, fetch and issue mutation exports at 588-594 (defined at 433-503), map to pending C04b.content-tools.feedback-triage-sync; incoming import uses the local store but belongs to the triage-sync flow. The pinned C04b census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 and its older range declarations remain unchanged. No single packet owns this whole facade; no packet admission, numeric source coverage, feedback delivery or browser/Tauri behavior acceptance is claimed."
+        }
       ]
     },
     {
