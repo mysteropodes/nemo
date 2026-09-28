@@ -6473,6 +6473,56 @@
           3293,
           3308
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            271,
+            279
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 271-279 are comment-only explanation of non-destructive combine hit confirmation; executable combineVisibleAt begins at 280 in pending C04a.select.combine-hit-confirm (#1039). This preamble has no separate executable responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            461,
+            464
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 461-462 explain the rotate cursor, line 463 defines executable ROTATE_CURSOR and 464 is blank. The cursor supports pending C04a.select.handle-computation (#1039), whose census names ROTATE_CURSOR and the adjacent handle/cursor behavior. This is not a comment-only boundary and adds no packet admission, behavior parity or numeric coverage."
+        },
+        {
+          "span": [
+            759,
+            763
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 759-763 are blank/comment-only motion-arc hit-test lead-in; executable hitTestArc starts at 764 in pending C04a.select.handle-computation (#1039). The preamble has no separate executable responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            772,
+            773
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 772 is blank and 773 defines executable lastPt state immediately before onDown begins at 774 in pending C04a.select.on-down (#1039). This is not a comment-only boundary and adds no packet admission, selection behavior parity or numeric coverage."
+        },
+        {
+          "span": [
+            2905,
+            2914
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 2905-2914 are blank/comment-only right-click context-menu lead-in; executable onContext begins at 2915 in pending C04a.select.on-context (#1039). The preamble has no separate executable responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            3293,
+            3308
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 3293-3308 are blank/comment-only per-element tween lead-in; executable toggleTweenOnForSelection starts at 3309 in pending C04a.select.tween-toggle (#1039). The preamble has no separate executable responsibility or numeric coverage."
+        }
       ]
     },
     {

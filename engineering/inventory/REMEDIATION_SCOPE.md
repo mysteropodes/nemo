@@ -273,8 +273,14 @@ uncovered counts remain 88 and 7 185. P03C-s/#1456 marks frozen `src/js/export
 boundary: line 1161 is blank and lines 1162-1174 are Render Manager batch-export lead-in comments;
 the first executable begins at 1175. The comments describe adjacent pending C05 Tauri-I/O batch
 export responsibility but implement none. The export.js uncovered count remains 186 and global
-7 185. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 69
+7 185. P03C-t/#1458 dispositions six frozen `src/js/select-bridge.js` seams against pending C04a
+selection packets: comment-only boundaries at 271-279 (combine hit confirmation), 759-763
+(motion-arc hit test), 2905-2914 (context menu) and 3293-3308 (per-element tween toggle), plus
+covered responsibility mappings at 461-464 (`ROTATE_CURSOR` at 463) and 772-773 (`lastPt` at 773).
+The executable opener 1-23 remains unresolved. C04a packet admissions, selection behavior parity
+and numeric coverage are unchanged; select-bridge.js retains 64 and the global report 7 185
+computed uncovered code lines. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
+pending packets, no notes needing reconciliation, 0 unmapped paths and 63
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
