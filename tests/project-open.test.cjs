@@ -56,6 +56,10 @@ function harness({ auto = null, version = null, deferFrames = false } = {}) {
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem() {}, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
     requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() { mutations++; }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
+  window.requestAnimationFrame = function (fn) {
+    assert.strictEqual(this, window, 'WebKit requestAnimationFrame requires a Window receiver');
+    return context.requestAnimationFrame(fn);
+  };
   if (version !== null) window.__TAURI__ = { fs: { readTextFile: async () => version } };
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });
@@ -83,7 +87,7 @@ function installNativeOpen(app) {
   const receipt = { owner: 'native', status: 'presented', frame: 0,
     instanceId: 'instance-a', documentId: 'document-a', contentRevision: 0,
     lifecycleGeneration: 1, documentSnapshotId: 'snapshot-a' };
-  let active = false, presentations = 0;
+  let active = false, presentations = 0, deferredAllowed = null;
   app.window.NemoNativeOpacityCutover = {
     blocksLegacy() { return active; }, isActive() { return active; },
     identity() { return { instanceId: receipt.instanceId, documentId: receipt.documentId,
@@ -91,10 +95,13 @@ function installNativeOpen(app) {
     persistenceJSON() { return '{"native":true}'; },
     presentPreview(frame) { assert.equal(frame, 0); presentations++; return visible.promise; },
   };
-  app.window.NemoNativeOpacityProject = { importJSON() { return first.promise.then(value => {
+  app.window.NemoNativeOpacityProject = { importJSON(json, silent, allowOccludedAdmission) {
+    deferredAllowed = allowOccludedAdmission;
+    return first.promise.then(value => {
     if (value) active = true; return value;
   }); } };
-  return { receipt, first, visible, get presentations() { return presentations; } };
+  return { receipt, first, visible, get presentations() { return presentations; },
+    get deferredAllowed() { return deferredAllowed; } };
 }
 
 test('browser Open keeps the file name and normalized clean baseline for later Save', async () => {
@@ -115,6 +122,7 @@ test('native browser Open publishes success only after both frame-0 presentation
   const app = harness({ deferFrames: true }), native = installNativeOpen(app);
   select(app, { name: 'Native.json', text: '{"supported":true}' });
   assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(native.deferredAllowed, true, 'only explicit Open opts into the reveal handoff');
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
   native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
@@ -131,6 +139,24 @@ test('native browser Open publishes success only after both frame-0 presentation
   assert.equal(app.project.isDirty(), false);
   assert.equal(app.toasts.at(-1), 'Opened: Native');
   assert.equal(app.mutations, 0, 'Paper writers never run during native Open');
+});
+
+test('deferred native first frame remains unpublished until post-reveal presentation', async () => {
+  const app = harness({ deferFrames: true }), native = installNativeOpen(app);
+  const first = { ...native.receipt, status: 'deferred-occluded' };
+  select(app, { name: 'Occluded.json', text: '{"supported":true}' });
+  native.first.resolve(first);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(native.presentations, 1);
+  native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.project.getCurrentLabel(), 'Occluded (not saved)');
+  assert.equal(app.toasts.at(-1), 'Opened: Occluded');
+  assert.equal(app.mutations, 0);
 });
 
 test('stale post-reveal native frame leaves desktop Open unpublished and returns to start screen', async () => {
