@@ -122,19 +122,66 @@
   function nativeKeyInteractionPlan(controller, holder) {
     return positionOverlayPlan(controller, holder, []);
   }
-  // Capture ownership while the row is built from a readable revision.
-  // A rapid native scrub deliberately opens a cache fence before this
-  // same DOM callback returns; re-querying prepared() from that callback
-  // would then throw and drop its next no-await value.
-  function renderedOpacityRoute(controller, holder, prop, frame) {
-    if (prop !== 'opacity') return UNHANDLED;
+  // Persistence is composed only after the pinned native serialize and all
+  // evaluations publish. The prepared projection is the opening snapshot.
+  function opacityReadModel(controller, holder, frame) {
     var current = preparedFor(controller, holder);
     if (!current) return UNHANDLED;
-    var layer = current.projection.layers[0], track = layer.motion && layer.motion.opacity;
-    var keys = track && track.keys || [];
-    return current ? freeze({ handled: true, layerUid: current.layerUid,
-      property: 'opacity', opacityMode: current.opacityMode, animated: keys.length > 0,
-      keyAtFrame: keys.some(function (key) { return key.frame === frame; }) }) : UNHANDLED;
+    if (!Number.isInteger(frame) || frame < 0 || frame >= current.totalFrames) {
+      throw new Error('native opacity frame is unavailable');
+    }
+    if (typeof controller.persistenceJSON !== 'function') throw new Error('native opacity persistence is unavailable');
+    var before = controller.identity();
+    var json = controller.persistenceJSON();
+    var after = controller.identity();
+    if (!before || !after || before.instanceId !== after.instanceId ||
+        before.documentId !== after.documentId || before.contentRevision !== after.contentRevision ||
+        typeof json !== 'string' || !json || json.length > 1048576) {
+      throw new Error('native opacity persistence is fenced or stale');
+    }
+    var document = JSON.parse(json);
+    var layers = document && document.layers;
+    if (document.version !== 13 || document.totalFrames !== current.totalFrames ||
+        !Array.isArray(layers) || layers.length !== 1) throw new Error('native opacity document is unsupported');
+    var layer = layers[0];
+    if (!layer || layer.layerUid !== current.layerUid ||
+        !layer.motionStatic || !Array.isArray(layer.motionStatic.opacity) ||
+        layer.motionStatic.opacity.length !== 1 ||
+        !Number.isFinite(layer.motionStatic.opacity[0]) || layer.motionStatic.opacity[0] < 0 ||
+        layer.motionStatic.opacity[0] > 100) throw new Error('native opacity layer is malformed');
+    var track = layer.motion && layer.motion.opacity;
+    var keys = [];
+    if (current.opacityMode === 'keyed') {
+      if (!track || !Array.isArray(track.keys) || track.keys.length !== 2) {
+        throw new Error('native opacity keys are unavailable');
+      }
+      track.keys.forEach(function (key, index) {
+        if (!key || key.frame !== (index ? 20 : 0) || !Array.isArray(key.v) ||
+            key.v.length !== 1 || key.v[0] !== (index ? 80 : 20) ||
+            Object.keys(key).sort().join(',') !== 'curvePoints,frame,hIn,hOut,v' ||
+            !Array.isArray(key.hIn) || key.hIn.length !== 2 || key.hIn[0] !== 0 || key.hIn[1] !== 0 ||
+            !Array.isArray(key.hOut) || key.hOut.length !== 2 || key.hOut[0] !== 0 || key.hOut[1] !== 0 ||
+            !Array.isArray(key.curvePoints) || key.curvePoints.length !== 5 ||
+            key.curvePoints.some(function (point, i) {
+              var expected = [[0, 0], [0.25, 0.156], [0.5, 0.5], [0.75, 0.844], [1, 1]][i];
+              return !point || Object.keys(point).sort().join(',') !== 'x,y' ||
+                point.x !== expected[0] || point.y !== expected[1];
+            })) {
+          throw new Error('native opacity key is malformed');
+        }
+        keys.push({ frame: key.frame, value: key.v[0] });
+      });
+    } else if (current.opacityMode !== 'static' || track) {
+      throw new Error('native opacity mode is malformed');
+    }
+    return freeze({ handled: true, instanceId: before.instanceId, documentId: before.documentId,
+      contentRevision: before.contentRevision, layerUid: current.layerUid, property: 'opacity',
+      opacityMode: current.opacityMode, staticValue: layer.motionStatic.opacity[0], keys: keys,
+      animated: keys.length > 0, keyAtFrame: keys.some(function (key) { return key.frame === frame; }) });
+  }
+  function renderedOpacityRoute(controller, holder, prop, frame) {
+    if (prop !== 'opacity') return UNHANDLED;
+    return opacityReadModel(controller, holder, frame);
   }
   // Native opacity owns its own history. Static value edits stay native;
   // every key/animation-mode edit requests release through opacityLegacy.
@@ -199,6 +246,7 @@
   return Object.freeze({ owns: owns, read: read, detachedElementView: detachedElementView,
     detachedExpressionView: detachedExpressionView, expressionSnapshot: expressionSnapshot,
     positionOverlayPlan: positionOverlayPlan, nativeKeyInteractionPlan: nativeKeyInteractionPlan,
-    renderedOpacityRoute: renderedOpacityRoute, routeIntent: routeIntent, routeDimension: routeDimension,
+    opacityReadModel: opacityReadModel, renderedOpacityRoute: renderedOpacityRoute,
+    routeIntent: routeIntent, routeDimension: routeDimension,
     publishWriters: publishWriters, requireAvailable: requireAvailable });
 }));
