@@ -68,7 +68,7 @@ pub(super) fn complete_replacement(
     complete_replacement_with(native, generation, instance, prepared, |_| Ok(()))
 }
 
-fn complete_replacement_with(
+pub(super) fn complete_replacement_with(
     native: &NativeState,
     generation: u64,
     instance: &str,
@@ -93,11 +93,25 @@ fn complete_replacement_with(
                     .ok_or_else(|| {
                         host_error("unavailable", "native desktop host is unavailable")
                     })?;
+                progress.viewport = ReplacementStage::Running;
+                let retired = viewport_host::retire_replacement(instance)?;
+                checkpoint("viewport_retired")?;
                 let (exports, preview) =
                     desktop.replace_project_prepared(prepared, progress, &mut checkpoint)?;
-                progress.viewport = ReplacementStage::Running;
+                let shared = desktop.preview_compositor().inner();
+                let compositor = shared
+                    .lock()
+                    .map_err(|_| host_error("internal", "compositor_lock_poisoned"))?;
+                viewport_host::rebind_replacement(instance, &compositor)?;
+                drop(compositor);
+                checkpoint("viewport_rebound")?;
                 checkpoint("viewport")?;
-                viewport_host::reconcile_replaced(instance, &preview)?;
+                if retired.iter().any(|work_id| !preview.contains(work_id)) {
+                    return Err(host_error(
+                        "internal",
+                        "retired viewport work was not reconciled",
+                    ));
+                }
                 progress.viewport = ReplacementStage::Complete;
                 Ok(NativeReplacementReceipt {
                     request_id: String::new(),
@@ -130,6 +144,9 @@ fn complete_replacement_with(
             Ok(receipt)
         }
         Ok(Err(error)) => {
+            // A was retired before core mutation. A failed B must not leave
+            // even its blank replacement surface retained behind the fence.
+            let _ = viewport_host::retire_replacement(instance);
             let progress = authority
                 .fence_replace(
                     generation,
@@ -140,6 +157,7 @@ fn complete_replacement_with(
             Err(fenced_error(progress))
         }
         Err(payload) => {
+            let _ = viewport_host::retire_replacement(instance);
             let progress = authority
                 .fence_replace(generation, "callback_panicked", panic_message(payload))
                 .map_err(|message| host_error("unavailable", message))?;

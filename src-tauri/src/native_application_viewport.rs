@@ -13,6 +13,19 @@ use native_engine::{
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
+#[cfg(test)]
+pub(crate) use crate::native_viewport::replacement_test_support::{
+    FakeOutcome, FakeViewport, SurfaceState,
+};
+#[cfg(test)]
+pub(crate) type TestCompositionResult = CompositionResult;
+#[cfg(test)]
+pub(crate) type TestFrameIdentity = ScheduledFrameIdentity;
+#[cfg(test)]
+pub(crate) type TestViewportMapping = ViewportMapping;
+#[cfg(test)]
+pub(crate) type TestWorkId = WorkId;
+
 struct RetainedViewport {
     instance_id: String,
     viewport: NativeViewport,
@@ -41,7 +54,8 @@ pub(crate) trait TestViewportDriver {
         result: &CompositionResult,
         identity: ScheduledFrameIdentity,
     ) -> HostResult<Presentation>;
-    fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId>;
+    fn retire_replacement(&mut self) -> Vec<WorkId>;
+    fn rebind_existing(&mut self, compositor: &Compositor) -> HostResult<()>;
 }
 
 #[cfg(test)]
@@ -59,13 +73,39 @@ thread_local! {
 pub(crate) fn install_test_viewport(instance_id: String, viewport: Box<dyn TestViewportDriver>) {
     TEST_VIEWPORT.with(|slot| {
         assert!(slot.borrow().is_none());
-        *slot.borrow_mut() = Some(RetainedTestViewport { instance_id, viewport });
+        *slot.borrow_mut() = Some(RetainedTestViewport {
+            instance_id,
+            viewport,
+        });
     });
 }
 
 #[cfg(test)]
-pub(crate) fn remove_test_viewport() {
-    TEST_VIEWPORT.with(|slot| { slot.borrow_mut().take(); });
+pub(crate) fn remove_test_viewport() -> Vec<WorkId> {
+    TEST_VIEWPORT.with(|slot| {
+        slot.borrow_mut()
+            .take()
+            .map_or_else(Vec::new, |mut value| value.viewport.retire_replacement())
+    })
+}
+
+#[cfg(test)]
+fn with_test_viewport<T>(
+    instance_id: &str,
+    operation: impl FnOnce(&mut dyn TestViewportDriver) -> HostResult<T>,
+) -> Option<HostResult<T>> {
+    TEST_VIEWPORT.with(|slot| {
+        slot.borrow_mut().as_mut().map(|value| {
+            if value.instance_id == instance_id {
+                operation(value.viewport.as_mut())
+            } else {
+                Err(host_error(
+                    "wrong_instance",
+                    "native viewport instance mismatch",
+                ))
+            }
+        })
+    })
 }
 
 pub(crate) async fn on_main_thread<T: Send + 'static>(
@@ -289,12 +329,9 @@ pub(crate) fn remove(instance_id: &str) -> HostResult<()> {
 
 pub(crate) fn require_instance_or_absent(instance_id: &str) -> HostResult<()> {
     #[cfg(test)]
-    if let Some(result) = TEST_VIEWPORT.with(|slot| {
-        slot.borrow().as_ref().map(|value| {
-            if value.instance_id == instance_id { Ok(()) }
-            else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
-        })
-    }) { return result; }
+    if let Some(result) = with_test_viewport(instance_id, |_| Ok(())) {
+        return result;
+    }
     MAIN_VIEWPORT.with(|slot| match slot.borrow().as_ref() {
         Some(value) if value.instance_id != instance_id => Err(host_error(
             "wrong_instance",
@@ -304,29 +341,43 @@ pub(crate) fn require_instance_or_absent(instance_id: &str) -> HostResult<()> {
     })
 }
 
-pub(crate) fn reconcile_replaced(
-    instance_id: &str,
-    work_ids: &[WorkId],
-) -> HostResult<Vec<WorkId>> {
+/// The authority lock is held by the committed replacement callback. Release
+/// A's retained surface/view before mutating its document or resources.
+pub(crate) fn retire_replacement(instance_id: &str) -> HostResult<Vec<WorkId>> {
     #[cfg(test)]
-    if let Some(result) = TEST_VIEWPORT.with(|slot| {
-        slot.borrow_mut().as_mut().map(|value| {
-            if value.instance_id == instance_id { Ok(value.viewport.reconcile_replaced(work_ids)) }
-            else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
-        })
-    }) { return result; }
-    MAIN_VIEWPORT.with(|slot| {
-        let mut slot = slot.borrow_mut();
-        match slot.as_mut() {
-            Some(value) if value.instance_id == instance_id => {
-                Ok(value.viewport.reconcile_replaced(work_ids))
-            }
-            Some(_) => Err(host_error(
-                "wrong_instance",
-                "native viewport instance mismatch",
-            )),
-            None => Ok(Vec::new()),
-        }
+    if let Some(result) =
+        with_test_viewport(instance_id, |viewport| Ok(viewport.retire_replacement()))
+    {
+        return result;
+    }
+    MAIN_VIEWPORT.with(|slot| match slot.borrow_mut().as_mut() {
+        Some(value) if value.instance_id == instance_id => Ok(value.viewport.retire_replacement()),
+        Some(_) => Err(host_error(
+            "wrong_instance",
+            "native viewport instance mismatch",
+        )),
+        None => Ok(Vec::new()),
+    })
+}
+
+/// Recreate only an empty surface on the original compositor context.
+pub(crate) fn rebind_replacement(instance_id: &str, compositor: &Compositor) -> HostResult<()> {
+    #[cfg(test)]
+    if let Some(result) =
+        with_test_viewport(instance_id, |viewport| viewport.rebind_existing(compositor))
+    {
+        return result;
+    }
+    MAIN_VIEWPORT.with(|slot| match slot.borrow_mut().as_mut() {
+        Some(value) if value.instance_id == instance_id => value
+            .viewport
+            .rebind_existing(compositor)
+            .map_err(|error| host_error("unavailable", error.to_string())),
+        Some(_) => Err(host_error(
+            "wrong_instance",
+            "native viewport instance mismatch",
+        )),
+        None => Ok(()),
     })
 }
 
@@ -337,13 +388,11 @@ pub(crate) fn present(
     identity: ScheduledFrameIdentity,
 ) -> HostResult<Presentation> {
     #[cfg(test)]
-    if let Some(result) = TEST_VIEWPORT.with(|slot| {
-        slot.borrow_mut().as_mut().map(|value| {
-            if value.instance_id == instance_id {
-                value.viewport.present(compositor, result, identity.clone())
-            } else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
-        })
-    }) { return result; }
+    if let Some(result) = with_test_viewport(instance_id, |viewport| {
+        viewport.present(compositor, result, identity.clone())
+    }) {
+        return result;
+    }
     with_viewport(instance_id, |viewport| {
         viewport.register(identity.clone()).map_err(|error| {
             host_error("internal", format!("register native preview: {error:?}"))
@@ -425,7 +474,7 @@ fn with_viewport<T>(
     })
 }
 
-fn status_label(status: &ViewportStatus) -> &'static str {
+pub(crate) fn status_label(status: &ViewportStatus) -> &'static str {
     match status {
         ViewportStatus::Presented => "presented",
         ViewportStatus::StaleDiscarded => "stale-discarded",
