@@ -5878,6 +5878,14 @@
         },
         {
           "span": [
+            8530,
+            8553
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 8530-8553 are keysLockedTo, the reader that finds exact in/out/layer lock modes on propsFor-addressed layer and element-holder tracks. C02.properties-and-curves.key-selection-and-clipboard (#1037) names keysLockedTo; C20c/#1137 explicitly distinguishes this adjacent C02 reader at 8530-8553 from its own menu builders and records its exclusions. The C02 packet remains pending; this adds no computed range coverage or implementation acceptance."
+        },
+        {
+          "span": [
             9429,
             9435
           ],
@@ -5891,6 +5899,14 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen 3f6eed2, lines 13256-13321 are blank/comment-only Motion-grid marquee rationale preceding initGridMarquee. C02.motion-advanced.canvas-drag-interactions (#1037) owns the grid pointer-capture registration at 13337-13365, and C20q/#1247 owns the key-marquee selection behavior it dispatches to. This preamble has no standalone executable responsibility."
+        },
+        {
+          "span": [
+            13854,
+            13879
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 13854-13879 export selectKeys to the shared key-selection state and onEaseSegChanged to the curve widget, which updates/repaints curvePoints and propagates the curve to selected keys. C02.properties-and-curves.key-selection-and-clipboard and C02.properties-and-curves.curves-and-easing (#1037) own those adjacent selection and easing responsibilities; C20o/#1245 documents the key/property-selection and shared curve-widget caller wiring, while the C02 curves-and-easing packet names onEaseSegChanged. Both C02 packets remain pending; this adds no computed range coverage or implementation acceptance."
         }
       ]
     },
