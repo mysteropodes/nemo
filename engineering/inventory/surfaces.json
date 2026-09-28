@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2e666bc2c486522ebea21af0abe88840bb73d3f2",
-  "describe": "v0.7.0-alpha.4-593-g2e666bc"
+  "head": "ede5268982636753e0fb0b69a0314320db85e891",
+  "describe": "v0.7.0-alpha.4-597-gede5268"
  },
- "inputsDigest": "43972031af64f0a7181d3631a20b8fbd4e5ff70356933e14eed36f27f1725f6e",
+ "inputsDigest": "7516daaee2266e5b86dfdacb321a26fc94fffbaa3db400f88e3a196be2f6348d",
  "states": [
   "inventoried",
   "characterized",
@@ -21505,7 +21505,7 @@
    "id": "labs:diagnostics-panel",
    "kind": "labs",
    "surface": "Settings > Labs / SMLabs.diagnostics-panel",
-   "capability": "labsDescribeDiagnosticsPanel",
+   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; a row click selects the layer it touched, Report produces a reproduction bundle",
    "area": "labs",
    "handler": [
     "src/js/labs/diagnostics-panel.js:176"
