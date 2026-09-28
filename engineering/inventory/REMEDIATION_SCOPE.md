@@ -296,8 +296,12 @@ C02 remains pending and layer-inout/global computed uncovered counts remain 74/7
 P03C-w/#1464 marks frozen `geometry-wasm/src/hit.rs:1-8` as a boundary: all eight lines
 are explanatory comments; the executable import and pending C03 hit-test responsibility start
 at line 9, outside the span. This does not admit C03 or change numeric coverage.
+P03C-x/#1466 maps frozen `src/js/tweens.js:4860` (folder-map snapshot field) and `:4925`
+(guarded folder-map restore field) to pending `C01.tweens.undo-redo-engine`. Adjacent folder
+comments and distinct link-group fields are outside these singleton spans. This is responsibility
+mapping only; C01 remains pending and tweens.js/global uncovered counts remain 516/7 185.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 59
+pending packets, no notes needing reconciliation, 0 unmapped paths and 57
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

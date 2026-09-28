@@ -6758,6 +6758,22 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 1020 in _matchLandmarks calls NemoTweenAssignment.solve on its augmented landmark-correspondence cost matrix. C02.tween-engine.resampling-and-nonrigid-warping (#1037) names _matchLandmarks and owns the feature-aware resampling/nonrigid-warping context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted only the generic assignment solver. The C02 packet remains pending; this does not add numeric coverage, packet admission, warp behavior acceptance or a parity claim."
+        },
+        {
+          "span": [
+            4860,
+            4860
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 4860 adds layerFolders via NemoFolderCodec.snapshotFolderMap(state.layerFolders) to layersSnapshotNow. The pinned C01/#1036 census packet C01.tweens.undo-redo-engine names layersSnapshotNow and whole-tree undo metadata responsibility. Explanatory folder metadata comments at 4854-4859 and the distinct layerLinkGroups snapshot at 4861 are outside this singleton. C01 remains pending; this mapping does not claim codec extraction, undo/redo behavior acceptance, or numeric coverage."
+        },
+        {
+          "span": [
+            4925,
+            4925
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 4925 conditionally restores s.layerFolders via NemoFolderCodec.hasFolderMap/restoreFolderMap inside restoreLayersSnapshot. The pinned C01/#1036 census packet C01.tweens.undo-redo-engine names restoreLayersSnapshot and whole-tree undo metadata responsibility. Compatibility comments at 4923-4924 and the distinct layerLinkGroups restore at 4926 are outside this singleton. C01 remains pending; this mapping does not claim codec extraction, undo/redo behavior acceptance, or numeric coverage."
         }
       ]
     },
