@@ -27,6 +27,7 @@ const root = path.resolve(__dirname, '..');
 const adapterPath = path.join(root, 'src/js/adapters/project-native-save.js');
 const adapter = require(adapterPath);
 const adapterSource = fs.readFileSync(adapterPath, 'utf8');
+const nativeEntrySource = fs.readFileSync(path.join(root, 'src/js/adapters/native-opacity-project-entry.js'), 'utf8');
 const projectSource = fs.readFileSync(path.join(root, 'src/js/project.js'), 'utf8');
 
 // A recording filesystem. `fail` maps an operation name to the call indices
@@ -227,6 +228,9 @@ function productionContext(f) {
   context.__TAURI__ = { fs: f.ports };
   vm.createContext(context);
   vm.runInContext(adapterSource, context, { filename: 'project-native-save.js' });
+  vm.runInContext(nativeEntrySource, context, { filename: 'native-opacity-project-entry.js' });
+  const projectJSON = slice(projectSource, 'function projectJSON(){', '\n  function nativeOpenReady', 'projectJSON');
+  vm.runInContext(`${projectJSON}\nthis.projectJSON = projectJSON;`, context, { filename: 'project-projectJSON.js' });
   const fn = slice(projectSource, WRITE_PROJECT_TO[0], WRITE_PROJECT_TO[1], 'writeProjectTo');
   const writeProjectTo = vm.runInContext(`(${fn})`, context, { filename: 'project-writeProjectTo.js' });
   return { writeProjectTo, calls, context };
