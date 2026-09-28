@@ -308,8 +308,19 @@ P03C-z/#1470 marks frozen `src/js/playback-cache.js:1-19` as a comment-only boun
 descriptive playback-bake header ends before the executable module IIFE and pending
 `C03.js-effects-and-playback.playback-bake-cache` packet begins at line 20. It claims no covered
 playback behavior or packet acceptance; playback-cache.js/global uncovered counts remain 19/7 185.
+P03C-aa/#1474 maps frozen `src/js/export.js:369-376` (`exportFrameRange`) to pending
+`C05.export.frame-compositor`, and `570-598` (`exportRenderPNGsToDir`) to pending
+`C05.export.tauri-io-ffmpeg`, with its separate engine-routing branch accounted for by the
+pending routing-gate packet. It marks `873-883` as the Lottie comment boundary before
+`lottieHexToRGBA` at 884, then maps line 1255 (blank), 1256 (section heading) and the
+`window.SMExport` facade at 1257-1389 to the applicable pending C05 frame-compositor, Tauri-I/O,
+browser fallback and Lottie packets; the Rive exporter separately augments that facade from
+`rive-export.js`. Accepted P17/#1019 and P18/#1020 remain narrow wrapper/job provenance only.
+These are responsibility and boundary records, not packet admission, numeric coverage or
+export/runtime parity acceptance. The frozen `export.js` uncovered count remains 186 and the
+global count remains 7 185.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 55
+pending packets, no notes needing reconciliation, 0 unmapped paths and 51
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
