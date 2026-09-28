@@ -12,6 +12,7 @@ const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
+const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const NativeProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
@@ -219,7 +220,7 @@ function nativeHarness(source, options = {}) {
   }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
     return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
   } },
-    operations: NativeOpacityOperations, motionSurface: NativeMotionSurface });
+    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];

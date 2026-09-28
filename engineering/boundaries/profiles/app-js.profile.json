@@ -1717,6 +1717,18 @@
       ]
     },
     {
+      "id": "app.native.opacity.viewport",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-viewport.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-viewport.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.operations",
       "layer": "application",
       "dir": "src/js/application",

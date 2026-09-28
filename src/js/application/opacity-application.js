@@ -150,7 +150,7 @@ var NemoOpacityApplicationCore = (function () {
   }
 
   function createNative(ports, modules) {
-    if (!modules || !modules.contract || !modules.lifecycle || !modules.operations) {
+    if (!modules || !modules.contract || !modules.lifecycle || !modules.operations || !modules.viewport) {
       throw new Error('native opacity modules must be supplied to the core');
     }
     function requireMotionSurface() {
@@ -168,7 +168,7 @@ var NemoOpacityApplicationCore = (function () {
       legacyImport: function () { return operations.reenterLegacy.apply(null, arguments); },
       onDisposed: function (session) { operations.disposeSession(session); }
     }), modules.contract);
-    operations = modules.operations.create(lifecycle, ports, modules.contract);
+    operations = modules.operations.create(lifecycle, ports, modules.contract, modules.viewport);
     return Object.freeze({ activate: function (prepared) { requireMotionSurface(); return lifecycle.activate(prepared); },
       release: lifecycle.requestRelease,
       releaseCurrent: lifecycle.releaseCurrent, requestRelease: lifecycle.requestRelease,

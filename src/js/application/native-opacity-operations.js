@@ -6,14 +6,15 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function create(lifecycle, ports, contract) {
+  function create(lifecycle, ports, contract, viewportModule) {
     if (!contract) throw new TypeError('native opacity operations require the pure contract');
+    if (!viewportModule || typeof viewportModule.create !== 'function') {
+      throw new Error('native opacity viewport scheduler is unavailable');
+    }
     var v1ByLifecycle = new WeakMap();
-    // Extension capabilities can outlive a document; this latch lasts for the page.
-    // All retry/trace and pending resize work, in contrast, belongs to one session.
-    var extensionExposed = false, resize = null, resizing = null, presenting = null;
-    var installation = null, opening = false;
-    var lastPresentedFrame = null;
+    // Extension capabilities outlive a document; opening is one import at a time.
+    var extensionExposed = false, installation = null, opening = false;
+    var viewport = viewportModule.create(lifecycle, ports, function () { return opening; });
 
     function ensureActive() {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
@@ -208,91 +209,11 @@
     function reenterLegacy() { return false; }
     function disposeSession(session) {
       v1ByLifecycle.delete(session);
-      if (resize && resize.session === session) {
-        if (resize.timer !== null) ports.surface.cancel(resize.timer);
-        resize = null;
-      }
-      lastPresentedFrame = null;
+      viewport.disposeSession(session);
     }
     function allowLegacy(kind) {
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
-    }
-    function applyResize(job) {
-      if (job.work) return job.work;
-      if (job.timer !== null) ports.surface.cancel(job.timer);
-      job.timer = null;
-      var prior = resizing && resizing.session === job.session ? resizing.work : null;
-      var priorPresentation = presenting;
-      job.work = (async function () {
-        if (prior) await prior;
-        if (priorPresentation) await priorPresentation;
-        var latest = lifecycle.inspect(), currentToken;
-        if (latest.session !== job.session) return false;
-        try { currentToken = lifecycle.getNativeIdentity(); } catch (_) { return false; }
-        if (!currentToken || currentToken.documentId !== job.token.documentId ||
-            currentToken.generation !== job.token.generation) return false;
-        await ports.surface.resize(lifecycle.identity());
-        return true;
-      })().catch(function (error) {
-        if (lifecycle.inspect().session === job.session) lifecycle.fence(error);
-        throw error;
-      }).finally(function () {
-        if (resizing === job) resizing = null;
-        if (resize === job) resize = null;
-      });
-      resizing = job;
-      return job.work;
-    }
-    async function settleResize(session) {
-      // A reveal receipt cannot precede a scheduled or already-running host resize.
-      while ((resizing && resizing.session === session) || (resize && resize.session === session)) {
-        if (resizing && resizing.session === session) {
-          var active = resizing;
-          active.joined = true;
-          await active.work;
-        } else {
-          var pending = resize;
-          pending.joined = true;
-          await applyResize(pending);
-        }
-      }
-    }
-    async function presentPreview(frame) {
-      var observed = ensureActive(), current = lifecycle.identity();
-      try {
-        var presented;
-        do {
-          await settleResize(observed.session);
-          var work = lifecycle.presentPreview(frame);
-          presenting = work;
-          try { presented = await work; }
-          finally { if (presenting === work) presenting = null; }
-          // A resize can be scheduled while the host is presenting. Finish it
-          // and present again before returning the file-open receipt.
-        } while ((resize && resize.session === observed.session) ||
-                 (resizing && resizing.session === observed.session));
-        var latest = lifecycle.inspect();
-        if (presented.status !== 'presented' || presented.frame !== frame ||
-            presented.lifecycleGeneration !== observed.generation ||
-            presented.instanceId !== current.instanceId ||
-            presented.documentId !== current.documentId ||
-            presented.contentRevision !== current.contentRevision ||
-            latest.phase !== 'native' || latest.session !== observed.session ||
-            latest.generation !== observed.generation ||
-            !latest.identity || latest.identity.instanceId !== current.instanceId ||
-            latest.identity.documentId !== current.documentId ||
-            latest.identity.contentRevision !== current.contentRevision ||
-            typeof lifecycle.persistenceJSON() !== 'string') {
-          throw new Error('native opacity frame was not presented at the admitted revision');
-        }
-        lastPresentedFrame = frame;
-        return Object.freeze(Object.assign({ owner: 'native' }, presented));
-      } catch (error) {
-        var failed = lifecycle.inspect();
-        if (failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
-        throw error;
-      }
     }
     async function importJSON(json) {
       var candidate;
@@ -306,40 +227,15 @@
         return false;
       }
       opening = true;
-      lastPresentedFrame = null;
+      viewport.reset();
       try {
         if (await lifecycle.activate(candidate) !== true) return false;
-        return await presentPreview(0);
+        return await viewport.presentPreview(0);
       } catch (error) {
         return false;
       } finally {
         opening = false;
       }
-    }
-    function resizeViewport() {
-      var observed = lifecycle.inspect(), token;
-      try { token = lifecycle.getNativeIdentity(); } catch (_) { return; }
-      if (!token || !observed.session) return;
-      if (resize && resize.timer !== null) ports.surface.cancel(resize.timer);
-      var job = { session: observed.session, token: token, timer: null, work: null, joined: false };
-      resize = job;
-      job.timer = ports.surface.defer(async function () {
-        if (resize !== job || lifecycle.inspect().session !== job.session) return;
-        try {
-          if (await applyResize(job) && !job.joined &&
-              lifecycle.inspect().session === job.session && lastPresentedFrame !== null) {
-            await presentPreview(lastPresentedFrame);
-          }
-        } catch (_) { /* applyResize/presentPreview already fenced this session. */ }
-      }, 50);
-    }
-    function renderPreview(frame) {
-      // Admission's afterChange runs before the file-open frame is established.
-      // The previous document's UI frame must not enter the native preview queue.
-      if (opening) return true;
-      var handled = lifecycle.renderPreview(frame);
-      if (handled === true && lifecycle.isActive()) lastPresentedFrame = frame;
-      return handled;
     }
     function install() {
       if (installation) return installation;
@@ -399,8 +295,8 @@
       disposers.push(surface.publish(Object.freeze({ allow: allowLegacy }), Object.freeze({
         blocksLegacy: lifecycle.blocksLegacy, isActive: lifecycle.isActive,
         prepared: lifecycle.prepared, identity: lifecycle.identity, projectSelection: lifecycle.projectSelection,
-        persistenceJSON: lifecycle.persistenceJSON, renderPreview: renderPreview,
-        presentPreview: presentPreview,
+        persistenceJSON: lifecycle.persistenceJSON, renderPreview: viewport.renderPreview,
+        presentPreview: viewport.presentPreview,
         exportPng: lifecycle.exportPng, releaseCurrent: lifecycle.releaseCurrent,
         historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); }
       }), Object.freeze({ importJSON: importJSON,
@@ -409,7 +305,7 @@
         var current = lifecycle.identity();
         return current ? { instanceId: current.instanceId, documentId: current.documentId,
           revision: current.contentRevision } : null;
-      } }), resizeViewport));
+      } }), viewport.resizeViewport));
       installation = Object.freeze({ dispose: function () {
         if (lifecycle.blocksLegacy()) throw new Error('native opacity must release before surface disposal');
         disposers.slice().reverse().forEach(function (dispose) { dispose(); });

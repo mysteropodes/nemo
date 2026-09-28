@@ -11,6 +11,7 @@ const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
+const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
 const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
@@ -286,7 +287,7 @@ function nativeHarness(source, options = {}) {
   }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
     return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
   } },
-    operations: NativeOpacityOperations, motionSurface: NativeMotionSurface });
+    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -473,6 +474,7 @@ test('classic startup loads frozen guard modules before the production first-lay
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
   const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
   const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-lifecycle.js',
+    'js/application/native-opacity-viewport.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
     'js/adapters/native-opacity-legacy-surface.js', 'js/adapters/native-opacity-motion-surface.js',
     'js/domain/component/exposed-properties.js'];
@@ -568,7 +570,7 @@ test('legacy Motion evaluation remains lazy without the surface while native com
   assert.deepEqual(Array.from(motion.SMMotion.valueAtFrame(state.layers[0], 'scale', 0)), [80, 90]);
   motion.sandbox.NemoNativeOpacityCutover = { blocksLegacy: () => true };
   assert.throws(() => motion.SMMotion.valueAtFrame(state.layers[0], 'opacity', 0), /surface is unavailable/);
-  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle, operations: NativeOpacityOperations };
+  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle, operations: NativeOpacityOperations, viewport: NativeOpacityViewport };
   for (const surface of [undefined, {}, Object.freeze({ requireAvailable() {} })]) {
     assert.throws(() => OpacityApplication.createNative({}, { ...base, motionSurface: surface }), /Motion surface/);
   }
@@ -2759,9 +2761,13 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     NemoNativeOpacityExportAdapter: { createNativeOpacityExportAdapter() { return { kind: 'export' }; } },
     NemoNativeOpacityLegacySurface: NativeLegacySurface,
     NemoNativeOpacityMotionSurface: NativeMotionSurface,
-    NemoOpacityApplicationCore: { createNative(received) {
+    NemoNativeOpacityOperations: NativeOpacityOperations,
+    NemoNativeOpacityViewport: NativeOpacityViewport,
+    NemoOpacityApplicationCore: { createNative(received, modules) {
       ports = received; events.push(['create']);
-      return { install() { return NativeOpacityOperations.create(controller, received, NativeOpacityContract).install(); } };
+      assert.strictEqual(modules.viewport, NativeOpacityViewport);
+      return { install() { return modules.operations.create(controller, received, NativeOpacityContract,
+        modules.viewport).install(); } };
     } },
     SMEngineBridge: {},
     SMNativeEditGuard: {
