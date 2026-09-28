@@ -293,8 +293,11 @@ comments. In the second, 1648-1653 are the `retimeLayers` body/close under the d
 outside the span; getter/setter bar-selection exports are at 1654/1658 with comment-only anchor
 notes at 1655-1657. The opener 1-22 remains unresolved. These are responsibility mappings only:
 C02 remains pending and layer-inout/global computed uncovered counts remain 74/7 185.
+P03C-w/#1464 marks frozen `geometry-wasm/src/hit.rs:1-8` as a boundary: all eight lines
+are explanatory comments; the executable import and pending C03 hit-test responsibility start
+at line 9, outside the span. This does not admit C03 or change numeric coverage.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 60
+pending packets, no notes needing reconciliation, 0 unmapped paths and 59
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

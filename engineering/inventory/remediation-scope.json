@@ -5027,6 +5027,16 @@
           1,
           8
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            8
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, geometry-wasm/src/hit.rs lines 1-8 are explanatory // overview comments only. The first executable responsibility is the crate::engine import at line 9, outside this span, belonging to pending C03.wasm-geometry-ops.hit-test (#1038; pinned C03 census hit.rs:9-104). This boundary identifies no executable implementation and does not admit the packet or change numeric coverage."
+        }
       ]
     },
     {
