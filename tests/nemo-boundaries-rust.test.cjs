@@ -181,6 +181,8 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N20R1 registers private core replacement containment and its oracle without exceptions', [
+    'native-engine/src/application_replacement.rs', 'native-engine/tests/application_replacement.rs']],
   ['N19F registers private revision synchronization under ordinary MCP limits without a baseline waiver', [
     'src-tauri/src/native_revision_sync.rs', 'src-tauri/src/native_revision_sync_tests.rs']],
   ['N19B registers terminal native release lifecycle sources without exclusions or a frozen-baseline waiver', [

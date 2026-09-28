@@ -32,6 +32,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/request_receipts.rs',
   'native-engine/src/read_queries.rs',
   'native-engine/tests/application_read.rs',
+  'native-engine/src/application_replacement.rs',
+  'native-engine/tests/application_replacement.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
@@ -193,7 +195,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
     if (name === 'export_job') expected.push('export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
-    if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"');
+    if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
+      'application_replacement_tests = "../tests/application_replacement.rs"');
     assert.deepEqual(testMacros[`test-${name}`], expected);
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });
   }
