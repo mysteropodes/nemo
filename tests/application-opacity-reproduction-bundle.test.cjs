@@ -97,6 +97,11 @@ test('buildBundle rejects a request whose entries are missing operation or paylo
   assert.throws(() => bundleCodec.buildBundle({ id: '', hash: 'h' }, [{ request: { operation: 'property.set', payload: {} } }]));
 });
 
+test('buildBundle rejects an empty operation before emitting a bundle that parseBundle cannot accept', () => {
+  assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' },
+    [{ request: { operation: '', payload: {} } }]), /well-formed request/);
+});
+
 test('buildBundle rejects a payload whose JSON representation is not an object', () => {
   const payload = { toJSON() { return null; } };
   assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' },

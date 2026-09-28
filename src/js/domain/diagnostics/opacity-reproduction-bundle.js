@@ -29,7 +29,7 @@ var NemoOpacityReproductionBundle = (function () {
     if (!Array.isArray(entries) || !entries.length) throw new Error('entries must be a nonempty array');
     var commands = entries.map(function (entry) {
       var request = entry && entry.request;
-      if (!object(request) || typeof request.operation !== 'string' || !object(request.payload)) {
+      if (!object(request) || typeof request.operation !== 'string' || !request.operation || !object(request.payload)) {
         throw new Error('every entry must carry a well-formed request');
       }
       var payload = clone(request.payload);
