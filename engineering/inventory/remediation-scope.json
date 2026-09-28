@@ -7149,6 +7149,16 @@
           72,
           77
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            72,
+            77
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (vectorize-bridge blob 3d1e3f817e981cdebc86919502515da64663157e), line 72 is blank and lines 73-77 only explain how splineToSegments converts vtracer's absolute cubic control-point chain into relative Paper.js Segment handles. The executable splineToSegments declaration begins at line 78 in pending C04b.content-tools.vectorize-shape-fitting (#1039), whose pinned census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 declares lines 78-395 for that responsibility. This preamble has no separate executable owner; the original C04b range, packet admission and numeric computed coverage remain unchanged. No vectorize feature or browser/Tauri/runtime acceptance is claimed."
+        }
       ]
     }
   ],
