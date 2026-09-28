@@ -5437,7 +5437,7 @@
             300
           ],
           "kind": "covered",
-          "evidence": "Responsibility mapping only: frozen lines 298-300 contain the request_id empty/over-128-byte guard and its InvalidRequest construction inside ApplicationRequest::validate, named by pending C07.mcp-contract.request-response-types (#1042). No surrounding validation branch, packet admission, numeric coverage or implementation acceptance is claimed."
+          "evidence": "Responsibility mapping only: frozen lines 298-300 contain the InvalidRequest construction and the message stating requestId must contain 1..128 bytes, inside ApplicationRequest::validate named by pending C07.mcp-contract.request-response-types (#1042); the empty/over-128 guard is at line 297 outside this span. No packet admission, numeric coverage or implementation acceptance is claimed."
         },
         {
           "span": [
