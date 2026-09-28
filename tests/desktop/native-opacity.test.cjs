@@ -157,8 +157,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
   }
   async function uiValue(waitForAdmission = false) {
     const current = await status();
-    let response;
-    await waitFor(async () => {
+    let response, attempts = 0;
+    try { await waitFor(async () => {
+      attempts++;
       const request = { apiVersion: 1, requestId: randomUUID(),
         instanceId: current.instanceId, documentId: current.documentId, operation: 'property.get',
         payload: { layerId: target.layerUid, property: 'opacity' } };
@@ -175,7 +176,16 @@ test('installed native opacity: live command oracles and externally driven UI ch
       assert.equal(response.ok, true, 'Live v1 property.get failed: ' +
         (response.error && response.error.code || 'missing error code') + '; see private last-ui-read.json');
       return true;
-    }, 'same-document UI admission', 10000);
+    }, 'same-document UI admission', 10000); }
+    catch (error) {
+      if (!waitForAdmission || error.message !== 'Runtime checkpoint not reached: same-document UI admission') throw error;
+      let finalStatus;
+      try { finalStatus = await status(); } catch (statusError) { finalStatus = { error: statusError.message }; }
+      write(path.join(reportDir, 'admission-failure.json'), {
+        checkpoint: stage, attempts, initialStatus: current, finalStatus, lastResponse: response });
+      throw new Error('Native UI admission did not complete after ' + attempts +
+        ' property reads; last response ' + (response?.error?.code || 'missing error code'));
+    }
     assert.equal(response.documentId, current.documentId, 'Live UI read belongs to a different document');
     assert.equal(response.revision, current.contentRevision, 'Live UI read belongs to a different revision');
     return response.result.value;
