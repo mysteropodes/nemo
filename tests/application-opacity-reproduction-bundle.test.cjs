@@ -27,11 +27,15 @@ function send(f, id, operation, payload) {
 
 // Independently specified digest: deliberately NOT the code the application
 // or the codec use for anything else -- just a canonical (sorted-key) JSON
-// snapshot of exactly what a reproduction is supposed to reproduce (each
-// layer's opacity value, and how many entries are on each history stack).
+// snapshot of exactly what a reproduction is supposed to reproduce (static
+// opacity, tracks/keys, sampled values, and both history stacks).
 function stateDigest(f) {
   const canonical = {
-    opacities: f.state.layers.map(layer => ({ layerUid: layer.layerUid, opacity: layer.motionStatic.opacity[0] }))
+    opacities: f.state.layers.map(layer => ({ layerUid: layer.layerUid,
+      staticOpacity: layer.motionStatic.opacity[0],
+      track: layer.motion && layer.motion.opacity || null,
+      at0: f.motion.valueAtFrame(layer, 'opacity', 0)[0],
+      at5: f.motion.valueAtFrame(layer, 'opacity', 5)[0] }))
       .sort((a, b) => a.layerUid.localeCompare(b.layerUid)),
     undoDepth: f.undo.length, redoDepth: f.redo.length,
   };
@@ -48,7 +52,11 @@ function recordBundle(id, seed) {
   const commands = [
     ['c1', 'property.set', opacity(layerA, 60)],
     ['c2', 'property.key.set', { ...opacity(layerB, 30), frame: 5 }],
-    ['c3', 'property.set', opacity(layerA, 15)],
+    ['c3', 'property.key.set', { ...opacity(layerB, 20), frame: 0 }],
+    ['c4', 'property.key.remove', { layerId: layerB, property: 'opacity', frame: 5 }],
+    ['c5', 'property.animation.set', { layerId: layerA, property: 'opacity', animated: true }],
+    ['c6', 'property.set', opacity(layerA, 15)],
+    ['c7', 'property.animation.set', { layerId: layerB, property: 'opacity', animated: false }],
   ];
   for (const [id2, operation, payload] of commands) {
     const response = send(f, id2, operation, payload);
@@ -74,6 +82,12 @@ function replay(target, commands) {
 
 test('a bundle recorded on one fixture replays on a fresh (id, seed)-identical fixture to the same independently specified digest', () => {
   const { source, bundle } = recordBundle('opacity-repro-a', 1234);
+  assert.deepEqual(bundle.commands.map(command => command.operation), [
+    'property.set', 'property.key.set', 'property.key.set', 'property.key.remove',
+    'property.animation.set', 'property.set', 'property.animation.set']);
+  assert.equal(source.state.layers[0].motion.opacity.keys[0].v[0], 15);
+  assert.equal(source.state.layers[1].motion.opacity.keys.length, 0);
+  assert.equal(source.state.layers[1].motionStatic.opacity[0], 20);
   const sourceDigest = stateDigest(source);
 
   const target = fixture.build('opacity-repro-a', 1234);

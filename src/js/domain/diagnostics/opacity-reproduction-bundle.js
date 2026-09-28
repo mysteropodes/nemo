@@ -11,7 +11,7 @@ var NemoOpacityReproductionBundle = (function () {
   'use strict';
   var FORMAT_VERSION = 1;
   var MAX_COMMANDS = 32;
-  var MAX_SERIALIZED_CHARS = 65536;
+  var MAX_SERIALIZED_CHARS = 65536; // JSON UTF-16 code units, not encoded bytes.
   var MAX_IDENTIFIER_CHARS = 128;
   var PROPERTY_WRITES = ['property.set', 'property.key.set', 'property.key.remove', 'property.animation.set'];
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -70,7 +70,8 @@ var NemoOpacityReproductionBundle = (function () {
   // (null) for the plain deterministic property writes this covers today;
   // carried so a future non-deterministic diagnostics source has somewhere
   // to record what made it reproducible, without this codec inventing
-  // clock/seed values that do not exist.
+  // clock/seed values that do not exist. Explicit metadata is trusted caller
+  // input and may contain private data; the default export supplies neither.
   function buildBundle(fixture, entries, meta) {
     var selectedFixture = fixtureFor(fixture, false);
     if (!Array.isArray(entries) || !entries.length || entries.length > MAX_COMMANDS) {

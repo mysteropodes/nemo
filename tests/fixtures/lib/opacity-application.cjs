@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const core = require(path.join(__dirname, '../../../src/js/application/opacity-application.js'));
 const domain = require(path.join(__dirname, '../../../src/js/domain/animation/opacity.js'));
+const { loadMotion } = require('./sandbox.cjs');
 const { mulberry32 } = require('./rng.cjs');
 
 function fixtureHash(startingState) {
@@ -32,6 +33,7 @@ function build(id, seed) {
   };
   const hash = fixtureHash(startingState);
   const state = deepClone(startingState);
+  const motion = loadMotion(state).SMMotion;
   const undo = [], redo = [];
   function restore(from, to) {
     if (!from.length) return false;
@@ -40,15 +42,24 @@ function build(id, seed) {
   const app = core.create({
     newId: () => `${id}-${seed}-${++sequence}`, state: () => state, context: () => 'document',
     canMutate: () => true, snapshot: () => deepClone(state),
-    valueAtFrame: layer => layer.motionStatic.opacity,
-    write(operation, layer, payload) { domain.setValue(layer, [payload.value], state.currentFrame); },
+    valueAtFrame: (layer, frame) => motion.valueAtFrame(layer, 'opacity', frame),
+    write(operation, layer, payload) {
+      if (operation === 'property.set') return domain.setValue(layer, [payload.value], state.currentFrame);
+      if (operation === 'property.key.set') return domain.setKeyAtFrame(layer, payload.frame, [payload.value], payload.curvePoints);
+      if (operation === 'property.key.remove') return domain.removeKeyAtFrame(layer, payload.frame);
+      if (operation === 'property.animation.set') {
+        return domain.setAnimated(layer, payload.animated, state.currentFrame,
+          motion.valueAtFrame(layer, 'opacity', state.currentFrame));
+      }
+      throw new Error('Unsupported opacity mutation');
+    },
     history: {
       checkpoint() { undo.push(deepClone(state.layers)); redo.length = 0; },
       undo: () => restore(undo, redo), redo: () => restore(redo, undo),
     },
     afterMutation() {},
   });
-  return { id, seed, hash, app, state, undo, redo };
+  return { id, seed, hash, app, state, motion, undo, redo };
 }
 
 module.exports = { build, fixtureHash };
