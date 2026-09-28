@@ -312,9 +312,9 @@ P03C-aa/#1474 maps frozen `src/js/export.js:369-376` (`exportFrameRange`) to pen
 `C05.export.frame-compositor`, and `570-598` (`exportRenderPNGsToDir`) to pending
 `C05.export.tauri-io-ffmpeg`, with its separate engine-routing branch accounted for by the
 pending routing-gate packet. It marks `873-883` as the Lottie comment boundary before
-`lottieHexToRGBA` at 884, then maps `1255-1389` (the MP4 quality constant and public
-`window.SMExport` facade) to the applicable pending C05 frame-compositor, Tauri-I/O, browser
-fallback and Lottie packets; the Rive exporter separately augments that facade from
+`lottieHexToRGBA` at 884, then maps line 1255 (blank), 1256 (section heading) and the
+`window.SMExport` facade at 1257-1389 to the applicable pending C05 frame-compositor, Tauri-I/O,
+browser fallback and Lottie packets; the Rive exporter separately augments that facade from
 `rive-export.js`. Accepted P17/#1019 and P18/#1020 remain narrow wrapper/job provenance only.
 These are responsibility and boundary records, not packet admission, numeric coverage or
 export/runtime parity acceptance. The frozen `export.js` uncovered count remains 186 and the
