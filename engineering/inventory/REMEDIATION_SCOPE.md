@@ -415,7 +415,7 @@ undispositioned spans become 19, with zero `tweens.js` spans remaining; all 762 
 pending, global computed uncovered code remains 7 185, and frozen `tweens.js` retains 516
 computed uncovered code lines and 158 overlapping lines.
 P03C-aj/#1493 dispositions the two remaining frozen `src/js/linked-media.js` spans. The
-`1-39` comment-only preamble describes the media-mode, linked-reference and persistence/cache
+`1-39` comment-only boundary describes the media-mode, linked-reference and persistence/cache
 contract before executable code begins at 40; its historical claims do not establish current
 behavior. The mixed `751-774` public facade maps resolver/cache/handle/relink exports,
 including `readLinkedDesktop` at 758, to pending `C05.media.linked-resolve-core`; conversion

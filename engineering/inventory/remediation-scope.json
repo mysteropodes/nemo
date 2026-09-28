@@ -6289,7 +6289,7 @@
             1,
             39
           ],
-          "kind": "covered",
+          "kind": "boundary",
           "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (linked-media blob ba81900d0ea1805fc206fc19ce992674522de6c5): lines 1-39 describe the project-wide embedded/linked mode, desktop linkedPath versus web linkedHandleId/opaque handle, serR/desR persistence choke points and a non-persistent resolved-pixel cache. Executable implementation begins with the IIFE at line 40. This header contextualizes pending C05.media.linked-resolve-core and C05.media.mode-setting-ui (#1040), but its historical live-verification statements and persistence claims are not independent proof of current browser, Tauri, save/load or render acceptance. No separate packet, numeric coverage or behavior acceptance is added."
         },
         {
