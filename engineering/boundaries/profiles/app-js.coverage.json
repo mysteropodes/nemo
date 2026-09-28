@@ -19,23 +19,23 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "56ed2e06a96e47309c817f3d574459431238a38c",
-    "sourceRootTree": "2094529098d055ff9d4228d25522f4a8eb2fc556",
+    "candidateCommit": "a9c2ae7ea99dba4b472f363305160381dac29cdc",
+    "sourceRootTree": "4550cb20ca03659746a47678d04ba6eb41ab0300",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "0e266c4105516b782464fb6cd873e72c2fbf033b",
-      "lastChangedCommit": "56ed2e06a96e47309c817f3d574459431238a38c"
+      "gitTree": "515bdf14ce837d67f281dea0f1042e6f12e1a4a1",
+      "lastChangedCommit": "a9c2ae7ea99dba4b472f363305160381dac29cdc"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "a8f6449c16eacd7ba502b5fc4017138857b38371",
-      "sha256": "3dc8e795251be9766854078f400ded11e2070b9cecb048153294fa995fb282e2",
-      "lastChangedCommit": "613b6049e29a8a5b064e13b23a6f30c0548f9ebe"
+      "gitBlob": "d4a42169e2f12edda4ab6983cd818eb313da4161",
+      "sha256": "a08c4d258e9f6bdad123682707dd20a5acd58d8eaabe50aed5b038af4f59f279",
+      "lastChangedCommit": "525891610514fd6f27d5f8ccd592a9b9b44e6619"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "402449547987ff5b9756715718d31b93c45ab1a350f2cc89564885a08e0ec9c2"
+      "value": "a635a4d77a9aa0e582eb94823a60d489263d1f40a68b1e78eb6494484e005d10"
     },
     "profiles": [
       {
@@ -43,7 +43,7 @@
         "gitBlob": "1cda56c4fd7d58509b0b2142cf1a86ccc68cfa09",
         "sha256": "f1e8b6f3c5e2b7e33922422ee5f43afbbde22e334e15de15c712e3498ea056e4",
         "moduleCount": 181,
-        "basedOnCommit": "56ed2e06a96e47309c817f3d574459431238a38c"
+        "basedOnCommit": "a9c2ae7ea99dba4b472f363305160381dac29cdc"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
