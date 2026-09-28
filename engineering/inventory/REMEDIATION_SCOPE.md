@@ -260,9 +260,13 @@ Bridge and global 7 185 computed uncovered code lines are unchanged. P03C-p/#1
 `server.rs:1-177` at source `ded641bd763379f36d629bf1686fcce8a6137a66`; the exact source diff maps its
 command-validation lines 169-170 to frozen 179-180. P07/#1009 PR #1113 is cited narrowly for
 registered-capability discovery provenance, not whole-packet or runtime/protocol acceptance.
-The server.rs 18 and global 7 185 computed uncovered code lines remain unchanged. **P03 is not
-complete and no extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes
-needing reconciliation, 0 unmapped paths and 74
+The computed uncovered counts (18 in server.rs; 7 185 globally) remain unchanged. P03C-q/#1451
+maps three frozen `src/js/export.js` spans to pending C05 frame-compositor and Tauri-I/O
+responsibilities. The C05 census at `419f1926` names the source ranges; accepted P17/#1019 PR #1160
+and P18/#1020 PR #1163 provide narrow SVG-wrapper and job-boundary provenance only, not full
+packet, export-format, runtime or parity acceptance. The 186 computed uncovered lines in export.js
+and global 7 185 remain unchanged. **P03 is not complete and no extraction is admitted**: the gate
+still exits 1 with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 71
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
