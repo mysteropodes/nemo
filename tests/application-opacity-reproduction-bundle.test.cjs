@@ -97,6 +97,12 @@ test('buildBundle rejects a request whose entries are missing operation or paylo
   assert.throws(() => bundleCodec.buildBundle({ id: '', hash: 'h' }, [{ request: { operation: 'property.set', payload: {} } }]));
 });
 
+test('buildBundle rejects a payload whose JSON representation is not an object', () => {
+  const payload = { toJSON() { return null; } };
+  assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' },
+    [{ request: { operation: 'property.set', payload } }]), /well-formed request/);
+});
+
 const malformedBundles = [
   ['not an object', 'nope'],
   ['null', null],
@@ -123,6 +129,15 @@ test('parseBundle rejects a cyclic command payload without throwing', () => {
   payload.self = payload;
   const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h' },
     commands: [{ operation: 'property.set', payload }] };
+  let result;
+  assert.doesNotThrow(() => { result = bundleCodec.parseBundle(bundle); });
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
+test('parseBundle rejects a payload whose JSON representation is not an object without throwing', () => {
+  const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h' },
+    commands: [{ operation: 'property.set', payload: { toJSON() { return null; } } }] };
   let result;
   assert.doesNotThrow(() => { result = bundleCodec.parseBundle(bundle); });
   assert.equal(typeof result.error, 'string');

@@ -32,7 +32,9 @@ var NemoOpacityReproductionBundle = (function () {
       if (!object(request) || typeof request.operation !== 'string' || !object(request.payload)) {
         throw new Error('every entry must carry a well-formed request');
       }
-      return { operation: request.operation, payload: clone(request.payload) };
+      var payload = clone(request.payload);
+      if (!object(payload)) throw new Error('every entry must carry a well-formed request');
+      return { operation: request.operation, payload: payload };
     });
     return {
       formatVersion: FORMAT_VERSION,
@@ -67,9 +69,16 @@ var NemoOpacityReproductionBundle = (function () {
           return { error: 'Bundle command ' + i + ' is malformed.' };
         }
       }
+      var commands = clone(bundle.commands);
+      for (var j = 0; j < commands.length; j++) {
+        var detached = commands[j];
+        if (!object(detached) || typeof detached.operation !== 'string' || !detached.operation || !object(detached.payload)) {
+          return { error: 'Bundle command ' + j + ' is malformed.' };
+        }
+      }
       return {
         fixture: clone(bundle.fixture),
-        commands: clone(bundle.commands),
+        commands: commands,
         clock: bundle.clock != null ? clone(bundle.clock) : null,
         seed: bundle.seed != null ? clone(bundle.seed) : null,
       };
