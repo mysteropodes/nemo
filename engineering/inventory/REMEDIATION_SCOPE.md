@@ -539,8 +539,31 @@ stay pending, global computed uncovered code remains 7 185 and frozen
 numeric range coverage, project/save/load/browser/Tauri/native behavior or
 runtime acceptance is claimed.
 
+P03C-ar/#1515 maps two frozen `src/js/application/opacity-application.js`
+spans to the accepted P06/#1008 registered-capability discovery seam. Lines
+78-93 define `capabilitySummary()`: it obtains the registry-backed
+`ports.capabilities()`, clones the full descriptors, derives legacy
+`properties` only from descriptors with `property.get`, and returns those
+alongside operations, retention and document identity. Line 96 routes the
+`perform` capabilities operation through that summary. P06 source commit
+`35bcb02392bdd44c8d341c94c3ae6b505eb3379a` introduced both changes;
+the production capability test checks the full export-plus-opacity descriptors,
+opacity-only properties and a fresh registry read. The surrounding `perform`
+command/query route remains in pending `C07.application-service.command-core`;
+the older C07 census described a hard-coded single-opacity response and is
+not being admitted. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, opacity core blob
+`d0b10900eb36a43c66237473009027eaa6680d28` and pinned C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. Current protected opacity
+source has a different blob, so these dispositions classify the frozen spans
+only. The 10 previously undispositioned spans become 8, with zero frozen
+opacity-core spans remaining. All 762 packets stay pending, global computed
+uncovered code remains 7 185 and frozen opacity core retains 15 computed
+uncovered code lines. No packet admission, numeric range coverage, capability
+runtime or installed-client behavior is accepted.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 10
+pending packets, no notes needing reconciliation, 0 unmapped paths and 8
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
