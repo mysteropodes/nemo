@@ -5269,6 +5269,96 @@
           337,
           340
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            131,
+            146
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 131-146 define Operation::labels(), the plural wire-name list. The older C07/#1042 symbol list names singular Operation::label, not this plural helper; accepted P07/#1009 source commit bd907d230c844a210fb62b455ec1f730c6148004 (PR #1113) is the exact added-helper provenance. C07.mcp-contract.request-response-types (#1042) remains the broader pending Operation/wire-contract owner, not evidence that this helper was named by C07 or that its packet is accepted. No numeric source coverage or behavior claim is added."
+        },
+        {
+          "span": [
+            168,
+            188
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 168-188 contain the is_property_operation predicate and required_payload_keys contract lead-in. C07.mcp-contract.request-response-types (#1042) owns the broader pending Operation and structural payload-admission contract, and explicitly names required_payload_keys. This does not add numeric range coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            196,
+            200
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 196-200 enumerate each operation's required payload keys in required_payload_keys, a symbol named by pending C07.mcp-contract.request-response-types (#1042). This adds no numeric source coverage, packet admission or behavior acceptance."
+        },
+        {
+          "span": [
+            205,
+            207
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 205-207 are comment-only lead-in to payload_example, whose executable definition begins at 208 and belongs to pending C07.mcp-contract.request-response-types (#1042). The preamble has no separate executable responsibility."
+        },
+        {
+          "span": [
+            215,
+            222
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 215-222 are payload_example's operation-specific JSON template match arms. C07.mcp-contract.request-response-types (#1042) names Operation::payload_example and owns the broader pending wire-template responsibility. This does not add numeric range coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            226,
+            255
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 226-255 define the comment and property_payload_example_with helper that selects a registered capability fixture/example for the operation template. C07.mcp-contract.request-response-types (#1042) owns the broader pending human-readable payload-template contract; its responsibility mapping does not imply this helper was separately named in the older census. No numeric coverage, packet admission or acceptance is added."
+        },
+        {
+          "span": [
+            257,
+            257
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 257 returns the selected property example from property_payload_example_with, within the C07.mcp-contract.request-response-types (#1042) payload-template responsibility. C07 remains pending; no numeric source coverage, packet admission or implementation acceptance is implied."
+        },
+        {
+          "span": [
+            260,
+            265
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 260-265 define check_payload, the structural payload-admission entry point named by pending C07.mcp-contract.request-response-types (#1042). This adds no numeric source coverage, packet admission or runtime-behavior acceptance."
+        },
+        {
+          "span": [
+            268,
+            278
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 268-278 define check_payload_with and its delegation to capability_contract::validate_payload, within the broader structural payload-admission responsibility of pending C07.mcp-contract.request-response-types (#1042). No numeric range coverage, packet admission or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            282,
+            282
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 282 defines command_payload_schema, named by pending C07.mcp-contract.request-response-types (#1042) as a schema-generation hook. This adds no numeric source coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            286,
+            286
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 286 defines query_payload_schema, named by pending C07.mcp-contract.request-response-types (#1042) as a schema-generation hook. This adds no numeric source coverage, packet admission or implementation acceptance."
+        }
       ]
     },
     {

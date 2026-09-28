@@ -130,6 +130,12 @@ responsibilities, while marking six comment/blank preambles (21-24, 51-53, 220-2
 486-497 and 634-635) as boundaries before their adjacent C01 owners. The executable module opener
 1-9 stays unresolved; these are responsibility/boundary records only, not packet admission or
 implementation acceptance. Project.js's 70 computed uncovered code lines and global 7 185 are unchanged.
+P03C-m/#1440 dispositioned eleven frozen `nemo-mcp/src/contract.rs` spans: ten `covered`
+responsibility mappings to pending C07 Operation/wire-contract responsibilities and the
+comment-only 205-207 `boundary`. In particular, 131-146 is the plural `Operation::labels()` helper,
+which the older C07 symbol list does not name (it names singular `Operation::label`); accepted
+P07/#1009 source commit `bd907d230` / PR #1113 is cited only as the added-helper provenance. C07
+remains pending; contract.rs's 134 and global 7 185 computed uncovered code lines are unchanged.
 (4)
 The 40 previously dispositioned executable paths without a packet
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
@@ -173,7 +179,10 @@ Every reviewed claim carries its evidence and is validated by shape:
   resampling responsibilities while citing the narrower accepted P23 assignment extraction;
   P03C-l maps Project lifecycle declarations/API and six preambles to pending C01 owners, leaving
   opener 1-9 unresolved. The 70 Project, 293 Motion, 516 Tweens and global computed uncovered code
-  totals are unchanged. P03C-c reconciled
+  totals are unchanged. P03C-m maps eleven contract.rs spans to pending C07 wire-contract ownership;
+  the plural `Operation::labels()` helper is attributed to accepted P07/#1009 PR #1113 rather than
+  misrepresented as a symbol named in the older C07 census. The 134 Contract and global computed
+  uncovered line totals remain unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
@@ -183,8 +192,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
   P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
-  five Tween assignment-seam spans, and P03C-l/#1438 dispositioned eight Project lifecycle spans;
-  113 spans remain undispositioned.
+  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans, and
+  P03C-m/#1440 dispositioned eleven MCP contract spans; 102 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -230,9 +239,12 @@ Hungarian solver extraction; 516 Tweens and 7 185 global computed uncovered co
 unchanged. P03C-l/#1438 maps frozen project.js declarations and getOpenTabs to pending C01
 document-I/O/project-tabs responsibilities, with six comment/blank preambles marked as boundaries
 to adjacent C01 owners; executable opener 1-9 remains unresolved. This changes no coverage or
-packet admission, and project.js stays at 70 computed uncovered code lines. **P03 is not complete
-and no extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes needing
-reconciliation, 0 unmapped paths and 113
+packet admission, and project.js stays at 70 computed uncovered code lines. P03C-m/#1440 maps
+eleven frozen contract.rs spans to pending C07 responsibilities; C07's older symbol list names
+singular `Operation::label`, while accepted P07/#1009 PR #1113 is cited only for the added plural
+`Operation::labels()` helper. C07 remains pending, and contract.rs's 134 computed uncovered code
+lines are unchanged. **P03 is not complete and no extraction is admitted**: the gate still exits 1
+with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 102
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
