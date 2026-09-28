@@ -5,14 +5,7 @@
 //! selection before the compositor creates its only device and queue. This
 //! module adds no startup selection and exposes no CPU or JavaScript pixels.
 
-use native_engine::compositor::{
-    CompositionResult, Compositor, CompositorError, CompositorInstance,
-};
-use native_engine::desktop_viewport::{
-    DesktopViewportHost, PresentationReceipt, SurfacePort, ViewportError, ViewportMapping,
-};
-use native_engine::render_scene::ScheduledFrameIdentity;
-use native_engine::scheduler::WorkId;
+use native_engine::compositor::CompositorError;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,499 +30,18 @@ impl From<CompositorError> for NativeViewportError {
 }
 
 #[cfg(target_os = "macos")]
-mod platform {
-    use super::*;
-    use native_engine::desktop_viewport::{
-        AcquiredSurfaceFrame, SettledSurfaceFrame, SurfaceAttempt, SurfacePresentation,
-        SurfaceRecoveryError,
-    };
-    use objc::declare::ClassDecl;
-    use objc::runtime::{Class, Object, Sel};
-    use objc::{class, msg_send, sel, sel_impl};
-    use raw_window_handle::{AppKitDisplayHandle, AppKitWindowHandle};
-    use std::ffi::c_void;
-    use std::ptr::{self, NonNull};
-    use std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc, Once,
-    };
-    use tauri::Manager;
-
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    #[rustfmt::skip]
-    struct NSPoint { x: f64, y: f64 }
-
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    #[rustfmt::skip]
-    struct NSSize { width: f64, height: f64 }
-
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    #[rustfmt::skip]
-    struct NSRect { origin: NSPoint, size: NSSize }
-
-    #[rustfmt::skip]
-    unsafe impl objc::Encode for NSPoint {
-        fn encode() -> objc::Encoding { unsafe { objc::Encoding::from_str("{CGPoint=dd}") } }
-    }
-
-    #[rustfmt::skip]
-    unsafe impl objc::Encode for NSSize {
-        fn encode() -> objc::Encoding { unsafe { objc::Encoding::from_str("{CGSize=dd}") } }
-    }
-
-    #[rustfmt::skip]
-    unsafe impl objc::Encode for NSRect {
-        fn encode() -> objc::Encoding { unsafe { objc::Encoding::from_str("{CGRect={CGPoint=dd}{CGSize=dd}}") } }
-    }
-
-    #[rustfmt::skip]
-    fn rect(x: f64, y: f64, width: f64, height: f64) -> NSRect {
-        NSRect { origin: NSPoint { x, y }, size: NSSize { width, height } }
-    }
-
-    extern "C" fn passthrough_hit_test(_this: &Object, _cmd: Sel, _point: NSPoint) -> *mut Object {
-        ptr::null_mut()
-    }
-
-    fn native_view_class() -> *const Class {
-        static ONCE: Once = Once::new();
-        static mut CLASS: *const Class = ptr::null();
-        ONCE.call_once(|| unsafe {
-            let mut declaration = ClassDecl::new("N16NativeViewportView", class!(NSView))
-                .expect("N16 native viewport class name is unique");
-            declaration.add_method(
-                sel!(hitTest:),
-                passthrough_hit_test as extern "C" fn(&Object, Sel, NSPoint) -> *mut Object,
-            );
-            CLASS = declaration.register();
-        });
-        unsafe { CLASS }
-    }
-
-    #[rustfmt::skip]
-    struct OwnedView { raw: *mut Object, attached: bool }
-
-    impl OwnedView {
-        fn new(
-            content_view: *mut Object,
-            mapping: ViewportMapping,
-        ) -> Result<Self, NativeViewportError> {
-            let allocated: *mut Object = unsafe { msg_send![native_view_class(), alloc] };
-            if allocated.is_null() {
-                return Err(NativeViewportError::new("allocate native AppKit viewport"));
-            }
-            let raw: *mut Object =
-                unsafe { msg_send![allocated, initWithFrame: rect(0.0, 0.0, 1.0, 1.0)] };
-            if raw.is_null() {
-                return Err(NativeViewportError::new(
-                    "initialize native AppKit viewport",
-                ));
-            }
-            let mut view = Self {
-                raw,
-                attached: false,
-            };
-            unsafe {
-                let _: () = msg_send![raw, setWantsLayer: true];
-                let _: () = msg_send![content_view, addSubview: raw];
-            }
-            view.attached = true;
-            view.apply_mapping(mapping)?;
-            Ok(view)
-        }
-
-        fn raw(&self) -> *mut Object {
-            self.raw
-        }
-
-        fn apply_mapping(&self, mapping: ViewportMapping) -> Result<(), NativeViewportError> {
-            let parent: *mut Object = unsafe { msg_send![self.raw, superview] };
-            if self.raw.is_null() || parent.is_null() {
-                return Err(NativeViewportError::new(
-                    "native AppKit viewport is detached",
-                ));
-            }
-            let bounds: NSRect = unsafe { msg_send![parent, bounds] };
-            let flipped: bool = unsafe { msg_send![parent, isFlipped] };
-            let css = mapping.css_bounds();
-            let x = bounds.origin.x + css.x;
-            let y = if flipped {
-                bounds.origin.y + css.y
-            } else {
-                bounds.origin.y + bounds.size.height - css.y - css.height
-            };
-            unsafe {
-                let _: () = msg_send![self.raw, setFrame: rect(x, y, css.width, css.height)];
-            }
-            Ok(())
-        }
-
-        fn dispose(&mut self) {
-            if self.raw.is_null() {
-                return;
-            }
-            unsafe {
-                if self.attached {
-                    let _: () = msg_send![self.raw, removeFromSuperview];
-                }
-                let _: () = msg_send![self.raw, release];
-            }
-            self.raw = ptr::null_mut();
-            self.attached = false;
-        }
-    }
-
-    #[rustfmt::skip]
-    impl Drop for OwnedView { fn drop(&mut self) { self.dispose(); } }
-
-    fn create_surface(
-        instance: &wgpu::Instance,
-        view: &OwnedView,
-    ) -> Result<wgpu::Surface<'static>, NativeViewportError> {
-        let handle = AppKitWindowHandle::new(
-            NonNull::new(view.raw().cast::<c_void>())
-                .ok_or_else(|| NativeViewportError::new("native AppKit viewport is disposed"))?,
-        );
-        // SAFETY: `OwnedView` keeps the +1 AppKit reference alive. The port's
-        // disposal path drops `surface` before detaching and releasing `view`.
-        unsafe {
-            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::RawHandle {
-                raw_display_handle: Some(AppKitDisplayHandle::new().into()),
-                raw_window_handle: handle.into(),
-            })
-        }
-        .map_err(|error| NativeViewportError::new(format!("create AppKit surface: {error}")))
-    }
-
-    fn surface_contract(
-        surface: &wgpu::Surface<'_>,
-        adapter: &wgpu::Adapter,
-    ) -> Result<(wgpu::TextureFormat, wgpu::CompositeAlphaMode), NativeViewportError> {
-        let capabilities = surface.get_capabilities(adapter);
-        let format = capabilities
-            .formats
-            .iter()
-            .copied()
-            .find(wgpu::TextureFormat::is_srgb)
-            .or_else(|| capabilities.formats.first().copied())
-            .ok_or_else(|| NativeViewportError::new("native surface has no texture format"))?;
-        let alpha_mode = capabilities
-            .alpha_modes
-            .iter()
-            .copied()
-            .find(|mode| *mode == wgpu::CompositeAlphaMode::Opaque)
-            .or_else(|| capabilities.alpha_modes.first().copied())
-            .ok_or_else(|| NativeViewportError::new("native surface has no alpha mode"))?;
-        Ok((format, alpha_mode))
-    }
-
-    #[rustfmt::skip]
-    struct MacOsSurfacePort { surface: Option<wgpu::Surface<'static>>, view: OwnedView, instance: wgpu::Instance, adapter: wgpu::Adapter, device: wgpu::Device, queue: wgpu::Queue, format: wgpu::TextureFormat, alpha_mode: wgpu::CompositeAlphaMode, blitter: wgpu::util::TextureBlitter, mapping: ViewportMapping, device_lost: Arc<AtomicBool> }
-
-    impl MacOsSurfacePort {
-        fn new(
-            surface: wgpu::Surface<'static>,
-            view: OwnedView,
-            compositor: &Compositor,
-            mapping: ViewportMapping,
-        ) -> Result<Self, NativeViewportError> {
-            let (format, alpha_mode) = match surface_contract(&surface, compositor.adapter()) {
-                Ok(contract) => contract,
-                Err(error) => {
-                    // Preserve the raw-handle lifetime rule on construction failure too.
-                    drop(surface);
-                    drop(view);
-                    return Err(error);
-                }
-            };
-            let blitter = wgpu::util::TextureBlitter::new(compositor.device(), format);
-            let device_lost = Arc::new(AtomicBool::new(false));
-            let lost_callback = Arc::clone(&device_lost);
-            compositor
-                .device()
-                .set_device_lost_callback(move |_, _| lost_callback.store(true, Ordering::Release));
-            let port = Self {
-                surface: Some(surface),
-                view,
-                instance: compositor.instance().clone(),
-                adapter: compositor.adapter().clone(),
-                device: compositor.device().clone(),
-                queue: compositor.queue().clone(),
-                format,
-                alpha_mode,
-                blitter,
-                mapping,
-                device_lost,
-            };
-            port.configure()?;
-            Ok(port)
-        }
-
-        fn configure(&self) -> Result<(), NativeViewportError> {
-            if self.device_lost.load(Ordering::Acquire) {
-                return Err(NativeViewportError::new("native GPU device is lost"));
-            }
-            let surface = self
-                .surface
-                .as_ref()
-                .ok_or_else(|| NativeViewportError::new("native surface is disposed"))?;
-            let extent = self.mapping.physical_extent();
-            let errors = self.device.push_error_scope(wgpu::ErrorFilter::Validation);
-            surface.configure(
-                &self.device,
-                &wgpu::SurfaceConfiguration {
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    format: self.format,
-                    width: extent.width,
-                    height: extent.height,
-                    present_mode: wgpu::PresentMode::AutoVsync,
-                    desired_maximum_frame_latency: 2,
-                    alpha_mode: self.alpha_mode,
-                    view_formats: vec![],
-                },
-            );
-            let _ = self.device.poll(wgpu::PollType::Poll);
-            match pollster::block_on(errors.pop()) {
-                Some(error) => Err(NativeViewportError::new(format!(
-                    "configure native surface: {error}"
-                ))),
-                None if self.device_lost.load(Ordering::Acquire) => {
-                    Err(NativeViewportError::new("native GPU device is lost"))
-                }
-                None => Ok(()),
-            }
-        }
-
-        fn replace_surface(&mut self, mapping: ViewportMapping) -> Result<(), NativeViewportError> {
-            self.view.apply_mapping(mapping)?;
-            self.surface.take();
-            let surface = create_surface(&self.instance, &self.view)?;
-            let (format, alpha_mode) = surface_contract(&surface, &self.adapter)?;
-            if format != self.format {
-                self.blitter = wgpu::util::TextureBlitter::new(&self.device, format);
-            }
-            self.surface = Some(surface);
-            self.format = format;
-            self.alpha_mode = alpha_mode;
-            self.mapping = mapping;
-            self.configure()
-        }
-    }
-
-    enum MacOsFrame<'port, 'source> {
-        Acquired {
-            texture: wgpu::SurfaceTexture,
-            blitter: &'port wgpu::util::TextureBlitter,
-            device: &'source wgpu::Device,
-            queue: &'source wgpu::Queue,
-            source: &'source wgpu::TextureView,
-            device_lost: &'port AtomicBool,
-        },
-        Failed(SettledSurfaceFrame),
-    }
-
-    impl AcquiredSurfaceFrame for MacOsFrame<'_, '_> {
-        fn settle(self) -> SettledSurfaceFrame {
-            match self {
-                Self::Acquired {
-                    texture,
-                    blitter,
-                    device,
-                    queue,
-                    source,
-                    device_lost,
-                } => {
-                    let errors = device.push_error_scope(wgpu::ErrorFilter::Validation);
-                    let target = texture
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-                    let mut encoder =
-                        device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("n16-native-viewport-blit"),
-                        });
-                    blitter.copy(device, &mut encoder, source, &target);
-                    queue.submit(Some(encoder.finish()));
-                    texture.present();
-                    let _ = device.poll(wgpu::PollType::Poll);
-                    if device_lost.load(Ordering::Acquire) {
-                        SettledSurfaceFrame::DeviceLost
-                    } else if pollster::block_on(errors.pop()).is_some() {
-                        SettledSurfaceFrame::ValidationFailure
-                    } else {
-                        SettledSurfaceFrame::Presented
-                    }
-                }
-                Self::Failed(outcome) => outcome,
-            }
-        }
-    }
-
-    impl SurfacePort for MacOsSurfacePort {
-        type Frame<'port, 'source> = MacOsFrame<'port, 'source>;
-
-        fn acquire<'port, 'source>(
-            &'port mut self,
-            source: SurfacePresentation<'source>,
-        ) -> SurfaceAttempt<Self::Frame<'port, 'source>> {
-            if self.device_lost.load(Ordering::Acquire) {
-                return SurfaceAttempt::Acquired(MacOsFrame::Failed(
-                    SettledSurfaceFrame::DeviceLost,
-                ));
-            }
-            if source.instance != &self.instance
-                || source.adapter != &self.adapter
-                || source.device != &self.device
-                || source.queue != &self.queue
-                || source.surface_extent != self.mapping.physical_extent()
-            {
-                return SurfaceAttempt::Acquired(MacOsFrame::Failed(
-                    SettledSurfaceFrame::ValidationFailure,
-                ));
-            }
-            let Some(surface) = self.surface.as_ref() else {
-                return SurfaceAttempt::Lost;
-            };
-            match surface.get_current_texture() {
-                wgpu::CurrentSurfaceTexture::Success(texture)
-                | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
-                    SurfaceAttempt::Acquired(MacOsFrame::Acquired {
-                        texture,
-                        blitter: &self.blitter,
-                        device: source.device,
-                        queue: source.queue,
-                        source: source.texture_view,
-                        device_lost: &self.device_lost,
-                    })
-                }
-                wgpu::CurrentSurfaceTexture::Lost => SurfaceAttempt::Lost,
-                wgpu::CurrentSurfaceTexture::Outdated => SurfaceAttempt::Outdated,
-                wgpu::CurrentSurfaceTexture::Timeout => SurfaceAttempt::Timeout,
-                wgpu::CurrentSurfaceTexture::Occluded => SurfaceAttempt::Occluded,
-                wgpu::CurrentSurfaceTexture::Validation => SurfaceAttempt::Acquired(
-                    MacOsFrame::Failed(SettledSurfaceFrame::ValidationFailure),
-                ),
-            }
-        }
-
-        fn recreate(&mut self, mapping: ViewportMapping) -> Result<(), SurfaceRecoveryError> {
-            self.replace_surface(mapping).map_err(|_| {
-                if self.device_lost.load(Ordering::Acquire) {
-                    SurfaceRecoveryError::DeviceLost
-                } else {
-                    SurfaceRecoveryError::Failed
-                }
-            })
-        }
-
-        fn reconfigure(&mut self, mapping: ViewportMapping) -> Result<(), SurfaceRecoveryError> {
-            let extent_changed = self.mapping.physical_extent() != mapping.physical_extent();
-            self.view
-                .apply_mapping(mapping)
-                .map_err(|_| SurfaceRecoveryError::Failed)?;
-            self.mapping = mapping;
-            if extent_changed {
-                self.configure().map_err(|_| {
-                    if self.device_lost.load(Ordering::Acquire) {
-                        SurfaceRecoveryError::DeviceLost
-                    } else {
-                        SurfaceRecoveryError::Failed
-                    }
-                })
-            } else {
-                Ok(())
-            }
-        }
-
-        fn dispose(&mut self) {
-            self.surface.take();
-            self.view.dispose();
-        }
-    }
-
-    impl Drop for MacOsSurfacePort {
-        fn drop(&mut self) {
-            self.dispose();
-        }
-    }
-
-    #[rustfmt::skip]
-    pub(crate) struct NativeViewport { host: DesktopViewportHost<MacOsSurfacePort> }
-
-    impl NativeViewport {
-        pub(crate) fn from_app(
-            app: &tauri::AppHandle,
-            window_label: &str,
-            mapping: ViewportMapping,
-        ) -> Result<(Self, Compositor), NativeViewportError> {
-            let window = app.get_webview_window(window_label).ok_or_else(|| {
-                NativeViewportError::new(format!(
-                    "native viewport unavailable: Tauri webview window '{window_label}' is absent"
-                ))
-            })?;
-            Self::from_window(&window, mapping)
-        }
-
-        fn from_window(
-            window: &tauri::WebviewWindow,
-            mapping: ViewportMapping,
-        ) -> Result<(Self, Compositor), NativeViewportError> {
-            let content_view = window.ns_view().map_err(|error| {
-                NativeViewportError::new(format!("resolve AppKit view: {error}"))
-            })? as *mut Object;
-            let construction = CompositorInstance::new();
-            let view = OwnedView::new(content_view, mapping)?;
-            let surface = create_surface(construction.instance(), &view)?;
-            let compositor = construction.create_for_surface(&surface)?;
-            let port = MacOsSurfacePort::new(surface, view, &compositor, mapping)?;
-            Ok((
-                Self {
-                    host: DesktopViewportHost::new(port, mapping),
-                },
-                compositor,
-            ))
-        }
-
-        pub(crate) fn register(
-            &mut self,
-            identity: ScheduledFrameIdentity,
-        ) -> Result<(), ViewportError> {
-            self.host.register(identity)
-        }
-
-        pub(crate) fn resize(&mut self, mapping: ViewportMapping) -> Result<(), ViewportError> {
-            self.host.resize(mapping)
-        }
-
-        pub(crate) fn present(
-            &mut self,
-            compositor: &Compositor,
-            result: &CompositionResult,
-        ) -> Result<PresentationReceipt, ViewportError> {
-            self.host.present_composition(compositor, result)
-        }
-
-        pub(crate) fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId> {
-            self.host.reconcile_replaced(work_ids)
-        }
-
-        pub(crate) fn dispose(&mut self) -> Vec<WorkId> {
-            self.host.dispose()
-        }
-    }
-
-    impl Drop for NativeViewport {
-        fn drop(&mut self) {
-            self.host.dispose();
-        }
-    }
-}
+#[path = "native_viewport_appkit.rs"]
+mod platform;
 
 #[cfg(not(target_os = "macos"))]
 mod platform {
     use super::*;
+    use native_engine::{
+        compositor::{CompositionResult, Compositor},
+        desktop_viewport::{PresentationReceipt, ViewportError, ViewportMapping},
+        render_scene::ScheduledFrameIdentity,
+        scheduler::WorkId,
+    };
 
     pub(crate) struct NativeViewport;
 
@@ -539,9 +51,249 @@ mod platform {
         pub(crate) fn register(&mut self, _identity: ScheduledFrameIdentity) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
         pub(crate) fn resize(&mut self, _mapping: ViewportMapping) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
         pub(crate) fn present(&mut self, _compositor: &Compositor, _result: &CompositionResult) -> Result<PresentationReceipt, ViewportError> { Err(ViewportError::Disposed) }
-        pub(crate) fn reconcile_replaced(&mut self, _work_ids: &[WorkId]) -> Vec<WorkId> { Vec::new() }
+        pub(crate) fn retire_replacement(&mut self) -> Vec<WorkId> { Vec::new() }
+        pub(crate) fn rebind_existing(&mut self, _compositor: &Compositor) -> Result<(), NativeViewportError> { Err(NativeViewportError::new("native viewport unavailable: macOS only")) }
         pub(crate) fn dispose(&mut self) -> Vec<WorkId> { Vec::new() }
     }
 }
 
 pub(crate) use platform::NativeViewport;
+
+#[cfg(all(test, target_os = "macos"))]
+mod appkit_detach_tests {
+    use crate::native_viewport::platform::OwnedView;
+    use objc::declare::ClassDecl;
+    use objc::runtime::{Class, Object, Sel};
+    use objc::{class, msg_send, sel, sel_impl};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        OnceLock,
+    };
+
+    static DETACH_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static PROBE_CLASS: OnceLock<usize> = OnceLock::new();
+
+    extern "C" fn record_detach(_object: &Object, _selector: Sel) {
+        DETACH_CALLS.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn probe_class() -> *const Class {
+        *PROBE_CLASS.get_or_init(|| {
+            let mut declaration = ClassDecl::new("N20R4DetachProbe", class!(NSObject))
+                .expect("unique low-level detach probe class");
+            unsafe {
+                declaration.add_method(
+                    sel!(removeFromSuperview),
+                    record_detach as extern "C" fn(&Object, Sel),
+                );
+            }
+            declaration.register() as *const Class as usize
+        }) as *const Class
+    }
+
+    #[test]
+    fn owned_view_dispose_sends_detach_selector_once_to_injected_receiver() {
+        // This invokes the production disposal method with a non-UI Objective-C
+        // receiver; it does not construct or present an AppKit NSView.
+        let allocated: *mut Object = unsafe { msg_send![probe_class(), alloc] };
+        assert!(!allocated.is_null());
+        let raw: *mut Object = unsafe { msg_send![allocated, init] };
+        assert!(!raw.is_null());
+        let before = DETACH_CALLS.load(Ordering::SeqCst);
+        let mut view = OwnedView {
+            raw,
+            attached: true,
+        };
+        view.dispose();
+        view.dispose();
+        assert_eq!(DETACH_CALLS.load(Ordering::SeqCst), before + 1);
+        assert!(view.raw.is_null());
+        assert!(!view.attached);
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod replacement_test_support {
+    use native_engine::compositor::{CompositionResult, Compositor};
+    use native_engine::desktop_viewport::{
+        AcquiredSurfaceFrame, DesktopViewportHost, PresentationReceipt, SettledSurfaceFrame,
+        SurfaceAttempt, SurfacePort, SurfacePresentation, SurfaceRecoveryError, ViewportError,
+        ViewportMapping,
+    };
+    use native_engine::render_scene::ScheduledFrameIdentity;
+    use native_engine::scheduler::WorkId;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Default)]
+    pub(crate) struct SurfaceState {
+        pub(crate) attached_snapshot: Option<String>,
+        pub(crate) disposals: usize,
+        pub(crate) rebinds: usize,
+        pub(crate) recreates: usize,
+        pub(crate) reconfigures: usize,
+        pub(crate) next_outcome: Option<FakeOutcome>,
+        context: Option<(wgpu::Instance, wgpu::Adapter, wgpu::Device, wgpu::Queue)>,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) enum FakeOutcome {
+        Timeout,
+        Occluded,
+        Lost,
+        Outdated,
+        ValidationFailure,
+        DeviceLost,
+    }
+
+    struct FakeSurface {
+        state: Arc<Mutex<SurfaceState>>,
+    }
+
+    struct FakeFrame {
+        state: Arc<Mutex<SurfaceState>>,
+        snapshot: String,
+        settled: SettledSurfaceFrame,
+    }
+
+    impl AcquiredSurfaceFrame for FakeFrame {
+        fn settle(self) -> SettledSurfaceFrame {
+            if self.settled == SettledSurfaceFrame::Presented {
+                self.state.lock().unwrap().attached_snapshot = Some(self.snapshot);
+            }
+            self.settled
+        }
+    }
+
+    impl SurfacePort for FakeSurface {
+        type Frame<'port, 'source> = FakeFrame;
+
+        fn acquire<'port, 'source>(
+            &'port mut self,
+            source: SurfacePresentation<'source>,
+        ) -> SurfaceAttempt<Self::Frame<'port, 'source>> {
+            let mut state = self.state.lock().unwrap();
+            let context = (
+                source.instance.clone(),
+                source.adapter.clone(),
+                source.device.clone(),
+                source.queue.clone(),
+            );
+            if let Some(old) = &state.context {
+                assert!(
+                    old.0 == context.0
+                        && old.1 == context.1
+                        && old.2 == context.2
+                        && old.3 == context.3,
+                    "replacement presentation must reuse the original GPU context"
+                );
+            } else {
+                state.context = Some(context);
+            }
+            let settled = match state.next_outcome.take() {
+                Some(FakeOutcome::Timeout) => return SurfaceAttempt::Timeout,
+                Some(FakeOutcome::Occluded) => return SurfaceAttempt::Occluded,
+                Some(FakeOutcome::Lost) => return SurfaceAttempt::Lost,
+                Some(FakeOutcome::Outdated) => return SurfaceAttempt::Outdated,
+                Some(FakeOutcome::ValidationFailure) => SettledSurfaceFrame::ValidationFailure,
+                Some(FakeOutcome::DeviceLost) => SettledSurfaceFrame::DeviceLost,
+                None => SettledSurfaceFrame::Presented,
+            };
+            drop(state);
+            SurfaceAttempt::Acquired(FakeFrame {
+                state: Arc::clone(&self.state),
+                snapshot: source
+                    .identity
+                    .evaluation_key()
+                    .document_snapshot_id()
+                    .to_owned(),
+                settled,
+            })
+        }
+
+        fn recreate(&mut self, _: ViewportMapping) -> Result<(), SurfaceRecoveryError> {
+            self.state.lock().unwrap().recreates += 1;
+            Ok(())
+        }
+        fn reconfigure(&mut self, _: ViewportMapping) -> Result<(), SurfaceRecoveryError> {
+            self.state.lock().unwrap().reconfigures += 1;
+            Ok(())
+        }
+        fn dispose(&mut self) {
+            let mut state = self.state.lock().unwrap();
+            state.attached_snapshot = None;
+            state.disposals += 1;
+        }
+    }
+
+    pub(crate) struct FakeViewport {
+        host: Option<DesktopViewportHost<FakeSurface>>,
+        state: Arc<Mutex<SurfaceState>>,
+        mapping: ViewportMapping,
+    }
+
+    impl FakeViewport {
+        pub(crate) fn new(mapping: ViewportMapping, state: Arc<Mutex<SurfaceState>>) -> Self {
+            Self {
+                host: Some(DesktopViewportHost::new(
+                    FakeSurface {
+                        state: Arc::clone(&state),
+                    },
+                    mapping,
+                )),
+                state,
+                mapping,
+            }
+        }
+
+        pub(crate) fn present(
+            &mut self,
+            compositor: &Compositor,
+            result: &CompositionResult,
+            identity: ScheduledFrameIdentity,
+        ) -> Result<(WorkId, u64, PresentationReceipt), ViewportError> {
+            let host = self.host.as_mut().expect("fake viewport must be attached");
+            host.register(identity.clone())?;
+            let receipt = host.present_composition(compositor, result)?;
+            Ok((
+                identity.work_id(),
+                identity.view_generation().value(),
+                receipt,
+            ))
+        }
+
+        pub(crate) fn retire_replacement(&mut self) -> Vec<WorkId> {
+            self.host
+                .take()
+                .map_or_else(Vec::new, |mut host| host.dispose())
+        }
+
+        pub(crate) fn rebind_existing(&mut self, compositor: &Compositor) -> Result<(), String> {
+            assert!(
+                self.host.is_none(),
+                "A surface must retire before B is bound"
+            );
+            let mut state = self.state.lock().unwrap();
+            let old = state.context.as_ref().expect("A must have been presented");
+            assert!(
+                old.0 == *compositor.instance()
+                    && old.1 == *compositor.adapter()
+                    && old.2 == *compositor.device()
+                    && old.3 == *compositor.queue(),
+                "blank replacement host must use the retained compositor"
+            );
+            assert!(
+                state.attached_snapshot.is_none(),
+                "replacement host must start blank"
+            );
+            state.rebinds += 1;
+            drop(state);
+            self.host = Some(DesktopViewportHost::new(
+                FakeSurface {
+                    state: Arc::clone(&self.state),
+                },
+                self.mapping,
+            ));
+            Ok(())
+        }
+    }
+}
