@@ -6993,6 +6993,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            103
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (tweens blob 6eca733): this is the tween feature-flag preamble, not a separate engine. TW_CURVATURE_DTW (12), TW_CORRECTION_PASS (13), TW_POINT_REDUCTION (14), TW_HANDLE_REHARMONISE (15), and TW_DTW_SYMMETRIC (59) gate C02.tween-engine.resampling-and-nonrigid-warping (#1037): their frozen reads are in DTW at 1124/1142 and correction/reharmonization/reduction at 2202/2122/2385. TW_FOLDBACK_W/FOLDBACK_MIN (26/29), TW_INTRINSIC_ANCHOR (33), TW_FOLD_UNWRAP (49), and TW_ALIGN_HAIRPIN (102) gate C02.tween-engine.interpolation-core, with reads at 3026, 1830, 2881 and 3181/3333. TW_MATCH_RELATIONAL/MATCH_LEN_W (79/88) gate C02.tween-engine.feature-extraction-and-matching, with reads in matchSc/autoMatchJS at 331/431-567. Line 103 is only the heading before buildTP at 104. These pending packet mappings change no flag behavior, packet admission or numeric coverage."
+        },
+        {
+          "span": [
             411,
             415
           ],
@@ -7033,6 +7041,30 @@
         },
         {
           "span": [
+            1564,
+            1958
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (tweens blob 6eca733), split by source callers rather than one packet: 1564-1590 defines tweenSpanKey/getEasingForPair and a UID-keyed per-pair easing read; generateTweens calls it at 3773-3774 and renderArcs at 4497, so this shared seam belongs to pending C02.tween-engine.tween-generation-and-splitting and C02.tween-engine.arc-rendering-and-reassignment (#1037), with timeline.js as an external settings consumer. Lines 1591-1674 define arcKey, getArcHandles, setArcHandle and rekeyTweenPairData: the writer stores state.motionArcs, select-bridge.js/tools.js call it on arc drag, timeline.js calls rekey on frame moves, renderArcs reads handles at 4512 and interpStroke reads them at 2401; assign the arc-state/overlay responsibility to C02.tween-engine.arc-rendering-and-reassignment and retain the interpolation caller separately. Lines 1675-1712 contain rotScalePt, _wrapPI, _segPolyLen and _nearPt for interpolation/crossing probes shared by pending C02.tween-engine.resampling-and-nonrigid-warping and C02.tween-engine.interpolation-core: rotScalePt is called at 2003-2006 and 2510 onward, _wrapPI in DTW at 1108-1136 and intrinsic/interpolation paths, _segPolyLen by interpStroke at 2576-2587, and _nearPt by the crossing probes at 1772/1791. Lines 1713-1756 carry color and persisted stroke style through _lerpHexColor/_carryTweenStyle; interpStroke invokes the style carry at 3109/3115, so these are interpolation-core helpers. Lines 1757-1796 hold _strokeDataPolyLen and self-crossing probes: the former feeds adaptive resampling and tween generation at 3666/4138, while _segsSelfXCount/_segsSelfIntersect feed both C02.tween-engine.resampling-and-nonrigid-warping at 2206/2249/2379 and interpolation-core at 2576 onward. Lines 1797-1870 define _intrinsicSegs, invoked by interpStroke at 2653/2813/3089, under interpolation-core. Lines 1871-1958 introduce and implement _mlsHandleIndices, called by _fitMLSPerVertex beginning at 1959, which the C02 resampling-and-nonrigid-warping packet explicitly names. The older C02 numeric ranges omit parts of this mixed frozen span; this maps existing pending responsibilities and actual callers without amending that census, asserting one owner for all 395 lines, admitting a packet or accepting tween behavior."
+        },
+        {
+          "span": [
+            3735,
+            3742
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 3735-3742 are the body and close of _dedupeFrameStrokeIds. It renames repeated nonempty strokeId values on a keyframe's stroke array to twdup_<frame>_<index>; generateTweens calls it on both source keyframes at 3796-3797 before matching. This keyframe metadata write is a precondition within pending C02.tween-engine.tween-generation-and-splitting (#1037), not a pure helper or a new extracted owner. No packet admission, numeric coverage or save/reload acceptance is claimed."
+        },
+        {
+          "span": [
+            4810,
+            4811
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: line 4810 documents the extracted frame-entry kind and line 4811 calls NemoFrameHistoryEntry.capture inside pushUndoActiveFrame. Pending C01.tweens.undo-redo-engine (#1036) explicitly names pushUndoActiveFrame and its frame-only branch; accepted P21/#1023 supplies the extracted capture module, not acceptance of the entire C01 undo engine. This adds no numeric coverage or undo behavior acceptance."
+        },
+        {
+          "span": [
             4860,
             4860
           ],
@@ -7046,6 +7078,22 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 4925 conditionally restores s.layerFolders via NemoFolderCodec.hasFolderMap/restoreFolderMap inside restoreLayersSnapshot. The pinned C01/#1036 census packet C01.tweens.undo-redo-engine names restoreLayersSnapshot and whole-tree undo metadata responsibility. Compatibility comments at 4923-4924 and the distinct layerLinkGroups restore at 4926 are outside this singleton. C01 remains pending; this mapping does not claim codec extraction, undo/redo behavior acceptance, or numeric coverage."
+        },
+        {
+          "span": [
+            4977,
+            4979
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 4977-4978 introduce undo()'s frame-only branch; line 4979 applies the entry through NemoFrameHistoryEntry.apply, pushes its inverse to redo, then refreshes the current frame and UI. Pending C01.tweens.undo-redo-engine (#1036) names undo and this lighter branch; accepted P21/#1023 owns the extracted entry helper but does not accept the full engine. No numeric coverage, history round-trip or runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            4992,
+            5016
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 4992-4993 are redo()'s frame-only NemoFrameHistoryEntry.apply/inverse-push/refresh branch under pending C01.tweens.undo-redo-engine (#1036), with P21/#1023 as the extracted-entry context. Line 4994 is blank. Lines 4995-5015 are the manual inbetween match-reassignment lead-in, describing state.tweenOverrides and its two-step A/B stroke selection; line 5016 declares the mutable _reassign flow state. That separate pending responsibility is C02.tween-engine.arc-rendering-and-reassignment (#1037), whose reassignStatusEl/startReassign and other named functions follow. C01's old coarse range extends through 5022 and C02's old reassign range starts at 5046; these coordinates are historical drift, not permission to assign the whole mixed span to C01 or silently amend either census. Both packets remain pending; this adds no numeric coverage or behavior acceptance."
         }
       ]
     },

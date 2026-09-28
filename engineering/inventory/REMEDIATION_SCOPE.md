@@ -205,7 +205,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
   `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
   dispositions the final two C03 module headers; 31 spans remained undispositioned at that
-  snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remain.
+  snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remained
+  at that snapshot. P03C-ai/#1491 dispositions six frozen `tweens.js` spans; 19 remain.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -394,8 +395,26 @@ code, browser, Tauri, native, render or export behavior is accepted. The 31 prev
 undispositioned spans become 25, with zero `motion.js` spans remaining; all 762 packets stay
 pending, global computed uncovered code remains 7 185, and frozen `motion.js` retains 293
 computed uncovered code lines and 190 overlapping lines.
+P03C-ai/#1491 dispositions all six remaining frozen `src/js/tweens.js` spans. `1-103` maps
+the feature flags to the pending C02 matching, resampling and interpolation packets by their
+actual read sites; notably `TW_CORRECTION_PASS` is read in `_applyFoldCorrection` under the
+resampling packet. The mixed `1564-1958` span maps UID-keyed easing, persistent tween-arc
+handles/rekey, style and intrinsic interpolation, crossing probes and MLS preparation to
+their separate C02 generation, arc, interpolation and resampling responsibilities using
+frozen `generateTweens`, `renderArcs` and `interpStroke` callers. `3735-3742` maps the
+keyframe stroke-ID deduplication used by tween generation. `4810-4811` and `4977-4979`
+map the frame-only capture/apply seams to pending C01 undo/redo, with P21's extracted entry
+as context only. `4992-5016` splits the redo branch from the distinct manual reassignment
+lead-in and `_reassign` state. The JSON records the exact subrange evidence against frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, tweens blob
+`6eca7339bbd608b98676b600c9e2f42ca9ce1863`, and pinned C01/C02 censuses. Their
+older numeric-range drift is unchanged. These responsibility mappings admit no packet and
+accept no code, browser, Tauri, native, render, export or history behavior. The 25 previously
+undispositioned spans become 19, with zero `tweens.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `tweens.js` retains 516
+computed uncovered code lines and 158 overlapping lines.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 25
+pending packets, no notes needing reconciliation, 0 unmapped paths and 19
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
