@@ -43,6 +43,7 @@ const CANDIDATE_FILES = [
   'engineering/inventory/surfaces.json',
   'engineering/inventory/surfaces.csv',
   'engineering/inventory/SURFACES.md',
+  'engineering/boundaries/profiles/app-js.coverage.json',
   'engineering/remediation/EXECUTION_PLAN.en.md',
   'engineering/remediation/EXECUTION_PLAN.fr.md',
 ];
