@@ -120,8 +120,9 @@ test('native browser Open publishes success only after both frame-0 presentation
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.startScreen.classList.contains('hid'), true);
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)', 'no early metadata publication');
-  app.flushFrame(); app.flushFrame(); app.flushFrame(); app.flushFrame();
+  app.flushFrame(); app.flushFrame();
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.repaints, 0, 'native reveal does not schedule legacy repaint');
   assert.equal(native.presentations, 1, 'the current viewport is presented after reveal');
   assert.equal(app.toasts.includes('Opened: Native'), false);
   native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
@@ -138,7 +139,7 @@ test('stale post-reveal native frame leaves desktop Open unpublished and returns
   const opening = app.project.openPath('/tmp/Native.json');
   native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
-  app.flushFrame(); app.flushFrame(); app.flushFrame(); app.flushFrame();
+  app.flushFrame(); app.flushFrame();
   await new Promise(resolve => setImmediate(resolve));
   native.visible.resolve({ ...native.receipt, lifecycleGeneration: 2 });
   await opening;

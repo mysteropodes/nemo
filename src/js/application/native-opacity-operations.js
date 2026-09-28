@@ -211,6 +211,15 @@
       v1ByLifecycle.delete(session);
       viewport.disposeSession(session);
     }
+    function afterChange() {
+      if (opening) {
+        if (!ports.surface || typeof ports.surface.setAdmissionFrameZero !== 'function') {
+          throw new Error('native admission presentation-frame port is unavailable');
+        }
+        ports.surface.setAdmissionFrameZero();
+      }
+      if (ports.afterChange) ports.afterChange();
+    }
     function allowLegacy(kind) {
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
@@ -324,7 +333,8 @@
       history: function (action, requestId) { return history(action, requestId, 'direct'); },
       historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); },
       legacyIntent: legacyIntent, handleV1: handleV1,
-      reenterLegacy: reenterLegacy, disposeSession: disposeSession, install: install
+      reenterLegacy: reenterLegacy, disposeSession: disposeSession,
+      afterChange: afterChange, install: install
     });
   }
 

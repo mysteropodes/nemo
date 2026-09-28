@@ -37,9 +37,12 @@
   }
 
   function reveal(root, first, ports) {
-    try { ports.hide(); ports.repaint(); }
+    // Native presentation below replaces the legacy repaint. The latter
+    // schedules a render from the previous document's UI frame during reveal.
+    var nativeOpen = !!root.NemoNativeOpacityProject;
+    try { ports.hide(); if (!nativeOpen) ports.repaint(); }
     catch (error) { ports.show(); throw error; }
-    if (!root.NemoNativeOpacityProject) return true;
+    if (!nativeOpen) return true;
     // The existing repaint crosses two frames after the start screen hides.
     // Present again after that boundary so a resize cannot clear the first frame.
     return new Promise(function (resolve) {

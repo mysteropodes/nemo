@@ -246,7 +246,11 @@ function stateBytes(h) {
 }
 function surfaceHarness(source, options = {}) {
   let publications, resized;
+  const ui = options.ui || { state: { currentFrame: 10 }, _curFrame: 10,
+    __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
+  const presentationFrame = NativeLegacySurface.desktopPorts(ui, {}).surface.setAdmissionFrameZero;
   const surface = {
+    setAdmissionFrameZero: presentationFrame,
     installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
     wrap() { return () => {}; },
     extensionOpen() { return !!options.extension; }, toast() {},
@@ -256,7 +260,7 @@ function surfaceHarness(source, options = {}) {
   };
   const h = nativeHarness(source, { ...options, surface });
   h.controller.install();
-  return { ...h, published: () => publications, resizeCallback: () => resized };
+  return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
 
 test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
@@ -448,19 +452,61 @@ test('resize failure fences the current owner without closing or importing it', 
   assert.equal(h.state.disconnects, 0); assert.equal(h.controller.persistenceJSON(), null);
 });
 
-test('production admission ignores the previous UI frame before presenting native frame zero', async () => {
+for (const [mode, makeSource, frameZeroOpacity] of [
+  ['static', staticSource, 25], ['keyed', keyedSource, 20],
+]) {
+  for (const previousFrame of [10, 59]) {
+    test(`${mode} native Open resets old UI frame ${previousFrame} before refresh and later renders`, async () => {
+      const source = makeSource(), paperCalls = [], observed = [];
+      const ui = { state: { currentFrame: previousFrame }, _curFrame: previousFrame,
+        __TAURI__: { core: { invoke() {} } },
+        SM: { importJSON() { paperCalls.push('import'); } },
+        goToFrame() { paperCalls.push('navigate'); },
+        loadFrame() { paperCalls.push('load'); },
+        saveAllLayerFrames() { paperCalls.push('save-frame'); },
+        pushUndo() { paperCalls.push('undo'); } };
+      let h;
+      h = surfaceHarness(source, { ui, resize: async () => {}, afterChange() {
+        observed.push([ui.state.currentFrame, ui._curFrame]);
+        // Real afterChange asks SMEngineBridge to render the UI playhead.
+        h.published().cutover.renderPreview(ui.state.currentFrame);
+      } });
+      const first = await h.published().project.importJSON(JSON.stringify(source));
+      assert.equal(first.status, 'presented');
+      assert.deepEqual(observed, [[0, 0]], 'both UI frame fields are current before refresh');
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+      assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [frameZeroOpacity]);
+      assert.equal(typeof h.controller.persistenceJSON(), 'string', 'native snapshot remains readable');
+      const root = { NemoNativeOpacityProject: h.published().project,
+        NemoNativeOpacityCutover: h.published().cutover };
+      assert.equal(await NativeProjectEntry.reveal(root, first, {
+        hide() {}, show() { throw new Error('unexpected failed reveal'); },
+        repaint() { throw new Error('legacy repaint ran during native Open'); },
+        raf(callback) { callback(); },
+      }), true);
+      h.published().cutover.renderPreview(ui.state.currentFrame);
+      await h.controller.flush();
+      h.published().resize();
+      await h.resizeCallback()();
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0]);
+      assert.deepEqual([ui.state.currentFrame, ui._curFrame], [0, 0]);
+      assert.deepEqual(paperCalls, []);
+      assert.equal(h.controller.status(), 'native');
+    });
+  }
+}
+
+test('unsupported and preactivation failed imports retain the previous UI playhead', async () => {
   const source = staticSource();
-  let h;
-  h = surfaceHarness(source, { afterChange() {
-    // The desktop afterChange -> SMEngineBridge.renderNow path uses the old
-    // document's frame; 59 is outside this supported 21-frame projection.
-    h.published().cutover.renderPreview(59);
-  } });
-  const first = await h.published().project.importJSON(JSON.stringify(source));
-  assert.equal(first.status, 'presented');
-  assert.equal(first.frame, 0);
-  assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
-  assert.equal(h.controller.status(), 'native');
+  for (const failsBootstrap of [false, true]) {
+    const ui = { state: { currentFrame: 59 }, _curFrame: 59,
+      __TAURI__: { core: { invoke() {} } }, SM: { importJSON() { throw new Error('Paper import'); } } };
+    const h = surfaceHarness(source, { ui, bootstrapFailure: () => failsBootstrap });
+    const result = await h.published().project.importJSON(failsBootstrap ? JSON.stringify(source) : '{invalid');
+    assert.equal(result, false);
+    assert.deepEqual([ui.state.currentFrame, ui._curFrame], [59, 59]);
+    assert.equal(h.state.previews.length, 0);
+  }
 });
 
 for (const fails of [false, true]) {

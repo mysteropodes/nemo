@@ -166,7 +166,8 @@ var NemoOpacityApplicationCore = (function () {
     var operations;
     var lifecycle = modules.lifecycle.create(Object.assign({}, ports, {
       legacyImport: function () { return operations.reenterLegacy.apply(null, arguments); },
-      onDisposed: function (session) { operations.disposeSession(session); }
+      onDisposed: function (session) { operations.disposeSession(session); },
+      afterChange: function () { return operations.afterChange(); }
     }), modules.contract);
     operations = modules.operations.create(lifecycle, ports, modules.contract, modules.viewport);
     return Object.freeze({ activate: function (prepared) { requireMotionSurface(); return lifecycle.activate(prepared); },
