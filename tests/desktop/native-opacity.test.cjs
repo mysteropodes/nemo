@@ -219,7 +219,16 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await waitFor(async () => (await status()).available, stage);
     assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
     report.checks.push({ checkpoint: stage, value: 25 });
-    await capture('motion-ready', 'Close the automatic tutorial and any introductory overlays, enter Motion, and select R08 rectangle. Capture the actual Motion surface with the selected layer and visible Opacity field before editing.');
+    const admittedDocument = await status();
+    await capture('motion-ready', 'Close the automatic tutorial and any introductory overlays, enter Motion, and select R08 rectangle. Capture the actual Motion surface and record visible: {canvasW, canvasH, fps, totalFrames, layerName, selectedLayer, opacity} from its controls before editing.');
+    const visible = read(path.join(reportDir, 'motion-ready.json')).visible;
+    assert.deepEqual(visible, { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 21,
+      layerName: 'R08 rectangle', selectedLayer: 'R08 rectangle', opacity: 25 },
+    'The visible Motion/editor controls must project the opened native fixture');
+    const projectedDocument = await status();
+    assert.deepEqual([projectedDocument.instanceId, projectedDocument.documentId, projectedDocument.contentRevision],
+      [admittedDocument.instanceId, admittedDocument.documentId, admittedDocument.contentRevision],
+      'The visible Motion projection must still belong to the admitted native document');
     assert.equal(await opacity(), 25); assert.equal(await uiValue(), 25);
     await valueCheckpoint('edit-40', 'Set the Motion layer Opacity field to 40 and commit with Tab.', 40);
     await valueCheckpoint('edit-60', 'Set the same Opacity field to 60 and commit with Tab.', 60);
