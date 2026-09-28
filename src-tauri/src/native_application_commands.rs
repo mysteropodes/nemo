@@ -167,14 +167,19 @@ pub(crate) async fn nemo_native_replace(
         .map_err(|message| replace_commands::admission_error(&native, message))?;
     let instance = request.instance_id.clone();
     let committed = native.clone();
-    match viewport_host::on_main_thread_replacement(&app, move || {
-        replace_commands::complete_replacement(&committed, generation, &instance, prepared)
-    })
+    let fallback = native.clone();
+    match viewport_host::on_main_thread_replacement(
+        &app,
+        move || replace_commands::complete_replacement(&committed, generation, &instance, prepared),
+        move |failure| {
+            let _ = replace_commands::fence_executor_failure(&fallback, generation, failure);
+        },
+    )
     .await
     {
         Ok(result) => result,
-        Err(failure) => Err(replace_commands::fence_executor_failure(
-            &native, generation, failure,
+        Err(_) => Err(replace_commands::retained_executor_error(
+            &native, generation,
         )),
     }
 }

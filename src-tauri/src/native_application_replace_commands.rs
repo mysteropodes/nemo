@@ -8,6 +8,10 @@ use crate::native_application_commands::{
 use crate::native_dispatch::{ReplacementProgress, ReplacementStage};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+#[cfg(test)]
+#[path = "native_application_replace_commands_acceptance_tests.rs"]
+mod acceptance_tests;
+
 pub(super) fn admission_error(
     native: &NativeState,
     message: String,
@@ -157,90 +161,40 @@ pub(super) fn fence_executor_failure(
     }
 }
 
+pub(super) fn retained_executor_error(
+    native: &NativeState,
+    generation: u64,
+) -> nemo_mcp::contract::NativeApplicationError {
+    let authority = native
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match &authority.phase {
+        crate::native_dispatch::NativePhase::Replacing {
+            generation: current,
+            progress,
+            ..
+        } if *current == generation && progress.failure.is_some() => fenced_error(progress.clone()),
+        _ => host_error("unavailable", "native replacement completion is stale"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::acceptance_tests::{geometry_b, project, setup};
     use super::*;
     use crate::{
         native_application::{admit_release_request, complete_release},
         native_application_commands::{
-            active_generation, with_installed_instance, ApplicationMcp, DesktopArtifactPort,
-            NATIVE_API_VERSION,
+            active_generation, with_installed_instance, NATIVE_API_VERSION,
         },
-        native_application_contract::{admit_project, GeometryResourceInput, NativeReleaseRequest},
-        native_application_ports::SharedCompositor,
-        native_dispatch::{NativeAuthority, NativePhase, ReleaseAdmission},
+        native_application_contract::{admit_project, NativeReleaseRequest},
+        native_dispatch::{NativePhase, ReleaseAdmission},
     };
-    use native_engine::compositor::Compositor;
-    use serde_json::{json, Value};
-    use std::{
-        fs,
-        path::PathBuf,
-        sync::{Arc, Mutex},
+    use serde_json::json;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
     };
-
-    const PROJECT: &[u8] =
-        include_bytes!("../../native-engine/tests/fixtures/opacity-v2/project.json");
-
-    struct Scratch(PathBuf);
-    impl Scratch {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!("nemo-n20r2-{}", uuid::Uuid::new_v4()));
-            fs::create_dir(&path).unwrap();
-            Self(path)
-        }
-    }
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    fn geometry() -> Vec<GeometryResourceInput> {
-        serde_json::from_value(json!([{
-            "resourceId": "geometry", "resourceVersion": "v1",
-            "layers": [{
-                "layerUid": "r08_curve_layer",
-                "bounds": [0.0, 0.0, 320.0, 180.0],
-                "transform": [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-                "paint": {"red": 12, "green": 34, "blue": 56}
-            }]
-        }]))
-        .unwrap()
-    }
-
-    fn project(opacity: u64) -> Value {
-        let mut value: Value = serde_json::from_slice(PROJECT).unwrap();
-        value["layers"][0]["motionStatic"]["opacity"] = json!([opacity]);
-        value
-    }
-
-    fn setup() -> (Scratch, NativeState, String, PreparedDesktopReplacement) {
-        let scratch = Scratch::new();
-        let first = admit_project(&project(25), &geometry()).unwrap();
-        let second = admit_project(&project(35), &geometry()).unwrap();
-        let prepared = DesktopNativeApplication::prepare_replacement(second).unwrap();
-        let artifacts = DesktopArtifactPort::new(
-            scratch.0.join("staging"),
-            std::iter::empty::<(String, PathBuf)>(),
-        )
-        .unwrap();
-        let compositor = SharedCompositor::new(Compositor::new().unwrap());
-        let application =
-            DesktopNativeApplication::new("native-fixture".into(), first, artifacts, compositor)
-                .unwrap();
-        let old_document = application.document_id().to_owned();
-        let mut authority = NativeAuthority::default();
-        let generation = authority.reserve_install().unwrap();
-        authority
-            .install(generation, Box::new(application))
-            .unwrap();
-        (
-            scratch,
-            Arc::new(Mutex::new(authority)),
-            old_document,
-            prepared,
-        )
-    }
 
     fn reserve(native: &NativeState, old_document: &str) -> (u64, u64) {
         let mut authority = native.lock().unwrap();
@@ -263,7 +217,7 @@ mod tests {
         let old = native.lock().unwrap().active_generation().unwrap();
         let mut invalid = project(35);
         invalid["formatVersion"] = json!(99);
-        assert!(admit_project(&invalid, &geometry()).is_err());
+        assert!(admit_project(&invalid, &geometry_b()).is_err());
         let authority = native.lock().unwrap();
         assert_eq!(authority.active_generation().unwrap(), old);
         assert_eq!(authority.active().unwrap().1.document_id(), old_document);
@@ -293,7 +247,7 @@ mod tests {
                     "contextId": "scene-root", "quality": "final",
                     "outputHandle": "output-fixture",
                     "frames": [{"sourceFrame": 0,
-                        "geometryHandle": {"resourceId": "geometry", "resourceVersion": "v1"}}]
+                        "geometryHandle": {"resourceId": "geometry-a", "resourceVersion": "v1"}}]
                 }
             }))
             .unwrap();
@@ -434,89 +388,61 @@ mod tests {
     }
 
     #[test]
-    fn scheduling_failure_and_callback_drop_keep_reserved_host_fenced() {
-        for failure in [
-            viewport_host::ReplacementCallbackFailure::SchedulingUnavailable,
-            viewport_host::ReplacementCallbackFailure::CallbackDropped,
-        ] {
-            let (_scratch, native, old_document, _prepared) = setup();
-            let (old, fresh) = reserve(&native, &old_document);
-            let error = fence_executor_failure(&native, fresh, failure);
-            assert_eq!(error.code, "replacement_indeterminate");
-            assert_eq!(
-                error.details.as_ref().unwrap()["replacement"]["core"],
-                "pending"
-            );
-            let mut authority = native.lock().unwrap();
-            assert!(authority.active_mut(old).is_err());
-            assert!(matches!(authority.phase, NativePhase::Replacing { .. }));
-        }
+    fn waiter_drop_then_callback_drop_fences_exactly_once() {
+        let (_scratch, native, old_document, _prepared) = setup();
+        let (old, fresh) = reserve(&native, &old_document);
+        let count = Arc::new(AtomicUsize::new(0));
+        let hook_native = native.clone();
+        let hook_count = count.clone();
+        let mut queued = None;
+        let waiter = viewport_host::submit_replacement(
+            |callback| {
+                queued = Some(callback);
+                Ok(())
+            },
+            || -> HostResult<()> { panic!("discarded callback must not run") },
+            move |failure| {
+                hook_count.fetch_add(1, Ordering::SeqCst);
+                let _ = fence_executor_failure(&hook_native, fresh, failure);
+            },
+        )
+        .unwrap();
+        drop(waiter);
+        drop(queued.take());
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        let error = retained_executor_error(&native, fresh);
+        assert_eq!(error.code, "replacement_indeterminate");
+        assert_eq!(
+            error.details.as_ref().unwrap()["replacement"]["failure"]["kind"],
+            "callback_dropped"
+        );
+        assert_eq!(
+            error.details.as_ref().unwrap()["replacement"]["core"],
+            "pending"
+        );
+        assert!(native.lock().unwrap().active_mut(old).is_err());
     }
 
     #[test]
-    fn reservation_denies_mcp_dispatch_and_old_revision_ack() {
-        let scratch = Scratch::new();
-        let state = ApplicationMcp::default();
-        let instance = state.instance_id().to_owned();
-        let admitted = admit_project(&project(25), &geometry()).unwrap();
-        let artifacts = DesktopArtifactPort::new(
-            scratch.0.join("staging"),
-            std::iter::empty::<(String, PathBuf)>(),
-        )
-        .unwrap();
-        let compositor = SharedCompositor::new(Compositor::new().unwrap());
-        let application =
-            DesktopNativeApplication::new(instance.clone(), admitted, artifacts, compositor)
-                .unwrap();
-        let document = application.document_id().to_owned();
-        let install = state.reserve_native_install().unwrap();
-        state
-            .install_dispatch(install.generation(), Box::new(application))
-            .unwrap();
-
-        let binding = state
-            .control_revision_for_test(json!({"action":"binding"}))
-            .unwrap();
-        state
-            .control_revision_for_test(json!({
-                "action":"subscribe", "binding": binding
-            }))
-            .unwrap();
-        let fresh = state
-            .reserve_native_replacement(&instance, &document, 0, |application| {
-                if application.as_any_mut().is::<DesktopNativeApplication>() {
-                    Ok(())
-                } else {
-                    Err("unavailable:native desktop host is unavailable".into())
-                }
-            })
-            .unwrap();
-        assert!(fresh > install.generation());
-
-        let response = state
-            .dispatch_native(nemo_mcp::contract::NativeApplicationRequest {
-                api_version: NATIVE_API_VERSION,
-                request_id: "old-query".into(),
-                instance_id: instance.clone(),
-                document_id: document.clone(),
-                expected_revision: None,
-                operation: "query.document.revision".into(),
-                payload: json!({}),
-                cancelled_before_dispatch: false,
-            })
-            .unwrap();
-        assert!(!response.ok);
-        assert_eq!(response.error.unwrap().code, "unavailable");
-        let stale_ack = state.control_revision_for_test(json!({
-            "action":"acknowledge",
-            "subscriptionId": binding["subscriptionId"],
-            "event": {
-                "instanceId": instance,
-                "documentId": document,
-                "lifecycleGeneration": install.generation(),
-                "fromRevision": 0, "toRevision": 1, "requestId": "old-command"
-            }
-        }));
-        assert!(stale_ack.unwrap_err().contains("unavailable"));
+    fn schedule_rejection_fences_with_distinct_terminal_reason() {
+        let (_scratch, native, old_document, _prepared) = setup();
+        let (_, fresh) = reserve(&native, &old_document);
+        let hook_native = native.clone();
+        let result = viewport_host::submit_replacement(
+            |_| Err(()),
+            || -> HostResult<()> { panic!("unscheduled callback must not run") },
+            move |failure| {
+                let _ = fence_executor_failure(&hook_native, fresh, failure);
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(viewport_host::ReplacementCallbackFailure::SchedulingUnavailable)
+        ));
+        let error = retained_executor_error(&native, fresh);
+        assert_eq!(
+            error.details.as_ref().unwrap()["replacement"]["failure"]["kind"],
+            "executor_unavailable"
+        );
     }
 }

@@ -183,6 +183,7 @@ function assertRegisteredLeaf(required) {
 const REGISTERED_LEAVES = [
   ['N20R2 registers private host replacement children without an edge or size waiver', [
     'src-tauri/src/native_application_replace_commands.rs',
+    'src-tauri/src/native_application_replace_commands_acceptance_tests.rs',
     'src-tauri/src/native_application_replacement.rs',
     'src-tauri/src/native_dispatch_replacement.rs']],
   ['N20R1 registers private core replacement containment and its oracle without exceptions', [

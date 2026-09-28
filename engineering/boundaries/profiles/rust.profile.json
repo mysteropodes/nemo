@@ -315,6 +315,7 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_commands.rs",
+        "native_application_replace_commands_acceptance_tests.rs",
         "native_application_replace_commands.rs"
       ],
       "publicApi": [
