@@ -6000,6 +6000,38 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 1161 is blank and lines 1162-1174 are comments introducing Render Manager batch exporters; the first executable function, exportPNGSequenceToDir, begins at 1175. The comments describe the adjacent pending C05.export.tauri-io-ffmpeg responsibility (C05 census source 419f192631b715b3a6c763575dac29162aefa2d9 declares export.js:1176-1251 and batch siblings), but contain no executable responsibility themselves. This is a boundary only, not packet ownership, admission, extraction, export parity or runtime acceptance; numeric range coverage is unchanged."
+        },
+        {
+          "span": [
+            369,
+            376
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 369-376 contain the frame-range lead-in and exportFrameRange helper. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 names exportFrameRange in pending C05.export.frame-compositor (#1040)'s public API, although that packet's numeric source range ends at line 369. This mapping follows the named responsibility and does not extend numeric source coverage, admit a packet, or claim export/runtime parity acceptance."
+        },
+        {
+          "span": [
+            570,
+            598
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 570-598 contain exportRenderPNGsToDir, the shared PNG-sequence loop for raster exports. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 names this symbol in pending C05.export.tauri-io-ffmpeg (#1040), whose census range omits this shared call site; its engine-routing dependency is separately mapped to pending C05.export.engine-routing-gate. The Paper.js and engine-render branches remain distinct. No packet admission, numeric source coverage, export-format parity or runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            873,
+            883
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 873 is blank and lines 874-883 are the Lottie/Bodymovin section heading and explanatory comments; executable lottieHexToRGBA begins at line 884, in the responsibility of pending C05.export.lottie-bodymovin (#1040). These lines contain no executable responsibility and only mark a boundary; no packet admission, numeric source coverage or export/runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            1255,
+            1389
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 1255-1389 contain MP4_QUALITY_QV and define the window.SMExport public facade with its export entry points. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 partitions these responsibilities across pending C05.export.frame-compositor (preview/frame-range/SVG composition), C05.export.tauri-io-ffmpeg (Tauri-backed sequence and file exports), C05.export.browser-native-fallbacks (browser video/GIF paths), and C05.export.lottie-bodymovin (Lottie output). Rive separately augments this object from rive-export.js under C05.export.rive-mcp. Accepted P17/#1019 PR #1160 and P18/#1020 PR #1163 provide only narrow prior wrapper/job provenance. These mappings admit no packet, add no numeric source coverage, and claim no format/runtime/export parity acceptance."
         }
       ]
     },
