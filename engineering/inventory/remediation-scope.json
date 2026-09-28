@@ -5520,6 +5520,56 @@
           179,
           180
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            3,
+            3
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 3 imports capabilities for NemoServer's discovery/tool-router surface. P07/#1009 source commit bd907d230 added this import as part of the registered-capability discovery addition; that is narrow provenance, not acceptance of pending C07.mcp-server.tool-router (#1042) or numeric range coverage."
+        },
+        {
+          "span": [
+            128,
+            137
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 128-137 document and build nemo_discover's structured response, including registered capability descriptors and discovered instances. The C07 census names nemo_discover within pending C07.mcp-server.tool-router (#1042); P07/#1009 source commit bd907d230 is cited narrowly for this registered-capability discovery addition, not whole-packet or protocol acceptance. No numeric source coverage is added."
+        },
+        {
+          "span": [
+            141,
+            141
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 141 is the nemo_query tool description for supported reads and payload-template guidance. The C07 census names nemo_query in pending C07.mcp-server.tool-router (#1042); this mapping does not claim packet/runtime/protocol acceptance or numeric source coverage."
+        },
+        {
+          "span": [
+            160,
+            163
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 160-163 revalidate the assembled read request before dispatch and return the typed validation code/message. The C07 census explicitly identifies the corresponding pre-wire nemo_query validation at its source lines 150-152 and names nemo_query under pending C07.mcp-server.tool-router (#1042). This does not accept the packet or assert runtime/protocol behavior; computed coverage is unchanged."
+        },
+        {
+          "span": [
+            169,
+            169
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 169 is the nemo_command tool description, including registered-property payload guidance and request identity/retry requirements. The C07 census names nemo_command in pending C07.mcp-server.tool-router (#1042); this is not packet/runtime/protocol acceptance or numeric source coverage."
+        },
+        {
+          "span": [
+            179,
+            180
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 179-180 call request.validate() and forward the typed error code/message in nemo_command. The C07 census source ded641bd763379f36d629bf1686fcce8a6137a66 lists the corresponding validation at server.rs:169-170; the exact frozen-source diff shifts it to 179-180 after intervening P07 additions. This maps to pending C07.mcp-server.tool-router (#1042) only; no packet/runtime/protocol acceptance or numeric coverage is claimed."
+        }
       ]
     },
     {
