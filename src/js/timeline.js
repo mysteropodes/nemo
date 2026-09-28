@@ -27,25 +27,13 @@ async function smConfirm(msg, title) {
 // ---- PLAYBACK (optimized: no DOM rebuild during play) ----
 var playInt=null;
 var playRaf=null;
-// One logical frame step, preserving the exact edge semantics the old
-// setInterval body had (loop, ping-pong direction flip, audio onLoop,
-// stop at the work-area edge). Returns the next frame, or null meaning
-// "playback ends here". Mutates state.playDir like before.
-// Ping-pong (right-click btn-loop, feedback: "quand on clic sur le
-// lecture loop... il faut switché aussi sur une lecture en pingpong")
-// bounces back and forth across the work area instead of hard-cutting
-// back to waIn every pass — direction only flips at the OUT-of-bounds edge.
+// Keep mutable playback state and audio at the UI boundary. The pure domain
+// step preserves the old edge, wrap and ping-pong decisions.
 function advancePlayFrame(cur){
-  var next=cur+state.playDir;
-  if(next>state.waOut){
-    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=cur-1;if(next<state.waIn)next=state.waIn;}
-    else if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}
-    else return null;
-  }else if(next<state.waIn){
-    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=cur+1;if(next>state.waOut)next=state.waOut;}
-    else return null;
-  }
-  return next;
+  var step=NemoPlaybackStep.advance(cur,state.playDir,state.waIn,state.waOut,state.loopPlayback,state.pingPongPlayback);
+  state.playDir=step.direction;
+  if(step.audioLoop&&window.SMAudio)SMAudio.onLoop(step.frame);
+  return step.frame;
 }
 function startPlay(){if(state.playing)return;
   // A brush-menu hover-preview mutates live paths with no pushUndo/save (see
