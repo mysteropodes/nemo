@@ -241,7 +241,8 @@
       "layer": "viewport-adapter",
       "dir": "src-tauri/src",
       "files": [
-        "native_viewport.rs"
+        "native_viewport.rs",
+        "native_viewport_appkit.rs"
       ],
       "publicApi": [
         "native_viewport.rs"
@@ -318,7 +319,8 @@
         "native_application_commands.rs",
         "native_application_replace_commands_acceptance_tests.rs",
         "native_application_replace_commands.rs",
-        "native_application_replace_replay.rs"
+        "native_application_replace_replay.rs",
+        "native_application_replace_viewport_tests.rs"
       ],
       "publicApi": [
         "native_application_commands.rs"
