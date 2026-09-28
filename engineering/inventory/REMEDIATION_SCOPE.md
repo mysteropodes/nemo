@@ -136,6 +136,14 @@ comment-only 205-207 `boundary`. In particular, 131-146 is the plural `Operation
 which the older C07 symbol list does not name (it names singular `Operation::label`); accepted
 P07/#1009 source commit `bd907d230` / PR #1113 is cited only as the added-helper provenance. C07
 remains pending; contract.rs's 134 and global 7 185 computed uncovered code lines are unchanged.
+P03C-n/#1443 dispositioned the twelve remaining frozen `nemo-mcp/src/contract.rs` spans: eleven
+`covered` mappings and the comment-only 37-39 `boundary`. The mappings reference C07's broader,
+still-pending request/response contract, not packet acceptance or numeric source coverage. C07's
+older symbol list does not name `RequestError` or the test-only module registration; P07/#1009
+commits `35d7eac66`, `bd907d230` and `5aa8026ef` provide the later typed-error/import/test-wiring
+provenance. The 337-340 span is specifically `cfg(test)` / `contract_tests.rs` / `mod tests`, not
+`NativeApplicationRequest`. contract.rs's 134 and global 7 185 computed uncovered code lines remain
+unchanged.
 (4)
 The 40 previously dispositioned executable paths without a packet
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing

@@ -5358,6 +5358,102 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 286 is the body call from query_payload_schema to capability_contract::payload_schema with READ_OPERATIONS; the function declaration is at line 285, outside this singleton span. C07.mcp-contract.request-response-types (#1042) names query_payload_schema as a schema-generation hook and retains that broader responsibility pending. This adds no numeric source coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            2,
+            3
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 2-3 import capabilities and capability_contract into the MCP contract module. C07.mcp-contract.request-response-types (#1042) owns the broader versioned request/response and payload-contract responsibility; the imports are supporting module wiring, not symbols individually named by the older census. P07/#1009 source commits 35d7eac66 and bd907d230 establish the later capability and capability-contract integration provenance. C07 remains pending; no packet admission, numeric coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            8,
+            10
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 8-10 are a cfg(test)-only import of capability_contract::json_kind and its following blank line. The older C07 census lists json_kind but does not name this test-only import/module wiring; P07/#1009 source commit bd907d230 adds the test seam provenance. This does not claim product request behavior, packet admission, numeric range coverage or implementation acceptance."
+        },
+        {
+          "span": [
+            37,
+            39
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 37-39 are comment-only rationale for retaining ApplicationRequest.payload as a free Value and describing the registered schema checks; executable schema annotation and payload field follow at lines 42-43, outside this span. This preamble adds no separate executable admission responsibility or numeric coverage."
+        },
+        {
+          "span": [
+            91,
+            99
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 91-99 declare RequestError and its four variants. The older C07/#1042 symbol list does not name RequestError; P07/#1009 source commit 35d7eac66 introduces this typed validation-error surface within the broader pending C07 request/response contract responsibility. C07 remains pending; no packet admission, numeric coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            102,
+            110
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 102-110 implement RequestError::code and its error-code mapping. This method is not separately named in the older C07/#1042 symbol list; P07/#1009 source commit 35d7eac66 establishes the typed RequestError API provenance under C07's broader pending request/response contract. No packet admission, numeric source coverage or behavior acceptance is implied."
+        },
+        {
+          "span": [
+            112,
+            117
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 112-117 implement RequestError::message by returning the stored message for each variant. The older C07/#1042 symbol list does not name RequestError or this method; P07/#1009 source commit 35d7eac66 establishes the typed error API provenance within the broader pending C07 contract. No packet admission, numeric source coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            122,
+            129
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 122-129 implement Display and std::error::Error for RequestError, followed by a blank line. These traits are not separately named in the older C07/#1042 symbol list; P07/#1009 source commit 35d7eac66 supplies the typed validation-error provenance under C07's broader pending request/response contract. No packet admission, numeric coverage or implementation acceptance is implied."
+        },
+        {
+          "span": [
+            290,
+            290
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 290 is the ApplicationRequest::validate method declaration, a symbol named by pending C07.mcp-contract.request-response-types (#1042). The body is outside this singleton span. This does not admit the packet or add numeric source coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            292,
+            292
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 292 begins the api_version mismatch rejection inside ApplicationRequest::validate; C07.mcp-contract.request-response-types (#1042) names that broader validation method. The surrounding branch and message are outside this singleton span. No packet admission, numeric coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            298,
+            300
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 298-300 contain the request_id empty/over-128-byte guard and its InvalidRequest construction inside ApplicationRequest::validate, named by pending C07.mcp-contract.request-response-types (#1042). No surrounding validation branch, packet admission, numeric coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            308,
+            308
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 308 begins the InvalidRequest construction for missing write identity within ApplicationRequest::validate, named by pending C07.mcp-contract.request-response-types (#1042). The surrounding guard and message are outside this singleton span. No packet admission, numeric coverage or implementation acceptance is claimed."
+        },
+        {
+          "span": [
+            337,
+            340
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 337-340 register the cfg(test) contract_tests.rs module with mod tests. P07/#1009 source commit 5aa8026ef supplies this test-module wiring provenance; the older C07 census names json_kind and contract test oracles but not this test-only module, and these lines are not NativeApplicationRequest. This is not product request behavior, packet admission, numeric source coverage or implementation acceptance."
         }
       ]
     },
