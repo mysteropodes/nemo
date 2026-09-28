@@ -35,7 +35,10 @@
   function installBrowserReadOnlyImport(root) {
     if (hasNativeHost(root) || !root || !root.SM || typeof root.SM.importJSON !== 'function') return;
     var original = root.SM.importJSON;
-    root.SM.importJSON = function () {
+    root.SM.importJSON = function (json) {
+      // JSON.parse coerces objects before validating them. A user-defined
+      // toString could reenter a writer while import has create-layer access.
+      if (typeof json !== 'string') return false;
       browserImportDepth.set(root, (browserImportDepth.get(root) || 0) + 1);
       try { return original.apply(this, arguments); }
       finally { browserImportDepth.set(root, browserImportDepth.get(root) - 1); }

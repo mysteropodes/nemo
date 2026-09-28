@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const ProjectDocument = require('../src/js/project-document.js');
+const { extractFunction } = require('./fixtures/lib/sandbox.cjs');
 
 const root = path.resolve(__dirname, '..');
 const noop = () => {};
@@ -121,4 +123,46 @@ test('browser direct opacity UI entries deny while fixture import remains readab
   for (const kind of ['motion-set-value', 'motion-key-current', 'history-checkpoint']) {
     assert.equal(ctx.n20AllowLegacyWrite(kind), false, kind);
   }
+});
+
+test('production browser importer rejects coercible objects before import grants create-layer', () => {
+  const app = fs.readFileSync(path.join(root, 'src/js/app.js'), 'utf8');
+  const timeline = fs.readFileSync(path.join(root, 'src/js/timeline.js'), 'utf8');
+  const start = timeline.indexOf('  importJSON:function(json,silent){');
+  const end = timeline.indexOf('\n  getState:function()', start);
+  assert.ok(start >= 0 && end > start);
+  const importSource = timeline.slice(start, end).replace('  importJSON:', '').replace(/},\s*$/, '}');
+  let paperCreated = 0, revision = 0;
+  const ctx = {
+    state: { totalFrames: 2, layers: [{ name: 'Original', layerUid: 'a' }],
+      undoStack: [], redoStack: [], undoLabels: [], redoLabels: [] },
+    userLayers: [], arcLayer: { activate: noop }, showToast: noop,
+    LAYER_COLOR_PALETTE: ['#ffffff'], SMProjectDocument: ProjectDocument,
+    NemoApplication: {}, NemoOpacityApplication: {
+      meta: () => ({ documentId: 'original', revision }), documentChanged: () => { revision++; },
+    },
+    Layer: function (options) { paperCreated++; this.name = options.name; this.insertBelow = noop; },
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(root, 'src/js/adapters/native-opacity-legacy-surface.js'), 'utf8'), ctx);
+  vm.runInContext(`${extractFunction(app, 'nextLayerColor')}\n${extractFunction(app, 'createUserLayer')}\n` +
+    `this.SM = { importJSON: (${importSource}) }; this.productionCreateUserLayer = createUserLayer;`, ctx);
+  ctx.NemoNativeOpacityLegacySurface.installBrowserReadOnlyImport(ctx);
+  assert.equal(ctx.n20AllowLegacyWrite('create-layer'), false);
+  const before = { document: JSON.stringify(ctx.state), paperCreated, paperLayers: ctx.userLayers.length,
+    metadata: ctx.NemoOpacityApplication.meta() };
+  let coercions = 0;
+  const malicious = { toString() {
+    coercions++;
+    ctx.productionCreateUserLayer('Reentrant mutation');
+    ctx.state.undoStack.push({ type: 'reentrant' });
+    ctx.NemoOpacityApplication.documentChanged();
+    return '{';
+  } };
+  assert.equal(ctx.SM.importJSON(malicious), false);
+  assert.equal(coercions, 0, 'untrusted conversion must not run inside the import allowance');
+  assert.deepEqual({ document: JSON.stringify(ctx.state), paperCreated, paperLayers: ctx.userLayers.length,
+    metadata: ctx.NemoOpacityApplication.meta() }, before);
+  assert.equal(ctx.n20AllowLegacyWrite('create-layer'), false);
 });
