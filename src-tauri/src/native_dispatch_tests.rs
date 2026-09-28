@@ -1,5 +1,19 @@
-use super::*;
+use crate::native_dispatch::{
+    replacement, spawn_export_pump_with, NativeAuthority, NativeDispatch, NativePhase, NativeState,
+    ReleaseAdmission, ReleaseTombstone, ReplacementAdmission, ReplacementReplay, ReplacementStage,
+};
+use native_engine::{
+    commands::{OpacityRequest, ResponseEnvelope},
+    document::OpacityDocument,
+    export_job::{JobReceipt, PendingFrame},
+};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    any::Any,
+    collections::BTreeMap,
+    io,
+    sync::{Arc, Mutex},
+};
 
 pub(crate) struct TerminalPump(pub(crate) Arc<AtomicUsize>);
 
