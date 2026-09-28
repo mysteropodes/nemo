@@ -200,8 +200,10 @@ Every reviewed claim carries its evidence and is validated by shape:
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
   P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
-  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans, and
-  P03C-m/#1440 dispositioned eleven MCP contract spans; 102 spans remain undispositioned.
+  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans,
+  P03C-m/#1440 dispositioned eleven MCP contract spans, and P03C-ae/#1482 dispositioned three
+  `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
+  `engine-bridge.js` spans; 33 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -354,13 +356,25 @@ records cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and C03 ce
 `337c9035f94f5290b2adf898d406550558560bfa`; they add no packet admission, numeric range
 coverage or runtime/render/export acceptance. The engine-bridge uncovered count remains 226 and
 global computed uncovered code lines remain 7 185. The 40 previously undispositioned spans become
-37; all 762 packets remain pending and the scope remains incomplete.
+37; all 762 packets remain pending and the scope remains incomplete. P03C-af/#1484 dispositions
+the remaining frozen `src/js/engine-bridge.js` spans: `1-10`, `260`, and `4618-4628` are
+comment-only boundaries (the last immediately precedes `autoEnable` at 4629); `91-224` maps
+jointly to pending `C03.js-engine-bridge.render-entry-points` and `engine-lifecycle` for suspended
+render scheduling, `build-scene-json` and `editor-overlay-builders` for color/coordinate rounding
+and scene/overlay serialization, `bounded-image-store` for `registeredImageIds`, and
+`retained-path-store` for its rationale. This explicitly mixed span is not assigned wholesale to
+one packet. The frozen source and C03 census pins remain unchanged; all six cited packets remain
+pending, and no packet admission, computed coverage, or runtime/render acceptance is claimed.
+Engine-bridge retains 226 computed uncovered code lines but has zero undispositioned spans; global
+computed uncovered code remains 7 185. The 37 previously undispositioned spans become 33; all 762
+packets remain pending and the scope remains incomplete.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 37
+pending packets, no notes needing reconciliation, 0 unmapped paths and 33
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
-`covered`/`boundary` or one last census slice, the small remainders in the original-partition
-files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
-pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`
+`covered`/`boundary` or one last census slice, the remaining small remainders in other
+original-partition files, and `style.css`/`index.html` once Ilya decides census versus
+`boundary`; split each pending packet into ≤90-minute leaves under its family parent or mark it
+`covered`/`deferred`
 with evidence. The execution plan and leaf issues remain the queue and ownership authority;
 D01 and T05 keep their reservations. No application behavior changes in this index.
