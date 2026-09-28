@@ -13,6 +13,7 @@ const NativeOpacityContract = require('../src/js/application/native-opacity-cont
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
+const NativeProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
 const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
 const SelectCanvasIntent = require('../src/js/adapters/select-canvas-intent.js');
@@ -37,6 +38,11 @@ function bytes(file) { return fs.readFileSync(file); }
 function json(file) { return JSON.parse(bytes(file)); }
 function sha(file) { return crypto.createHash('sha256').update(bytes(file)).digest('hex'); }
 function clone(value) { return structuredClone(value); }
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
 function staticSource(value = 25) {
   const source = json(SHELL_PATH);
   source.layers[0].motionStatic = { opacity: [value] };
@@ -197,7 +203,8 @@ function nativeHarness(source, options = {}) {
     })); },
     async previewHost(request) {
       state.previews.push(request);
-      if (options.previewGate) await options.previewGate;
+      if (options.previewGate) await (typeof options.previewGate === 'function'
+        ? options.previewGate(request, state) : options.previewGate);
       const receipt = { workId: `preview-${state.previews.length}`,
         viewGeneration: state.previews.length, status: 'presented' };
       return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
@@ -244,7 +251,7 @@ function surfaceHarness(source, options = {}) {
     extensionOpen() { return !!options.extension; }, toast() {},
     publish(admission, cutover, project, handlers, resize) { publications = { admission, cutover, project, handlers, resize }; return () => {}; },
     defer(callback) { resized = callback; return 1; }, cancel() {},
-    async resize() { throw new Error('resize failed'); },
+    resize(current) { return options.resize ? options.resize(current) : Promise.reject(new Error('resize failed')); },
   };
   const h = nativeHarness(source, { ...options, surface });
   h.controller.install();
@@ -438,6 +445,104 @@ test('resize failure fences the current owner without closing or importing it', 
   assert.equal(h.controller.blocksLegacy(), true);
   assert.equal(h.state.releases, 0); assert.equal(h.state.imports.length, 0);
   assert.equal(h.state.disconnects, 0); assert.equal(h.controller.persistenceJSON(), null);
+});
+
+test('production admission ignores the previous UI frame before presenting native frame zero', async () => {
+  const source = staticSource();
+  let h;
+  h = surfaceHarness(source, { afterChange() {
+    // The desktop afterChange -> SMEngineBridge.renderNow path uses the old
+    // document's frame; 59 is outside this supported 21-frame projection.
+    h.published().cutover.renderPreview(59);
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(source));
+  assert.equal(first.status, 'presented');
+  assert.equal(first.frame, 0);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+  assert.equal(h.controller.status(), 'native');
+});
+
+for (const fails of [false, true]) {
+  test(`first-open reveal joins a delayed host resize before ${fails ? 'failure' : 'success'}`, async () => {
+    const source = staticSource(), gate = deferred();
+    const h = surfaceHarness(source, { resize: () => gate.promise });
+    const first = await h.published().project.importJSON(JSON.stringify(source));
+    let shown = 0, settled = false;
+    const root = { NemoNativeOpacityProject: h.published().project,
+      NemoNativeOpacityCutover: h.published().cutover };
+    const revealed = NativeProjectEntry.reveal(root, first, {
+      hide() { h.published().resize(); }, show() { shown++; }, repaint() {},
+      raf(callback) { callback(); },
+    }).finally(() => { settled = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, 'Open must wait for the pending host resize');
+    assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+    if (fails) {
+      gate.reject(new Error('resize failed during reveal'));
+      await assert.rejects(revealed, /resize failed during reveal/);
+      assert.equal(h.controller.status(), 'indeterminate');
+      assert.equal(shown, 1, 'failed reveal restores the start screen');
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
+    } else {
+      gate.resolve();
+      assert.equal(await revealed, true);
+      assert.equal(shown, 0);
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+      assert.equal(h.controller.status(), 'native');
+    }
+  });
+}
+
+test('first-open reveal joins an already-running resize without a duplicate presentation', async () => {
+  const source = staticSource(), gate = deferred();
+  const h = surfaceHarness(source, { resize: () => gate.promise });
+  const first = await h.published().project.importJSON(JSON.stringify(source));
+  h.published().resize();
+  const resizing = h.resizeCallback()();
+  let settled = false;
+  const root = { NemoNativeOpacityProject: h.published().project,
+    NemoNativeOpacityCutover: h.published().cutover };
+  const revealed = NativeProjectEntry.reveal(root, first, {
+    hide() {}, show() {}, repaint() {}, raf(callback) { callback(); },
+  }).finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  gate.resolve();
+  await Promise.all([resizing, revealed]);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  assert.equal(h.controller.status(), 'native');
+});
+
+test('a resize arriving during presentation is applied before the final receipt', async () => {
+  const source = staticSource(), hostGate = deferred();
+  const h = surfaceHarness(source, { resize: async () => {},
+    previewGate(_request, state) {
+      if (state.previews.length === 2) return hostGate.promise;
+    } });
+  await h.published().project.importJSON(JSON.stringify(source));
+  let settled = false;
+  const presenting = h.published().cutover.presentPreview(0).finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  h.published().resize();
+  const resizing = h.resizeCallback()();
+  hostGate.resolve();
+  await Promise.all([presenting, resizing]);
+  assert.equal(settled, true);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0]);
+  assert.equal(h.controller.status(), 'native');
+});
+
+test('a later successful viewport resize presents the latest native frame again', async () => {
+  const source = staticSource();
+  const h = surfaceHarness(source, { resize: async () => {} });
+  await h.published().project.importJSON(JSON.stringify(source));
+  h.published().cutover.renderPreview(10);
+  await h.controller.flush();
+  h.published().resize();
+  await h.resizeCallback()();
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 10, 10]);
+  assert.equal(h.controller.status(), 'native');
 });
 
 test('failed initial or direct B bootstrap cannot restore legacy or admit another bootstrap', async () => {
