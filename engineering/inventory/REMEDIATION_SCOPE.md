@@ -98,13 +98,17 @@ dispositioned the four `timeline.js` spans: 2002-2011 maps to C02 playback; 2027
 C04a transform/brush geometry; 2247 maps to the C01 team-sync facade and C21d merge-caller
 chain; 7449 is the keyboard section comment adjoining C06. The three `covered` entries record
 responsibility ownership only: they add no packet or computed-range coverage and assert no
-implementation acceptance. The 22 `motion.js` remainders
-(561-580, 1562-1566, 1571, 1578, 1712, 1719, 1724, 1743-1745, 1748-1750, 1752-1753, 1759,
-8435-8438, 8530-8553, 9429-9435, 13256-13321, 13351-13352, 13372-13394, 13455-13476,
+implementation acceptance. P03C-h/#1427 dispositioned four `motion.js` comment/blank preambles
+as `boundary`: 1562-1566 before the C02 expression helpers, 8435-8438 before the C02 time-link
+cycle helper, 9429-9435 before the C02 Elements helper, and 13256-13321 before initGridMarquee
+at 13322, whose registration is assigned to C02 and dispatches to C20q key-marquee behavior.
+The remaining 18 `motion.js` spans (561-580, 1571, 1578, 1712, 1719, 1724, 1743-1745,
+1748-1750, 1752-1753,
+1759, 8530-8553, 13351-13352, 13372-13394, 13455-13476,
 13565-13621, 13808-13825, 13854-13879, 13896-13908) are gaps between adjacent census slices —
 C20s's own boundary note names 12406-12684 and 13125+ as the two gaps it leaves unassigned;
 the refrozen coverage shows 12406-12684 fully covered by the original C02 packets, while 13125
-onward keeps the eight open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
+onward keeps the seven open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
 files carry small remainders (module headers, export blocks, trailing helpers) left by the
 original partitions. P03C-f/#1421 marks six frozen geometry-WASM module preambles as
 `boundary`: the comment/import lines before C03/#1038 packet starts at eraser.rs:10, fill.rs:34,
@@ -144,17 +148,18 @@ Every reviewed claim carries its evidence and is validated by shape:
   (measured), 14 `boundary` (scope statements, cross-checked against the spans), and 2
   `human-decision` (C03:3 unwired selection API, C08:3 `40min-checkins/`). No note remains
   `needs-reconciliation`. C08:1's original note is verbatim; its evidence now identifies the
-  59a5a38c source pin and C19 packet ranges. This is census ownership only: the timeline still
-  had 27 uncovered code lines in those four `timeline.js` spans before P03C-g mapped their
-  responsibilities; the computed 7,185 uncovered-code total is unchanged. P03C-c reconciled
+  59a5a38c source pin and C19 packet ranges. P03C-g mapped the four `timeline.js` spans without
+  changing its 27 uncovered code lines. P03C-h marks four `motion.js` comment/blank preambles as
+  boundaries without changing its 293 uncovered code lines; computed uncovered-code totals are
+  unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
-  evidence. P03C-f/#1421 dispositioned six preambles and P03C-g/#1424 dispositioned four
-  timeline spans (three responsibility mappings and one comment boundary); 141 spans remain
-  undispositioned.
+  evidence. P03C-f/#1421 dispositioned six preambles, P03C-g/#1424 dispositioned four timeline
+  spans (three responsibility mappings and one comment boundary), and P03C-h/#1427 dispositioned
+  four Motion comment/blank preambles; 137 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -189,11 +194,12 @@ P03C-d/#1401 reconciled C08:1 to the C19 census evidence without changing the fr
 packet admissions, or implementation state. P03C-f/#1421 records six geometry-WASM preamble
 boundaries against C03/#1038's exact packet start lines. P03C-g/#1424 maps three timeline
 responsibilities to existing C02/C04a/C01/C21d evidence and marks the adjacent keyboard header
-as a boundary. Neither leaf changes the frozen source, packet admissions or computed range
-coverage. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 141 undispositioned
-spans; the computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the residual spans — the `motion.js` orphans between adjacent slices as
+as a boundary. P03C-h/#1427 marks four comment/blank Motion preambles as boundaries against
+existing C02/C20 evidence. These leaves do not change the frozen source, packet admissions or
+computed range coverage. **P03 is not complete and no extraction is admitted**: the gate still
+exits 1 with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 137
+undispositioned spans; the computed range report still has 7 185 uncovered code lines.
+What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
 pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`
