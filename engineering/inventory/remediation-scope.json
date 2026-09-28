@@ -5985,6 +5985,72 @@
           634,
           635
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            11,
+            19
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 11 and 18 declare currentPath/currentName and tabs/activeTabId respectively. C01.project.document-io-and-dirty-tracking (#1036) names and owns the current-path/name closure state; C01.project.project-tabs (#1036) owns the tabs and activeTabId closure state. Both packets remain pending; this adds no numeric range coverage, packet admission, implementation acceptance or product-behavior claim."
+        },
+        {
+          "span": [
+            21,
+            24
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 21-24 are comment-only browser-autosave explanation immediately before autosaveWrite begins at 25, within pending C01.project.document-io-and-dirty-tracking (#1036). This preamble has no separate executable responsibility."
+        },
+        {
+          "span": [
+            51,
+            53
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 51-53 are blank/comment-only New / Open / Save section lead-in; newProject begins at 54 in pending C01.project.document-io-and-dirty-tracking (#1036). No executable responsibility begins within this span."
+        },
+        {
+          "span": [
+            220,
+            227
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 220-227 are comment-only version-history lead-in; HISTORY_MAX begins at 228 in pending C01.project.version-history (#1036). The comments add no separate executable responsibility."
+        },
+        {
+          "span": [
+            311,
+            321
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 311-321 are comment-only team-sync section lead-in; SYNC_MAX_PER_PROFILE begins at 322 in pending C01.project.team-sync (#1036). This boundary records adjacency only, not team-sync implementation acceptance."
+        },
+        {
+          "span": [
+            412,
+            432
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 421-425 define the read-only getOpenTabs API named by pending C01.project.document-io-and-dirty-tracking (#1036). Lines 427-432 are comment-only lead-in to initCloseGuard at 433, outside this span and assigned to the separate pending C01.project.close-unsaved-work-guard packet. The span does not claim executable close-guard code, numeric range coverage, packet admission or implementation acceptance."
+        },
+        {
+          "span": [
+            486,
+            497
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 486-497 are blank/comment-only project-tabs section lead-in; makeTabId begins at 498 in pending C01.project.project-tabs (#1036). This preamble has no separate executable responsibility."
+        },
+        {
+          "span": [
+            634,
+            635
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 634-635 are a blank line and the comment-only Start screen section header; hideStartScreen begins at 636 in pending C01.project.start-screen (#1036). No executable responsibility starts in this span."
+        }
       ]
     },
     {
