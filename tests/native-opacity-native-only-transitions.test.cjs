@@ -211,7 +211,7 @@ function nativeHarness(source, options = {}) {
       return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
     },
     async bindOutput(request) { state.outputs.push(request); },
-    currentFrame() { return 10; },
+    currentFrame() { return options.ui ? options.ui.state.currentFrame : 10; },
     afterChange() {
       state.afterChanges = (state.afterChanges || 0) + 1;
       if (options.afterChange) options.afterChange(controller, state);
@@ -258,7 +258,7 @@ function surfaceHarness(source, options = {}) {
     defer(callback) { resized = callback; return 1; }, cancel() {},
     resize(current) { return options.resize ? options.resize(current) : Promise.reject(new Error('resize failed')); },
   };
-  const h = nativeHarness(source, { ...options, surface });
+  const h = nativeHarness(source, { ...options, ui, surface });
   h.controller.install();
   return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
@@ -477,6 +477,16 @@ for (const [mode, makeSource, frameZeroOpacity] of [
       assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
       assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [frameZeroOpacity]);
       assert.equal(typeof h.controller.persistenceJSON(), 'string', 'native snapshot remains readable');
+      const snapshot = h.controller.handleV1({ apiVersion: 1, requestId: `frame-zero-${mode}-${previousFrame}`,
+        operation: 'snapshot', payload: { frame: null } });
+      assert.equal(snapshot.ok, true);
+      assert.equal(snapshot.result.frame, 0);
+      assert.equal(snapshot.result.totalFrames, 21);
+      assert.equal(snapshot.result.layers[0].opacity, frameZeroOpacity);
+      const property = h.controller.handleV1({ apiVersion: 1, requestId: `opacity-zero-${mode}-${previousFrame}`,
+        operation: 'property.get', payload: { layerId: 'r08_curve_layer', property: 'opacity', frame: null } });
+      assert.equal(property.ok, true);
+      assert.equal(property.result.value, frameZeroOpacity);
       const root = { NemoNativeOpacityProject: h.published().project,
         NemoNativeOpacityCutover: h.published().cutover };
       assert.equal(await NativeProjectEntry.reveal(root, first, {
