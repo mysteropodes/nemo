@@ -255,9 +255,14 @@ lines are unchanged. P03C-o/#1446 dispositioned ten frozen `engine-bridge.js` im
 eight responsibility mappings to pending C03 image-store, scene-build and public-API packets, and
 comment-only boundaries at 640-643 and 2621. Accepted P26/#1028 PR #1168 provides narrower
 image-budget policy provenance, not C03 completion or runtime/pixel acceptance. The 226 Engine
-Bridge and global 7 185 computed uncovered code lines are unchanged. **P03 is not complete and no
-extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes needing
-reconciliation, 0 unmapped paths and 80
+Bridge and global 7 185 computed uncovered code lines are unchanged. P03C-p/#1448 maps six frozen
+`nemo-mcp/src/server.rs` spans to the pending C07 tool-router responsibility. C07's census pins
+`server.rs:1-177` at source `ded641bd763379f36d629bf1686fcce8a6137a66`; the exact source diff maps its
+command-validation lines 169-170 to frozen 179-180. P07/#1009 PR #1113 is cited narrowly for
+registered-capability discovery provenance, not whole-packet or runtime/protocol acceptance.
+The server.rs 18 and global 7 185 computed uncovered code lines remain unchanged. **P03 is not
+complete and no extraction is admitted**: the gate still exits 1 with 762 pending packets, no notes
+needing reconciliation, 0 unmapped paths and 74
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
