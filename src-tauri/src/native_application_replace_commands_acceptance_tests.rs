@@ -31,6 +31,9 @@ use tokio::{
 
 use crate::native_application_commands::replace_replay::replay_result;
 
+#[path = "native_application_replace_viewport_tests.rs"]
+mod viewport_tests;
+
 #[test]
 fn response_loss_identical_a_to_b_retry_replays_completed_receipt() {
     let (_scratch, native, old_document, prepared) = setup();

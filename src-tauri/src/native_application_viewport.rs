@@ -33,6 +33,41 @@ thread_local! {
     static MAIN_VIEWPORT: RefCell<Option<RetainedViewport>> = const { RefCell::new(None) };
 }
 
+#[cfg(test)]
+pub(crate) trait TestViewportDriver {
+    fn present(
+        &mut self,
+        compositor: &Compositor,
+        result: &CompositionResult,
+        identity: ScheduledFrameIdentity,
+    ) -> HostResult<Presentation>;
+    fn reconcile_replaced(&mut self, work_ids: &[WorkId]) -> Vec<WorkId>;
+}
+
+#[cfg(test)]
+struct RetainedTestViewport {
+    instance_id: String,
+    viewport: Box<dyn TestViewportDriver>,
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_VIEWPORT: RefCell<Option<RetainedTestViewport>> = const { RefCell::new(None) };
+}
+
+#[cfg(test)]
+pub(crate) fn install_test_viewport(instance_id: String, viewport: Box<dyn TestViewportDriver>) {
+    TEST_VIEWPORT.with(|slot| {
+        assert!(slot.borrow().is_none());
+        *slot.borrow_mut() = Some(RetainedTestViewport { instance_id, viewport });
+    });
+}
+
+#[cfg(test)]
+pub(crate) fn remove_test_viewport() {
+    TEST_VIEWPORT.with(|slot| { slot.borrow_mut().take(); });
+}
+
 pub(crate) async fn on_main_thread<T: Send + 'static>(
     app: &tauri::AppHandle,
     operation: impl FnOnce() -> HostResult<T> + Send + 'static,
@@ -253,6 +288,13 @@ pub(crate) fn remove(instance_id: &str) -> HostResult<()> {
 }
 
 pub(crate) fn require_instance_or_absent(instance_id: &str) -> HostResult<()> {
+    #[cfg(test)]
+    if let Some(result) = TEST_VIEWPORT.with(|slot| {
+        slot.borrow().as_ref().map(|value| {
+            if value.instance_id == instance_id { Ok(()) }
+            else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
+        })
+    }) { return result; }
     MAIN_VIEWPORT.with(|slot| match slot.borrow().as_ref() {
         Some(value) if value.instance_id != instance_id => Err(host_error(
             "wrong_instance",
@@ -266,6 +308,13 @@ pub(crate) fn reconcile_replaced(
     instance_id: &str,
     work_ids: &[WorkId],
 ) -> HostResult<Vec<WorkId>> {
+    #[cfg(test)]
+    if let Some(result) = TEST_VIEWPORT.with(|slot| {
+        slot.borrow_mut().as_mut().map(|value| {
+            if value.instance_id == instance_id { Ok(value.viewport.reconcile_replaced(work_ids)) }
+            else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
+        })
+    }) { return result; }
     MAIN_VIEWPORT.with(|slot| {
         let mut slot = slot.borrow_mut();
         match slot.as_mut() {
@@ -287,6 +336,14 @@ pub(crate) fn present(
     result: &CompositionResult,
     identity: ScheduledFrameIdentity,
 ) -> HostResult<Presentation> {
+    #[cfg(test)]
+    if let Some(result) = TEST_VIEWPORT.with(|slot| {
+        slot.borrow_mut().as_mut().map(|value| {
+            if value.instance_id == instance_id {
+                value.viewport.present(compositor, result, identity.clone())
+            } else { Err(host_error("wrong_instance", "native viewport instance mismatch")) }
+        })
+    }) { return result; }
     with_viewport(instance_id, |viewport| {
         viewport.register(identity.clone()).map_err(|error| {
             host_error("internal", format!("register native preview: {error:?}"))
