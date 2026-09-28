@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "0220f48e7d9bed2195a2d923dcea62aa5db40b6e",
-    "sourceRootTree": "fda2d0b214b6986b119f0e6d7765049be824500b",
+    "candidateCommit": "df6cdeef3389d321d01eab7cd46830fab8e59589",
+    "sourceRootTree": "0c6b995cc000e7bb2c0521f97562dab7fbd07364",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "08dcb8ee1507c98e34a7819ed449b797dfd27421",
-      "lastChangedCommit": "c302c9ac0dcbb23f23bc39ec82d59262322be7b5"
+      "gitTree": "33bb235ff679a941a93eb7b8118a99be1c87e67f",
+      "lastChangedCommit": "df6cdeef3389d321d01eab7cd46830fab8e59589"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "13904aea1d6715ebf1bc59d33eefe64b7d8464b204b5478014cf36724002ee7f"
+      "value": "36eb004fb31e67e0b5e55ee7aeefa15e448bc47c70b0f152699b550847c8b1fc"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "ce1401380c9dfbcfe64cc3c323d28116560802a3",
-        "sha256": "0c1eaff52f43d37084dd22f3a31e0ea7bb118dd283b198a1347f37fe53e90c59",
-        "moduleCount": 180,
-        "basedOnCommit": "887a40507eeaed023210309a11baee1820658d68"
+        "gitBlob": "3beb55cf2efa412c8f63a96a6c51c350e8abfb65",
+        "sha256": "3bc5a81dc0d7d2141690625cec2a29b18a9a934e7a42b5839c5a98caca6d4e67",
+        "moduleCount": 181,
+        "basedOnCommit": "6d8560342873481e4f74069c6b96116d97bac370"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -204,6 +204,485 @@
       "activation": "dependency evaluation of imported ag-psd bundle"
     }
   ],
+  "exclusions": [
+    {
+      "path": "src/js/ag-psd.vendor.mjs",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "f25b6a64352a1f556440f030feada980e3075aca",
+        "sha256": "62b9689c83a3f70480a9c52c9ccf68f13339c2a3f841f1c86b0449cfca031c9b",
+        "lastChangedCommit": "46fab90c180f42df73843a9204b479454691de5e",
+        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
+      },
+      "component": "ag-psd 31.0.2 (esm.sh bundle)",
+      "reason": "Vendored PSD parser bundle, not handwritten application code. The Buffer import was patched to a local shim and a dangling source-map comment was later removed. No blanket exemption for .mjs or upstream byte equality is asserted.",
+      "evidence": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 1,
+          "role": "package/version header"
+        },
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2,
+          "role": "patched local import"
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/psd-import-bridge.js",
+          "line": 30
+        }
+      ],
+      "activation": "Dynamic import prewarmed by loadModule() at psd-import-bridge.js:36 during classic startup; reused for PSD requests."
+    },
+    {
+      "path": "src/js/delaunator.vendor.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "5579d52527bce6460f791aae91fec515c52546d9",
+        "sha256": "51d9b219877ce99908ba5e2bf4b7429932419d5ce3f00c26d2a011e582be73be",
+        "lastChangedCommit": "1ef0290a03e552de31b6303290a23640fd5a27a8"
+      },
+      "component": "Delaunator 5.0.1 including bundled robust-predicates 3.0.2",
+      "reason": "Vendored UMD triangulation bundle identified by the header and notices; upstream bundle code is outside handwritten application budgets. The local attribution header is retained.",
+      "evidence": [
+        {
+          "path": "src/js/delaunator.vendor.js",
+          "line": 2
+        },
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 22
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2465,
+          "scriptOrdinal": 122
+        }
+      ]
+    },
+    {
+      "path": "src/js/mp4box.all.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "7e31a44b6235c4f80c3a42512291eb5a81c3e784",
+        "sha256": "3d6bc70a484291d1474fde834205f84336a52b6aa1e63b1c4b6423f71d19dd80",
+        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
+      },
+      "component": "MP4Box.js 0.5.2",
+      "reason": "Vendored minified MP4/MOV demuxer identified by its local attribution header; excluded on third-party provenance regardless of lexical parse support.",
+      "evidence": [
+        {
+          "path": "src/js/mp4box.all.min.js",
+          "line": 2
+        },
+        {
+          "path": "src/js/mp4box.all.min.js",
+          "line": 5
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2439,
+          "scriptOrdinal": 99
+        }
+      ]
+    },
+    {
+      "path": "src/js/node-buffer-shim.vendor.mjs",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "860121fd97c37e806e3004260e0daa98faf3a894",
+        "sha256": "64fb61aa5f48644d685f9ceabedba60ea6b5d6ce03dac1943e863d00d9e574f3",
+        "lastChangedCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0",
+        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
+      },
+      "component": "Bundled unenv browser Buffer shim; upstream version not recorded in this file",
+      "reason": "Vendored Buffer polyfill imported by ag-psd. The introduction commit records the bundle origin, and the file carries unenv/ieee754/buffer attribution. No unrecorded upstream version or upstream byte equality is asserted.",
+      "evidence": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2
+        },
+        {
+          "path": "src/js/node-buffer-shim.vendor.mjs",
+          "line": 2,
+          "role": "bundled license information"
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/ag-psd.vendor.mjs",
+          "line": 2
+        }
+      ],
+      "activation": "Static ESM dependency of the dynamically imported, prewarmed ag-psd bundle."
+    },
+    {
+      "path": "src/js/opentype.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "5dbd60aac7ea3015fa16d8018101b68f1c77fa6d",
+        "sha256": "1f6cce0f0185f553121f116d2d0df3e1768934a725c0abf0700ef9419af5e031",
+        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
+      },
+      "component": "opentype.js; no version inferred",
+      "reason": "Vendored minified font parser identified by its local attribution header and notices, outside handwritten application budgets.",
+      "evidence": [
+        {
+          "path": "src/js/opentype.min.js",
+          "line": 2
+        },
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 20
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2325,
+          "scriptOrdinal": 21
+        }
+      ]
+    },
+    {
+      "path": "src/paper-full.min.js",
+      "category": "vendor",
+      "provenance": {
+        "gitBlob": "11a760c45796d402a191f1a9cf8c650130699fcb",
+        "sha256": "13526b252be3856db63b096ca282270454a3bb4567943e137875d9ced54ce9ba",
+        "lastChangedCommit": "1ceff28c082582d4864e4a40adf3f0218f613e2a"
+      },
+      "component": "Paper.js minified build",
+      "reason": "Vendored minified Paper.js runtime identified by the repository notices. It is outside src/js but inside the selected src root, requiring this explicit exclusion.",
+      "evidence": [
+        {
+          "path": "THIRD_PARTY_NOTICES.md",
+          "line": 19
+        }
+      ],
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 10,
+          "scriptOrdinal": 2
+        }
+      ]
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "bdba3f6316bef758e5cbfdfdf33dc76aca2b610a",
+        "sha256": "f9d82247bcb1244b69bad8dcc6e8ac66cf89ecaea98196aaa04ec789ca85015e",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm-vectorize/vectorize_wasm.js"
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm.js",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "55731085adcef264dffe00831e0a2a6a677382b8",
+        "sha256": "26fa557b6acbc54f2f3428aeffead49cdffc31604292f4d32ccb65b0019584b7",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm.js",
+          "line": 1
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "dedicated-worker",
+      "loadSites": [
+        {
+          "path": "src/js/vectorize-worker.js",
+          "line": 18
+        }
+      ],
+      "activation": "Dynamic import on module worker startup; computed ?v= token does not change repository identity."
+    },
+    {
+      "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "dc7defdc4820e2513d3ecd4f78c83bdbf559c1c3",
+        "sha256": "863a11c0a343bf3a271a3999f4b11e4417623c7dc6657e2425d17382b3c51c16",
+        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
+        "crateManifest": "vectorize-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "vectorize-wasm/src",
+          "vectorize-core/src"
+        ],
+        "documentedBuild": {
+          "directory": "vectorize-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm-vectorize"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 24
+        },
+        {
+          "path": "src/wasm-vectorize/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm-vectorize/vectorize_wasm_bg.wasm"
+    },
+    {
+      "path": "src/wasm/geometry_wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "54c5d49890672ee40ee088671282a25fac39a31e",
+        "sha256": "57d12763a2f0e0141baa97b9f456a19a29b93c02a2628c69956a7cbe848382d4",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm/geometry_wasm.js"
+    },
+    {
+      "path": "src/wasm/geometry_wasm.js",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "7c52450ebf4cfccc5061430589b31a639ca35991",
+        "sha256": "3ac8f3b4df2cf8ab52c4abcb16591660b72cc19c77f3323046833b8d0309c2bf",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm.js",
+          "line": 1
+        }
+      ],
+      "executionClass": "imported-module",
+      "context": "window",
+      "loadSites": [
+        {
+          "path": "src/js/geometry-wasm-loader.js",
+          "line": 23
+        }
+      ],
+      "activation": "Dynamic import on document module evaluation; computed ?v= token does not change repository identity."
+    },
+    {
+      "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
+      "category": "generated",
+      "provenance": {
+        "gitBlob": "515ca538d29e43fa9b677ab73fb948c0df71e300",
+        "sha256": "b6f256fcee16108988ad2fc6754d406538b8aad77cabe221eeaecf9668efc3c9",
+        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
+        "crateManifest": "geometry-wasm/Cargo.toml",
+        "sourceDirectories": [
+          "geometry-wasm/src"
+        ],
+        "documentedBuild": {
+          "directory": "geometry-wasm",
+          "argv": [
+            "wasm-pack",
+            "build",
+            "--target",
+            "web",
+            "--out-dir",
+            "../src/wasm"
+          ]
+        },
+        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
+      },
+      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
+      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
+      "evidence": [
+        {
+          "path": ".gitignore",
+          "line": 16
+        },
+        {
+          "path": "src/wasm/package.json",
+          "line": 1
+        },
+        {
+          "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
+          "line": 1
+        }
+      ],
+      "executionClass": "type-declaration",
+      "loadSites": [],
+      "describes": "src/wasm/geometry_wasm_bg.wasm"
+    }
+  ],
+  "integration": {
+    "coverageHelper": {
+      "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",
+      "path": "scripts/nemo/lib/boundaries-coverage.cjs",
+      "export": "checkSourceCoverage",
+      "sourcePaths": "Independently rediscover all selected committed candidate paths from scope, including exclusions. Never seed discovery from retainedSources, a profile or a baseline.",
+      "exclusions": "Project policy.exclusions to an exact string[] of record.path values.",
+      "options": "Only root, sourcePaths and exclusions are helper options. Validate policy version, provenance and execution metadata outside the helper."
+    },
+    "scriptOrderHelper": "Use pinned HTML bytes and actual tag attributes. retainedSources[].loadSites records scriptOrdinal only for actual document entries. Worker/import edges and additional Node test contexts are separate from document parser order.",
+    "requiredChecks": [
+      "Fresh committed inventory equals the disjoint union of retainedSources paths and exact exclusions, each occurring once. Reject new, missing, aliased or duplicate sources.",
+      "Retained paths and module IDs equal reviewed profile membership exactly.",
+      "Every exclusion exists as a selected regular source and retains justified provenance; verify artifact hashes and review changes.",
+      "Reconcile source/index/profile provenance and loader evidence on the actual integration candidate; snapshot counts do not replace fresh discovery."
+    ],
+    "openGates": [
+      "Reviewed architecture layers/APIs and complete global provider/consumer boundaries.",
+      "Parsed bootstrap-order evidence and runtime readiness remain separate from source coverage and size enforcement."
+    ]
+  },
   "retainedSources": [
     {
       "path": "src/js/abr-import.js",
@@ -2467,485 +2946,13 @@
           "scriptOrdinal": 144
         }
       ]
+    },
+    {
+      "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
+      "moduleId": "app.opacity.reproduction.bundle.domain",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "activation": "T07: no production load site at this head; required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs. T10 adds its production load site."
     }
-  ],
-  "exclusions": [
-    {
-      "path": "src/js/ag-psd.vendor.mjs",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "f25b6a64352a1f556440f030feada980e3075aca",
-        "sha256": "62b9689c83a3f70480a9c52c9ccf68f13339c2a3f841f1c86b0449cfca031c9b",
-        "lastChangedCommit": "46fab90c180f42df73843a9204b479454691de5e",
-        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
-      },
-      "component": "ag-psd 31.0.2 (esm.sh bundle)",
-      "reason": "Vendored PSD parser bundle, not handwritten application code. The Buffer import was patched to a local shim and a dangling source-map comment was later removed. No blanket exemption for .mjs or upstream byte equality is asserted.",
-      "evidence": [
-        {
-          "path": "src/js/ag-psd.vendor.mjs",
-          "line": 1,
-          "role": "package/version header"
-        },
-        {
-          "path": "src/js/ag-psd.vendor.mjs",
-          "line": 2,
-          "role": "patched local import"
-        }
-      ],
-      "executionClass": "imported-module",
-      "context": "window",
-      "loadSites": [
-        {
-          "path": "src/js/psd-import-bridge.js",
-          "line": 30
-        }
-      ],
-      "activation": "Dynamic import prewarmed by loadModule() at psd-import-bridge.js:36 during classic startup; reused for PSD requests."
-    },
-    {
-      "path": "src/js/delaunator.vendor.js",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "5579d52527bce6460f791aae91fec515c52546d9",
-        "sha256": "51d9b219877ce99908ba5e2bf4b7429932419d5ce3f00c26d2a011e582be73be",
-        "lastChangedCommit": "1ef0290a03e552de31b6303290a23640fd5a27a8"
-      },
-      "component": "Delaunator 5.0.1 including bundled robust-predicates 3.0.2",
-      "reason": "Vendored UMD triangulation bundle identified by the header and notices; upstream bundle code is outside handwritten application budgets. The local attribution header is retained.",
-      "evidence": [
-        {
-          "path": "src/js/delaunator.vendor.js",
-          "line": 2
-        },
-        {
-          "path": "THIRD_PARTY_NOTICES.md",
-          "line": 22
-        }
-      ],
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2465,
-          "scriptOrdinal": 122
-        }
-      ]
-    },
-    {
-      "path": "src/js/mp4box.all.min.js",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "7e31a44b6235c4f80c3a42512291eb5a81c3e784",
-        "sha256": "3d6bc70a484291d1474fde834205f84336a52b6aa1e63b1c4b6423f71d19dd80",
-        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
-      },
-      "component": "MP4Box.js 0.5.2",
-      "reason": "Vendored minified MP4/MOV demuxer identified by its local attribution header; excluded on third-party provenance regardless of lexical parse support.",
-      "evidence": [
-        {
-          "path": "src/js/mp4box.all.min.js",
-          "line": 2
-        },
-        {
-          "path": "src/js/mp4box.all.min.js",
-          "line": 5
-        }
-      ],
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2439,
-          "scriptOrdinal": 99
-        }
-      ]
-    },
-    {
-      "path": "src/js/node-buffer-shim.vendor.mjs",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "860121fd97c37e806e3004260e0daa98faf3a894",
-        "sha256": "64fb61aa5f48644d685f9ceabedba60ea6b5d6ce03dac1943e863d00d9e574f3",
-        "lastChangedCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0",
-        "importCommit": "c5365806a8bbd4705b547c21d5e8127c939a9ed0"
-      },
-      "component": "Bundled unenv browser Buffer shim; upstream version not recorded in this file",
-      "reason": "Vendored Buffer polyfill imported by ag-psd. The introduction commit records the bundle origin, and the file carries unenv/ieee754/buffer attribution. No unrecorded upstream version or upstream byte equality is asserted.",
-      "evidence": [
-        {
-          "path": "src/js/ag-psd.vendor.mjs",
-          "line": 2
-        },
-        {
-          "path": "src/js/node-buffer-shim.vendor.mjs",
-          "line": 2,
-          "role": "bundled license information"
-        }
-      ],
-      "executionClass": "imported-module",
-      "context": "window",
-      "loadSites": [
-        {
-          "path": "src/js/ag-psd.vendor.mjs",
-          "line": 2
-        }
-      ],
-      "activation": "Static ESM dependency of the dynamically imported, prewarmed ag-psd bundle."
-    },
-    {
-      "path": "src/js/opentype.min.js",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "5dbd60aac7ea3015fa16d8018101b68f1c77fa6d",
-        "sha256": "1f6cce0f0185f553121f116d2d0df3e1768934a725c0abf0700ef9419af5e031",
-        "lastChangedCommit": "dc2e2b3923abd53248843dfd07702355a2c70ff4"
-      },
-      "component": "opentype.js; no version inferred",
-      "reason": "Vendored minified font parser identified by its local attribution header and notices, outside handwritten application budgets.",
-      "evidence": [
-        {
-          "path": "src/js/opentype.min.js",
-          "line": 2
-        },
-        {
-          "path": "THIRD_PARTY_NOTICES.md",
-          "line": 20
-        }
-      ],
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2325,
-          "scriptOrdinal": 21
-        }
-      ]
-    },
-    {
-      "path": "src/paper-full.min.js",
-      "category": "vendor",
-      "provenance": {
-        "gitBlob": "11a760c45796d402a191f1a9cf8c650130699fcb",
-        "sha256": "13526b252be3856db63b096ca282270454a3bb4567943e137875d9ced54ce9ba",
-        "lastChangedCommit": "1ceff28c082582d4864e4a40adf3f0218f613e2a"
-      },
-      "component": "Paper.js minified build",
-      "reason": "Vendored minified Paper.js runtime identified by the repository notices. It is outside src/js but inside the selected src root, requiring this explicit exclusion.",
-      "evidence": [
-        {
-          "path": "THIRD_PARTY_NOTICES.md",
-          "line": 19
-        }
-      ],
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 10,
-          "scriptOrdinal": 2
-        }
-      ]
-    },
-    {
-      "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "bdba3f6316bef758e5cbfdfdf33dc76aca2b610a",
-        "sha256": "f9d82247bcb1244b69bad8dcc6e8ac66cf89ecaea98196aaa04ec789ca85015e",
-        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
-        "crateManifest": "vectorize-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "vectorize-wasm/src",
-          "vectorize-core/src"
-        ],
-        "documentedBuild": {
-          "directory": "vectorize-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm-vectorize"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 24
-        },
-        {
-          "path": "src/wasm-vectorize/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm-vectorize/vectorize_wasm.d.ts",
-          "line": 1
-        }
-      ],
-      "executionClass": "type-declaration",
-      "loadSites": [],
-      "describes": "src/wasm-vectorize/vectorize_wasm.js"
-    },
-    {
-      "path": "src/wasm-vectorize/vectorize_wasm.js",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "55731085adcef264dffe00831e0a2a6a677382b8",
-        "sha256": "26fa557b6acbc54f2f3428aeffead49cdffc31604292f4d32ccb65b0019584b7",
-        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
-        "crateManifest": "vectorize-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "vectorize-wasm/src",
-          "vectorize-core/src"
-        ],
-        "documentedBuild": {
-          "directory": "vectorize-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm-vectorize"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 24
-        },
-        {
-          "path": "src/wasm-vectorize/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm-vectorize/vectorize_wasm.js",
-          "line": 1
-        }
-      ],
-      "executionClass": "imported-module",
-      "context": "dedicated-worker",
-      "loadSites": [
-        {
-          "path": "src/js/vectorize-worker.js",
-          "line": 18
-        }
-      ],
-      "activation": "Dynamic import on module worker startup; computed ?v= token does not change repository identity."
-    },
-    {
-      "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "dc7defdc4820e2513d3ecd4f78c83bdbf559c1c3",
-        "sha256": "863a11c0a343bf3a271a3999f4b11e4417623c7dc6657e2425d17382b3c51c16",
-        "lastChangedCommit": "5950e23f7039bfd02cb31ec356ba5a1381250f63",
-        "crateManifest": "vectorize-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "vectorize-wasm/src",
-          "vectorize-core/src"
-        ],
-        "documentedBuild": {
-          "directory": "vectorize-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm-vectorize"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "vectorize-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 24
-        },
-        {
-          "path": "src/wasm-vectorize/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm-vectorize/vectorize_wasm_bg.wasm.d.ts",
-          "line": 1
-        }
-      ],
-      "executionClass": "type-declaration",
-      "loadSites": [],
-      "describes": "src/wasm-vectorize/vectorize_wasm_bg.wasm"
-    },
-    {
-      "path": "src/wasm/geometry_wasm.d.ts",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "54c5d49890672ee40ee088671282a25fac39a31e",
-        "sha256": "57d12763a2f0e0141baa97b9f456a19a29b93c02a2628c69956a7cbe848382d4",
-        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
-        "crateManifest": "geometry-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "geometry-wasm/src"
-        ],
-        "documentedBuild": {
-          "directory": "geometry-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 16
-        },
-        {
-          "path": "src/wasm/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm/geometry_wasm.d.ts",
-          "line": 1
-        }
-      ],
-      "executionClass": "type-declaration",
-      "loadSites": [],
-      "describes": "src/wasm/geometry_wasm.js"
-    },
-    {
-      "path": "src/wasm/geometry_wasm.js",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "7c52450ebf4cfccc5061430589b31a639ca35991",
-        "sha256": "3ac8f3b4df2cf8ab52c4abcb16591660b72cc19c77f3323046833b8d0309c2bf",
-        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
-        "crateManifest": "geometry-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "geometry-wasm/src"
-        ],
-        "documentedBuild": {
-          "directory": "geometry-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated ES module glue for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 16
-        },
-        {
-          "path": "src/wasm/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm/geometry_wasm.js",
-          "line": 1
-        }
-      ],
-      "executionClass": "imported-module",
-      "context": "window",
-      "loadSites": [
-        {
-          "path": "src/js/geometry-wasm-loader.js",
-          "line": 23
-        }
-      ],
-      "activation": "Dynamic import on document module evaluation; computed ?v= token does not change repository identity."
-    },
-    {
-      "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
-      "category": "generated",
-      "provenance": {
-        "gitBlob": "515ca538d29e43fa9b677ab73fb948c0df71e300",
-        "sha256": "b6f256fcee16108988ad2fc6754d406538b8aad77cabe221eeaecf9668efc3c9",
-        "lastChangedCommit": "19743ef8954e6211f2577de5debe0803ee08de21",
-        "crateManifest": "geometry-wasm/Cargo.toml",
-        "sourceDirectories": [
-          "geometry-wasm/src"
-        ],
-        "documentedBuild": {
-          "directory": "geometry-wasm",
-          "argv": [
-            "wasm-pack",
-            "build",
-            "--target",
-            "web",
-            "--out-dir",
-            "../src/wasm"
-          ]
-        },
-        "rebuildVerification": "not-run; hashes pin committed outputs, not reproducible-build or Rust-to-WASM freshness acceptance"
-      },
-      "component": "geometry-wasm wasm-pack / wasm-bindgen output",
-      "reason": "Generated TypeScript declaration (non-executable) for the Rust WASM crate. The committed build-output policy and package metadata identify the artifact; regenerate with its crate instead of applying handwritten application budgets.",
-      "evidence": [
-        {
-          "path": ".gitignore",
-          "line": 16
-        },
-        {
-          "path": "src/wasm/package.json",
-          "line": 1
-        },
-        {
-          "path": "src/wasm/geometry_wasm_bg.wasm.d.ts",
-          "line": 1
-        }
-      ],
-      "executionClass": "type-declaration",
-      "loadSites": [],
-      "describes": "src/wasm/geometry_wasm_bg.wasm"
-    }
-  ],
-  "integration": {
-    "coverageHelper": {
-      "candidateCommit": "aacc6adf69f5250e83e0ee8b491ecb06f4da37a1",
-      "path": "scripts/nemo/lib/boundaries-coverage.cjs",
-      "export": "checkSourceCoverage",
-      "sourcePaths": "Independently rediscover all selected committed candidate paths from scope, including exclusions. Never seed discovery from retainedSources, a profile or a baseline.",
-      "exclusions": "Project policy.exclusions to an exact string[] of record.path values.",
-      "options": "Only root, sourcePaths and exclusions are helper options. Validate policy version, provenance and execution metadata outside the helper."
-    },
-    "scriptOrderHelper": "Use pinned HTML bytes and actual tag attributes. retainedSources[].loadSites records scriptOrdinal only for actual document entries. Worker/import edges and additional Node test contexts are separate from document parser order.",
-    "requiredChecks": [
-      "Fresh committed inventory equals the disjoint union of retainedSources paths and exact exclusions, each occurring once. Reject new, missing, aliased or duplicate sources.",
-      "Retained paths and module IDs equal reviewed profile membership exactly.",
-      "Every exclusion exists as a selected regular source and retains justified provenance; verify artifact hashes and review changes.",
-      "Reconcile source/index/profile provenance and loader evidence on the actual integration candidate; snapshot counts do not replace fresh discovery."
-    ],
-    "openGates": [
-      "Reviewed architecture layers/APIs and complete global provider/consumer boundaries.",
-      "Parsed bootstrap-order evidence and runtime readiness remain separate from source coverage and size enforcement."
-    ]
-  }
+  ]
 }
