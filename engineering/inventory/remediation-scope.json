@@ -5317,7 +5317,7 @@
             255
           ],
           "kind": "covered",
-          "evidence": "Responsibility mapping only: frozen lines 226-255 define the comment and property_payload_example_with helper that selects a registered capability fixture/example for the operation template. C07.mcp-contract.request-response-types (#1042) owns the broader pending human-readable payload-template contract; its responsibility mapping does not imply this helper was separately named in the older census. No numeric coverage, packet admission or acceptance is added."
+          "evidence": "Responsibility mapping only: frozen lines 226-255 contain the comment and partial body of property_payload_example_with, through the object.insert at 255 that adds the registered capability id. The selected-example return at 257 and helper closing brace at 258 are outside this span. C07.mcp-contract.request-response-types (#1042) owns the broader pending human-readable payload-template contract; this does not imply the helper was separately named in the older census. No numeric coverage, packet admission or acceptance is added."
         },
         {
           "span": [
@@ -5349,7 +5349,7 @@
             282
           ],
           "kind": "covered",
-          "evidence": "Responsibility mapping only: frozen line 282 defines command_payload_schema, named by pending C07.mcp-contract.request-response-types (#1042) as a schema-generation hook. This adds no numeric source coverage, packet admission or implementation acceptance."
+          "evidence": "Responsibility mapping only: frozen line 282 is the body call from command_payload_schema to capability_contract::payload_schema with WRITE_OPERATIONS; the function declaration is at line 281, outside this singleton span. C07.mcp-contract.request-response-types (#1042) names command_payload_schema as a schema-generation hook and retains that broader responsibility pending. This adds no numeric source coverage, packet admission or implementation acceptance."
         },
         {
           "span": [
@@ -5357,7 +5357,7 @@
             286
           ],
           "kind": "covered",
-          "evidence": "Responsibility mapping only: frozen line 286 defines query_payload_schema, named by pending C07.mcp-contract.request-response-types (#1042) as a schema-generation hook. This adds no numeric source coverage, packet admission or implementation acceptance."
+          "evidence": "Responsibility mapping only: frozen line 286 is the body call from query_payload_schema to capability_contract::payload_schema with READ_OPERATIONS; the function declaration is at line 285, outside this singleton span. C07.mcp-contract.request-response-types (#1042) names query_payload_schema as a schema-generation hook and retains that broader responsibility pending. This adds no numeric source coverage, packet admission or implementation acceptance."
         }
       ]
     },
