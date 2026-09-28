@@ -6382,6 +6382,14 @@
       "dispositions": [
         {
           "span": [
+            561,
+            580
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 561 is reloadIfTimeLinkOffset's conditional loadFrame call for timeLinkInOffset/timeLinkOutOffset, and line 566 declares the PROP_DIM_LABELS property metadata table. Both remain with pending C02.properties-and-curves.properties-and-metadata (#1037); C20f/#1156 and C20o/#1245 identify the helper as a caller-side dependency, not their owned implementation. Lines 567-580 are only rationale for DUP_TARGET_PROPS at 581, the adjacent pending C02.motion-advanced.duplicator-and-effector-props responsibility. This mixed span adds no new writer, packet admission, computed coverage or behavior acceptance."
+        },
+        {
+          "span": [
             1562,
             1566
           ],
@@ -6491,6 +6499,46 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen 3f6eed2, lines 13256-13321 are blank/comment-only Motion-grid marquee rationale preceding initGridMarquee. C02.motion-advanced.canvas-drag-interactions (#1037) owns the grid pointer-capture registration at 13337-13365, and C20q/#1247 owns the key-marquee selection behavior it dispatches to. This preamble has no standalone executable responsibility."
+        },
+        {
+          "span": [
+            13351,
+            13352
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2 (motion blob 6617bac), line 13351 is blank and line 13352 opens the public window.SMMotion object. This structural API opening defines no independent feature or state authority; the following interleaved exports map to their named pending C02/C20 responsibilities. No packet admission, computed coverage or runtime acceptance follows from this boundary."
+        },
+        {
+          "span": [
+            13372,
+            13394
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 13372 exports hasExpr to pending C02.expressions.expression-runtime (#1037); lines 13374-13383 expose control readers/mutators and registerControlPropMeta to C02.properties-and-curves.properties-and-metadata; line 13387 exports renderMotionPropsPanel to C20d.motion-properties-panel (#1150); line 13392 exports startTimeLinkPickwhip to C02.motion-advanced.canvas-drag-interactions. Intervening comments explain external callers and do not transfer implementations between packets. All named packets remain pending; this adds no numeric coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            13455,
+            13476
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 13455 exports hit3DGizmoRing and line 13456 exposes debugMotionDrag under the pending C02.motion-advanced.3d-layers-and-gizmo public API (#1037); the latter is a diagnostic for gizmo projection and hit-test math, with canvas-drag interactions as a consumer. Lines 13459, 13461 and 13467 expose evalTrack, isAnimated and a getLayerValue wrapper through C02.properties-and-curves.keyframe-track-model; line 13460 returns a copy of DEFAULT_CURVE from C20j.easing-curve-constants (#1230). Lines 13468-13476 only introduce the layerMotionPointMap export at 13477, owned by C02.motion-advanced.point-mapping-and-parent-chain. These interleaved API references do not admit any packet or establish numeric coverage or runtime acceptance."
+        },
+        {
+          "span": [
+            13565,
+            13621
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): lines 13565-13566 expose parent-key writers, and 13587-13588 expose computeMotionMat/elementMotionAt, under pending C02.motion-advanced.transform-application (#1037); 13570 exposes liveRefreshVisiblePropertyFields under C02.motion-advanced.canvas-drag-interactions; 13576 and 13603 expose propsFor/registerEffectorPropMeta under C02.properties-and-curves.properties-and-metadata; 13577 exposes setExpressionCode under C20o.widget-wiring-and-expression-bake (#1245). Lines 13589-13590 re-export addTextAnimator/removeTextAnimator, and 13592 exports textAnimatorWeights, under C20a.text-animator-runtime (#1125); line 13591 is the related inline textAnimatorsOf read-only facade, outside C20a's assigned implementation range. Lines 13593-13595 expose element style readers under C20a.element-style-readers. The matteOnAt reader at 13604-13610 uses C02.properties-and-curves.keyframe-track-model's hasKeys/valueAtFrame to answer the render bridge's matte threshold; this maps the reader context without claiming C20d's separate matte UI. Line 13621 exports holderRefOf to C02.properties-and-curves.key-selection-and-clipboard. Comments document consumers; all packets remain pending, with no numeric coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            13808,
+            13825
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): lines 13810 and 13814 export invalidateSymbolUnionBounds and selectLayerFromGrid to pending C02.motion-advanced.mode-toggle-and-workspace-continuity (#1037); lines 13815-13816 export layerElements/elementLabel to C02.motion-advanced.component-shape-tree; lines 13823-13824 export ensureElementHolder/setKeyAtFrame to C20n.element-holders and C20n.set-key-at-frame (#1238); line 13825 exports registerExposedPropMeta to C02.properties-and-curves.properties-and-metadata. The intervening comments describe callers; no implementation, packet admission, numeric coverage or runtime acceptance is claimed."
         },
         {
           "span": [
