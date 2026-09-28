@@ -265,8 +265,12 @@ maps three frozen `src/js/export.js` spans to pending C05 frame-compositor and T
 responsibilities. The C05 census at `419f1926` names the source ranges; accepted P17/#1019 PR #1160
 and P18/#1020 PR #1163 provide narrow SVG-wrapper and job-boundary provenance only, not full
 packet, export-format, runtime or parity acceptance. The 186 computed uncovered lines in export.js
-and global 7 185 remain unchanged. **P03 is not complete and no extraction is admitted**: the gate
-still exits 1 with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 71
+and global 7 185 remain unchanged. P03C-r/#1454 maps the frozen `geometry-wasm/src/track.rs:345-432`
+test-module tail to the pending C03 pyramidal point-tracker packet's test-oracle responsibility.
+The census oracle is specifically the four tests at 388-429; this disposition does not claim the
+whole module is covered, test correctness, or packet acceptance. The tracker and global computed
+uncovered counts remain 88 and 7 185. **P03 is not complete and no extraction is admitted**: the gate
+still exits 1 with 762 pending packets, no notes needing reconciliation, 0 unmapped paths and 70
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
