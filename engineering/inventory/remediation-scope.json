@@ -4979,6 +4979,16 @@
           1,
           9
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            9
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.eraser-boolean-subtract starts at eraser.rs:10; lines 1-9 are its explanatory tool-port preamble."
+        }
       ]
     },
     {
@@ -4995,6 +5005,16 @@
           1000,
           1037
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.fill-region-tracer starts at fill.rs:34; lines 1-33 are explanatory design comments and imports preceding fill_find."
+        }
       ]
     },
     {
@@ -5038,6 +5058,16 @@
           1,
           7
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            7
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.basic-shape-segments starts at shapes.rs:8; lines 1-7 are the tool-scope header and imports."
+        }
       ]
     },
     {
@@ -5050,6 +5080,16 @@
           1,
           13
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-geometry-ops.stroke-input-modeler starts at strokemodeler.rs:14; lines 1-13 are model provenance, parity, and state-boundary comments."
+        }
       ]
     },
     {
@@ -5078,6 +5118,16 @@
           345,
           432
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            21
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.pyramidal-point-tracker starts at track.rs:22; lines 1-21 are algorithm provenance and overview comments plus imports."
+        }
       ]
     },
     {
@@ -5102,6 +5152,16 @@
           1,
           14
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            14
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.auto-match-correspondence starts at tweenmatch.rs:15; lines 1-14 are the port-scope rationale and imports before shared types."
+        }
       ]
     },
     {

@@ -102,7 +102,11 @@ C20s's own boundary note names 12406-12684 and 13125+ as the two gaps it leaves 
 the refrozen coverage shows 12406-12684 fully covered by the original C02 packets, while 13125
 onward keeps the eight open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
 files carry small remainders (module headers, export blocks, trailing helpers) left by the
-original partitions. (4) The 40 previously dispositioned executable paths without a packet
+original partitions. P03C-f/#1421 marks six frozen geometry-WASM module preambles as
+`boundary`: the comment/import lines before C03/#1038 packet starts at eraser.rs:10, fill.rs:34,
+shapes.rs:8, strokemodeler.rs:14, track.rs:22 and tweenmatch.rs:15. This accounts for six spans
+without changing the computed 7 185 uncovered code lines, frozen source or packet state. (4)
+The 40 previously dispositioned executable paths without a packet
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
 the total to 46 and the unmapped count to zero.
 The three Rust boundary tooling paths (`geometry-wasm.edges.json`, `boundaries-rust.cjs` and its
@@ -143,7 +147,7 @@ Every reviewed claim carries its evidence and is validated by shape:
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
   gate data created by a merged leaf, with its PR) and 8 `oracle` (compiled MCP tests named by C07).
 - **Spans** — `admitted` (issue), `covered` or `boundary`, each naming one reported span with
-  evidence. None is dispositioned yet.
+  evidence. P03C-f/#1421 dispositions six preambles; 145 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -175,10 +179,13 @@ C20g–C20s) at `3f6eed2…` and published the residual gap above; it changed no
 or disposition. P03C-c/#1362 reconciled only C02:10 to the eleven accepted C20g–C20i census
 packets; all eleven packet admissions remain pending and no implementation is claimed.
 P03C-d/#1401 reconciled C08:1 to the C19 census evidence without changing the frozen source,
-packet admissions, or implementation state. The old whole-file gap is stale; the four current
-timeline spans and 27 uncovered code lines remain undispositioned.
+packet admissions, or implementation state. P03C-f/#1421 records six geometry-WASM preamble
+boundaries against C03/#1038's exact packet start lines; it changes neither the census ranges
+nor packet admissions. The old whole-file gap is stale; the four current timeline spans and 27
+uncovered code lines remain undispositioned.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762 pending
-packets, no notes needing reconciliation, 0 unmapped paths and 151 undispositioned spans.
+packets, no notes needing reconciliation, 0 unmapped paths and 145 undispositioned spans; the
+computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual spans — the `timeline.js`/`motion.js` orphans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
 files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
