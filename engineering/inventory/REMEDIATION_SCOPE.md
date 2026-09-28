@@ -445,8 +445,19 @@ unchanged. The 17 previously undispositioned spans become 16, with zero feedback
 spans remaining; all 762 packets stay pending, global computed uncovered code remains
 7 185 and frozen feedback-bridge retains 23 computed uncovered code lines. No packet,
 feedback delivery or browser/Tauri behavior is accepted.
+P03C-al/#1500 marks frozen `src/js/vectorize-bridge.js:72-77` as a structural
+`boundary`: line 72 is blank and lines 73-77 explain the vtracer absolute-control to
+Paper.js relative-handle conversion before executable `splineToSegments` begins at 78.
+That function remains in pending `C04b.content-tools.vectorize-shape-fitting`; the
+original C04b range starts at 78 and its pin stays unchanged. The JSON cites frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, vectorize blob
+`3d1e3f817e981cdebc86919502515da64663157e` and C04b census blob
+`f76259d59dedb715edc18b9f84db98ac00ee7cb8`. The 16 previously undispositioned
+spans become 15, with zero vectorize-bridge spans remaining. All 762 packets stay
+pending, global computed uncovered code remains 7 185 and frozen vectorize-bridge
+retains 5 computed uncovered code lines. No packet or runtime behavior is accepted.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 16
+pending packets, no notes needing reconciliation, 0 unmapped paths and 15
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
