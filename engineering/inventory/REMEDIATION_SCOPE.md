@@ -430,8 +430,23 @@ admitted and no linked-media, browser, Tauri, render, export or persistence beha
 accepted. The 19 previously undispositioned spans become 17, with zero `linked-media.js`
 spans remaining; all 762 packets stay pending, global computed uncovered code remains 7 185,
 and frozen `linked-media.js` retains 61 computed uncovered code lines.
+P03C-ak/#1498 dispositions the frozen `src/js/feedback-bridge.js:572-596` mixed public
+`window.SMFeedback` facade. Its action/click trail, local read and local approval/resolution/
+deletion exports map to pending `C04b.content-tools.feedback-local-log-storage`; the
+`submitFeedback` export bridges that local write and pending
+`C04b.content-tools.feedback-worker-publish`; its declared range also contains the
+best-effort team-Sync write paired with the incoming flow. Incoming team-Sync and GitHub token/issue
+triage exports map to pending `C04b.content-tools.feedback-triage-sync`; incoming import
+uses the local store without making the whole facade a local-storage packet. The JSON
+records exact frozen export and definition lines against source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+feedback-bridge blob `b87a6fc24b20f136c05df123d772b224e81ba212` and pinned C04b census
+blob `f76259d59dedb715edc18b9f84db98ac00ee7cb8`. Its older range declarations stay
+unchanged. The 17 previously undispositioned spans become 16, with zero feedback-bridge
+spans remaining; all 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen feedback-bridge retains 23 computed uncovered code lines. No packet,
+feedback delivery or browser/Tauri behavior is accepted.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 17
+pending packets, no notes needing reconciliation, 0 unmapped paths and 16
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
