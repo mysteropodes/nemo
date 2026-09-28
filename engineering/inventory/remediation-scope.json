@@ -6333,6 +6333,16 @@
           1,
           19
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            19
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, src/js/playback-cache.js:1-19 is the descriptive header for the playback-bake fallback. The executable module IIFE and pending C03.js-effects-and-playback.playback-bake-cache responsibility begin at line 20, outside this comment-only span. This boundary does not claim covered playback behavior or accept the packet."
+        }
       ]
     },
     {
