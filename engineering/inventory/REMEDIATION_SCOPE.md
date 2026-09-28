@@ -505,8 +505,24 @@ global computed uncovered code remains 7 185 and frozen `select-bridge.js`
 retains 64 computed uncovered code lines. No numeric range coverage, Select
 behavior, browser/native parity or runtime acceptance is claimed.
 
+P03C-ap/#1512 marks frozen `src/js/tools.js:3370-3372` as a comment-only
+`boundary`. Those three lines explain `gapThr` as a plain world-space
+distance, the stroke-end gap still counted as one closed shape, and the Gap
+Size presets without scale/resolution conversion. The separate WASM-path
+comment begins at line 3373 in pending `C04a.fill.find-wasm-js-raster`;
+executable `_wallSegments` begins at 3381. Neither belongs to this span.
+The JSON cites frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+tools blob `3c25962dbe314d5e791489da30b2b642ff899357` and pinned C04a census
+blob `8ffb669c5018190bd448b787a09ade35bd594b30`. Current protected
+`tools.js` has a different blob, so this disposition classifies only the
+frozen span. The 12 previously undispositioned spans become 11, with zero
+frozen `tools.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `tools.js` retains 3
+computed uncovered code lines. No packet admission, numeric range coverage,
+fill behavior, JS/Rust parity or runtime acceptance is claimed.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 12
+pending packets, no notes needing reconciliation, 0 unmapped paths and 11
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
