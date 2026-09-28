@@ -206,7 +206,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
   dispositions the final two C03 module headers; 31 spans remained undispositioned at that
   snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remained
-  at that snapshot. P03C-ai/#1491 dispositions six frozen `tweens.js` spans; 19 remain.
+  at that snapshot. P03C-ai/#1491 dispositions six frozen `tweens.js` spans; 19 remained.
+  P03C-aj/#1493 dispositions two frozen `linked-media.js` spans; 17 remain.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -413,8 +414,24 @@ accept no code, browser, Tauri, native, render, export or history behavior. The 
 undispositioned spans become 19, with zero `tweens.js` spans remaining; all 762 packets stay
 pending, global computed uncovered code remains 7 185, and frozen `tweens.js` retains 516
 computed uncovered code lines and 158 overlapping lines.
+P03C-aj/#1493 dispositions the two remaining frozen `src/js/linked-media.js` spans. The
+`1-39` comment-only preamble describes the media-mode, linked-reference and persistence/cache
+contract before executable code begins at 40; its historical claims do not establish current
+behavior. The mixed `751-774` public facade maps resolver/cache/handle/relink exports,
+including `readLinkedDesktop` at 758, to pending `C05.media.linked-resolve-core`; conversion
+exports to pending `C05.media.linked-bulk-convert`; and `syncUI` to pending
+`C05.media.mode-setting-ui`. Frozen `app.js`, `images.js`, `media-library.js`,
+`native-video-bridge.js` and `timeline.js` callers support that split. The old C05 census
+does not list `readLinkedDesktop` and its approximate numeric ranges drift; its blob pin
+`725d7875da509cd99a77bc404fc62296280399a0` remains unchanged. The JSON records
+the precise evidence against frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`
+and linked-media blob `ba81900d0ea1805fc206fc19ce992674522de6c5`. No packet is
+admitted and no linked-media, browser, Tauri, render, export or persistence behavior is
+accepted. The 19 previously undispositioned spans become 17, with zero `linked-media.js`
+spans remaining; all 762 packets stay pending, global computed uncovered code remains 7 185,
+and frozen `linked-media.js` retains 61 computed uncovered code lines.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 19
+pending packets, no notes needing reconciliation, 0 unmapped paths and 17
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus

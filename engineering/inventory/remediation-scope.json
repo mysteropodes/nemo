@@ -6282,6 +6282,24 @@
           751,
           774
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            39
+          ],
+          "kind": "covered",
+          "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (linked-media blob ba81900d0ea1805fc206fc19ce992674522de6c5): lines 1-39 describe the project-wide embedded/linked mode, desktop linkedPath versus web linkedHandleId/opaque handle, serR/desR persistence choke points and a non-persistent resolved-pixel cache. Executable implementation begins with the IIFE at line 40. This header contextualizes pending C05.media.linked-resolve-core and C05.media.mode-setting-ui (#1040), but its historical live-verification statements and persistence claims are not independent proof of current browser, Tauri, save/load or render acceptance. No separate packet, numeric coverage or behavior acceptance is added."
+        },
+        {
+          "span": [
+            751,
+            774
+          ],
+          "kind": "covered",
+          "evidence": "Mixed public-facade responsibility mapping at frozen 3f6eed2 (linked-media blob ba81900): line 751 is a blank separator; 752 opens window.SMLinkedMedia. Resolver/cache/handle/relink exports isWebLinkingSupported/getCachedSrc/primeCache/resolveAsync/resolveOnce/readLinkedDesktop/pickWebImages at 753-759 and pickWebVideo/getHandleFile/forgetHandle/relinkImageEntry/requestPermissionForAll at 762-766 (with a video comment at 760-761) map to pending C05.media.linked-resolve-core (#1040): frozen app.js:1208-1209 calls cache/resolve, images.js:265/498 calls the web pickers, media-library.js:164/553 calls handle/relink, and native-video-bridge.js:853/1347 calls handle/picker. readLinkedDesktop at 758 is the thin _resolveDesktopPath wrapper defined at linked-media.js:224, absent from the older C05 symbol list; resolveOnce at 757 is defined at 423 after the census's approximate ~40-396 core range. Those are source-backed resolver mappings, not invented census entries. syncUI at 767 maps to pending C05.media.mode-setting-ui (timeline.js:2679 calls it after mediaMode load). The conversion comment at 768-769 and convertLinkedToEmbedded/convertEmbeddedToLinked/convertActionSupported exports at 770-772 map to pending C05.media.linked-bulk-convert; 773-774 close the object/IIFE. The pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0 and its old numeric ranges remain unchanged. No packet admission, numeric coverage or linked-media/browser/Tauri/render/export acceptance is claimed."
+        }
       ]
     },
     {
