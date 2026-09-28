@@ -144,6 +144,22 @@ test('parseBundle rejects a payload whose JSON representation is not an object w
   assert.equal(result.commands, undefined);
 });
 
+test('parseBundle rejects a fixture whose JSON representation loses its required shape', () => {
+  const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h', toJSON() { return null; } },
+    commands: [{ operation: 'property.set', payload: {} }] };
+  const result = bundleCodec.parseBundle(bundle);
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
+test('parseBundle rejects commands whose JSON representation becomes empty', () => {
+  const commands = [{ operation: 'property.set', payload: {} }];
+  commands.toJSON = () => [];
+  const result = bundleCodec.parseBundle({ formatVersion: 1, fixture: { id: 'x', hash: 'h' }, commands });
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
 test('a rejected bundle never reaches the active document -- parseBundle fails before any replay is attempted', () => {
   const active = fixture.build('opacity-repro-active', 42);
   send(active, 'seed-write', 'property.set', opacity(active.state.layers[0].layerUid, 77));

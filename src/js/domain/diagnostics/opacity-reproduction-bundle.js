@@ -69,7 +69,13 @@ var NemoOpacityReproductionBundle = (function () {
           return { error: 'Bundle command ' + i + ' is malformed.' };
         }
       }
+      var fixture = clone(bundle.fixture);
+      if (!object(fixture) || typeof fixture.id !== 'string' || !fixture.id
+          || typeof fixture.hash !== 'string' || !fixture.hash) {
+        return { error: 'Bundle fixture is missing or malformed.' };
+      }
       var commands = clone(bundle.commands);
+      if (!Array.isArray(commands) || !commands.length) return { error: 'Bundle must contain at least one command.' };
       for (var j = 0; j < commands.length; j++) {
         var detached = commands[j];
         if (!object(detached) || typeof detached.operation !== 'string' || !detached.operation || !object(detached.payload)) {
@@ -77,7 +83,7 @@ var NemoOpacityReproductionBundle = (function () {
         }
       }
       return {
-        fixture: clone(bundle.fixture),
+        fixture: fixture,
         commands: commands,
         clock: bundle.clock != null ? clone(bundle.clock) : null,
         seed: bundle.seed != null ? clone(bundle.seed) : null,
