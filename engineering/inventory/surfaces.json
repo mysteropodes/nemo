@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "312fda8524adf3ea44f63b6b66ebdcf745eb90ea",
-  "describe": "v0.7.0-alpha.4-621-g312fda85"
+  "head": "887a40507eeaed023210309a11baee1820658d68",
+  "describe": "v0.7.0-alpha.4-630-g887a4050-dirty"
  },
- "inputsDigest": "5774af668f20831c6a37cd23e9c1dc80e04c392c12c1ff5df26ad0544adf3fe2",
+ "inputsDigest": "89bd454f2804bd7c710a6156d50aaaecc7c02e10889b691ca61955e671309dbd",
  "states": [
   "inventoried",
   "characterized",
@@ -15439,7 +15439,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 68,
     "via": "variable resetBtn",
     "references": []
    },
@@ -15853,7 +15853,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 51,
+    "functionsVisited": 52,
     "via": "chain",
     "references": [
      "src/js/project.js:660 initStartScreen()"
