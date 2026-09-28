@@ -104,20 +104,21 @@ impl ApplicationMcp {
 
     pub(crate) fn reserve_native_replacement(
         &self,
-        instance_id: &str,
-        document_id: &str,
-        expected_revision: u64,
+        identity: crate::native_dispatch::ReplacementIdentity<'_>,
         preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
-    ) -> Result<u64, String> {
-        // Native -> revision is the same lock order used by dispatch and acknowledgment.
+    ) -> Result<crate::native_dispatch::ReplacementAdmission, String> {
         let mut native = self
             .native
             .lock()
             .map_err(|_| "unavailable:native application lock unavailable")?;
-        let generation =
-            native.admit_replace(instance_id, document_id, expected_revision, preflight)?;
-        self.revisions.invalidate();
-        Ok(generation)
+        let admission = native.admit_replace_identity(identity, preflight)?;
+        if matches!(
+            admission,
+            crate::native_dispatch::ReplacementAdmission::Execute(_)
+        ) {
+            self.revisions.invalidate();
+        }
+        Ok(admission)
     }
 
     pub(crate) fn install_dispatch(

@@ -181,6 +181,10 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N20R3 registers private host replay and dispatch-test children without an edge or size waiver', [
+    'src-tauri/src/native_application_contract_fingerprints.rs',
+    'src-tauri/src/native_application_replace_replay.rs',
+    'src-tauri/src/native_dispatch_tests.rs']],
   ['N20R2 registers private host replacement children without an edge or size waiver', [
     'src-tauri/src/native_application_replace_commands.rs',
     'src-tauri/src/native_application_replace_commands_acceptance_tests.rs',

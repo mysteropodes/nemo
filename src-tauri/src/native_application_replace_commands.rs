@@ -32,7 +32,9 @@ pub(super) fn admission_error(
     error
 }
 
-fn fenced_error(progress: ReplacementProgress) -> nemo_mcp::contract::NativeApplicationError {
+pub(super) fn fenced_error(
+    progress: ReplacementProgress,
+) -> nemo_mcp::contract::NativeApplicationError {
     let failure = progress.failure.as_ref();
     let mut error = host_error(
         "replacement_indeterminate",
@@ -98,6 +100,8 @@ fn complete_replacement_with(
                 viewport_host::reconcile_replaced(instance, &preview)?;
                 progress.viewport = ReplacementStage::Complete;
                 Ok(NativeReplacementReceipt {
+                    request_id: String::new(),
+                    retrieved: false,
                     document_id: desktop.document_id().to_owned(),
                     content_revision: desktop.content_revision(),
                     resource_count,
@@ -108,7 +112,10 @@ fn complete_replacement_with(
         ))
     };
     match result {
-        Ok(Ok(receipt)) => {
+        Ok(Ok(mut receipt)) => {
+            receipt.request_id = authority
+                .replacement_request_id(generation)
+                .unwrap_or_default();
             let (_, progress) = authority
                 .replacing_mut(generation)
                 .map_err(|message| host_error("unavailable", message))?;
@@ -116,6 +123,10 @@ fn complete_replacement_with(
             authority
                 .activate_replace(generation)
                 .map_err(|message| host_error("unavailable", message))?;
+            authority.record_replace_success(
+                generation,
+                serde_json::to_value(&receipt).expect("native replacement receipt is serializable"),
+            );
             Ok(receipt)
         }
         Ok(Err(error)) => {
@@ -182,13 +193,14 @@ pub(super) fn retained_executor_error(
 mod tests {
     use super::acceptance_tests::{geometry_b, project, setup};
     use super::*;
+    use crate::native_application_commands::replace_replay::replay_result;
     use crate::{
         native_application::{admit_release_request, complete_release},
         native_application_commands::{
             active_generation, with_installed_instance, NATIVE_API_VERSION,
         },
         native_application_contract::{admit_project, NativeReleaseRequest},
-        native_dispatch::{NativePhase, ReleaseAdmission},
+        native_dispatch::{NativePhase, ReleaseAdmission, ReplacementAdmission},
     };
     use serde_json::json;
     use std::sync::{
@@ -390,7 +402,22 @@ mod tests {
     #[test]
     fn waiter_drop_then_callback_drop_fences_exactly_once() {
         let (_scratch, native, old_document, _prepared) = setup();
-        let (old, fresh) = reserve(&native, &old_document);
+        let old = native.lock().unwrap().active_generation().unwrap();
+        let admission = native
+            .lock()
+            .unwrap()
+            .admit_replace_request(
+                "dropped",
+                b"typed-body",
+                "native-fixture",
+                &old_document,
+                0,
+                |_| Ok(()),
+            )
+            .unwrap();
+        let ReplacementAdmission::Execute(fresh) = admission else {
+            panic!("first request must execute")
+        };
         let count = Arc::new(AtomicUsize::new(0));
         let hook_native = native.clone();
         let hook_count = count.clone();
@@ -421,6 +448,14 @@ mod tests {
             "pending"
         );
         assert!(native.lock().unwrap().active_mut(old).is_err());
+        let replay = native
+            .lock()
+            .unwrap()
+            .lookup_replace_replay("dropped", b"typed-body")
+            .unwrap()
+            .unwrap();
+        let repeated = replay_result(replay).unwrap_err();
+        assert_eq!(repeated, error);
     }
 
     #[test]

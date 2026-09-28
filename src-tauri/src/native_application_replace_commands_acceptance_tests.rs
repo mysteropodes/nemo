@@ -8,7 +8,9 @@ use crate::{
         admit_project, work_label, GeometryResourceInput, NativePreviewRequest,
     },
     native_application_ports::{DesktopArtifactPort, SharedCompositor},
-    native_dispatch::{NativeAuthority, NativeDispatch, NativeState},
+    native_dispatch::{
+        NativeAuthority, NativeDispatch, NativeState, ReplacementAdmission, ReplacementIdentity,
+    },
 };
 use native_engine::compositor::Compositor;
 use nemo_mcp::{
@@ -26,6 +28,65 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::oneshot,
 };
+
+use crate::native_application_commands::replace_replay::replay_result;
+
+#[test]
+fn response_loss_identical_a_to_b_retry_replays_completed_receipt() {
+    let (_scratch, native, old_document, prepared) = setup();
+    let admission = native
+        .lock()
+        .unwrap()
+        .admit_replace_request(
+            "replace-a",
+            b"typed-a-to-b",
+            "native-fixture",
+            &old_document,
+            0,
+            |_| Ok(()),
+        )
+        .unwrap();
+    let ReplacementAdmission::Execute(fresh) = admission else {
+        panic!("first request must execute")
+    };
+    let pending = native
+        .lock()
+        .unwrap()
+        .lookup_replace_replay("replace-a", b"typed-a-to-b")
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        replay_result(pending).unwrap_err().code,
+        "replacement_pending"
+    );
+    let discarded = complete_replacement(&native, fresh, "native-fixture", prepared).unwrap();
+    assert_ne!(discarded.document_id, old_document);
+    let retry = native
+        .lock()
+        .unwrap()
+        .admit_replace_request(
+            "replace-a",
+            b"typed-a-to-b",
+            "native-fixture",
+            &old_document,
+            0,
+            |_| panic!("an identical retry must not prepare or execute B again"),
+        )
+        .unwrap();
+    let ReplacementAdmission::Replay(replay) = retry else {
+        panic!("identical retry must replay")
+    };
+    let retrieved = replay_result(replay).unwrap();
+    assert_eq!(retrieved.document_id, discarded.document_id);
+    assert_eq!(retrieved.request_id, "replace-a");
+    assert!(retrieved.retrieved);
+    assert!(native
+        .lock()
+        .unwrap()
+        .lookup_replace_replay("replace-a", b"changed-b")
+        .unwrap_err()
+        .contains("changed replacement body"));
+}
 
 const PROJECT: &[u8] = include_bytes!("../../native-engine/tests/fixtures/opacity-v2/project.json");
 
@@ -153,20 +214,56 @@ async fn pending_external(state: &ApplicationMcp, document: &str, generation: u6
         assert_eq!(event["toRevision"], 1);
         assert_eq!(event["lifecycleGeneration"], generation);
         assert!(state
-            .reserve_native_replacement(state.instance_id(), document, 0, |_| Ok(()))
+            .reserve_native_replacement(
+                ReplacementIdentity {
+                    request_id: "rejected",
+                    fingerprint: b"body-rejected",
+                    instance_id: state.instance_id(),
+                    document_id: document,
+                    expected_revision: 0
+                },
+                |_| Ok(())
+            )
             .is_err());
         let ack = json!({"action":"acknowledge", "subscriptionId":binding["subscriptionId"], "event":event});
         let fresh = if cancel {
             let next = state
-                .reserve_native_replacement(state.instance_id(), document, 1, |application| {
-                    if application.as_any_mut().is::<DesktopNativeApplication>() {
-                        Ok(())
-                    } else {
-                        Err("unavailable:native desktop host is unavailable".into())
-                    }
-                })
+                .reserve_native_replacement(
+                    ReplacementIdentity {
+                        request_id: "admitted",
+                        fingerprint: b"body-admitted",
+                        instance_id: state.instance_id(),
+                        document_id: document,
+                        expected_revision: 1,
+                    },
+                    |application| {
+                        if application.as_any_mut().is::<DesktopNativeApplication>() {
+                            Ok(())
+                        } else {
+                            Err("unavailable:native desktop host is unavailable".into())
+                        }
+                    },
+                )
                 .unwrap();
+            let ReplacementAdmission::Execute(next) = next else {
+                panic!("fresh request must execute")
+            };
             assert!(next > generation);
+            assert!(matches!(
+                state.reserve_native_replacement(
+                    ReplacementIdentity {
+                        request_id: "admitted",
+                        fingerprint: b"body-admitted",
+                        instance_id: state.instance_id(),
+                        document_id: document,
+                        expected_revision: 1
+                    },
+                    |_| panic!("pending replacement replay cannot rerun preflight")
+                ),
+                Ok(ReplacementAdmission::Replay(
+                    crate::native_dispatch::ReplacementReplay::Pending(_)
+                ))
+            ));
             assert!(state
                 .control_revision_for_test(ack)
                 .unwrap_err()
@@ -290,19 +387,38 @@ fn distinct_a_preview_reconciles_and_b_preview_export_use_only_b_resources() {
             .to_vec();
         (old, preview.identity.work_id(), pixels)
     };
-    let fresh = native
+    let admission = native
         .lock()
         .unwrap()
-        .admit_replace("native-fixture", &old_document, 0, |application| {
-            if application.as_any_mut().is::<DesktopNativeApplication>() {
-                Ok(())
-            } else {
-                Err("unavailable:native desktop host is unavailable".into())
-            }
-        })
+        .admit_replace_request(
+            "replace-resources",
+            b"typed-b-resources",
+            "native-fixture",
+            &old_document,
+            0,
+            |application| {
+                if application.as_any_mut().is::<DesktopNativeApplication>() {
+                    Ok(())
+                } else {
+                    Err("unavailable:native desktop host is unavailable".into())
+                }
+            },
+        )
         .unwrap();
+    let ReplacementAdmission::Execute(fresh) = admission else {
+        panic!("fresh B must execute")
+    };
     assert!(fresh > old);
     let receipt = complete_replacement(&native, fresh, "native-fixture", prepared_b).unwrap();
+    let replay = native
+        .lock()
+        .unwrap()
+        .lookup_replace_replay("replace-resources", b"typed-b-resources")
+        .unwrap()
+        .unwrap();
+    let retrieved = replay_result(replay).unwrap();
+    assert_eq!(retrieved.document_id, receipt.document_id);
+    assert!(retrieved.retrieved);
     assert!(receipt
         .cancelled_preview_work_ids
         .contains(&work_label(a_work)));
