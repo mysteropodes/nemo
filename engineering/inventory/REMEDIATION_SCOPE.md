@@ -398,13 +398,13 @@ computed uncovered code lines and 190 overlapping lines.
 P03C-ai/#1491 dispositions all six remaining frozen `src/js/tweens.js` spans. `1-103` maps
 the feature flags to the pending C02 matching, resampling and interpolation packets by their
 actual read sites; notably `TW_CORRECTION_PASS` is read in `_applyFoldCorrection` under the
-resampling packet. The mixed `1564-1958` span maps UID-keyed easing, persistent tween-arc
-handles/rekey, style and intrinsic interpolation, crossing probes and MLS preparation to
-their separate C02 generation, arc, interpolation and resampling responsibilities using
-frozen `generateTweens`, `renderArcs` and `interpStroke` callers. `3735-3742` maps the
-keyframe stroke-ID deduplication used by tween generation. `4810-4811` and `4977-4979`
-map the frame-only capture/apply seams to pending C01 undo/redo, with P21's extracted entry
-as context only. `4992-5016` splits the redo branch from the distinct manual reassignment
+resampling packet. The mixed `1564-1958` span maps UID-keyed easing, shared scalar `lerp`,
+persistent tween-arc handles/rekey, style and intrinsic interpolation, crossing probes and
+MLS preparation to separate C02 generation, arc, interpolation and resampling
+responsibilities using frozen `generateTweens`, `renderArcs` and `interpStroke` callers.
+`3735-3742` maps keyframe stroke-ID deduplication used by tween generation. `4810-4811` and
+`4977-4979` map the frame-only capture/apply seams to pending C01 undo/redo, with P21's
+extracted entry as context only. `4992-5016` splits the redo branch from manual reassignment
 lead-in and `_reassign` state. The JSON records the exact subrange evidence against frozen
 source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, tweens blob
 `6eca7339bbd608b98676b600c9e2f42ca9ce1863`, and pinned C01/C02 censuses. Their
