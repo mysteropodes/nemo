@@ -47,4 +47,5 @@ test_modules! {
     "test-export_job" => export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs";
     "test-application" => application_tests = "../tests/application.rs";
     "test-application" => application_read_tests = "../tests/application_read.rs";
+    "test-application" => application_replacement_tests = "../tests/application_replacement.rs";
 }
