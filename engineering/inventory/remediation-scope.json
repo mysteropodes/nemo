@@ -5786,6 +5786,40 @@
           13896,
           13908
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1562,
+            1566
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 1562-1566 are comment-only explanation of the extracted NemoExpressionRandomDomain.hashUnit; the adjacent hashNoise1D/hashNoise2D implementation is owned by C02.expressions.expression-runtime (#1037), and C20k/#1235 routes the pre-1769 noise helpers to that C02 responsibility. No separate executable responsibility begins in this span."
+        },
+        {
+          "span": [
+            8435,
+            8438
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 8435-8438 are comment-only cycle-refusal rationale immediately before timeLinkWouldCycle at 8439. C02.motion-advanced.canvas-drag-interactions (#1037) owns the helper at its actual location; C20c/#1137 records the corrected 8435-8452 C02 ownership. This preamble adds no separate executable responsibility."
+        },
+        {
+          "span": [
+            9429,
+            9435
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 9429-9435 are comment-only Elements explanation immediately before layerElements at 9436. C02 component-shape-tree owns the adjoining responsibility; C20f/#1156 explicitly excludes these leading comments and the function start. No executable responsibility is in this span."
+        },
+        {
+          "span": [
+            13256,
+            13321
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 13256-13321 are blank/comment-only Motion-grid marquee rationale preceding initGridMarquee. C02.motion-advanced.canvas-drag-interactions (#1037) owns the grid pointer-capture registration at 13337-13365, and C20q/#1247 owns the key-marquee selection behavior it dispatches to. This preamble has no standalone executable responsibility."
+        }
       ]
     },
     {
