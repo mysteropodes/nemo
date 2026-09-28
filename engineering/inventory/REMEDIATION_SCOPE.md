@@ -114,7 +114,12 @@ spans (561-580, 13351-13352, 13372-13394, 13455-13476, 13565-13621, 13808-13825,
 are gaps between adjacent census slices —
 C20s's own boundary note names 12406-12684 and 13125+ as the two gaps it leaves unassigned;
 the refrozen coverage shows 12406-12684 fully covered by the original C02 packets, while 13125
-onward keeps the seven open spans listed above — candidates for one reconciliation leaf. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
+onward keeps the seven open spans listed above — candidates for one reconciliation leaf.
+P03C-k/#1436 dispositioned five frozen `tweens.js` spans: 411-415 is a comment-only `boundary`,
+and 472, 564, 630 and 1020 map to still-pending C02 matching/resampling responsibilities.
+Accepted P23/#1025 (PR #1166) identifies only the extracted assignment solver; these mappings
+do not assert C02 acceptance, matcher/warp parity or numeric coverage. The 516 Tweens and 7 185
+global uncovered code lines remain unchanged. (3) `tweens.js`, `engine-bridge.js`, `export.js`, `lib.rs`, `contract.rs` and 24 further
 files carry small remainders (module headers, export blocks, trailing helpers) left by the
 original partitions. P03C-f/#1421 marks six frozen geometry-WASM module preambles as
 `boundary`: the comment/import lines before C03/#1038 packet starts at eraser.rs:10, fill.rs:34,
@@ -158,7 +163,9 @@ Every reviewed claim carries its evidence and is validated by shape:
   changing its 27 uncovered code lines. P03C-h marked four `motion.js` comment/blank preambles
   as boundaries, P03C-i mapped eight C02 expression responsibilities plus one comment
   boundary, and P03C-j mapped two key-selection/curve-widget spans to pending C02
-  responsibilities; the 293 Motion uncovered code lines and computed totals are unchanged. P03C-c reconciled
+  responsibilities; P03C-k maps four frozen Tween solver call sites to pending C02 matching and
+  resampling responsibilities while citing the narrower accepted P23 assignment extraction.
+  The 293 Motion, 516 Tweens and global computed uncovered code totals are unchanged. P03C-c reconciled
   C02:10's exact 1,300-line Motion span to the eleven accepted C20g–C20i census packets; their
   admissions remain pending and this records census ownership only, not implementation.
 - **Executable paths without a packet** — 46, all dispositioned: 38 `leaf` (module, test or
@@ -167,8 +174,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   evidence. P03C-f/#1421 dispositioned six preambles, P03C-g/#1424 dispositioned four timeline
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
-  and P03C-j/#1433 mapped two Motion key-selection/curve-widget spans; 126 spans remain
-  undispositioned.
+  P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
+  five Tween assignment-seam spans; 121 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -208,8 +215,11 @@ existing C02/C20 evidence. P03C-i/#1430 maps eight C02 expression wrappers and m
 boundary, with C20k evidence. P03C-j/#1433 maps frozen `keysLockedTo` to pending C02 key-selection
 with C20c evidence and the `selectKeys`/curve-widget bridge jointly to pending C02 key-selection
 and curves/easing with C20o evidence. Packet admissions and computed range coverage remain
+unchanged. P03C-k/#1436 records the frozen Tween assignment call sites against pending C02
+matching/resampling responsibilities, while P23/#1025 (PR #1166) remains limited to its accepted
+Hungarian solver extraction; 516 Tweens and 7 185 global computed uncovered code lines are
 unchanged. **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 126
+pending packets, no notes needing reconciliation, 0 unmapped paths and 121
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition

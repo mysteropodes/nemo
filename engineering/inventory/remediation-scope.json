@@ -6205,6 +6205,48 @@
           4992,
           5016
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            411,
+            415
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, lines 411-415 are comment-only explanation that the Hungarian assignment solver was extracted to domain/tween/assignment.js. Accepted P23/#1025 (PR #1166, merged as 579bfe8) records that bounded solver extraction; the adjacent matching implementation remains C02.tween-engine.feature-extraction-and-matching (#1037). This comment preamble has no separate executable responsibility and grants no code coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            472,
+            472
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 472 calls NemoTweenAssignment.solve for autoMatchJS's first cost matrix. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction and matching context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            564,
+            564
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 564 calls NemoTweenAssignment.solve for autoMatchJS's second-pass cost matrix. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction and matching context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            630,
+            630
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 630 calls NemoTweenAssignment.solve inside autoMatchJS's relational-refinement assignment loop. C02.tween-engine.feature-extraction-and-matching (#1037) owns the feature-extraction, assignment and relational-refinement context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted the generic Hungarian solver but did not accept the broader C02 matcher. C02 remains pending; this does not add numeric coverage, packet admission, matcher parity or behavior acceptance."
+        },
+        {
+          "span": [
+            1020,
+            1020
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1020 in _matchLandmarks calls NemoTweenAssignment.solve on its augmented landmark-correspondence cost matrix. C02.tween-engine.resampling-and-nonrigid-warping (#1037) names _matchLandmarks and owns the feature-aware resampling/nonrigid-warping context; accepted P23/#1025 (PR #1166, merged as 579bfe8) extracted only the generic assignment solver. The C02 packet remains pending; this does not add numeric coverage, packet admission, warp behavior acceptance or a parity claim."
+        }
       ]
     },
     {
