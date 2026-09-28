@@ -313,6 +313,25 @@ test('close receipt retrieval is fingerprinted and retains protection after disp
   assert.equal(h.controller.status(), 'native'); assert.equal(h.state.releases, 1);
 });
 
+test('release drains pending preview work while denying its late awaited presentation', async () => {
+  let finishHost;
+  const gate = new Promise((resolve) => { finishHost = resolve; });
+  const h = nativeHarness(staticSource(), { previewGate: gate });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const awaited = h.state.lifecycle.presentPreview(10);
+  for (let spin = 0; spin < 5 && h.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(h.state.previews.length, 1);
+  const closing = h.controller.releaseCurrent('preview-drain');
+  assert.equal(h.controller.status(), 'release-requested');
+  finishHost();
+  await assert.rejects(awaited, /not active/);
+  assert.equal((await closing).status, 'closed');
+  assert.equal(h.state.releases, 1);
+  assert.equal(h.state.disconnects, 1);
+  await assert.rejects(h.state.lifecycle.presentPreview(10), /not active/);
+  assert.equal(h.state.imports.length, 0);
+});
+
 test('resize failure fences the current owner without closing or importing it', async () => {
   const h = surfaceHarness(staticSource());
   await h.controller.activate(h.prepared);
