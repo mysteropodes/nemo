@@ -6693,6 +6693,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            9
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / project.js blob e2248533b47b0a067a61e4b641f83c7d24b00e79: lines 1-8 are New/Open/Save/Recent project-management header comments, while line 9 is executable (function(){ opening the IIFE around the whole project module. The opener is not comment-only and is not a separate feature writer or solely one C01 responsibility. First feature data RECENTS_KEY/MAX_RECENTS begins at line 10 in pending C01.project.start-screen; other pending C01 packets own document I/O, close guard, tabs, history and team sync. Pinned C01 census blob d81b618308f9f4849b0ba24fa512af6be90aa72c. Current project.js has a different blob under native work, so this classifies only the frozen span. No packet admission, numeric source coverage, project/save/load/browser/Tauri/native behavior or runtime acceptance is claimed."
+        },
+        {
+          "span": [
             11,
             19
           ],

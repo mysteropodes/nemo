@@ -521,8 +521,26 @@ computed uncovered code remains 7 185 and frozen `tools.js` retains 3
 computed uncovered code lines. No packet admission, numeric range coverage,
 fill behavior, JS/Rust parity or runtime acceptance is claimed.
 
+P03C-aq/#1513 marks frozen `src/js/project.js:1-9` as a structural and
+documentary `boundary`. Lines 1-8 are New/Open/Save/Recent comments; line 9 is
+the executable `(function(){` IIFE opener around the entire project module,
+not comment-only or attributable solely to one C01 packet. First feature
+data `RECENTS_KEY`/`MAX_RECENTS` begins at line 10 in pending
+`C01.project.start-screen`; the opener also encloses the other pending C01
+project responsibilities. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, project blob
+`e2248533b47b0a067a61e4b641f83c7d24b00e79` and pinned C01 census blob
+`d81b618308f9f4849b0ba24fa512af6be90aa72c`. Current protected
+`project.js` has a different blob under native work, so this disposition
+classifies only the frozen span. The 11 previously undispositioned spans
+become 10, with zero frozen `project.js` spans remaining. All 762 packets
+stay pending, global computed uncovered code remains 7 185 and frozen
+`project.js` retains 70 computed uncovered code lines. No packet admission,
+numeric range coverage, project/save/load/browser/Tauri/native behavior or
+runtime acceptance is claimed.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 11
+pending packets, no notes needing reconciliation, 0 unmapped paths and 10
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
