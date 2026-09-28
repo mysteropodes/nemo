@@ -631,7 +631,13 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     _motionColumnPreset = localStorage.getItem('nemo-motion-columns') || '3d';
     _motionSnapEnabled = localStorage.getItem('nemo-motion-snap') !== '0';
   } catch (e) {}
-  function propHasContent(holder, prop) { return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]); }
+  function propHasContent(holder, prop) {
+    if (prop === 'opacity' && nativeOwns(holder, prop)) {
+      var model = nativeOpacityModel(holder, state.currentFrame);
+      return model.animated || model.staticValue !== undefined;
+    }
+    return isAnimated(holder, prop) || !!(holder.motionStatic && holder.motionStatic[prop]);
+  }
   function isPropFiltered(prop) { return !!_propFilter && _propFilter.indexOf(prop) < 0; }
   function propHasExpression(holder, prop) {
     return !!(holder && holder.expressions && holder.expressions[prop] && holder.expressions[prop].enabled);
@@ -1196,7 +1202,10 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     return ld.motion[prop];
   }
   function hasKeys(ld, prop) { var t = trackFor(ld, prop); return !!(t && t.keys && t.keys.length); }
-  function isAnimated(ld, prop) { return hasKeys(ld, prop); }
+  function isAnimated(ld, prop) {
+    if (prop === 'opacity' && nativeOwns(ld, prop)) return nativeOpacityModel(ld, state.currentFrame).animated;
+    return hasKeys(ld, prop);
+  }
   function sortKeys(track) { track.keys.sort(function (a, b) { return a.frame - b.frame; }); }
   function keyAt(track, frame) {
     if (!track || !track.keys || !track.keys.length) return null;
@@ -2720,6 +2729,9 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     return surface; }
   function nativeRead(holder, prop, frame) { var surface = nativeMotionSurface(); return surface && surface.read(window.NemoNativeOpacityCutover, holder, prop, frame); }
   function nativeOwns(holder, prop) { var surface = nativeMotionSurface(); return !!surface && surface.owns(window.NemoNativeOpacityCutover, holder, prop); }
+  function nativeOpacityModel(holder, frame) {
+    return nativeMotionSurface().opacityReadModel(window.NemoNativeOpacityCutover, holder, frame);
+  }
   function setKeyAtCurrentFrame(ld, prop, values) {
     if (prop === 'opacity') {
       var legacy = opacityLegacy('key-current', ld, values, state.currentFrame);
@@ -10534,6 +10546,43 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
   function trackRowHtml(ld, prop, rowEl) {
     rowEl.innerHTML = '';
     rowEl.style.position = 'relative';
+    if (prop === 'opacity' && nativeOwns(ld, prop)) {
+      // Native keys are detached display data. Never enter the generic
+      // trackFor builder, whose key and connector listeners edit JS tracks.
+      var model = nativeOpacityModel(ld, state.currentFrame);
+      rowEl.style.pointerEvents = 'none';
+      var nativeSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      nativeSvg.setAttribute('width', state.totalFrames * FC);
+      nativeSvg.setAttribute('height', ROW_H);
+      nativeSvg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
+      if (model.keys.length > 1 && model.keys[0].value !== model.keys[1].value) {
+        var conn = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        conn.setAttribute('class', 'native-opacity-connector');
+        conn.setAttribute('x', model.keys[0].frame * FC + FC / 2);
+        conn.setAttribute('y', Math.round((ROW_H - 5) / 2));
+        conn.setAttribute('width', (model.keys[1].frame - model.keys[0].frame) * FC);
+        conn.setAttribute('height', 5); conn.setAttribute('rx', 2);
+        conn.style.cssText = 'fill:#2E6B60;pointer-events:none;'; nativeSvg.appendChild(conn);
+      }
+      rowEl.appendChild(nativeSvg);
+      for (var nativeFrame = 0; nativeFrame < state.totalFrames; nativeFrame++) {
+        var nativeCell = document.createElement('div');
+        nativeCell.className = 'fc motion-fc' + (nativeFrame === state.currentFrame ? ' cur' : '');
+        nativeCell.dataset.frame = nativeFrame;
+        if (model.keys.some(function (key) { return key.frame === nativeFrame; })) {
+          var nativeDiamond = document.createElement('div');
+          nativeDiamond.className = 'native-opacity-diamond';
+          nativeDiamond.style.cssText = 'position:relative;z-index:2;width:7px;height:7px;border-radius:2px;'
+            + 'background:' + (nativeFrame === state.currentFrame ? '#ffaa28' : 'transparent') + ';'
+            + 'border:1.5px solid ' + (nativeFrame === state.currentFrame ? '#ffaa28' : '#cfcfcf') + ';'
+            + 'transform:rotate(45deg);pointer-events:none;';
+          nativeDiamond.title = (PROP_LABEL[prop] || prop) + ' · image ' + (nativeFrame + 1);
+          nativeCell.appendChild(nativeDiamond);
+        }
+        rowEl.appendChild(nativeCell);
+      }
+      return;
+    }
     // Tagged directly on the element (plain JS properties, not a WeakMap —
     // simplest way for the marquee-select code below to recover "which
     // holder/prop does this row belong to" from a DOM hit-test without
@@ -13195,7 +13244,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
       // longer installs that grip at all — see renderTimelineMotion's own
       // comment on why (the bar's mousedown arms reordering itself now).
       // .layer-inout-bar's own exemption below is what that relies on.
-      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
+      if (e.target.closest('.fc.motion-fc, .layer-inout-handle, .layer-inout-key, .layer-inout-bar, .motion-key-connect, .native-opacity-diamond, .native-opacity-connector, #frame-hdr, #playhead-flag, #bars-row, #motion-graph-resize')) return;
       // Scrollbar clicks land on the wrap itself but outside its client
       // area — intercepting them would break scrollbar dragging.
       var r = wrap.getBoundingClientRect();

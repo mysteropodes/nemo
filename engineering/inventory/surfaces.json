@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "571da35cef3b69bf4030a210d38c0c6405d679d7",
-  "describe": "v0.7.0-alpha.4-573-g571da35"
+  "head": "2e666bc2c486522ebea21af0abe88840bb73d3f2",
+  "describe": "v0.7.0-alpha.4-593-g2e666bc"
  },
- "inputsDigest": "8e44fafb69d331e7e0d89a713c28d272b15d50e4c98982f0c6d6e1ad4e46f0cd",
+ "inputsDigest": "43972031af64f0a7181d3631a20b8fbd4e5ff70356933e14eed36f27f1725f6e",
  "states": [
   "inventoried",
   "characterized",
@@ -236,7 +236,7 @@
   },
   "SMMotion": {
    "file": "src/js/motion.js",
-   "line": 13209,
+   "line": 13258,
    "members": 29
   },
   "SMNativeVideo": {
@@ -723,7 +723,7 @@
     "functionsVisited": 6,
     "via": "variable btn",
     "references": [
-     "src/js/motion.js:7254 action()"
+     "src/js/motion.js:7266 action()"
     ]
    },
    "fixtures": [
@@ -1141,7 +1141,7 @@
     "functionsVisited": 533,
     "via": "variable btn",
     "references": [
-     "src/js/motion.js:7253 action()"
+     "src/js/motion.js:7265 action()"
     ]
    },
    "fixtures": [
@@ -2990,7 +2990,7 @@
     "functionsVisited": 138,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13075 setAppMode()",
+     "src/js/motion.js:13124 setAppMode()",
      "src/js/timeline.js:1169 toggleLayerMotionBlur()",
      "src/js/timeline.js:1190 toggleMotionBlurComp()"
     ]
@@ -3252,7 +3252,7 @@
     "via": "variable b",
     "references": [
      "src/js/motion-graph.js:457 toggle()",
-     "src/js/motion.js:13071 setAppMode()"
+     "src/js/motion.js:13120 setAppMode()"
     ]
    },
    "fixtures": [
@@ -4849,7 +4849,7 @@
     "functionsVisited": 122,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13073 setAppMode()",
+     "src/js/motion.js:13122 setAppMode()",
      "src/js/timeline.js:1210 toggleLayerShy()"
     ]
    },
@@ -18719,7 +18719,7 @@
    "capability": "StoryBoard — in development, not yet available in this build",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13109 initModeSwitch()"
+    "src/js/motion.js:13158 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18768,7 +18768,7 @@
    "capability": "2D Animation",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13109 initModeSwitch()"
+    "src/js/motion.js:13158 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18817,7 +18817,7 @@
    "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13109 initModeSwitch()"
+    "src/js/motion.js:13158 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -21505,7 +21505,7 @@
    "id": "labs:diagnostics-panel",
    "kind": "labs",
    "surface": "Settings > Labs / SMLabs.diagnostics-panel",
-   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; a row click selects the layer it touched, Report produces a reproduction bundle",
+   "capability": "labsDescribeDiagnosticsPanel",
    "area": "labs",
    "handler": [
     "src/js/labs/diagnostics-panel.js:176"
@@ -24212,13 +24212,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10436",
+   "id": "menu:motion.js:10448",
    "kind": "menu",
    "surface": "dynamic menu (renderDiscreteKeyGridRow)",
    "capability": "Delete this key",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10436 renderDiscreteKeyGridRow()"
+    "src/js/motion.js:10448 renderDiscreteKeyGridRow()"
    ],
    "events": [
     "click"
@@ -24239,7 +24239,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10436",
+   "source": "src/js/motion.js:10448",
    "meta": {
     "i18n": "ctxDeleteThisKey",
     "functionsVisited": 475
@@ -24254,13 +24254,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10831",
+   "id": "menu:motion.js:10880",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Delete this key",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10831 trackRowHtml()"
+    "src/js/motion.js:10880 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24281,7 +24281,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10831",
+   "source": "src/js/motion.js:10880",
    "meta": {
     "i18n": "ctxDeleteThisKey",
     "functionsVisited": 266
@@ -24296,13 +24296,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10834",
+   "id": "menu:motion.js:10883",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Add a key here",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10834 trackRowHtml()"
+    "src/js/motion.js:10883 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24323,7 +24323,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10834",
+   "source": "src/js/motion.js:10883",
    "meta": {
     "i18n": "ctxAddKeyHere",
     "functionsVisited": 476
@@ -24338,13 +24338,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10840",
+   "id": "menu:motion.js:10889",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Edit the ease curve…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10840 trackRowHtml()"
+    "src/js/motion.js:10889 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24363,7 +24363,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10840",
+   "source": "src/js/motion.js:10889",
    "meta": {
     "i18n": "ctxEditEaseCurve",
     "functionsVisited": 135
@@ -24378,13 +24378,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10856",
+   "id": "menu:motion.js:10905",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Easy Ease  (F9)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10856 trackRowHtml()"
+    "src/js/motion.js:10905 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24401,7 +24401,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10856",
+   "source": "src/js/motion.js:10905",
    "meta": {
     "i18n": "ctxEasyEaseF9",
     "functionsVisited": 10
@@ -24416,13 +24416,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10857",
+   "id": "menu:motion.js:10906",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Easy Ease In  (Shift+F9)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10857 trackRowHtml()"
+    "src/js/motion.js:10906 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24439,7 +24439,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10857",
+   "source": "src/js/motion.js:10906",
    "meta": {
     "i18n": "ctxEasyEaseInShiftF9",
     "functionsVisited": 10
@@ -24454,13 +24454,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10858",
+   "id": "menu:motion.js:10907",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Easy Ease Out  (Cmd+Shift+F9)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10858 trackRowHtml()"
+    "src/js/motion.js:10907 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24477,7 +24477,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10858",
+   "source": "src/js/motion.js:10907",
    "meta": {
     "i18n": "ctxEasyEaseOutCmdShiftF9",
     "functionsVisited": 10
@@ -24492,13 +24492,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10859",
+   "id": "menu:motion.js:10908",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Linear  (Cmd+Alt+K)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10859 trackRowHtml()"
+    "src/js/motion.js:10908 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24515,7 +24515,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10859",
+   "source": "src/js/motion.js:10908",
    "meta": {
     "i18n": "ctxLinearCmdAltK",
     "functionsVisited": 10
@@ -24530,13 +24530,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10867",
+   "id": "menu:motion.js:10916",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Distribute evenly",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10867 trackRowHtml()"
+    "src/js/motion.js:10916 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24557,7 +24557,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10867",
+   "source": "src/js/motion.js:10916",
    "meta": {
     "i18n": "ctxDistributeEvenly",
     "functionsVisited": 270
@@ -24572,13 +24572,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10868",
+   "id": "menu:motion.js:10917",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Flip order",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10868 trackRowHtml()"
+    "src/js/motion.js:10917 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24599,7 +24599,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10868",
+   "source": "src/js/motion.js:10917",
    "meta": {
     "i18n": "ctxFlipOrder",
     "functionsVisited": 270
@@ -24614,13 +24614,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10869",
+   "id": "menu:motion.js:10918",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Subdivide (key at midpoint)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10869 trackRowHtml()"
+    "src/js/motion.js:10918 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24641,7 +24641,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10869",
+   "source": "src/js/motion.js:10918",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
     "functionsVisited": 488
@@ -24656,13 +24656,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10870",
+   "id": "menu:motion.js:10919",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Color the keys…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10870 trackRowHtml()"
+    "src/js/motion.js:10919 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24680,7 +24680,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10870",
+   "source": "src/js/motion.js:10919",
    "meta": {
     "i18n": "ctxColorKeysEllipsis",
     "functionsVisited": 43
@@ -24695,13 +24695,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10875",
+   "id": "menu:motion.js:10924",
    "kind": "menu",
    "surface": "dynamic menu (action)",
    "capability": "Remove the color",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10875 action()"
+    "src/js/motion.js:10924 action()"
    ],
    "events": [
     "click"
@@ -24719,7 +24719,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10875",
+   "source": "src/js/motion.js:10924",
    "meta": {
     "i18n": "ctxRemoveColor",
     "functionsVisited": 40
@@ -24734,13 +24734,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10877",
+   "id": "menu:motion.js:10926",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Select every other one",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10877 trackRowHtml()"
+    "src/js/motion.js:10926 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24757,7 +24757,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10877",
+   "source": "src/js/motion.js:10926",
    "meta": {
     "i18n": "ctxSelectEvery2nd",
     "functionsVisited": 41
@@ -24772,13 +24772,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10878",
+   "id": "menu:motion.js:10927",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Select 1 in N…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10878 trackRowHtml()"
+    "src/js/motion.js:10927 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24795,7 +24795,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10878",
+   "source": "src/js/motion.js:10927",
    "meta": {
     "i18n": "ctxSelectEveryNthEllipsis",
     "functionsVisited": 42
@@ -24810,13 +24810,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10882",
+   "id": "menu:motion.js:10931",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Keep at random…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10882 trackRowHtml()"
+    "src/js/motion.js:10931 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24833,7 +24833,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10882",
+   "source": "src/js/motion.js:10931",
    "meta": {
     "i18n": "ctxKeepRandomEllipsis",
     "functionsVisited": 47
@@ -24848,13 +24848,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10887",
+   "id": "menu:motion.js:10936",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Invert the selection",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10887 trackRowHtml()"
+    "src/js/motion.js:10936 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24871,7 +24871,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10887",
+   "source": "src/js/motion.js:10936",
    "meta": {
     "i18n": "ctxInvertSelection",
     "functionsVisited": 101
@@ -24886,13 +24886,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10897",
+   "id": "menu:motion.js:10946",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Parent in Time — link time to…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10897 trackRowHtml()"
+    "src/js/motion.js:10946 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24913,7 +24913,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10897",
+   "source": "src/js/motion.js:10946",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
     "functionsVisited": 341
@@ -24928,13 +24928,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:11407",
+   "id": "menu:motion.js:11456",
    "kind": "menu",
    "surface": "dynamic menu (decorateMotionPropertyRow)",
    "capability": "Expression controls…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:11407 decorateMotionPropertyRow()"
+    "src/js/motion.js:11456 decorateMotionPropertyRow()"
    ],
    "events": [
     "click"
@@ -24952,7 +24952,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:11407",
+   "source": "src/js/motion.js:11456",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
     "functionsVisited": 35
@@ -24967,13 +24967,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:11411",
+   "id": "menu:motion.js:11460",
    "kind": "menu",
    "surface": "dynamic menu (decorateMotionPropertyRow)",
    "capability": "Bake expression to keyframes…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:11411 decorateMotionPropertyRow()"
+    "src/js/motion.js:11460 decorateMotionPropertyRow()"
    ],
    "events": [
     "click"
@@ -24991,7 +24991,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:11411",
+   "source": "src/js/motion.js:11460",
    "meta": {
     "i18n": "ctxBakeExpressionEllipsis",
     "functionsVisited": 145
@@ -25241,13 +25241,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7236",
+   "id": "menu:motion.js:7248",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7236 renderLayerListMotion()"
+    "src/js/motion.js:7248 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25265,7 +25265,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7236",
+   "source": "src/js/motion.js:7248",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 78
@@ -25280,13 +25280,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7241",
+   "id": "menu:motion.js:7253",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Remove from the folder",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7241 renderLayerListMotion()"
+    "src/js/motion.js:7253 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25307,7 +25307,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7241",
+   "source": "src/js/motion.js:7253",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
     "functionsVisited": 171
@@ -25322,13 +25322,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7251",
+   "id": "menu:motion.js:7263",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Convert to component",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7251 renderLayerListMotion()"
+    "src/js/motion.js:7263 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25348,7 +25348,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7251",
+   "source": "src/js/motion.js:7263",
    "meta": {
     "i18n": "ctxConvertToComponent",
     "functionsVisited": 108
@@ -25363,13 +25363,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7252",
+   "id": "menu:motion.js:7264",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Break apart the component",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7252 renderLayerListMotion()"
+    "src/js/motion.js:7264 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25390,7 +25390,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7252",
+   "source": "src/js/motion.js:7264",
    "meta": {
     "i18n": "ctxBreakApartComponent",
     "functionsVisited": 151
@@ -25405,13 +25405,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7253",
+   "id": "menu:motion.js:7265",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Insert a camera layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7253 renderLayerListMotion()"
+    "src/js/motion.js:7265 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25425,7 +25425,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7253",
+   "source": "src/js/motion.js:7265",
    "meta": {
     "i18n": "ctxInsertCameraLayer",
     "functionsVisited": 2
@@ -25440,13 +25440,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7254",
+   "id": "menu:motion.js:7266",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Import an audio track…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7254 renderLayerListMotion()"
+    "src/js/motion.js:7266 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25460,7 +25460,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7254",
+   "source": "src/js/motion.js:7266",
    "meta": {
     "i18n": "ctxInsertAudioTrack",
     "functionsVisited": 2
@@ -25475,13 +25475,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7255",
+   "id": "menu:motion.js:7267",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Split into layers (one shape per layer)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7255 renderLayerListMotion()"
+    "src/js/motion.js:7267 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25500,7 +25500,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7255",
+   "source": "src/js/motion.js:7267",
    "meta": {
     "i18n": "ctxSplitIntoLayers",
     "functionsVisited": 34
@@ -25515,13 +25515,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7256",
+   "id": "menu:motion.js:7268",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Cut at the playhead  (⌘⇧D)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7256 renderLayerListMotion()"
+    "src/js/motion.js:7268 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25542,7 +25542,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7256",
+   "source": "src/js/motion.js:7268",
    "meta": {
     "i18n": "ctxCutAtPlayhead",
     "functionsVisited": 194
@@ -25557,13 +25557,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7278",
+   "id": "menu:motion.js:7290",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Parent in Time — link time to…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7278 renderLayerListMotion()"
+    "src/js/motion.js:7290 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25584,7 +25584,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7278",
+   "source": "src/js/motion.js:7290",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
     "functionsVisited": 341
@@ -25599,13 +25599,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7286",
+   "id": "menu:motion.js:7298",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Expression controls…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7286 renderLayerListMotion()"
+    "src/js/motion.js:7298 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25623,7 +25623,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7286",
+   "source": "src/js/motion.js:7298",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
     "functionsVisited": 35
@@ -25638,13 +25638,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7294",
+   "id": "menu:motion.js:7306",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Widget settings…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7294 renderLayerListMotion()"
+    "src/js/motion.js:7306 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25662,7 +25662,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7294",
+   "source": "src/js/motion.js:7306",
    "meta": {
     "i18n": "ctxWidgetSettingsEllipsis",
     "functionsVisited": 23
@@ -25677,13 +25677,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7299",
+   "id": "menu:motion.js:7311",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Add an effector layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7299 renderLayerListMotion()"
+    "src/js/motion.js:7311 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25704,7 +25704,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7299",
+   "source": "src/js/motion.js:7311",
    "meta": {
     "i18n": "ctxAddEffectorLayer",
     "functionsVisited": 89
@@ -25719,13 +25719,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7304",
+   "id": "menu:motion.js:7316",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Add a marker on this layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7304 renderLayerListMotion()"
+    "src/js/motion.js:7316 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25742,7 +25742,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7304",
+   "source": "src/js/motion.js:7316",
    "meta": {
     "i18n": "ctxAddMarkerOnLayer",
     "functionsVisited": 17
@@ -25757,13 +25757,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7315",
+   "id": "menu:motion.js:7327",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Merge the selected layers",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7315 renderLayerListMotion()"
+    "src/js/motion.js:7327 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25784,7 +25784,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7315",
+   "source": "src/js/motion.js:7327",
    "meta": {
     "i18n": "ctxMergeSelectedLayers",
     "functionsVisited": 132
@@ -25799,13 +25799,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7316",
+   "id": "menu:motion.js:7328",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Object-mode Duplicator…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7316 renderLayerListMotion()"
+    "src/js/motion.js:7328 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25826,7 +25826,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7316",
+   "source": "src/js/motion.js:7328",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
     "functionsVisited": 167
@@ -25841,13 +25841,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7318",
+   "id": "menu:motion.js:7330",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Stagger the selected layers…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7318 renderLayerListMotion()"
+    "src/js/motion.js:7330 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25865,7 +25865,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7318",
+   "source": "src/js/motion.js:7330",
    "meta": {
     "i18n": "ctxStaggerSelectedLayersEllipsis",
     "functionsVisited": 139
@@ -25880,13 +25880,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7734",
+   "id": "menu:motion.js:7746",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Matte layer:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7734 openMatteConfigMenu()"
+    "src/js/motion.js:7746 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25900,7 +25900,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7734",
+   "source": "src/js/motion.js:7746",
    "meta": {
     "i18n": "matteMenuSourceHdr",
     "functionsVisited": 0
@@ -25915,13 +25915,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7740",
+   "id": "menu:motion.js:7752",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "  ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7740 openMatteConfigMenu()"
+    "src/js/motion.js:7752 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25940,7 +25940,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7740",
+   "source": "src/js/motion.js:7752",
    "meta": {
     "i18n": null,
     "functionsVisited": 157
@@ -25955,13 +25955,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7754",
+   "id": "menu:motion.js:7766",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Mode:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7754 openMatteConfigMenu()"
+    "src/js/motion.js:7766 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25975,7 +25975,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7754",
+   "source": "src/js/motion.js:7766",
    "meta": {
     "i18n": "matteMenuModeHdr",
     "functionsVisited": 0
@@ -25990,13 +25990,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7757",
+   "id": "menu:motion.js:7769",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "  ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7757 openMatteConfigMenu()"
+    "src/js/motion.js:7769 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -26015,7 +26015,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7757",
+   "source": "src/js/motion.js:7769",
    "meta": {
     "i18n": null,
     "functionsVisited": 153
@@ -26030,13 +26030,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7764",
+   "id": "menu:motion.js:7776",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Remove the matte",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7764 openMatteConfigMenu()"
+    "src/js/motion.js:7776 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -26055,120 +26055,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7764",
+   "source": "src/js/motion.js:7776",
    "meta": {
     "i18n": "matteMenuRemove",
     "functionsVisited": 153
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:7812",
-   "kind": "menu",
-   "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "Matte layer:",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:7812 openExtraMatteMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7812",
-   "meta": {
-    "i18n": "matteMenuSourceHdr",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:7815",
-   "kind": "menu",
-   "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "  ",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:7815 openExtraMatteMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 1,
-    "persist": 2,
-    "render": 2,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7815",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 157
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:7821",
-   "kind": "menu",
-   "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "Mode:",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:7821 openExtraMatteMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7821",
-   "meta": {
-    "i18n": "matteMenuModeHdr",
-    "functionsVisited": 0
    },
    "fixtures": [
     "static-props",
@@ -26183,10 +26073,45 @@
    "id": "menu:motion.js:7824",
    "kind": "menu",
    "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "  ",
+   "capability": "Matte layer:",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:7824 openExtraMatteMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:7824",
+   "meta": {
+    "i18n": "matteMenuSourceHdr",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:7827",
+   "kind": "menu",
+   "surface": "dynamic menu (openExtraMatteMenu)",
+   "capability": "  ",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:7827 openExtraMatteMenu()"
    ],
    "events": [
     "click"
@@ -26205,7 +26130,82 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7824",
+   "source": "src/js/motion.js:7827",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 157
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:7833",
+   "kind": "menu",
+   "surface": "dynamic menu (openExtraMatteMenu)",
+   "capability": "Mode:",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:7833 openExtraMatteMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:7833",
+   "meta": {
+    "i18n": "matteMenuModeHdr",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:7836",
+   "kind": "menu",
+   "surface": "dynamic menu (openExtraMatteMenu)",
+   "capability": "  ",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:7836 openExtraMatteMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 1,
+    "persist": 2,
+    "render": 2,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:7836",
    "meta": {
     "i18n": null,
     "functionsVisited": 153
@@ -26220,13 +26220,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7830",
+   "id": "menu:motion.js:7842",
    "kind": "menu",
    "surface": "dynamic menu (openExtraMatteMenu)",
    "capability": "Remove the matte",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7830 openExtraMatteMenu()"
+    "src/js/motion.js:7842 openExtraMatteMenu()"
    ],
    "events": [
     "click"
@@ -26245,7 +26245,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7830",
+   "source": "src/js/motion.js:7842",
    "meta": {
     "i18n": "matteMenuRemove",
     "functionsVisited": 153
@@ -26260,13 +26260,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8171",
+   "id": "menu:motion.js:8183",
    "kind": "menu",
    "surface": "dynamic menu (openExtraParentMenu)",
    "capability": "Remove this parent",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8171 openExtraParentMenu()"
+    "src/js/motion.js:8183 openExtraParentMenu()"
    ],
    "events": [
     "click"
@@ -26287,7 +26287,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8171",
+   "source": "src/js/motion.js:8183",
    "meta": {
     "i18n": "menuRemoveThisParent",
     "functionsVisited": 471
@@ -26302,13 +26302,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8248",
+   "id": "menu:motion.js:8260",
    "kind": "menu",
    "surface": "dynamic menu (renderTimeLinkRow)",
    "capability": "Unlink time",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8248 renderTimeLinkRow()"
+    "src/js/motion.js:8260 renderTimeLinkRow()"
    ],
    "events": [
     "click"
@@ -26329,7 +26329,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8248",
+   "source": "src/js/motion.js:8260",
    "meta": {
     "i18n": "ctxUnlinkTime",
     "functionsVisited": 500
@@ -26344,13 +26344,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8337",
+   "id": "menu:motion.js:8349",
    "kind": "menu",
    "surface": "dynamic menu (buildKeyLockMenuItems)",
    "capability": "Lock keyframes on:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8337 buildKeyLockMenuItems()"
+    "src/js/motion.js:8349 buildKeyLockMenuItems()"
    ],
    "events": [
     "click"
@@ -26364,7 +26364,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8337",
+   "source": "src/js/motion.js:8349",
    "meta": {
     "i18n": "ctxLockKeyframesOnColon",
     "functionsVisited": 0
@@ -26379,13 +26379,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8372",
+   "id": "menu:motion.js:8384",
    "kind": "menu",
    "surface": "dynamic menu (buildKeySelectionLockMenuItems)",
    "capability": "Lock keyframes on:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8372 buildKeySelectionLockMenuItems()"
+    "src/js/motion.js:8384 buildKeySelectionLockMenuItems()"
    ],
    "events": [
     "click"
@@ -26399,7 +26399,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8372",
+   "source": "src/js/motion.js:8384",
    "meta": {
     "i18n": "ctxLockKeyframesOnColon",
     "functionsVisited": 0
@@ -26414,13 +26414,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8966",
+   "id": "menu:motion.js:8978",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "value — no change",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8966 buildExprEditorRow()"
+    "src/js/motion.js:8978 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26436,7 +26436,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8966",
+   "source": "src/js/motion.js:8978",
    "meta": {
     "i18n": "exprExValue",
     "functionsVisited": 10
@@ -26451,121 +26451,10 @@
    ]
   },
   {
-   "id": "menu:motion.js:8967",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "wiggle — random shake",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8967 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8967",
-   "meta": {
-    "i18n": "exprExWiggle",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8971",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "Math.sin — steady oscillation",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8971 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8971",
-   "meta": {
-    "i18n": "exprExOscillate",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8975",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "stepTime — shake stepped every 4 frames",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8975 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8975",
-   "meta": {
-    "i18n": "exprExStepped",
-    "functionsVisited": 15
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
    "id": "menu:motion.js:8979",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopAfter('cycle') — repeat after the last keyframe",
+   "capability": "wiggle — random shake",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:8979 buildExprEditorRow()"
@@ -26586,118 +26475,7 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:8979",
    "meta": {
-    "i18n": "exprExLoopCycle",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8980",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopAfter('pingpong') — repeat back and forth",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8980 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8980",
-   "meta": {
-    "i18n": "exprExLoopPingpong",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8981",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopAfter('offset') — repeat, each pass stacking on the last",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8981 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8981",
-   "meta": {
-    "i18n": "exprExLoopOffset",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8982",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopBefore('cycle') — repeat before the first keyframe",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8982 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8982",
-   "meta": {
-    "i18n": "exprExLoopBefore",
+    "i18n": "exprExWiggle",
     "functionsVisited": 11
    },
    "fixtures": [
@@ -26713,7 +26491,7 @@
    "id": "menu:motion.js:8983",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "Bounce after the last keyframe",
+   "capability": "Math.sin — steady oscillation",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:8983 buildExprEditorRow()"
@@ -26734,8 +26512,45 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:8983",
    "meta": {
-    "i18n": "exprExBounce",
-    "functionsVisited": 20
+    "i18n": "exprExOscillate",
+    "functionsVisited": 11
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:8987",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "stepTime — shake stepped every 4 frames",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:8987 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:8987",
+   "meta": {
+    "i18n": "exprExStepped",
+    "functionsVisited": 15
    },
    "fixtures": [
     "static-props",
@@ -26750,7 +26565,7 @@
    "id": "menu:motion.js:8991",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "remap — driven by another layer’s X",
+   "capability": "loopAfter('cycle') — repeat after the last keyframe",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:8991 buildExprEditorRow()"
@@ -26771,7 +26586,7 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:8991",
    "meta": {
-    "i18n": "exprExRemapOther",
+    "i18n": "exprExLoopCycle",
     "functionsVisited": 11
    },
    "fixtures": [
@@ -26784,13 +26599,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8996",
+   "id": "menu:motion.js:8992",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "seed + randomFixed — a fixed offset per layer",
+   "capability": "loopAfter('pingpong') — repeat back and forth",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8996 buildExprEditorRow()"
+    "src/js/motion.js:8992 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26806,7 +26621,192 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8996",
+   "source": "src/js/motion.js:8992",
+   "meta": {
+    "i18n": "exprExLoopPingpong",
+    "functionsVisited": 11
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:8993",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "loopAfter('offset') — repeat, each pass stacking on the last",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:8993 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:8993",
+   "meta": {
+    "i18n": "exprExLoopOffset",
+    "functionsVisited": 11
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:8994",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "loopBefore('cycle') — repeat before the first keyframe",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:8994 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:8994",
+   "meta": {
+    "i18n": "exprExLoopBefore",
+    "functionsVisited": 11
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:8995",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "Bounce after the last keyframe",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:8995 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:8995",
+   "meta": {
+    "i18n": "exprExBounce",
+    "functionsVisited": 20
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9003",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "remap — driven by another layer’s X",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9003 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9003",
+   "meta": {
+    "i18n": "exprExRemapOther",
+    "functionsVisited": 11
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9008",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "seed + randomFixed — a fixed offset per layer",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9008 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9008",
    "meta": {
     "i18n": "exprExStagger",
     "functionsVisited": 13
@@ -26821,13 +26821,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9000",
+   "id": "menu:motion.js:9012",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "contentBox — fit to what the layer draws",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9000 buildExprEditorRow()"
+    "src/js/motion.js:9012 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26843,7 +26843,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9000",
+   "source": "src/js/motion.js:9012",
    "meta": {
     "i18n": "exprExContentBox",
     "functionsVisited": 11
@@ -26858,13 +26858,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9007",
+   "id": "menu:motion.js:9019",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "angleTo — angle between two layers",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9007 buildExprEditorRow()"
+    "src/js/motion.js:9019 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26880,7 +26880,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9007",
+   "source": "src/js/motion.js:9019",
    "meta": {
     "i18n": "exprExAngleTo",
     "functionsVisited": 12
@@ -26895,13 +26895,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9010",
+   "id": "menu:motion.js:9022",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "layer('Layer 1') — follow another layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9010 buildExprEditorRow()"
+    "src/js/motion.js:9022 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26917,7 +26917,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9010",
+   "source": "src/js/motion.js:9022",
    "meta": {
     "i18n": "exprExFollowLayer",
     "functionsVisited": 11
@@ -26932,13 +26932,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9011",
+   "id": "menu:motion.js:9023",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "self.keys.at(1) — hold the first keyframe’s value",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9011 buildExprEditorRow()"
+    "src/js/motion.js:9023 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26954,7 +26954,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9011",
+   "source": "src/js/motion.js:9023",
    "meta": {
     "i18n": "exprExFirstKey",
     "functionsVisited": 17
@@ -26969,13 +26969,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9024",
+   "id": "menu:motion.js:9036",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "Read a control on this layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9024 buildExprEditorRow()"
+    "src/js/motion.js:9036 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26991,7 +26991,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9024",
+   "source": "src/js/motion.js:9036",
    "meta": {
     "i18n": "exprExControl",
     "functionsVisited": 22
@@ -27006,13 +27006,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9733",
+   "id": "menu:motion.js:9745",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9733 renderElementsList()"
+    "src/js/motion.js:9745 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27030,7 +27030,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9733",
+   "source": "src/js/motion.js:9745",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 157
@@ -27045,13 +27045,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9734",
+   "id": "menu:motion.js:9746",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Select members",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9734 renderElementsList()"
+    "src/js/motion.js:9746 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27070,7 +27070,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9734",
+   "source": "src/js/motion.js:9746",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 73
@@ -27085,13 +27085,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9735",
+   "id": "menu:motion.js:9747",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Ungroup",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9735 renderElementsList()"
+    "src/js/motion.js:9747 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27112,7 +27112,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9735",
+   "source": "src/js/motion.js:9747",
    "meta": {
     "i18n": "elementsUngroup",
     "functionsVisited": 490
@@ -27127,13 +27127,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9778",
+   "id": "menu:motion.js:9790",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9778 renderElementsList()"
+    "src/js/motion.js:9790 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27154,7 +27154,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9778",
+   "source": "src/js/motion.js:9790",
    "meta": {
     "i18n": "elementsRename",
     "functionsVisited": 389
@@ -27169,13 +27169,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9779",
+   "id": "menu:motion.js:9791",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Select",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9779 renderElementsList()"
+    "src/js/motion.js:9791 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27194,7 +27194,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9779",
+   "source": "src/js/motion.js:9791",
    "meta": {
     "i18n": "elementsSelect",
     "functionsVisited": 73
@@ -27209,13 +27209,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9780",
+   "id": "menu:motion.js:9792",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Delete",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9780 renderElementsList()"
+    "src/js/motion.js:9792 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27236,7 +27236,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9780",
+   "source": "src/js/motion.js:9792",
    "meta": {
     "i18n": "elementsDelete",
     "functionsVisited": 544
