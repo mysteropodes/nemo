@@ -5804,6 +5804,24 @@
           96,
           96
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            78,
+            93
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen opacity-application.js lines 78-93 define capabilitySummary, which reads ports.capabilities(), clones all registered descriptors, derives the legacy properties projection only from descriptors advertising property.get, and includes operations, retry/trace retention and document identity in the response. P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a added this registered-capability discovery seam; bootstrap binds the port to registry.list(), and the production capability test checks full export.svg.frame plus opacity descriptors, opacity-only properties, and a fresh registry read. The older pinned C07.application-service.command-core packet (#1042) covers the surrounding perform route but describes only hard-coded opacity and remains pending; this disposition does not admit it. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core has a different blob. No numeric source coverage, capability runtime, native/browser/Tauri/client or installed behavior acceptance is claimed."
+        },
+        {
+          "span": [
+            96,
+            96
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 96 is the perform capabilities branch that returns capabilitySummary() through response(). P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a replaced the earlier inline hard-coded opacity response with this registered-capability discovery call. The surrounding perform command/query routing belongs to pending C07.application-service.command-core (#1042), not to an accepted whole C07 packet. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core differs; no packet admission, numeric source coverage, runtime or installed behavior acceptance is claimed."
+        }
       ]
     },
     {
