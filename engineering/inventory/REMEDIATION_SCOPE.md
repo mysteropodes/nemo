@@ -318,9 +318,18 @@ browser fallback and Lottie packets; the Rive exporter separately augments that 
 `rive-export.js`. Accepted P17/#1019 and P18/#1020 remain narrow wrapper/job provenance only.
 These are responsibility and boundary records, not packet admission, numeric coverage or
 export/runtime parity acceptance. The frozen `export.js` uncovered count remains 186 and the
-global count remains 7 185.
+global count remains 7 185. P03C-ab/#1476 maps frozen `src/js/bootstrap/opacity-application.js`
+spans 30, 40-41 and 44-54 to the still-pending `C07.application-service.bootstrap-bindings`:
+line 30 reuses or creates the capability registry; 40-41 supply the `afterMutation` and
+`capabilities` ports; 44-48 are P06 comments describing opacity self-registration and per-request
+registry dispatch; 49 registers `NemoOpacityCapability`; 50 opens `root.NemoApplication`; 51
+dispatches by the opacity descriptor ID; 52-53 expose `setInstanceId` and `capabilities`; and 54
+closes the object. P05 registry and P06 opacity-registration provenance do not accept C07.
+These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, the 51
+total undispositioned spans (48 after these three records), 762 pending packets and global 7 185
+computed uncovered code lines are unchanged.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 51
+pending packets, no notes needing reconciliation, 0 unmapped paths and 48
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the small remainders in the original-partition
