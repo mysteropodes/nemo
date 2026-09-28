@@ -13,7 +13,7 @@ const fixtureSha = 'dceb05d13576a4dda0eb1a1a9d8c0184e8617e9a3a2662150ee54f4baded
 test.use({ channel: 'chrome' });
 
 // This is the production browser, with no Tauri object, transport mock or injected
-// native owner. The working v1 editor is a separate capability, not a v2 fallback.
+// native owner. An unavailable native capability must not select a second writer.
 test('native opacity is unavailable in the browser and cannot fall back to a legacy write', async ({ browser }, testInfo) => {
   test.setTimeout(90000);
   expect(sha(fs.readFileSync(fixture))).toBe(fixtureSha);
@@ -73,6 +73,7 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
       const legacy = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-legacy-control',
         ...meta, expectedRevision: meta.revision, operation: 'property.set',
         payload: { layerId: 'r08_curve_layer', property: 'opacity', value: 26 } });
+      const afterLegacy = { serialized: SM.exportJSON(), meta: NemoOpacityApplication.meta() };
       const current = NemoOpacityApplication.meta();
       const read = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-read',
         ...current, operation: 'property.get',
@@ -83,7 +84,7 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
         legacyUnchanged: NemoOpacityApplication.legacy === window.__n21ObservedOwners.legacy,
         handleSource: NemoApplication.handle.toString(), legacySource: NemoOpacityApplication.legacy.toString() };
       delete window.__n21ObservedOwners;
-      return { before, after, refused, discovery, legacy, read, owner: owner(), handlers,
+      return { before, after, afterLegacy, refused, discovery, legacy, read, owner: owner(), handlers,
         stored: JSON.parse(SM.exportJSON()), userAgent: navigator.userAgent };
     });
     expect(observed.owner).toEqual({ tauri: 'undefined', cutover: 'undefined',
@@ -93,10 +94,10 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
     expect(observed.after).toEqual(observed.before);
     expect(observed.discovery.ok).toBe(true);
     expect(observed.discovery.result.descriptors.map(value => value.id)).not.toContain('native.opacity');
-    expect(observed.legacy.ok).toBe(true);
-    expect(observed.read.ok).toBe(true);
-    expect(observed.read.result.value).toBe(26);
-    expect(observed.stored.layers[0].motionStatic.opacity).toEqual([26]);
+    expect(observed.legacy.ok).toBe(false);
+    expect(observed.legacy.error.code).toBe('unavailable');
+    expect(observed.afterLegacy).toEqual(observed.before);
+    expect(observed.stored.layers[0].motionStatic.opacity).toEqual([25]);
     expect(observed.handlers).toMatchObject({ handleType: 'function', legacyType: 'function',
       handleUnchanged: true, legacyUnchanged: true });
     expect(errors).toEqual([]);
@@ -106,7 +107,8 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
         sourceSha: identity.source.startup.head, sourceDirty: identity.source.startup.dirty,
         browserVersion: browser.version(), userAgent: observed.userAgent, pageErrors: errors, fixtureSha, sourceHashes,
         nativeAvailability: 'unavailable', nativeRequestError: observed.refused.error.code,
-        rejectedRequestPreservedDocument: true, legacyControlValue: observed.read.result.value,
+        rejectedRequestPreservedDocument: true, legacyWriteError: observed.legacy.error.code,
+        legacyRead: observed.read,
         owner: observed.owner, handlers: { ...observed.handlers,
           handleSource: sha(observed.handlers.handleSource), legacySource: sha(observed.handlers.legacySource) },
         limitations: ['Browser capability boundary only; no installed-native acceptance.'] }, null, 2)) });

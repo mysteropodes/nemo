@@ -235,7 +235,11 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const cancellation = await dispatch('transaction.cancel', { transactionId }); assert.equal(cancellation.ok, true);
     assert.equal(cancellation.result.terminalDisposition, 'cancelled'); assert.equal(cancellation.result.historyEntriesAdded, 0);
     assert.equal(await opacity(), 25); assert.equal((await status()).contentRevision, unchanged.contentRevision);
-    report.checks.push({ checkpoint: 'stale-and-cancel-preserve-document', value: 25 });
+    const unsupportedAction = await dispatch('command.document.apply', {
+      command: 'layer.unsupported.set', stableTarget: target, value: 99 });
+    assert.equal(unsupportedAction.ok, false);
+    assert.equal(await opacity(), 25); assert.equal((await status()).contentRevision, unchanged.contentRevision);
+    report.checks.push({ checkpoint: 'stale-cancel-unsupported-preserve-document', value: 25 });
     const prior = await status();
     phase('save', 'Use Save As to save the project to the saved.json path in phase.json.');
     await waitFor(() => fs.existsSync(fixtures.saved), stage);
@@ -270,16 +274,18 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal(afterExport.ok, true); assert.deepEqual(afterExport.result, beforeExport.result);
     assert.equal((await status()).contentRevision, pinned.contentRevision);
     report.checks.push({ checkpoint: 'pinned-png-export-preserves-document', revision: pinned.contentRevision });
-    phase('release-unsupported', 'Open unsupported.json. The document must remain usable under explicit legacy ownership after native release.');
-    await waitFor(async () => !(await status()).available, stage);
-    const retired = await wire(endpoint, 'nativeRequest', { apiVersion: 2, requestId: randomUUID(), instanceId: pinned.instanceId,
-      documentId: pinned.documentId, operation: 'query.document.opacity', payload: { stableTarget: target } });
-    assert.equal(retired.ok, false); assert.equal(retired.error.code, 'unavailable');
-    report.checks.push({ checkpoint: 'released-native-owner-unavailable' });
-    phase('reenter-static', 'Open static.json once more; this must admit a fresh native owner.');
-    await waitFor(async () => (await status()).available, stage); assert.equal(await opacity(), 25);
-    assert.equal(await uiValue(true), 25);
-    assert.notEqual((await status()).documentId, pinned.documentId);
+    await capture('unsupported-denied', 'Attempt to open unsupported.json through the real project-open UI. Capture the visible refusal; do not reopen another document. The existing native document must stay selected and unchanged.');
+    const afterDeniedOpen = await status();
+    assert.equal(afterDeniedOpen.available, true, 'Unsupported content must be denied before native ownership changes');
+    assert.equal(afterDeniedOpen.instanceId, pinned.instanceId);
+    assert.equal(afterDeniedOpen.documentId, pinned.documentId);
+    assert.equal(afterDeniedOpen.contentRevision, pinned.contentRevision);
+    const afterDeniedSerialize = await dispatch('query.document.serialize', { atRevision: pinned.contentRevision });
+    assert.equal(afterDeniedSerialize.ok, true);
+    assert.deepEqual(afterDeniedSerialize.result, beforeExport.result);
+    assert.equal(await uiValue(), 20);
+    report.checks.push({ checkpoint: 'unsupported-open-denied-before-mutation',
+      documentId: pinned.documentId, revision: pinned.contentRevision });
     stage = 'host-resource-loss';
     // Terminate only the verified child of this owned launcher. This exercises
     // transport/host loss, not a synthetic successful GPU-device-loss callback.
