@@ -16,6 +16,10 @@ use crate::revision::DocumentSnapshot;
 use crate::transaction::TerminalDisposition;
 use std::collections::HashMap;
 
+#[path = "application_replacement.rs"]
+mod replacement;
+pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgress};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceResolutionErrorKind {
     InvalidRequest,
@@ -71,6 +75,7 @@ pub struct NativeApplication<P, C, R> {
     resources: R,
     requests: HashMap<String, RecordedRequest>,
     release: Option<ApplicationReleaseReceipt>,
+    replacement: Option<ReplacementProgress>,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
@@ -89,6 +94,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             resources,
             requests: HashMap::new(),
             release: None,
+            replacement: None,
         })
     }
 
@@ -105,10 +111,20 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 
     pub fn acquire_snapshot(&self, revision: u64) -> Option<DocumentSnapshot> {
+        if self.replacement.is_some() {
+            return None;
+        }
         self.history.acquire_snapshot(revision)
     }
 
     pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+        if self.replacement.is_some() {
+            return self.failure(
+                &request,
+                DispatchErrorCode::Unavailable,
+                "Native document replacement is fenced pending export reconciliation.",
+            );
+        }
         if self.release.is_some() {
             return self.failure(
                 &request,
@@ -188,32 +204,6 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     ) -> Result<Option<PendingFrame>, ExportJobError> {
         self.require_active()?;
         self.exports.start_next_frame(job_id)
-    }
-
-    pub fn finish_export_frame(
-        &mut self,
-        pending: PendingFrame,
-    ) -> Result<JobReceipt, ExportJobError> {
-        self.exports.finish_frame(pending)
-    }
-
-    pub fn replace_document(
-        &mut self,
-        document: OpacityDocument,
-    ) -> Result<Vec<JobReceipt>, String> {
-        if self.release.is_some() {
-            return Err("native application authority has been released".into());
-        }
-        self.history
-            .replace_document(document)
-            .map_err(str::to_owned)?;
-        let document_id = self.history.document_id().to_owned();
-        let reconciled = self
-            .exports
-            .replace_document(&document_id)
-            .map_err(|error| error.message)?;
-        self.requests.clear();
-        Ok(reconciled)
     }
 
     pub fn export_receipt(&self, job_id: &str) -> Result<JobReceipt, ExportJobError> {
@@ -493,7 +483,12 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 
     fn require_active(&self) -> Result<(), ExportJobError> {
-        if self.release.is_some() {
+        if self.replacement.is_some() {
+            Err(ExportJobError {
+                kind: ExportJobErrorKind::Released,
+                message: "native document replacement is fenced".into(),
+            })
+        } else if self.release.is_some() {
             Err(ExportJobError {
                 kind: ExportJobErrorKind::Released,
                 message: "native application authority has been released".into(),
