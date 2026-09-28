@@ -314,6 +314,21 @@ mod tests {
     }
 
     #[test]
+    fn response_loss_identical_a_to_b_retry_replays_completed_receipt() {
+        let (_scratch, native, old_document, prepared) = setup();
+        let (_, fresh) = reserve(&native, &old_document);
+        let discarded = complete_replacement(&native, fresh, "native-fixture", prepared).unwrap();
+        assert_ne!(discarded.document_id, old_document);
+        let retry = native.lock().unwrap().admit_replace(
+            "native-fixture",
+            &old_document,
+            0,
+            |_| panic!("an identical retry must not prepare or execute B again"),
+        );
+        assert!(retry.is_ok(), "identical A to B retry must retrieve the completed receipt: {retry:?}");
+    }
+
+    #[test]
     fn post_core_error_retains_b_behind_fence_with_exact_stage() {
         let (_scratch, native, old_document, prepared) = setup();
         let (old, fresh) = reserve(&native, &old_document);
