@@ -88,7 +88,7 @@
       return Object.freeze(consumer);
     }
     function createConsumers(target) {
-      target.preview = scoped(ports.createPreview(), ['register', 'receive']);
+      target.preview = scoped(ports.createPreview(), ['register', 'receive', 'present']);
       target.exporter = scoped(ports.createExporter(), ['begin', 'status', 'cancel', 'observe', 'plan']);
     }
     function disposeConsumers(target) { if (!target) return;
@@ -309,29 +309,29 @@
       requireReadable();
       return ports.selection.projectSelection(evaluations.get(frame), descriptor);
     }
+    function presentPreview(frame) {
+      if (phase !== 'native') return Promise.reject(new Error('native opacity authority is not active'));
+      var target = cycle;
+      function verify() { requireAdmission(); if (target !== cycle || target.synchronizing) throw new Error('native opacity preview lifecycle changed or synchronization is pending'); }
+      return enqueue(async function () {
+        try {
+          verify();
+          var current = copyIdentity();
+          return await target.preview.present(current.instanceId, generation, {
+            documentSnapshotId: serializeResponse.result.documentSnapshotId, documentId: current.documentId,
+            contentRevision: current.contentRevision, contextId: 'scene-root', frame: frame,
+            quality: 'final', outputSpec: output, geometryHandle: prepared.frames[frame].geometryHandle,
+          }, ports.previewHost, verify);
+        } catch (error) { if (phase === 'release-requested' && target === cycle) throw error;
+          throw failLifecycle(target, error); }
+      });
+    }
     function renderPreview(frame) {
       if (phase === 'legacy') return false;
       if (phase !== 'native') return true;
       try { requireAdmission(); } catch (_) { return true; }
       if (cacheFences || cycle.synchronizing) return true;
-      var target = cycle;
-      enqueue(async function () {
-        try {
-          requireAdmitted(target);
-          var snapshot = serializeResponse.result.documentSnapshotId;
-          var geometry = prepared.frames[frame].geometryHandle;
-          var metadata = { documentSnapshotId: snapshot, documentId: identity.documentId,
-            contentRevision: identity.contentRevision, contextId: 'scene-root', frame: frame,
-            quality: 'final', outputSpec: output, geometryHandle: geometry };
-          var receipt = await ports.previewHost({ apiVersion: 2, instanceId: identity.instanceId,
-            documentId: identity.documentId, contentRevision: identity.contentRevision,
-            documentSnapshotId: snapshot, contextId: 'scene-root', frame: frame,
-            quality: 'final', outputSpec: output, geometryHandle: geometry });
-          requireAdmitted(target);
-          target.preview.register(metadata, { workId: receipt.workId, viewGeneration: receipt.viewGeneration });
-          target.preview.receive(receipt);
-        } catch (error) { throw failLifecycle(target, error); }
-      });
+      presentPreview(frame).catch(function () {});
       return true;
     }
     function exportPng(destination, frames, onProgress) {
@@ -388,7 +388,7 @@
       },
       blocksLegacy: function () { return phase !== 'legacy'; }, status: function () { return phase; },
       identity: identityValue, valueAtFrame: valueAtFrame, projectSelection: projectSelection,
-      renderPreview: renderPreview, exportPng: exportPng,
+      renderPreview: renderPreview, presentPreview: presentPreview, exportPng: exportPng,
       persistenceJSON: function () {
         if (phase !== 'native' || !cycle || cacheFences || cycle.synchronizing) return null;
         try { requireAdmission(); } catch (_) { return null; }

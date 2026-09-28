@@ -272,8 +272,9 @@ function nativeHarness(source, options = {}) {
     async previewHost(request) {
       state.previews.push(request);
       if (options.previewGate) await options.previewGate;
-      return { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
+      const receipt = { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
         status: 'presented' };
+      return options.previewReceipt ? options.previewReceipt(receipt, request, state) : receipt;
     },
     async bindOutput(request) { state.outputs.push(request); },
     currentFrame() { return 10; },
@@ -1405,6 +1406,119 @@ test('native controller atomically owns evaluation, mutation, history, preview, 
   assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 40);
 });
 
+test('awaited preview resolves only from its current host presentation and shares the boolean preview queue', async () => {
+  let finishHost;
+  const gate = new Promise((resolve) => { finishHost = resolve; });
+  const harness = nativeHarness(staticSource(), { previewGate: gate });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const awaited = harness.state.lifecycle.presentPreview(10);
+  let settled = false;
+  awaited.then(() => { settled = true; });
+  for (let spin = 0; spin < 5 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1);
+  assert.equal(settled, false, 'host presentation is still pending');
+  assert.equal(harness.controller.renderPreview(10), true);
+  assert.equal(harness.state.previews.length, 1, 'the boolean call queues behind the awaited call');
+  finishHost();
+  const presented = await awaited;
+  assert.deepEqual(presented, {
+    instanceId: 'instance-a', lifecycleGeneration: 1,
+    documentSnapshotId: 'native-opacity:native-document-1:0', documentId: 'native-document-1',
+    contentRevision: 0, contextId: 'scene-root', frame: 10, quality: 'final',
+    outputSpec: { kind: 'frame', format: 'rgba8', width: 320, height: 180,
+      colorInterpretation: 'srgb', alphaMode: 'straight' },
+    geometryHandle: harness.prepared.frames[10].geometryHandle,
+    workId: 'preview-1', viewGeneration: 1, status: 'presented',
+  });
+  assert.equal(Object.isFrozen(presented), true);
+  assert.equal(Object.isFrozen(presented.outputSpec), true);
+  assert.equal(Object.isFrozen(presented.geometryHandle), true);
+  await harness.controller.flush();
+  assert.equal(harness.state.previews.length, 2);
+  assert.equal(harness.state.previewConsumers.length, 1, 'both calls use the lifecycle adapter');
+  assert.equal(harness.state.previews[1].documentSnapshotId, presented.documentSnapshotId);
+});
+
+test('awaited preview uses revision-matched metadata after a native revision event', async () => {
+  const harness = nativeHarness(staticSource());
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const before = await harness.state.lifecycle.presentPreview(10);
+  await harness.externalOpacity(55, 'preview-revision-event');
+  const after = await harness.state.lifecycle.presentPreview(10);
+  const mutation = harness.controller.setOpacity('r08_curve_layer', 65);
+  const queued = harness.state.lifecycle.presentPreview(10);
+  await mutation;
+  const afterMutation = await queued;
+  assert.equal(before.contentRevision, 0);
+  assert.equal(after.contentRevision, 1);
+  assert.equal(after.documentSnapshotId, 'native-opacity:native-document-1:1');
+  assert.equal(afterMutation.contentRevision, 2);
+  assert.equal(afterMutation.documentSnapshotId, 'native-opacity:native-document-1:2');
+  assert.equal(after.documentId, before.documentId);
+  assert.equal(after.lifecycleGeneration, before.lifecycleGeneration);
+  assert.notEqual(after.workId, before.workId);
+  assert.deepEqual(harness.state.previews.map(({ contentRevision }) => contentRevision), [0, 1, 2]);
+});
+
+test('awaited preview reports valid non-presented statuses without losing native authority', async () => {
+  for (const status of ['stale-discarded', 'failed-device-lost', 'deferred-occluded']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, status }) });
+    assert.equal(await harness.controller.activate(harness.prepared), true, status);
+    const receipt = await harness.state.lifecycle.presentPreview(10);
+    assert.equal(receipt.status, status);
+    assert.equal(Object.isFrozen(receipt), true, status);
+    assert.equal(harness.controller.status(), 'native', status);
+    assert.equal(harness.state.imports.length, 0, status);
+  }
+});
+
+test('a deferred preview can later present through its still-active host work', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, request, state) {
+    return state.previews.length === 1 ? { ...receipt, status: 'deferred-timeout' }
+      : { workId: 'preview-1', viewGeneration: 1, status: 'presented' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const deferred = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(deferred.status, 'deferred-timeout');
+  assert.equal(harness.controller.status(), 'native');
+  const presented = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(presented.status, 'presented');
+  assert.equal(presented.workId, deferred.workId);
+  assert.equal(presented.viewGeneration, deferred.viewGeneration);
+  assert.equal(harness.state.previews.length, 2);
+});
+
+test('malformed host preview receipt fences authority without registering work', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, extra: true }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await assert.rejects(harness.state.lifecycle.presentPreview(10), /receipt/);
+  assert.equal(harness.controller.status(), 'indeterminate');
+  assert.throws(() => harness.state.previewConsumers[0].receive({
+    workId: 'preview-1', viewGeneration: 1, status: 'presented',
+  }), /not registered/);
+});
+
+test('boolean preview consumes a malformed host rejection without an unhandled promise', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, extra: true }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  assert.equal(harness.controller.renderPreview(10), true);
+  await harness.controller.flush();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.controller.status(), 'indeterminate');
+});
+
+test('boolean preview remains fire-and-forget for valid failed and deferred receipts', async () => {
+  for (const status of ['failed-validation', 'deferred-timeout']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, status }) });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    assert.equal(harness.controller.renderPreview(10), true);
+    await harness.controller.flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.controller.status(), 'native', status);
+    assert.equal(harness.state.imports.length, 0, status);
+  }
+});
+
 test('afterChange observes readable post-write caches for UI, v1, and external native mutations', async () => {
   const source = staticSource();
   const observations = [];
@@ -2249,11 +2363,13 @@ test('transport loss while preview host work is pending rejects the stale receip
   const previewGate = new Promise((resolve) => { finishPreview = resolve; });
   const harness = nativeHarness(staticSource(), { previewGate });
   assert.equal(await harness.controller.activate(harness.prepared), true);
-  assert.equal(harness.controller.renderPreview(10), true);
+  const awaited = harness.state.lifecycle.presentPreview(10);
   for (let spin = 0; spin < 5 && harness.state.previews.length === 0; spin++) await Promise.resolve();
   assert.equal(harness.state.previews.length, 1);
   harness.state.connected = false;
-  finishPreview(); await harness.controller.flush();
+  finishPreview();
+  await assert.rejects(awaited, /disconnected/);
+  await harness.controller.flush();
   assert.equal(harness.controller.status(), 'indeterminate');
   assert.equal(harness.controller.persistenceJSON(), null);
   assert.throws(() => harness.state.previewConsumers[0].receive({
@@ -2343,6 +2459,10 @@ test('preview, export, subscription and release state are lifecycle-scoped acros
   assert.equal((await harness.controller.exportPng('/tmp/n20-cycle-two', [10])).status, 'succeeded');
   assert.notStrictEqual(harness.state.previewConsumers[0], harness.state.previewConsumers[1]);
   assert.notStrictEqual(harness.state.exportConsumers[0], harness.state.exportConsumers[1]);
+  const secondPresentation = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(secondPresentation.lifecycleGeneration, 2);
+  assert.equal(secondPresentation.documentId, 'native-document-2');
+  await assert.rejects(firstPreview.present(), /disposed/);
   await assert.rejects(firstSubscription.synchronize({ instanceId: 'instance-a',
     documentId: 'native-document-1', lifecycleGeneration: 1, fromRevision: 0,
     toRevision: 1, requestId: 'late-cycle-one' }), /closed lifecycle/);
