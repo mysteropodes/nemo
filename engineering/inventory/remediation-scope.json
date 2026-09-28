@@ -5127,6 +5127,14 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.pyramidal-point-tracker starts at track.rs:22; lines 1-21 are algorithm provenance and overview comments plus imports."
+        },
+        {
+          "span": [
+            345,
+            432
+          ],
+          "kind": "covered",
+          "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.pyramidal-point-tracker declares implementation lines 22-344; its census oracle separately identifies four #[cfg(test)] tests at track.rs:388-429 for integer translation, subpixel translation, large displacement via the pyramid, and flat-texture rejection. Frozen lines 345-432 are the trailing test module (shared synthetic-texture helpers at 346-386, oracle tests at 388-429, and module/file closure); this maps that test-oracle responsibility to the pending packet only. It does not claim the whole module is covered, assert test correctness, or accept the packet."
         }
       ]
     },
