@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "f095739b60ee78f0f7e8e40610df428c70d91c7c",
-    "sourceRootTree": "c94edfc8f063a4a91cc349c18495d83b43d3f6df",
+    "candidateCommit": "23443f80e1edd84e82b55eeeb50b6d3b671e9a15",
+    "sourceRootTree": "7c8c8fb79fa83cdc1fd5d395c41f6c1cfce14cf5",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "a574fec733a735ff776310e211a519b319cfaf8a",
-      "lastChangedCommit": "f095739b60ee78f0f7e8e40610df428c70d91c7c"
+      "gitTree": "2bd38d861bb64058f98cd6c5b4a98682e0c577fa",
+      "lastChangedCommit": "23443f80e1edd84e82b55eeeb50b6d3b671e9a15"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "7586a5c489f35d286268fda88fdbae1e71a2653449fea9e1d8d20def5c33c25c"
+      "value": "933ed71d8aee777f889216a0274fe5f9091687ba20463aac6e124c900d0b60b2"
     },
     "profiles": [
       {
@@ -834,9 +834,9 @@
     {
       "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
       "moduleId": "app.opacity.reproduction.bundle.domain",
-      "executionClass": "imported-module",
+      "executionClass": "classic-without-load-site",
       "loadSites": [],
-      "activation": "T07: not yet wired into src/index.html -- required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs today. T08's UI/MCP diagnostics inspector is the leaf that gives it a production caller."
+      "activation": "T07: no production load site at this head; required directly by tests/application-opacity-reproduction-bundle.test.cjs and tests/fixtures/lib/opacity-application.cjs. T10 adds its production load site."
     },
     {
       "path": "src/js/domain/document/folder-codec.js",
