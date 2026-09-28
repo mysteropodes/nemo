@@ -203,7 +203,8 @@ Every reviewed claim carries its evidence and is validated by shape:
   five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans,
   P03C-m/#1440 dispositioned eleven MCP contract spans, and P03C-ae/#1482 dispositioned three
   `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
-  `engine-bridge.js` spans; 33 spans remain undispositioned.
+  `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
+  dispositions the final two C03 module headers; 31 spans remain undispositioned.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -368,8 +369,18 @@ pending, and no packet admission, computed coverage, or runtime/render acceptanc
 Engine-bridge retains 226 computed uncovered code lines but has zero undispositioned spans; global
 computed uncovered code remains 7 185. The 37 previously undispositioned spans become 33; all 762
 packets remain pending and the scope remains incomplete.
+P03C-ag/#1486 marks frozen `geometry-wasm/src/timeline.rs:1-13` as a structural boundary:
+lines 1-10 document frame-resolution provenance, 11-12 import `serde`/`wasm_bindgen`, and 13 is
+blank; pending `C03.wasm-geometry-ops.timeline-frame-resolution` starts its implementation at 14.
+It marks frozen `src/js/render-manager.js:1-33` as a comment-only boundary before the batch-queue
+IIFE starts at 34 under pending `C03.js-effects-and-playback.render-manager-queue`. Both records
+cite source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and pinned C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`. The two spans add no separate responsibility,
+packet admission, numeric coverage, or native/browser/Tauri/render/export acceptance. The 33
+previously undispositioned spans become 31, with zero C03 spans remaining; all 762 packets stay
+pending and global computed uncovered code remains 7 185.
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 33
+pending packets, no notes needing reconciliation, 0 unmapped paths and 31
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
 `covered`/`boundary` or one last census slice, the remaining small remainders in other

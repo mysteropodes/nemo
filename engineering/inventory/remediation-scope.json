@@ -5148,6 +5148,16 @@
           1,
           13
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, timeline.rs:1-10 is the frame-resolution provenance preamble, 11-12 are structural serde/wasm_bindgen imports, and 13 is blank. The implementation begins with #[derive(Deserialize)] and SymbolPlayback at 14 under pending C03.wasm-geometry-ops.timeline-frame-resolution (#1038; pinned C03 census blob 337c9035f94f5290b2adf898d406550558560bfa). This boundary has no separate packet responsibility, packet admission, or numeric coverage."
+        }
       ]
     },
     {
@@ -6663,6 +6673,16 @@
           1,
           33
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, render-manager.js:1-33 is comment-only batch-queue, current-document, and export-delegation context. The executable IIFE begins at 34 under pending C03.js-effects-and-playback.render-manager-queue (#1038; pinned C03 census blob 337c9035f94f5290b2adf898d406550558560bfa). This preamble has no separate executable responsibility, packet admission, or numeric coverage."
+        }
       ]
     },
     {
