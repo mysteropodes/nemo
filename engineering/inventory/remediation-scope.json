@@ -6981,7 +6981,7 @@
         "leaf": "P12",
         "issue": 1014,
         "pullRequest": 1176,
-        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust geometry boundary profile and adapter inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P12/#1014 and merged via PR #1176; adopted Rust crate boundary policy for layers, exported ports, Cargo cfg/features and exceptions. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {
@@ -9392,7 +9392,7 @@
         "leaf": "P12",
         "issue": 1014,
         "pullRequest": 1176,
-        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust boundary tooling test inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P12/#1014 and merged via PR #1176; exercises positive and negative controls for the Rust boundary scanner. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {
@@ -9687,7 +9687,7 @@
         "leaf": "P12",
         "issue": 1014,
         "pullRequest": 1176,
-        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust boundary tooling inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P12/#1014 and merged via PR #1176; Rust-aware boundary analyzer. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {
@@ -9902,7 +9902,7 @@
         "leaf": "P03B",
         "issue": 1170,
         "pullRequest": 1175,
-        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-build tooling inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; builds and refreezes the remediation-scope index. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {
@@ -9917,7 +9917,7 @@
         "leaf": "P03B",
         "issue": 1170,
         "pullRequest": 1175,
-        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-census tooling inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; parses census declarations and maps source ranges. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {
@@ -9932,7 +9932,7 @@
         "leaf": "P03B",
         "issue": 1170,
         "pullRequest": 1175,
-        "evidence": "Added by P03B/#1170 and merged via PR #1175; inventory-verification tooling inventory only, not native runtime feature acceptance."
+        "evidence": "Added by P03B/#1170 and merged via PR #1175; verifies frozen-source integrity, dispositions and completeness. The P03C-e inventory disposition does not itself prove native runtime feature acceptance."
       }
     },
     {

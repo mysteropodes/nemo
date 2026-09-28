@@ -106,11 +106,13 @@ original partitions. (4) The 40 previously dispositioned executable paths withou
 (`leaf`/`oracle`) are unchanged; **P03C-e/#1419 dispositioned six additional paths**, bringing
 the total to 46 and the unmapped count to zero.
 The three Rust boundary tooling paths (`geometry-wasm.edges.json`, `boundaries-rust.cjs` and its
-test) cite P12/#1014, merged as PR #1176. The three inventory checker modules
+test) cite P12/#1014, merged as PR #1176: adopted crate boundary policy, a Rust-aware analyzer,
+and positive/negative scanner controls. The three inventory checker modules
 (`remediation-scope-build.cjs`, `remediation-scope-census.cjs` and
-`remediation-scope-verify.cjs`) cite P03B/#1170, merged as PR #1175. These dispositions record
-the provenance of inventory and adapter tooling only; they do not establish native runtime
-feature acceptance.
+`remediation-scope-verify.cjs`) cite P03B/#1170, merged as PR #1175: index build/refreeze,
+census declaration/range mapping, and integrity/disposition/completeness verification. The
+P03C-e inventory disposition records these path roles and provenance; it does not itself prove
+native runtime feature acceptance.
 
 Overlaps are unchanged by this refreeze — **1 832 lines** in total, identical to P03C-a:
 `shader-effects-library.js` (1 311, claimed twice), `motion.js` (190, C02-internal), `tweens.js`
