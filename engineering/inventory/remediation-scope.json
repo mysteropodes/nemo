@@ -6272,6 +6272,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            22
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only: frozen src/js/layer-inout.js lines 1-11 and 13-22 are explanatory comments about the UI bar and raw-versus-clamped render gate. Line 12 is executable (function () { opening the IIFE around all three pending C02.layer-inout responsibilities; it is not a comment and does not own a separate feature writer. The first feature functions inPointOf/outPointOf begin at line 23 in C02.layer-inout.bar-rendering, while later C02 packets own selection/marquee and drag/batch operations. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / layer-inout.js blob 131156e2f419e17e8669c1980c3ae0f77164e786; pinned C02 census blob 3e920d4f112028ed486df697b5885aa4c67df316. This does not assign the entire preamble solely to bar-rendering or admit any C02 packet, numeric source coverage, runtime behavior or browser/Tauri/export acceptance."
+        },
+        {
+          "span": [
             1601,
             1646
           ],

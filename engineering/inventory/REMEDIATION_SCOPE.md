@@ -473,8 +473,25 @@ remaining. All 762 packets stay pending, global computed uncovered code remains
 7 185 and frozen `lib.rs` retains 2 computed uncovered code lines. No MCP
 functionality, numeric range coverage or runtime behavior is accepted.
 
+P03C-an/#1508 marks frozen `src/js/layer-inout.js:1-22` as a structural and
+documentary `boundary`. Lines 1-11 and 13-22 are comments, but line 12 is the
+executable `(function () {` IIFE opener enclosing all three pending C02
+layer-inout responsibilities; it is not comment-only or a separate feature
+writer. `inPointOf`/`outPointOf` first begin at line 23 in pending
+`C02.layer-inout.bar-rendering`, with the selection/marquee and drag/batch
+packets owning later areas. The whole preamble is not assigned solely to bar
+rendering. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, layer-inout blob
+`131156e2f419e17e8669c1980c3ae0f77164e786` (also current protected) and
+pinned C02 census blob `3e920d4f112028ed486df697b5885aa4c67df316`.
+The 14 previously undispositioned spans become 13, with zero frozen
+`layer-inout.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `layer-inout.js` retains 74
+computed uncovered code lines. No numeric range coverage, layer behavior,
+browser/Tauri/export or runtime acceptance is claimed.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 14
+pending packets, no notes needing reconciliation, 0 unmapped paths and 13
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
