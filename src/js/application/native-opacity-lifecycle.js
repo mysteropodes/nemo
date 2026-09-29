@@ -344,7 +344,7 @@
       busy: function () { return cacheFences || cycle.synchronizing; },
       requireAdmission: requireAdmission, requireAdmitted: requireAdmitted, enqueue: enqueue, fail: failLifecycle,
     });
-    function exportPng(destination, frames, onProgress) {
+    function exportPng(destination, frames, onProgress, signal) {
       requireReadable();
       var target = cycle;
       cacheFences++;
@@ -352,7 +352,7 @@
         try {
           requireAdmitted(target);
           var receipt = await exportWorkflow.run(ports, contract, application, target,
-            copyIdentity(), prepared, requestFor, id, destination, frames, onProgress);
+            copyIdentity(), prepared, requestFor, id, destination, frames, onProgress, signal);
           requireAdmitted(target);
           return receipt;
         } catch (error) { throw failLifecycle(target, error); }

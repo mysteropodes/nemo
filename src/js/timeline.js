@@ -11705,8 +11705,9 @@ window.updateCombinePanel=updateCombinePanel;
   // calls, on exactly the session export.js memoises. Shown only for the SVG
   // sequence, the only format behind the bounded job; #exp-cancel is in
   // index.html. Rationale: adapters/export-svg-sequence.js's header.
-  var cancelBtn=document.getElementById('exp-cancel');
+  var cancelBtn=document.getElementById('exp-cancel'),nativePngAbort=null;
   cancelBtn.addEventListener('click',function(){
+    if(nativePngAbort){cancelBtn.disabled=true;nativePngAbort.abort();return;}
     var s=window.SMExport.svgSequenceJob(),id=s&&s.meta().running;
     if(!id)return; // the directory picker is still open — no job exists yet
     cancelBtn.disabled=true;s.cancel(id);progEl.style.display='block';progEl.textContent=SM.t('exportCancelled');
@@ -11725,7 +11726,9 @@ window.updateCombinePanel=updateCombinePanel;
       onProgress:function(i,n){progEl.style.display='block';progEl.textContent=SM.t('exportRenderingFrame').replace('{i}',i).replace('{n}',n);},
       onFfmpeg:function(line){progEl.style.display='block';progEl.textContent=line.substring(0,80);},
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
-    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
+    var nativePng=fmtSel.value==='png'&&window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy();
+    nativePngAbort=nativePng?new AbortController():null;if(nativePngAbort)opts.signal=nativePngAbort.signal;
+    runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(nativePng||fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
     try{
       // The native PNG job reads a pinned Rust revision. Saving Paper frames
       // here would either be denied or create a second document writer.
@@ -11756,7 +11759,7 @@ window.updateCombinePanel=updateCombinePanel;
     }catch(err){
       progEl.textContent=SM.t('exportError').replace('{e}',err&&err.message?err.message:err);
     }finally{
-      runBtn.disabled=false;cancelBtn.style.display='none';
+      nativePngAbort=null;runBtn.disabled=false;cancelBtn.style.display='none';
     }
   });
 })();
