@@ -256,7 +256,11 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal((await dispatch('history.redo')).ok, true); assert.equal(await opacity(), 40);
     report.checks.push({ checkpoint: 'post-40-one-history-entry', value: 40,
       limitation: 'History alone does not prove the input was a continuous pointer gesture.' });
-    assert.equal((await dispatch('command.document.apply', { command: 'layer.opacity.set', stableTarget: target, value: 25 })).ok, true);
+    stage = 'mcp-ui-parity';
+    const parityWrite = await dispatch('command.document.apply', {
+      command: 'layer.opacity.set', stableTarget: target, value: 25 });
+    if (!parityWrite.ok) write(path.join(reportDir, 'parity-write-failure.json'), parityWrite);
+    assert.equal(parityWrite.ok, true, 'External native edit failed: ' + JSON.stringify(parityWrite.error));
     assert.equal(await compatibilityValue(), 25);
     await capture('mcp-ui-parity', 'Verify the visible Motion Opacity field changed to 25 after the external MCP write.');
     const unchanged = await status();
