@@ -41,7 +41,6 @@ function harness({ auto = null, version = null, deferFrames = false } = {}) {
       contains(name) { return classes.has(name); } },
       addEventListener(type, fn) { this.listeners ||= {}; this.listeners[type] = fn; }, appendChild(child) { this.children.push(child); },
       setAttribute(name, value) { this.attributes ||= {}; this.attributes[name] = value; },
-      setAttribute(name, value) { this.attributes ||= {}; this.attributes[name] = value; },
       getAttribute(name) { return this.attributes && this.attributes[name]; },
       removeChild() {}, click() { this.clicked = true; } };
     Object.defineProperty(el, 'innerHTML', { get() { return ''; }, set() { this.children = []; } });
