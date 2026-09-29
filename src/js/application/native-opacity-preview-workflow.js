@@ -12,10 +12,12 @@
         return Promise.reject(new Error('native opacity authority is not active'));
       }
       var target = scope.cycle();
+      var superseded = new Error('native opacity preview lifecycle changed or synchronization is pending');
+      superseded.code = 'native_preview_superseded';
       function verify() {
         scope.requireAdmitted(target);
         if (scope.phase() !== 'native') throw new Error('native opacity authority is not active');
-        if (target.synchronizing) throw new Error('native opacity preview lifecycle changed or synchronization is pending');
+        if (target.synchronizing) throw superseded;
       }
       return scope.enqueue(async function () {
         try {
@@ -27,6 +29,10 @@
             quality: 'final', outputSpec: scope.output(), geometryHandle: prepared.frames[frame].geometryHandle,
           }, scope.host(), verify);
         } catch (error) {
+          // A prior-frame preview may complete while an external native revision
+          // is synchronizing. Its receipt is stale, but the revision must still
+          // be allowed to refresh caches and acknowledge the committed write.
+          if (error === superseded) throw error;
           if (scope.phase() === 'release-requested' && target === scope.cycle()) throw error;
           throw scope.fail(target, error);
         }

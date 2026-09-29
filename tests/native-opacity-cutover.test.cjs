@@ -2331,6 +2331,32 @@ test('actual bundled transport refreshes UI, save, and release after an external
   assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 55);
 });
 
+test('superseded preview does not poison a subsequent external revision acknowledgment', async () => {
+  let finishPreview;
+  const previewGate = new Promise((resolve) => { finishPreview = resolve; });
+  const harness = nativeHarness(staticSource(), {
+    previewGate,
+    transportFactory: realTauriTransportFactory(),
+  });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await harness.controller.setOpacityFromUi('r08_curve_layer', 40, 'ui-before-external-preview');
+  await harness.externalOpacity(25, 'first-external-preview');
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false);
+  const oldPreview = viewport.presentPreview(10);
+  for (let spin = 0; spin < 10 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1, 'prior-revision preview reached host');
+  const nextRevision = harness.externalOpacity(60, 'second-external-preview');
+  finishPreview();
+  await assert.rejects(oldPreview, /synchronization is pending/);
+  await nextRevision;
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.transportBridge.transport.status().contentRevision, 3);
+  assert.equal(harness.controller.identity().contentRevision, 3);
+  assert.equal(harness.controller.valueAtFrame('r08_curve_layer', 10)[0], 60);
+  assert.equal(harness.transportBridge.calls.filter(([command, args]) => command === 'nemo_native_revision_sync' &&
+    args.request.action === 'acknowledge').length, 2);
+});
+
 test('revision acknowledgment failure passively disconnects and invalidates refreshed controller caches', async () => {
   const harness = nativeHarness(staticSource(), {
     transportFactory: realTauriTransportFactory({ ackFailure: true }),

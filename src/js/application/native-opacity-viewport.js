@@ -101,7 +101,8 @@
         return Object.freeze(Object.assign({ owner: 'native' }, presented));
       } catch (error) {
         var failed = lifecycle.inspect();
-        if (failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
+        if ((!error || error.code !== 'native_preview_superseded') &&
+            failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
         throw error;
       }
     }
