@@ -549,8 +549,8 @@
   }
   var tabAddGeneration=0,tabAdmissionMessage=null;
   function tabAddNotice(message){
-    if(!tabAdmissionMessage){var bar=document.getElementById('project-tabs-bar');tabAdmissionMessage=document.createElement('div');tabAdmissionMessage.setAttribute('role','alert');bar.style.position='relative';bar.style.zIndex='60';
-      Object.assign(tabAdmissionMessage.style,{position:'absolute',top:'100%',left:'0',right:'0',zIndex:'501',padding:'7px 14px',background:'var(--panel2)',color:'#ffb5a8',fontSize:'12px'});bar.appendChild(tabAdmissionMessage);}tabAdmissionMessage.textContent=message;tabAdmissionMessage.style.display=message?'block':'none';return false;}
+    if(!tabAdmissionMessage){var bar=document.getElementById('project-tabs-bar');tabAdmissionMessage=document.createElement('div');tabAdmissionMessage.setAttribute('role','alert');
+      Object.assign(tabAdmissionMessage.style,{marginLeft:'auto',minWidth:'0',maxWidth:'60%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#ffb5a8',fontSize:'12px'});bar.appendChild(tabAdmissionMessage);}tabAdmissionMessage.textContent=message;tabAdmissionMessage.style.display=message?'block':'none';return false;}
   function addTab(){var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
     function admitted(ok){
       if(generation!==tabAddGeneration||activeTabId!==initialTab||currentName!==initialName||currentPath!==initialPath)return false;if(ok===false||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return denied();
