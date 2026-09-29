@@ -5089,7 +5089,20 @@ function convertLayerToStrokeFillShadowFolder(layerIdx){
   if(window.renderLayerList)window.renderLayerList();if(window.renderTimeline)window.renderTimeline();
   showToast(SM.t('toastLayerSplitSFS'));
 }
+var _nativeFrameNavigator=null;
 function goToFrame(idx){
+  var nativeOpacity=window.NemoNativeOpacityCutover;
+  if(nativeOpacity&&nativeOpacity.blocksLegacy()){
+    if(!_nativeFrameNavigator)_nativeFrameNavigator=NemoNativeOpacityMotionSurface.createFrameNavigator({
+      frame:function(){return state.currentFrame;},total:function(){return state.totalFrames;},
+      commit:function(frame){state.currentFrame=frame;window._curFrame=frame;},
+      paint:function(){updateUI(true);},
+      syncInput:function(){document.getElementById('tl-cf').value=state.currentFrame+1;},
+      fail:function(){showToast('Could not display this frame');},
+      controller:function(){return window.NemoNativeOpacityCutover;}
+    });
+    return _nativeFrameNavigator.navigate(nativeOpacity,idx);
+  }
   if(idx<0||idx>=state.totalFrames)return;
   // Already on this frame (e.g. a live-scrub tick that re-dispatched 'change'
   // without the value actually moving) — avoid a redundant save+reload pass.
