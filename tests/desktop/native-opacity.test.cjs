@@ -78,6 +78,9 @@ function pngOracle(file, opacity, left) {
 test('installed native opacity: live command oracles and externally driven UI checkpoints', { timeout: 1800000 }, async t => {
   assert.equal(process.env.NEMO_N21_INTERACTIVE, '1',
     'BLOCKED: N21 requires an operator driving the installed UI; set NEMO_N21_INTERACTIVE=1');
+  // Diagnostic runs may continue past an unverified pointer gesture to expose
+  // later failures. They still fail at the end and cannot be used for acceptance.
+  const probeAfterGestureFailure = process.env.NEMO_N21_PROBE_AFTER_GESTURE_FAILURE === '1';
   const app = packagedApp(process.env.NEMO_DESKTOP_APP, runtime);
   const proofFile = path.join(path.dirname(app.bundle), 'build-proof.json');
   const proof = read(proofFile), source = identity.sourceIdentity();
@@ -240,7 +243,15 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await valueCheckpoint('edit-60', 'Set the same Opacity field to 60 and commit with Tab.', 60);
     await valueCheckpoint('undo-40', 'Use the actual UI undo command.', 40);
     await valueCheckpoint('redo-60', 'Use the actual UI redo command.', 60);
-    await valueCheckpoint('gesture-40', 'Drag the Motion Opacity scrub field from 60 to 40 (one continuous gesture).', 40);
+    if (probeAfterGestureFailure) {
+      report.checks.push({ checkpoint: 'gesture-40', disposition: 'unverified',
+        limitation: 'Diagnostic probe used a native command to reach 40; no pointer gesture was accepted.' });
+      assert.equal((await dispatch('command.document.apply', {
+        command: 'layer.opacity.set', stableTarget: target, value: 40 })).ok, true);
+      assert.equal(await opacity(), 40);
+    } else {
+      await valueCheckpoint('gesture-40', 'Drag the Motion Opacity scrub field from 60 to 40 (one continuous gesture).', 40);
+    }
     assert.equal((await dispatch('history.undo')).ok, true); assert.equal(await opacity(), 60);
     assert.equal((await dispatch('history.redo')).ok, true); assert.equal(await opacity(), 40);
     report.checks.push({ checkpoint: 'post-40-one-history-entry', value: 40,
@@ -319,6 +330,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await waitFor(() => !alive(instance.snapshot.app.pid), stage, 15000);
     await assert.rejects(status(), /transport/);
     report.checks.push({ checkpoint: stage, disposition: 'transport unavailable after owned host exit' });
+    if (probeAfterGestureFailure) {
+      stage = 'gesture-40-unverified';
+      throw new Error('Diagnostic probe only: continuous Motion opacity gesture remains unverified');
+    }
     report.result = 'protocol-pass-pending-visual-review';
   } catch (error) {
     report.result = 'fail'; report.failedCheckpoint = stage; report.reason = error.message;
