@@ -125,6 +125,14 @@ test('production SM.t resolves all six diagnostics keys in every locale', () => 
     { filename: 'src/js/i18n.js' });
   const keys = ['labsDiagnosticsTitle', 'labsDiagnosticsRefresh', 'labsDiagnosticsReport',
     'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics'];
+  // T10 leaves Report unavailable until a native recording with a recoverable
+  // fixture exists; the Labs tooltip must not promise a bundle meanwhile.
+  const unavailable = {
+    en: /Report is currently unavailable/,
+    fr: /rapport est actuellement indisponible/,
+    ja: /レポートは現在利用できません/,
+    es: /informe no está disponible actualmente/,
+  };
   for (const locale of LOCALES) {
     window.SM.setLanguage(locale);
     for (const key of keys) {
@@ -132,5 +140,7 @@ test('production SM.t resolves all six diagnostics keys in every locale', () => 
       assert.ok(typeof value === 'string' && value.trim(), `${locale}: ${key} has text`);
       assert.notEqual(value, key, `${locale}: ${key} did not fall through to the raw key`);
     }
+    assert.match(window.SM.t('labsDescribeDiagnosticsPanel'), unavailable[locale],
+      `${locale}: diagnostics tooltip must describe Report as unavailable`);
   }
 });
