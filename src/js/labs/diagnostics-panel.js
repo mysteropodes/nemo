@@ -16,7 +16,7 @@
 // xsheet-panel.js's "click a row to jump the playhead"); nothing here ever
 // calls diagnostics.replay or any property-writing operation.
 (function () {
-  var panel = null;
+  var panel = null, generation = 0;
 
   // Trace fields are NOT trusted text. `requestId` is caller-supplied and only
   // length-checked by opacity-application.js's validate(), so it reaches here
@@ -45,13 +45,26 @@
     return -1;
   }
 
-  function fetchEntries() {
-    if (!window.NemoApplication || !window.NemoOpacityApplication) return { error: 'diagnostics application not loaded' };
-    var identity = window.NemoOpacityApplication.meta();
-    var response = window.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-panel:' + Math.random(),
-      ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
-    if (!response.ok) return { error: (response.error && response.error.message) || 'diagnostics.trace failed' };
-    return { entries: response.result.entries };
+  function currentIdentity() {
+    try {
+      var identity = window.NemoOpacityApplication.meta();
+      return { instanceId: identity.instanceId, documentId: identity.documentId, revision: identity.revision };
+    } catch (_) { return null; }
+  }
+
+  function sameDocument(a, b) {
+    return !!(a && b && typeof a.instanceId === 'string' && a.instanceId
+      && typeof a.documentId === 'string' && a.documentId
+      && a.instanceId === b.instanceId && a.documentId === b.documentId);
+  }
+
+  function traceResult(response, identity) {
+    if (!response || !response.ok) return { error: (response && response.error && response.error.message) || 'diagnostics.trace failed' };
+    if (!sameDocument(identity, response)) return { error: 'Diagnostics response identity does not match the requested document.' };
+    if (!response.result || !Array.isArray(response.result.entries)) return { error: 'diagnostics.trace returned no command list' };
+    return { entries: response.result.entries, identity: {
+      instanceId: response.instanceId, documentId: response.documentId, revision: response.revision
+    } };
   }
 
   function rowHtml(entry, selectedLayers) {
@@ -69,13 +82,21 @@
       '</tr>';
   }
 
+  // ---- report link (T10/#1399) -------------------------------------------
+  // Source-stage only: neither the v1 trace nor T08A's metadata has recoverable
+  // starting fixture bytes. T10A owns an opt-in native synthetic recording;
+  // T08B owns its panel binding. Never infer provenance from user state/hash.
+  async function buildReport(result) {
+    return { error: result.error || 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.' };
+  }
+
   function build() {
     if (!SMLabs.isOn('diagnostics-panel')) return;
     if (!panel) {
       panel = document.createElement('div');
       panel.id = 'labs-diagnostics';
       panel.style.cssText =
-        'position:fixed;top:60px;right:16px;width:auto;max-height:70vh;overflow:auto;z-index:9999;' +
+        'position:fixed;top:60px;right:16px;width:auto;max-width:calc(100vw - 32px);max-height:70vh;overflow:auto;z-index:190;' +
         'background:#201f25;border:1px solid rgba(255,255,255,.12);border-radius:10px;' +
         'font:11px ui-monospace,monospace;color:#eceae7;box-shadow:0 8px 30px rgba(0,0,0,.5);padding:6px 0;';
       document.body.appendChild(panel);
@@ -85,27 +106,70 @@
 
   function refresh() {
     if (!panel) return;
-    var result = fetchEntries();
+    var target = panel, token = ++generation, identity = currentIdentity();
+    function finish(result) {
+      if (panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
+      if (identity && !sameDocument(identity, currentIdentity())) return;
+      if (!result.identity) result.identity = identity;
+      render(result, target, token);
+    }
+    try {
+      if (!identity || !window.NemoApplication) return finish({ error: 'diagnostics application not loaded' });
+      var response = window.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-panel:' + Math.random(),
+        ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
+      // Keep the synchronous compatibility path; delayed adapters share the
+      // same generation/document fence without updating detached panels.
+      if (response && typeof response.then === 'function') {
+        Promise.resolve(response).then(function (value) { finish(traceResult(value, identity)); },
+          function () { finish({ error: 'diagnostics.trace failed' }); });
+      } else finish(traceResult(response, identity));
+    } catch (_) { finish({ error: 'diagnostics.trace failed' }); }
+  }
+
+  function render(result, target, token) {
     var selectedLayers = correlatedLayerIndices();
     var t2 = (typeof SM !== 'undefined' && SM.t) ? SM.t : function (k) { return k; };
+    var reportLabel = t2('labsDiagnosticsReport');
+    if (reportLabel === 'labsDiagnosticsReport') reportLabel = 'Report';
     var body = result.error
       ? '<div style="padding:6px 8px;color:#e08787;">' + esc(result.error) + '</div>'
       : (result.entries.length
         ? '<table style="border-collapse:collapse;"><tr><th style="padding:2px 8px;color:#888;">status</th><th style="padding:2px 8px;color:#888;">operation</th><th style="padding:2px 8px;color:#888;">rev</th><th style="padding:2px 8px;color:#888;">requestId</th></tr>'
           + result.entries.slice().reverse().map(function (e) { return rowHtml(e, selectedLayers); }).join('') + '</table>'
-        : '<div style="padding:6px 8px;color:#888;">' + t2('labsDiagnosticsEmpty') + '</div>');
+        : '<div data-diag-empty style="padding:6px 8px;color:#888;">' + esc(t2('labsDiagnosticsEmpty')) + '</div>');
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
-      '<b style="font-size:11px;">' + t2('labsDiagnosticsTitle') + '</b>' +
-      '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + t2('labsDiagnosticsRefresh') + '</button>' +
-      '</div>' + body;
+      '<b style="font-size:11px;">' + esc(t2('labsDiagnosticsTitle')) + '</b>' +
+      '<span>' +
+      '<button type="button" data-diag-report style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;margin-right:4px;">' + esc(reportLabel) + '</button>' +
+      '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + esc(t2('labsDiagnosticsRefresh')) + '</button>' +
+      '</span></div>' + body + '<div data-diag-report-status style="padding:2px 8px;color:#888;"></div>';
     var refreshBtn = panel.querySelector('[data-diag-refresh]');
     if (refreshBtn) refreshBtn.addEventListener('click', refresh);
+    var reportBtn = panel.querySelector('[data-diag-report]');
+    if (reportBtn) {
+      reportBtn.addEventListener('click', function () {
+        if (panel !== target || generation !== token) return;
+        var status = target.querySelector('[data-diag-report-status]');
+        if (result.identity && !sameDocument(result.identity, currentIdentity())) {
+          if (status) status.textContent = 'Document changed; refresh diagnostics before reporting.';
+          return;
+        }
+        // Fence completion even when disable/re-enable recreates a panel or
+        // Refresh starts another read before this continuation is scheduled.
+        buildReport(result).then(function (out) {
+          if (!status || panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
+          if (result.identity && !sameDocument(result.identity, currentIdentity())) return;
+          status.textContent = out.error;
+        });
+      });
+    }
     panel.querySelectorAll('tr[data-layer-idx]').forEach(function (tr) {
       var idx = parseInt(tr.getAttribute('data-layer-idx'), 10);
       if (idx < 0) return;
       tr.addEventListener('click', function () {
-        if (typeof SM !== 'undefined' && typeof SM.setActiveLayer === 'function') SM.setActiveLayer(idx, true);
+        if (panel === target && generation === token && sameDocument(result.identity, currentIdentity())
+          && typeof SM !== 'undefined' && typeof SM.setActiveLayer === 'function') SM.setActiveLayer(idx, true);
       });
     });
   }
@@ -114,7 +178,7 @@
     flag: 'nemo-labs-diagnostics-panel',
     describe: 'labsDescribeDiagnosticsPanel',
     onEnable: function () { build(); },
-    onDisable: function () { if (panel) { panel.remove(); panel = null; } },
+    onDisable: function () { generation++; if (panel) { panel.remove(); panel = null; } },
   });
   if (SMLabs.isOn('diagnostics-panel')) build();
 })();
