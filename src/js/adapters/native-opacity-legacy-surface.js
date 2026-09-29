@@ -122,6 +122,72 @@
       if (root.NemoOpacityApplication.legacy === legacy) root.NemoOpacityApplication.legacy = original.legacy;
     };
   }
+  var projectionStateFields = ['canvasW', 'canvasH', 'canvasBg', 'fps', 'totalFrames',
+    'waIn', 'waOut', 'layers', 'currentFrame', 'activeLayerIdx', 'symbols',
+    'cameraKeys', 'activeSymbolId'];
+  var projectionGlobalFields = ['_curFrame', '_totalF', '_waIn', '_waOut',
+    '_layerSel', '_layerSelAnchor', '_motionCanvasEmptyClick',
+    '_motionExpandedLayer', '_motionExpandedElement', '_motionRevealedLayers',
+    '_motionRevealedElementLayers', '_perObjBoxes', '_nvSelectedLayer',
+    '_idxShadow', 'selectedPaths'];
+  function snapshotUiProjection(root) {
+    function capture(object, fields) {
+      var saved = {};
+      fields.forEach(function (key) { saved[key] = { present: Object.prototype.hasOwnProperty.call(object, key), value: object[key] }; });
+      return saved;
+    }
+    return { state: capture(root.state, projectionStateFields), globals: capture(root, projectionGlobalFields),
+      selectionFrames: root._sel && root._sel.frames };
+  }
+  function restoreUiProjection(root, snapshot) {
+    function restore(object, fields) {
+      Object.keys(fields).forEach(function (key) {
+        if (fields[key].present) object[key] = fields[key].value;
+        else delete object[key];
+      });
+    }
+    restore(root.state, snapshot.state);
+    restore(root, snapshot.globals);
+    if (root._sel) root._sel.frames = snapshot.selectionFrames;
+  }
+  function validatedProjection(root, document) {
+    var prepared = root.SMProjectDocument.prepareNativeOpacity(document);
+    if (!root.userLayers || root.userLayers.length !== 1 ||
+        !root.userLayers[0] || root.userLayers[0].children.length !== 0) {
+      throw new Error('Native UI projection requires the empty boot Paper row');
+    }
+    return JSON.parse(JSON.stringify(prepared.shell));
+  }
+  function installUiProjection(root, document) {
+    var view = validatedProjection(root, document);
+    var state = root.state;
+    state.canvasW = view.canvasW; state.canvasH = view.canvasH; state.canvasBg = view.canvasBg;
+    state.fps = view.fps; state.totalFrames = view.totalFrames;
+    state.waIn = view.waIn; state.waOut = view.waOut;
+    state.layers = view.layers; state.symbols = view.symbols; state.cameraKeys = view.cameraKeys;
+    state.activeSymbolId = null;
+    state.currentFrame = 0; state.activeLayerIdx = 0;
+    root._curFrame = 0; root._totalF = view.totalFrames;
+    root._waIn = view.waIn; root._waOut = view.waOut;
+    root._layerSel = [0]; root._layerSelAnchor = 0;
+    root._motionCanvasEmptyClick = false;
+    root._motionExpandedLayer = null; root._motionExpandedElement = null;
+    root._motionRevealedLayers = []; root._motionRevealedElementLayers = [];
+    root._perObjBoxes = null; root._nvSelectedLayer = null;
+    root._idxShadow = {};
+    if (root._sel) root._sel.frames = [];
+    root.selectedPaths = [];
+  }
+  function refreshUiProjection(root, json) {
+    if (typeof json !== 'string' || !root.state.layers || root.state.layers.length !== 1) {
+      throw new Error('Native UI projection is unavailable');
+    }
+    var view = validatedProjection(root, JSON.parse(json));
+    if (root.state.layers[0].layerUid !== view.layers[0].layerUid) {
+      throw new Error('Native UI projection layer changed identity');
+    }
+    root.state.layers = view.layers;
+  }
   function desktopPorts(root, transport) {
     var tauri = root.__TAURI__, invoke = tauri.core.invoke;
     return Object.freeze({
@@ -152,20 +218,16 @@
       capabilities: function () { return root.NemoApplication.capabilities(); },
       currentFrame: function () { return root.state.currentFrame; },
       afterChange: function () {
-        if (root.renderLayerList) root.renderLayerList();
-        if (root.renderTimeline) root.renderTimeline();
         if (root.updateUI) root.updateUI();
         if (root.SMEngineBridge) root.SMEngineBridge.renderNow();
       },
       sleep: function (ms) { return new Promise(function (resolve) { root.setTimeout(resolve, ms); }); },
       surface: Object.freeze({
-        setAdmissionFrameZero: function () {
-          // The playhead is transient UI state. Native document/cache ownership
-          // has already been admitted before this port runs; do not navigate or
-          // write any Paper frame while establishing its first visible frame.
-          root.state.currentFrame = 0;
-          root._curFrame = 0;
-        },
+        snapshotUiProjection: function () { return snapshotUiProjection(root); },
+        installUiProjection: function (document) { return installUiProjection(root, document); },
+        restoreUiProjection: function (snapshot) { return restoreUiProjection(root, snapshot); },
+        refreshUiProjection: function (json) { return refreshUiProjection(root, json); },
+        paintUiProjection: function () { if (root.updateUI) root.updateUI(); },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');

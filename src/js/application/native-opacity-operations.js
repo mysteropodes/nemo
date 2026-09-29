@@ -14,6 +14,7 @@
     var v1ByLifecycle = new WeakMap();
     // Extension capabilities outlive a document; opening is one import at a time.
     var extensionExposed = false, installation = null, opening = false;
+    var pendingOpen = null, publishedSession = null, admissionStarted = false;
     var viewport = viewportModule.create(lifecycle, ports, function () { return opening; });
 
     function ensureActive() {
@@ -210,15 +211,69 @@
     function disposeSession(session) {
       v1ByLifecycle.delete(session);
       viewport.disposeSession(session);
+      if (pendingOpen && pendingOpen.session === session) pendingOpen = null;
+      if (publishedSession === session) publishedSession = null;
+      admissionStarted = false;
     }
     function afterChange() {
-      if (opening) {
-        if (!ports.surface || typeof ports.surface.setAdmissionFrameZero !== 'function') {
-          throw new Error('native admission presentation-frame port is unavailable');
-        }
-        ports.surface.setAdmissionFrameZero();
+      if (opening || pendingOpen) return;
+      var current = lifecycle.inspect();
+      if (admissionStarted && current.phase === 'native' && current.session !== publishedSession) return;
+      if (publishedSession && current.phase === 'native' && current.session === publishedSession) {
+        ports.surface.refreshUiProjection(lifecycle.persistenceJSON());
       }
       if (ports.afterChange) ports.afterChange();
+    }
+    function sameReceipt(a, b) {
+      return !!a && !!b && a.owner === 'native' && b.owner === 'native' &&
+        a.frame === 0 && b.frame === 0 &&
+        a.instanceId === b.instanceId && a.documentId === b.documentId &&
+        a.contentRevision === b.contentRevision &&
+        a.lifecycleGeneration === b.lifecycleGeneration &&
+        a.documentSnapshotId === b.documentSnapshotId;
+    }
+    function currentOpen(token) {
+      var current = lifecycle.inspect();
+      return current.phase === 'native' && !current.busy && current.session === token.session &&
+        current.generation === token.generation && current.identity &&
+        current.identity.instanceId === token.first.instanceId &&
+        current.identity.documentId === token.first.documentId &&
+        current.identity.contentRevision === token.first.contentRevision;
+    }
+    async function finishOpenAfterReveal(first) {
+      var token = pendingOpen;
+      if (!token || token.finishing || first !== token.first || !currentOpen(token)) {
+        throw new Error('Native Open is stale or already published');
+      }
+      token.finishing = true;
+      try {
+        var visible = await viewport.presentPreview(0);
+        if (!sameReceipt(token.first, visible) || visible.status !== 'presented' ||
+            !currentOpen(token)) throw new Error('Native viewport is not current after reveal');
+        var json = lifecycle.persistenceJSON();
+        if (typeof json !== 'string' || !currentOpen(token)) {
+          throw new Error('Native document is not ready for UI projection');
+        }
+        var projection = ports.document.prepareNativeOpacity(json);
+        if (projection.opacityMode !== token.opacityMode || projection.layerUid !== token.layerUid ||
+            !currentOpen(token)) throw new Error('Native UI projection changed identity');
+        var saved = ports.surface.snapshotUiProjection();
+        try {
+          ports.surface.installUiProjection(projection.shell);
+          ports.surface.paintUiProjection();
+          if (!currentOpen(token)) throw new Error('Native Open changed during UI projection');
+        } catch (error) {
+          ports.surface.restoreUiProjection(saved);
+          try { ports.surface.paintUiProjection(); } catch (_) {}
+          throw error;
+        }
+        publishedSession = token.session;
+        pendingOpen = null;
+        return visible;
+      } catch (error) {
+        if (pendingOpen === token) pendingOpen = null;
+        throw error;
+      }
     }
     function allowLegacy(kind) {
       try { return ports.surface.allow(kind) === true; }
@@ -228,7 +283,7 @@
       var candidate;
       try { candidate = ports.document.prepareNativeOpacity(json); }
       catch (_) { return false; }
-      if (opening || !['legacy', 'closed'].includes(lifecycle.inspect().phase)) return false;
+      if (opening || pendingOpen || !['legacy', 'closed'].includes(lifecycle.inspect().phase)) return false;
       if (extensionExposed || ports.surface.extensionOpen()) {
         ports.surface.toast(extensionExposed
           ? 'Reload or restart Nemo before enabling native opacity after using scripts or plugins.'
@@ -236,10 +291,17 @@
         return false;
       }
       opening = true;
+      admissionStarted = true;
       viewport.reset();
       try {
         if (await lifecycle.activate(candidate) !== true) return false;
-        return await viewport.presentPreview(0, allowOccludedAdmission === true);
+        var first = await viewport.presentPreview(0, allowOccludedAdmission === true);
+        var current = lifecycle.inspect();
+        if (!first || first.owner !== 'native' || !current.session ||
+            !['presented', 'deferred-occluded'].includes(first.status)) return false;
+        pendingOpen = { first: first, session: current.session, generation: current.generation,
+          opacityMode: candidate.opacityMode, layerUid: candidate.layerUid, finishing: false };
+        return first;
       } catch (error) {
         return false;
       } finally {
@@ -308,7 +370,7 @@
         presentPreview: viewport.presentPreview,
         exportPng: lifecycle.exportPng, releaseCurrent: lifecycle.releaseCurrent,
         historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); }
-      }), Object.freeze({ importJSON: importJSON,
+      }), Object.freeze({ importJSON: importJSON, finishOpenAfterReveal: finishOpenAfterReveal,
         release: function (kind) { return lifecycle.releaseCurrent(kind || 'document-replacement'); }
       }), Object.freeze({ handle: handleV1, legacy: legacyIntent, meta: function () {
         var current = lifecycle.identity();

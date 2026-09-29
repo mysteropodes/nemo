@@ -248,9 +248,15 @@ function surfaceHarness(source, options = {}) {
   let publications, resized;
   const ui = options.ui || { state: { currentFrame: 10 }, _curFrame: 10,
     __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
-  const presentationFrame = NativeLegacySurface.desktopPorts(ui, {}).surface.setAdmissionFrameZero;
+  ui.userLayers ||= [{ children: [] }];
+  ui.SMProjectDocument = ProjectDocument;
+  const projection = NativeLegacySurface.desktopPorts(ui, {}).surface;
   const surface = {
-    setAdmissionFrameZero: presentationFrame,
+    snapshotUiProjection: projection.snapshotUiProjection,
+    installUiProjection: projection.installUiProjection,
+    restoreUiProjection: projection.restoreUiProjection,
+    refreshUiProjection: projection.refreshUiProjection,
+    paintUiProjection() { if (options.paintUiProjection) options.paintUiProjection(h.controller, h.state); },
     installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
     wrap() { return () => {}; },
     extensionOpen() { return !!options.extension; }, toast() {},
@@ -262,6 +268,15 @@ function surfaceHarness(source, options = {}) {
   h.controller.install();
   return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
+
+test('terminal desktop UI paint does not enqueue an unverified native frame', () => {
+  let paints = 0, presentations = 0;
+  const ui = { state: {}, __TAURI__: { core: { invoke() {} } },
+    SM: { importJSON() {} }, updateUI() { paints++; },
+    SMEngineBridge: { renderNow() { presentations++; } } };
+  NativeLegacySurface.desktopPorts(ui, {}).surface.paintUiProjection();
+  assert.equal(paints, 1); assert.equal(presentations, 0);
+});
 
 test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
   assert.equal(sha(SHELL_PATH), SHELL_SHA);
@@ -496,7 +511,7 @@ for (const [mode, makeSource, frameZeroOpacity] of [
   ['static', staticSource, 25], ['keyed', keyedSource, 20],
 ]) {
   for (const previousFrame of [10, 59]) {
-    test(`${mode} native Open resets old UI frame ${previousFrame} before refresh and later renders`, async () => {
+    test(`${mode} native Open retains old UI frame ${previousFrame} until final presentation`, async () => {
       const source = makeSource(), paperCalls = [], observed = [];
       const ui = { state: { currentFrame: previousFrame }, _curFrame: previousFrame,
         __TAURI__: { core: { invoke() {} } },
@@ -506,27 +521,17 @@ for (const [mode, makeSource, frameZeroOpacity] of [
         saveAllLayerFrames() { paperCalls.push('save-frame'); },
         pushUndo() { paperCalls.push('undo'); } };
       let h;
-      h = surfaceHarness(source, { ui, resize: async () => {}, afterChange() {
+      h = surfaceHarness(source, { ui, resize: async () => {}, paintUiProjection() {
         observed.push([ui.state.currentFrame, ui._curFrame]);
+      }, afterChange() {
         // Real afterChange asks SMEngineBridge to render the UI playhead.
         h.published().cutover.renderPreview(ui.state.currentFrame);
       } });
       const first = await h.published().project.importJSON(JSON.stringify(source));
       assert.equal(first.status, 'presented');
-      assert.deepEqual(observed, [[0, 0]], 'both UI frame fields are current before refresh');
+      assert.deepEqual(observed, [], 'candidate cannot repaint before final presentation');
+      assert.deepEqual([ui.state.currentFrame, ui._curFrame], [previousFrame, previousFrame]);
       assert.deepEqual(h.state.previews.map(request => request.frame), [0]);
-      assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [frameZeroOpacity]);
-      assert.equal(typeof h.controller.persistenceJSON(), 'string', 'native snapshot remains readable');
-      const snapshot = h.controller.handleV1({ apiVersion: 1, requestId: `frame-zero-${mode}-${previousFrame}`,
-        operation: 'snapshot', payload: { frame: null } });
-      assert.equal(snapshot.ok, true);
-      assert.equal(snapshot.result.frame, 0);
-      assert.equal(snapshot.result.totalFrames, 21);
-      assert.equal(snapshot.result.layers[0].opacity, frameZeroOpacity);
-      const property = h.controller.handleV1({ apiVersion: 1, requestId: `opacity-zero-${mode}-${previousFrame}`,
-        operation: 'property.get', payload: { layerId: 'r08_curve_layer', property: 'opacity', frame: null } });
-      assert.equal(property.ok, true);
-      assert.equal(property.result.value, frameZeroOpacity);
       const root = { NemoNativeOpacityProject: h.published().project,
         NemoNativeOpacityCutover: h.published().cutover };
       assert.equal(await NativeProjectEntry.reveal(root, first, {
@@ -534,11 +539,24 @@ for (const [mode, makeSource, frameZeroOpacity] of [
         repaint() { throw new Error('legacy repaint ran during native Open'); },
         raf(callback) { callback(); },
       }), true);
+      assert.deepEqual(observed, [[0, 0]], 'UI refresh occurs only after final presentation');
+      assert.deepEqual([ui.state.canvasW, ui.state.canvasH, ui.state.fps, ui.state.totalFrames], [320, 180, 24, 21]);
+      assert.equal(ui.state.layers[0].name, 'R08 rectangle');
+      assert.equal(ui.state.layers[0].motionStatic.opacity[0], mode === 'keyed' ? 25 : frameZeroOpacity,
+        'the UI shadow preserves stored opacity while keyed frame evaluation stays native');
+      assert.deepEqual(ui._layerSel, [0]);
+      const snapshot = h.controller.handleV1({ apiVersion: 1, requestId: `frame-zero-${mode}-${previousFrame}`,
+        operation: 'snapshot', payload: { frame: null } });
+      assert.equal(snapshot.ok, true);
+      assert.equal(snapshot.result.frame, 0);
+      assert.equal(snapshot.result.totalFrames, 21);
+      assert.equal(snapshot.result.layers[0].opacity, frameZeroOpacity);
       h.published().cutover.renderPreview(ui.state.currentFrame);
       await h.controller.flush();
       h.published().resize();
       await h.resizeCallback()();
-      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0]);
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0],
+        'terminal UI paint never schedules a third native presentation');
       assert.deepEqual([ui.state.currentFrame, ui._curFrame], [0, 0]);
       assert.deepEqual(paperCalls, []);
       assert.equal(h.controller.status(), 'native');
@@ -557,6 +575,72 @@ test('unsupported and preactivation failed imports retain the previous UI playhe
     assert.deepEqual([ui.state.currentFrame, ui._curFrame], [59, 59]);
     assert.equal(h.state.previews.length, 0);
   }
+});
+
+test('terminal Open rejects a changed receipt and duplicate publication without replacing the old view', async () => {
+  const ui = { state: { currentFrame: 59, layers: [{ name: 'Keep' }] }, _curFrame: 59,
+    _layerSel: [0], userLayers: [{ children: [] }],
+    __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
+  const h = surfaceHarness(staticSource(), { ui });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  await assert.rejects(h.published().project.finishOpenAfterReveal({ ...first }), /stale or already published/);
+  assert.deepEqual([ui.state.currentFrame, ui._curFrame, ui.state.layers[0].name], [59, 59, 'Keep']);
+  await h.published().project.finishOpenAfterReveal(first);
+  assert.deepEqual([ui.state.currentFrame, ui._curFrame, ui.state.layers[0].name], [0, 0, 'R08 rectangle']);
+  await assert.rejects(h.published().project.finishOpenAfterReveal(first), /stale or already published/);
+  assert.equal(h.state.previews.length, 2, 'duplicate callback cannot request another frame');
+});
+
+test('a native revision before final reveal cannot publish a stale UI projection', async () => {
+  const ui = { state: { currentFrame: 59, layers: [{ name: 'Keep' }] }, _curFrame: 59,
+    userLayers: [{ children: [] }], __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
+  const h = surfaceHarness(staticSource(), { ui });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  await h.controller.setOpacity('r08_curve_layer', 60);
+  await assert.rejects(h.published().project.finishOpenAfterReveal(first), /stale or already published/);
+  assert.deepEqual([ui.state.currentFrame, ui._curFrame, ui.state.layers[0].name], [59, 59, 'Keep']);
+  assert.equal(h.state.previews.length, 1, 'stale callback cannot request a second frame');
+  assert.equal(h.state.imports.length, 0);
+});
+
+test('renderer failure restores every touched UI field and leaves Open unpublished', async () => {
+  const oldLayers = [{ name: 'Keep' }], oldSelection = [0], oldPaths = [{ id: 'old' }];
+  const oldFrames = [{ layer: 0, frame: 4 }], oldShadow = { test: 'keep' };
+  const ui = { state: { currentFrame: 59, canvasW: 800, layers: oldLayers }, _curFrame: 59,
+    _layerSel: oldSelection, selectedPaths: oldPaths, _sel: { frames: oldFrames },
+    _idxShadow: oldShadow, userLayers: [{ children: [] }],
+    __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
+  let renders = 0;
+  const h = surfaceHarness(staticSource(), { ui, paintUiProjection() {
+    if (++renders === 1) {
+      ui._sel.frames.push({ layer: 0, frame: 0 });
+      ui._idxShadow.projected = true;
+      throw new Error('renderer failed');
+    }
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  await assert.rejects(h.published().project.finishOpenAfterReveal(first), /renderer failed/);
+  assert.equal(renders, 2, 'old view is repainted after rollback');
+  assert.equal(ui.state.currentFrame, 59); assert.equal(ui._curFrame, 59);
+  assert.equal(ui.state.canvasW, 800); assert.strictEqual(ui.state.layers, oldLayers);
+  assert.strictEqual(ui._layerSel, oldSelection); assert.strictEqual(ui.selectedPaths, oldPaths);
+  assert.strictEqual(ui._sel.frames, oldFrames); assert.strictEqual(ui._idxShadow, oldShadow);
+  assert.equal(Object.hasOwn(ui.state, 'fps'), false);
+  assert.equal(h.controller.blocksLegacy(), true);
+});
+
+test('accepted native edit, undo and redo refresh the detached UI opacity', async () => {
+  const h = surfaceHarness(staticSource());
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  await h.published().project.finishOpenAfterReveal(first);
+  assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 25);
+  await h.controller.setOpacity('r08_curve_layer', 60);
+  assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60);
+  await h.controller.history('undo');
+  assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 25);
+  await h.controller.history('redo');
+  assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60);
+  assert.equal(h.state.imports.length, 0, 'no legacy document writer runs');
 });
 
 for (const fails of [false, true]) {
