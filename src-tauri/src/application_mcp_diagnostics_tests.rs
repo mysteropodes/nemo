@@ -6,7 +6,10 @@ use std::{
     io::{BufRead, BufReader, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        OnceLock,
+    },
     thread::{self, JoinHandle},
     time::Duration,
 };
@@ -149,11 +152,7 @@ impl Client {
         Self::in_registry(&host.root)
     }
     fn in_registry(root: &std::path::Path) -> Self {
-        let binary = std::env::var_os("NEMO_TEST_MCP_BINARY")
-            .map(PathBuf::from)
-            .expect(
-                "build nemo-mcp at the candidate SHA, then set NEMO_TEST_MCP_BINARY explicitly",
-            );
+        let binary = candidate_binary();
         assert!(
             binary.is_file(),
             "build the candidate nemo-mcp binary or set NEMO_TEST_MCP_BINARY"
@@ -222,6 +221,36 @@ impl Client {
         );
         result["result"]["structuredContent"].clone()
     }
+}
+
+/// Normal desktop test entrypoints need no manual fixture setup. Never use a
+/// potentially stale default: require a successful locked build first. An
+/// explicit binary is reserved for separately built/digested acceptance runs.
+fn candidate_binary() -> PathBuf {
+    if let Some(binary) = std::env::var_os("NEMO_TEST_MCP_BINARY") {
+        return PathBuf::from(binary);
+    }
+    static BUILT: OnceLock<PathBuf> = OnceLock::new();
+    BUILT
+        .get_or_init(|| {
+            let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nemo-mcp");
+            let target = crate_dir.join("target");
+            let status = Command::new("cargo")
+                .args(["build", "--locked", "--manifest-path"])
+                .arg(crate_dir.join("Cargo.toml"))
+                .args(["--bin", "nemo-mcp", "--target-dir"])
+                .arg(&target)
+                .status()
+                .expect("build current-source MCP fixture");
+            assert!(
+                status.success(),
+                "current-source MCP fixture build must succeed"
+            );
+            target
+                .join("debug")
+                .join(format!("nemo-mcp{}", std::env::consts::EXE_SUFFIX))
+        })
+        .clone()
 }
 
 /// A fault-injection relay holds bytes produced by the genuine native endpoint.
