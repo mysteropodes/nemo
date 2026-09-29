@@ -11713,7 +11713,6 @@ window.updateCombinePanel=updateCombinePanel;
   });
 
   runBtn.addEventListener('click',async function(){
-    saveAllLayerFrames();
     var range=(rangeSel.value==='all')?{start:0,end:state.totalFrames-1}:{start:state.waIn,end:state.waOut};
     var scale=currentExportScale();
     var alpha=ALPHA_FORMATS.indexOf(fmtSel.value)>=0&&document.getElementById('exp-alpha').checked;
@@ -11728,6 +11727,10 @@ window.updateCombinePanel=updateCombinePanel;
       onRiveProgress:function(msg){progEl.style.display='block';progEl.textContent=msg;}};
     runBtn.disabled=true;progEl.style.display='block';progEl.textContent=SM.t('exportPreparing');cancelBtn.disabled=false;cancelBtn.style.display=(fmtSel.value==='svg'&&window.SMExport.isAvailable())?'':'none';
     try{
+      // The native PNG job reads a pinned Rust revision. Saving Paper frames
+      // here would either be denied or create a second document writer.
+      var nativeOpacity=window.NemoNativeOpacityCutover;
+      if(fmtSel.value!=='png'||!nativeOpacity||!nativeOpacity.blocksLegacy())saveAllLayerFrames();
       var fn={svg:'exportSVGSequence',png:'exportPNGSequence',tiff:'exportTIFFSequence',gif:'exportGIF',mp4:'exportMP4',prores:'exportProRes',lottie:'exportLottie',rive:'exportRive','ae-camera':'exportAECamera'}[fmtSel.value];
       var res=await window.SMExport[fn](opts);
       if(res.cancelled){progEl.textContent=SM.t('exportCancelled');}

@@ -572,8 +572,7 @@ function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerComp
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
 async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
   var nativeOpacity=exportNativeOpacity();if(nativeOpacity){
-    if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');
-    if((scale&&scale!==1)||alpha){await nativeOpacity.releaseCurrent(alpha?'alpha-raster-export':'scaled-raster-export');return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);}
+    if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');if((scale&&scale!==1)||alpha)throw new Error('Native opacity PNG export supports only 1× with an opaque background');
     var destination=dir.replace(/[\\/]+$/,'')+'/nemo-native-opacity-'+Date.now()+'-'+Math.floor(Math.random()*1000000);var frames=[];for(var nativeFrame=start;nativeFrame<=end;nativeFrame++)frames.push(nativeFrame);
     await nativeOpacity.exportPng(destination,frames,onProgress);return destination;
   }
@@ -1292,7 +1291,7 @@ window.SMExport={
 
   exportPNGSequence:async function(opts){
     if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
-    var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
+    var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var nativeOpacity=exportNativeOpacity();if(nativeOpacity&&((scale!==1)||(opts&&opts.alpha)))return{ok:false,error:'Native opacity PNG export supports only 1× with an opaque background'};
     var dir=await exportPickDir('Dossier de séquence PNG');
     if(!dir)return{cancelled:true};
     var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);return{ok:true,dir:renderedDir};
