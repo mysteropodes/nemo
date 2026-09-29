@@ -31,6 +31,16 @@
   function revision(value, positive) {
     return Number.isSafeInteger(value) && value >= (positive ? 1 : 0);
   }
+  function frozen(value) {
+    if (!value || typeof value !== 'object') return value === null ||
+      ['string', 'boolean'].includes(typeof value) || typeof value === 'number' && Number.isFinite(value);
+    return (Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype || plain(value)) &&
+      Object.isFrozen(value) && Reflect.ownKeys(value).every(function (key) {
+        var field = Object.getOwnPropertyDescriptor(value, key);
+        return typeof key === 'string' && has(field, 'value') &&
+          (field.enumerable || Array.isArray(value) && key === 'length') && frozen(field.value);
+      });
+  }
   function successful(response, label) {
     if (!response || response.ok !== true) throw new Error(label + ' failed: ' +
       (response && response.error && response.error.message || 'unknown native error'));
@@ -51,6 +61,20 @@
         receipt.contentRevision !== 0 || receipt.resourceCount !== prepared.resources.length ||
         receipt.viewportAvailable !== true) {
       throw new Error('native bootstrap receipt is not the N20 viewport contract');
+    }
+    return receipt;
+  }
+  function validateReplacement(receipt, current, request, prepared) {
+    if (!exact(receipt, ['requestId', 'retrieved', 'documentId', 'contentRevision',
+      'resourceCount', 'cancelledPreviewWorkIds', 'reconciledExports']) ||
+        receipt.requestId !== request.requestId || !bounded(receipt.documentId) ||
+        receipt.documentId === current.documentId || receipt.contentRevision !== 0 ||
+        receipt.resourceCount !== prepared.resources.length ||
+        typeof receipt.retrieved !== 'boolean' ||
+        !validateIds(receipt.cancelledPreviewWorkIds) ||
+        !Array.isArray(receipt.reconciledExports) ||
+        !receipt.reconciledExports.every(validateExport)) {
+      throw new Error('native replacement receipt is not a new document');
     }
     return receipt;
   }
@@ -194,8 +218,9 @@
   }
 
   return Object.freeze({ READS: READS, WRITES: WRITES, PROPERTY_WRITES: PROPERTY_WRITES,
-    clone: clone, has: has, plain: plain, bounded: bounded, successful: successful,
+    clone: clone, has: has, plain: plain, bounded: bounded, frozen: frozen, successful: successful,
     expectedValue: expectedValue, validateBootstrap: validateBootstrap,
+    validateReplacement: validateReplacement,
     validateSubscription: validateSubscription, validateRelease: validateRelease,
     validateRevisionEvent: validateRevisionEvent, registered: registered,
     capabilitySummary: capabilitySummary, v1PayloadValid: v1PayloadValid,
