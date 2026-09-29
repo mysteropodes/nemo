@@ -192,6 +192,7 @@
       },
     },
     { name: 'xsheet', label: 'labsPanelLabelXsheet' },
+    { name: 'diagnostics-panel', label: 'labsPanelLabelDiagnostics' },
     {
       name: 'reference-3d', label: 'labsPanelLabelReference3d',
       hintExtra: 'labsPanelHintReference3d',
