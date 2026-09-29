@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a1c6ec6ce0e3e8ed18eca4a22ae49134e3b7c824",
-  "describe": "v0.7.0-alpha.4-768-ga1c6ec6c"
+  "head": "51100197141fef3a1fecae360c9e84aad1d68dc4",
+  "describe": "v0.7.0-alpha.4-783-g51100197"
  },
- "inputsDigest": "ca8f485dcd29f49f4359f565d70e63831c0920628b4ed1a11c3c0b3ab1a96618",
+ "inputsDigest": "857468fd22ba5e13d1e73c7e6eb9b5493aac9466faaa79dff5fef00bbcfe99f7",
  "states": [
   "inventoried",
   "characterized",
@@ -15385,7 +15385,7 @@
    "capability": "settings language",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/i18n.js:4233 initLanguage()"
+    "src/js/i18n.js:4237 initLanguage()"
    ],
    "events": [
     "change"
@@ -15409,7 +15409,7 @@
     "functionsVisited": 11,
     "via": "variable sel",
     "references": [
-     "src/js/i18n.js:4198 applyI18n()",
+     "src/js/i18n.js:4202 applyI18n()",
      "src/js/tutorial.js:1023 measure()"
     ]
    },
@@ -21505,7 +21505,7 @@
    "id": "labs:diagnostics-panel",
    "kind": "labs",
    "surface": "Settings > Labs / SMLabs.diagnostics-panel",
-   "capability": "labsDescribeDiagnosticsPanel",
+   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; a row click selects the layer it touched, Report produces a reproduction bundle",
    "area": "labs",
    "handler": [
     "src/js/labs/diagnostics-panel.js:177"
