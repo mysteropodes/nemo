@@ -271,6 +271,56 @@ fn diagnostics_never_retains_unresolved_payload_targets_or_invalid_request_label
 }
 
 #[test]
+fn diagnostics_omits_imported_path_targets_but_preserves_opaque_request_correlation() {
+    let path_uid = "file:/private/secret";
+    let project = std::str::from_utf8(PROJECT)
+        .unwrap()
+        .replace(LAYER, path_uid);
+    let mut app = NativeApplication::new(
+        "diagnostics-fixture",
+        decode_project(project.as_bytes()).unwrap(),
+        Unused,
+        Unused,
+        Unused,
+    )
+    .unwrap();
+    let mut edit = set(&app, "caller:/opaque/correlation", 40);
+    edit.payload["stableTarget"]["layerUid"] = json!(path_uid);
+    assert!(app.dispatch(edit).is_ok());
+    let begin = OpacityRequest::history_stage(
+        "path-begin",
+        app.instance_id(),
+        app.document_id(),
+        Some(1),
+        "transaction.begin",
+        json!({"stableTarget":{"layerUid":path_uid}}),
+    );
+    let begun = app.dispatch(begin);
+    assert!(begun.is_ok());
+    let update = OpacityRequest::history_stage(
+        "path-update",
+        app.instance_id(),
+        app.document_id(),
+        None,
+        "transaction.update",
+        json!({"transactionId":begun.result().unwrap()["transactionId"], "value":60}),
+    );
+    assert!(app.dispatch(update).is_ok());
+    let trace = recent(&mut app);
+    assert_eq!(trace["records"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        trace["records"][0]["requestId"],
+        "caller:/opaque/correlation"
+    );
+    assert!(trace["records"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|r| r.get("targetId").is_none()));
+    assert!(!serde_json::to_string(&trace).unwrap().contains(path_uid));
+}
+
+#[test]
 fn diagnostics_transaction_stages_capture_target_and_cancel_without_history_growth() {
     let mut app = app();
     let begin = OpacityRequest::history_stage(

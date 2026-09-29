@@ -316,9 +316,11 @@ fn diagnostics_result(value: &Value) -> bool {
                     .get("requestId")
                     .and_then(Value::as_str)
                     .is_some_and(bounded_identifier)
-                && record
-                    .get("targetId")
-                    .is_none_or(|value| value.as_str().is_some_and(bounded_identifier))
+                && record.get("targetId").is_none_or(|value| {
+                    value
+                        .as_str()
+                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/']))
+                })
                 && record
                     .get("operation")
                     .and_then(Value::as_str)
@@ -355,6 +357,7 @@ mod tests {
             ("errorCode", json!("internal")),
             ("operation", json!("query.diagnostics.recent")),
             ("targetId", json!("/private/path")),
+            ("targetId", json!("file:/private/path")),
         ] {
             let mut altered = valid.clone();
             altered["records"][0][key] = value;

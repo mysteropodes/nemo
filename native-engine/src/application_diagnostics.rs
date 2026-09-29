@@ -105,7 +105,10 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                         .and_then(|value| value.as_str())
                         .and_then(|id| self.history.transactions.get(id))
                         .map(|record| record.layer_uid.clone())
-                });
+                })
+                // Imported identifiers can contain path syntax. Targets are
+                // optional; never copy such document-derived labels into trace.
+                .filter(|value| identifier(value) && !value.contains([':', '/']));
             (
                 request.request_id.clone(),
                 request.operation.clone(),

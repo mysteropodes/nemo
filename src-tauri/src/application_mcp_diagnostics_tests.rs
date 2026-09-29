@@ -1,4 +1,4 @@
-//! Real MCP stdio → native wire/revision barrier → one actual Rust authority.
+//! Real MCP stdio → native wire/revision barrier → isolated Rust authorities.
 //! Fixture ports replace only rendering; this is not installed UI acceptance.
 use crate::application_mcp::tests::*;
 use serde_json::Value;
@@ -151,9 +151,9 @@ impl Client {
     fn in_registry(root: &std::path::Path) -> Self {
         let binary = std::env::var_os("NEMO_TEST_MCP_BINARY")
             .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nemo-mcp/target/debug/nemo-mcp")
-            });
+            .expect(
+                "build nemo-mcp at the candidate SHA, then set NEMO_TEST_MCP_BINARY explicitly",
+            );
         assert!(
             binary.is_file(),
             "build the candidate nemo-mcp binary or set NEMO_TEST_MCP_BINARY"
@@ -235,7 +235,11 @@ struct HeldResponse {
 }
 impl HeldResponse {
     fn start(host: &Host) -> Self {
-        let upstream = registry::read_endpoints(&host.root).unwrap().remove(0);
+        let upstream = registry::read_endpoints(&host.root)
+            .unwrap()
+            .into_iter()
+            .find(|endpoint| endpoint.instance_id == host.state.instance_id)
+            .unwrap();
         let root =
             std::env::temp_dir().join(format!("nemo-held-response-{}", uuid::Uuid::new_v4()));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -367,18 +371,27 @@ fn native_diagnostics_stdio_observes_ui_and_mcp_edits_on_one_real_authority() {
     assert_eq!(after.result, before.result);
     assert_eq!(after.content_revision, before.content_revision);
     let other = Host::start();
+    let other_endpoint = registry::read_endpoints(&other.root).unwrap().remove(0);
+    let _shared_registration = Registration::create(&host.root, &other_endpoint).unwrap();
+    assert_eq!(registry::read_endpoints(&host.root).unwrap().len(), 2);
+    other.subscribe();
+    assert_eq!(client.call(&other.set("other-80", 0, 80))["ok"], true);
+    let other_trace = client.call(&other.query());
     assert_eq!(
-        other
-            .state
-            .dispatch_native(other.query())
-            .unwrap()
-            .result
-            .unwrap()["records"],
-        json!([]),
-        "a second native authority must not observe this trace"
+        other_trace["result"]["records"],
+        json!([{"sequence":1,"requestId":"other-80","operation":"command.document.apply","targetId":"r08_curve_layer","contentRevision":1,"ok":true}]),
+        "the same stdio client must select the second real authority"
+    );
+    assert_eq!(
+        client.call(&query),
+        trace,
+        "second-instance edits stay isolated"
     );
     let mut wrong = query.clone();
     wrong.instance_id = other.state.instance_id.clone();
+    assert_eq!(client.call(&wrong)["error"]["code"], "wrong_document");
+    assert_eq!(client.call(&other.query()), other_trace);
+    wrong.instance_id = uuid::Uuid::new_v4().to_string();
     assert_eq!(client.call(&wrong)["error"]["code"], "unavailable");
     let mut held = HeldResponse::start(&host);
     let mut delayed_client = Client::in_registry(&held.root);

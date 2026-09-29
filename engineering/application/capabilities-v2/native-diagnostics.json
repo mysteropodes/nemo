@@ -19,7 +19,8 @@
     "maxResponseBytes": 4096,
     "responseSizeIncludesEnvelope": true,
     "overflow": "Omit oldest records from the response and set truncated; never slice identifiers.",
-    "forbidden": ["request payload", "document content", "error message/details", "asset or output path"]
+    "forbidden": ["request payload", "document content", "error message/details", "asset or output path"],
+    "correlationPrivacy": "requestId is an exact caller-controlled opaque correlation label under the existing v2 Identifier contract, not sanitized content. Callers must not place secrets or private paths in requestId; such labels remain visible to trace readers. Optional document-derived targetId omits identifiers containing colon or slash. This boundary excludes payload/path fields; it does not promise sanitization of caller correlation labels."
   },
   "semantics": {
     "scope": "Terminal current-identity command.document.apply, transaction begin/update/commit/cancel, history undo/redo attempts at the native authority boundary.",

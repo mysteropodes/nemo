@@ -540,7 +540,7 @@
         "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
         "requestId": { "$ref": "#/$defs/Identifier" },
         "operation": { "enum": ["command.document.apply", "transaction.begin", "transaction.update", "transaction.commit", "transaction.cancel", "history.undo", "history.redo"] },
-        "targetId": { "$ref": "#/$defs/Identifier" },
+        "targetId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
         "contentRevision": { "$ref": "#/$defs/Revision" },
         "ok": { "type": "boolean" },
         "errorCode": { "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"] }
