@@ -371,6 +371,18 @@ test('active native Open replaces A with a fresh subscribed B before UI publicat
   assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [60]);
 });
 
+test('native Open hides the populated startup Paper group only after the final frame', async () => {
+  const paper = { children: [{ name: 'boot artwork' }], visible: true };
+  const ui = { state: {}, userLayers: [paper], __TAURI__: { core: { invoke() {} } },
+    SM: { importJSON() {} } };
+  const h = surfaceHarness(staticSource(), { ui });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  assert.equal(paper.visible, true);
+  await h.published().project.finishOpenAfterReveal(first);
+  assert.equal(paper.visible, false);
+  assert.equal(ui.state.layers[0].name, 'R08 rectangle');
+});
+
 test('replacement with an unpresented first frame fences B and blocks stale A publication', async () => {
   let blocked = 0;
   const h = surfaceHarness(staticSource(), {
@@ -698,7 +710,7 @@ test('renderer failure restores every touched UI field and leaves Open unpublish
   const oldFrames = [{ layer: 0, frame: 4 }], oldShadow = { test: 'keep' };
   const ui = { state: { currentFrame: 59, canvasW: 800, layers: oldLayers }, _curFrame: 59,
     _layerSel: oldSelection, selectedPaths: oldPaths, _sel: { frames: oldFrames },
-    _idxShadow: oldShadow, userLayers: [{ children: [] }],
+    _idxShadow: oldShadow, userLayers: [{ children: [{}], visible: true }],
     __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
   let renders = 0;
   const h = surfaceHarness(staticSource(), { ui, paintUiProjection() {
@@ -715,6 +727,7 @@ test('renderer failure restores every touched UI field and leaves Open unpublish
   assert.equal(ui.state.canvasW, 800); assert.strictEqual(ui.state.layers, oldLayers);
   assert.strictEqual(ui._layerSel, oldSelection); assert.strictEqual(ui.selectedPaths, oldPaths);
   assert.strictEqual(ui._sel.frames, oldFrames); assert.strictEqual(ui._idxShadow, oldShadow);
+  assert.equal(ui.userLayers[0].visible, true);
   assert.equal(Object.hasOwn(ui.state, 'fps'), false);
   assert.equal(h.controller.blocksLegacy(), true);
 });
