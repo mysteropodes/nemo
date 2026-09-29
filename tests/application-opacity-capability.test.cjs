@@ -18,7 +18,7 @@ const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
 const capability = require('../src/js/application/opacity-capability.js');
 
-function application() {
+function application(options = {}) {
   let sequence = 0;
   const noop = () => {};
   const ctx = {
@@ -36,6 +36,12 @@ function application() {
     renderLayerList: noop, renderTimeline: noop,
     createUserLayer(name) { ctx.state.layers.push({ name }); return ctx.state.layers.length - 1; },
   };
+  if (!options.browser) {
+    ctx.__TAURI__ = { core: { invoke: noop } };
+    ctx.n20AllowLegacyWrite = () => true;
+  } else {
+    ctx.n20AllowLegacyWrite = () => false;
+  }
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
@@ -94,6 +100,20 @@ test('opacity is registered at boot and discoverable', () => {
   assert.equal(opacityEntry.handlerKey, 'application.opacity.property');
   assert.equal(opacityEntry.bound, true);
   assert.deepEqual(JSON.parse(JSON.stringify(opacityEntry.descriptor)), capability.DESCRIPTOR);
+});
+
+test('browser discovery marks opacity unavailable without changing the canonical native contract', () => {
+  const ctx = application({ browser: true });
+  const direct = ctx.NemoApplication.capabilities().find((entry) => entry.id === 'opacity');
+  assert.ok(direct);
+  assert.equal(direct.bound, true);
+  assert.equal(direct.descriptor.availability.state, 'unavailable');
+  assert.equal(capability.DESCRIPTOR.availability.state, 'available');
+  const v1 = ctx.NemoApplication.handle(command(ctx, 'browser-discovery', 'capabilities'));
+  assert.equal(v1.ok, true);
+  assert.equal(v1.result.descriptors.find((entry) => entry.id === 'opacity').availability.state,
+    'unavailable');
+  assert.ok(v1.result.operations.includes('property.set'));
 });
 
 test('the production capabilities operation derives its legacy projection and full contract from registration', () => {

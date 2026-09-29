@@ -1717,6 +1717,54 @@
       ]
     },
     {
+      "id": "app.native.opacity.replacement",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-replacement.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-replacement.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.export.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-export-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-export-workflow.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.preview.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-preview-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-preview-workflow.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.v1",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-v1.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-v1.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.lifecycle",
       "layer": "application",
       "dir": "src/js/application",
