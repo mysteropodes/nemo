@@ -223,8 +223,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 119);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 120);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 120);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 121);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {
