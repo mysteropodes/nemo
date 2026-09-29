@@ -320,7 +320,18 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal(afterExport.ok, true); assert.deepEqual(afterExport.result, beforeExport.result);
     assert.equal((await status()).contentRevision, pinned.contentRevision);
     report.checks.push({ checkpoint: 'pinned-png-export-preserves-document', revision: pinned.contentRevision });
-    await capture('unsupported-denied', 'Attempt to open unsupported.json through the real project-open UI. Capture the visible refusal; do not reopen another document. The existing native document must stay selected and unchanged.');
+    await capture('unsupported-denied', 'Attempt to open unsupported.json through the real project-open UI. Capture the visible refusal without reopening another document. Record visible: {screen, totalFrames, layerName, selectedLayer, opacity, refusal} from the actual editor and error.');
+    const deniedVisible = read(path.join(reportDir, 'unsupported-denied.json')).visible;
+    assert.ok(deniedVisible && typeof deniedVisible === 'object',
+      'The refused Open needs a visible installed-editor observation');
+    assert.deepEqual({ screen: deniedVisible.screen, totalFrames: deniedVisible.totalFrames,
+      layerName: deniedVisible.layerName, selectedLayer: deniedVisible.selectedLayer,
+      opacity: deniedVisible.opacity },
+    { screen: 'editor', totalFrames: 21, layerName: 'R08 rectangle',
+      selectedLayer: 'R08 rectangle', opacity: 20 },
+    'A refused Open must leave the prior native document visible and selected');
+    assert.match(deniedVisible.refusal, /Could not open project|unavailable|unsupported/i,
+      'The refused Open must explain its result in the installed UI');
     const afterDeniedOpen = await status();
     assert.equal(afterDeniedOpen.available, true, 'Unsupported content must be denied before native ownership changes');
     assert.equal(afterDeniedOpen.instanceId, pinned.instanceId);
