@@ -17,9 +17,9 @@ const nativeSchema = load('engineering', 'application', 'native-transport-v2.sch
 // transport-v1.schema.json silently stayed one descriptor short -- the only test
 // pinning that array compared it against the same stale list. Source order is
 // significant: catalog().descriptors() returns registration order, not sorted.
-function declaredDescriptors() {
+function declaredDescriptors(name = 'CAPABILITY_SOURCES') {
   const rust = fs.readFileSync(path.join(root, 'nemo-mcp', 'src', 'capabilities.rs'), 'utf8');
-  const start = rust.indexOf('CAPABILITY_SOURCES');
+  const start = rust.indexOf(`pub const ${name}:`);
   const block = rust.slice(start, rust.indexOf('];', start));
   const out = [];
   const re = /include_str!\s*\(\s*"([^"]+)"\s*\)/g;
@@ -30,9 +30,7 @@ function declaredDescriptors() {
   return out;
 }
 const descriptors = declaredDescriptors();
-const nativeDescriptors = [
-  load('engineering', 'application', 'capabilities-v2', 'native-opacity.json'),
-];
+const nativeDescriptors = declaredDescriptors('NATIVE_CAPABILITY_SOURCES');
 
 function compiledSchema(...args) {
   return execFileSync('cargo', [

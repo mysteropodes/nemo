@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.diagnostics",
+  "version": 1,
+  "status": "active",
+  "availability": { "state": "available", "reason": null },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": ["query.diagnostics.recent"],
+  "handlerKey": "native-engine::application::NativeApplication::dispatch",
+  "effects": {
+    "readOnly": true,
+    "retainsQueryReceipts": false,
+    "changesDocumentRevision": false,
+    "changesHistory": false
+  },
+  "resourceBoundary": {
+    "maxRecords": 32,
+    "maxResponseBytes": 4096,
+    "responseSizeIncludesEnvelope": true,
+    "overflow": "Omit oldest records from the response and set truncated; never slice identifiers.",
+    "forbidden": ["request payload", "document content", "error message/details", "asset or output path"]
+  },
+  "semantics": {
+    "scope": "Terminal current-identity command.document.apply, transaction begin/update/commit/cancel, history undo/redo attempts at the native authority boundary.",
+    "retry": "Each admitted attempt has a sequence; identical write retries preserve the retained response revision and do not execute again. Queries retain no receipt; collisions with retained write IDs remain invalid.",
+    "identity": "The response envelope identifies the instance and document. Successful document replacement clears records and restarts sequence; failed reconciliation keeps the old document fenced.",
+    "revision": "The native terminal response revision, which can move backwards between a newer edit and an older retry. Transport acknowledgement is separate.",
+    "sequence": "Strictly increasing within the current document, starting at one; recording stops with truncated=true if the safe integer sequence is exhausted."
+  },
+  "input": { "$ref": "../native-transport-v2.schema.json#/$defs/EmptyPayload" },
+  "output": { "$ref": "../native-transport-v2.schema.json#/$defs/DiagnosticsResult" },
+  "ports": [{ "label": "mcp", "state": "active" }, { "label": "ui-panel", "state": "unavailable", "reason": "T08B" }],
+  "fixture": "native-engine/tests/fixtures/opacity-v2/project.json",
+  "examples": [{
+    "label": "Read the same bounded native trace without retaining an inspection receipt",
+    "request": { "apiVersion": 2, "requestId": "inspect-1", "instanceId": "instance-a", "documentId": "native-document-1", "operation": "query.diagnostics.recent", "payload": {} },
+    "response": { "apiVersion": 2, "requestId": "inspect-1", "instanceId": "instance-a", "documentId": "native-document-1", "contentRevision": 1, "ok": true, "result": { "records": [{ "sequence": 1, "requestId": "edit-1", "operation": "command.document.apply", "targetId": "r08_curve_layer", "contentRevision": 1, "ok": true }], "truncated": false } }
+  }]
+}

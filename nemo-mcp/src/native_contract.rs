@@ -44,8 +44,16 @@ fn frame(value: Option<&Value>) -> Option<u64> {
     value?.as_u64().filter(|frame| *frame <= u32::MAX as u64)
 }
 
+pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
+    matches!(
+        operation,
+        "query.document.serialize" | "query.document.evaluate" | "query.diagnostics.recent"
+    )
+}
+
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
+        "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "query.document.serialize" => exact(payload, &["atRevision"], &[])
             .is_some_and(|object| revision(object.get("atRevision")).is_some()),
         "query.document.evaluate" => exact(payload, &["atRevision", "contextId", "frame"], &[])
@@ -178,6 +186,9 @@ pub(crate) fn validate_result(
     if !validate_request(operation, payload) {
         return false;
     }
+    if operation == "query.diagnostics.recent" {
+        return diagnostics_result(result);
+    }
     if !matches!(
         operation,
         "query.document.serialize" | "query.document.evaluate"
@@ -244,10 +255,128 @@ pub(crate) fn validate_result(
     }
 }
 
+fn diagnostics_result(value: &Value) -> bool {
+    let Some(result) = exact(value, &["records", "truncated"], &[]) else {
+        return false;
+    };
+    let Some(records) = result["records"].as_array() else {
+        return false;
+    };
+    let mut prior = 0;
+    result["truncated"].is_boolean()
+        && (records.first().is_none_or(|record| record["sequence"] == 1)
+            || result["truncated"] == true)
+        && records.len() <= 32
+        && records.iter().all(|record| {
+            let Some(record) = exact(
+                record,
+                &[
+                    "sequence",
+                    "requestId",
+                    "operation",
+                    "contentRevision",
+                    "ok",
+                ],
+                &["targetId", "errorCode"],
+            ) else {
+                return false;
+            };
+            let Some(sequence) = revision(record.get("sequence"))
+                .filter(|sequence| *sequence > 0 && (prior == 0 || *sequence == prior + 1))
+            else {
+                return false;
+            };
+            prior = sequence;
+            let disposition = match record.get("ok").and_then(Value::as_bool) {
+                Some(true) => !record.contains_key("errorCode"),
+                Some(false) => {
+                    record
+                        .get("errorCode")
+                        .and_then(Value::as_str)
+                        .is_some_and(|code| {
+                            matches!(
+                                code,
+                                "invalid_request"
+                                    | "wrong_instance"
+                                    | "wrong_document"
+                                    | "stale_revision"
+                                    | "busy_conflict"
+                                    | "unavailable"
+                                    | "not_found"
+                                    | "cancelled_before_dispatch"
+                                    | "internal"
+                            )
+                        })
+                }
+                None => false,
+            };
+            disposition
+                && revision(record.get("contentRevision")).is_some()
+                && record
+                    .get("requestId")
+                    .and_then(Value::as_str)
+                    .is_some_and(bounded_identifier)
+                && record
+                    .get("targetId")
+                    .is_none_or(|value| value.as_str().is_some_and(bounded_identifier))
+                && record
+                    .get("operation")
+                    .and_then(Value::as_str)
+                    .is_some_and(|operation| {
+                        matches!(
+                            operation,
+                            "command.document.apply"
+                                | "transaction.begin"
+                                | "transaction.update"
+                                | "transaction.commit"
+                                | "transaction.cancel"
+                                | "history.undo"
+                                | "history.redo"
+                        )
+                    })
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn diagnostics_result_rejects_open_shapes_bad_dispositions_and_unordered_sequences() {
+        let record = json!({"sequence":1,"requestId":"edit-1","operation":"history.undo","contentRevision":2,"ok":true});
+        let valid = json!({"records":[record.clone()],"truncated":false});
+        assert!(diagnostics_result(&valid));
+        let mut bad = Vec::new();
+        for (key, value) in [
+            ("payload", json!({"private":"secret"})),
+            ("sequence", json!(0)),
+            ("ok", json!(false)),
+            ("errorCode", json!("internal")),
+            ("operation", json!("query.diagnostics.recent")),
+            ("targetId", json!("/private/path")),
+        ] {
+            let mut altered = valid.clone();
+            altered["records"][0][key] = value;
+            bad.push(altered);
+        }
+        bad.push(json!({"records":[record.clone(), record.clone()],"truncated":false}));
+        let mut gap = record.clone();
+        gap["sequence"] = json!(3);
+        bad.push(json!({"records":[record.clone(), gap.clone()],"truncated":true}));
+        bad.push(json!({"records":[gap],"truncated":false}));
+        bad.push(json!({"records":vec![record;33],"truncated":true}));
+        bad.push(json!({"records":[],"truncated":false,"privatePath":"secret"}));
+        for value in bad {
+            assert!(!diagnostics_result(&value));
+        }
+        assert!(!validate_result(
+            "query.diagnostics.recent",
+            "doc",
+            &json!({"limit":32}),
+            &valid
+        ));
+    }
 
     fn serialized(document: Value) -> Value {
         json!({

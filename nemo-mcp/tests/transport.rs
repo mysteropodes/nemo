@@ -10,6 +10,59 @@ use serde_json::json;
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 use tokio_util::sync::CancellationToken;
 
+#[tokio::test]
+async fn diagnostics_wire_rejects_payload_leaks_bad_order_and_full_envelope_overflow() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: "instance".into(),
+        port: listener.local_addr().unwrap().port(),
+        secret: "secret".into(),
+        build_id: "candidate".into(),
+    };
+    let record = json!({"sequence":1,"requestId":"edit-1","operation":"history.undo","contentRevision":2,"ok":true});
+    let valid = json!({"records":[record.clone()],"truncated":false});
+    let mut leak = valid.clone();
+    leak["records"][0]["payload"] = json!({"privatePath":"/private/secret"});
+    let duplicate = json!({"records":[record.clone(),record],"truncated":false});
+    let oversized = json!({"records":(1..=32).map(|sequence| json!({"sequence":sequence,"requestId":"x".repeat(128),"operation":"history.undo","contentRevision":2,"ok":true})).collect::<Vec<_>>(),"truncated":true});
+    let server = tokio::spawn(async move {
+        for result in [valid, leak, duplicate, oversized] {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let request: wire::NativeWireRequest = wire::read_json(&mut stream).await.unwrap();
+            wire::write_json(
+                &mut stream,
+                &NativeApplicationResponse {
+                    api_version: 2,
+                    request_id: request.native_request.request_id,
+                    instance_id: "instance".into(),
+                    document_id: "native-document".into(),
+                    content_revision: 2,
+                    ok: true,
+                    result: Some(result),
+                    error: None,
+                },
+            )
+            .await
+            .unwrap();
+        }
+    });
+    for expected in [true, false, false, false] {
+        let request = NativeApplicationRequest {
+            operation: "query.diagnostics.recent".into(),
+            payload: json!({}),
+            expected_revision: None,
+            ..native_request()
+        };
+        assert_eq!(
+            wire::call_native(&endpoint, request, CancellationToken::new())
+                .await
+                .is_ok(),
+            expected
+        );
+    }
+    server.await.unwrap();
+}
+
 fn request() -> ApplicationRequest {
     ApplicationRequest {
         api_version: 1,
