@@ -107,6 +107,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     buildSourceSha: buildSource, executableSha256: app.executableSha256, buildProofSha256: hash(proofFile),
     fixtureSha256: FIXTURE_SHA, checks: [], uiEvidence: [],
     limitations: ['Visual preview and input captures require independent manual review.',
+      'A value and history check cannot establish that a continuous pointer scrub occurred; review the gesture evidence separately.',
       'Resource-loss control terminates the owned app host; it does not inject a hardware GPU device fault.'] };
   const controller = createController({ root: ROOT, app: app.bundle });
   let instance, endpoint, stage = 'launch', sequence = 0;
@@ -155,7 +156,8 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const response = await dispatch('query.document.opacity', { stableTarget: target });
     assert.equal(response.ok, true); return response.result.value;
   }
-  async function uiValue(waitForAdmission = false) {
+  // This is compatibility API parity, not a read of the visible Motion control.
+  async function compatibilityValue(waitForAdmission = false) {
     const current = await status();
     let response, attempts = 0;
     try { await waitFor(async () => {
@@ -192,7 +194,11 @@ test('installed native opacity: live command oracles and externally driven UI ch
   }
   async function valueCheckpoint(name, instruction, value) {
     phase(name, instruction); await waitFor(async () => await opacity() === value, name);
-    assert.equal(await uiValue(), value); report.checks.push({ checkpoint: name, value });
+    assert.equal(await compatibilityValue(), value);
+    await capture(name, 'Show the actual Motion Opacity control at ' + value + '% after the requested UI action. Record visibleOpacity from that control.');
+    assert.equal(read(path.join(reportDir, name + '.json')).visibleOpacity, value,
+      'The visible Motion control must match the native value');
+    report.checks.push({ checkpoint: name, value, evidence: name + '.json' });
   }
   async function capture(name, instruction) {
     phase(name, instruction + ' Save the real screenshot and ' + name + '.json in the report directory.');
@@ -217,7 +223,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal((await status()).available, false);
     phase('admit-static', 'Open static.json from the start screen. Wait for the Motion preparation checkpoint before editing.');
     await waitFor(async () => (await status()).available, stage);
-    assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
+    assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
     report.checks.push({ checkpoint: stage, value: 25 });
     const admittedDocument = await status();
     await capture('motion-ready', 'Close the automatic tutorial and any introductory overlays, enter Motion, and select R08 rectangle. Capture the actual Motion surface and record visible: {canvasW, canvasH, fps, totalFrames, layerName, selectedLayer, opacity} from its controls before editing.');
@@ -229,7 +235,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.deepEqual([projectedDocument.instanceId, projectedDocument.documentId, projectedDocument.contentRevision],
       [admittedDocument.instanceId, admittedDocument.documentId, admittedDocument.contentRevision],
       'The visible Motion projection must still belong to the admitted native document');
-    assert.equal(await opacity(), 25); assert.equal(await uiValue(), 25);
+    assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(), 25);
     await valueCheckpoint('edit-40', 'Set the Motion layer Opacity field to 40 and commit with Tab.', 40);
     await valueCheckpoint('edit-60', 'Set the same Opacity field to 60 and commit with Tab.', 60);
     await valueCheckpoint('undo-40', 'Use the actual UI undo command.', 40);
@@ -237,9 +243,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await valueCheckpoint('gesture-40', 'Drag the Motion Opacity scrub field from 60 to 40 (one continuous gesture).', 40);
     assert.equal((await dispatch('history.undo')).ok, true); assert.equal(await opacity(), 60);
     assert.equal((await dispatch('history.redo')).ok, true); assert.equal(await opacity(), 40);
-    report.checks.push({ checkpoint: 'gesture-one-history-entry', value: 40 });
+    report.checks.push({ checkpoint: 'post-40-one-history-entry', value: 40,
+      limitation: 'History alone does not prove the input was a continuous pointer gesture.' });
     assert.equal((await dispatch('command.document.apply', { command: 'layer.opacity.set', stableTarget: target, value: 25 })).ok, true);
-    assert.equal(await uiValue(), 25);
+    assert.equal(await compatibilityValue(), 25);
     await capture('mcp-ui-parity', 'Verify the visible Motion Opacity field changed to 25 after the external MCP write.');
     const unchanged = await status();
     const mutation = { command: 'layer.opacity.set', stableTarget: target, value: 99 };
@@ -266,14 +273,14 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.deepEqual(saved.layers[0].motionStatic.opacity, [25]);
     phase('reopen', 'Open the saved.json file through the real project-open UI.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
-    assert.equal(await opacity(), 25); assert.equal(await uiValue(true), 25);
+    assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
     const replaced = await dispatch('command.document.apply', mutation, { documentId: prior.documentId, expectedRevision: prior.contentRevision });
     assert.equal(replaced.ok, false); assert.equal(replaced.error.code, 'wrong_document'); assert.equal(await opacity(), 25);
     report.checks.push({ checkpoint: 'save-reopen-old-document-rejected', savedSha256: hash(fixtures.saved) });
     const staticDocument = await status();
     phase('open-keyed', 'Open keyed.json, enter Motion and select R08 rectangle.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== staticDocument.documentId; }, stage);
-    assert.equal(await uiValue(true), 20);
+    assert.equal(await compatibilityValue(true), 20);
     const pinned = await status();
     const beforeExport = await dispatch('query.document.serialize', { atRevision: pinned.contentRevision });
     assert.equal(beforeExport.ok, true);
@@ -302,7 +309,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const afterDeniedSerialize = await dispatch('query.document.serialize', { atRevision: pinned.contentRevision });
     assert.equal(afterDeniedSerialize.ok, true);
     assert.deepEqual(afterDeniedSerialize.result, beforeExport.result);
-    assert.equal(await uiValue(), 20);
+    assert.equal(await compatibilityValue(), 20);
     report.checks.push({ checkpoint: 'unsupported-open-denied-before-mutation',
       documentId: pinned.documentId, revision: pinned.contentRevision });
     stage = 'host-resource-loss';
