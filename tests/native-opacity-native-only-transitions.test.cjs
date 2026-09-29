@@ -256,6 +256,7 @@ function surfaceHarness(source, options = {}) {
     installUiProjection: projection.installUiProjection,
     restoreUiProjection: projection.restoreUiProjection,
     refreshUiProjection: projection.refreshUiProjection,
+    paintUiProjection() { if (options.paintUiProjection) options.paintUiProjection(h.controller, h.state); },
     installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
     wrap() { return () => {}; },
     extensionOpen() { return !!options.extension; }, toast() {},
@@ -267,6 +268,15 @@ function surfaceHarness(source, options = {}) {
   h.controller.install();
   return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
+
+test('terminal desktop UI paint does not enqueue an unverified native frame', () => {
+  let paints = 0, presentations = 0;
+  const ui = { state: {}, __TAURI__: { core: { invoke() {} } },
+    SM: { importJSON() {} }, updateUI() { paints++; },
+    SMEngineBridge: { renderNow() { presentations++; } } };
+  NativeLegacySurface.desktopPorts(ui, {}).surface.paintUiProjection();
+  assert.equal(paints, 1); assert.equal(presentations, 0);
+});
 
 test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
   assert.equal(sha(SHELL_PATH), SHELL_SHA);
@@ -511,8 +521,9 @@ for (const [mode, makeSource, frameZeroOpacity] of [
         saveAllLayerFrames() { paperCalls.push('save-frame'); },
         pushUndo() { paperCalls.push('undo'); } };
       let h;
-      h = surfaceHarness(source, { ui, resize: async () => {}, afterChange() {
+      h = surfaceHarness(source, { ui, resize: async () => {}, paintUiProjection() {
         observed.push([ui.state.currentFrame, ui._curFrame]);
+      }, afterChange() {
         // Real afterChange asks SMEngineBridge to render the UI playhead.
         h.published().cutover.renderPreview(ui.state.currentFrame);
       } });
@@ -544,7 +555,8 @@ for (const [mode, makeSource, frameZeroOpacity] of [
       await h.controller.flush();
       h.published().resize();
       await h.resizeCallback()();
-      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0, 0]);
+      assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0, 0],
+        'terminal UI paint never schedules a third native presentation');
       assert.deepEqual([ui.state.currentFrame, ui._curFrame], [0, 0]);
       assert.deepEqual(paperCalls, []);
       assert.equal(h.controller.status(), 'native');
@@ -593,12 +605,18 @@ test('a native revision before final reveal cannot publish a stale UI projection
 
 test('renderer failure restores every touched UI field and leaves Open unpublished', async () => {
   const oldLayers = [{ name: 'Keep' }], oldSelection = [0], oldPaths = [{ id: 'old' }];
+  const oldFrames = [{ layer: 0, frame: 4 }], oldShadow = { test: 'keep' };
   const ui = { state: { currentFrame: 59, canvasW: 800, layers: oldLayers }, _curFrame: 59,
-    _layerSel: oldSelection, selectedPaths: oldPaths, userLayers: [{ children: [] }],
+    _layerSel: oldSelection, selectedPaths: oldPaths, _sel: { frames: oldFrames },
+    _idxShadow: oldShadow, userLayers: [{ children: [] }],
     __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
   let renders = 0;
-  const h = surfaceHarness(staticSource(), { ui, afterChange() {
-    if (++renders === 1) throw new Error('renderer failed');
+  const h = surfaceHarness(staticSource(), { ui, paintUiProjection() {
+    if (++renders === 1) {
+      ui._sel.frames.push({ layer: 0, frame: 0 });
+      ui._idxShadow.projected = true;
+      throw new Error('renderer failed');
+    }
   } });
   const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
   await assert.rejects(h.published().project.finishOpenAfterReveal(first), /renderer failed/);
@@ -606,6 +624,7 @@ test('renderer failure restores every touched UI field and leaves Open unpublish
   assert.equal(ui.state.currentFrame, 59); assert.equal(ui._curFrame, 59);
   assert.equal(ui.state.canvasW, 800); assert.strictEqual(ui.state.layers, oldLayers);
   assert.strictEqual(ui._layerSel, oldSelection); assert.strictEqual(ui.selectedPaths, oldPaths);
+  assert.strictEqual(ui._sel.frames, oldFrames); assert.strictEqual(ui._idxShadow, oldShadow);
   assert.equal(Object.hasOwn(ui.state, 'fps'), false);
   assert.equal(h.controller.blocksLegacy(), true);
 });

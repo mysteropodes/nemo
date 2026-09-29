@@ -260,11 +260,11 @@
         var saved = ports.surface.snapshotUiProjection();
         try {
           ports.surface.installUiProjection(projection.shell);
-          if (ports.afterChange) ports.afterChange();
+          ports.surface.paintUiProjection();
           if (!currentOpen(token)) throw new Error('Native Open changed during UI projection');
         } catch (error) {
           ports.surface.restoreUiProjection(saved);
-          try { if (ports.afterChange) ports.afterChange(); } catch (_) {}
+          try { ports.surface.paintUiProjection(); } catch (_) {}
           throw error;
         }
         publishedSession = token.session;

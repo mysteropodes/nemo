@@ -127,14 +127,17 @@
     'cameraKeys', 'activeSymbolId'];
   var projectionGlobalFields = ['_curFrame', '_totalF', '_waIn', '_waOut',
     '_layerSel', '_layerSelAnchor', '_motionCanvasEmptyClick',
-    '_motionExpandedLayer', '_motionExpandedElement', 'selectedPaths'];
+    '_motionExpandedLayer', '_motionExpandedElement', '_motionRevealedLayers',
+    '_motionRevealedElementLayers', '_perObjBoxes', '_nvSelectedLayer',
+    '_idxShadow', 'selectedPaths'];
   function snapshotUiProjection(root) {
     function capture(object, fields) {
       var saved = {};
       fields.forEach(function (key) { saved[key] = { present: Object.prototype.hasOwnProperty.call(object, key), value: object[key] }; });
       return saved;
     }
-    return { state: capture(root.state, projectionStateFields), globals: capture(root, projectionGlobalFields) };
+    return { state: capture(root.state, projectionStateFields), globals: capture(root, projectionGlobalFields),
+      selectionFrames: root._sel && root._sel.frames };
   }
   function restoreUiProjection(root, snapshot) {
     function restore(object, fields) {
@@ -145,6 +148,7 @@
     }
     restore(root.state, snapshot.state);
     restore(root, snapshot.globals);
+    if (root._sel) root._sel.frames = snapshot.selectionFrames;
   }
   function validatedProjection(root, document) {
     var prepared = root.SMProjectDocument.prepareNativeOpacity(document);
@@ -168,6 +172,10 @@
     root._layerSel = [0]; root._layerSelAnchor = 0;
     root._motionCanvasEmptyClick = false;
     root._motionExpandedLayer = null; root._motionExpandedElement = null;
+    root._motionRevealedLayers = []; root._motionRevealedElementLayers = [];
+    root._perObjBoxes = null; root._nvSelectedLayer = null;
+    root._idxShadow = {};
+    if (root._sel) root._sel.frames = [];
     root.selectedPaths = [];
   }
   function refreshUiProjection(root, json) {
@@ -219,6 +227,7 @@
         installUiProjection: function (document) { return installUiProjection(root, document); },
         restoreUiProjection: function (snapshot) { return restoreUiProjection(root, snapshot); },
         refreshUiProjection: function (json) { return refreshUiProjection(root, json); },
+        paintUiProjection: function () { if (root.updateUI) root.updateUI(); },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');
