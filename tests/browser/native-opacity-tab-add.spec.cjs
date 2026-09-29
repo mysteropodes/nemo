@@ -38,6 +38,10 @@ test('editor tab add explains native-only browser denial without changing the op
     await page.locator('#project-tab-add').click();
     await expect(page.locator('#project-tabs-bar [role="alert"]')).toBeVisible();
     await expect(page.locator('#project-tabs-bar [role="alert"]')).toHaveText(/New project unavailable.*native admission was denied/i);
+    expect(await page.locator('#project-tabs-bar [role="alert"]').evaluate(alert => {
+      const rect = alert.getBoundingClientRect();
+      return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest('[role="alert"]') === alert;
+    })).toBe(true);
     expect(await snapshot()).toEqual(before);
     expect(pageErrors).toEqual([]);
   } finally {
