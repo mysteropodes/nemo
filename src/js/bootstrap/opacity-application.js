@@ -3,6 +3,10 @@
   'use strict';
   var domain = NemoOpacityDomain;
   function newId() { return root.crypto.randomUUID(); }
+  function allowLegacyOpacity(kind) {
+    try { return typeof root.n20AllowLegacyWrite === 'function' && root.n20AllowLegacyWrite(kind) === true; }
+    catch (_) { return false; }
+  }
   function ensureIds() { root.state.layers.forEach(function (layer) { root.SMMotion.ensureLayerUid(layer); }); }
   function read(layer, frame) { return root.SMMotion.valueAtFrame(layer, 'opacity', frame); }
   function refresh(layer) {
@@ -31,7 +35,7 @@
   var app = NemoOpacityApplicationCore.create({
     newId: newId, state: function () { return root.state; }, valueAtFrame: read, write: write,
     context: function () { return JSON.stringify([root.state.activeSymbolId || null, root.state.activeMontageViewId || null]); },
-    canMutate: function () { return !root._scrubLiveActive; },
+    canMutate: function () { return !root._scrubLiveActive && allowLegacyOpacity('opacity-application-write'); },
     snapshot: function () { return { layers: root.state.layers.map(function (layer) {
       return { id: layer.layerUid, name: layer.name || '', opacity: read(layer, root.state.currentFrame)[0] };
     }), frame: root.state.currentFrame, totalFrames: root.state.totalFrames }; },
@@ -40,9 +44,18 @@
     afterMutation: refresh,
     capabilities: function () { return registry.list(); }
   });
+  if (root.NemoNativeOpacityLegacySurface) root.NemoNativeOpacityLegacySurface.installBrowserReadOnlyImport(root);
   ensureIds();
   // P06: registry lookup is resolved for every request so no stale handler survives.
-  NemoOpacityCapability.register(registry, app.handle);
+  // The v1 operation names remain recognizable in browsers, but their opacity
+  // writer is unavailable until a native browser adapter owns the document.
+  if (root.__TAURI__ && root.__TAURI__.core && typeof root.__TAURI__.core.invoke === 'function') {
+    NemoOpacityCapability.register(registry, app.handle);
+  } else {
+    registry.register(Object.assign({}, NemoOpacityCapability.DESCRIPTOR, {
+      availability: { state: 'unavailable', reason: 'Native opacity requires the Tauri host.' }
+    }), app.handle);
+  }
   var exportCapability = NemoExportSvgSequence.capability({
     session: function () { return (root.SMExport && root.SMExport.svgSequenceJob) ? root.SMExport.svgSequenceJob() : null; },
     meta: app.meta,
@@ -74,6 +87,7 @@
       if (root.renderHistoryPanelIfOpen) root.renderHistoryPanelIfOpen();
     },
     legacy: function (kind, holder, values, frame, curvePoints) {
+      if (!allowLegacyOpacity('opacity-' + kind)) return false;
       var result;
       if (kind === 'set') result = domain.setValue(holder, values, root.state.currentFrame);
       else if (kind === 'key-current') result = domain.setKeyAtFrame(holder, root.state.currentFrame, values);

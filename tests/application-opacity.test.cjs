@@ -8,6 +8,11 @@ function app() {
   let identity = 0;
   const context = { crypto: { randomUUID: () => `test-${++identity}` }, state: { currentFrame: 0, totalFrames: 24, layers: [{ layerUid: 'a', name: 'A', motionStatic: { opacity: [100] } }] }, window: null, pushUndo() { context.pushes++; }, pushes: 0 };
   context.window = context;
+  // This isolated core harness omits the production native guard. Model an
+  // admitted Tauri session so its positive command contracts remain testable;
+  // browser denial is exercised separately with the real guard installed.
+  context.__TAURI__ = { core: { invoke() { throw new Error('native transport is not used by this harness'); } } };
+  context.n20AllowLegacyWrite = () => true;
   context.SMMotion = {
     valueAtFrame(layer) { return layer.motionStatic.opacity; },
     ensureLayerUid(layer) { return layer.layerUid; }

@@ -14,13 +14,35 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
+  var browserImportDepth = new WeakMap();
+  function hasNativeHost(root) {
+    return !!(root && root.__TAURI__ && root.__TAURI__.core &&
+      typeof root.__TAURI__.core.invoke === 'function');
+  }
   function allowLegacyWrite(root, kind, central) {
     try {
       if (central !== undefined) return typeof central === 'function' && central(kind) === true;
       var admission = root && root.NemoNativeOpacityLegacyAdmission;
-      return admission === undefined || !!admission && typeof admission.allow === 'function' &&
+      if (admission !== undefined) return !!admission && typeof admission.allow === 'function' &&
         admission.allow(kind) === true;
+      // Browser/WASM has no admitted native opacity owner. Import may build a
+      // read-side fixture, but edits must not revive the JavaScript writer.
+      if (!hasNativeHost(root)) return kind === 'document-import' ||
+        kind === 'create-layer' && (!root.NemoApplication || (browserImportDepth.get(root) || 0) > 0);
+      return true;
     } catch (_) { return false; }
+  }
+  function installBrowserReadOnlyImport(root) {
+    if (hasNativeHost(root) || !root || !root.SM || typeof root.SM.importJSON !== 'function') return;
+    var original = root.SM.importJSON;
+    root.SM.importJSON = function (json) {
+      // JSON.parse coerces objects before validating them. A user-defined
+      // toString could reenter a writer while import has create-layer access.
+      if (typeof json !== 'string') return false;
+      browserImportDepth.set(root, (browserImportDepth.get(root) || 0) + 1);
+      try { return original.apply(this, arguments); }
+      finally { browserImportDepth.set(root, browserImportDepth.get(root) - 1); }
+    };
   }
   function requireLegacyWrite(root, kind, central) {
     if (allowLegacyWrite(root, kind, central)) return true;
@@ -178,6 +200,7 @@
   }
 
   return Object.freeze({ allowLegacyWrite: allowLegacyWrite, requireLegacyWrite: requireLegacyWrite,
+    installBrowserReadOnlyImport: installBrowserReadOnlyImport,
     allowProjectTransition: allowProjectTransition,
     releaseProjectTransition: releaseProjectTransition,
     wrapWriter: wrapWriter,
