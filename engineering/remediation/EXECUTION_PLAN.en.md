@@ -812,7 +812,7 @@ N07–N19A supplied accepted native save/load, identity, command/history, evalua
 | [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) · **D1** · Extract the existing single-frame SVG export adapter | [P19 / #1021](https://github.com/mysteropodes/nemo/issues/1021) · **D1** · Bind existing export UI and MCP to the same job |
 | [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058) · **D1** · Map immutable SVG sequence inputs before job extraction | [P08 / #1010](https://github.com/mysteropodes/nemo/issues/1010) · **D1** · Verify export-feature auto-registration from a fresh agent session |
 | [P18 / #1020](https://github.com/mysteropodes/nemo/issues/1020) · **D1** · Add bounded job lifecycle to that exporter | [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056) · **D1** · Roundtrip one isolated synthetic reproduction bundle |
-| [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) · **D1** · Extract bounded application diagnostics from opacity | [T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) · **D2** · Expose the shared diagnostics inspector in UI and MCP |
+| [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) · **D1** · Extract bounded application diagnostics from opacity | [T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) · **Ilya/O** · Expose the shared diagnostics inspector in UI and MCP |
 | [T06 / #1055](https://github.com/mysteropodes/nemo/issues/1055) · **D2** · Correlate one Rust MCP request with application diagnostics | — |
 
 - [ ] **[P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) — Extract the existing single-frame SVG export adapter**
@@ -913,7 +913,7 @@ N07–N19A supplied accepted native save/load, identity, command/history, evalua
 
 - [ ] **[T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) — Expose the shared diagnostics inspector in UI and MCP**
 
-  Owner **Cyrill/D2** · skill `diagnostics` · `sonnet` / **medium**. Predecessors: [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054), [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056), [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009).
+  Owner **Ilya/O** since the 29 September T08 transfer · skill `diagnostics`. Cyrill/D2's original `sonnet` / **medium** source and review receipts remain historical evidence. Predecessors: [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054), [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056), [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009).
 
   Scope: `new Diagnostics panel binding`; `diagnostics feature descriptor`; `UI/MCP diagnostics tests`.
 

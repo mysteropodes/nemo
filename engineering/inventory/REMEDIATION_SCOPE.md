@@ -430,8 +430,140 @@ admitted and no linked-media, browser, Tauri, render, export or persistence beha
 accepted. The 19 previously undispositioned spans become 17, with zero `linked-media.js`
 spans remaining; all 762 packets stay pending, global computed uncovered code remains 7 185,
 and frozen `linked-media.js` retains 61 computed uncovered code lines.
+P03C-ak/#1498 dispositions the frozen `src/js/feedback-bridge.js:572-596` mixed public
+`window.SMFeedback` facade. Its action/click trail, local read and local approval/resolution/
+deletion exports map to pending `C04b.content-tools.feedback-local-log-storage`; the
+`submitFeedback` export bridges that local write and pending
+`C04b.content-tools.feedback-worker-publish`; its declared range also contains the
+best-effort team-Sync write paired with the incoming flow. Incoming team-Sync and GitHub token/issue
+triage exports map to pending `C04b.content-tools.feedback-triage-sync`; incoming import
+uses the local store without making the whole facade a local-storage packet. The JSON
+records exact frozen export and definition lines against source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+feedback-bridge blob `b87a6fc24b20f136c05df123d772b224e81ba212` and pinned C04b census
+blob `f76259d59dedb715edc18b9f84db98ac00ee7cb8`. Its older range declarations stay
+unchanged. The 17 previously undispositioned spans become 16, with zero feedback-bridge
+spans remaining; all 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen feedback-bridge retains 23 computed uncovered code lines. No packet,
+feedback delivery or browser/Tauri behavior is accepted.
+P03C-al/#1500 marks frozen `src/js/vectorize-bridge.js:72-77` as a structural
+`boundary`: line 72 is blank and lines 73-77 explain the vtracer absolute-control to
+Paper.js relative-handle conversion before executable `splineToSegments` begins at 78.
+That function remains in pending `C04b.content-tools.vectorize-shape-fitting`; the
+original C04b range starts at 78 and its pin stays unchanged. The JSON cites frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, vectorize blob
+`3d1e3f817e981cdebc86919502515da64663157e` and C04b census blob
+`f76259d59dedb715edc18b9f84db98ac00ee7cb8`. The 16 previously undispositioned
+spans become 15, with zero vectorize-bridge spans remaining. All 762 packets stay
+pending, global computed uncovered code remains 7 185 and frozen vectorize-bridge
+retains 5 computed uncovered code lines. No packet or runtime behavior is accepted.
+
+P03C-am/#1506 maps frozen `nemo-mcp/src/lib.rs:2-3` to the pending
+`C07.mcp-server.binary-entrypoint` module-root responsibility: the executable
+`capabilities` and `capability_contract` declarations were added by P07 source
+commits `35d7eac66` and `bd907d230`. C07's pinned `lib.rs:1-7` range and
+module-root description support the `covered` responsibility disposition;
+neither module body nor the packet is admitted. The JSON pins this finding to
+frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, `lib.rs` blob
+`2d8f0dd07102d3b2aa1df154b84fcba7eeae5247` and C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. The current protected
+`lib.rs` contains a later `native_contract` declaration and has a different
+blob; this disposition does not classify the current whole file. The 15
+previously undispositioned spans become 14, with zero frozen `lib.rs` spans
+remaining. All 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen `lib.rs` retains 2 computed uncovered code lines. No MCP
+functionality, numeric range coverage or runtime behavior is accepted.
+
+P03C-an/#1508 marks frozen `src/js/layer-inout.js:1-22` as a structural and
+documentary `boundary`. Lines 1-11 and 13-22 are comments, but line 12 is the
+executable `(function () {` IIFE opener enclosing all three pending C02
+layer-inout responsibilities; it is not comment-only or a separate feature
+writer. `inPointOf`/`outPointOf` first begin at line 23 in pending
+`C02.layer-inout.bar-rendering`, with the selection/marquee and drag/batch
+packets owning later areas. The whole preamble is not assigned solely to bar
+rendering. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, layer-inout blob
+`131156e2f419e17e8669c1980c3ae0f77164e786` (also current protected) and
+pinned C02 census blob `3e920d4f112028ed486df697b5885aa4c67df316`.
+The 14 previously undispositioned spans become 13, with zero frozen
+`layer-inout.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `layer-inout.js` retains 74
+computed uncovered code lines. No numeric range coverage, layer behavior,
+browser/Tauri/export or runtime acceptance is claimed.
+
+P03C-ao/#1510 marks frozen `src/js/select-bridge.js:1-23` as a structural and
+documentary `boundary`: lines 1-22 are comments, but line 23 is the executable
+`(function () {` IIFE opener enclosing all pending C04a Select responsibilities.
+It is not comment-only or assigned solely to `C04a.select.hover-helpers`, whose
+first census range starts at line 24. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, select-bridge blob
+`a831eb065ed611f70a77692c61846eaddcd97a5a` and pinned C04a census blob
+`8ffb669c5018190bd448b787a09ade35bd594b30`. The current protected
+`select-bridge.js` has a different blob, so this disposition classifies only
+the frozen span. The 13 previously undispositioned spans become 12, with zero
+frozen `select-bridge.js` spans remaining. All 762 packets stay pending,
+global computed uncovered code remains 7 185 and frozen `select-bridge.js`
+retains 64 computed uncovered code lines. No numeric range coverage, Select
+behavior, browser/native parity or runtime acceptance is claimed.
+
+P03C-ap/#1512 marks frozen `src/js/tools.js:3370-3372` as a comment-only
+`boundary`. Those three lines explain `gapThr` as a plain world-space
+distance, the stroke-end gap still counted as one closed shape, and the Gap
+Size presets without scale/resolution conversion. The separate WASM-path
+comment begins at line 3373 in pending `C04a.fill.find-wasm-js-raster`;
+executable `_wallSegments` begins at 3381. Neither belongs to this span.
+The JSON cites frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+tools blob `3c25962dbe314d5e791489da30b2b642ff899357` and pinned C04a census
+blob `8ffb669c5018190bd448b787a09ade35bd594b30`. Current protected
+`tools.js` has a different blob, so this disposition classifies only the
+frozen span. The 12 previously undispositioned spans become 11, with zero
+frozen `tools.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `tools.js` retains 3
+computed uncovered code lines. No packet admission, numeric range coverage,
+fill behavior, JS/Rust parity or runtime acceptance is claimed.
+
+P03C-aq/#1513 marks frozen `src/js/project.js:1-9` as a structural and
+documentary `boundary`. Lines 1-8 are New/Open/Save/Recent comments; line 9 is
+the executable `(function(){` IIFE opener around the entire project module,
+not comment-only or attributable solely to one C01 packet. First feature
+data `RECENTS_KEY`/`MAX_RECENTS` begins at line 10 in pending
+`C01.project.start-screen`; the opener also encloses the other pending C01
+project responsibilities. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, project blob
+`e2248533b47b0a067a61e4b641f83c7d24b00e79` and pinned C01 census blob
+`d81b618308f9f4849b0ba24fa512af6be90aa72c`. Current protected
+`project.js` has a different blob under native work, so this disposition
+classifies only the frozen span. The 11 previously undispositioned spans
+become 10, with zero frozen `project.js` spans remaining. All 762 packets
+stay pending, global computed uncovered code remains 7 185 and frozen
+`project.js` retains 70 computed uncovered code lines. No packet admission,
+numeric range coverage, project/save/load/browser/Tauri/native behavior or
+runtime acceptance is claimed.
+
+P03C-ar/#1515 maps two frozen `src/js/application/opacity-application.js`
+spans to the accepted P06/#1008 registered-capability discovery seam. Lines
+78-93 define `capabilitySummary()`: it obtains the registry-backed
+`ports.capabilities()`, clones the full descriptors, derives legacy
+`properties` only from descriptors with `property.get`, and returns those
+alongside operations, retention and document identity. Line 96 routes the
+`perform` capabilities operation through that summary. P06 source commit
+`35bcb02392bdd44c8d341c94c3ae6b505eb3379a` introduced both changes;
+the production capability test checks the full export-plus-opacity descriptors,
+opacity-only properties and a fresh registry read. The surrounding `perform`
+command/query route remains in pending `C07.application-service.command-core`;
+the older C07 census described a hard-coded single-opacity response and is
+not being admitted. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, opacity core blob
+`d0b10900eb36a43c66237473009027eaa6680d28` and pinned C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. Current protected opacity
+source has a different blob, so these dispositions classify the frozen spans
+only. The 10 previously undispositioned spans become 8, with zero frozen
+opacity-core spans remaining. All 762 packets stay pending, global computed
+uncovered code remains 7 185 and frozen opacity core retains 15 computed
+uncovered code lines. No packet admission, numeric range coverage, capability
+runtime or installed-client behavior is accepted.
+
 **P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 17
+pending packets, no notes needing reconciliation, 0 unmapped paths and 8
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
 What remains, in order: disposition the remaining small remainders in other
 original-partition files, and `style.css`/`index.html` once Ilya decides census versus
