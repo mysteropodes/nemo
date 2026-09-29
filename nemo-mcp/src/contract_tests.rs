@@ -43,6 +43,23 @@ fn native_catalog_rejects_duplicate_ids_and_operations() {
 }
 
 #[test]
+fn diagnostics_query_is_registered_strict_and_read_only() {
+    let operation = "query.diagnostics.recent";
+    let descriptor = crate::capabilities::native_catalog()
+        .capability_for_operation(operation)
+        .unwrap();
+    assert_eq!(descriptor["id"], "native.diagnostics");
+    assert_eq!(descriptor["resourceBoundary"]["maxResponseBytes"], 4096);
+    assert!(native_request(operation, json!({})).validate().is_ok());
+    assert!(native_request(operation, json!({"path":"secret"}))
+        .validate()
+        .is_err());
+    let mut revised = native_request(operation, json!({}));
+    revised.expected_revision = Some(0);
+    assert!(revised.validate().is_err());
+}
+
+#[test]
 fn native_request_resolution_is_descriptor_driven_and_bounded() {
     let valid = native_request(
         "query.document.opacity",

@@ -2130,6 +2130,10 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;}
+/* The native AppKit viewport covers the canvas column above WebView modals.
+   Keep this export dialog in the unobstructed properties column. */
+#export-modal{justify-content:flex-end;padding-right:10px;box-sizing:border-box;}
+#export-modal .modal-box{width:260px;max-width:calc(100vw - 20px);}
 /* Kitsu modal (Phase 4) can be opened from the start screen (#start-screen,
    z-index:500) via its "Ouvrir depuis Kitsu…" card — every other
    .modal-overlay only ever opens from inside the already-hidden-start-screen
