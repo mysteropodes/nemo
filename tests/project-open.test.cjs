@@ -94,7 +94,7 @@ test('production loads the native project-entry adapter before its project consu
   const project = html.indexOf('js/project.js', adapter);
   assert.ok(adapter >= 0 && project > adapter);
 });
-function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
+function deferred() { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; }
 function installNativeOpen(app) {
   const first = deferred(), visible = deferred();
   const receipt = { owner: 'native', status: 'presented', frame: 0,
@@ -286,6 +286,54 @@ test('closing the first active tab selects a surviving document', () => {
   assert.equal(JSON.parse(app.json).title, 'second');
   app.json = JSON.stringify({ title: 'second', edited: true });
   assert.equal(app.project.isDirty(), true);
+});
+
+test('native-owned tab add explains denial without changing the current project', async () => {
+  for (const release of [() => false, () => Promise.resolve(false), () => Promise.reject(new Error('transport unavailable'))]) {
+    const app = harness();
+    app.project.enterEditor();
+    const tabs = app.elements.get('project-tabs-list');
+    app.window.NemoNativeOpacityLegacySurface = { allowProjectTransition() { return false; }, releaseProjectTransition: release };
+    const before = { json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, mutations: app.mutations };
+    assert.equal(await app.elements.get('project-tab-add').listeners.click(), false);
+    assert.deepEqual({ json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, mutations: app.mutations }, before);
+    const alert = app.elements.get('project-tabs-bar').children.at(-1);
+    assert.equal(alert.attributes.role, 'alert');
+    assert.equal(alert.style.display, 'block');
+    assert.match(alert.textContent, /New project unavailable.*native admission was denied/);
+  }
+});
+
+test('tab add denies before mutation when legacy writer admission is absent, then clears notice on allowed legacy add', async () => {
+  const app = harness();
+  app.project.enterEditor();
+  delete app.window.NemoNativeOpacityLegacySurface;
+  app.window.n20AllowLegacyWrite = () => false;
+  const tabs = app.elements.get('project-tabs-list');
+  const before = { json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, mutations: app.mutations };
+  assert.equal(await app.elements.get('project-tab-add').listeners.click(), false);
+  assert.deepEqual({ json: app.json, label: app.project.getCurrentLabel(), count: tabs.children.length, mutations: app.mutations }, before);
+  const alert = app.elements.get('project-tabs-bar').children.at(-1);
+  assert.equal(alert.style.display, 'block');
+  app.window.n20AllowLegacyWrite = () => true;
+  await app.elements.get('project-tab-add').listeners.click();
+  assert.equal(tabs.children.length, before.count + 1);
+  assert.ok(app.mutations > before.mutations);
+  assert.equal(alert.style.display, 'none');
+});
+
+test('late tab-add denial cannot announce failure after a newer successful tab add', async () => {
+  const app = harness();
+  app.project.enterEditor();
+  const pending = deferred();
+  app.window.NemoNativeOpacityLegacySurface = { allowProjectTransition() { return false; }, releaseProjectTransition() { return pending.promise; } };
+  const first = app.elements.get('project-tab-add').listeners.click();
+  delete app.window.NemoNativeOpacityLegacySurface;
+  await app.elements.get('project-tab-add').listeners.click();
+  pending.reject(new Error('old transport failure'));
+  assert.equal(await first, false);
+  assert.equal(app.elements.get('project-tabs-list').children.length, 2);
+  assert.equal(app.elements.get('project-tabs-bar').children.at(-1).style.display, 'none');
 });
 
 test('actual New and blank tab callbacks deny before release or document creation for every blocked phase', async () => {

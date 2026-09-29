@@ -547,17 +547,17 @@
       if(admitted===false)return false;activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
     }); // markSaved belongs to the new tab
   }
-  function addTab(){
-    return afterMaybe(releaseNative('tab-add'),function(admitted){
-      if(admitted===false)return false;snapshotActiveIntoTab();
-      var n=tabs.length+1;
-      var id=makeTabId();
+  var tabAddGeneration=0,tabAdmissionMessage=null;
+  function tabAddNotice(message){
+    if(!tabAdmissionMessage){var bar=document.getElementById('project-tabs-bar');tabAdmissionMessage=document.createElement('div');tabAdmissionMessage.setAttribute('role','alert');
+      Object.assign(tabAdmissionMessage.style,{marginLeft:'auto',minWidth:'0',maxWidth:'60%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#ffb5a8',fontSize:'12px'});bar.appendChild(tabAdmissionMessage);}tabAdmissionMessage.textContent=message;tabAdmissionMessage.style.display=message?'block':'none';return false;}
+  function addTab(){var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
+    function admitted(ok){
+      if(generation!==tabAddGeneration||activeTabId!==initialTab||currentName!==initialName||currentPath!==initialPath)return false;if(ok===false||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return denied();
+      tabAddNotice('');snapshotActiveIntoTab();var n=tabs.length+1,id=makeTabId();
       tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
-      activeTabId=id;
-      newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});
-      currentPath=null;currentName='Untitled '+n;updateCurrentLabel();
-      renderTabBar();
-    });
+      activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});currentPath=null;currentName='Untitled '+n;updateCurrentLabel();renderTabBar();}
+    try{var result=releaseNative('tab-add');return result&&typeof result.then==='function'?result.then(admitted,denied):admitted(result);}catch(e){return denied();}
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
