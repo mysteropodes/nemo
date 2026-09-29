@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "a969935c297aa3b1b652a28c11d4e3e3c120ebd46c5cedcf23d65bc8428e3250"
+      "value": "06b72d5c8091cb250f8cb4a4d6ed3b7cebc33437563d6fe3c89536bf0269570d"
     },
     "profiles": [
       {
