@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "5def4bcec4547666e78ba3ee8bd0ee5706654658",
-  "describe": "v0.7.0-alpha.4-761-g5def4bce"
+  "head": "a1c6ec6ce0e3e8ed18eca4a22ae49134e3b7c824",
+  "describe": "v0.7.0-alpha.4-768-ga1c6ec6c"
  },
- "inputsDigest": "22c46957503ed165fb2df2afa3d0089b3394a5eef817fc09a9e6ecfbcffc95e2",
+ "inputsDigest": "ca8f485dcd29f49f4359f565d70e63831c0920628b4ed1a11c3c0b3ab1a96618",
  "states": [
   "inventoried",
   "characterized",
@@ -14749,7 +14749,7 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 173,
+    "functionsVisited": 180,
     "via": "chain",
     "references": [
      "src/js/project.js:630",
