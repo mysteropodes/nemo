@@ -190,11 +190,10 @@
       var result = enqueue(async function () {
         // Already admitted A work runs first. New UI work is denied by replacementRequested.
         if (phase !== 'native' || cycle !== old || old.failure || cacheFences || old.synchronizing) {
-          replacementRequested = false;
           throw old.failure || new Error('native replacement cannot start while A is changing');
         }
         phase = 'replacing';
-        try { return await replacement.run({ ports: ports, contract: contract,
+        return replacement.run({ ports: ports, contract: contract,
         before: before, prepared: nextPrepared, oldHostGeneration: oldHostGeneration,
         requestId: id('n20-replace'), checkOld: function () { if (old.failure) throw old.failure; requireConnected(old); },
         newCycle: function () { return { session: Object.freeze({}), active: true,
@@ -225,14 +224,14 @@
           }
           if (next) disposeConsumers(next); return failLifecycle(cycle || old, error);
         }
-        }); } finally { replacementRequested = false; }
+        });
       });
       return result.then(async function (receipt) {
         if (installedNext && installedNext.syncPending) await installedNext.syncPending;
         if (phase !== 'native' || installedNext.failure)
           throw installedNext.failure || new Error('native replacement was superseded');
         return receipt;
-      });
+      }).finally(function () { replacementRequested = false; });
     }
     function performMutation(project, mode) {
       try {
