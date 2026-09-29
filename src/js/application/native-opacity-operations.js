@@ -141,10 +141,10 @@
       }
       opening = true;
       admissionStarted = true;
-      viewport.reset();
       try {
         var admitted = wasNative ? await lifecycle.replace(candidate) : await lifecycle.activate(candidate);
         if (!admitted) return false;
+        viewport.reset();
         var first = await viewport.presentPreview(0, allowOccludedAdmission === true);
         var current = lifecycle.inspect();
         if (!first || first.owner !== 'native' || !current.session ||

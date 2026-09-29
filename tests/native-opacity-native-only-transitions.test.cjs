@@ -238,7 +238,7 @@ function nativeHarness(source, options = {}) {
         viewGeneration: state.previews.length, status: 'presented' };
       return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
     },
-    async bindOutput(request) { state.outputs.push(request); },
+    async bindOutput(request) { state.outputs.push(request); if (options.outputGate) await options.outputGate; },
     currentFrame() { return options.ui ? options.ui.state.currentFrame : 10; },
     afterChange() {
       state.afterChanges = (state.afterChanges || 0) + 1;
@@ -418,6 +418,24 @@ test('stale host rejection fences A until its actual revision is reconciled', as
   assert.equal(await h.controller.activate(h.prepared), true);
   await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /stale native revision/);
   assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
+});
+
+test('busy local replacement refusal retains A frame token for later resize', async () => {
+  const gate = deferred();
+  const h = surfaceHarness(staticSource(), { outputGate: gate.promise, resize: async () => {} });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await h.published().project.finishOpenAfterReveal(first);
+  const previews = h.state.previews.length;
+  const exporting = h.state.lifecycle.exportPng('busy-output', [0]);
+  for (let spin = 0; spin < 10 && !h.state.outputs.length; spin++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.outputs.length, 1);
+  assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true), false);
+  assert.equal(h.state.replacements.length, 0);
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  gate.resolve(); await exporting;
+  h.published().resize(); await h.resizeCallback()();
+  assert.ok(h.state.previews.length > previews);
+  assert.equal(h.state.previews.at(-1).documentId, 'native-document-1');
 });
 
 test('ambiguous replacement error fences A even when its transport still appears bound', async () => {
