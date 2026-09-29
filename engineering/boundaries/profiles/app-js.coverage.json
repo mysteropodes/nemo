@@ -19,23 +19,23 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "9c633eff39e0aa9c6f8af5e8ad9ea9a75e6f529b",
-    "sourceRootTree": "06a4a1dd0fb139b619525c703e6b6cd52228c151",
+    "candidateCommit": "e5a335978be5ba72e0683301c239f5d8ac7d4133",
+    "sourceRootTree": "74b53560fb0f5db47ecb3494a378eca7041a2496",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "6c6404a8224b3e819a9b0b63e9be5c3d0ad1e937",
-      "lastChangedCommit": "9c633eff39e0aa9c6f8af5e8ad9ea9a75e6f529b"
+      "gitTree": "265655619f0b1f1d42b2679aa0631714eaed3e5f",
+      "lastChangedCommit": "e5a335978be5ba72e0683301c239f5d8ac7d4133"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "f163394cb1048bbecd73426031b5c1ed1d098805",
-      "sha256": "ae80ceee592c6f2e278956f1c6cfb48f5b291d12610902b85d2ff42cc80e997b",
-      "lastChangedCommit": "decc26fdc05995b025edd4451762d9ad4ca02924"
+      "gitBlob": "12d92013a74e65175bebca106cffb356e4fd66dc",
+      "sha256": "b7769b9d22f73a50d617c9645c653667d3c1dadef327699b7b522c6b6c47bcf9",
+      "lastChangedCommit": "e5a335978be5ba72e0683301c239f5d8ac7d4133"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "35340d3c1d7f4b35f6ced1652e96e15f36af5c67e8a5e59ec712e8e10eae6fa0"
+      "value": "3bed4b1fe5a9674b91f75066aa38c3a5ec17644cd0a724ec56c53e623eaef50e"
     },
     "profiles": [
       {
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 170,
-    "externalClassicTags": 167,
+    "totalScriptTags": 176,
+    "externalClassicTags": 173,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 163,
+    "retainedClassicTags": 169,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 166,
+    "classicTagsUnderSrcJsIncludingVendors": 172,
     "inlineScripts": [
       {
         "path": "src/index.html",
