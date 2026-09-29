@@ -44,16 +44,6 @@
     return Object.freeze({ request: request, receipt: receipt });
   }
 
-  function canRestoreA(error, before, state) {
-    if (!error || !['invalid_request', 'stale_revision'].includes(error.code) ||
-        error.details && error.details.replacement || !state.sameCycle || state.failure ||
-        state.synchronizing || state.cacheFences) return false;
-    var connected = state.connected, current = state.identity;
-    return !!connected && !!current && ['instanceId', 'documentId', 'contentRevision'].every(function (key) {
-      return connected[key] === before[key] && current[key] === before[key];
-    });
-  }
-
   async function bindFresh(scope, current, receipt, next) {
     var binding = await scope.ports.connect();
     if (binding.instanceId !== current.instanceId || binding.documentId !== receipt.documentId ||
@@ -68,13 +58,11 @@
   }
 
   async function run(scope) {
-    var next = null, hostAttempted = false, hostCompleted = false;
+    var next = null;
     try {
       scope.checkOld();
-      hostAttempted = true;
       var result = await replaceHost(scope.ports, scope.contract, scope.before,
         scope.prepared, scope.requestId);
-      hostCompleted = true;
       next = scope.newCycle();
       var fresh = await bindFresh(scope, scope.before, result.receipt, next);
       scope.confirm(next, fresh.hostGeneration);
@@ -86,9 +74,9 @@
       scope.finish(next, caches);
       return result.receipt;
     } catch (error) {
-      throw scope.fail(next, error, hostAttempted, hostCompleted);
+      throw scope.fail(next, error);
     }
   }
 
-  return Object.freeze({ buildCaches: buildCaches, canRestoreA: canRestoreA, run: run });
+  return Object.freeze({ buildCaches: buildCaches, run: run });
 }));

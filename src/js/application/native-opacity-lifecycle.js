@@ -215,13 +215,7 @@
           disposeConsumers(old); if (ports.onDisposed) ports.onDisposed(old.session);
           if (!next.synchronizing && ports.afterChange) ports.afterChange();
         },
-        fail: function (next, error, hostAttempted, hostCompleted) {
-          if (!next && hostAttempted && !hostCompleted) {
-            var connected = null; try { connected = ports.connectionStatus(); } catch (_) { /* Unverified A stays fenced. */ }
-            if (replacement.canRestoreA(error, before, { connected: connected, identity: identity,
-              sameCycle: cycle === old, failure: old.failure, synchronizing: old.synchronizing,
-              cacheFences: cacheFences })) { phase = 'native'; return error; }
-          }
+        fail: function (next, error) {
           if (next) disposeConsumers(next); return failLifecycle(cycle || old, error);
         }
         });

@@ -412,17 +412,12 @@ test('B revision delivered during subscription is synchronized before replacemen
   assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [70]);
 });
 
-test('confirmed pre-reservation rejection preserves the unchanged A authority', async () => {
+test('stale host rejection fences A until its actual revision is reconciled', async () => {
   const refusal = Object.assign(new Error('stale native revision'), { code: 'stale_revision' });
   const h = nativeHarness(staticSource(), { replaceFailure: refusal });
   assert.equal(await h.controller.activate(h.prepared), true);
-  const before = h.state.lifecycle.inspect();
   await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /stale native revision/);
-  const after = h.state.lifecycle.inspect();
-  assert.equal(after.phase, 'native');
-  assert.deepEqual(after.identity, before.identity);
-  assert.strictEqual(after.session, before.session);
-  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [25]);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
 });
 
 test('ambiguous replacement error fences A even when its transport still appears bound', async () => {
