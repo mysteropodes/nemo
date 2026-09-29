@@ -99,7 +99,18 @@ function installNativeOpen(app) {
     deferredAllowed = allowOccludedAdmission;
     return first.promise.then(value => {
     if (value) active = true; return value;
-  }); } };
+  }); }, finishOpenAfterReveal(incoming) {
+    assert.equal(incoming.instanceId, receipt.instanceId);
+    presentations++;
+    return visible.promise.then(result => {
+      if (result.status !== 'presented' || result.lifecycleGeneration !== incoming.lifecycleGeneration ||
+          result.instanceId !== incoming.instanceId || result.documentId !== incoming.documentId ||
+          result.documentSnapshotId !== incoming.documentSnapshotId) {
+        throw new Error('Native viewport is not current after reveal');
+      }
+      return result;
+    });
+  } };
   return { receipt, first, visible, get presentations() { return presentations; },
     get deferredAllowed() { return deferredAllowed; } };
 }
