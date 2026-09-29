@@ -65,15 +65,27 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
         instanceId: meta.instanceId, documentId: meta.documentId,
         expectedRevision: meta.revision, operation: 'command.document.apply',
         payload: { command: 'layer.opacity.set', stableTarget: { layerUid: 'r08_curve_layer' }, value: 7 } };
-      const before = { serialized: SM.exportJSON(), meta: NemoOpacityApplication.meta() };
+      // exportJSON flushes Paper frames and is now correctly denied by the
+      // browser write guard. Observe the live document without invoking it.
+      const snapshot = () => ({
+        layers: state.layers.map(layer => ({ layerUid: layer.layerUid,
+          motion: JSON.stringify(layer.motion ?? null),
+          motionStatic: JSON.stringify(layer.motionStatic ?? null) })),
+        undoCount: state.undoStack.length, redoCount: state.redoStack.length,
+        meta: NemoOpacityApplication.meta(),
+      });
+      const before = snapshot();
+      const initialRead = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-initial-read',
+        ...meta, operation: 'property.get',
+        payload: { layerId: 'r08_curve_layer', property: 'opacity' } });
       const refused = await NemoApplication.handle(request);
-      const after = { serialized: SM.exportJSON(), meta: NemoOpacityApplication.meta() };
+      const after = snapshot();
       const discovery = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-discovery',
         ...meta, operation: 'capabilities', payload: {} });
       const legacy = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-legacy-control',
         ...meta, expectedRevision: meta.revision, operation: 'property.set',
         payload: { layerId: 'r08_curve_layer', property: 'opacity', value: 26 } });
-      const afterLegacy = { serialized: SM.exportJSON(), meta: NemoOpacityApplication.meta() };
+      const afterLegacy = snapshot();
       const current = NemoOpacityApplication.meta();
       const read = await NemoApplication.handle({ apiVersion: 1, requestId: 'n21-browser-read',
         ...current, operation: 'property.get',
@@ -84,15 +96,15 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
         legacyUnchanged: NemoOpacityApplication.legacy === window.__n21ObservedOwners.legacy,
         handleSource: NemoApplication.handle.toString(), legacySource: NemoOpacityApplication.legacy.toString() };
       delete window.__n21ObservedOwners;
-      return { before, after, afterLegacy, refused, discovery, legacy, read, owner: owner(), handlers,
-        stored: JSON.parse(SM.exportJSON()), userAgent: navigator.userAgent };
+      return { before, after, afterLegacy, initialRead, refused, discovery, legacy, read, owner: owner(), handlers,
+        userAgent: navigator.userAgent };
     });
     await testInfo.attach('native-opacity-browser-observation', { contentType: 'application/json',
       body: Buffer.from(JSON.stringify({ sourceSha: identity.source.startup.head,
         browserVersion: browser.version(), nativeRequest: observed.refused,
         legacyWrite: observed.legacy,
-        beforeOpacity: JSON.parse(observed.before.serialized).layers[0].motionStatic?.opacity ?? null,
-        afterOpacity: JSON.parse(observed.afterLegacy.serialized).layers[0].motionStatic?.opacity ?? null,
+        beforeOpacity: observed.initialRead.result?.value ?? null,
+        afterOpacity: observed.read.result?.value ?? null,
         beforeRevision: observed.before.meta.revision,
         afterRevision: observed.afterLegacy.meta.revision }, null, 2)) });
     expect(observed.owner).toEqual({ tauri: 'undefined', cutover: 'undefined',
@@ -105,7 +117,10 @@ test('native opacity is unavailable in the browser and cannot fall back to a leg
     expect(observed.legacy.ok).toBe(false);
     expect(observed.legacy.error.code).toBe('unavailable');
     expect(observed.afterLegacy).toEqual(observed.before);
-    expect(observed.stored.layers[0].motionStatic.opacity).toEqual([25]);
+    expect(observed.initialRead.ok).toBe(true);
+    expect(observed.initialRead.result.value).toBe(100);
+    expect(observed.read.ok).toBe(true);
+    expect(observed.read.result.value).toBe(100);
     expect(observed.handlers).toMatchObject({ handleType: 'function', legacyType: 'function',
       handleUnchanged: true, legacyUnchanged: true });
     expect(errors).toEqual([]);
