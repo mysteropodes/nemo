@@ -150,6 +150,18 @@ fn failed_cleanup_cannot_admit_b_or_resume_a() {
     assert!(app.dispatch(undo).is_ok());
     assert_eq!(app.content_revision(), 3);
     let old_id = app.document_id().to_owned();
+    let trace_request = OpacityRequest::query(
+        "inspect-before-failure",
+        app.instance_id(),
+        app.document_id(),
+        "query.diagnostics.recent",
+        json!({}),
+    );
+    let trace = app.dispatch(trace_request.clone());
+    assert_eq!(
+        trace.result().unwrap()["records"].as_array().unwrap().len(),
+        3
+    );
     let old_snapshot = app.acquire_snapshot(3).unwrap();
     assert_eq!(old_snapshot.static_opacity(LAYER), Some(40.0));
     let begun = app.dispatch(begin(&app));
@@ -165,6 +177,15 @@ fn failed_cleanup_cannot_admit_b_or_resume_a() {
         .is_err());
     assert_eq!(app.document_id(), old_id);
     assert_eq!(app.content_revision(), 3);
+    let denied_trace = app.dispatch(trace_request);
+    assert_eq!(
+        denied_trace.error().unwrap().code(),
+        DispatchErrorCode::Unavailable
+    );
+    assert!(
+        denied_trace.result().is_none(),
+        "fenced A must expose no stale success to B"
+    );
     let progress = app.replacement_progress().unwrap();
     assert_eq!(
         progress.phase,
