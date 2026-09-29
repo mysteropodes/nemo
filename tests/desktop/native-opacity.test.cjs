@@ -252,10 +252,15 @@ test('installed native opacity: live command oracles and externally driven UI ch
     } else {
       await valueCheckpoint('gesture-40', 'Drag the Motion Opacity scrub field from 60 to 40 (one continuous gesture).', 40);
     }
-    assert.equal((await dispatch('history.undo')).ok, true); assert.equal(await opacity(), 60);
-    assert.equal((await dispatch('history.redo')).ok, true); assert.equal(await opacity(), 40);
-    report.checks.push({ checkpoint: 'post-40-one-history-entry', value: 40,
-      limitation: 'History alone does not prove the input was a continuous pointer gesture.' });
+    if (probeAfterGestureFailure) {
+      report.checks.push({ checkpoint: 'post-40-one-history-entry', disposition: 'unverified',
+        limitation: 'Diagnostic native command is not a substitute for pointer-gesture history.' });
+    } else {
+      assert.equal((await dispatch('history.undo')).ok, true); assert.equal(await opacity(), 60);
+      assert.equal((await dispatch('history.redo')).ok, true); assert.equal(await opacity(), 40);
+      report.checks.push({ checkpoint: 'post-40-one-history-entry', value: 40,
+        limitation: 'History alone does not prove the input was a continuous pointer gesture.' });
+    }
     stage = 'mcp-ui-parity';
     const parityWrite = await dispatch('command.document.apply', {
       command: 'layer.opacity.set', stableTarget: target, value: 25 });
