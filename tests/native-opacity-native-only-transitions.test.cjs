@@ -11,6 +11,10 @@ const { defaultState, extractFunction, loadMotion } = require('./fixtures/lib/sa
 const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
+const NativeOpacityReplacement = require('../src/js/application/native-opacity-replacement.js');
+const NativeOpacityExportWorkflow = require('../src/js/application/native-opacity-export-workflow.js');
+const NativeOpacityPreviewWorkflow = require('../src/js/application/native-opacity-preview-workflow.js');
+const NativeOpacityV1 = require('../src/js/application/native-opacity-v1.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
@@ -62,7 +66,8 @@ function nativeHarness(source, options = {}) {
     identity: { instanceId: 'instance-a', documentId: 'native-document-1', contentRevision: 0 },
     document: clone(prepared.projection), history: [], redo: [], releases: 0,
     disconnects: 0, imports: [], previews: [], outputs: [], evaluations: 0,
-    activations: 0, hostGeneration: 0, connected: false, subscriptions: [], previewConsumers: [], exportConsumers: [],
+    activations: 0, replacements: [], hostGeneration: 0, connected: false,
+    subscriptions: [], previewConsumers: [], exportConsumers: [],
     dispatches: [],
   };
   function response(request, result) {
@@ -166,6 +171,7 @@ function nativeHarness(source, options = {}) {
     },
     async connect() {
       if (transportBridge) return transportBridge.transport.connect();
+      const old = state.subscriptions.at(-1); if (old) old.active = false;
       state.connected = true; return clone(state.identity);
     },
     connectionStatus() {
@@ -176,7 +182,16 @@ function nativeHarness(source, options = {}) {
       if (transportBridge) return transportBridge.transport.subscribeRevisions(transportBridge.listen, synchronize);
       const subscription = { synchronize, hostGeneration: state.hostGeneration, active: true };
       state.subscriptions.push(subscription);
-      return { ...clone(state.identity), lifecycleGeneration: state.hostGeneration,
+      const subscribedBinding = clone(state.identity);
+      if (options.revisionDuringSubscribe && state.hostGeneration > 1) {
+        const fromRevision = state.identity.contentRevision;
+        state.document.layers[0].motionStatic.opacity = [options.revisionDuringSubscribe];
+        state.identity.contentRevision++;
+        state.earlyRevision = synchronize({ instanceId: state.identity.instanceId,
+          documentId: state.identity.documentId, lifecycleGeneration: state.hostGeneration,
+          fromRevision, toRevision: state.identity.contentRevision, requestId: 'early-b-revision' });
+      }
+      return { ...subscribedBinding, lifecycleGeneration: state.hostGeneration,
         subscriptionId: `subscription-${state.hostGeneration}` };
     },
     async disconnect() {
@@ -194,6 +209,19 @@ function nativeHarness(source, options = {}) {
       if (options.releaseFailure) throw new Error('release failed');
       return options.releaseReceipt ? options.releaseReceipt(fullReleaseReceipt(request), request) : fullReleaseReceipt(request);
     },
+    async replace(request) {
+      state.replacements.push(clone(request));
+      if (options.replaceGate) await options.replaceGate;
+      if (options.replaceFailure) throw options.replaceFailure;
+      state.document = clone(request.projection);
+      state.identity = { instanceId: state.identity.instanceId,
+        documentId: `native-document-${state.replacements.length + 1}`, contentRevision: 0 };
+      state.history.length = 0; state.redo.length = 0; state.hostGeneration++;
+      const receipt = { requestId: request.requestId, retrieved: false,
+        documentId: state.identity.documentId, contentRevision: 0,
+        resourceCount: request.resources.length, cancelledPreviewWorkIds: [], reconciledExports: [] };
+      return options.replaceReceipt ? options.replaceReceipt(receipt) : receipt;
+    },
     legacyImport(bytes, silent) {
       state.imports.push(JSON.parse(bytes));
       return options.legacyImport ? options.legacyImport(bytes, silent, controller, state) : true;
@@ -210,17 +238,20 @@ function nativeHarness(source, options = {}) {
         viewGeneration: state.previews.length, status: 'presented' };
       return options.previewReceipt ? options.previewReceipt(receipt, request) : receipt;
     },
-    async bindOutput(request) { state.outputs.push(request); },
+    async bindOutput(request) { state.outputs.push(request); if (options.outputGate) await options.outputGate; },
     currentFrame() { return options.ui ? options.ui.state.currentFrame : 10; },
     afterChange() {
       state.afterChanges = (state.afterChanges || 0) + 1;
       if (options.afterChange) options.afterChange(controller, state);
     },
     sleep() { return Promise.resolve(); },
-  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
-    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
+  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract, replacement, exportWorkflow) {
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow, NativeOpacityPreviewWorkflow);
   } },
-    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
+    replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
+    operations: NativeOpacityOperations, v1: NativeOpacityV1,
+    viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -257,6 +288,7 @@ function surfaceHarness(source, options = {}) {
     restoreUiProjection: projection.restoreUiProjection,
     refreshUiProjection: projection.refreshUiProjection,
     paintUiProjection() { if (options.paintUiProjection) options.paintUiProjection(h.controller, h.state); },
+    blockPublication() { if (options.blockPublication) options.blockPublication(h.controller, h.state); },
     installGuard() {}, allow() { return !h.controller.blocksLegacy(); },
     wrap() { return () => {}; },
     extensionOpen() { return !!options.extension; }, toast() {},
@@ -278,6 +310,20 @@ test('terminal desktop UI paint does not enqueue an unverified native frame', ()
   assert.equal(paints, 1); assert.equal(presentations, 0);
 });
 
+test('host replacement receipt admits only a distinct revision-zero document', () => {
+  const current = { instanceId: 'instance-a', documentId: 'native-document-1', contentRevision: 3 };
+  const request = { requestId: 'replace-1' };
+  const prepared = { resources: [{ resourceId: 'geometry-a' }] };
+  const receipt = { requestId: 'replace-1', retrieved: false, documentId: 'native-document-2',
+    contentRevision: 0, resourceCount: 1, cancelledPreviewWorkIds: [], reconciledExports: [] };
+  assert.strictEqual(NativeOpacityContract.validateReplacement(receipt, current, request, prepared), receipt);
+  assert.strictEqual(NativeOpacityContract.validateReplacement({ ...receipt, retrieved: true }, current, request, prepared).retrieved, true);
+  for (const changed of [{ documentId: current.documentId }, { contentRevision: 1 },
+    { requestId: 'wrong' }, { resourceCount: 0 }, { cancelledPreviewWorkIds: ['duplicate', 'duplicate'] }]) {
+    assert.throws(() => NativeOpacityContract.validateReplacement({ ...receipt, ...changed }, current, request, prepared));
+  }
+});
+
 test('N20B freezes independent fixtures and static history/keyed evaluation oracles', async () => {
   assert.equal(sha(SHELL_PATH), SHELL_SHA);
   assert.equal(sha(NATIVE_PATH), NATIVE_SHA);
@@ -293,14 +339,12 @@ test('N20B freezes independent fixtures and static history/keyed evaluation orac
   assert.deepEqual([0, 10, 20].map(f => k.controller.valueAtFrame('r08_curve_layer', f)[0]), [20, 50, 80]);
 });
 
-test('complete B production admission never changes A or B, including extension and no-A imports', async () => {
+test('unsupported B preflight never changes A or B, including extension and no-A imports', async () => {
   const unsupported = staticSource(); unsupported.extraContent = { unknown: true };
   for (const active of [false, true]) for (const extension of [false, true]) {
     const h = surfaceHarness(staticSource(), { extension });
     if (active) { await h.controller.activate(h.prepared); await h.controller.setOpacity('r08_curve_layer', 40); }
-    const incomingFiles = active || extension
-      ? ['{', JSON.stringify(unsupported), JSON.stringify(staticSource(60)), JSON.stringify(keyedSource())]
-      : ['{', JSON.stringify(unsupported)];
+    const incomingFiles = ['{', JSON.stringify(unsupported)];
     for (const incoming of incomingFiles) {
       const before = stateBytes(h), input = incoming, session = h.state.lifecycle.inspect().session;
       assert.equal(await h.published().project.importJSON(incoming, false), false);
@@ -310,6 +354,138 @@ test('complete B production admission never changes A or B, including extension 
       await Promise.resolve(); assert.equal(stateBytes(h), before);
     }
   }
+});
+
+test('active native Open replaces A with a fresh subscribed B before UI publication', async () => {
+  const h = surfaceHarness(staticSource());
+  await h.controller.activate(h.prepared);
+  await h.controller.setOpacity('r08_curve_layer', 40);
+  const before = h.state.lifecycle.inspect();
+  const oldSubscription = h.state.subscriptions.at(-1);
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true);
+  assert.equal(first.owner, 'native');
+  assert.equal(h.state.replacements.length, 1);
+  assert.equal(h.state.replacements[0].documentId, before.identity.documentId);
+  assert.equal(h.state.replacements[0].expectedRevision, before.identity.contentRevision);
+  const current = h.state.lifecycle.inspect();
+  assert.equal(current.identity.documentId, 'native-document-2');
+  assert.equal(current.identity.contentRevision, 0);
+  assert.notStrictEqual(current.session, before.session);
+  assert.ok(current.generation > before.generation);
+  assert.ok(h.state.subscriptions.at(-1).hostGeneration > oldSubscription.hostGeneration);
+  assert.equal(oldSubscription.active, false);
+  assert.deepEqual(h.state.history, []);
+  assert.equal(h.ui.state.layers, undefined, 'B remains unpublished in the UI until final reveal');
+  const final = await h.published().project.finishOpenAfterReveal(first);
+  assert.equal(final.status, 'presented');
+  assert.equal(h.ui.state.layers[0].name, 'R08 rectangle');
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [60]);
+});
+
+test('replacement drains an admitted A preview before changing lifecycle phase', async () => {
+  const hostGate = deferred();
+  const h = nativeHarness(staticSource(), { previewGate(request) {
+    if (request.documentId === 'native-document-1') return hostGate.promise;
+  } });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const preview = h.state.lifecycle.presentPreview(10);
+  for (let spin = 0; spin < 10 && !h.state.previews.length; spin++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.previews.length, 1);
+  const replacing = h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.state.replacements.length, 0);
+  hostGate.resolve();
+  assert.equal((await preview).status, 'presented');
+  await replacing;
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  assert.equal(h.state.lifecycle.inspect().identity.documentId, 'native-document-2');
+});
+
+test('B revision delivered during subscription is synchronized before replacement returns', async () => {
+  const h = nativeHarness(staticSource(), { revisionDuringSubscribe: 70 });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  await h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+  await h.state.earlyRevision;
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  assert.equal(h.state.lifecycle.inspect().identity.contentRevision, 1);
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [70]);
+});
+
+test('stale host rejection fences A until its actual revision is reconciled', async () => {
+  const refusal = Object.assign(new Error('stale native revision'), { code: 'stale_revision' });
+  const h = nativeHarness(staticSource(), { replaceFailure: refusal });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /stale native revision/);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
+});
+
+test('busy local replacement refusal retains A frame token for later resize', async () => {
+  const gate = deferred();
+  const h = surfaceHarness(staticSource(), { outputGate: gate.promise, resize: async () => {} });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await h.published().project.finishOpenAfterReveal(first);
+  const previews = h.state.previews.length;
+  const exporting = h.state.lifecycle.exportPng('busy-output', [0]);
+  for (let spin = 0; spin < 10 && !h.state.outputs.length; spin++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.outputs.length, 1);
+  assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true), false);
+  assert.equal(h.state.replacements.length, 0);
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  gate.resolve(); await exporting;
+  h.published().resize(); await h.resizeCallback()();
+  assert.ok(h.state.previews.length > previews);
+  assert.equal(h.state.previews.at(-1).documentId, 'native-document-1');
+});
+
+test('ambiguous replacement error fences A even when its transport still appears bound', async () => {
+  const h = nativeHarness(staticSource(), { replaceFailure: new Error('reply lost') });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /reply lost/);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
+});
+
+test('native Open hides the populated startup Paper group only after the final frame', async () => {
+  const paper = { children: [{ name: 'boot artwork' }], visible: true };
+  const ui = { state: {}, userLayers: [paper], __TAURI__: { core: { invoke() {} } },
+    SM: { importJSON() {} } };
+  const h = surfaceHarness(staticSource(), { ui });
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource()));
+  assert.equal(paper.visible, true);
+  await h.published().project.finishOpenAfterReveal(first);
+  assert.equal(paper.visible, false);
+  assert.equal(ui.state.layers[0].name, 'R08 rectangle');
+});
+
+test('replacement with an unpresented first frame fences B and blocks stale A publication', async () => {
+  let blocked = 0;
+  const h = surfaceHarness(staticSource(), {
+    previewReceipt(receipt, request) {
+      return request.documentId === 'native-document-2' ? { ...receipt, status: 'failed' } : receipt;
+    }, blockPublication() { blocked++; },
+  });
+  await h.controller.activate(h.prepared);
+  assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true), false);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
+  assert.equal(blocked, 1);
+  assert.equal(h.controller.blocksLegacy(), true);
+});
+
+test('replacement with a failed final frame fences B and blocks stale A publication', async () => {
+  let blocked = 0, bPresentations = 0;
+  const h = surfaceHarness(staticSource(), {
+    previewReceipt(receipt, request) {
+      return request.documentId === 'native-document-2' && ++bPresentations === 2
+        ? { ...receipt, status: 'failed' } : receipt;
+    }, blockPublication() { blocked++; },
+  });
+  await h.controller.activate(h.prepared);
+  const first = await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true);
+  assert.equal(first.status, 'presented');
+  await assert.rejects(h.published().project.finishOpenAfterReveal(first), /receipt.status is unknown/);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
+  assert.equal(blocked, 1);
+  assert.equal(h.controller.blocksLegacy(), true);
 });
 
 test('first static and keyed native opens await the lifecycle-owned frame-0 presentation', async () => {
@@ -608,7 +784,7 @@ test('renderer failure restores every touched UI field and leaves Open unpublish
   const oldFrames = [{ layer: 0, frame: 4 }], oldShadow = { test: 'keep' };
   const ui = { state: { currentFrame: 59, canvasW: 800, layers: oldLayers }, _curFrame: 59,
     _layerSel: oldSelection, selectedPaths: oldPaths, _sel: { frames: oldFrames },
-    _idxShadow: oldShadow, userLayers: [{ children: [] }],
+    _idxShadow: oldShadow, userLayers: [{ children: [{}], visible: true }],
     __TAURI__: { core: { invoke() {} } }, SM: { importJSON() {} } };
   let renders = 0;
   const h = surfaceHarness(staticSource(), { ui, paintUiProjection() {
@@ -625,6 +801,7 @@ test('renderer failure restores every touched UI field and leaves Open unpublish
   assert.equal(ui.state.canvasW, 800); assert.strictEqual(ui.state.layers, oldLayers);
   assert.strictEqual(ui._layerSel, oldSelection); assert.strictEqual(ui.selectedPaths, oldPaths);
   assert.strictEqual(ui._sel.frames, oldFrames); assert.strictEqual(ui._idxShadow, oldShadow);
+  assert.equal(ui.userLayers[0].visible, true);
   assert.equal(Object.hasOwn(ui.state, 'fps'), false);
   assert.equal(h.controller.blocksLegacy(), true);
 });

@@ -136,8 +136,10 @@
       fields.forEach(function (key) { saved[key] = { present: Object.prototype.hasOwnProperty.call(object, key), value: object[key] }; });
       return saved;
     }
+    var paper = root.userLayers && root.userLayers.length === 1 ? root.userLayers[0] : null;
     return { state: capture(root.state, projectionStateFields), globals: capture(root, projectionGlobalFields),
-      selectionFrames: root._sel && root._sel.frames };
+      selectionFrames: root._sel && root._sel.frames,
+      paper: paper && { group: paper, present: Object.prototype.hasOwnProperty.call(paper, 'visible'), visible: paper.visible } };
   }
   function restoreUiProjection(root, snapshot) {
     function restore(object, fields) {
@@ -149,17 +151,22 @@
     restore(root.state, snapshot.state);
     restore(root, snapshot.globals);
     if (root._sel) root._sel.frames = snapshot.selectionFrames;
+    if (snapshot.paper && root.userLayers && root.userLayers[0] === snapshot.paper.group) {
+      if (snapshot.paper.present || snapshot.paper.visible !== undefined) snapshot.paper.group.visible = snapshot.paper.visible;
+      else delete snapshot.paper.group.visible;
+    }
   }
   function validatedProjection(root, document) {
     var prepared = root.SMProjectDocument.prepareNativeOpacity(document);
     if (!root.userLayers || root.userLayers.length !== 1 ||
-        !root.userLayers[0] || root.userLayers[0].children.length !== 0) {
-      throw new Error('Native UI projection requires the empty boot Paper row');
+        !root.userLayers[0] || !Array.isArray(root.userLayers[0].children)) {
+      throw new Error('Native UI projection requires one stable Paper group');
     }
     return JSON.parse(JSON.stringify(prepared.shell));
   }
   function installUiProjection(root, document) {
     var view = validatedProjection(root, document);
+    root.userLayers[0].visible = false;
     var state = root.state;
     state.canvasW = view.canvasW; state.canvasH = view.canvasH; state.canvasBg = view.canvasBg;
     state.fps = view.fps; state.totalFrames = view.totalFrames;
@@ -212,6 +219,7 @@
       disconnect: function () { return transport.disconnect(); },
       application: function () { return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', transport); },
       release: function (request) { return invoke('nemo_native_release', { request: request }); },
+      replace: function (request) { return invoke('nemo_native_replace', { request: request }); },
       previewHost: function (request) { return invoke('nemo_native_preview', { request: request }); },
       bindOutput: function (request) { return invoke('nemo_native_bind_output', { request: request }); },
       legacyImport: root.SM.importJSON.bind(root.SM),
@@ -228,6 +236,11 @@
         restoreUiProjection: function (snapshot) { return restoreUiProjection(root, snapshot); },
         refreshUiProjection: function (json) { return refreshUiProjection(root, json); },
         paintUiProjection: function () { if (root.updateUI) root.updateUI(); },
+        blockPublication: function () {
+          var start = root.document.getElementById('start-screen');
+          if (start) start.classList.remove('hid');
+          if (root.showToast) root.showToast('Native project replacement could not be verified; reopen Nemo before editing.');
+        },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');

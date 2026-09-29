@@ -190,10 +190,12 @@
   }
   async function openPath(path){
     if(!tauriOk())return;
+    var json;
+    try{json=await window.__TAURI__.fs.readTextFile(path);}
+    catch(e){showToast('Could not read file — it may have moved or been deleted');return false;}
     try{
-      var json=await window.__TAURI__.fs.readTextFile(path);
       var opened=await importProjectJSON(json,true,true);
-      if(!opened||!nativeOpenReady(opened))throw new Error('Invalid or unpresented project');
+      if(!opened||!nativeOpenReady(opened))throw new Error('Native project admission or replacement failed');
       await revealOpenedProject(opened);
       markSaved(projectJSON());
       currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
@@ -201,9 +203,7 @@
       renderRecents();
       ensureInitialTab();
       showToast('Opened: '+currentName);
-    }catch(e){
-      showToast('Could not open file — it may have moved or been deleted');
-    }
+    }catch(e){showToast('Could not open project — native admission or presentation failed');return false;}
   }
   async function openDialog(){
     if(!tauriOk()){document.getElementById('file-input').click();return;}

@@ -10,6 +10,10 @@ const vm = require('node:vm');
 const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
+const NativeOpacityReplacement = require('../src/js/application/native-opacity-replacement.js');
+const NativeOpacityExportWorkflow = require('../src/js/application/native-opacity-export-workflow.js');
+const NativeOpacityPreviewWorkflow = require('../src/js/application/native-opacity-preview-workflow.js');
+const NativeOpacityV1 = require('../src/js/application/native-opacity-v1.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
@@ -284,10 +288,13 @@ function nativeHarness(source, options = {}) {
       if (options.afterChange) options.afterChange(controller, state);
     },
     sleep() { return Promise.resolve(); },
-  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
-    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
+  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract, replacement, exportWorkflow) {
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow, NativeOpacityPreviewWorkflow);
   } },
-    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
+    replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
+    operations: NativeOpacityOperations, v1: NativeOpacityV1,
+    viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -473,7 +480,10 @@ test('retained component app facade keeps admission first and every dependency l
 test('classic startup loads frozen guard modules before the production first-layer creation', () => {
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
   const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
-  const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-lifecycle.js',
+  const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-replacement.js',
+    'js/application/native-opacity-export-workflow.js', 'js/application/native-opacity-preview-workflow.js',
+    'js/application/native-opacity-v1.js',
+    'js/application/native-opacity-lifecycle.js',
     'js/application/native-opacity-viewport.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
     'js/adapters/native-opacity-legacy-surface.js', 'js/adapters/native-opacity-motion-surface.js',
@@ -570,7 +580,10 @@ test('legacy Motion evaluation remains lazy without the surface while native com
   assert.deepEqual(Array.from(motion.SMMotion.valueAtFrame(state.layers[0], 'scale', 0)), [80, 90]);
   motion.sandbox.NemoNativeOpacityCutover = { blocksLegacy: () => true };
   assert.throws(() => motion.SMMotion.valueAtFrame(state.layers[0], 'opacity', 0), /surface is unavailable/);
-  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle, operations: NativeOpacityOperations, viewport: NativeOpacityViewport };
+  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle,
+    replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
+    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, v1: NativeOpacityV1 };
   for (const surface of [undefined, {}, Object.freeze({ requireAvailable() {} })]) {
     assert.throws(() => OpacityApplication.createNative({}, { ...base, motionSurface: surface }), /Motion surface/);
   }
@@ -2762,12 +2775,13 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     NemoNativeOpacityLegacySurface: NativeLegacySurface,
     NemoNativeOpacityMotionSurface: NativeMotionSurface,
     NemoNativeOpacityOperations: NativeOpacityOperations,
+    NemoNativeOpacityV1: NativeOpacityV1,
     NemoNativeOpacityViewport: NativeOpacityViewport,
     NemoOpacityApplicationCore: { createNative(received, modules) {
       ports = received; events.push(['create']);
       assert.strictEqual(modules.viewport, NativeOpacityViewport);
       return { install() { return modules.operations.create(controller, received, NativeOpacityContract,
-        modules.viewport).install(); } };
+        modules.viewport, modules.v1).install(); } };
     } },
     SMEngineBridge: {},
     SMNativeEditGuard: {
