@@ -211,7 +211,7 @@ test('response validator enforces exact envelopes, closed common errors and JobR
   assert.strictEqual(validateResponse(declaration.examples[1].response, 'fixture-export', 'job.export.png.begin').result.status, 'running');
 });
 
-test('schema and active declaration carry the same frozen operations and examples', () => {
+test('schema includes active feature operations while the JS adapter retains its declared surface', () => {
   assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.ok(schema.$defs.Request);
   assert.ok(schema.$defs.Response);
@@ -221,7 +221,14 @@ test('schema and active declaration carry the same frozen operations and example
     const operation = branch.allOf[1].properties.operation;
     for (const value of operation.enum || [operation.const]) schemaOperations.add(value);
   }
-  assert.deepEqual([...schemaOperations].sort(), [...declaration.operations].sort());
+  const rust = fs.readFileSync(path.join(ROOT, 'nemo-mcp/src/capabilities.rs'), 'utf8');
+  const start = rust.indexOf('pub const NATIVE_CAPABILITY_SOURCES:');
+  assert.ok(start >= 0);
+  const block = rust.slice(start, rust.indexOf('];', start));
+  const descriptors = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)]
+    .map((match) => JSON.parse(fs.readFileSync(path.resolve(ROOT, 'nemo-mcp/src', match[1]), 'utf8')));
+  assert.deepEqual([...schemaOperations].sort(), descriptors.flatMap((entry) => entry.operations).sort());
+  assert.throws(() => validateRequest({ ...query(), operation: 'query.diagnostics.recent', payload: {} }), /operation/);
   assert.equal(declaration.schemaVersion, 2);
   assert.equal(declaration.apiVersion, 2);
   assert.equal(declaration.status, 'active');

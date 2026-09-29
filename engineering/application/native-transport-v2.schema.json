@@ -169,6 +169,15 @@
           "allOf": [
             { "$ref": "#/$defs/ForbiddenRevisionRequest" },
             { "properties": {
+              "operation": { "const": "query.diagnostics.recent" },
+              "payload": { "$ref": "#/$defs/EmptyPayload" }
+            } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ForbiddenRevisionRequest" },
+            { "properties": {
               "operation": { "const": "query.document.serialize" },
               "payload": { "$ref": "#/$defs/SerializeQueryPayload" }
             } }
@@ -524,6 +533,37 @@
         "error": { "$ref": "#/$defs/JobError" }
       }
     },
+    "DiagnosticsRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sequence", "operation", "contentRevision", "ok"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "requestId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
+        "requestIdRedacted": { "const": true },
+        "operation": { "enum": ["command.document.apply", "transaction.begin", "transaction.update", "transaction.commit", "transaction.cancel", "history.undo", "history.redo"] },
+        "targetId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
+        "contentRevision": { "$ref": "#/$defs/Revision" },
+        "ok": { "type": "boolean" },
+        "errorCode": { "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"] }
+      },
+      "anyOf": [
+        { "required": ["requestId"], "not": { "required": ["requestIdRedacted"] } },
+        { "required": ["requestIdRedacted"], "not": { "required": ["requestId"] } }
+      ],
+      "oneOf": [
+        { "properties": { "ok": { "const": true } }, "not": { "required": ["errorCode"] } },
+        { "properties": { "ok": { "const": false } }, "required": ["errorCode"] }
+      ]
+    },
+    "DiagnosticsResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["records", "truncated"],
+      "properties": {
+        "records": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/DiagnosticsRecord" } },
+        "truncated": { "type": "boolean" }
+      },
+      "description": "Ordered native terminal attempts, with oldest records omitted as needed to keep the full v2 response within 4096 encoded bytes."
+    },
     "ResponseBase": {
       "type": "object",
       "additionalProperties": false,
@@ -537,6 +577,7 @@
         "ok": { "type": "boolean" },
         "result": {
           "oneOf": [
+            { "$ref": "#/$defs/DiagnosticsResult" },
             { "$ref": "#/$defs/CommandResult" },
             { "$ref": "#/$defs/OpacityQueryResult" },
             { "$ref": "#/$defs/RevisionQueryResult" },

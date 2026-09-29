@@ -364,10 +364,7 @@ impl NativeApplicationRequest {
             ));
         }
         if self.expected_revision.is_some()
-            && matches!(
-                self.operation.as_str(),
-                "query.document.serialize" | "query.document.evaluate"
-            )
+            && crate::native_contract::forbids_expected_revision(&self.operation)
         {
             return Err(RequestError::InvalidRequest(
                 "native pinned reads forbid expectedRevision".into(),

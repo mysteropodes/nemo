@@ -17,9 +17,9 @@ const nativeSchema = load('engineering', 'application', 'native-transport-v2.sch
 // transport-v1.schema.json silently stayed one descriptor short -- the only test
 // pinning that array compared it against the same stale list. Source order is
 // significant: catalog().descriptors() returns registration order, not sorted.
-function declaredDescriptors() {
+function declaredDescriptors(name = 'CAPABILITY_SOURCES') {
   const rust = fs.readFileSync(path.join(root, 'nemo-mcp', 'src', 'capabilities.rs'), 'utf8');
-  const start = rust.indexOf('CAPABILITY_SOURCES');
+  const start = rust.indexOf(`pub const ${name}:`);
   const block = rust.slice(start, rust.indexOf('];', start));
   const out = [];
   const re = /include_str!\s*\(\s*"([^"]+)"\s*\)/g;
@@ -30,9 +30,7 @@ function declaredDescriptors() {
   return out;
 }
 const descriptors = declaredDescriptors();
-const nativeDescriptors = [
-  load('engineering', 'application', 'capabilities-v2', 'native-opacity.json'),
-];
+const nativeDescriptors = declaredDescriptors('NATIVE_CAPABILITY_SOURCES');
 
 function compiledSchema(...args) {
   return execFileSync('cargo', [
@@ -80,6 +78,19 @@ test('feature-owned native declarations cover exactly the v2 transport operation
   assert.equal(new Set(schemaOperations).size, schemaOperations.length, 'v2 schema repeats an operation');
   assert.equal(new Set(declaredOperations).size, declaredOperations.length, 'native declarations repeat an operation');
   assert.deepEqual([...new Set(declaredOperations)].sort(), [...new Set(schemaOperations)].sort());
+});
+
+test('diagnostics redaction is trace-only and its label shapes are mutually exclusive', () => {
+  const record = nativeSchema.$defs.DiagnosticsRecord;
+  const ordinary = new RegExp(record.properties.requestId.allOf[1].pattern);
+  assert.ok(ordinary.test('edit-1'));
+  assert.equal(ordinary.test('file:/private/secret'), false);
+  assert.ok(new RegExp(nativeSchema.$defs.Identifier.pattern).test('file:/private/secret'));
+  assert.deepEqual(record.properties.requestIdRedacted, { const: true });
+  assert.deepEqual(record.anyOf, [
+    { required: ['requestId'], not: { required: ['requestIdRedacted'] } },
+    { required: ['requestIdRedacted'], not: { required: ['requestId'] } },
+  ]);
 });
 
 test('pinned read schemas declare strict selectors and exact native result identities', () => {

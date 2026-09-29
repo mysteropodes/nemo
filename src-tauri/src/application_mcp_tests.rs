@@ -13,6 +13,9 @@ use native_engine::{
 use serde_json::json;
 use std::sync::{mpsc, Arc, Barrier};
 
+#[path = "application_mcp_diagnostics_tests.rs"]
+mod diagnostics;
+
 const PROJECT: &[u8] = include_bytes!("../../native-engine/tests/fixtures/opacity-v2/project.json");
 
 struct Port;
