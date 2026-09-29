@@ -535,16 +535,21 @@
     },
     "DiagnosticsRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["sequence", "requestId", "operation", "contentRevision", "ok"],
+      "required": ["sequence", "operation", "contentRevision", "ok"],
       "properties": {
         "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-        "requestId": { "$ref": "#/$defs/Identifier" },
+        "requestId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
+        "requestIdRedacted": { "const": true },
         "operation": { "enum": ["command.document.apply", "transaction.begin", "transaction.update", "transaction.commit", "transaction.cancel", "history.undo", "history.redo"] },
         "targetId": { "allOf": [{ "$ref": "#/$defs/Identifier" }, { "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }] },
         "contentRevision": { "$ref": "#/$defs/Revision" },
         "ok": { "type": "boolean" },
         "errorCode": { "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"] }
       },
+      "anyOf": [
+        { "required": ["requestId"], "not": { "required": ["requestIdRedacted"] } },
+        { "required": ["requestIdRedacted"], "not": { "required": ["requestId"] } }
+      ],
       "oneOf": [
         { "properties": { "ok": { "const": true } }, "not": { "required": ["errorCode"] } },
         { "properties": { "ok": { "const": false } }, "required": ["errorCode"] }

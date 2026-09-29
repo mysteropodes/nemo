@@ -405,12 +405,20 @@ fn native_diagnostics_stdio_observes_ui_and_mcp_edits_on_one_real_authority() {
     assert_eq!(registry::read_endpoints(&host.root).unwrap().len(), 2);
     other.subscribe();
     assert_eq!(client.call(&other.set("other-80", 0, 80))["ok"], true);
+    assert_eq!(
+        client.call(&other.set("file:/private/secret", 1, 30))["requestId"],
+        "file:/private/secret"
+    );
     let other_trace = client.call(&other.query());
     assert_eq!(
         other_trace["result"]["records"],
-        json!([{"sequence":1,"requestId":"other-80","operation":"command.document.apply","targetId":"r08_curve_layer","contentRevision":1,"ok":true}]),
+        json!([
+            {"sequence":1,"requestId":"other-80","operation":"command.document.apply","targetId":"r08_curve_layer","contentRevision":1,"ok":true},
+            {"sequence":2,"requestIdRedacted":true,"operation":"command.document.apply","targetId":"r08_curve_layer","contentRevision":2,"ok":true}
+        ]),
         "the same stdio client must select the second real authority"
     );
+    assert!(!other_trace.to_string().contains("file:/private/secret"));
     assert_eq!(
         client.call(&query),
         trace,

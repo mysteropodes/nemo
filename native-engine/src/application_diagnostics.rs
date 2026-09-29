@@ -30,7 +30,10 @@ impl RecentDiagnostics {
 #[serde(rename_all = "camelCase")]
 struct Record {
     sequence: u64,
-    request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id_redacted: Option<bool>,
     operation: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_id: Option<String>,
@@ -110,7 +113,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                 // optional; never copy such document-derived labels into trace.
                 .filter(|value| identifier(value) && !value.contains([':', '/']));
             (
-                request.request_id.clone(),
+                (!request.request_id.contains([':', '/'])).then(|| request.request_id.clone()),
                 request.operation.clone(),
                 target,
             )
@@ -125,6 +128,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                 }
                 self.diagnostics.records.push_back(Record {
                     sequence: self.diagnostics.sequence,
+                    request_id_redacted: request_id.is_none().then_some(true),
                     request_id,
                     operation,
                     target_id,

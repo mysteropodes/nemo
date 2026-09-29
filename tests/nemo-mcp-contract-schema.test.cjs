@@ -80,6 +80,19 @@ test('feature-owned native declarations cover exactly the v2 transport operation
   assert.deepEqual([...new Set(declaredOperations)].sort(), [...new Set(schemaOperations)].sort());
 });
 
+test('diagnostics redaction is trace-only and its label shapes are mutually exclusive', () => {
+  const record = nativeSchema.$defs.DiagnosticsRecord;
+  const ordinary = new RegExp(record.properties.requestId.allOf[1].pattern);
+  assert.ok(ordinary.test('edit-1'));
+  assert.equal(ordinary.test('file:/private/secret'), false);
+  assert.ok(new RegExp(nativeSchema.$defs.Identifier.pattern).test('file:/private/secret'));
+  assert.deepEqual(record.properties.requestIdRedacted, { const: true });
+  assert.deepEqual(record.anyOf, [
+    { required: ['requestId'], not: { required: ['requestIdRedacted'] } },
+    { required: ['requestIdRedacted'], not: { required: ['requestId'] } },
+  ]);
+});
+
 test('pinned read schemas declare strict selectors and exact native result identities', () => {
   for (const [operation, payload, result, required] of [
     ['query.document.serialize', 'SerializeQueryPayload', 'SerializeQueryResult', ['atRevision']],

@@ -270,14 +270,8 @@ fn diagnostics_result(value: &Value) -> bool {
         && records.iter().all(|record| {
             let Some(record) = exact(
                 record,
-                &[
-                    "sequence",
-                    "requestId",
-                    "operation",
-                    "contentRevision",
-                    "ok",
-                ],
-                &["targetId", "errorCode"],
+                &["sequence", "operation", "contentRevision", "ok"],
+                &["requestId", "requestIdRedacted", "targetId", "errorCode"],
             ) else {
                 return false;
             };
@@ -312,10 +306,13 @@ fn diagnostics_result(value: &Value) -> bool {
             };
             disposition
                 && revision(record.get("contentRevision")).is_some()
-                && record
-                    .get("requestId")
-                    .and_then(Value::as_str)
-                    .is_some_and(bounded_identifier)
+                && match (record.get("requestId"), record.get("requestIdRedacted")) {
+                    (Some(id), None) => id
+                        .as_str()
+                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/'])),
+                    (None, Some(redacted)) => redacted == true,
+                    _ => false,
+                }
                 && record.get("targetId").is_none_or(|value| {
                     value
                         .as_str()
@@ -349,6 +346,16 @@ mod tests {
         let record = json!({"sequence":1,"requestId":"edit-1","operation":"history.undo","contentRevision":2,"ok":true});
         let valid = json!({"records":[record.clone()],"truncated":false});
         assert!(diagnostics_result(&valid));
+        let mut redacted = valid.clone();
+        redacted["records"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("requestId");
+        assert!(!diagnostics_result(&redacted));
+        redacted["records"][0]["requestIdRedacted"] = json!(true);
+        assert!(diagnostics_result(&redacted));
+        redacted["records"][0]["requestIdRedacted"] = json!(false);
+        assert!(!diagnostics_result(&redacted));
         let mut bad = Vec::new();
         for (key, value) in [
             ("payload", json!({"private":"secret"})),
@@ -358,6 +365,8 @@ mod tests {
             ("operation", json!("query.diagnostics.recent")),
             ("targetId", json!("/private/path")),
             ("targetId", json!("file:/private/path")),
+            ("requestId", json!("file:/private/path")),
+            ("requestIdRedacted", json!(true)),
         ] {
             let mut altered = valid.clone();
             altered["records"][0][key] = value;

@@ -271,7 +271,7 @@ fn diagnostics_never_retains_unresolved_payload_targets_or_invalid_request_label
 }
 
 #[test]
-fn diagnostics_omits_imported_path_targets_but_preserves_opaque_request_correlation() {
+fn diagnostics_redacts_path_request_labels_and_omits_imported_path_targets() {
     let path_uid = "file:/private/secret";
     let project = std::str::from_utf8(PROJECT)
         .unwrap()
@@ -286,7 +286,17 @@ fn diagnostics_omits_imported_path_targets_but_preserves_opaque_request_correlat
     .unwrap();
     let mut edit = set(&app, "caller:/opaque/correlation", 40);
     edit.payload["stableTarget"]["layerUid"] = json!(path_uid);
-    assert!(app.dispatch(edit).is_ok());
+    let committed = app.dispatch(edit.clone());
+    assert!(committed.is_ok());
+    assert_eq!(
+        serde_json::to_value(&committed).unwrap()["requestId"],
+        "caller:/opaque/correlation"
+    );
+    assert_eq!(
+        app.dispatch(edit),
+        committed,
+        "wire retry identity remains unchanged"
+    );
     let begin = OpacityRequest::history_stage(
         "path-begin",
         app.instance_id(),
@@ -307,17 +317,22 @@ fn diagnostics_omits_imported_path_targets_but_preserves_opaque_request_correlat
     );
     assert!(app.dispatch(update).is_ok());
     let trace = recent(&mut app);
-    assert_eq!(trace["records"].as_array().unwrap().len(), 3);
-    assert_eq!(
-        trace["records"][0]["requestId"],
-        "caller:/opaque/correlation"
-    );
+    assert_eq!(trace["records"].as_array().unwrap().len(), 4);
+    for index in 0..2 {
+        assert!(trace["records"][index].get("requestId").is_none());
+        assert_eq!(trace["records"][index]["requestIdRedacted"], true);
+        assert_eq!(trace["records"][index]["sequence"], index + 1);
+    }
+    assert_eq!(trace["records"][2]["requestId"], "path-begin");
     assert!(trace["records"]
         .as_array()
         .unwrap()
         .iter()
         .all(|r| r.get("targetId").is_none()));
     assert!(!serde_json::to_string(&trace).unwrap().contains(path_uid));
+    assert!(!serde_json::to_string(&trace)
+        .unwrap()
+        .contains("caller:/opaque/correlation"));
 }
 
 #[test]
