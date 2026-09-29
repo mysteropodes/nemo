@@ -825,7 +825,7 @@ N07–N19A ont fourni les interfaces natives acceptées de sauvegarde/chargement
 | [P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) · **D1** · Extraire l’adaptateur existant d’export SVG d’une seule image | [P19 / #1021](https://github.com/mysteropodes/nemo/issues/1021) · **D1** · Relier l’interface d’export existante et le MCP au même job |
 | [H01 / #1058](https://github.com/mysteropodes/nemo/issues/1058) · **D1** · Cartographier les entrées immuables de séquence SVG avant l’extraction du job | [P08 / #1010](https://github.com/mysteropodes/nemo/issues/1010) · **D1** · Vérifier l’enregistrement automatique de l’export depuis une nouvelle session d’agent |
 | [P18 / #1020](https://github.com/mysteropodes/nemo/issues/1020) · **D1** · Ajouter un cycle de vie de job borné à cet exportateur | [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056) · **D1** · Effectuer l’aller-retour d’un paquet de reproduction synthétique isolé |
-| [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) · **D1** · Extraire les diagnostics applicatifs bornés à partir de l’opacité | [T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) · **D2** · Exposer l’inspecteur de diagnostic partagé dans l’interface et le MCP |
+| [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054) · **D1** · Extraire les diagnostics applicatifs bornés à partir de l’opacité | [T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) · **Ilya/O** · Exposer l’inspecteur de diagnostic partagé dans l’interface et le MCP |
 | [T06 / #1055](https://github.com/mysteropodes/nemo/issues/1055) · **D2** · Corréler une requête MCP Rust avec les diagnostics applicatifs | — |
 
 - [ ] **[P17 / #1019](https://github.com/mysteropodes/nemo/issues/1019) — Extraire l’adaptateur existant d’export SVG d’une seule image**
@@ -926,7 +926,7 @@ N07–N19A ont fourni les interfaces natives acceptées de sauvegarde/chargement
 
 - [ ] **[T08 / #1057](https://github.com/mysteropodes/nemo/issues/1057) — Exposer l’inspecteur de diagnostic partagé dans l’interface et le MCP**
 
-  Responsable **Cyrill/D2** · compétence `diagnostics` · `sonnet` / **medium**. Prédécesseurs : [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054), [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056), [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009).
+  Responsable **Ilya/O** depuis le transfert T08 du 29 septembre · compétence `diagnostics`. Le code et les comptes rendus historiques de Cyrill/D2 (`sonnet` / **medium**) restent conservés. Prédécesseurs : [T05 / #1054](https://github.com/mysteropodes/nemo/issues/1054), [T07 / #1056](https://github.com/mysteropodes/nemo/issues/1056), [P07 / #1009](https://github.com/mysteropodes/nemo/issues/1009).
 
   Périmètre : `nouvelle liaison de panneau Diagnostics`; `descripteur de fonctionnalité de diagnostic`; `tests de diagnostic interface/MCP`.
 

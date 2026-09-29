@@ -59,7 +59,7 @@
       }
     }
 
-    async function presentPreview(frame) {
+    async function presentPreview(frame, allowOccludedAdmission) {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
       var observed = lifecycle.inspect(), current = lifecycle.identity();
       try {
@@ -74,7 +74,8 @@
         } while ((resize && resize.session === observed.session) ||
                  (resizing && resizing.session === observed.session));
         var latest = lifecycle.inspect();
-        if (presented.status !== 'presented' || presented.frame !== frame ||
+        if (!['presented', 'deferred-occluded'].includes(presented.status) ||
+            presented.frame !== frame ||
             presented.lifecycleGeneration !== observed.generation ||
             presented.instanceId !== current.instanceId ||
             presented.documentId !== current.documentId ||
@@ -86,6 +87,15 @@
             latest.identity.contentRevision !== current.contentRevision ||
             typeof lifecycle.persistenceJSON() !== 'string') {
           throw new Error('native opacity frame was not presented at the admitted revision');
+        }
+        // The start screen can occlude the native layer before reveal. This
+        // receipt admits only the handoff, never an Open success; reveal must
+        // obtain a fresh, strictly presented receipt at the same identity.
+        if (presented.status === 'deferred-occluded') {
+          if (!allowOccludedAdmission || !isOpening()) {
+            throw new Error('native opacity frame was not presented at the admitted revision');
+          }
+          return Object.freeze(Object.assign({ owner: 'native' }, presented));
         }
         lastPresentedFrame = frame;
         return Object.freeze(Object.assign({ owner: 'native' }, presented));

@@ -15,6 +15,8 @@ const diagnostics = require('../src/js/domain/diagnostics/opacity-diagnostics.js
 const PROPERTY_WRITES = ['property.set', 'property.key.set', 'property.key.remove', 'property.animation.set'];
 const clone = value => JSON.parse(JSON.stringify(value));
 const opacity = (layerId, value) => ({ layerId, property: 'opacity', value });
+const successfulEntry = (payload = opacity('layer-a', 1)) => ({ ok: true,
+  request: { operation: 'property.set', payload } });
 
 function send(f, id, operation, payload) {
   const identity = f.app.meta();
@@ -25,11 +27,15 @@ function send(f, id, operation, payload) {
 
 // Independently specified digest: deliberately NOT the code the application
 // or the codec use for anything else -- just a canonical (sorted-key) JSON
-// snapshot of exactly what a reproduction is supposed to reproduce (each
-// layer's opacity value, and how many entries are on each history stack).
+// snapshot of exactly what a reproduction is supposed to reproduce (static
+// opacity, tracks/keys, sampled values, and both history stacks).
 function stateDigest(f) {
   const canonical = {
-    opacities: f.state.layers.map(layer => ({ layerUid: layer.layerUid, opacity: layer.motionStatic.opacity[0] }))
+    opacities: f.state.layers.map(layer => ({ layerUid: layer.layerUid,
+      staticOpacity: layer.motionStatic.opacity[0],
+      track: layer.motion && layer.motion.opacity || null,
+      at0: f.motion.valueAtFrame(layer, 'opacity', 0)[0],
+      at5: f.motion.valueAtFrame(layer, 'opacity', 5)[0] }))
       .sort((a, b) => a.layerUid.localeCompare(b.layerUid)),
     undoDepth: f.undo.length, redoDepth: f.redo.length,
   };
@@ -46,7 +52,11 @@ function recordBundle(id, seed) {
   const commands = [
     ['c1', 'property.set', opacity(layerA, 60)],
     ['c2', 'property.key.set', { ...opacity(layerB, 30), frame: 5 }],
-    ['c3', 'property.set', opacity(layerA, 15)],
+    ['c3', 'property.key.set', { ...opacity(layerB, 20), frame: 0 }],
+    ['c4', 'property.key.remove', { layerId: layerB, property: 'opacity', frame: 5 }],
+    ['c5', 'property.animation.set', { layerId: layerA, property: 'opacity', animated: true }],
+    ['c6', 'property.set', opacity(layerA, 15)],
+    ['c7', 'property.animation.set', { layerId: layerB, property: 'opacity', animated: false }],
   ];
   for (const [id2, operation, payload] of commands) {
     const response = send(f, id2, operation, payload);
@@ -72,6 +82,12 @@ function replay(target, commands) {
 
 test('a bundle recorded on one fixture replays on a fresh (id, seed)-identical fixture to the same independently specified digest', () => {
   const { source, bundle } = recordBundle('opacity-repro-a', 1234);
+  assert.deepEqual(bundle.commands.map(command => command.operation), [
+    'property.set', 'property.key.set', 'property.key.set', 'property.key.remove',
+    'property.animation.set', 'property.set', 'property.animation.set']);
+  assert.equal(source.state.layers[0].motion.opacity.keys[0].v[0], 15);
+  assert.equal(source.state.layers[1].motion.opacity.keys.length, 0);
+  assert.equal(source.state.layers[1].motionStatic.opacity[0], 20);
   const sourceDigest = stateDigest(source);
 
   const target = fixture.build('opacity-repro-a', 1234);
@@ -95,6 +111,17 @@ test('buildBundle rejects a request whose entries are missing operation or paylo
   assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' }, [{ request: { operation: 'property.set' } }]));
   assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' }, []));
   assert.throws(() => bundleCodec.buildBundle({ id: '', hash: 'h' }, [{ request: { operation: 'property.set', payload: {} } }]));
+});
+
+test('buildBundle rejects an empty operation before emitting a bundle that parseBundle cannot accept', () => {
+  assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' },
+    [{ ok: true, request: { operation: '', payload: opacity('layer-a', 1) } }]), /well-formed request/);
+});
+
+test('buildBundle rejects a payload whose JSON representation is not an object', () => {
+  const payload = { ...opacity('layer-a', 1), toJSON() { return null; } };
+  assert.throws(() => bundleCodec.buildBundle({ id: 'x', hash: 'h' },
+    [{ ok: true, request: { operation: 'property.set', payload } }]), /well-formed request/);
 });
 
 const malformedBundles = [
@@ -125,6 +152,31 @@ test('parseBundle rejects a cyclic command payload without throwing', () => {
     commands: [{ operation: 'property.set', payload }] };
   let result;
   assert.doesNotThrow(() => { result = bundleCodec.parseBundle(bundle); });
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
+test('parseBundle rejects a payload whose JSON representation is not an object without throwing', () => {
+  const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h' },
+    commands: [{ operation: 'property.set', payload: { toJSON() { return null; } } }] };
+  let result;
+  assert.doesNotThrow(() => { result = bundleCodec.parseBundle(bundle); });
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
+test('parseBundle rejects a fixture whose JSON representation loses its required shape', () => {
+  const bundle = { formatVersion: 1, fixture: { id: 'x', hash: 'h', toJSON() { return null; } },
+    commands: [{ operation: 'property.set', payload: {} }] };
+  const result = bundleCodec.parseBundle(bundle);
+  assert.equal(typeof result.error, 'string');
+  assert.equal(result.commands, undefined);
+});
+
+test('parseBundle rejects commands whose JSON representation becomes empty', () => {
+  const commands = [{ operation: 'property.set', payload: {} }];
+  commands.toJSON = () => [];
+  const result = bundleCodec.parseBundle({ formatVersion: 1, fixture: { id: 'x', hash: 'h' }, commands });
   assert.equal(typeof result.error, 'string');
   assert.equal(result.commands, undefined);
 });
@@ -179,7 +231,7 @@ test('routing guard: the bundle codec never dispatches and never touches window/
 // copy was intended. These two tests are what make that regression loud.
 
 test('a built bundle is a copy: mutating it never reaches the recorded trace', () => {
-  const live = [{ request: { operation: 'property.set', payload: { layerId: 'layer-a', value: 1 } } }];
+  const live = [successfulEntry()];
   const bundle = bundleCodec.buildBundle({ id: 'iso', hash: 'h' }, live);
   bundle.commands[0].payload.value = 999;
   bundle.commands[0].operation = 'mutated';
@@ -188,7 +240,7 @@ test('a built bundle is a copy: mutating it never reaches the recorded trace', (
 });
 
 test('a parsed bundle is a copy: mutating the parse result never reaches the bundle', () => {
-  const live = [{ request: { operation: 'property.set', payload: { layerId: 'layer-a', value: 1 } } }];
+  const live = [successfulEntry()];
   const bundle = bundleCodec.buildBundle({ id: 'iso', hash: 'h' }, live);
   const parsed = bundleCodec.parseBundle(bundle);
   parsed.commands[0].payload.value = 777;
@@ -205,7 +257,7 @@ test('a parsed bundle is a copy: mutating the parse result never reaches the bun
 // for it. Write-only fields are worse than absent ones: they read as support.
 
 test('clock and seed survive a build/parse round-trip instead of being silently dropped', () => {
-  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const live = [successfulEntry()];
   const bundle = bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, { clock: 1234, seed: 99 });
   assert.equal(bundle.clock, 1234);
   assert.equal(bundle.seed, 99);
@@ -215,7 +267,7 @@ test('clock and seed survive a build/parse round-trip instead of being silently 
 });
 
 test('object-valued clock and seed in a built bundle cannot mutate caller metadata', () => {
-  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const live = [successfulEntry()];
   const meta = { clock: { ticks: [1] }, seed: { source: { value: 99 } } };
   const bundle = bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, meta);
   bundle.clock.ticks.push(2);
@@ -224,8 +276,64 @@ test('object-valued clock and seed in a built bundle cannot mutate caller metada
 });
 
 test('an absent clock/seed round-trips as null, not undefined', () => {
-  const live = [{ request: { operation: 'property.set', payload: { value: 1 } } }];
+  const live = [successfulEntry()];
   const parsed = bundleCodec.parseBundle(bundleCodec.buildBundle({ id: 'meta', hash: 'h' }, live, null));
   assert.equal(parsed.clock, null);
   assert.equal(parsed.seed, null);
+});
+
+test('a real traced write exports only replayable opacity fields, not private request extras', () => {
+  const f = fixture.build('opacity-repro-private', 11);
+  const layerId = f.state.layers[0].layerUid;
+  send(f, 'private-extra', 'property.set', { ...opacity(layerId, 40), privatePath: '/Users/private/client/project.json' });
+  const identity = f.app.meta();
+  const trace = f.app.handle({ apiVersion: 1, requestId: 'read-trace', ...identity,
+    operation: 'diagnostics.trace', payload: {} });
+  assert.equal(trace.ok, true);
+  assert.equal(trace.result.entries[0].request.payload.privatePath, '/Users/private/client/project.json',
+    'the application trace really contains the sensitive extra field');
+  const bundle = bundleCodec.buildBundle({ id: f.id, hash: f.hash }, trace.result.entries);
+  assert.deepEqual(bundle.commands[0].payload, opacity(layerId, 40));
+  assert.equal(JSON.stringify(bundle).includes('privatePath'), false);
+  assert.deepEqual(bundleCodec.parseBundle(bundle).commands[0].payload, opacity(layerId, 40));
+  const untrusted = clone(bundle);
+  untrusted.commands[0].payload.privatePath = '/Users/private/client/project.json';
+  assert.equal(typeof bundleCodec.parseBundle(untrusted).error, 'string');
+});
+
+test('a failed traced write cannot masquerade as a successful replay command', () => {
+  const f = fixture.build('opacity-repro-failed', 12);
+  const identity = f.app.meta();
+  const denied = f.app.handle({ apiVersion: 1, requestId: 'failed-write', ...identity,
+    expectedRevision: identity.revision, operation: 'property.set',
+    payload: opacity(f.state.layers[0].layerUid, 200) });
+  assert.equal(denied.ok, false);
+  const trace = f.app.handle({ apiVersion: 1, requestId: 'read-failed', ...f.app.meta(),
+    operation: 'diagnostics.trace', payload: {} });
+  assert.equal(trace.result.entries[0].ok, false);
+  assert.throws(() => bundleCodec.buildBundle({ id: f.id, hash: f.hash }, trace.result.entries),
+    /successful property write/);
+});
+
+test('path-shaped fixture and layer identifiers are refused instead of exported', () => {
+  const pathId = '/Users/private/client/project.json';
+  assert.throws(() => bundleCodec.buildBundle({ id: pathId, hash: 'h' }, [successfulEntry()]),
+    /fixture must/);
+  assert.throws(() => bundleCodec.buildBundle({ id: 'safe', hash: 'h' },
+    [successfulEntry(opacity(pathId, 40))]), /well-formed request/);
+  const bundle = bundleCodec.buildBundle({ id: 'safe', hash: 'h' }, [successfulEntry()]);
+  bundle.commands[0].payload.layerId = pathId;
+  assert.equal(typeof bundleCodec.parseBundle(bundle).error, 'string');
+});
+
+test('build and parse reject more than the retained trace window and oversized bundles', () => {
+  const one = successfulEntry();
+  const many = Array.from({ length: 33 }, () => clone(one));
+  assert.throws(() => bundleCodec.buildBundle({ id: 'bounded', hash: 'h' }, many), /1\.\.32/);
+  const bundle = bundleCodec.buildBundle({ id: 'bounded', hash: 'h' }, [one]);
+  const tooMany = { ...bundle, commands: Array.from({ length: 33 }, () => clone(bundle.commands[0])) };
+  assert.equal(typeof bundleCodec.parseBundle(tooMany).error, 'string');
+  assert.throws(() => bundleCodec.buildBundle({ id: 'bounded', hash: 'h' }, [one],
+    { clock: { ticks: 'x'.repeat(70000) } }), /size limit/);
+  assert.equal(typeof bundleCodec.parseBundle({ ...bundle, seed: 'x'.repeat(70000) }).error, 'string');
 });

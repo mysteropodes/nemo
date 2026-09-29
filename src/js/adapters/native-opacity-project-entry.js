@@ -23,7 +23,8 @@
 
   function ready(root, receipt, first) {
     if (!root.NemoNativeOpacityProject) return receipt === true;
-    if (!receipt || receipt.owner !== 'native' || receipt.status !== 'presented' || receipt.frame !== 0) return false;
+    if (!receipt || receipt.owner !== 'native' || receipt.frame !== 0 ||
+        !(receipt.status === 'presented' || !first && receipt.status === 'deferred-occluded')) return false;
     var native = root.NemoNativeOpacityCutover;
     if (!native || typeof native.isActive !== 'function' || !native.isActive() ||
         typeof native.identity !== 'function') return false;
@@ -48,11 +49,14 @@
     return new Promise(function (resolve) {
       ports.raf(function () { ports.raf(resolve); });
     }).then(function () {
-      var native = root.NemoNativeOpacityCutover;
-      if (!native || typeof native.presentPreview !== 'function') throw new Error('Native presentation is unavailable');
-      return native.presentPreview(0);
-    }).then(function (visible) {
-      if (!ready(root, visible, first)) throw new Error('Native viewport is not current after reveal');
+      var project = root.NemoNativeOpacityProject;
+      if (!project || typeof project.finishOpenAfterReveal !== 'function') {
+        throw new Error('Native Open publication is unavailable');
+      }
+      return project.finishOpenAfterReveal(first);
+    }).then(function () {
+      // finishOpenAfterReveal owns the final receipt, identity checks, UI
+      // projection and rollback as one terminal publication operation.
       return true;
     }).catch(function (error) { ports.show(); throw error; });
   }
