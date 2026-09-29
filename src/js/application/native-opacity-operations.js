@@ -224,7 +224,7 @@
       try { return ports.surface.allow(kind) === true; }
       catch (_) { return false; }
     }
-    async function importJSON(json) {
+    async function importJSON(json, silent, allowOccludedAdmission) {
       var candidate;
       try { candidate = ports.document.prepareNativeOpacity(json); }
       catch (_) { return false; }
@@ -239,7 +239,7 @@
       viewport.reset();
       try {
         if (await lifecycle.activate(candidate) !== true) return false;
-        return await viewport.presentPreview(0);
+        return await viewport.presentPreview(0, allowOccludedAdmission === true);
       } catch (error) {
         return false;
       } finally {

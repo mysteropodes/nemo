@@ -328,8 +328,48 @@ test('first static and keyed native opens await the lifecycle-owned frame-0 pres
   }
 });
 
+test('explicit Open can unocclude the first native frame before publishing success', async () => {
+  const source = staticSource();
+  const h = surfaceHarness(source, { previewReceipt(receipt) {
+    return { ...receipt, status: h.state.previews.length === 1 ? 'deferred-occluded' : 'presented' };
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
+  const root = { NemoNativeOpacityProject: h.published().project,
+    NemoNativeOpacityCutover: h.published().cutover };
+  assert.equal(first.status, 'deferred-occluded');
+  assert.equal(NativeProjectEntry.ready(root, first), true, 'provisional receipt admits reveal only');
+  assert.equal(h.controller.status(), 'native');
+  let hidden = 0, shown = 0;
+  assert.equal(await NativeProjectEntry.reveal(root, first, {
+    hide() { hidden++; }, show() { shown++; }, repaint() { throw new Error('Paper repaint'); },
+    raf(callback) { callback(); },
+  }), true);
+  assert.equal(hidden, 1); assert.equal(shown, 0);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  assert.equal(h.controller.blocksLegacy(), true);
+});
+
+test('occlusion on the second native presentation fails closed after reveal', async () => {
+  const source = staticSource();
+  const h = surfaceHarness(source, { previewReceipt(receipt) {
+    return { ...receipt, status: 'deferred-occluded' };
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
+  const root = { NemoNativeOpacityProject: h.published().project,
+    NemoNativeOpacityCutover: h.published().cutover };
+  let shown = 0;
+  await assert.rejects(NativeProjectEntry.reveal(root, first, {
+    hide() {}, show() { shown++; }, repaint() { throw new Error('Paper repaint'); },
+    raf(callback) { callback(); },
+  }), /not presented/);
+  assert.equal(shown, 1);
+  assert.equal(h.controller.status(), 'indeterminate');
+  assert.equal(h.controller.blocksLegacy(), true);
+  assert.equal(h.state.imports.length, 0);
+});
+
 test('failed, deferred and malformed first presentations cannot publish an open or reenter Paper', async () => {
-  for (const status of ['failed-validation', 'deferred-timeout', 'stale-discarded', 'malformed']) {
+  for (const status of ['failed-validation', 'deferred-timeout', 'deferred-occluded', 'stale-discarded', 'malformed']) {
     const h = surfaceHarness(staticSource(), { previewReceipt(receipt) {
       return status === 'malformed' ? { ...receipt, workId: '' } : { ...receipt, status };
     } });

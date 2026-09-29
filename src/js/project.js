@@ -18,11 +18,12 @@
   var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
-  function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
+  function importProjectJSON(json,silent,allowOccludedAdmission){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent,allowOccludedAdmission):window.SM.importJSON(json,silent);}
   function projectJSON(){return window.NemoNativeOpacityProjectEntry.documentJSON(window);}
   function nativeOpenReady(receipt,first){return window.NemoNativeOpacityProjectEntry.ready(window,receipt,first);}
   function revealOpenedProject(first){return window.NemoNativeOpacityProjectEntry.reveal(window,first,
-    {hide:hideStartScreen,show:showStartScreen,repaint:SMProjectEntry.repaint,raf:requestAnimationFrame});}
+    {hide:hideStartScreen,show:showStartScreen,repaint:SMProjectEntry.repaint,
+      raf:function(callback){return window.requestAnimationFrame(callback);}});}
   function saveFramesIfLegacy(){return window.NemoNativeOpacityProjectEntry.saveFramesIfLegacy(window,saveAllLayerFrames);}
   function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
   function releaseNative(kind){var surface=window.NemoNativeOpacityLegacySurface;if(surface===undefined)return window.NemoNativeOpacityCutover===undefined&&window.NemoNativeOpacityProject===undefined?null:false;try{return surface&&typeof surface.allowProjectTransition==='function'&&typeof surface.releaseProjectTransition==='function'?surface.releaseProjectTransition(window,kind):false;}catch(e){return false;}}
@@ -191,7 +192,7 @@
     if(!tauriOk())return;
     try{
       var json=await window.__TAURI__.fs.readTextFile(path);
-      var opened=await importProjectJSON(json,true);
+      var opened=await importProjectJSON(json,true,true);
       if(!opened||!nativeOpenReady(opened))throw new Error('Invalid or unpresented project');
       await revealOpenedProject(opened);
       markSaved(projectJSON());
@@ -731,7 +732,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true),function(imported){if(!imported||!nativeOpenReady(imported))throw new Error('Invalid or unpresented project');return afterMaybe(revealOpenedProject(imported),function(){markSaved(projectJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();ensureInitialTab();showToast('Opened: '+currentName);});});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true,true),function(imported){if(!imported||!nativeOpenReady(imported))throw new Error('Invalid or unpresented project');return afterMaybe(revealOpenedProject(imported),function(){markSaved(projectJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();ensureInitialTab();showToast('Opened: '+currentName);});});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });
