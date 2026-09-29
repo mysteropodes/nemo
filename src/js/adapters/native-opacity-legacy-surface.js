@@ -212,6 +212,7 @@
       disconnect: function () { return transport.disconnect(); },
       application: function () { return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', transport); },
       release: function (request) { return invoke('nemo_native_release', { request: request }); },
+      replace: function (request) { return invoke('nemo_native_replace', { request: request }); },
       previewHost: function (request) { return invoke('nemo_native_preview', { request: request }); },
       bindOutput: function (request) { return invoke('nemo_native_bind_output', { request: request }); },
       legacyImport: root.SM.importJSON.bind(root.SM),
@@ -228,6 +229,11 @@
         restoreUiProjection: function (snapshot) { return restoreUiProjection(root, snapshot); },
         refreshUiProjection: function (json) { return refreshUiProjection(root, json); },
         paintUiProjection: function () { if (root.updateUI) root.updateUI(); },
+        blockPublication: function () {
+          var start = root.document.getElementById('start-screen');
+          if (start) start.classList.remove('hid');
+          if (root.showToast) root.showToast('Native project replacement could not be verified; reopen Nemo before editing.');
+        },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');

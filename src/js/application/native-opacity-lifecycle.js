@@ -6,8 +6,14 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function create(ports, contract) {
+  function create(ports, contract, replacement, exportWorkflow) {
     if (!contract) throw new TypeError('native opacity lifecycle requires the pure contract');
+    if (!replacement || typeof replacement.buildCaches !== 'function') {
+      throw new TypeError('native opacity lifecycle requires the replacement coordinator');
+    }
+    if (!exportWorkflow || typeof exportWorkflow.run !== 'function') {
+      throw new TypeError('native opacity lifecycle requires the export workflow');
+    }
     var phase = 'legacy', prepared = null, identity = null, generation = 0;
     var serializeResponse = null, evaluations = new Map(), persistence = null;
     var application = null, pending = Promise.resolve(), releasePromise = null, activationPromise = null;
@@ -49,30 +55,8 @@
     }
     function requireReadable() { requireAdmission(); if (cacheFences || cycle.synchronizing) {
       throw new Error('native opacity synchronization is pending'); } }
-    async function buildCaches(current) {
-      var at = current.contentRevision;
-      var serialized = contract.successful(await application.dispatch(requestFor(current,
-        'query.document.serialize', { atRevision: at })), 'native serialize');
-      if (serialized.contentRevision !== at || serialized.result.atRevision !== at) throw new Error('native serialize revision mismatch');
-      var reads = [];
-      for (var frame = 0; frame < prepared.totalFrames; frame++) reads.push(application.dispatch(
-        requestFor(current, 'query.document.evaluate', { atRevision: at, contextId: 'scene-root', frame: frame })));
-      var received = await Promise.all(reads), next = new Map();
-      received.forEach(function (response, frame) {
-        contract.successful(response, 'native evaluation');
-        var result = response.result;
-        if (response.contentRevision !== at || result.contentRevision !== at || result.frame !== frame ||
-            result.layers.length !== 1 || result.layers[0].layerUid !== prepared.layerUid) {
-          throw new Error('native evaluation identity mismatch');
-        }
-        var expected = contract.expectedValue(frame, serialized.result.document);
-        if (expected !== null && Math.abs(result.layers[0].value - expected) > 1e-8) throw new Error('native opacity characterization mismatch');
-        next.set(frame, result);
-      });
-      var composed = ports.document.composeNativeOpacity(prepared, serialized, current);
-      return { identity: Object.freeze({ instanceId: current.instanceId, documentId: current.documentId,
-        contentRevision: current.contentRevision }), serializeResponse: serialized,
-        evaluations: next, persistence: JSON.stringify(composed) };
+    function buildCaches(current) {
+      return replacement.buildCaches(ports, contract, application, prepared, current, requestFor);
     }
     function publishCaches(next) { identity = next.identity; serializeResponse = next.serializeResponse;
       evaluations = next.evaluations; persistence = next.persistence; }
@@ -145,16 +129,9 @@
         phase = 'indeterminate';
       }
     }
-    function frozen(value) {
-      if (!value || typeof value !== 'object') return value === null || ['string', 'boolean'].includes(typeof value) || typeof value === 'number' && Number.isFinite(value);
-      return (Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype || contract.plain(value)) && Object.isFrozen(value) &&
-        Reflect.ownKeys(value).every(function (key) { var field = Object.getOwnPropertyDescriptor(value, key);
-          return typeof key === 'string' && contract.has(field, 'value') &&
-            (field.enumerable || Array.isArray(value) && key === 'length') && frozen(field.value); });
-    }
     function activate(nextPrepared) {
       if (!['legacy', 'closed'].includes(phase)) throw new Error('native opacity activation requires verified closed ownership');
-      var canonical = nextPrepared && frozen(nextPrepared) && ports.document.prepareNativeOpacity(nextPrepared.shell);
+      var canonical = nextPrepared && contract.frozen(nextPrepared) && ports.document.prepareNativeOpacity(nextPrepared.shell);
       if (!canonical || JSON.stringify(nextPrepared) !== JSON.stringify(canonical)) {
         throw new Error('native opacity prepared candidate is not immutable canonical admission');
       }
@@ -196,6 +173,45 @@
       })();
       activationPromise = work;
       return work.finally(function () { if (activationPromise === work) activationPromise = null; });
+    }
+    function replace(nextPrepared) {
+      if (phase !== 'native' || cacheFences || !cycle || cycle.synchronizing) {
+        return Promise.reject(new Error('native replacement requires an idle active document'));
+      }
+      var canonical = nextPrepared && contract.frozen(nextPrepared) && ports.document.prepareNativeOpacity(nextPrepared.shell);
+      if (!canonical || JSON.stringify(canonical) !== JSON.stringify(nextPrepared)) {
+        return Promise.reject(new Error('native replacement candidate is not immutable canonical admission'));
+      }
+      var old = cycle, before = copyIdentity(), oldHostGeneration = old.hostGeneration;
+      phase = 'replacing';
+      return enqueue(function () { return replacement.run({ ports: ports, contract: contract,
+        before: before, prepared: nextPrepared, oldHostGeneration: oldHostGeneration,
+        requestId: id('n20-replace'),
+        checkOld: function () { if (old.failure) throw old.failure; requireConnected(old); },
+        newCycle: function () { return { session: Object.freeze({}), active: true,
+          hostGeneration: null, observedHostGeneration: null, synchronizing: false,
+          failure: null, preview: null, exporter: null }; },
+        synchronize: synchronizeRevision,
+        install: function (next, fresh) {
+          identity = Object.freeze({ instanceId: fresh.binding.instanceId, documentId: fresh.binding.documentId,
+            contentRevision: fresh.binding.contentRevision });
+          prepared = nextPrepared; generation++; cycle = next; next.hostGeneration = fresh.hostGeneration;
+          application = ports.application(); createConsumers(next); phase = 'installing';
+        },
+        buildCaches: function () { return buildCaches(copyIdentity()); },
+        finish: function (next, caches) {
+          if (next.failure || cycle !== next || ports.connectionStatus().documentId !== identity.documentId) {
+            throw next.failure || new Error('native replacement changed during cache preparation');
+          }
+          publishCaches(caches); phase = 'native';
+          disposeConsumers(old); if (ports.onDisposed) ports.onDisposed(old.session);
+          if (ports.afterChange) ports.afterChange();
+        },
+        fail: function (next, error) {
+          if (next) disposeConsumers(next);
+          return failLifecycle(cycle || old, error);
+        }
+      }); });
     }
     function performMutation(project, mode) {
       try {
@@ -341,27 +357,10 @@
       return enqueue(async function () {
         try {
           requireAdmitted(target);
-          var current = copyIdentity(), outputHandle = id('n20-output');
-          await ports.bindOutput({ apiVersion: 2, instanceId: current.instanceId,
-            documentId: current.documentId, expectedRevision: current.contentRevision,
-            outputHandle: outputHandle, destination: destination });
-          var snapshotRequest = requestFor(current, 'query.document.snapshot.acquire',
-            { atRevision: current.contentRevision });
-          var snapshotResponse = contract.successful(await application.dispatch(snapshotRequest), 'native snapshot');
-          var selected = frames.map(function (frame) { return prepared.frames[frame]; });
-          var begin = target.exporter.begin(current, snapshotResponse, id('n20-export'), outputHandle, selected);
-          var observed = target.exporter.observe(begin,
-            contract.successful(await application.dispatch(begin), 'native export begin'));
-          while (observed.receipt.status === 'running') {
-            if (onProgress) onProgress(Math.round(observed.receipt.progress * selected.length), selected.length);
-            await ports.sleep(10);
-            var statusRequest = target.exporter.status(current, id('n20-export-status'), observed.receipt.jobId);
-            observed = target.exporter.observe(statusRequest,
-              contract.successful(await application.dispatch(statusRequest), 'native export status'));
-          }
-          if (observed.receipt.status !== 'succeeded') throw new Error('native export did not succeed');
-          if (onProgress) onProgress(selected.length, selected.length);
-          return observed.receipt;
+          var receipt = await exportWorkflow.run(ports, contract, application, target,
+            copyIdentity(), prepared, requestFor, id, destination, frames, onProgress);
+          requireAdmitted(target);
+          return receipt;
         } catch (error) { throw failLifecycle(target, error); }
         finally { cacheFences--; }
       });
@@ -380,7 +379,7 @@
       throw new Error('native opacity identity is indeterminate');
     }
 
-    return Object.freeze({ activate: activate, requestRelease: requestRelease,
+    return Object.freeze({ activate: activate, replace: replace, requestRelease: requestRelease,
       releaseCurrent: releaseCurrent, getNativeIdentity: getNativeIdentity,
       isActive: function () {
         if (phase !== 'native') return false;
