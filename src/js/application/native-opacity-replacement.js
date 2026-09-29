@@ -44,35 +44,51 @@
     return Object.freeze({ request: request, receipt: receipt });
   }
 
-  async function bindFresh(ports, contract, current, oldHostGeneration, receipt, synchronize) {
-    var binding = await ports.connect();
+  function canRestoreA(error, before, state) {
+    if (!error || !['invalid_request', 'stale_revision'].includes(error.code) ||
+        error.details && error.details.replacement || !state.sameCycle || state.failure ||
+        state.synchronizing || state.cacheFences) return false;
+    var connected = state.connected, current = state.identity;
+    return !!connected && !!current && ['instanceId', 'documentId', 'contentRevision'].every(function (key) {
+      return connected[key] === before[key] && current[key] === before[key];
+    });
+  }
+
+  async function bindFresh(scope, current, receipt, next) {
+    var binding = await scope.ports.connect();
     if (binding.instanceId !== current.instanceId || binding.documentId !== receipt.documentId ||
         binding.contentRevision !== 0) throw new Error('replacement transport did not bind the new document');
-    var subscribed = await ports.subscribeRevisions(synchronize);
-    var hostGeneration = contract.validateSubscription(subscribed, binding, null);
-    if (hostGeneration <= oldHostGeneration) throw new Error('replacement reused an old revision generation');
+    scope.install(next, { binding: binding, hostGeneration: null });
+    var subscribed = await scope.ports.subscribeRevisions(function (event) {
+      return scope.synchronize(event, next);
+    });
+    var hostGeneration = scope.contract.validateSubscription(subscribed, binding, next.observedHostGeneration);
+    if (hostGeneration <= scope.oldHostGeneration) throw new Error('replacement reused an old revision generation');
     return Object.freeze({ binding: binding, hostGeneration: hostGeneration });
   }
 
   async function run(scope) {
-    var next = null;
+    var next = null, hostAttempted = false, hostCompleted = false;
     try {
       scope.checkOld();
+      hostAttempted = true;
       var result = await replaceHost(scope.ports, scope.contract, scope.before,
         scope.prepared, scope.requestId);
+      hostCompleted = true;
       next = scope.newCycle();
-      var fresh = await bindFresh(scope.ports, scope.contract, scope.before,
-        scope.oldHostGeneration, result.receipt, function (event) {
-          return scope.synchronize(event, next);
-        });
-      scope.install(next, fresh);
-      var caches = await scope.buildCaches();
+      var fresh = await bindFresh(scope, scope.before, result.receipt, next);
+      scope.confirm(next, fresh.hostGeneration);
+      var caches = null;
+      if (!next.synchronizing) {
+        try { caches = await scope.buildCaches(); }
+        catch (error) { if (!next.synchronizing) throw error; }
+      }
       scope.finish(next, caches);
       return result.receipt;
     } catch (error) {
-      throw scope.fail(next, error);
+      throw scope.fail(next, error, hostAttempted, hostCompleted);
     }
   }
 
-  return Object.freeze({ buildCaches: buildCaches, run: run });
+  return Object.freeze({ buildCaches: buildCaches, canRestoreA: canRestoreA, run: run });
 }));

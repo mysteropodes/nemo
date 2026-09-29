@@ -13,6 +13,7 @@ const NativeOpacityContract = require('../src/js/application/native-opacity-cont
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityReplacement = require('../src/js/application/native-opacity-replacement.js');
 const NativeOpacityExportWorkflow = require('../src/js/application/native-opacity-export-workflow.js');
+const NativeOpacityPreviewWorkflow = require('../src/js/application/native-opacity-preview-workflow.js');
 const NativeOpacityV1 = require('../src/js/application/native-opacity-v1.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
@@ -181,7 +182,16 @@ function nativeHarness(source, options = {}) {
       if (transportBridge) return transportBridge.transport.subscribeRevisions(transportBridge.listen, synchronize);
       const subscription = { synchronize, hostGeneration: state.hostGeneration, active: true };
       state.subscriptions.push(subscription);
-      return { ...clone(state.identity), lifecycleGeneration: state.hostGeneration,
+      const subscribedBinding = clone(state.identity);
+      if (options.revisionDuringSubscribe && state.hostGeneration > 1) {
+        const fromRevision = state.identity.contentRevision;
+        state.document.layers[0].motionStatic.opacity = [options.revisionDuringSubscribe];
+        state.identity.contentRevision++;
+        state.earlyRevision = synchronize({ instanceId: state.identity.instanceId,
+          documentId: state.identity.documentId, lifecycleGeneration: state.hostGeneration,
+          fromRevision, toRevision: state.identity.contentRevision, requestId: 'early-b-revision' });
+      }
+      return { ...subscribedBinding, lifecycleGeneration: state.hostGeneration,
         subscriptionId: `subscription-${state.hostGeneration}` };
     },
     async disconnect() {
@@ -236,9 +246,10 @@ function nativeHarness(source, options = {}) {
     },
     sleep() { return Promise.resolve(); },
   }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract, replacement, exportWorkflow) {
-    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow);
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow, NativeOpacityPreviewWorkflow);
   } },
     replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
     operations: NativeOpacityOperations, v1: NativeOpacityV1,
     viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
@@ -369,6 +380,56 @@ test('active native Open replaces A with a fresh subscribed B before UI publicat
   assert.equal(final.status, 'presented');
   assert.equal(h.ui.state.layers[0].name, 'R08 rectangle');
   assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [60]);
+});
+
+test('replacement drains an admitted A preview before changing lifecycle phase', async () => {
+  const hostGate = deferred();
+  const h = nativeHarness(staticSource(), { previewGate(request) {
+    if (request.documentId === 'native-document-1') return hostGate.promise;
+  } });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const preview = h.state.lifecycle.presentPreview(10);
+  for (let spin = 0; spin < 10 && !h.state.previews.length; spin++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.previews.length, 1);
+  const replacing = h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  await assert.rejects(h.state.lifecycle.presentPreview(0), /not active/);
+  assert.equal(h.state.replacements.length, 0);
+  hostGate.resolve();
+  assert.equal((await preview).status, 'presented');
+  await replacing;
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  assert.equal(h.state.lifecycle.inspect().identity.documentId, 'native-document-2');
+});
+
+test('B revision delivered during subscription is synchronized before replacement returns', async () => {
+  const h = nativeHarness(staticSource(), { revisionDuringSubscribe: 70 });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  await h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+  await h.state.earlyRevision;
+  assert.equal(h.state.lifecycle.inspect().phase, 'native');
+  assert.equal(h.state.lifecycle.inspect().identity.contentRevision, 1);
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [70]);
+});
+
+test('confirmed pre-reservation rejection preserves the unchanged A authority', async () => {
+  const refusal = Object.assign(new Error('stale native revision'), { code: 'stale_revision' });
+  const h = nativeHarness(staticSource(), { replaceFailure: refusal });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  const before = h.state.lifecycle.inspect();
+  await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /stale native revision/);
+  const after = h.state.lifecycle.inspect();
+  assert.equal(after.phase, 'native');
+  assert.deepEqual(after.identity, before.identity);
+  assert.strictEqual(after.session, before.session);
+  assert.deepEqual(h.controller.valueAtFrame('r08_curve_layer', 0), [25]);
+});
+
+test('ambiguous replacement error fences A even when its transport still appears bound', async () => {
+  const h = nativeHarness(staticSource(), { replaceFailure: new Error('reply lost') });
+  assert.equal(await h.controller.activate(h.prepared), true);
+  await assert.rejects(h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60))), /reply lost/);
+  assert.equal(h.state.lifecycle.inspect().phase, 'indeterminate');
 });
 
 test('native Open hides the populated startup Paper group only after the final frame', async () => {

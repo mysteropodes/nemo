@@ -37,6 +37,7 @@ test('opacity application slice declares native workflows, compatibility, bootst
     ['app.native.opacity.contract', 'domain', 'src/js/application/native-opacity-contract.js', 'Domain/application'],
     ['app.native.opacity.replacement', 'application', 'src/js/application/native-opacity-replacement.js', 'Domain/application'],
     ['app.native.opacity.export.workflow', 'application', 'src/js/application/native-opacity-export-workflow.js', 'Domain/application'],
+    ['app.native.opacity.preview.workflow', 'application', 'src/js/application/native-opacity-preview-workflow.js', 'Domain/application'],
     ['app.native.opacity.v1', 'application', 'src/js/application/native-opacity-v1.js', 'Domain/application'],
     ['app.native.opacity.lifecycle', 'application', 'src/js/application/native-opacity-lifecycle.js', 'Domain/application'],
     ['app.native.opacity.operations', 'application', 'src/js/application/native-opacity-operations.js', 'Domain/application'],

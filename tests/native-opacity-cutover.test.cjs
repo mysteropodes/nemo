@@ -12,6 +12,7 @@ const NativeOpacityContract = require('../src/js/application/native-opacity-cont
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
 const NativeOpacityReplacement = require('../src/js/application/native-opacity-replacement.js');
 const NativeOpacityExportWorkflow = require('../src/js/application/native-opacity-export-workflow.js');
+const NativeOpacityPreviewWorkflow = require('../src/js/application/native-opacity-preview-workflow.js');
 const NativeOpacityV1 = require('../src/js/application/native-opacity-v1.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
 const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
@@ -288,9 +289,10 @@ function nativeHarness(source, options = {}) {
     },
     sleep() { return Promise.resolve(); },
   }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract, replacement, exportWorkflow) {
-    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow);
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow, NativeOpacityPreviewWorkflow);
   } },
     replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
     operations: NativeOpacityOperations, v1: NativeOpacityV1,
     viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
@@ -479,7 +481,8 @@ test('classic startup loads frozen guard modules before the production first-lay
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
   const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
   const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-replacement.js',
-    'js/application/native-opacity-export-workflow.js', 'js/application/native-opacity-v1.js',
+    'js/application/native-opacity-export-workflow.js', 'js/application/native-opacity-preview-workflow.js',
+    'js/application/native-opacity-v1.js',
     'js/application/native-opacity-lifecycle.js',
     'js/application/native-opacity-viewport.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
@@ -579,6 +582,7 @@ test('legacy Motion evaluation remains lazy without the surface while native com
   assert.throws(() => motion.SMMotion.valueAtFrame(state.layers[0], 'opacity', 0), /surface is unavailable/);
   const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle,
     replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
     operations: NativeOpacityOperations, viewport: NativeOpacityViewport, v1: NativeOpacityV1 };
   for (const surface of [undefined, {}, Object.freeze({ requireAvailable() {} })]) {
     assert.throws(() => OpacityApplication.createNative({}, { ...base, motionSurface: surface }), /Motion surface/);

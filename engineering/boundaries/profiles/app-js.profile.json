@@ -1729,6 +1729,18 @@
       ]
     },
     {
+      "id": "app.native.opacity.preview.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-preview-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-preview-workflow.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.v1",
       "layer": "application",
       "dir": "src/js/application",

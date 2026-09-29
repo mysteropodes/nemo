@@ -6,7 +6,7 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function create(ports, contract, replacement, exportWorkflow) {
+  function create(ports, contract, replacement, exportWorkflow, previewWorkflow) {
     if (!contract) throw new TypeError('native opacity lifecycle requires the pure contract');
     if (!replacement || typeof replacement.buildCaches !== 'function') {
       throw new TypeError('native opacity lifecycle requires the replacement coordinator');
@@ -14,10 +14,13 @@
     if (!exportWorkflow || typeof exportWorkflow.run !== 'function') {
       throw new TypeError('native opacity lifecycle requires the export workflow');
     }
+    if (!previewWorkflow || typeof previewWorkflow.create !== 'function') {
+      throw new TypeError('native opacity lifecycle requires the preview workflow');
+    }
     var phase = 'legacy', prepared = null, identity = null, generation = 0;
     var serializeResponse = null, evaluations = new Map(), persistence = null;
     var application = null, pending = Promise.resolve(), releasePromise = null, activationPromise = null;
-    var cycle = null, sequence = 0, cacheFences = 0, terminal = null;
+    var cycle = null, sequence = 0, cacheFences = 0, terminal = null, replacementRequested = false;
     var output = Object.freeze({ kind: 'frame', format: 'rgba8', width: 320, height: 180,
       colorInterpretation: 'srgb', alphaMode: 'straight' });
 
@@ -41,7 +44,7 @@
       return connected;
     }
     function requireAdmission() {
-      if (phase !== 'native' || !identity || !application || !cycle || !cycle.active) {
+      if (phase !== 'native' || replacementRequested || !identity || !application || !cycle || !cycle.active) {
         throw new Error('native opacity authority is not active');
       }
       requireConnected(cycle);
@@ -99,7 +102,7 @@
         if (target.synchronizing) throw new Error('native revision synchronization is already pending');
       } catch (error) { return Promise.reject(failLifecycle(target, error)); }
       target.synchronizing = true; cacheFences++;
-      return enqueue(async function () {
+      var result = enqueue(async function () {
         var fenced = true;
         try {
           requireAdmitted(target);
@@ -114,6 +117,8 @@
         } catch (error) { throw failLifecycle(target, error); }
         finally { if (fenced) { target.synchronizing = false; cacheFences--; } }
       });
+      target.syncPending = result;
+      return result;
     }
     async function rollbackBootstrap() {
       var target = cycle;
@@ -175,43 +180,59 @@
       return work.finally(function () { if (activationPromise === work) activationPromise = null; });
     }
     function replace(nextPrepared) {
-      if (phase !== 'native' || cacheFences || !cycle || cycle.synchronizing) {
+      if (phase !== 'native' || replacementRequested || cacheFences || !cycle || cycle.synchronizing)
         return Promise.reject(new Error('native replacement requires an idle active document'));
-      }
       var canonical = nextPrepared && contract.frozen(nextPrepared) && ports.document.prepareNativeOpacity(nextPrepared.shell);
-      if (!canonical || JSON.stringify(canonical) !== JSON.stringify(nextPrepared)) {
+      if (!canonical || JSON.stringify(canonical) !== JSON.stringify(nextPrepared))
         return Promise.reject(new Error('native replacement candidate is not immutable canonical admission'));
-      }
       var old = cycle, before = copyIdentity(), oldHostGeneration = old.hostGeneration;
-      phase = 'replacing';
-      return enqueue(function () { return replacement.run({ ports: ports, contract: contract,
+      replacementRequested = true; var installedNext = null;
+      var result = enqueue(async function () {
+        // Already admitted A work runs first. New UI work is denied by replacementRequested.
+        if (phase !== 'native' || cycle !== old || old.failure || cacheFences || old.synchronizing) {
+          replacementRequested = false;
+          throw old.failure || new Error('native replacement cannot start while A is changing');
+        }
+        phase = 'replacing';
+        try { return await replacement.run({ ports: ports, contract: contract,
         before: before, prepared: nextPrepared, oldHostGeneration: oldHostGeneration,
-        requestId: id('n20-replace'),
-        checkOld: function () { if (old.failure) throw old.failure; requireConnected(old); },
+        requestId: id('n20-replace'), checkOld: function () { if (old.failure) throw old.failure; requireConnected(old); },
         newCycle: function () { return { session: Object.freeze({}), active: true,
-          hostGeneration: null, observedHostGeneration: null, synchronizing: false,
-          failure: null, preview: null, exporter: null }; },
+          hostGeneration: null, observedHostGeneration: null, synchronizing: false, failure: null,
+          preview: null, exporter: null }; },
         synchronize: synchronizeRevision,
         install: function (next, fresh) {
           identity = Object.freeze({ instanceId: fresh.binding.instanceId, documentId: fresh.binding.documentId,
             contentRevision: fresh.binding.contentRevision });
-          prepared = nextPrepared; generation++; cycle = next; next.hostGeneration = fresh.hostGeneration;
+          prepared = nextPrepared; generation++; cycle = next; next.hostGeneration = fresh.hostGeneration; installedNext = next;
           application = ports.application(); createConsumers(next); phase = 'installing';
         },
+        confirm: function (next, hostGeneration) { next.hostGeneration = hostGeneration; },
         buildCaches: function () { return buildCaches(copyIdentity()); },
         finish: function (next, caches) {
-          if (next.failure || cycle !== next || ports.connectionStatus().documentId !== identity.documentId) {
+          if (next.failure || cycle !== next || ports.connectionStatus().documentId !== identity.documentId)
             throw next.failure || new Error('native replacement changed during cache preparation');
-          }
-          publishCaches(caches); phase = 'native';
+          if (caches && !next.synchronizing) publishCaches(caches); phase = 'native';
           disposeConsumers(old); if (ports.onDisposed) ports.onDisposed(old.session);
-          if (ports.afterChange) ports.afterChange();
+          if (!next.synchronizing && ports.afterChange) ports.afterChange();
         },
-        fail: function (next, error) {
-          if (next) disposeConsumers(next);
-          return failLifecycle(cycle || old, error);
+        fail: function (next, error, hostAttempted, hostCompleted) {
+          if (!next && hostAttempted && !hostCompleted) {
+            var connected = null; try { connected = ports.connectionStatus(); } catch (_) { /* Unverified A stays fenced. */ }
+            if (replacement.canRestoreA(error, before, { connected: connected, identity: identity,
+              sameCycle: cycle === old, failure: old.failure, synchronizing: old.synchronizing,
+              cacheFences: cacheFences })) { phase = 'native'; return error; }
+          }
+          if (next) disposeConsumers(next); return failLifecycle(cycle || old, error);
         }
-      }); });
+        }); } finally { replacementRequested = false; }
+      });
+      return result.then(async function (receipt) {
+        if (installedNext && installedNext.syncPending) await installedNext.syncPending;
+        if (phase !== 'native' || installedNext.failure)
+          throw installedNext.failure || new Error('native replacement was superseded');
+        return receipt;
+      });
     }
     function performMutation(project, mode) {
       try {
@@ -318,38 +339,18 @@
       requireReadable();
       if (!evaluations.has(frame)) throw new Error('native opacity evaluation is unavailable');
       var layers = evaluations.get(frame).layers.filter(function (layer) { return layer.layerUid === layerUid; });
-      if (layers.length !== 1) throw new Error('native opacity layer identity is unavailable');
-      return [layers[0].value];
+      if (layers.length !== 1) throw new Error('native opacity layer identity is unavailable'); return [layers[0].value];
     }
-    function projectSelection(descriptor, frame) {
-      requireReadable();
-      return ports.selection.projectSelection(evaluations.get(frame), descriptor);
-    }
-    function presentPreview(frame) {
-      if (phase !== 'native') return Promise.reject(new Error('native opacity authority is not active'));
-      var target = cycle;
-      function verify() { requireAdmission(); if (target !== cycle || target.synchronizing) throw new Error('native opacity preview lifecycle changed or synchronization is pending'); }
-      return enqueue(async function () {
-        try {
-          verify();
-          var current = copyIdentity();
-          return await target.preview.present(current.instanceId, generation, {
-            documentSnapshotId: serializeResponse.result.documentSnapshotId, documentId: current.documentId,
-            contentRevision: current.contentRevision, contextId: 'scene-root', frame: frame,
-            quality: 'final', outputSpec: output, geometryHandle: prepared.frames[frame].geometryHandle,
-          }, ports.previewHost, verify);
-        } catch (error) { if (phase === 'release-requested' && target === cycle) throw error;
-          throw failLifecycle(target, error); }
-      });
-    }
-    function renderPreview(frame) {
-      if (phase === 'legacy') return false;
-      if (phase !== 'native') return true;
-      try { requireAdmission(); } catch (_) { return true; }
-      if (cacheFences || cycle.synchronizing) return true;
-      presentPreview(frame).catch(function () {});
-      return true;
-    }
+    function projectSelection(descriptor, frame) { requireReadable();
+      return ports.selection.projectSelection(evaluations.get(frame), descriptor); }
+    var preview = previewWorkflow.create({
+      phase: function () { return phase; }, replacementRequested: function () { return replacementRequested; },
+      cycle: function () { return cycle; }, identity: copyIdentity, prepared: function () { return prepared; },
+      serialized: function () { return serializeResponse; }, generation: function () { return generation; },
+      output: function () { return output; }, host: function () { return ports.previewHost; },
+      busy: function () { return cacheFences || cycle.synchronizing; },
+      requireAdmission: requireAdmission, requireAdmitted: requireAdmitted, enqueue: enqueue, fail: failLifecycle,
+    });
     function exportPng(destination, frames, onProgress) {
       requireReadable();
       var target = cycle;
@@ -387,7 +388,7 @@
       },
       blocksLegacy: function () { return phase !== 'legacy'; }, status: function () { return phase; },
       identity: identityValue, valueAtFrame: valueAtFrame, projectSelection: projectSelection,
-      renderPreview: renderPreview, presentPreview: presentPreview, exportPng: exportPng,
+      renderPreview: preview.render, presentPreview: preview.present, exportPng: exportPng,
       persistenceJSON: function () {
         if (phase !== 'native' || !cycle || cacheFences || cycle.synchronizing) return null;
         try { requireAdmission(); } catch (_) { return null; }
