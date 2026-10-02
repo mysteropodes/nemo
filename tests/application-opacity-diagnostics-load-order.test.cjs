@@ -43,6 +43,14 @@ function read(relative) {
 // The ordered list of classic-script sources `index.html` executes. Derived
 // from the real document rather than restated, so a moved tag is observed
 // here instead of silently invalidating the premise of this test.
+//
+// It matches 172 of the 174 `src=` tags; the two it misses are the wasm
+// loaders, which are `type="module"` and so correctly absent from a
+// classic-script list. Note WHY they are absent: their `type=` happens to
+// precede their `src=`, not because this pattern filters on type. A tag
+// written `<script src="x.js" type="module">` would be wrongly included, and
+// a module script calling create() would evade the only-caller test below.
+// Zero such tags today (also checked: zero commented-out `<script src=>`).
 function scriptOrder() {
   const html = read('index.html');
   return [...html.matchAll(/<script\s+src="([^"]+)"/g)].map(match => match[1]);
@@ -145,25 +153,48 @@ test('the bootstrap is the only script that calls NemoOpacityApplicationCore.cre
     'if another script gains a create() call, its position must be guarded too');
 });
 
-// The declaration FORM is guarded statically rather than by execution, for a
-// measured reason: Node's vm realm and Chrome disagree here. In this realm a
-// cross-script `let X` after a `var X` is accepted and silently shadows the
-// global property (verified: `var X=1` then `let X=2` runs, and `typeof X`
-// becomes the let binding), while Chrome rejects the same pair with
-// "Identifier has already been declared". Only the reverse pair -- `let`
-// first, then `var` -- throws in both. So a runtime assertion would catch a
-// provider-side `let` by accident in one engine and not at all in the other.
-// The source assertion catches it in every engine, for the real reason: the
-// shared binding only exists because both declarations are `var`.
-function assertDeclarationForm(label, source) {
-  assert.match(source, /^var NemoOpacityDiagnostics\b/m,
-    `the ${label} must declare NemoOpacityDiagnostics with a top-level var; `
-    + 'a let or const binding is lexical, so the two files would no longer share one binding');
+// The declaration form is NOT guarded by executing the two scripts as a pair,
+// for a measured reason: Node's vm realm and Chrome disagree there. In this
+// realm a cross-script `let X` after a `var X` is accepted and silently
+// shadows the global property (verified: `var X=1` then `let X=2` runs, and
+// `typeof X` becomes the let binding), while Chrome rejects the same pair with
+// "Identifier has already been declared" -- in BOTH directions, which is the
+// spec-correct side (GlobalDeclarationInstantiation throws when a lexical name
+// collides with an existing var-declared global). So an assertion that runs
+// the mutated pair is engine-dependent.
+//
+// It is also not guarded by a `/^var /` source match, which would be a false
+// positive waiting to happen: what actually shares the binding here is the
+// GLOBAL OBJECT -- the consumer's browser branch literally reads
+// `window.NemoOpacityDiagnostics` -- so publishing the provider as
+// `window.NemoOpacityDiagnostics = (function () {...})()` keeps the invariant
+// intact while failing any var-shaped regex. That is not hypothetical: nine
+// files in src/js already publish their global that way.
+//
+// So the assertion runs each file ALONE in a fresh realm and asks the only
+// question that matters: did this source publish the name as an own property
+// of the global object? That never touches redeclaration semantics, so the
+// engine divergence cannot arise. Measured identical in Node 26.9 and real
+// Chrome 154 across the eight declaration forms below.
+function publishesGlobalBinding(label, source) {
+  const context = vm.createContext({});
+  vm.runInContext('var window = this;', context);
+  vm.runInContext(source, context, { filename: `index.html:${label}` });
+  return vm.runInContext(
+    "Object.prototype.hasOwnProperty.call(this, 'NemoOpacityDiagnostics')", context);
 }
 
-test('both declarations are top-level `var`, which is what shares the binding', () => {
-  assertDeclarationForm('provider', read(PROVIDER));
-  assertDeclarationForm('consumer', read(CONSUMER));
+function assertSharedGlobalBinding(label, source) {
+  assert.ok(publishesGlobalBinding(label, source),
+    `the ${label} must publish NemoOpacityDiagnostics as an own property of the `
+    + 'global object -- a top-level `var`, or an explicit `window.` assignment. A '
+    + '`let` or `const` binding is lexical, so the two files would no longer share '
+    + 'one binding and the inverted load order would stop working.');
+}
+
+test('both files publish the global property, which is what shares the binding', () => {
+  assertSharedGlobalBinding('provider', read(PROVIDER));
+  assertSharedGlobalBinding('consumer', read(CONSUMER));
 });
 
 test('the first create(), at the bootstrap position, gets the real module', () => {
@@ -189,17 +220,36 @@ test('the consumer resolves the provider lazily, not at load time', () => {
 
 // --- (b) each mutation of the invariant must be caught --------------------
 
-// Declaration-form mutations: caught by the static guard above, in whichever
-// of the two files is rewritten.
+// Declaration-form mutations: caught by the own-property probe above, in
+// whichever of the two files is rewritten.
 for (const [label, file] of [['provider', PROVIDER], ['consumer', CONSUMER]]) {
   for (const keyword of ['let', 'const']) {
     test(`the guard fails when the ${label} declaration becomes \`${keyword}\``, () => {
       const mutated = read(file).replace(/^var NemoOpacityDiagnostics\b/m, `${keyword} NemoOpacityDiagnostics`);
       assert.ok(mutated.includes(`${keyword} NemoOpacityDiagnostics`) && mutated !== read(file),
         'the declaration-form mutation must actually have applied');
-      assert.throws(() => assertDeclarationForm(label, mutated), assert.AssertionError);
+      assert.throws(() => assertSharedGlobalBinding(label, mutated), assert.AssertionError);
     });
   }
+}
+
+// The other half of the probe, and the reason it replaced a source match: the
+// `window.X =` publication form -- already used by nine other src/js files,
+// and the exact form the consumer READS -- must stay ACCEPTED. For the
+// provider that is proved end to end, not just by the probe: the real
+// bootstrap create() still reaches the real module through it.
+for (const [label, file] of [['provider', PROVIDER], ['consumer', CONSUMER]]) {
+  test(`the guard accepts a \`window.\` publication in the ${label}`, () => {
+    const viaWindow = read(file).replace(/^var NemoOpacityDiagnostics\b/m, 'window.NemoOpacityDiagnostics');
+    assert.ok(viaWindow.includes('window.NemoOpacityDiagnostics =') && viaWindow !== read(file),
+      'the window-publication mutation must actually have applied');
+    assertSharedGlobalBinding(label, viaWindow);
+    if (file !== PROVIDER) return;
+    const probe = firstCreateAtBootstrapPosition([[CONSUMER, read(CONSUMER)], [PROVIDER, viaWindow]]);
+    assert.strictEqual(probe.wroteOk, true, 'the invariant still holds through the window form');
+    assert.strictEqual(probe.entries.length, 1, 'the real ring buffer still recorded the write');
+    assert.strictEqual(probe.traceRetention, 32, 'the real module LIMIT still reached capabilities');
+  });
 }
 
 // Order and resolution-timing mutations: caught by actually executing the
