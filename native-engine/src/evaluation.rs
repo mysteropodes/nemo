@@ -184,7 +184,11 @@ fn evaluate_track(
     let eased = evaluate_admitted_curve(left.curve_points(), t)?;
     let from = number(left.value(), "motion.opacity.keys[].v[0]")?;
     let to = number(right.value(), "motion.opacity.keys[].v[0]")?;
-    Ok(from + (to - from) * eased)
+    let value = from + (to - from) * eased;
+    if !value.is_finite() {
+        return invalid("interpolated opacity must be finite");
+    }
+    Ok(value)
 }
 
 fn validate_track(keys: &[OpacityKey], total_frames: u32) -> Result<(), EvaluationError> {

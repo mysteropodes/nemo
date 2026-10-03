@@ -304,6 +304,33 @@ fn authored_native_curves_match_independent_oracles_at_pinned_revisions() {
     }
 }
 
+#[test]
+fn finite_authored_curve_with_overflowing_opacity_rejects_without_mutation() {
+    let mut project = project_value();
+    let keys = &mut project["layers"][0]["motion"]["opacity"]["keys"];
+    keys[0]["curvePoints"] = json!([{"x":0,"y":0}, {"x":1,"y":1e308}]);
+    keys[1]["v"] = json!([60]);
+    let app = application(&serde_json::to_vec(&project).unwrap());
+    let snapshot = app.acquire_snapshot(0).unwrap();
+    let before = encode_project(snapshot.document()).unwrap();
+    assert_eq!(
+        encode_project(&decode_project(&before).unwrap()).unwrap(),
+        before
+    );
+    // The curve's midpoint is finite (5e307), but 20 + 40*5e307 overflows.
+    let error = evaluate(&snapshot, SUPPORTED_CONTEXT_ID, 10).unwrap_err();
+    assert_eq!(error.kind(), EvaluationErrorKind::Invalid);
+    assert!(error.message().contains("finite"));
+    close(value_at(&snapshot, 0).layers()[0].value(), 20.0);
+    close(value_at(&snapshot, 20).layers()[0].value(), 60.0);
+    let after = app.acquire_snapshot(0).unwrap();
+    assert_eq!(after.id(), snapshot.id());
+    assert_eq!(after.document_id(), snapshot.document_id());
+    assert_eq!(after.content_revision(), 0);
+    assert_eq!(app.content_revision(), 0);
+    assert_eq!(encode_project(after.document()).unwrap(), before);
+}
+
 fn sample(x: f64, y: f64) -> CurveSample {
     CurveSample {
         x,
