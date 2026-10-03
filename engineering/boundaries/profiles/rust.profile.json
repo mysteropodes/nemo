@@ -60,8 +60,8 @@
       "id": "rust.native.engine.evaluation",
       "layer": "native-evaluation",
       "dir": "native-engine/src",
-      "files": ["evaluation.rs"],
-      "publicApi": ["evaluation.rs"],
+      "files": ["evaluation.rs", "animation_curve.rs"],
+      "publicApi": ["evaluation.rs", "animation_curve.rs"],
       "sizeProfile": "Rust production module"
     },
     {

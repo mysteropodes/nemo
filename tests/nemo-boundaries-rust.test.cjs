@@ -210,6 +210,9 @@ const REGISTERED_LEAVES = [
     'native-engine/src/history.rs', 'native-engine/src/transaction.rs', 'native-engine/tests/history.rs']],
   ['N10 registers immutable evaluation without exclusions or a frozen-baseline waiver', [
     'native-engine/src/evaluation.rs', 'native-engine/tests/evaluation.rs']],
+  ['N22A registers authoritative easing without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/animation_curve.rs', 'native-engine/src/evaluation.rs',
+    'native-engine/tests/evaluation.rs']],
   ['N11 registers frame scheduling and resource leases without exclusions or a frozen-baseline waiver', [
     'native-engine/src/resource_leases.rs', 'native-engine/src/scheduler.rs', 'native-engine/tests/scheduler.rs']],
   ['N12 registers the shared compositor without exclusions or a frozen-baseline waiver', [
