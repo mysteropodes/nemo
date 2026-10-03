@@ -6634,7 +6634,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
 
   // ---- Motion mode UI: layer list (Transform property rows) ----
   function fmtVal(n) { return Math.round(n * 10) / 10; }
-  function scrubField(value, onCommit, mixed) {
+  function scrubField(value, onCommit, mixed, nativeOpacityMode) {
     var inp = document.createElement('input');
     // Typed edits are absolute (useful to align several keys). A horizontal
     // scrub is relative: ui.js raises _scrubLiveActive while it dispatches
@@ -6643,6 +6643,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // collapsing their existing spacing.
     var lastScrubValue = mixed ? 0 : (Number(value) || 0);
     inp.type = 'number'; inp.className = 'pi scrub motion-val' + (mixed ? ' mixed' : '');
+    if (nativeOpacityMode === 'static') inp.dataset.nativeOpacityScrub = 'static';
     inp.value = mixed ? '' : fmtVal(value);
     if (mixed) { inp.placeholder = '—'; inp.title = SM.t('titleMixedValuesHint'); }
     inp.step = 1;
@@ -8766,7 +8767,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             renderLayerList(); renderTimeline();
             reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          }, display.mixed);
+          }, display.mixed, nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.opacityMode : null);
           fieldWrap.appendChild(f);
         })(d);
       }

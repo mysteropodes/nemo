@@ -1346,7 +1346,8 @@
   document.addEventListener('pointerdown',function(e){
     var el=e.target.closest&&e.target.closest('input.scrub');
     if(!el||document.activeElement===el)return;
-    scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,moved:false};
+    scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,
+      moved:false,nativeOpacity:el.dataset.nativeOpacityScrub==='static'};
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
@@ -1375,7 +1376,7 @@
     if(scrubChangeRaf)return;
     scrubChangeRaf=requestAnimationFrame(function(){
       scrubChangeRaf=0;
-      if(scrubState&&scrubState.moved&&scrubLiveDirty){
+      if(scrubState&&scrubState.moved&&!scrubState.nativeOpacity&&scrubLiveDirty){
         scrubLiveDirty=false;
         scrubState.el.dispatchEvent(new Event('input',{bubbles:true}));
         scrubState.el.dispatchEvent(new Event('change',{bubbles:true}));
@@ -1391,7 +1392,7 @@
       // data-nav-only (tl-cf) : le champ ne fait QUE naviguer (goToFrame),
       // aucune édition de document — un pushUndo ici ne ferait que polluer
       // la pile d'un snapshot identique et vider le redo pour rien.
-      if(window.pushUndo&&!scrubState.el.dataset.navOnly)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
+      if(window.pushUndo&&!scrubState.el.dataset.navOnly&&!scrubState.nativeOpacity)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
       window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;
@@ -1406,12 +1407,27 @@
     if(max!==null)raw=Math.min(max,raw);
     var decimals=(String(step).split('.')[1]||'').length;
     scrubState.el.value=decimals?raw.toFixed(decimals):Math.round(raw);
-    dispatchLiveChange();
+    // The admitted native opacity field is a tentative input until release.
+    // Its one final change enters Rust history; interim legacy changes would
+    // create several undo entries and expose an uncommitted document value.
+    if(!scrubState.nativeOpacity)dispatchLiveChange();
   });
   function endScrub(e){
     if(!scrubState||(e&&e.pointerId!==undefined&&e.pointerId!==scrubState.pointerId))return;
     if(scrubChangeRaf){cancelAnimationFrame(scrubChangeRaf);scrubChangeRaf=0;}
     if(!scrubState.moved){scrubState.el.focus();scrubState.el.select();}
+    else if(scrubState.nativeOpacity){
+      var nativeField=scrubState.el,nativeStart=scrubState.startVal;
+      nativeField.classList.remove('scrubbing');
+      try{
+        if(e.type!=='pointercancel')nativeField.dispatchEvent(new Event('change',{bubbles:true}));
+      }finally{
+        // The authoritative projection will repaint after the native receipt.
+        // A cancelled or rejected command must never leave the tentative value.
+        nativeField.value=nativeStart;
+        window._scrubLiveActive=false;
+      }
+    }
     else{
       scrubState.el.classList.remove('scrubbing');
       if(scrubLiveDirty){
@@ -1433,6 +1449,10 @@
   // window losing focus mid-drag), don't leave a scrub stuck forever.
   window.addEventListener('blur',function(){
     if(scrubChangeRaf){cancelAnimationFrame(scrubChangeRaf);scrubChangeRaf=0;}
+    if(scrubState&&scrubState.nativeOpacity) {
+      scrubState.el.value=scrubState.startVal;
+      scrubState.el.classList.remove('scrubbing');
+    }
     scrubLiveDirty=false;scrubState=null;window._scrubLiveActive=false;
   });
 })();
