@@ -13,7 +13,7 @@ macro_rules! engine_modules {
 }
 
 engine_modules! {
-    "codec" => codec, document;
+    "codec" => codec, document, project_structure;
     "commands" => commands, request_receipts, revision;
     "history" => history, transaction;
     "evaluation" => evaluation, animation_curve;
@@ -37,6 +37,7 @@ macro_rules! test_modules {
 #[cfg(test)]
 test_modules! {
     "test-codec" => codec_tests = "../tests/codec.rs";
+    "test-codec" => project_structure_tests = "../tests/project_structure.rs";
     "test-commands" => commands_tests = "../tests/commands.rs";
     "test-history" => history_tests = "../tests/history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
