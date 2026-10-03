@@ -49,11 +49,11 @@
     "native-png-output": { "allowedLayers": ["native-compositor", "native-render-scene"], "meaning": "PNG output consumes the same prepared scene and compositor port as preview." },
     "native-export-job": { "allowedLayers": ["native-history", "native-png-output", "native-render-scene", "native-revision", "native-scheduler", "native-resource-leases"], "meaning": "Export coordinates immutable history snapshots, scheduling, resource leases and PNG output." },
     "native-protocol": { "allowedLayers": ["native-commands", "native-export-job"], "meaning": "The wire-neutral application protocol translates commands and export results." },
-    "native-application": { "allowedLayers": ["native-commands", "native-document", "native-export-job", "native-history", "native-protocol", "native-render-scene", "native-request-receipts", "native-revision"], "meaning": "The application facade composes the native authority without depending on a host shell." }
+    "native-application": { "allowedLayers": ["native-codec", "native-commands", "native-document", "native-export-job", "native-history", "native-protocol", "native-render-scene", "native-request-receipts", "native-revision"], "meaning": "The application facade composes the native authority and decodes only the verified embedded reproduction fixture, without depending on a host shell." }
   },
   "permittedEdges": {
-    "note": "Observed from use and inline crate paths, recomputed for N19A. Layer rules are the enforced contract; the test suite pins the exact observed 43-edge graph so additions require a reviewed policy change.",
-    "edgeCount": 43
+    "note": "Observed from use and inline crate paths, recomputed for N19A and extended by T10A1's verified embedded-fixture decode. Layer rules are the enforced contract; the test suite pins the exact observed 44-edge graph so additions require a reviewed policy change.",
+    "edgeCount": 44
   },
   "exportedPort": {
     "source": "native-engine/src/lib.rs exposes modules through a declaration macro rather than pub use; N19 tests pin that macro and its Cargo mapping separately.",

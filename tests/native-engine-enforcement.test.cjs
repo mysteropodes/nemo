@@ -33,10 +33,14 @@ const CANDIDATE_FILES = [
   'native-engine/src/read_queries.rs',
   'native-engine/tests/application_read.rs',
   'native-engine/src/application_replacement.rs',
+  'native-engine/src/application_construction.rs',
   'native-engine/src/application.rs',
   'native-engine/src/application_diagnostics.rs',
+  'native-engine/src/reproduction_catalog.rs',
+  'native-engine/fixtures/reproduction-opacity-v1.json',
   'native-engine/tests/application_diagnostics.rs',
   'native-engine/tests/application_replacement.rs',
+  'native-engine/tests/reproduction_catalog.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
@@ -62,7 +66,7 @@ const EXPECTED_MODULES = [
 ];
 
 const EXPECTED_EDGES = [
-  'application->commands', 'application->document', 'application->export-job', 'application->history',
+  'application->codec', 'application->commands', 'application->document', 'application->export-job', 'application->history',
   'application->protocol', 'application->render-scene', 'application->request-receipts', 'application->revision',
   'codec->document', 'commands->document', 'commands->request-receipts', 'commands->revision',
   'compositor->render-scene', 'desktop-viewport->compositor', 'desktop-viewport->render-scene',
@@ -180,7 +184,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 43);
+  assert.equal(result.edges.length, 44);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
