@@ -5,17 +5,20 @@ const { startBrowserRuntime, IDENTITY_PATH } = require('../../scripts/nemo/lib/b
 
 test.use({ channel: 'chrome' });
 
-test('browser compatibility Diagnostics panel opens and refreshes without changing the document', async ({ browser }) => {
+test('browser compatibility Diagnostics panel reports reproduction unavailable without changing the document', async ({ browser }, testInfo) => {
   test.setTimeout(60000);
   const runtime = await startBrowserRuntime({ taskId: `diagnostics-panel-${process.pid}-${Date.now()}`, port: 0 });
   let context;
   const pageErrors = [];
+  const downloads = [];
   try {
     const identity = await fetch(runtime.origin + IDENTITY_PATH).then((response) => response.json());
     expect(identity.healthy).toBe(true);
     context = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    await context.addInitScript(() => localStorage.setItem('nemo-tut-feedback-shown', '1'));
     const page = await context.newPage();
     page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('download', (download) => downloads.push(download));
     await page.goto(runtime.origin, { waitUntil: 'networkidle' });
     await expect.poll(() => page.evaluate(() => !!(window.SM && window.SMLabs && window.NemoApplication && window.state))).toBe(true);
     // The separated native baseline cannot create a writable browser
@@ -58,12 +61,18 @@ test('browser compatibility Diagnostics panel opens and refreshes without changi
     // This browser has no native opacity writer. The source-stage compatibility
     // inspector shows its empty v1 trace; T08B owns explicit native unavailability.
     await expect(diagnostics.locator('table')).toHaveCount(0);
-    const emptyStatus = diagnostics.locator(':scope > div').last();
+    const emptyStatus = diagnostics.locator('[data-diag-empty]');
     await expect(emptyStatus).toBeVisible();
     const emptyLabel = await page.evaluate(() => SM.t('labsDiagnosticsEmpty'));
     await expect(emptyStatus).toHaveText(emptyLabel);
+    await diagnostics.locator('[data-diag-report]').click();
+    await expect(diagnostics.locator('[data-diag-report-status]')).toContainText('Reproduction unavailable');
+    await expect(diagnostics.locator('[data-diag-report-status]')).toContainText('native synthetic recording');
+    await testInfo.attach('source-stage-report-unavailable', { body: await diagnostics.screenshot(), contentType: 'image/png' });
+    expect(await snapshot()).toEqual(before);
     await refresh.click();
     await expect(emptyStatus).toHaveText(emptyLabel);
+    await expect(diagnostics.locator('[data-diag-report-status]')).toBeEmpty();
     await expect(diagnostics.locator('table')).toHaveCount(0);
 
     await openLabs();
@@ -75,6 +84,7 @@ test('browser compatibility Diagnostics panel opens and refreshes without changi
     await expect(diagnostics).toBeVisible();
     await diagnostics.locator('[data-diag-refresh]').click();
     expect(await snapshot()).toEqual(before);
+    expect(downloads).toEqual([]);
     expect(pageErrors).toEqual([]);
   } finally {
     if (context) await context.close();

@@ -1,293 +1,263 @@
 'use strict';
-// T10/#1399 -- the report link: the recorded pre-state that makes a trace
-// window into a REPRODUCIBLE bundle.
-//
-// The property under test is not "a bundle is produced" but "the bundle says
-// what it actually replays from". T07's buildBundle identifies a bundle by
-// {id, hash of its STARTING state}; before T10 the trace kept only
-// {request, revision, ok}, so no honest hash existed and the only way to
-// produce one would have been to hash the current state and mislabel it.
-
+// T10 source-stage safety. Native opt-in reproduction is T10A/T08B; a legacy
+// trace or user-state hash is not a recoverable synthetic fixture.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const fixture = require('./fixtures/lib/opacity-application.cjs');
 const diagnostics = require('../src/js/domain/diagnostics/opacity-diagnostics.js');
 const bundleCodec = require('../src/js/domain/diagnostics/opacity-reproduction-bundle.js');
 
-const sha = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-
 function drive(f, id, value) {
   const identity = f.app.meta();
-  return f.app.handle({
-    apiVersion: 1, requestId: id, ...identity, expectedRevision: identity.revision,
-    operation: 'property.set', payload: { layerId: f.state.layers[0].layerUid, property: 'opacity', value },
-  });
+  return f.app.handle({ apiVersion: 1, requestId: id, ...identity, expectedRevision: identity.revision,
+    operation: 'property.set', payload: { layerId: f.state.layers[0].layerUid, property: 'opacity', value } });
 }
 function traceOf(f) {
-  const identity = f.app.meta();
-  return f.app.handle({ apiVersion: 1, requestId: 'read-trace', ...identity,
-    expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} }).result.entries;
+  return f.app.handle({ apiVersion: 1, requestId: 'read-trace', ...f.app.meta(),
+    operation: 'diagnostics.trace', payload: {} }).result.entries;
 }
 
-// ---- the fixture equivalence that makes a report verifiable --------------
-
-test('the oldest retained pre-state hashes to exactly the fixture hash it started from', () => {
-  const f = fixture.build('t10-equiv', 55);
-  drive(f, 'c1', 11);
-  drive(f, 'c2', 22);
+test('ordinary writes never retain the 50 KB private document sentinel', () => {
+  const f = fixture.build('t10-private', 55);
+  const sentinel = '/private/artist/assets/DO-NOT-EXPORT-' + 'x'.repeat(50000);
+  f.state.privateAsset = sentinel;
+  assert.equal(drive(f, 'c1', 11).ok, true);
   const entries = traceOf(f);
-  assert.equal(entries.length, 2);
-  assert.equal(sha(entries[0].stateBefore), f.hash,
-    'a report built from this window must carry the same fixture hash a synthetic fixture would');
-  assert.notEqual(sha(entries[1].stateBefore), f.hash, 'the second command starts from a different state');
+  assert.equal(Object.hasOwn(entries[0], 'stateBefore'), false);
+  assert.equal(JSON.stringify(entries).includes('DO-NOT-EXPORT'), false);
+  assert.ok(JSON.stringify(entries).length < 2048, 'trace size must not scale with document data');
+  assert.equal(f.state.privateAsset, sentinel);
 });
 
-// ---- the reason pre-state is per entry rather than per buffer ------------
-
-test('after eviction the window reports the state its OLDEST SURVIVING command assumed', () => {
-  const f = fixture.build('t10-evict', 7);
-  const layerId = f.state.layers[0].layerUid;
-  for (let n = 0; n < 40; n++) drive(f, `w${n}`, n % 101);
-  const entries = traceOf(f);
-  assert.equal(entries.length, diagnostics.LIMIT, 'the ring still bounds the trace');
-  assert.equal(entries[0].request.requestId, 'w8', 'w0..w7 were evicted');
-  assert.notEqual(sha(entries[0].stateBefore), f.hash,
-    'a buffer-wide starting state would still claim the original fixture here -- that is the bug this design avoids');
-  const opacityIn = (s) => s.layers.find((l) => l.layerUid === layerId).motionStatic.opacity[0];
-  assert.equal(opacityIn(entries[0].stateBefore), 7,
-    'the surviving window starts from what the evicted predecessor w7 left behind');
+test('cyclic document state does not wedge the edit guard or a following valid write', () => {
+  const f = fixture.build('t10-cycle', 7);
+  f.state.privateCycle = f.state;
+  let first, thrown;
+  try { first = drive(f, 'c1', 11); } catch (error) { thrown = error; }
+  delete f.state.privateCycle;
+  const next = drive(f, 'c2', 22);
+  assert.equal(next.ok, true, 'a failed diagnostic serialization must never retain edit ownership');
+  assert.equal(thrown, undefined, 'a write must not serialize arbitrary root state');
+  assert.equal(first.ok, true);
+  assert.equal(f.state.layers[0].motionStatic.opacity[0], 22);
 });
 
-// ---- startingState() is the window's start, and never a guess ------------
+test('diagnostics never traverses an unrelated document getter', () => {
+  const f = fixture.build('t10-getter', 3);
+  Object.defineProperty(f.state, 'privateAsset', { enumerable: true, get() { throw new Error('private getter read'); } });
+  assert.equal(drive(f, 'c1', 11).ok, true);
+  assert.equal(drive(f, 'c2', 22).ok, true);
+});
 
-test('startingState() tracks the surviving window and is undefined when nothing was recorded', () => {
+test('the diagnostics boundary ignores arbitrary state arguments and preserves detached entries', () => {
   const recorded = diagnostics.create(['property.set']);
-  assert.equal(recorded.startingState(), undefined, 'an empty trace has no starting state');
-
-  recorded.remember({ requestId: 'a', operation: 'property.set', payload: {} }, { revision: 1, ok: true }, { at: 'before-a' });
-  recorded.remember({ requestId: 'b', operation: 'property.set', payload: {} }, { revision: 2, ok: true }, { at: 'before-b' });
-  assert.deepEqual(recorded.startingState(), { at: 'before-a' });
-
-  const legacy = diagnostics.create(['property.set']);
-  legacy.remember({ requestId: 'a', operation: 'property.set', payload: {} }, { revision: 1, ok: true });
-  assert.equal(legacy.startingState(), undefined,
-    'a caller that records no pre-state must get undefined, never a plausible-looking wrong answer');
-  assert.equal(legacy.entries()[0].stateBefore, undefined, 'and the entry carries no invented field');
+  const privateState = { privateAsset: '/private/sentinel' };
+  privateState.self = privateState;
+  const request = { requestId: 'a', operation: 'property.set', payload: { value: 25 } };
+  assert.doesNotThrow(() => recorded.remember(request, { revision: 1, ok: true }, privateState));
+  const entries = recorded.entries();
+  assert.deepEqual(Object.keys(entries[0]).sort(), ['ok', 'request', 'revision']);
+  entries[0].request.payload.value = 99;
+  assert.equal(recorded.entries()[0].request.payload.value, 25);
 });
 
-test('remember() copies the pre-state it is handed, so a live caller object cannot rewrite history', () => {
-  // The application happens to pass a fresh clone today, which is why storing
-  // the argument by reference still looks correct end-to-end. It is not: any
-  // other caller handing over live state would see its recorded history
-  // change underneath it. Guard the copy where the copy is made.
-  const recorded = diagnostics.create(['property.set']);
-  const live = { layers: [{ opacity: 1 }] };
-  recorded.remember({ requestId: 'a', operation: 'property.set', payload: {} }, { revision: 1, ok: true }, live);
-  live.layers[0].opacity = 999;
-  assert.equal(recorded.startingState().layers[0].opacity, 1, 'the trace kept what was recorded, not a live alias');
-  assert.equal(recorded.entries()[0].stateBefore.layers[0].opacity, 1);
-});
-
-test('the recorded pre-state is a copy: mutating the trace never reaches the document', () => {
-  const f = fixture.build('t10-iso', 3);
-  drive(f, 'c1', 11);
-  const entries = traceOf(f);
-  entries[0].stateBefore.layers[0].motionStatic.opacity[0] = 999;
-  assert.notEqual(traceOf(f)[0].stateBefore.layers[0].motionStatic.opacity[0], 999,
-    'entries() hands out clones; a caller cannot write back through a report');
-});
-
-// ---- the bundle the panel would produce ----------------------------------
-
-test('a bundle built from the recorded window carries a fixture the codec accepts', () => {
-  const f = fixture.build('t10-bundle', 9);
-  drive(f, 'c1', 11);
-  drive(f, 'c2', 22);
-  const entries = traceOf(f);
-  const bundle = bundleCodec.buildBundle({ id: f.app.meta().documentId, hash: sha(entries[0].stateBefore) }, entries, null);
-  const parsed = bundleCodec.parseBundle(bundle);
-  assert.equal(parsed.error, undefined, 'the codec must accept what the panel produces');
-  assert.deepEqual(parsed.commands.map((c) => c.payload.value), [11, 22]);
-  assert.equal(parsed.fixture.hash, f.hash, 'and the bundle names the state it truly replays from');
-});
-
-// ---- the panel path itself, driven through a real click -----------------
-// The layers below are covered above, but the panel is what the leaf is named
-// after and it had no behavioural coverage: hashing the LAST entry instead of
-// the first, or dropping the "no starting state" guard, both survived the full
-// suite. Those two mutations are exactly what these tests kill. The provenance
-// pins DO fail when the panel source changes, but they are edit detectors --
-// an added space fails them identically -- so they prove nothing about
-// behaviour.
-
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-
-const ROOT = path.resolve(__dirname, '..');
-
-// The panel's click handler is not itself async: it kicks off buildReport()
-// and returns, so awaiting the handler proves nothing -- the digest is still in
-// flight. A fixed setTimeout(0) is NOT enough either: crypto.subtle.digest
-// settles on its own schedule and a single macrotask hop loses the race most
-// runs (measured: 5 of 6 failed). Wait for the observable signal instead of
-// guessing a delay, so the test is deterministic rather than timing-dependent.
-async function waitUntil(predicate, what) {
-  for (let attempt = 0; attempt < 500; attempt++) {
-    if (predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 1));
-  }
-  throw new Error(`timed out waiting for ${what}`);
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
 }
-
-function recordingElement(tag) {
+function element(tag) {
   const listeners = {};
   return {
-    tagName: tag, style: {}, children: [], _html: '', listeners,
+    tagName: tag, style: {}, children: [], listeners, isConnected: true, textContent: '', _html: '',
     get innerHTML() { return this._html; },
-    // Assigning innerHTML replaces the children in a real DOM, which is what
-    // drops the previous render's listeners. Without this the stub caches the
-    // same button forever, handlers pile up, and listeners.click[0] is a stale
-    // closure over an older trace -- the harness would then test nothing.
-    set innerHTML(v) { this._html = v; this._found = {}; },
-    setAttribute() {}, getAttribute() { return null; },
-    appendChild(child) { this.children.push(child); return child; },
-    remove() {}, click() {},
-    addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
-    // The panel looks up its buttons and its status line by data-attribute.
-    querySelector(selector) {
-      this._found = this._found || {};
-      if (!this._found[selector]) this._found[selector] = recordingElement('stub');
-      return this._found[selector];
+    set innerHTML(value) {
+      for (const child of Object.values(this._found || {})) child.isConnected = false;
+      this._html = value; this._found = {};
     },
+    appendChild(child) { this.children.push(child); child.isConnected = true; return child; },
+    remove() { this.isConnected = false; },
+    click() { for (const listener of listeners.click || []) listener(); },
+    addEventListener(type, listener) { (listeners[type] ||= []).push(listener); },
+    querySelector(selector) { return (this._found ||= {})[selector] ||= element('stub'); },
     querySelectorAll() { return []; },
   };
 }
 
-// Drives the real labs panel over the real application, and returns the
-// panel's own Report click handler plus the elements it writes into.
-function panelUnderTest() {
-  const flags = { 'nemo-labs-diagnostics-panel': true };
-  let sequence = 0;
+async function panelUnderTest() {
   const f = fixture.build('t10-panel', 21);
-  const created = [];
+  drive(f, 'p1', 41);
+  const flags = { 'nemo-labs-diagnostics-panel': true };
+  const created = [], requests = [], bundles = [], downloads = [];
   const ctx = {
-    console,
-    document: {
-      createElement(tag) { const el = recordingElement(tag); created.push(el); return el; },
-      body: { appendChild: () => {} }, readyState: 'complete', addEventListener: () => {},
-      querySelector: () => null, querySelectorAll: () => [], getElementById: () => null,
-    },
-    localStorage: { getItem: (k) => (flags[k] ? '1' : null), setItem: (k, v) => { flags[k] = v === '1'; } },
-    crypto: globalThis.crypto,
-    TextEncoder,
-    Blob: function Blob(parts) { this.parts = parts; },
-    URL: { createObjectURL: () => 'blob:stub', revokeObjectURL: () => {} },
-    SM: { t: (k) => k, setActiveLayer: () => {} },
-    state: f.state, userLayers: [], _layerSel: [],
-    NemoApplication: { handle: (request) => f.app.handle(request) },
+    console, TextEncoder, Blob: function Blob(parts) { this.parts = parts; },
+    crypto: { subtle: { digest: async () => new Uint8Array(32).buffer } },
+    URL: { createObjectURL(blob) { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} },
+    document: { createElement(tag) { const node = element(tag); created.push(node); return node; }, body: element('body') },
+    localStorage: { getItem: (key) => flags[key] ? '1' : null, setItem: (key, value) => { flags[key] = value === '1'; } },
+    SM: { t: (key) => key, setActiveLayer() {} }, state: f.state, userLayers: [], _layerSel: [],
+    NemoApplication: { handle(request) { requests.push(request); return f.app.handle(request); } },
     NemoOpacityApplication: f.app,
-    NemoOpacityReproductionBundle: bundleCodec,
+    NemoOpacityReproductionBundle: { buildBundle(...args) { bundles.push(args); return bundleCodec.buildBundle(...args); } },
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const file of ['labs/labs-core.js', 'labs/diagnostics-panel.js']) {
-    const filename = path.resolve(ROOT, 'src/js', file);
+    const filename = path.resolve(__dirname, '../src/js', file);
     vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });
   }
-  return { ctx, f, panel: created[0] };
+  await settle();
+  return { ctx, f, created, requests, bundles, downloads, panel: created[0] };
 }
+const report = (panel) => panel.querySelector('[data-diag-report]');
+const refresh = (panel) => panel.querySelector('[data-diag-refresh]');
+const status = (panel) => panel.querySelector('[data-diag-report-status]');
 
-test('panel: clicking Report hashes the OLDEST retained entry, not the newest', async () => {
-  const { ctx, f, panel } = panelUnderTest();
-  const layerId = f.state.layers[0].layerUid;
-  for (const [id, value] of [['p1', 41], ['p2', 52], ['p3', 63]]) {
-    const identity = f.app.meta();
-    f.app.handle({ apiVersion: 1, requestId: id, ...identity, expectedRevision: identity.revision,
-      operation: 'property.set', payload: { layerId, property: 'opacity', value } });
-  }
-  // The panel is built at load, before these writes; use its own Refresh
-  // button to re-read the trace rather than rebuilding (disable/enable would
-  // create a NEW element and leave this handle stale).
-  panel.querySelector('[data-diag-refresh]').listeners.click[0]();
+test('panel Report is explicitly unavailable and never invents a fixture or dispatches a write', async () => {
+  const h = await panelUnderTest();
+  const before = JSON.stringify({ state: h.f.state, undo: h.f.undo, redo: h.f.redo, trace: traceOf(h.f) });
+  const queries = h.requests.length;
+  report(h.panel).click();
+  await settle();
+  assert.match(status(h.panel).textContent, /reproduction unavailable/i);
+  assert.match(status(h.panel).textContent, /native synthetic/i);
+  assert.equal(h.bundles.length, 0);
+  assert.equal(h.downloads.length, 0);
+  assert.equal(h.requests.length, queries, 'report uses the displayed trace without dispatching');
+  assert.equal(JSON.stringify({ state: h.f.state, undo: h.f.undo, redo: h.f.redo, trace: traceOf(h.f) }), before);
+});
 
-  const live = panel.querySelector('[data-diag-report]');
-  const status = panel.querySelector('[data-diag-report-status]');
-  assert.ok(live.listeners.click && live.listeners.click.length, 'the Report button must be wired');
-
-  const captured = [];
-  ctx.NemoOpacityReproductionBundle = {
-    buildBundle: (fixtureRef, entries, meta) => {
-      captured.push({ fixtureRef, entries });
-      return bundleCodec.buildBundle(fixtureRef, entries, meta);
-    },
+test('a stateBefore object or valid-looking hash does not make arbitrary user state replayable', async () => {
+  const h = await panelUnderTest();
+  h.ctx.NemoApplication.handle = (request) => {
+    const response = h.f.app.handle(request);
+    response.result.entries[0].stateBefore = { privateAsset: '/private/DO-NOT-EXPORT' };
+    response.result.fixture = { id: 'user-document', hash: 'a'.repeat(64) };
+    return response;
   };
-  live.listeners.click[0]();
-  await waitUntil(() => captured.length === 1, 'the report click to reach the codec');
-  const entries = traceOf(f);
-  assert.equal(captured[0].fixtureRef.hash, sha(entries[0].stateBefore),
-    'the reported fixture must be the state the OLDEST retained command assumed');
-  assert.notEqual(captured[0].fixtureRef.hash, sha(entries[entries.length - 1].stateBefore),
-    'hashing the newest entry would name a state these commands never replay from');
-  assert.equal(captured[0].fixtureRef.id, f.app.meta().documentId,
-    'the bundle must name the document it came from, so a report can be traced back');
-  assert.match(status.innerHTML + status.textContent, /./);
+  refresh(h.panel).click();
+  await settle();
+  report(h.panel).click();
+  await settle();
+  assert.match(status(h.panel).textContent, /reproduction unavailable/i);
+  assert.equal(h.bundles.length, 0);
+  assert.equal(h.downloads.length, 0);
 });
 
-test('panel: refuses to report when the trace carries no starting state', async () => {
-  const { ctx, f, panel } = panelUnderTest();
-  const layerId = f.state.layers[0].layerUid;
-  const identity = f.app.meta();
-  f.app.handle({ apiVersion: 1, requestId: 'p1', ...identity, expectedRevision: identity.revision,
-    operation: 'property.set', payload: { layerId, property: 'opacity', value: 41 } });
-
-  // A trace recorded before T10 (or by any caller that records no pre-state).
-  ctx.NemoApplication = { handle: (request) => {
-    const response = f.app.handle(request);
-    if (request.operation === 'diagnostics.trace' && response.ok) {
-      response.result.entries.forEach((entry) => { delete entry.stateBefore; });
-    }
-    return response;
-  } };
-  panel.querySelector('[data-diag-refresh]').listeners.click[0]();
-
-  let built = false;
-  ctx.NemoOpacityReproductionBundle = { buildBundle: () => { built = true; return {}; } };
-  const live = panel.querySelector('[data-diag-report]');
-  const status = panel.querySelector('[data-diag-report-status]');
-  live.listeners.click[0]();
-  await waitUntil(() => String(status.textContent).length > 0, 'the panel to report its refusal');
-
-  assert.equal(built, false, 'no bundle may be built without a starting state -- inventing a fixture is the failure this leaf exists to prevent');
-  assert.match(String(status.textContent), /no starting state/i, 'and the panel must say why');
+test('report completion is discarded after document replacement', async () => {
+  const h = await panelUnderTest();
+  const oldStatus = status(h.panel);
+  report(h.panel).click();
+  h.f.app.documentChanged();
+  await settle();
+  assert.equal(oldStatus.textContent, '');
+  assert.equal(h.downloads.length, 0);
 });
 
-test('panel: the refusal is decided by the OLDEST entry, not by whichever one happens to carry state', async () => {
-  // A window whose newest entry has a pre-state but whose oldest does not: the
-  // bundle would replay from the oldest, so it is the oldest that decides. A
-  // guard reading the last entry passes this window and emits a bundle whose
-  // fixture describes nothing it replays from.
-  const { ctx, f, panel } = panelUnderTest();
-  const layerId = f.state.layers[0].layerUid;
-  for (const [id, value] of [['m1', 41], ['m2', 52]]) {
-    const identity = f.app.meta();
-    f.app.handle({ apiVersion: 1, requestId: id, ...identity, expectedRevision: identity.revision,
-      operation: 'property.set', payload: { layerId, property: 'opacity', value } });
+test('a report started from an already stale document asks for Refresh', async () => {
+  const h = await panelUnderTest();
+  h.f.app.documentChanged();
+  report(h.panel).click();
+  await settle();
+  assert.match(status(h.panel).textContent, /refresh/i);
+  assert.equal(h.downloads.length, 0);
+});
+
+test('Refresh fences a pending report without updating its detached status', async () => {
+  const h = await panelUnderTest();
+  const oldStatus = status(h.panel);
+  report(h.panel).click();
+  refresh(h.panel).click();
+  await settle();
+  assert.equal(oldStatus.textContent, '');
+  assert.equal(status(h.panel).textContent, '');
+  assert.equal(h.downloads.length, 0);
+});
+
+test('disable and re-enable fences the prior panel report', async () => {
+  const h = await panelUnderTest();
+  const oldStatus = status(h.panel);
+  report(h.panel).click();
+  h.ctx.SMLabs.disable('diagnostics-panel');
+  h.ctx.SMLabs.enable('diagnostics-panel');
+  await settle();
+  assert.equal(oldStatus.textContent, '');
+  assert.equal(h.downloads.length, 0);
+  assert.equal(status(h.created.find((node) => node.id === 'labs-diagnostics' && node !== h.panel)).textContent, '');
+});
+
+test('a delayed older refresh cannot overwrite a newer trace window', async () => {
+  const h = await panelUnderTest();
+  const pending = deferred();
+  const oldResponse = h.f.app.handle({ apiVersion: 1, requestId: 'old-read', ...h.f.app.meta(), operation: 'diagnostics.trace', payload: {} });
+  const before = h.panel.innerHTML;
+  h.ctx.NemoApplication.handle = () => pending.promise;
+  refresh(h.panel).click();
+  await settle();
+  assert.equal(h.panel.innerHTML, before, 'the pending request must not fabricate an error');
+  h.ctx.NemoApplication.handle = (request) => h.f.app.handle(request);
+  drive(h.f, 'newer-command', 52);
+  refresh(h.panel).click();
+  await settle();
+  assert.match(h.panel.innerHTML, /newer-command/);
+  pending.resolve(oldResponse);
+  await settle();
+  assert.match(h.panel.innerHTML, /newer-command/);
+});
+
+test('a delayed trace response is discarded after document replacement or panel disable', async () => {
+  for (const action of ['replace', 'disable']) {
+    const h = await panelUnderTest();
+    const pending = deferred();
+    const oldResponse = h.f.app.handle({ apiVersion: 1, requestId: 'old-read', ...h.f.app.meta(), operation: 'diagnostics.trace', payload: {} });
+    const before = h.panel.innerHTML;
+    h.ctx.NemoApplication.handle = () => pending.promise;
+    refresh(h.panel).click();
+    if (action === 'replace') h.f.app.documentChanged();
+    else h.ctx.SMLabs.disable('diagnostics-panel');
+    pending.resolve(oldResponse);
+    await settle();
+    assert.equal(h.panel.innerHTML, before, action);
+    assert.equal(h.downloads.length, 0);
   }
-  ctx.NemoApplication = { handle: (request) => {
-    const response = f.app.handle(request);
-    if (request.operation === 'diagnostics.trace' && response.ok) delete response.result.entries[0].stateBefore;
-    return response;
-  } };
-  panel.querySelector('[data-diag-refresh]').listeners.click[0]();
+});
 
-  let built = false;
-  ctx.NemoOpacityReproductionBundle = { buildBundle: () => { built = true; return {}; } };
-  const status = panel.querySelector('[data-diag-report-status]');
-  panel.querySelector('[data-diag-report]').listeners.click[0]();
-  await waitUntil(() => String(status.textContent).length > 0, 'the panel to decide');
+test('the latest delayed query renders normally and rejected queries can be refreshed', async () => {
+  const h = await panelUnderTest();
+  const pending = deferred();
+  drive(h.f, 'async-command', 72);
+  let request;
+  h.ctx.NemoApplication.handle = (value) => { request = value; return pending.promise; };
+  refresh(h.panel).click();
+  pending.resolve(h.f.app.handle(request));
+  await settle();
+  assert.match(h.panel.innerHTML, /async-command/);
+  h.ctx.NemoApplication.handle = () => Promise.reject(new Error('/private/error-details'));
+  refresh(h.panel).click();
+  await settle();
+  assert.match(h.panel.innerHTML, /diagnostics.trace failed/);
+  assert.doesNotMatch(h.panel.innerHTML, /private/);
+  h.ctx.NemoApplication.handle = (value) => h.f.app.handle(value);
+  refresh(h.panel).click();
+  await settle();
+  assert.match(h.panel.innerHTML, /async-command/);
+});
 
-  assert.equal(built, false, 'the oldest entry lacks a pre-state, so this window is not reportable');
-  assert.match(String(status.textContent), /no starting state/i);
+test('mismatched trace response identity is refused and trace labels remain injection-safe', async () => {
+  const h = await panelUnderTest();
+  const malicious = '<img src=x onerror="secret()">';
+  drive(h.f, malicious, 55);
+  refresh(h.panel).click();
+  await settle();
+  assert.ok(!h.panel.innerHTML.includes(malicious));
+  assert.match(h.panel.innerHTML, /&lt;img/);
+  h.ctx.NemoApplication.handle = (request) => ({ ...h.f.app.handle(request), documentId: 'different-document' });
+  refresh(h.panel).click();
+  await settle();
+  assert.match(h.panel.innerHTML, /identity|document changed/i);
+  assert.doesNotMatch(h.panel.innerHTML, /<table/);
 });

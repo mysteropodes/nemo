@@ -18,7 +18,7 @@ engine_modules! {
     "history" => history, transaction;
     "evaluation" => evaluation;
     "scheduler" => resource_leases, scheduler;
-    "compositor" => compositor, render_scene;
+    "compositor" => compositor, render_scene, render_geometry;
     "viewport" => desktop_viewport;
     "export_job" => export_job, export_job_lifecycle, png_output;
     "application" => application, protocol, read_queries;
@@ -42,8 +42,10 @@ test_modules! {
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
+    "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
+    "test-export_job" => export_geometry_tests = "../tests/render_geometry.rs";
     "test-export_job" => export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs";
     "test-application" => application_tests = "../tests/application.rs";
     "test-application" => application_read_tests = "../tests/application_read.rs";

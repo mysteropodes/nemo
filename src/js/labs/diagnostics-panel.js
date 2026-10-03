@@ -16,7 +16,7 @@
 // xsheet-panel.js's "click a row to jump the playhead"); nothing here ever
 // calls diagnostics.replay or any property-writing operation.
 (function () {
-  var panel = null;
+  var panel = null, generation = 0;
 
   // Trace fields are NOT trusted text. `requestId` is caller-supplied and only
   // length-checked by opacity-application.js's validate(), so it reaches here
@@ -45,30 +45,26 @@
     return -1;
   }
 
-  // T12/#1405 -- see the matching note in application/diagnostics-capability.js
-  // for why requestId has to be unique by CONSTRUCTION, not probably unique,
-  // and for what a collision actually costs: a read is never retained, so the
-  // risk is not a stale memoised trace but a spurious `invalid_request` when a
-  // read id collides with one of the retained WRITE ids.
-  //
-  // Minted locally rather than shared with the capability module on purpose:
-  // diagnostics-capability.js carries no script tag (it is declared
-  // classic-without-load-site), so window.NemoDiagnosticsCapability does not
-  // exist in the browser and cannot be depended on from here. What keeps the
-  // two sites consistent is that both key off the same application identity.
-  var minted = 0;
-  function mintRequestId(identity) {
-    minted += 1;
-    return 'diagnostics-panel:' + identity.instanceId + ':' + minted;
+  function currentIdentity() {
+    try {
+      var identity = window.NemoOpacityApplication.meta();
+      return { instanceId: identity.instanceId, documentId: identity.documentId, revision: identity.revision };
+    } catch (_) { return null; }
   }
 
-  function fetchEntries() {
-    if (!window.NemoApplication || !window.NemoOpacityApplication) return { error: 'diagnostics application not loaded' };
-    var identity = window.NemoOpacityApplication.meta();
-    var response = window.NemoApplication.handle({ apiVersion: 1, requestId: mintRequestId(identity),
-      ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
-    if (!response.ok) return { error: (response.error && response.error.message) || 'diagnostics.trace failed' };
-    return { entries: response.result.entries };
+  function sameDocument(a, b) {
+    return !!(a && b && typeof a.instanceId === 'string' && a.instanceId
+      && typeof a.documentId === 'string' && a.documentId
+      && a.instanceId === b.instanceId && a.documentId === b.documentId);
+  }
+
+  function traceResult(response, identity) {
+    if (!response || !response.ok) return { error: (response && response.error && response.error.message) || 'diagnostics.trace failed' };
+    if (!sameDocument(identity, response)) return { error: 'Diagnostics response identity does not match the requested document.' };
+    if (!response.result || !Array.isArray(response.result.entries)) return { error: 'diagnostics.trace returned no command list' };
+    return { entries: response.result.entries, identity: {
+      instanceId: response.instanceId, documentId: response.documentId, revision: response.revision
+    } };
   }
 
   function rowHtml(entry, selectedLayers) {
@@ -87,49 +83,11 @@
   }
 
   // ---- report link (T10/#1399) -------------------------------------------
-  // Turns the trace the panel already shows into T07's reproduction bundle.
-  // The fixture hash is SHA-256 over the recorded pre-state of the OLDEST
-  // RETAINED entry -- the state that window actually replays from, which
-  // stops being wherever the trace began as soon as the ring evicts anything.
-  // crypto.subtle is deliberate: it is the one digest available in both the
-  // webview and Node, and it emits the same bytes as the node `crypto`
-  // sha256 behind T07's fixture hashing, so a bundle reported from the app is
-  // verifiable against a synthetic fixture. Async is fine -- this runs on a
-  // click, never per write.
-  async function sha256Hex(value) {
-    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)));
-    return Array.from(new Uint8Array(digest)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-  }
-
-  async function buildReport(entries) {
-    var codec = window.NemoOpacityReproductionBundle;
-    if (!codec) return { error: 'reproduction bundle codec not loaded' };
-    if (!entries || !entries.length) return { error: 'no recorded commands to report' };
-    // No recorded pre-state means the bundle cannot say what it replays from.
-    // Refuse, rather than hash the CURRENT state and label it "starting" --
-    // that yields a bundle that looks replayable and diverges in silence.
-    if (entries[0].stateBefore === undefined) {
-      return { error: 'trace carries no starting state; cannot build a reproducible bundle' };
-    }
-    try {
-      var identity = window.NemoOpacityApplication.meta();
-      var hash = await sha256Hex(entries[0].stateBefore);
-      return { bundle: codec.buildBundle({ id: identity.documentId, hash: hash }, entries, null) };
-    } catch (error) {
-      return { error: (error && error.message) || 'bundle construction failed' };
-    }
-  }
-
-  function offerDownload(bundle) {
-    var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = 'opacity-reproduction-' + String(bundle.fixture.hash).slice(0, 12) + '.json';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  // Source-stage only: neither the v1 trace nor T08A's metadata has recoverable
+  // starting fixture bytes. T10A owns an opt-in native synthetic recording;
+  // T08B owns its panel binding. Never infer provenance from user state/hash.
+  async function buildReport(result) {
+    return { error: result.error || 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.' };
   }
 
   function build() {
@@ -138,7 +96,7 @@
       panel = document.createElement('div');
       panel.id = 'labs-diagnostics';
       panel.style.cssText =
-        'position:fixed;top:60px;right:16px;width:auto;max-height:70vh;overflow:auto;z-index:9999;' +
+        'position:fixed;top:60px;right:16px;width:auto;max-width:calc(100vw - 32px);max-height:70vh;overflow:auto;z-index:190;' +
         'background:#201f25;border:1px solid rgba(255,255,255,.12);border-radius:10px;' +
         'font:11px ui-monospace,monospace;color:#eceae7;box-shadow:0 8px 30px rgba(0,0,0,.5);padding:6px 0;';
       document.body.appendChild(panel);
@@ -148,36 +106,61 @@
 
   function refresh() {
     if (!panel) return;
-    var result = fetchEntries();
+    var target = panel, token = ++generation, identity = currentIdentity();
+    function finish(result) {
+      if (panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
+      if (identity && !sameDocument(identity, currentIdentity())) return;
+      if (!result.identity) result.identity = identity;
+      render(result, target, token);
+    }
+    try {
+      if (!identity || !window.NemoApplication) return finish({ error: 'diagnostics application not loaded' });
+      var response = window.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-panel:' + Math.random(),
+        ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
+      // Keep the synchronous compatibility path; delayed adapters share the
+      // same generation/document fence without updating detached panels.
+      if (response && typeof response.then === 'function') {
+        Promise.resolve(response).then(function (value) { finish(traceResult(value, identity)); },
+          function () { finish({ error: 'diagnostics.trace failed' }); });
+      } else finish(traceResult(response, identity));
+    } catch (_) { finish({ error: 'diagnostics.trace failed' }); }
+  }
+
+  function render(result, target, token) {
     var selectedLayers = correlatedLayerIndices();
     var t2 = (typeof SM !== 'undefined' && SM.t) ? SM.t : function (k) { return k; };
+    var reportLabel = t2('labsDiagnosticsReport');
+    if (reportLabel === 'labsDiagnosticsReport') reportLabel = 'Report';
     var body = result.error
       ? '<div style="padding:6px 8px;color:#e08787;">' + esc(result.error) + '</div>'
       : (result.entries.length
         ? '<table style="border-collapse:collapse;"><tr><th style="padding:2px 8px;color:#888;">status</th><th style="padding:2px 8px;color:#888;">operation</th><th style="padding:2px 8px;color:#888;">rev</th><th style="padding:2px 8px;color:#888;">requestId</th></tr>'
           + result.entries.slice().reverse().map(function (e) { return rowHtml(e, selectedLayers); }).join('') + '</table>'
-        : '<div style="padding:6px 8px;color:#888;">' + t2('labsDiagnosticsEmpty') + '</div>');
+        : '<div data-diag-empty style="padding:6px 8px;color:#888;">' + esc(t2('labsDiagnosticsEmpty')) + '</div>');
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
-      '<b style="font-size:11px;">' + t2('labsDiagnosticsTitle') + '</b>' +
+      '<b style="font-size:11px;">' + esc(t2('labsDiagnosticsTitle')) + '</b>' +
       '<span>' +
-      '<button type="button" data-diag-report style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;margin-right:4px;">' + t2('labsDiagnosticsReport') + '</button>' +
-      '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + t2('labsDiagnosticsRefresh') + '</button>' +
+      '<button type="button" data-diag-report style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;margin-right:4px;">' + esc(reportLabel) + '</button>' +
+      '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + esc(t2('labsDiagnosticsRefresh')) + '</button>' +
       '</span></div>' + body + '<div data-diag-report-status style="padding:2px 8px;color:#888;"></div>';
     var refreshBtn = panel.querySelector('[data-diag-refresh]');
     if (refreshBtn) refreshBtn.addEventListener('click', refresh);
     var reportBtn = panel.querySelector('[data-diag-report]');
     if (reportBtn) {
       reportBtn.addEventListener('click', function () {
-        var status = panel.querySelector('[data-diag-report-status]');
-        // result.entries is the exact window the panel is displaying, so the
-        // bundle reports what the user is looking at -- not a re-fetch that
-        // could have moved on between render and click.
-        buildReport(result.entries).then(function (out) {
-          if (!status) return;
-          if (out.error) { status.textContent = out.error; return; }
-          offerDownload(out.bundle);
-          status.textContent = out.bundle.commands.length + ' command(s), fixture ' + String(out.bundle.fixture.hash).slice(0, 12);
+        if (panel !== target || generation !== token) return;
+        var status = target.querySelector('[data-diag-report-status]');
+        if (result.identity && !sameDocument(result.identity, currentIdentity())) {
+          if (status) status.textContent = 'Document changed; refresh diagnostics before reporting.';
+          return;
+        }
+        // Fence completion even when disable/re-enable recreates a panel or
+        // Refresh starts another read before this continuation is scheduled.
+        buildReport(result).then(function (out) {
+          if (!status || panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
+          if (result.identity && !sameDocument(result.identity, currentIdentity())) return;
+          status.textContent = out.error;
         });
       });
     }
@@ -185,7 +168,8 @@
       var idx = parseInt(tr.getAttribute('data-layer-idx'), 10);
       if (idx < 0) return;
       tr.addEventListener('click', function () {
-        if (typeof SM !== 'undefined' && typeof SM.setActiveLayer === 'function') SM.setActiveLayer(idx, true);
+        if (panel === target && generation === token && sameDocument(result.identity, currentIdentity())
+          && typeof SM !== 'undefined' && typeof SM.setActiveLayer === 'function') SM.setActiveLayer(idx, true);
       });
     });
   }
@@ -194,7 +178,7 @@
     flag: 'nemo-labs-diagnostics-panel',
     describe: 'labsDescribeDiagnosticsPanel',
     onEnable: function () { build(); },
-    onDisable: function () { if (panel) { panel.remove(); panel = null; } },
+    onDisable: function () { generation++; if (panel) { panel.remove(); panel = null; } },
   });
   if (SMLabs.isOn('diagnostics-panel')) build();
 })();

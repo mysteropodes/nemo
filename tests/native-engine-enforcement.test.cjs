@@ -33,6 +33,9 @@ const CANDIDATE_FILES = [
   'native-engine/src/read_queries.rs',
   'native-engine/tests/application_read.rs',
   'native-engine/src/application_replacement.rs',
+  'native-engine/src/application.rs',
+  'native-engine/src/application_diagnostics.rs',
+  'native-engine/tests/application_diagnostics.rs',
   'native-engine/tests/application_replacement.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
@@ -79,7 +82,7 @@ const PRODUCTION = {
   history: ['history', 'transaction'],
   evaluation: ['evaluation'],
   scheduler: ['resource_leases', 'scheduler'],
-  compositor: ['compositor', 'render_scene'],
+  compositor: ['compositor', 'render_scene', 'render_geometry'],
   viewport: ['desktop_viewport'],
   export_job: ['export_job', 'export_job_lifecycle', 'png_output'],
   application: ['application', 'protocol', 'read_queries'],
@@ -195,7 +198,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(testMacros), Object.keys(TEST_TARGETS).map((name) => `test-${name}`));
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
-    if (name === 'export_job') expected.push('export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
+    if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
+    if (name === 'export_job') expected.push('export_geometry_tests = "../tests/render_geometry.rs"',
+      'export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
     if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
       'application_replacement_tests = "../tests/application_replacement.rs"');
     assert.deepEqual(testMacros[`test-${name}`], expected);

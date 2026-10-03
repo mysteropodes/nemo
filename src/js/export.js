@@ -570,12 +570,11 @@ function exportHasCenterlineMotion(){
 }
 function exportNeedsEngine(){return exportHasActiveEffects()||exportHasLayerCompositing()||exportHasEngineOnlyMotion()||exportHasImageMesh()||exportHasCenterlineMotion();}
 // ---- PNG sequence rendering to a working directory (shared by raster exports) ----
-async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha){
+async function exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha,signal){
   var nativeOpacity=exportNativeOpacity();if(nativeOpacity){
-    if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');
-    if((scale&&scale!==1)||alpha){await nativeOpacity.releaseCurrent(alpha?'alpha-raster-export':'scaled-raster-export');return exportRenderPNGsToDir(dir,start,end,scale,onProgress,alpha);}
+    if(!nativeOpacity.isActive())throw new Error('Native opacity export authority is indeterminate');if((scale&&scale!==1)||alpha)throw new Error('Native opacity PNG export supports only 1× with an opaque background');
     var destination=dir.replace(/[\\/]+$/,'')+'/nemo-native-opacity-'+Date.now()+'-'+Math.floor(Math.random()*1000000);var frames=[];for(var nativeFrame=start;nativeFrame<=end;nativeFrame++)frames.push(nativeFrame);
-    await nativeOpacity.exportPng(destination,frames,onProgress);return destination;
+    var receipt=await nativeOpacity.exportPng(destination,frames,onProgress,signal);return receipt&&receipt.status==='cancelled'?null:destination;
   }
   // Effects (blur/vignette/glow/ground shadow/...) only ever rendered in
   // the live GPU preview — exportFrameDataURL rasterizes straight from
@@ -1292,10 +1291,11 @@ window.SMExport={
 
   exportPNGSequence:async function(opts){
     if(!exportTauriAvailable())return{ok:false,error:'Disponible uniquement dans l\'app Nemo (pas en preview navigateur).'};
-    var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;
+    var r=exportFrameRange(opts);var scale=(opts&&opts.scale)||1;var nativeOpacity=exportNativeOpacity();if(nativeOpacity&&((scale!==1)||(opts&&opts.alpha)))return{ok:false,error:'Native opacity PNG export supports only 1× with an opaque background'};
+    if(opts&&opts.signal&&opts.signal.aborted)return{cancelled:true};
     var dir=await exportPickDir('Dossier de séquence PNG');
-    if(!dir)return{cancelled:true};
-    var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha);return{ok:true,dir:renderedDir};
+    if(!dir||opts&&opts.signal&&opts.signal.aborted)return{cancelled:true};
+    var renderedDir=await exportRenderPNGsToDir(dir,r.start,r.end,scale,opts&&opts.onProgress,opts&&opts.alpha,opts&&opts.signal);return renderedDir?{ok:true,dir:renderedDir}:{cancelled:true};
   },
 
   exportTIFFSequence:async function(opts){

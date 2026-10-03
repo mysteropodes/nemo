@@ -174,6 +174,46 @@ fn malformed_or_mismatched_input_fails_before_any_partial_publish() {
 }
 
 #[test]
+fn cubic_cap_matches_fixed_pixels_translation_and_pinned_identity() {
+    use crate::render_geometry_tests::{assert_cap_pixels, cap};
+    let mut compositor = Compositor::new().expect("N24A requires a real native GPU");
+    eprintln!("N24A GPU: {:?}", compositor.adapter().get_info());
+    for (frame, opacity) in [(0, 20), (10, 50), (20, 80)] {
+        for offset in [0, 64] {
+            let (mut scheduler, work) = scheduled(frame);
+            let identity = ScheduledFrameIdentity::from_scheduled(&work);
+            let geometry = cap(offset as f64);
+            let before = geometry.clone();
+            let counters = scheduler.lease_counters();
+            let pinned = scheduler.pinned_snapshot(work.work_id()).unwrap().clone();
+            let scene = prepare(&scheduler, &work, &geometry).unwrap();
+            let first = compositor.compose(&scene).unwrap();
+            let _preview = first.texture_view();
+            let bytes = compositor.readback_rgba8(&first).unwrap();
+            let repeated = compositor.compose(&scene).unwrap();
+            assert_eq!(bytes, compositor.readback_rgba8(&repeated).unwrap());
+            assert_eq!(bytes.scheduled_identity(), &identity);
+            assert_eq!(bytes.document_snapshot_id(), pinned.id());
+            assert_eq!(bytes.content_revision(), pinned.content_revision());
+            assert_cap_pixels(bytes.bytes(), opacity, offset);
+            assert_eq!(geometry, before);
+            assert_eq!(scheduler.lease_counters(), counters);
+            let after = scheduler.pinned_snapshot(work.work_id()).unwrap();
+            assert_eq!(after.id(), pinned.id());
+            assert_eq!(
+                serde_json::to_vec(after.document()).unwrap(),
+                serde_json::to_vec(pinned.document()).unwrap()
+            );
+            let receipt = scheduler.succeed(work.work_id()).unwrap();
+            assert_released(&scheduler);
+            let terminal = scheduler.lease_counters();
+            assert_eq!(scheduler.succeed(work.work_id()).unwrap(), receipt);
+            assert_eq!(scheduler.lease_counters(), terminal);
+        }
+    }
+}
+
+#[test]
 fn only_the_characterized_final_output_contract_is_admitted() {
     let rejected = [
         ("draft", output()),

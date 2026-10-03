@@ -156,6 +156,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         }
         let reconciled = outcome.unwrap().unwrap();
         self.history = prepared;
+        self.diagnostics = Default::default();
         self.requests.clear();
         self.replacement = None;
         Ok(reconciled)

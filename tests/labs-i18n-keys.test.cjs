@@ -14,6 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const LOCALES = ['en', 'fr', 'ja', 'es'];
@@ -42,7 +43,26 @@ function referencedKeys(source) {
   const keys = new Set();
   for (const match of source.matchAll(/(?:SM\.t|[^a-zA-Z_]t2?)\(\s*'([a-zA-Z][a-zA-Z0-9_]*)'\s*\)/g)) keys.add(match[1]);
   for (const match of source.matchAll(/describe:\s*'([a-zA-Z][a-zA-Z0-9_]*)'/g)) keys.add(match[1]);
+  // Labs spec labels and extra hints are key names resolved later through SM.t.
+  for (const match of source.matchAll(/(?:label|hintExtra):\s*'(labs[A-Za-z0-9_]*)'/g)) keys.add(match[1]);
   return keys;
+}
+
+function missingReferences(sources, bodies) {
+  const missing = [];
+  for (const [file, source] of sources) {
+    for (const key of referencedKeys(source)) {
+      const absent = bodies.filter(({ body }) => !declares(body, key)).map(({ locale }) => locale);
+      if (absent.length) missing.push(`${file}: ${key} missing from ${absent.join(', ')}`);
+    }
+  }
+  return missing;
+}
+
+function labsSources() {
+  const dir = path.join(ROOT, 'src/js/labs');
+  return fs.readdirSync(dir).filter((name) => name.endsWith('.js'))
+    .map((file) => [file, fs.readFileSync(path.join(dir, file), 'utf8')]);
 }
 
 test('the check itself detects a declared key, so a green result is not vacuous', () => {
@@ -56,22 +76,31 @@ test('the check itself detects a declared key, so a green result is not vacuous'
 
 test('every i18n key referenced by a Labs panel is declared in all four locales', () => {
   const bodies = localeBodies();
-  const dir = path.join(ROOT, 'src/js/labs');
-  const missing = [];
-  for (const file of fs.readdirSync(dir).filter((name) => name.endsWith('.js'))) {
-    const source = fs.readFileSync(path.join(dir, file), 'utf8');
-    for (const key of referencedKeys(source)) {
-      const absent = bodies.filter(({ body }) => !declares(body, key)).map(({ locale }) => locale);
-      if (absent.length) missing.push(`${file}: ${key} missing from ${absent.join(', ')}`);
-    }
-  }
+  const missing = missingReferences(labsSources(), bodies);
   assert.deepEqual(missing, [], `Labs panels reference i18n keys that do not exist:\n  ${missing.join('\n  ')}`);
+});
+
+test('the scanner finds deferred Labs labels and hints, and a one-locale deletion fails', () => {
+  const sources = labsSources();
+  const panel = sources.find(([file]) => file === 'labs-panel.js');
+  assert.ok(panel, 'Labs settings panel is part of the scanned source set');
+  assert.ok(referencedKeys(panel[1]).has('labsPanelLabelDiagnostics'));
+  assert.ok(referencedKeys(panel[1]).has('labsPanelHintFrenchCurve'));
+  assert.ok(!referencedKeys("{ value: '1', label: 'Ones (1)' }").has('Ones'));
+
+  const bodies = localeBodies();
+  const mutated = bodies.map(({ locale, body }) => ({
+    locale,
+    body: locale === 'ja' ? body.replace(/labsPanelLabelDiagnostics\s*:\s*'[^']*',/, '') : body,
+  }));
+  assert.deepEqual(missingReferences(sources, mutated).filter((entry) => entry.includes('labsPanelLabelDiagnostics')),
+    ['labs-panel.js: labsPanelLabelDiagnostics missing from ja']);
 });
 
 test('the diagnostics panel keys specifically resolve to real text, not to their own name', () => {
   const bodies = localeBodies();
   const keys = ['labsDiagnosticsTitle', 'labsDiagnosticsRefresh', 'labsDiagnosticsReport',
-    'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel'];
+    'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics'];
   for (const { locale, body } of bodies) {
     for (const key of keys) {
       assert.ok(declares(body, key), `${key} is missing from the ${locale} block`);
@@ -79,5 +108,39 @@ test('the diagnostics panel keys specifically resolve to real text, not to their
       assert.ok(value && value[1].trim(), `${key} in ${locale} must have non-empty text`);
       assert.notEqual(value[1], key, `${key} in ${locale} must not be its own name`);
     }
+  }
+});
+
+test('production SM.t resolves all six diagnostics keys in every locale', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'src/js/i18n.js'), 'utf8');
+  const state = { language: 'en' };
+  const window = { state };
+  const document = {
+    readyState: 'loading',
+    addEventListener() {},
+    querySelectorAll() { return []; },
+    getElementById() { return null; },
+  };
+  vm.runInNewContext(source, { window, state, document, localStorage: { setItem() {} } },
+    { filename: 'src/js/i18n.js' });
+  const keys = ['labsDiagnosticsTitle', 'labsDiagnosticsRefresh', 'labsDiagnosticsReport',
+    'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics'];
+  // T10 leaves Report unavailable until a native recording with a recoverable
+  // fixture exists; the Labs tooltip must not promise a bundle meanwhile.
+  const unavailable = {
+    en: /Report is currently unavailable/,
+    fr: /rapport est actuellement indisponible/,
+    ja: /レポートは現在利用できません/,
+    es: /informe no está disponible actualmente/,
+  };
+  for (const locale of LOCALES) {
+    window.SM.setLanguage(locale);
+    for (const key of keys) {
+      const value = window.SM.t(key);
+      assert.ok(typeof value === 'string' && value.trim(), `${locale}: ${key} has text`);
+      assert.notEqual(value, key, `${locale}: ${key} did not fall through to the raw key`);
+    }
+    assert.match(window.SM.t('labsDescribeDiagnosticsPanel'), unavailable[locale],
+      `${locale}: diagnostics tooltip must describe Report as unavailable`);
   }
 });

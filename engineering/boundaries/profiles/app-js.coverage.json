@@ -19,23 +19,23 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "899615df642db7bc49a93ba6963c062505901003",
-    "sourceRootTree": "8dcecf3ad2b80cb49ccae5b388031dfa6adf6e16",
+    "candidateCommit": "1f2782c0f65f49947418fae214b96e8ca445cf36",
+    "sourceRootTree": "798327fdc6778f570da7411e1cd1daa398de054e",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "25194e685ce4c98b83475590b95ee39507eb454a",
-      "lastChangedCommit": "899615df642db7bc49a93ba6963c062505901003"
+      "gitTree": "feb231b413d040da3337b19a3c41baebff9ebb35",
+    "lastChangedCommit": "1f2782c0f65f49947418fae214b96e8ca445cf36"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "12d92013a74e65175bebca106cffb356e4fd66dc",
-      "sha256": "b7769b9d22f73a50d617c9645c653667d3c1dadef327699b7b522c6b6c47bcf9",
-      "lastChangedCommit": "e5a335978be5ba72e0683301c239f5d8ac7d4133"
+      "gitBlob": "f163394cb1048bbecd73426031b5c1ed1d098805",
+      "sha256": "ae80ceee592c6f2e278956f1c6cfb48f5b291d12610902b85d2ff42cc80e997b",
+      "lastChangedCommit": "decc26fdc05995b025edd4451762d9ad4ca02924"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "7504e68d69f74675b7672b78eceda2a86346aee88eb8f5a2880b7ea91b22df64"
+      "value": "15b1cc9c238c6b5a76c781ae874bf2ab3941cd7a37ffd232a1b6c936b0ebac76"
     },
     "profiles": [
       {
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 176,
-    "externalClassicTags": 173,
+    "totalScriptTags": 175,
+    "externalClassicTags": 172,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 169,
+    "retainedClassicTags": 168,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 172,
+    "classicTagsUnderSrcJsIncludingVendors": 171,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -1385,14 +1385,9 @@
     {
       "path": "src/js/domain/diagnostics/opacity-reproduction-bundle.js",
       "moduleId": "app.opacity.reproduction.bundle.domain",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2522,
-          "scriptOrdinal": 176
-        }
-      ]
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "activation": "T07: codec retained for isolated synthetic tests. T10 source-stage report is unavailable pending T10A native recording and T08B binding; no production load site is claimed."
     },
     {
       "path": "src/js/domain/document/folder-codec.js",

@@ -84,8 +84,8 @@
       "id": "rust.native.engine.render-scene",
       "layer": "native-render-scene",
       "dir": "native-engine/src",
-      "files": ["render_scene.rs"],
-      "publicApi": ["render_scene.rs"],
+      "files": ["render_scene.rs", "render_geometry.rs"],
+      "publicApi": ["render_scene.rs", "render_geometry.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -132,7 +132,7 @@
       "id": "rust.native.engine.application",
       "layer": "native-application",
       "dir": "native-engine/src",
-      "files": ["application.rs", "application_replacement.rs"],
+      "files": ["application.rs", "application_replacement.rs", "application_diagnostics.rs"],
       "publicApi": ["application.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "render_geometry.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
@@ -231,6 +231,7 @@
       "dir": "src-tauri/src",
       "files": [
         "application_mcp_tests.rs",
+        "application_mcp_diagnostics_tests.rs",
         "native_revision_sync_tests.rs"
       ],
       "publicApi": [],

@@ -19,6 +19,12 @@ use std::collections::HashMap;
 #[path = "application_replacement.rs"]
 mod replacement;
 pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgress};
+#[path = "application_diagnostics.rs"]
+mod diagnostics;
+
+#[cfg(test)]
+#[path = "../tests/application_diagnostics.rs"]
+mod diagnostics_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceResolutionErrorKind {
@@ -76,6 +82,7 @@ pub struct NativeApplication<P, C, R> {
     requests: HashMap<String, RecordedRequest>,
     release: Option<ApplicationReleaseReceipt>,
     replacement: Option<ReplacementProgress>,
+    diagnostics: diagnostics::RecentDiagnostics,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
@@ -95,6 +102,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             requests: HashMap::new(),
             release: None,
             replacement: None,
+            diagnostics: diagnostics::RecentDiagnostics::default(),
         })
     }
 
@@ -117,7 +125,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.history.acquire_snapshot(revision)
     }
 
-    pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+    fn dispatch_inner(&mut self, request: OpacityRequest) -> ResponseEnvelope {
         if self.replacement.is_some() {
             return self.failure(
                 &request,
@@ -186,6 +194,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         }
 
         match request.operation.as_str() {
+            diagnostics::QUERY => self.recent_diagnostics(&request),
             OP_JOB_EXPORT_PNG_BEGIN => self.begin_export(&request, fingerprint),
             OP_JOB_EXPORT_PNG_STATUS => self.job_stage(&request, fingerprint, false),
             OP_JOB_EXPORT_PNG_CANCEL => self.job_stage(&request, fingerprint, true),
