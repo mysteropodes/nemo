@@ -1346,36 +1346,22 @@
   document.addEventListener('pointerdown',function(e){
     var el=e.target.closest&&e.target.closest('input.scrub');
     if(!el||document.activeElement===el)return;
-    scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,moved:false};
+    scrubState={el:el,pointerId:e.pointerId,startX:e.clientX,startVal:parseFloat(el.value)||0,
+      moved:false,nativeOpacity:el.dataset.nativeOpacityScrub==='static'};
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
-  // Live scrub (2026-07-17, "les valeurs qui se changent en drag doivent
-  // se refléter en temps réel dans le canvas, pas juste au relâchement") :
-  // pendant le drag, on dispatch les VRAIS événements 'input' et 'change'
-  // au plus une fois par frame. Les deux doivent être coalescés : les
-  // transformations, le zoom, les masques et plusieurs effets font leur
-  // rendu lourd sur 'input', tandis que Motion utilise surtout 'change'.
-  // Un stylet peut envoyer bien plus de 60 pointermove/s, mais seul le
-  // dernier état avant la prochaine image est visible. Au relâchement on
-  // flush synchroniquement une valeur encore en attente, donc aucun delta
-  // final n'est perdu.
-  //
-  // Contrepartie undo : la plupart de ces handlers commencent par
-  // pushUndo() — un snapshot par tick de drag aurait pollué la pile (des
-  // dizaines d'entrées pour UN geste) et, pire, le snapshot du release
-  // aurait capturé l'état déjà-final (Ctrl+Z = no-op perçu). D'où
-  // window._scrubLiveActive : UN pushUndo réel au premier mouvement du
-  // drag (snapshot pré-geste), puis pushUndoLayers (tweens.js) NO-OP tant
-  // que le flag est levé — y compris pendant le 'change' final du release.
-  // Un geste = une entrée d'undo, qui restaure l'état d'avant le drag.
+  // Legacy scrubs coalesce input/change to one animation frame and flush on
+  // release. Their first movement snapshots pre-gesture undo; subsequent
+  // handlers see _scrubLiveActive and cannot add duplicate history entries.
+  // Native opacity skips those events; its final change makes one Rust history entry.
   var scrubChangeRaf=0,scrubLiveDirty=false;
   function dispatchLiveChange(){
     scrubLiveDirty=true;
     if(scrubChangeRaf)return;
     scrubChangeRaf=requestAnimationFrame(function(){
       scrubChangeRaf=0;
-      if(scrubState&&scrubState.moved&&scrubLiveDirty){
+      if(scrubState&&scrubState.moved&&!scrubState.nativeOpacity&&scrubLiveDirty){
         scrubLiveDirty=false;
         scrubState.el.dispatchEvent(new Event('input',{bubbles:true}));
         scrubState.el.dispatchEvent(new Event('change',{bubbles:true}));
@@ -1391,7 +1377,7 @@
       // data-nav-only (tl-cf) : le champ ne fait QUE naviguer (goToFrame),
       // aucune édition de document — un pushUndo ici ne ferait que polluer
       // la pile d'un snapshot identique et vider le redo pour rien.
-      if(window.pushUndo&&!scrubState.el.dataset.navOnly)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
+      if(window.pushUndo&&!scrubState.el.dataset.navOnly&&!scrubState.nativeOpacity)window.pushUndo(); // snapshot pré-geste, AVANT de lever le flag
       window._scrubLiveActive=true;
     }
     var step=parseFloat(scrubState.el.dataset.step)||1;
@@ -1406,12 +1392,22 @@
     if(max!==null)raw=Math.min(max,raw);
     var decimals=(String(step).split('.')[1]||'').length;
     scrubState.el.value=decimals?raw.toFixed(decimals):Math.round(raw);
-    dispatchLiveChange();
+    if(!scrubState.nativeOpacity)dispatchLiveChange();
   });
   function endScrub(e){
     if(!scrubState||(e&&e.pointerId!==undefined&&e.pointerId!==scrubState.pointerId))return;
     if(scrubChangeRaf){cancelAnimationFrame(scrubChangeRaf);scrubChangeRaf=0;}
     if(!scrubState.moved){scrubState.el.focus();scrubState.el.select();}
+    else if(scrubState.nativeOpacity){
+      var nativeField=scrubState.el,nativeStart=scrubState.startVal;
+      nativeField.classList.remove('scrubbing');
+      try{
+        if(e.type!=='pointercancel'&&nativeField.isConnected!==false)nativeField.dispatchEvent(new Event('change',{bubbles:true}));
+      }finally{
+        nativeField.value=nativeStart;
+        window._scrubLiveActive=false;
+      }
+    }
     else{
       scrubState.el.classList.remove('scrubbing');
       if(scrubLiveDirty){
@@ -1433,6 +1429,10 @@
   // window losing focus mid-drag), don't leave a scrub stuck forever.
   window.addEventListener('blur',function(){
     if(scrubChangeRaf){cancelAnimationFrame(scrubChangeRaf);scrubChangeRaf=0;}
+    if(scrubState&&scrubState.nativeOpacity) {
+      scrubState.el.value=scrubState.startVal;
+      scrubState.el.classList.remove('scrubbing');
+    }
     scrubLiveDirty=false;scrubState=null;window._scrubLiveActive=false;
   });
 })();

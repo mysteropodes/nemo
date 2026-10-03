@@ -1705,6 +1705,8 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
     String(element.className).includes('motion-val'));
   assert.ok(input && input._listeners.change && input._listeners.change.length === 1,
     'production scrubField installed its opacity change callback');
+  assert.equal(input.dataset.nativeOpacityScrub, 'static',
+    'only the admitted native static opacity row uses the native scrub path');
 
   function commitInput(value) {
     input.value = String(value);
@@ -1736,10 +1738,97 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   assert.equal(harness.state.releases, 0, 'first opacity commands remain native after canvas selection');
   assert.deepEqual(harness.state.history, [25]);
   assert.deepEqual(harness.state.redo, [60]);
+  assert.equal(harness.controller.isActive(), true);
   assert.equal(synchronousRenders, 0, 'native input callbacks defer cache-reading renders to afterChange');
   assert.equal(refreshes, 2, 'activation and the final queued mutation each publish one readable refresh');
   assert.equal(JSON.stringify(source), legacyBytes, 'native UI callbacks never mutate the frozen JS shell');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'native UI callbacks never mutate the Paper mirror');
+
+  // Exercise the shipped generic pointer scrub against the actual rendered
+  // Motion input and native command facade, not a manually invoked callback.
+  const uiSource = fs.readFileSync(path.join(ROOT, 'src/js/ui.js'), 'utf8');
+  const scrubStart = uiSource.indexOf('var scrubState=null;');
+  const scrubEnd = uiSource.indexOf('})();', scrubStart);
+  assert.ok(scrubStart >= 0 && scrubEnd > scrubStart);
+  const scrubListeners = new Map();
+  const nativeScrubIntents = [];
+  const priorLegacyIntent = motion.sandbox.NemoOpacityApplication.legacy;
+  motion.sandbox.NemoOpacityApplication.legacy = (...args) => {
+    nativeScrubIntents.push(args);
+    return priorLegacyIntent(...args);
+  };
+  const scrubDocument = { activeElement: null,
+    addEventListener(type, listener) { scrubListeners.set(type, listener); } };
+  currentInput.closest = (selector) => selector === 'input.scrub' ? currentInput : null;
+  currentInput.min = ''; currentInput.max = '';
+  assert.equal(currentInput._listeners.change.length, 1);
+  currentInput.setPointerCapture = () => {};
+  let scrubChanges = 0;
+  let scrubValueAtChange = null;
+  currentInput.dispatchEvent = (event) => {
+    if (event.type === 'change') { scrubChanges++; scrubValueAtChange = currentInput.value; }
+    for (const listener of currentInput._listeners[event.type] || []) listener(event);
+  };
+  vm.runInNewContext(uiSource.slice(scrubStart, scrubEnd), {
+    document: scrubDocument, window: motion.sandbox, Math,
+    Event: class { constructor(type) { this.type = type; } },
+    requestAnimationFrame() { throw new Error('native pointer scrub dispatched an interim edit'); },
+    cancelAnimationFrame() {},
+  });
+  function pointer(type, x) {
+    scrubListeners.get(type)({ type, target: currentInput, pointerId: 7,
+      clientX: x, preventDefault() {} });
+  }
+  pointer('pointerdown', 100);
+  assert.doesNotThrow(() => pointer('pointermove', 160));
+  assert.equal(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply').length, 2,
+    'pointer movement is tentative and does not enter native history');
+  pointer('pointerup', 160);
+  assert.equal(scrubChanges, 1, 'one release reaches the real Motion change callback');
+  assert.equal(Number(scrubValueAtChange), 55);
+  assert.deepEqual(nativeScrubIntents.map((args) => [args[0], args[2][0]]), [['set', 55]]);
+  assert.equal(Number(currentInput.value), 40, 'field awaits the authoritative native projection');
+  await harness.controller.flush();
+  assert.deepEqual(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply')
+    .map((request) => request.payload.value), [40, 60, 55]);
+  assert.deepEqual(harness.state.history, [25, 40], 'one pointer gesture creates one native history entry');
+  assert.deepEqual(harness.state.redo, [], 'new native command clears the prior redo branch');
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [55]);
+  await harness.controller.historyFromUi('undo', 'ui-undo-pointer-scrub');
+  await harness.controller.flush();
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [40]);
+  await harness.controller.historyFromUi('redo', 'ui-redo-pointer-scrub');
+  await harness.controller.flush();
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [55]);
+  assert.equal(JSON.stringify(source), legacyBytes, 'pointer scrub never mutates the frozen JS shell');
+  assert.equal(JSON.stringify(paperProject), paperBytes, 'pointer scrub never mutates the Paper mirror');
+
+  // A retained field may receive pointerup after an Open replaces its native
+  // session. It must not apply its old drag to the new document.
+  const priorDocumentId = harness.controller.identity().documentId;
+  pointer('pointerdown', 100);
+  pointer('pointermove', 160);
+  await harness.controller.releaseCurrent('replacement-during-opacity-scrub');
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  assert.notEqual(harness.controller.identity().documentId, priorDocumentId);
+  await harness.controller.setOpacity('r08_curve_layer', 80);
+  await harness.controller.flush();
+  const commandsBeforeStaleRelease = harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length;
+  pointer('pointerup', 160);
+  await harness.controller.flush();
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [80]);
+  const nativeOwner = motion.sandbox.NemoNativeOpacityCutover;
+  motion.sandbox.NemoNativeOpacityCutover = {
+    ...nativeOwner, identity() { throw new Error('native identity fenced'); },
+  };
+  currentInput.value = '60';
+  assert.doesNotThrow(() => currentInput._listeners.change[0]());
+  motion.sandbox.NemoNativeOpacityCutover = nativeOwner;
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
 });
 
 test('v1 facade rejects stale identity and malformed read payloads as structured failures', async () => {
