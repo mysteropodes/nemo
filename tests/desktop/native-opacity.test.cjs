@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const http = require('node:http');
 const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { createController, packagedApp, hash, alive } = require('./native-harness.cjs');
@@ -114,6 +115,36 @@ test('installed native opacity: live command oracles and externally driven UI ch
       'Resource-loss control terminates the owned app host; it does not inject a hardware GPU device fault.'] };
   const controller = createController({ root: ROOT, app: app.bundle });
   let instance, endpoint, stage = 'launch', sequence = 0;
+  const captureToken = randomUUID();
+  const captureServer = http.createServer((request, response) => {
+    const send = (code, value) => {
+      response.writeHead(code, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(value));
+    };
+    if (request.method !== 'POST' || request.url !== '/capture/' + encodeURIComponent(stage)
+      || request.headers['x-nemo-capture-token'] !== captureToken) {
+      request.resume(); send(403, { error: 'inactive or unauthenticated checkpoint' }); return;
+    }
+    let size = 0, chunks = [];
+    request.on('data', chunk => {
+      size += chunk.length;
+      if (size > 8 * 1024 * 1024) chunks = null;
+      else if (chunks) chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (!chunks) { send(413, { error: 'screenshot exceeds 8 MiB' }); return; }
+      const bytes = Buffer.concat(chunks);
+      const jpeg = bytes.length > 4 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      if (!jpeg && !png) { send(415, { error: 'expected JPEG or PNG screenshot bytes' }); return; }
+      const image = stage + (jpeg ? '.jpg' : '.png');
+      try {
+        fs.writeFileSync(path.join(reportDir, image), bytes, { flag: 'wx', mode: 0o600 });
+        send(201, { checkpoint: stage, image, sha256: hash(path.join(reportDir, image)) });
+      } catch { send(409, { error: 'checkpoint screenshot already exists or could not be stored' }); }
+    });
+  });
+  captureServer.requestTimeout = 15000;
   async function waitFor(check, label, timeout = 180000) {
     const deadline = Date.now() + timeout;
     do {
@@ -127,7 +158,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
   function phase(name, instruction) {
     stage = name;
     write(path.join(reportDir, 'phase.json'), { checkpoint: name, instruction, appPid: instance.snapshot.app.pid,
-      executableSha256: app.executableSha256, fixtures, reportDir });
+      executableSha256: app.executableSha256, fixtures, reportDir,
+      screenshotCapture: { url: 'http://127.0.0.1:' + captureServer.address().port +
+        '/capture/' + encodeURIComponent(name), token: captureToken } });
     t.diagnostic('N21 UI checkpoint: ' + name + ' — ' + instruction);
   }
   function status() { return wire(endpoint, 'nativeStatus', { apiVersion: 2,
@@ -204,9 +237,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
     report.checks.push({ checkpoint: name, value, evidence: name + '.json' });
   }
   async function capture(name, instruction) {
-    phase(name, instruction + ' Save the real screenshot and ' + name + '.json in the report directory.');
+    phase(name, instruction + ' Capture the selected real app window through the private loopback screenshot endpoint in phase.json, then write ' + name + '.json with its returned image and sha256.');
     const file = path.join(reportDir, name + '.json');
-    await waitFor(() => fs.existsSync(file), name);
+    await waitFor(() => fs.existsSync(file), name, 300000);
     const evidence = read(file);
     assert.equal(evidence.checkpoint, name); assert.equal(evidence.appPid, instance.snapshot.app.pid);
     assert.equal(evidence.executableSha256, app.executableSha256);
@@ -225,6 +258,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     name + ' must show the admitted document and frame in the actual editor');
   }
   try {
+    await new Promise((resolve, reject) => {
+      captureServer.once('error', reject);
+      captureServer.listen(0, '127.0.0.1', resolve);
+    });
     instance = await controller.start(`n21-opacity-${process.pid}-${Date.now()}`, ['desktop-input', 'gpu-reference']);
     const owned = await controller.status(instance); assert.equal(owned.code, 0); instance.snapshot = owned.value;
     assert.equal(fs.realpathSync(instance.snapshot.app.executable), app.executable);
@@ -387,6 +424,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
       assert.equal(identity.sourceIdentity().head, source.head);
       assert.equal(identity.sourceIdentity().dirty, false);
     } catch (error) { report.result = 'fail'; report.cleanup = 'incomplete'; throw error; }
-    finally { write(path.join(reportDir, 'result.json'), report); }
+    finally {
+      if (captureServer.listening) await new Promise(resolve => captureServer.close(resolve));
+      write(path.join(reportDir, 'result.json'), report);
+    }
   }
 });
