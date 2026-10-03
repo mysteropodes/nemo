@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "53eff7a9f0188a8031d859ceb81921df0ccd3a57",
-    "sourceRootTree": "1856097791b6cdf86556181437fcd91618a399ea",
+    "candidateCommit": "13df7116aea5b672698e1a638f18602d139f672c",
+    "sourceRootTree": "0763713a128181e4051036e27b032b5338667fc2",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "45963db375d64c1cf751144842f4fdcc7032d869",
-      "lastChangedCommit": "53eff7a9f0188a8031d859ceb81921df0ccd3a57"
+      "gitTree": "540cf73fbacb4338939c5dda53b2ba55ed7b9de7",
+      "lastChangedCommit": "13df7116aea5b672698e1a638f18602d139f672c"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "f163394cb1048bbecd73426031b5c1ed1d098805",
-      "sha256": "ae80ceee592c6f2e278956f1c6cfb48f5b291d12610902b85d2ff42cc80e997b",
-      "lastChangedCommit": "decc26fdc05995b025edd4451762d9ad4ca02924"
+      "gitBlob": "da45f0f99bd1472442caeb9a4a75b49749fe0c61",
+      "sha256": "28f89bd228abaf59fbeaadcbb2ac01f65084b22e775d8340c656cd85fd280fba",
+      "lastChangedCommit": "11ab2bac87ec6e1d75bd4a753fa40f14fdb5a546"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "894d15b05d0553cabf7d36ff58c7eccea0fb4e2a32f5736164e71fd0875c0e34"
+      "value": "0f987c58f754e07896c6769ff21c6644818f1a8203a5ba75718909405a9efd70"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "b9e683fda9ae58bbfd35e0afbb3d63ec72f0d381",
-        "sha256": "97c27bfcedf8c1bce075ecb4ac87f97dd75ac94935281f56ece37e802e071d49",
-        "moduleCount": 187,
-        "basedOnCommit": "decc26fdc05995b025edd4451762d9ad4ca02924"
+        "gitBlob": "ad5a1e55555e866e92b261c4695f4c413bed0fc5",
+        "sha256": "87a516f7a9543d4d54acd26841e104832790c36ed7e7400281266b4b34547120",
+        "moduleCount": 188,
+        "basedOnCommit": "11ab2bac87ec6e1d75bd4a753fa40f14fdb5a546"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 175,
-    "externalClassicTags": 172,
+    "totalScriptTags": 176,
+    "externalClassicTags": 173,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 168,
+    "retainedClassicTags": 169,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 171,
+    "classicTagsUnderSrcJsIncludingVendors": 172,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -753,6 +753,18 @@
           "path": "src/index.html",
           "line": 2513,
           "scriptOrdinal": 167
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-diagnostics-query.js",
+      "moduleId": "app.native.diagnostics.query.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2522,
+          "scriptOrdinal": 176
         }
       ]
     },

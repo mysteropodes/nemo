@@ -228,7 +228,7 @@ test('schema includes active feature operations while the JS adapter retains its
   const descriptors = [...block.matchAll(/include_str!\s*\(\s*"([^"]+)"\s*\)/g)]
     .map((match) => JSON.parse(fs.readFileSync(path.resolve(ROOT, 'nemo-mcp/src', match[1]), 'utf8')));
   assert.deepEqual([...schemaOperations].sort(), descriptors.flatMap((entry) => entry.operations).sort());
-  assert.throws(() => validateRequest({ ...query(), operation: 'query.diagnostics.recent', payload: {} }), /operation/);
+  assert.doesNotThrow(() => validateRequest({ ...query(), operation: 'query.diagnostics.recent', payload: {} }));
   assert.equal(declaration.schemaVersion, 2);
   assert.equal(declaration.apiVersion, 2);
   assert.equal(declaration.status, 'active');

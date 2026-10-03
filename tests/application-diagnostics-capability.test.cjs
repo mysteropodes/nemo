@@ -137,140 +137,7 @@ test('routing guard: diagnostics-panel.js never calls diagnostics.replay or a pr
   assert.doesNotMatch(code, /property\.(set|key\.set|key\.remove|animation\.set)/, 'the panel must never mutate a document property');
 });
 
-// ---- panel and capability observe the exact same synthetic trace ----------
-//
-// Loads the real shipped sources (opacity-application.js chain +
-// diagnostics-panel.js) into one shared vm context, the same pattern
-// application-opacity-bootstrap.test.cjs already uses, plus a minimal DOM
-// fake covering exactly what the panel needs (createElement/appendChild/
-// innerHTML/style). Not a reimplementation of the panel: the actual shipped
-// diagnostics-panel.js source runs unmodified.
-
-function fakeElement(tag) {
-  return {
-    tagName: tag, style: {}, children: [], _html: '',
-    get innerHTML() { return this._html; }, set innerHTML(v) { this._html = v; },
-    setAttribute() {}, getAttribute() { return null; },
-    appendChild(child) { this.children.push(child); return child; },
-    remove() {}, addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; },
-  };
-}
-
-function panelWindow(options = {}) {
-  let sequence = 0;
-  const flags = {};
-  const domain = require('../src/js/domain/animation/opacity.js');
-  const undo = [], redo = [];
-  const layerA = 'diag-panel-layer-a';
-  const state = { currentFrame: 0, totalFrames: 24, fps: 24, appMode: 'motion',
-    activeLayerIdx: 0, waOut: 23, maxUndo: 50, symbols: {},
-    layers: [{ name: 'A', layerUid: layerA, frames: { 0: { strokes: [] } }, motionStatic: { opacity: [100] } }],
-    undoStack: [], redoStack: [], undoLabels: [], redoLabels: [] };
-  const ctx = {
-    console,
-    document: {
-      _lastCreated: null,
-      createElement(tag) { const el = fakeElement(tag); this._lastCreated = el; return el; },
-      body: { appendChild: () => {} }, readyState: 'complete', addEventListener: () => {},
-      querySelector: () => null, querySelectorAll: () => [], getElementById: () => null,
-    },
-    localStorage: { getItem: (k) => (flags[k] ? '1' : null), setItem: (k, v) => { flags[k] = v === '1'; } },
-    crypto: { randomUUID: () => `panel-${++sequence}` },
-    state, userLayers: [], _layerSel: [],
-    SM: { t: (k) => k, setActiveLayer: () => {} },
-    saveAllLayerFrames: () => {}, activateUL: () => {}, loadFrame: () => {},
-    renderOS: () => {}, renderArcs: () => {}, updateUI: () => {}, showToast: () => {},
-    renderLayerList: () => {}, renderTimeline: () => {},
-    createUserLayer() { return 0; },
-  };
-  ctx.window = ctx;
-  vm.createContext(ctx);
-  for (const file of ['animation/curve.js', 'domain/animation/opacity.js', 'motion.js',
-    'domain/document/folder-codec.js', 'domain/tween/assignment.js', 'application/history/frame-entry.js',
-    'tweens.js', 'domain/diagnostics/opacity-diagnostics.js', 'application/opacity-application.js',
-    'application/capability-registry.js', 'application/opacity-capability.js',
-    'application/export-job.js', 'adapters/export-svg-sequence.js',
-    'bootstrap/opacity-application.js',
-    'application/diagnostics-capability.js', 'labs/labs-core.js', 'labs/diagnostics-panel.js']) {
-    const filename = path.resolve(ROOT, 'src/js', file);
-    let source = fs.readFileSync(filename, 'utf8');
-    if (options.counterStart !== undefined && ['application/diagnostics-capability.js', 'labs/diagnostics-panel.js'].includes(file)) {
-      // Reach the otherwise impractical exhaustion boundary without a public
-      // production test hook. Everything after initialization is real code.
-      assert.ok(source.includes('var minted = 0;'));
-      source = source.replace('var minted = 0;', `var minted = ${options.counterStart};`);
-    }
-    vm.runInContext(source, ctx, { filename });
-    if (file === 'tweens.js') { ctx.renderOS = () => {}; ctx.renderArcs = () => {}; }
-  }
-  return { ctx, layerA };
-}
-
-test('the diagnostics capability and the panel observe the exact same synthetic trace', () => {
-  const { ctx, layerA } = panelWindow();
-  function send(id, value) {
-    const response = ctx.NemoApplication.handle({ apiVersion: 1, requestId: id, ...ctx.NemoOpacityApplication.meta(),
-      expectedRevision: ctx.NemoOpacityApplication.meta().revision, operation: 'property.set', payload: { layerId: layerA, property: 'opacity', value } });
-    assert.equal(response.ok, true, JSON.stringify(response));
-  }
-  send('panel-c1', 41);
-  send('panel-c2', 52);
-
-  // The capability's own view.
-  const registry = ctx.NemoCapabilityRegistry.create();
-  const handler = ctx.NemoDiagnosticsCapability.handlerFor(ctx.window);
-  ctx.NemoDiagnosticsCapability.register(registry, handler, { state: 'available', reason: null });
-  const inspected = handler({ operation: 'inspect', payload: {} });
-  assert.equal(inspected.ok, true);
-  // Spread out of the vm realm: its Array.prototype differs from this
-  // realm's, so a structurally identical array still fails deepEqual by
-  // prototype alone (same trap documented in
-  // application-opacity-capability.test.cjs).
-  assert.deepEqual([...inspected.result.entries].map((e) => e.requestId), ['panel-c1', 'panel-c2']);
-
-  // The panel's own view: enabling the labs flag renders through the real
-  // shipped diagnostics-panel.js, which fetches through the same
-  // NemoApplication.handle('diagnostics.trace', ...) path.
-  ctx.SMLabs.enable('diagnostics-panel');
-  const panelEl = ctx.document._lastCreated; // see note below
-  assert.ok(panelEl, 'the panel must have created its container element');
-  assert.match(panelEl.innerHTML, /panel-c1/);
-  assert.match(panelEl.innerHTML, /panel-c2/);
-  assert.match(panelEl.innerHTML, /property\.set/);
-});
-
-// ---- review fixes (Pollen, 2026-09-22) -------------------------------------
-
-test('a hostile requestId cannot inject markup into the panel', () => {
-  // requestId is caller-supplied and only length-checked by validate(), so it
-  // arrives here verbatim from whatever drove the command -- an MCP client
-  // included. The panel builds rows as an innerHTML string, so this is the
-  // regression guard for that escaping.
-  const HOSTILE = '"><img src=x onerror=alert(1)>';
-  const { ctx, layerA } = panelWindow();
-  const meta = () => ctx.NemoOpacityApplication.meta();
-  const written = ctx.NemoApplication.handle({ apiVersion: 1, requestId: HOSTILE, ...meta(),
-    expectedRevision: meta().revision, operation: 'property.set',
-    payload: { layerId: layerA, property: 'opacity', value: 42 } });
-  assert.equal(written.ok, true, 'the core still accepts it as an ordinary requestId; the panel is what must be safe');
-
-  ctx.SMLabs.enable('diagnostics-panel');
-  const html = ctx.document._lastCreated.innerHTML;
-  assert.doesNotMatch(html, /<img/, 'no tag may survive into the rendered markup');
-  assert.ok(!html.includes(HOSTILE), 'the payload must not appear verbatim');
-  assert.match(html, /&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;/, 'it must appear escaped instead');
-});
-
-test('the panel escapes every interpolated trace field, not only requestId', () => {
-  const { ctx, layerA } = panelWindow();
-  const meta = () => ctx.NemoOpacityApplication.meta();
-  ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'a<b>&c"d', ...meta(),
-    expectedRevision: meta().revision, operation: 'property.set',
-    payload: { layerId: layerA, property: 'opacity', value: 7 } });
-  ctx.SMLabs.enable('diagnostics-panel');
-  const html = ctx.document._lastCreated.innerHTML;
-  assert.match(html, /a&lt;b&gt;&amp;c&quot;d/);
-});
+// Native panel behavior and T12 counter oracles: native-diagnostics-query.test.cjs.
 
 test('retentionLimit is read from the application, not restated as a literal', () => {
   // A bound change made coherently (ring buffer + capabilitySummary) used to
@@ -323,8 +190,8 @@ test('routing guard: no trace field is interpolated into the panel markup withou
   const code = withoutLineComments(fs.readFileSync(path.join(ROOT, 'src/js/labs/diagnostics-panel.js'), 'utf8'));
   assert.doesNotMatch(code, /\+\s*(req|entry)\.[A-Za-z]/,
     'every req./entry. field must reach the markup through esc(), never by direct interpolation');
-  assert.match(code, /esc\(req\.requestId\)/);
-  assert.match(code, /esc\(req\.operation\)/);
+  assert.match(code, /esc\(entry\.requestIdRedacted/);
+  assert.match(code, /esc\(entry\.operation\)/);
 });
 
 // ---- T12/#1405 — request ids are unique by construction --------------------
@@ -390,133 +257,36 @@ test('T12: every inspect mints a distinct request id, derived from the applicati
   assertConsecutiveCounters(minted, 'inspect');
 });
 
-test('T12: every panel fetch mints a distinct request id — its body is identical each time', () => {
-  const { ctx, layerA } = panelWindow();
-  const response = ctx.NemoApplication.handle({ apiVersion: 1, requestId: 'seed', ...ctx.NemoOpacityApplication.meta(),
-    expectedRevision: ctx.NemoOpacityApplication.meta().revision,
-    operation: 'property.set', payload: { layerId: layerA, property: 'opacity', value: 37 } });
-  assert.equal(response.ok, true, JSON.stringify(response));
-
-  const seen = [];
-  const inner = ctx.NemoApplication.handle;
-  ctx.NemoApplication.handle = (request) => { seen.push(request.requestId); return inner(request); };
-
-  // Each enable runs the shipped panel's own fetch; the module-scoped counter
-  // survives the cycle, which is the property under test.
-  for (let i = 0; i < MINT_CALLS; i++) {
-    ctx.SMLabs.enable('diagnostics-panel');
-    ctx.SMLabs.disable('diagnostics-panel');
-  }
-
-  const minted = seen.filter((id) => id.startsWith('diagnostics-panel:'));
-  assert.equal(minted.length, MINT_CALLS, 'each open fetches the trace exactly once');
-  assert.equal(new Set(minted).size, MINT_CALLS,
-    'the panel must mint a distinct id per fetch -- same construction pin as the capability, not a guard against a reachable failure');
-  const instanceId = ctx.NemoOpacityApplication.meta().instanceId;
-  assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId.slice(0, 64)}:`)),
-    'the panel keys off the same application identity as the capability');
-  assert.ok(minted.every((id) => id.length <= 128));
-  assertConsecutiveCounters(minted, 'panel fetch');
-});
-
-for (const length of [36, 120, 128, 512]) {
-  test(`T12: both real-core consumers accept a ${length}-character identity with bounded IDs and full envelopes`, () => {
-    const { ctx } = panelWindow();
-    const instanceId = 'identity:'.padEnd(length, 'x');
-    assert.equal(ctx.NemoApplication.setInstanceId(instanceId).ok, true);
-    const seen = [];
-    const inner = ctx.NemoApplication.handle;
-    ctx.NemoApplication.handle = (request) => {
-      const response = inner(request);
-      seen.push({ request, response });
-      return response;
-    };
-    // Multiple handler objects must share the capability's counter.
-    for (let i = 0; i < 3; i++) {
-      const handler = ctx.NemoDiagnosticsCapability.handlerFor(ctx);
-      assert.equal(handler({ operation: 'inspect', payload: {} }).ok, true);
-      ctx.SMLabs.enable('diagnostics-panel');
-      assert.match(ctx.document._lastCreated.innerHTML, /data-diag-empty/);
-      ctx.SMLabs.disable('diagnostics-panel');
-    }
-    const traces = seen.filter(({ request }) => request.operation === 'diagnostics.trace');
-    assert.equal(traces.length, 6);
-    for (const { request, response } of seen) {
-      assert.equal(response.ok, true, JSON.stringify(response));
-      assert.equal(request.instanceId, instanceId, 'clipping must never reach the identity envelope');
-      assert.equal(request.documentId, ctx.NemoOpacityApplication.meta().documentId);
-      assert.equal(request.expectedRevision, request.revision);
-      assert.ok(request.requestId.length <= 128);
-    }
-    for (const prefix of ['diagnostics-inspect:', 'diagnostics-panel:']) {
-      const ids = traces.map(({ request }) => request.requestId).filter((id) => id.startsWith(prefix));
-      assert.equal(ids.length, 3);
-      assert.ok(ids.every((id) => id.startsWith(prefix + instanceId.slice(0, 64) + ':')));
-      assert.ok(ids.every((id) => (id + ':replay').length <= 128));
-      assertConsecutiveCounters(ids, prefix);
-    }
-    assert.equal(new Set(traces.map(({ request }) => request.requestId)).size, 6, 'module prefixes separate the two counters');
-  });
-}
-
-test('T12: identities with the same clipped hint remain distinct across both module lifetimes', () => {
-  const { ctx } = panelWindow();
-  const hint = 'h'.repeat(64);
-  const seen = [];
-  for (const suffix of ['first', 'second']) {
-    const win = opacityWindow();
-    const instanceId = hint + suffix;
-    assert.equal(win.NemoOpacityApplication.setInstanceId(instanceId).ok, true);
-    // Substitute the actual core, keeping both shipped consumer modules alive.
-    ctx.NemoOpacityApplication = win.NemoOpacityApplication;
-    ctx.NemoApplication.handle = (request) => {
-      const response = win.NemoApplication.handle(request);
-      assert.equal(response.ok, true, JSON.stringify(response));
-      assert.equal(request.instanceId, instanceId);
-      if (request.operation === 'diagnostics.trace') seen.push(request.requestId);
-      return response;
-    };
-    assert.equal(ctx.NemoDiagnosticsCapability.handlerFor(ctx)({ operation: 'inspect', payload: {} }).ok, true);
-    ctx.SMLabs.enable('diagnostics-panel');
-    ctx.SMLabs.disable('diagnostics-panel');
-  }
-  assert.equal(new Set(seen).size, 4);
-  for (const prefix of ['diagnostics-inspect:', 'diagnostics-panel:']) {
-    const ids = seen.filter((id) => id.startsWith(prefix));
-    assert.ok(ids.every((id) => id.startsWith(prefix + hint + ':')));
-    assertConsecutiveCounters(ids, prefix);
-  }
-});
-
-test('T12: each counter accepts its last safe integer then fails closed without dispatch or reset', () => {
-  const { ctx } = panelWindow({ counterStart: Number.MAX_SAFE_INTEGER - 1 });
-  assert.equal(ctx.NemoApplication.setInstanceId('x'.repeat(512)).ok, true);
-  const seen = [];
-  const inner = ctx.NemoApplication.handle;
-  ctx.NemoApplication.handle = (request) => { seen.push(request); return inner(request); };
-  const handler = ctx.NemoDiagnosticsCapability.handlerFor(ctx);
-  assert.equal(handler({ operation: 'inspect', payload: {} }).ok, true);
-  ctx.SMLabs.enable('diagnostics-panel');
-  assert.match(ctx.document._lastCreated.innerHTML, /data-diag-empty/);
-  ctx.SMLabs.disable('diagnostics-panel');
-  const count = seen.length;
-  for (let i = 0; i < 2; i++) {
-    const result = handler({ operation: 'inspect', payload: {} });
-    assert.equal(result.ok, false);
-    assert.equal(result.error.code, 'unavailable');
-    assert.match(result.error.message, /counter exhausted/);
-    ctx.SMLabs.enable('diagnostics-panel');
-    assert.match(ctx.document._lastCreated.innerHTML, /counter exhausted/);
-    ctx.SMLabs.disable('diagnostics-panel');
-  }
-  assert.equal(seen.length, count, 'exhausted counters must not dispatch a reused or rounded ID');
-  const traces = seen.filter((request) => request.operation === 'diagnostics.trace');
-  assert.equal(traces.length, 2);
-  assert.ok(traces.every((request) => request.requestId.endsWith(':' + Number.MAX_SAFE_INTEGER)));
-  assert.ok(traces.every((request) => (request.requestId + ':replay').length <= 128));
-});
-
 // Pins the claim the two comments above rest on, so it cannot rot into folklore:
+// The v1 capability retains its wider identity contract; native panel coverage
+// now lives in native-diagnostics-query.test.cjs with native's 128-byte IDs.
+test('T12 capability preserves full long identities, clipped-hint uniqueness and exhaustion', () => {
+  function load(counter) {
+    const context = vm.createContext({});
+    const source = fs.readFileSync(path.join(ROOT, 'src/js/application/diagnostics-capability.js'), 'utf8');
+    vm.runInContext(source.replace('var minted = 0;', `var minted = ${counter};`), context);
+    return context.NemoDiagnosticsCapability;
+  }
+  const module = load(0), seen = [];
+  for (const length of [36, 120, 128, 512]) {
+    const win = opacityWindow(), identity = 'identity:'.padEnd(length, 'x');
+    assert.equal(win.NemoOpacityApplication.setInstanceId(identity).ok, true);
+    const inner = win.NemoApplication.handle;
+    win.NemoApplication.handle = (request) => {
+      assert.equal(request.instanceId, identity);
+      if (request.operation === 'diagnostics.trace') seen.push(request.requestId);
+      return inner(request);
+    };
+    assert.equal(module.handlerFor(win)({ operation: 'inspect', payload: {} }).ok, true);
+  }
+  assert.equal(new Set(seen).size, 4); assertConsecutiveCounters(seen, 'capability');
+  assert.ok(seen.every((id) => id.length <= 128));
+  const exhausted = load(Number.MAX_SAFE_INTEGER - 1), win = opacityWindow();
+  assert.equal(exhausted.handlerFor(win)({ operation: 'inspect', payload: {} }).ok, true);
+  win.NemoApplication.handle = () => { throw new Error('exhausted counter dispatched'); };
+  for (let i = 0; i < 2; i++) assert.match(exhausted.handlerFor(win)({ operation: 'inspect', payload: {} }).error.message, /counter exhausted/);
+});
+
 // what a requestId collision costs on a READ path. Probed rather than reasoned.
 test('T12: a read is never retained, so a collision costs a hard failure and not a stale trace', () => {
   const win = opacityWindow();

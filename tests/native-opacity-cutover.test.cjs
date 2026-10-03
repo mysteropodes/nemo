@@ -2877,10 +2877,10 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.strictEqual(desktop.SMEngineBridge.nativeEditGuard, desktop.SMNativeEditGuard);
   assert.equal(Object.isFrozen(desktop.NemoNativeOpacityCutover), true);
   assert.deepEqual(Object.keys(desktop.NemoNativeOpacityCutover).sort(), [
-    'blocksLegacy', 'exportPng', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
+    'blocksLegacy', 'exportPng', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
     'prepared', 'presentPreview', 'projectSelection', 'releaseCurrent', 'renderPreview',
   ]);
-  for (const authorityKey of ['activate', 'requestRelease', 'getNativeIdentity', 'handleV1',
+  for (const authorityKey of ['activate', 'requestRelease', 'handleV1',
     'legacyIntent', 'setOpacity', 'history']) {
     assert.equal(desktop.NemoNativeOpacityCutover[authorityKey], undefined, authorityKey);
   }

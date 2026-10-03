@@ -10,6 +10,7 @@
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
+    'query.diagnostics.recent',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
     'job.export.png.begin', 'job.export.png.status', 'job.export.png.cancel',
@@ -90,7 +91,8 @@
       exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
       revision(payload.atRevision, 'atRevision');
       if (evaluate) { id(payload.contextId, 'contextId'); frame(payload.frame); }
-    } else if (operation === 'command.document.apply') {
+    } else if (operation === 'query.diagnostics.recent') empty(payload, operation);
+    else if (operation === 'command.document.apply') {
       exact(payload, ['command', 'stableTarget', 'value'], [], 'command payload');
       if (payload.command !== 'layer.opacity.set') throw new TypeError('unsupported command');
       target({ stableTarget: payload.stableTarget }, 'command target');
@@ -211,7 +213,28 @@
   }
   function validateResult(value, operation) {
     if (!operation) return;
-    if (operation === 'query.document.serialize') {
+    if (operation === 'query.diagnostics.recent') {
+      exact(value, ['records', 'truncated'], [], 'diagnostics result');
+      if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
+      let prior = 0;
+      value.records.forEach((record) => {
+        exact(record, ['sequence', 'operation', 'contentRevision', 'ok'],
+          ['requestId', 'requestIdRedacted', 'targetId', 'errorCode'], 'diagnostics record');
+        revision(record.sequence, 'sequence'); revision(record.contentRevision, 'contentRevision');
+        if (record.sequence <= prior) throw new TypeError('diagnostics sequence must be strictly ascending');
+        prior = record.sequence;
+        if (!['command.document.apply', 'transaction.begin', 'transaction.update', 'transaction.commit',
+          'transaction.cancel', 'history.undo', 'history.redo'].includes(record.operation) || typeof record.ok !== 'boolean') throw new TypeError('invalid diagnostics operation or status');
+        if (has(record, 'requestId') === has(record, 'requestIdRedacted') ||
+            (has(record, 'requestIdRedacted') && record.requestIdRedacted !== true)) throw new TypeError('invalid diagnostics redaction');
+        for (const key of ['requestId', 'targetId']) if (has(record, key)) {
+          id(record[key], key);
+          if (/[:/]/.test(record[key])) throw new TypeError('diagnostics identifier must be redacted');
+        }
+        if (record.ok === has(record, 'errorCode') ||
+            (has(record, 'errorCode') && !commonErrors.has(record.errorCode))) throw new TypeError('invalid diagnostics error code');
+      });
+    } else if (operation === 'query.document.serialize') {
       exact(value, ['atRevision', 'documentSnapshotId', 'document'], [], 'serialize result');
       revision(value.atRevision, 'atRevision'); id(value.documentSnapshotId, 'documentSnapshotId');
       validateSerializedDocument(value.document);
@@ -253,7 +276,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value);
-    if (['query.document.serialize', 'query.document.evaluate'].includes(operation)) {
+    if (['query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -285,6 +308,8 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
+          if (outbound.operation === 'query.diagnostics.recent' &&
+              (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');
           if (response.ok && ['query.document.serialize', 'query.document.evaluate'].includes(outbound.operation)) {
             const result = response.result, evaluate = outbound.operation === 'query.document.evaluate';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId ||
