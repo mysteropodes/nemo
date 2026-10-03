@@ -45,6 +45,7 @@ test_modules! {
     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
+    "test-export_job" => authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs";
     "test-export_job" => export_geometry_tests = "../tests/render_geometry.rs";
     "test-export_job" => export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs";
     "test-application" => application_tests = "../tests/application.rs";

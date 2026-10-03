@@ -72,6 +72,51 @@ pub struct OpacityKey {
 pub struct CurvePoint {
     pub(crate) x: Number,
     pub(crate) y: Number,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "authored_number"
+    )]
+    pub(crate) tx: Option<Number>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "authored_number"
+    )]
+    pub(crate) ty: Option<Number>,
+}
+
+// Missing means automatic; an explicitly present tangent must be a number,
+// including zero. In particular, null must not silently become an absent field.
+fn authored_number<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Number>, D::Error> {
+    Number::deserialize(deserializer).map(Some)
+}
+
+/// Shared structural admission for stored curves, independent of evaluation.
+/// Short arrays retain the kernel's passthrough semantics and authored values.
+pub(crate) fn validate_curve_points(points: &[CurvePoint]) -> Result<(), &'static str> {
+    let mut previous_x = None;
+    for point in points {
+        if [&point.x, &point.y]
+            .into_iter()
+            .chain(point.tx.iter())
+            .chain(point.ty.iter())
+            .any(|value| !value.as_f64().is_some_and(f64::is_finite))
+        {
+            return Err("curvePoints coordinates and tangents must be finite numbers");
+        }
+        let x = point.x.as_f64().expect("finite coordinate checked above");
+        if previous_x.is_some_and(|previous| previous >= x) {
+            return Err("curvePoints.x must be strictly increasing");
+        }
+        previous_x = Some(x);
+    }
+    if points.len() >= 2 && (points[0].x.as_f64() != Some(0.0) || previous_x != Some(1.0)) {
+        return Err("curvePoints must start at x=0 and end at x=1");
+    }
+    Ok(())
 }
 
 impl OpacityDocument {
@@ -125,5 +170,9 @@ impl OpacityKey {
 impl CurvePoint {
     pub fn coordinates(&self) -> (&Number, &Number) {
         (&self.x, &self.y)
+    }
+
+    pub fn tangents(&self) -> (Option<&Number>, Option<&Number>) {
+        (self.tx.as_ref(), self.ty.as_ref())
     }
 }

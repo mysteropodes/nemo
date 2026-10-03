@@ -19,7 +19,7 @@ fn history(label: &str) -> NativeOpacityHistory {
     NativeOpacityHistory::new(label, decode_project(PROJECT).unwrap()).unwrap()
 }
 
-fn geometry(offset: f64) -> GeometryPaintInput {
+pub(super) fn geometry(offset: f64) -> GeometryPaintInput {
     GeometryPaintInput::new(
         "geometry/r08",
         "v1",
@@ -34,7 +34,7 @@ fn geometry(offset: f64) -> GeometryPaintInput {
     .unwrap()
 }
 
-fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
+pub(super) fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
     ExportBegin {
         request_id: id.into(),
         expected_revision: revision,
@@ -49,10 +49,10 @@ fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
 }
 
 #[derive(Default)]
-struct MemoryPort {
+pub(super) struct MemoryPort {
     events: Vec<String>,
     staged: Vec<(String, Vec<u8>)>,
-    write_log: Vec<(String, Vec<u8>)>,
+    pub(super) write_log: Vec<(String, Vec<u8>)>,
     published: Vec<ExportArtifact>,
     fail_write: Option<usize>,
     fail_cleanup: bool,
@@ -175,7 +175,7 @@ impl ExportCompositor for ExtremeReadbackCompositor {
     }
 }
 
-fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
+pub(super) fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
     let decoder = png::Decoder::new(Cursor::new(bytes));
     let mut reader = decoder.read_info().unwrap();
     let mut rgba = vec![0; reader.output_buffer_size().unwrap()];
@@ -186,7 +186,7 @@ fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
     (info.width, info.height, rgba)
 }
 
-fn edit_to_revision_one(history: &mut NativeOpacityHistory) {
+pub(super) fn edit_to_revision_one(history: &mut NativeOpacityHistory) {
     let command = OpacityRequest::command(
         "n14-edit-r1",
         history.instance_id(),
