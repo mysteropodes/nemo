@@ -1,5 +1,4 @@
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
-use crate::document::OpacityDocument;
 use crate::export_job::{
     ExportBegin, ExportCompositor, ExportFrameInput, ExportJobError, ExportJobErrorKind,
     ExportJobManager, JobReceipt, PendingFrame, ReconciliationStage, StagedArtifactPort,
@@ -19,8 +18,15 @@ use std::collections::HashMap;
 #[path = "application_replacement.rs"]
 mod replacement;
 pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgress};
+#[path = "application_construction.rs"]
+mod construction;
 #[path = "application_diagnostics.rs"]
 mod diagnostics;
+#[path = "reproduction_catalog.rs"]
+mod reproduction_catalog;
+pub use reproduction_catalog::{
+    ReproductionCatalogError, ReproductionEligibility, ReproductionFixture, REPRODUCTION_FIXTURE,
+};
 
 #[cfg(test)]
 #[path = "../tests/application_diagnostics.rs"]
@@ -83,29 +89,12 @@ pub struct NativeApplication<P, C, R> {
     release: Option<ApplicationReleaseReceipt>,
     replacement: Option<ReplacementProgress>,
     diagnostics: diagnostics::RecentDiagnostics,
+    reproduction_origin: Option<reproduction_catalog::CatalogOrigin>,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     NativeApplication<P, C, R>
 {
-    pub fn new(
-        instance_id: impl Into<String>,
-        document: OpacityDocument,
-        artifact_port: P,
-        compositor: C,
-        resources: R,
-    ) -> Result<Self, &'static str> {
-        Ok(Self {
-            history: NativeOpacityHistory::new(instance_id, document)?,
-            exports: ExportJobManager::new(artifact_port, compositor),
-            resources,
-            requests: HashMap::new(),
-            release: None,
-            replacement: None,
-            diagnostics: diagnostics::RecentDiagnostics::default(),
-        })
-    }
-
     pub fn instance_id(&self) -> &str {
         self.history.instance_id()
     }
