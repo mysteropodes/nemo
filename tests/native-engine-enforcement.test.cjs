@@ -77,7 +77,7 @@ const EXPECTED_EDGES = [
 ].sort();
 
 const PRODUCTION = {
-  codec: ['codec', 'document'],
+  codec: ['codec', 'document', 'project_structure'],
   commands: ['commands', 'request_receipts', 'revision'],
   history: ['history', 'transaction'],
   evaluation: ['evaluation', 'animation_curve'],
@@ -198,6 +198,7 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(testMacros), Object.keys(TEST_TARGETS).map((name) => `test-${name}`));
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
+    if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
       'export_geometry_tests = "../tests/render_geometry.rs"',
