@@ -5,20 +5,12 @@
 //! host, and selecting a context/frame cannot advance content revision.
 
 use crate::animation_curve::{self, CurveSample};
-use crate::document::{CurvePoint, OpacityKey};
+use crate::document::{validate_curve_points, CurvePoint, OpacityKey};
 use crate::revision::DocumentSnapshot;
 use serde_json::Number;
 use std::fmt::{Display, Formatter};
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
-
-const CHARACTERIZED_CURVE: [[f64; 2]; 5] = [
-    [0.0, 0.0],
-    [0.25, 0.156],
-    [0.5, 0.5],
-    [0.75, 0.844],
-    [1.0, 1.0],
-];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvaluationErrorKind {
@@ -212,32 +204,11 @@ fn validate_track(keys: &[OpacityKey], total_frames: u32) -> Result<(), Evaluati
         }
         previous = Some(key.frame());
         opacity(key.value(), "motion.opacity.keys[].v[0]")?;
-        validate_curve(key.curve_points())?;
+        validate_curve_points(key.curve_points())
+            .map_err(|message| EvaluationError::new(EvaluationErrorKind::Invalid, message))?;
         let (h_out, h_in) = key.handles();
         validate_zero_handle(h_out, "hOut")?;
         validate_zero_handle(h_in, "hIn")?;
-    }
-    Ok(())
-}
-
-fn validate_curve(points: &[CurvePoint]) -> Result<(), EvaluationError> {
-    if points.len() != CHARACTERIZED_CURVE.len() {
-        return invalid("curvePoints must contain the five characterized points");
-    }
-    let mut previous_x = None;
-    for (index, (point, expected)) in points.iter().zip(CHARACTERIZED_CURVE).enumerate() {
-        let (x, y) = point.coordinates();
-        let actual = [number(x, "curvePoints.x")?, number(y, "curvePoints.y")?];
-        if previous_x.is_some_and(|value| value >= actual[0]) {
-            return invalid("curvePoints.x must be strictly increasing");
-        }
-        previous_x = Some(actual[0]);
-        if actual != expected {
-            return Err(EvaluationError::new(
-                EvaluationErrorKind::Unsupported,
-                format!("curvePoints[{index}] differs from the characterized opacity curve"),
-            ));
-        }
     }
     Ok(())
 }
@@ -254,16 +225,20 @@ fn validate_zero_handle(handle: &[Number; 2], name: &str) -> Result<(), Evaluati
 }
 
 fn evaluate_admitted_curve(points: &[CurvePoint], x: f64) -> Result<f64, EvaluationError> {
-    validate_curve(points)?;
     let points = points
         .iter()
         .map(|point| {
             let (x, y) = point.coordinates();
+            let (tx, ty) = point.tangents();
             Ok(CurveSample {
                 x: number(x, "curvePoints.x")?,
                 y: number(y, "curvePoints.y")?,
-                tx: None,
-                ty: None,
+                tx: tx
+                    .map(|value| number(value, "curvePoints.tx"))
+                    .transpose()?,
+                ty: ty
+                    .map(|value| number(value, "curvePoints.ty"))
+                    .transpose()?,
             })
         })
         .collect::<Result<Vec<_>, EvaluationError>>()?;

@@ -154,12 +154,12 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
     );
 
     let mut changed_curve = project_value();
-    changed_curve["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][1]["y"] = json!(0.25);
+    changed_curve["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][1]["x"] = json!(0);
     assert_eq!(
         decode_project(&serde_json::to_vec(&changed_curve).unwrap())
             .unwrap_err()
             .kind(),
-        CodecErrorKind::Unsupported
+        CodecErrorKind::Invalid
     );
     assert_eq!(
         evaluate(
@@ -169,7 +169,7 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
         )
         .unwrap_err()
         .kind(),
-        EvaluationErrorKind::Unsupported
+        EvaluationErrorKind::Invalid
     );
 
     let mut nonzero_handle = project_value();
@@ -247,15 +247,59 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
 }
 
 #[test]
-fn pure_kernel_does_not_expand_native_authored_curve_admission() {
-    for field in ["tx", "ty"] {
+fn authored_native_curves_match_independent_oracles_at_pinned_revisions() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/animation-curves/authored.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
         let mut project = project_value();
-        project["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][0][field] = json!(0);
+        let keys = &mut project["layers"][0]["motion"]["opacity"]["keys"];
+        keys[0]["curvePoints"] = case["points"].clone();
+        keys[1]["v"] = json!([60]);
+        project["layers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"layerUid":"static", "motionStatic":{"opacity":[25]}}));
+        let mut app = application(&serde_json::to_vec(&project).unwrap());
+        let pinned = app.acquire_snapshot(0).unwrap();
+        let before = encode_project(pinned.document()).unwrap();
+        let response = app.handle(OpacityRequest::command("advance", app.instance_id(), app.document_id(), 0,
+            json!({"command":"layer.opacity.set", "stableTarget":{"layerUid":"static"}, "value":40})));
+        assert!(response.is_ok());
+        assert_eq!(app.content_revision(), 1);
+        let current = app.acquire_snapshot(1).unwrap();
+        for (frame, expected) in fixture["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(case["opacity"].as_array().unwrap())
+        {
+            let frame = frame.as_u64().unwrap() as u32;
+            for snapshot in [&pinned, &current] {
+                let result = value_at(snapshot, frame);
+                close(result.layers()[0].value(), expected.as_f64().unwrap());
+                assert_eq!(result.document_snapshot_id(), snapshot.id());
+                assert_eq!(result.document_id(), pinned.document_id());
+                assert_eq!(result.content_revision(), snapshot.content_revision());
+                close(
+                    result.layers()[1].value(),
+                    if snapshot.content_revision() == 0 {
+                        25.0
+                    } else {
+                        40.0
+                    },
+                );
+            }
+        }
         assert_eq!(
-            decode_project(&serde_json::to_vec(&project).unwrap())
-                .unwrap_err()
-                .kind(),
-            CodecErrorKind::Unsupported
+            encode_project(pinned.document()).unwrap(),
+            before,
+            "{}",
+            case["name"]
+        );
+        let reloaded = application(&before).acquire_snapshot(0).unwrap();
+        close(
+            value_at(&reloaded, 10).layers()[0].value(),
+            case["opacity"][2].as_f64().unwrap(),
         );
     }
 }
