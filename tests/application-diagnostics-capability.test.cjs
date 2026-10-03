@@ -156,7 +156,7 @@ function fakeElement(tag) {
   };
 }
 
-function panelWindow() {
+function panelWindow(options = {}) {
   let sequence = 0;
   const flags = {};
   const domain = require('../src/js/domain/animation/opacity.js');
@@ -193,7 +193,14 @@ function panelWindow() {
     'bootstrap/opacity-application.js',
     'application/diagnostics-capability.js', 'labs/labs-core.js', 'labs/diagnostics-panel.js']) {
     const filename = path.resolve(ROOT, 'src/js', file);
-    vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, { filename });
+    let source = fs.readFileSync(filename, 'utf8');
+    if (options.counterStart !== undefined && ['application/diagnostics-capability.js', 'labs/diagnostics-panel.js'].includes(file)) {
+      // Reach the otherwise impractical exhaustion boundary without a public
+      // production test hook. Everything after initialization is real code.
+      assert.ok(source.includes('var minted = 0;'));
+      source = source.replace('var minted = 0;', `var minted = ${options.counterStart};`);
+    }
+    vm.runInContext(source, ctx, { filename });
     if (file === 'tweens.js') { ctx.renderOS = () => {}; ctx.renderArcs = () => {}; }
   }
   return { ctx, layerA };
@@ -346,8 +353,8 @@ test('routing guard: no trace field is interpolated into the panel markup withou
 
 const MINT_CALLS = 200;
 
-// The id is `<prefix>:<instanceId>:<counter>`; instanceId is a UUID and carries
-// no ':' of its own, so the counter is the last segment. Asserted as a run of
+// The id is `<prefix>:<identity hint>:<counter>`; the hint may contain ':',
+// so only the final segment is the counter. Asserted as a run of
 // consecutive integers rather than "all different": the starting value depends
 // on how many times the module-scoped counter was already used in this process.
 function assertConsecutiveCounters(ids, label) {
@@ -376,7 +383,7 @@ test('T12: every inspect mints a distinct request id, derived from the applicati
   assert.equal(new Set(minted).size, MINT_CALLS,
     'the counter must make every minted id distinct -- reads are never retained, so this pins the construction rather than guarding a reachable failure');
   const instanceId = win.NemoOpacityApplication.meta().instanceId;
-  assert.ok(minted.every((id) => id.startsWith(`diagnostics-inspect:${instanceId}:`)),
+  assert.ok(minted.every((id) => id.startsWith(`diagnostics-inspect:${instanceId.slice(0, 64)}:`)),
     'the id must be derived from the identity the application itself uses, not from a fresh random source');
   assert.ok(minted.every((id) => id.length <= 128),
     'validate() rejects a requestId longer than 128 characters');
@@ -406,10 +413,107 @@ test('T12: every panel fetch mints a distinct request id — its body is identic
   assert.equal(new Set(minted).size, MINT_CALLS,
     'the panel must mint a distinct id per fetch -- same construction pin as the capability, not a guard against a reachable failure');
   const instanceId = ctx.NemoOpacityApplication.meta().instanceId;
-  assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId}:`)),
+  assert.ok(minted.every((id) => id.startsWith(`diagnostics-panel:${instanceId.slice(0, 64)}:`)),
     'the panel keys off the same application identity as the capability');
   assert.ok(minted.every((id) => id.length <= 128));
   assertConsecutiveCounters(minted, 'panel fetch');
+});
+
+for (const length of [36, 120, 128, 512]) {
+  test(`T12: both real-core consumers accept a ${length}-character identity with bounded IDs and full envelopes`, () => {
+    const { ctx } = panelWindow();
+    const instanceId = 'identity:'.padEnd(length, 'x');
+    assert.equal(ctx.NemoApplication.setInstanceId(instanceId).ok, true);
+    const seen = [];
+    const inner = ctx.NemoApplication.handle;
+    ctx.NemoApplication.handle = (request) => {
+      const response = inner(request);
+      seen.push({ request, response });
+      return response;
+    };
+    // Multiple handler objects must share the capability's counter.
+    for (let i = 0; i < 3; i++) {
+      const handler = ctx.NemoDiagnosticsCapability.handlerFor(ctx);
+      assert.equal(handler({ operation: 'inspect', payload: {} }).ok, true);
+      ctx.SMLabs.enable('diagnostics-panel');
+      assert.match(ctx.document._lastCreated.innerHTML, /data-diag-empty/);
+      ctx.SMLabs.disable('diagnostics-panel');
+    }
+    const traces = seen.filter(({ request }) => request.operation === 'diagnostics.trace');
+    assert.equal(traces.length, 6);
+    for (const { request, response } of seen) {
+      assert.equal(response.ok, true, JSON.stringify(response));
+      assert.equal(request.instanceId, instanceId, 'clipping must never reach the identity envelope');
+      assert.equal(request.documentId, ctx.NemoOpacityApplication.meta().documentId);
+      assert.equal(request.expectedRevision, request.revision);
+      assert.ok(request.requestId.length <= 128);
+    }
+    for (const prefix of ['diagnostics-inspect:', 'diagnostics-panel:']) {
+      const ids = traces.map(({ request }) => request.requestId).filter((id) => id.startsWith(prefix));
+      assert.equal(ids.length, 3);
+      assert.ok(ids.every((id) => id.startsWith(prefix + instanceId.slice(0, 64) + ':')));
+      assert.ok(ids.every((id) => (id + ':replay').length <= 128));
+      assertConsecutiveCounters(ids, prefix);
+    }
+    assert.equal(new Set(traces.map(({ request }) => request.requestId)).size, 6, 'module prefixes separate the two counters');
+  });
+}
+
+test('T12: identities with the same clipped hint remain distinct across both module lifetimes', () => {
+  const { ctx } = panelWindow();
+  const hint = 'h'.repeat(64);
+  const seen = [];
+  for (const suffix of ['first', 'second']) {
+    const win = opacityWindow();
+    const instanceId = hint + suffix;
+    assert.equal(win.NemoOpacityApplication.setInstanceId(instanceId).ok, true);
+    // Substitute the actual core, keeping both shipped consumer modules alive.
+    ctx.NemoOpacityApplication = win.NemoOpacityApplication;
+    ctx.NemoApplication.handle = (request) => {
+      const response = win.NemoApplication.handle(request);
+      assert.equal(response.ok, true, JSON.stringify(response));
+      assert.equal(request.instanceId, instanceId);
+      if (request.operation === 'diagnostics.trace') seen.push(request.requestId);
+      return response;
+    };
+    assert.equal(ctx.NemoDiagnosticsCapability.handlerFor(ctx)({ operation: 'inspect', payload: {} }).ok, true);
+    ctx.SMLabs.enable('diagnostics-panel');
+    ctx.SMLabs.disable('diagnostics-panel');
+  }
+  assert.equal(new Set(seen).size, 4);
+  for (const prefix of ['diagnostics-inspect:', 'diagnostics-panel:']) {
+    const ids = seen.filter((id) => id.startsWith(prefix));
+    assert.ok(ids.every((id) => id.startsWith(prefix + hint + ':')));
+    assertConsecutiveCounters(ids, prefix);
+  }
+});
+
+test('T12: each counter accepts its last safe integer then fails closed without dispatch or reset', () => {
+  const { ctx } = panelWindow({ counterStart: Number.MAX_SAFE_INTEGER - 1 });
+  assert.equal(ctx.NemoApplication.setInstanceId('x'.repeat(512)).ok, true);
+  const seen = [];
+  const inner = ctx.NemoApplication.handle;
+  ctx.NemoApplication.handle = (request) => { seen.push(request); return inner(request); };
+  const handler = ctx.NemoDiagnosticsCapability.handlerFor(ctx);
+  assert.equal(handler({ operation: 'inspect', payload: {} }).ok, true);
+  ctx.SMLabs.enable('diagnostics-panel');
+  assert.match(ctx.document._lastCreated.innerHTML, /data-diag-empty/);
+  ctx.SMLabs.disable('diagnostics-panel');
+  const count = seen.length;
+  for (let i = 0; i < 2; i++) {
+    const result = handler({ operation: 'inspect', payload: {} });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'unavailable');
+    assert.match(result.error.message, /counter exhausted/);
+    ctx.SMLabs.enable('diagnostics-panel');
+    assert.match(ctx.document._lastCreated.innerHTML, /counter exhausted/);
+    ctx.SMLabs.disable('diagnostics-panel');
+  }
+  assert.equal(seen.length, count, 'exhausted counters must not dispatch a reused or rounded ID');
+  const traces = seen.filter((request) => request.operation === 'diagnostics.trace');
+  assert.equal(traces.length, 2);
+  assert.ok(traces.every((request) => request.requestId.endsWith(':' + Number.MAX_SAFE_INTEGER)));
+  assert.ok(traces.every((request) => (request.requestId + ':replay').length <= 128));
 });
 
 // Pins the claim the two comments above rest on, so it cannot rot into folklore:

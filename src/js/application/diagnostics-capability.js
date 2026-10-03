@@ -17,35 +17,18 @@ var NemoDiagnosticsCapability = (function () {
       && win.NemoOpacityApplication && typeof win.NemoOpacityApplication.meta === 'function');
   }
 
-  // T12/#1405 -- requestId is the application's idempotency key, and it has to
-  // be unique by CONSTRUCTION rather than probably-unique. What a collision
-  // actually costs here, measured against the real core rather than assumed:
-  //
-  //   * `remember()` returns early for anything that is not a WRITE
-  //     (opacity-application.js:61), so a READ -- which is all this file and
-  //     the panel ever send -- is NEVER stored in `retained`. Repeating a read
-  //     id therefore does not serve a memoised answer: probed with one id and
-  //     two different read bodies, both execute.
-  //   * The LOOKUP, however, is unconditional (opacity-application.js:136), so
-  //     a read id that happens to equal one of the up-to-256 retained WRITE
-  //     ids is rejected: bodies differ, and the request fails
-  //     `invalid_request` -- the inspector stops working rather than lying.
-  //
-  // So the hazard is a spurious hard failure, not silent staleness. Small
-  // probability, visible symptom, and no reason to keep: Math.random() offers
-  // no uniqueness guarantee at all, and the fix removes the case entirely.
-  //
-  // The identity used here is the application's own -- instanceId comes from
-  // ports.newId(), which bootstrap/opacity-application.js implements as
-  // crypto.randomUUID() -- and the counter makes every id minted within that
-  // instance distinct. Module-scoped deliberately: the counter must keep
-  // rising across every handler built over the same application instance.
-  // Composed as a suffix, never parsed: opacity-diagnostics.js appends
-  // ':replay' to a requestId, and nothing anywhere splits one.
+  // T12/#1405: a clipped application identity is a hint; the module counter
+  // distinguishes every mint during this module's lifetime, even across
+  // handlers or identities sharing that hint. Full identity stays in the
+  // envelope. 64 hint characters plus prefix and a safe integer fit within
+  // 128 characters, including the existing ':replay' suffix if appended.
+  // READs are not retained. An arbitrary caller can still choose the same ID
+  // for a retained WRITE, which rejects the READ rather than serving stale data.
   var minted = 0;
-  function mintRequestId(prefix, identity) {
+  function mintRequestId(identity) {
+    if (!Number.isSafeInteger(minted) || minted >= Number.MAX_SAFE_INTEGER) return null;
     minted += 1;
-    return prefix + ':' + identity.instanceId + ':' + minted;
+    return 'diagnostics-inspect:' + identity.instanceId.slice(0, 64) + ':' + minted;
   }
 
   // Live environment check for a caller to pass into register()'s optional
@@ -123,7 +106,9 @@ var NemoDiagnosticsCapability = (function () {
       if (operation !== 'inspect') return { ok: false, error: { code: 'unknown_operation', message: 'Unsupported operation: ' + operation } };
       var limit = request.payload && request.payload.limit;
       var identity = win.NemoOpacityApplication.meta();
-      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: mintRequestId('diagnostics-inspect', identity),
+      var requestId = mintRequestId(identity);
+      if (requestId === null) return { ok: false, error: { code: 'unavailable', message: 'Diagnostics request counter exhausted.' } };
+      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: requestId,
         ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
       if (!traced.ok) return { ok: false, error: traced.error };
       // The bound is the application's to declare, not ours to restate: the
