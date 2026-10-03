@@ -207,6 +207,15 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const response = await dispatch('query.document.opacity', { stableTarget: target });
     assert.equal(response.ok, true); return response.result.value;
   }
+  async function evaluatedOpacity(frame) {
+    const current = await status();
+    const response = await dispatch('query.document.evaluate', {
+      atRevision: current.contentRevision, contextId: 'scene-root', frame });
+    assert.equal(response.ok, true);
+    assert.equal(response.result.documentId, current.documentId);
+    assert.equal(response.result.contentRevision, current.contentRevision);
+    return response.result.layers.find(layer => layer.layerUid === target.layerUid).value;
+  }
   // This is compatibility API parity, not a read of the visible Motion control.
   async function compatibilityValue(waitForAdmission = false) {
     const current = await status();
@@ -359,7 +368,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.deepEqual(saved.layers[0].motionStatic.opacity, [25]);
     phase('open-intermediate-keyed', 'Open keyed.json through the real project-open UI first. Save As can leave the saved document in the current tab; this intermediate different document proves a later saved.json Open is a replacement rather than the existing tab label. Foreground Nemo after the picker and wait for the keyed tab, Motion opacity 20 and red frame-0 preview.');
     await waitForNewDocument(stage, prior);
-    assert.equal(await opacity(), 20); assert.equal(await compatibilityValue(true), 20);
+    assert.equal(await evaluatedOpacity(0), 20); assert.equal(await compatibilityValue(true), 20);
     await capture('intermediate-visible', 'Show the keyed tab, selected R08 rectangle, displayed frame 1, Motion opacity 20 and red rectangle in the actual editor after Open. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
     assertVisibleProjection('intermediate-visible', { screen: 'editor', tabName: 'keyed',
       selectedLayer: 'R08 rectangle', displayedFrame: 1,
