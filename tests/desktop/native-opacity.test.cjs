@@ -165,6 +165,21 @@ test('installed native opacity: live command oracles and externally driven UI ch
   }
   function status() { return wire(endpoint, 'nativeStatus', { apiVersion: 2,
     requestId: `n21-status-${++sequence}`, instanceId: endpoint.instanceId }); }
+  async function waitForNewDocument(name, previous) {
+    let observed = '';
+    await waitFor(async () => {
+      const current = await status();
+      const identity = JSON.stringify({ available: current.available,
+        instanceId: current.instanceId, documentId: current.documentId,
+        contentRevision: current.contentRevision });
+      if (identity !== observed) {
+        observed = identity;
+        fs.appendFileSync(path.join(reportDir, 'open-status.jsonl'),
+          JSON.stringify({ checkpoint: name, nativeStatus: current }) + '\n', { mode: 0o600 });
+      }
+      return current.available && current.documentId !== previous.documentId;
+    }, name);
+  }
   async function dispatch(operation, payload = {}, extra = {}) {
     const current = await status();
     if (current.available !== true) {
@@ -342,8 +357,16 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await waitFor(() => fs.existsSync(fixtures.saved), stage);
     const saved = read(fixtures.saved); assert.equal(saved.layers[0].layerUid, target.layerUid);
     assert.deepEqual(saved.layers[0].motionStatic.opacity, [25]);
-    phase('reopen', 'Open saved.json through the real project-open UI. After the picker closes, foreground the Nemo window and wait for the saved tab, Motion opacity 25 and red frame-0 preview before recording visible evidence; native admission alone is not UI completion.');
-    await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
+    phase('open-intermediate-keyed', 'Open keyed.json through the real project-open UI first. Save As can leave the saved document in the current tab; this intermediate different document proves a later saved.json Open is a replacement rather than the existing tab label. Foreground Nemo after the picker and wait for the keyed tab, Motion opacity 20 and red frame-0 preview.');
+    await waitForNewDocument(stage, prior);
+    assert.equal(await opacity(), 20); assert.equal(await compatibilityValue(true), 20);
+    await capture('intermediate-visible', 'Show the keyed tab, selected R08 rectangle, displayed frame 1, Motion opacity 20 and red rectangle in the actual editor after Open. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
+    assertVisibleProjection('intermediate-visible', { screen: 'editor', tabName: 'keyed',
+      selectedLayer: 'R08 rectangle', displayedFrame: 1,
+      opacity: 20, redRectangleVisible: true });
+    const intermediate = await status();
+    phase('reopen', 'Now open saved.json through the real project-open UI. After the picker closes, foreground Nemo and wait for the saved tab, Motion opacity 25 and red frame-0 preview before recording visible evidence; native admission alone is not UI completion.');
+    await waitForNewDocument(stage, intermediate);
     assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
     await capture('reopen-visible', 'With Nemo foregrounded after the picker, show the saved tab, selected R08 rectangle, displayed frame 1, Motion opacity 25 and red rectangle in the actual editor after the replacement. Wait for the visible frame; record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
     assertVisibleProjection('reopen-visible', { screen: 'editor', tabName: 'saved',
