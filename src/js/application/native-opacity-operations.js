@@ -222,6 +222,7 @@
       wrap('plugin', ['openFile', 'loadArchive', 'loadFiles'], 'plugin-', exposeExtension);
       disposers.push(surface.publish(Object.freeze({ allow: allowLegacy }), Object.freeze({
         blocksLegacy: lifecycle.blocksLegacy, isActive: lifecycle.isActive,
+        getNativeIdentity: lifecycle.getNativeIdentity,
         prepared: lifecycle.prepared, identity: lifecycle.identity, projectSelection: lifecycle.projectSelection,
         persistenceJSON: lifecycle.persistenceJSON, renderPreview: viewport.renderPreview,
         presentPreview: viewport.presentPreview,

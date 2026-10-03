@@ -9,7 +9,6 @@
     try {
       var controller = root.NemoNativeOpacityCutover;
       if (!controller || !controller.isActive()) return null;
-      if (controller.status() !== 'native') return null;
       var view = controller.getNativeIdentity(), identity = controller.identity();
       if (!view || !identity || view.documentId !== identity.documentId ||
           !Number.isSafeInteger(view.generation) || view.generation < 0) return null;

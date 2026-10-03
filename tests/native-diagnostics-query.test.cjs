@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const adapter = require('../src/js/adapters/native-application.js');
-const opacityApplication = require('../src/js/application/opacity-application.js');
-const motionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
+const nativeOperations = require('../src/js/application/native-opacity-operations.js');
+const legacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 const query = () => ({ apiVersion: 2, requestId: 'read', instanceId: 'instance', documentId: 'document', operation: 'query.diagnostics.recent', payload: {} });
 const record = (sequence = 1) => ({ sequence, operation: 'command.document.apply', requestId: 'edit-' + sequence, targetId: 'layer', contentRevision: sequence, ok: true });
@@ -89,22 +89,24 @@ function harness(options = {}) {
   const flags = {}, nodes = [], calls = [], selections = [];
   const model = { instanceId: options.instanceId || 'instance', documentId: 'document', generation: 1, contentRevision: 2,
     records: [record()], truncated: false, active: true, history: [100, 80], serialized: '{opacity:80}' };
-  // Exercise the shipped facade, not the private lifecycle's richer interface.
-  // Installed T08B exposed that inspect() is deliberately absent here.
-  const controller = opacityApplication.createNative({}, {
-    contract: {}, replacement: {}, exportWorkflow: {}, previewWorkflow: {}, viewport: {}, v1: {}, motionSurface,
-    lifecycle: { create: () => ({ isActive: () => model.active, status: () => 'native',
-      getNativeIdentity: () => ({ documentId: model.documentId, generation: model.generation }),
-      identity: () => ({ instanceId: model.instanceId, documentId: model.documentId, contentRevision: model.contentRevision }) }) },
-    operations: { create: () => ({}) },
-  });
   const ctx = { console, TextEncoder, state: { layers: [{ layerUid: 'layer' }], activeLayerIdx: 0 }, _layerSel: [],
-    SM: { t: (key) => key, setActiveLayer: (...args) => selections.push(args) },
+    SM: { t: (key) => key, setActiveLayer: (...args) => selections.push(args), importJSON() {} },
     localStorage: { getItem: (key) => flags[key] ? '1' : null, setItem: (key, value) => { flags[key] = value === '1'; } },
     document: { createElement() { const el = element(); nodes.push(el); return el; }, body: element() },
     NemoApplication: { handle() { throw new Error('v1 fallback forbidden'); } },
-    NemoNativeOpacityCutover: controller,
+    NemoOpacityApplication: { meta() {}, legacy() {} },
+    addEventListener() {}, removeEventListener() {},
   };
+  // Publish through the actual operations.install -> desktop surface.publish.
+  // The installed cutover object is narrower than both core and lifecycle APIs.
+  ctx.__TAURI__ = { core: { invoke() { throw new Error('unexpected publication dispatch'); } } };
+  const surface = legacySurface.desktopPorts(ctx, {}).surface;
+  delete ctx.__TAURI__;
+  const lifecycle = { isActive: () => model.active, blocksLegacy: () => model.active,
+    getNativeIdentity: () => ({ documentId: model.documentId, generation: model.generation }),
+    identity: () => ({ instanceId: model.instanceId, documentId: model.documentId, contentRevision: model.contentRevision }) };
+  nativeOperations.create(lifecycle, { surface: { installGuard() {}, wrap: () => () => {}, publish: surface.publish } }, {},
+    { create: () => ({}) }, { create: () => ({ handle: () => null }) }).install();
   let invoke = async (command, args) => {
     calls.push({ command, args });
     if (command === 'nemo_native_status') return { apiVersion: 2, available: true, ...model };
@@ -160,10 +162,12 @@ test('early persisted panel and browser/WASM are unavailable; later manual Refre
   assert.equal(h.calls.filter((c) => c.args).length, 1);
 });
 
-test('native diagnostics captures the shipped public facade without private inspect()', async () => {
+test('native diagnostics captures the actual published cutover without status or inspect', async () => {
   const h = harness();
   assert.equal(h.ctx.NemoNativeOpacityCutover.inspect, undefined);
-  assert.equal(h.ctx.NemoNativeOpacityCutover.status(), 'native');
+  assert.equal(h.ctx.NemoNativeOpacityCutover.status, undefined);
+  assert.ok(Object.isFrozen(h.ctx.NemoNativeOpacityCutover));
+  assert.equal(typeof h.ctx.NemoNativeOpacityCutover.getNativeIdentity, 'function');
   const captured = h.ctx.NemoNativeDiagnosticsQuery.capture(h.ctx);
   assert.equal(captured.instanceId, h.model.instanceId);
   assert.equal(captured.documentId, h.model.documentId);
@@ -171,7 +175,7 @@ test('native diagnostics captures the shipped public facade without private insp
   await settle(); assert.match(h.panel.innerHTML, /edit-1/);
 });
 
-for (const reject of [false, true]) for (const transition of ['instance', 'document', 'controller', 'A-B-B', 'reopen', 'refresh']) {
+for (const reject of [false, true]) for (const transition of ['instance', 'document', 'controller', 'A-B-A', 'A-B-B', 'reopen', 'refresh']) {
   test(`delayed ${reject ? 'error' : 'success'} fenced on ${transition}`, async () => {
     const h = harness(); await settle();
     let resolve, fail, dispatched;
@@ -185,6 +189,11 @@ for (const reject of [false, true]) for (const transition of ['instance', 'docum
     if (transition === 'document') h.model.documentId = 'replacement-document';
     if (transition === 'controller') h.ctx.NemoNativeOpacityCutover = { ...h.ctx.NemoNativeOpacityCutover };
     if (transition === 'A-B-B') h.model.generation += 2;
+    if (transition === 'A-B-A') {
+      const originalDocument = h.model.documentId;
+      h.model.documentId = 'replacement-B'; h.model.generation++;
+      h.model.documentId = originalDocument; h.model.generation++;
+    }
     if (transition === 'reopen') { h.ctx.SMLabs.disable('diagnostics-panel'); h.ctx.SMLabs.enable('diagnostics-panel'); }
     h.setInvoke(original);
     h.model.records = [{ ...record(2), requestId: 'current-trace' }];
@@ -258,7 +267,7 @@ test('service refuses missing, transitional, malformed or replaced native author
   h.ctx.NemoNativeOpacityCutover = null; assert.equal(service.capture(h.ctx), null);
   h.ctx.NemoNativeOpacityCutover = { ...controller, identity() { throw new Error('disconnected'); } };
   assert.equal(service.capture(h.ctx), null);
-  h.ctx.NemoNativeOpacityCutover = { ...controller, status: () => 'installing' };
+  h.ctx.NemoNativeOpacityCutover = { ...controller, isActive: () => false };
   assert.equal(service.capture(h.ctx), null);
   for (const view of [null, { documentId: 'other', generation: 1 }, { documentId: h.model.documentId, generation: -1 },
     { documentId: h.model.documentId, generation: Number.MAX_SAFE_INTEGER + 1 }]) {
