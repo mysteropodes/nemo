@@ -9,8 +9,10 @@
     try {
       var controller = root.NemoNativeOpacityCutover;
       if (!controller || !controller.isActive()) return null;
-      var view = controller.inspect(), identity = controller.identity();
-      if (view.phase !== 'native' || !Number.isSafeInteger(view.generation) || view.generation < 0 || !identity) return null;
+      if (controller.status() !== 'native') return null;
+      var view = controller.getNativeIdentity(), identity = controller.identity();
+      if (!view || !identity || view.documentId !== identity.documentId ||
+          !Number.isSafeInteger(view.generation) || view.generation < 0) return null;
       return Object.freeze({ controller: controller, generation: view.generation,
         instanceId: identity.instanceId, documentId: identity.documentId });
     } catch (_) { return null; }
