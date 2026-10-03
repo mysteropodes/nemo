@@ -25,7 +25,15 @@
       var priorPresentation = presenting;
       job.work = (async function () {
         if (prior) await prior;
-        if (priorPresentation) await priorPresentation;
+        if (priorPresentation) {
+          try { await priorPresentation; }
+          catch (error) {
+            // A prior frame can be superseded by a native revision while this
+            // resize waits. Join that revision before resizing its new identity.
+            if (error && error.code === 'native_preview_superseded') await lifecycle.flush();
+            else throw error;
+          }
+        }
         var latest = lifecycle.inspect(), currentToken;
         if (latest.session !== job.session) return false;
         try { currentToken = lifecycle.getNativeIdentity(); } catch (_) { return false; }

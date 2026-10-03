@@ -2357,6 +2357,61 @@ test('superseded preview does not poison a subsequent external revision acknowle
     args.request.action === 'acknowledge').length, 2);
 });
 
+test('resize joined to a superseded preview preserves the next external revision acknowledgment', async () => {
+  let finishPreview, scheduledResize;
+  const resizeRevisions = [];
+  const previewGate = new Promise((resolve) => { finishPreview = resolve; });
+  const harness = nativeHarness(staticSource(), {
+    previewGate,
+    transportFactory: realTauriTransportFactory(),
+  });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await harness.controller.setOpacityFromUi('r08_curve_layer', 40, 'ui-before-external-preview');
+  await harness.externalOpacity(25, 'first-external-preview');
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    surface: {
+      defer(callback) { scheduledResize = callback; return 1; },
+      cancel() {},
+      async resize(identity) { resizeRevisions.push(identity.contentRevision); },
+    },
+  }, () => false);
+  const oldPreview = viewport.presentPreview(10);
+  for (let spin = 0; spin < 10 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1);
+  const nextRevision = harness.externalOpacity(60, 'second-external-preview');
+  viewport.resizeViewport();
+  const resizeWork = scheduledResize();
+  finishPreview();
+  await assert.rejects(oldPreview, /synchronization is pending/);
+  await Promise.all([resizeWork, nextRevision]);
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.transportBridge.transport.status().contentRevision, 3);
+  assert.equal(harness.controller.valueAtFrame('r08_curve_layer', 10)[0], 60);
+  assert.deepEqual(resizeRevisions, [3], 'resize uses the newly acknowledged identity');
+  assert.deepEqual(harness.transportBridge.calls.filter(([command, args]) =>
+    command === 'nemo_native_revision_sync' && args.request.action === 'acknowledge')
+    .map(([, args]) => [args.request.event.fromRevision, args.request.event.toRevision,
+      args.request.event.requestId]),
+  [[1, 2, 'first-external-preview'], [2, 3, 'second-external-preview']]);
+});
+
+test('a genuine current-session resize failure still fences native authority', async () => {
+  let scheduledResize;
+  const harness = nativeHarness(staticSource());
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    surface: {
+      defer(callback) { scheduledResize = callback; return 1; },
+      cancel() {},
+      async resize() { throw new Error('host resize failed'); },
+    },
+  }, () => false);
+  viewport.resizeViewport();
+  await scheduledResize();
+  assert.equal(harness.controller.status(), 'indeterminate');
+  assert.equal(harness.controller.persistenceJSON(), null);
+});
+
 test('revision acknowledgment failure passively disconnects and invalidates refreshed controller caches', async () => {
   const harness = nativeHarness(staticSource(), {
     transportFactory: realTauriTransportFactory({ ackFailure: true }),
