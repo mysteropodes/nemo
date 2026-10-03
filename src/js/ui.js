@@ -1402,7 +1402,7 @@
       var nativeField=scrubState.el,nativeStart=scrubState.startVal;
       nativeField.classList.remove('scrubbing');
       try{
-        if(e.type!=='pointercancel')nativeField.dispatchEvent(new Event('change',{bubbles:true}));
+        if(e.type!=='pointercancel'&&nativeField.isConnected!==false)nativeField.dispatchEvent(new Event('change',{bubbles:true}));
       }finally{
         nativeField.value=nativeStart;
         window._scrubLiveActive=false;

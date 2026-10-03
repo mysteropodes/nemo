@@ -65,3 +65,13 @@ test('cancelled native static-opacity drag restores the authoritative field with
   assert.deepEqual(h.events, []);
   assert.equal(h.input.value, '25');
 });
+
+test('detached native opacity field cannot submit its retained pointer release', () => {
+  const h = scrubHarness();
+  h.fire('pointerdown');
+  h.fire('pointermove', 160);
+  h.input.isConnected = false;
+  h.fire('pointerup', 160);
+  assert.deepEqual(h.events, []);
+  assert.equal(h.input.value, '25');
+});

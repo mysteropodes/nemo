@@ -6634,7 +6634,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
 
   // ---- Motion mode UI: layer list (Transform property rows) ----
   function fmtVal(n) { return Math.round(n * 10) / 10; }
-  function scrubField(value, onCommit, mixed, nativeOpacityMode) {
+  function scrubField(value, onCommit, mixed, nativeOpacityRoute) {
     var inp = document.createElement('input');
     // Typed edits are absolute (useful to align several keys). A horizontal
     // scrub is relative: ui.js raises _scrubLiveActive while it dispatches
@@ -6643,12 +6643,20 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
     // collapsing their existing spacing.
     var lastScrubValue = mixed ? 0 : (Number(value) || 0);
     inp.type = 'number'; inp.className = 'pi scrub motion-val' + (mixed ? ' mixed' : '');
-    if (nativeOpacityMode === 'static') inp.dataset.nativeOpacityScrub = 'static';
+    if (nativeOpacityRoute && nativeOpacityRoute.handled && nativeOpacityRoute.opacityMode === 'static') inp.dataset.nativeOpacityScrub = 'static';
     inp.value = mixed ? '' : fmtVal(value);
     if (mixed) { inp.placeholder = '—'; inp.title = SM.t('titleMixedValuesHint'); }
     inp.step = 1;
     inp.addEventListener('change', function () {
       if (inp.value === '' || !isFinite(parseFloat(inp.value))) return;
+      if (nativeOpacityRoute && nativeOpacityRoute.handled) {
+        var nativeOwner = window.NemoNativeOpacityCutover;
+        var current;
+        try { current = nativeOwner && nativeOwner.identity(); } catch (_) { return; }
+        if (inp.isConnected === false || !current ||
+            current.instanceId !== nativeOpacityRoute.instanceId ||
+            current.documentId !== nativeOpacityRoute.documentId) return;
+      }
       var nextValue = parseFloat(inp.value);
       var relative = !!window._scrubLiveActive;
       onCommit(nextValue, { relative: relative, delta: relative ? nextValue - lastScrubValue : 0 });
@@ -8767,7 +8775,7 @@ var n20RequireLegacyWrite=typeof n20RequireLegacyWrite==='function'?n20RequireLe
             renderLayerList(); renderTimeline();
             reloadIfTimeLinkOffset(prop);
             if (window.SMEngineBridge) window.SMEngineBridge.renderNow();
-          }, display.mixed, nativeOpacityRoute && nativeOpacityRoute.handled ? nativeOpacityRoute.opacityMode : null);
+          }, display.mixed, nativeOpacityRoute);
           fieldWrap.appendChild(f);
         })(d);
       }

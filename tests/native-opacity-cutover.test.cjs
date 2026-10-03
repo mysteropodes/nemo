@@ -1802,6 +1802,33 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [55]);
   assert.equal(JSON.stringify(source), legacyBytes, 'pointer scrub never mutates the frozen JS shell');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'pointer scrub never mutates the Paper mirror');
+
+  // A retained field may receive pointerup after an Open replaces its native
+  // session. It must not apply its old drag to the new document.
+  const priorDocumentId = harness.controller.identity().documentId;
+  pointer('pointerdown', 100);
+  pointer('pointermove', 160);
+  await harness.controller.releaseCurrent('replacement-during-opacity-scrub');
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  assert.notEqual(harness.controller.identity().documentId, priorDocumentId);
+  await harness.controller.setOpacity('r08_curve_layer', 80);
+  await harness.controller.flush();
+  const commandsBeforeStaleRelease = harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length;
+  pointer('pointerup', 160);
+  await harness.controller.flush();
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [80]);
+  const nativeOwner = motion.sandbox.NemoNativeOpacityCutover;
+  motion.sandbox.NemoNativeOpacityCutover = {
+    ...nativeOwner, identity() { throw new Error('native identity fenced'); },
+  };
+  currentInput.value = '60';
+  assert.doesNotThrow(() => currentInput._listeners.change[0]());
+  motion.sandbox.NemoNativeOpacityCutover = nativeOwner;
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
 });
 
 test('v1 facade rejects stale identity and malformed read payloads as structured failures', async () => {
