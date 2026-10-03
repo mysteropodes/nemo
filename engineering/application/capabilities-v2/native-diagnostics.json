@@ -31,7 +31,7 @@
   },
   "input": { "$ref": "../native-transport-v2.schema.json#/$defs/EmptyPayload" },
   "output": { "$ref": "../native-transport-v2.schema.json#/$defs/DiagnosticsResult" },
-  "ports": [{ "label": "mcp", "state": "active" }, { "label": "ui-panel", "state": "unavailable", "reason": "T08B" }],
+  "ports": [{ "label": "mcp", "state": "active" }, { "label": "ui-panel", "state": "active" }],
   "fixture": "native-engine/tests/fixtures/opacity-v2/project.json",
   "examples": [{
     "label": "Read the same bounded native trace without retaining an inspection receipt",
