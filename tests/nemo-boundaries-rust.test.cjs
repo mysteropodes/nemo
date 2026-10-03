@@ -213,6 +213,10 @@ const REGISTERED_LEAVES = [
   ['N22A registers authoritative easing without exclusions or a frozen-baseline waiver', [
     'native-engine/src/animation_curve.rs', 'native-engine/src/evaluation.rs',
     'native-engine/tests/evaluation.rs']],
+  ['N22B registers authored-curve consumer evidence without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/codec.rs', 'native-engine/src/document.rs',
+    'native-engine/src/evaluation.rs', 'native-engine/tests/authored_curve_consumers.rs',
+    'native-engine/tests/codec.rs', 'native-engine/tests/evaluation.rs']],
   ['N11 registers frame scheduling and resource leases without exclusions or a frozen-baseline waiver', [
     'native-engine/src/resource_leases.rs', 'native-engine/src/scheduler.rs', 'native-engine/tests/scheduler.rs']],
   ['N12 registers the shared compositor without exclusions or a frozen-baseline waiver', [

@@ -199,7 +199,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
-    if (name === 'export_job') expected.push('export_geometry_tests = "../tests/render_geometry.rs"',
+    if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
+      'export_geometry_tests = "../tests/render_geometry.rs"',
       'export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
     if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
       'application_replacement_tests = "../tests/application_replacement.rs"');
