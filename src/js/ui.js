@@ -1351,25 +1351,10 @@
     el.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
-  // Live scrub (2026-07-17, "les valeurs qui se changent en drag doivent
-  // se refléter en temps réel dans le canvas, pas juste au relâchement") :
-  // pendant le drag, on dispatch les VRAIS événements 'input' et 'change'
-  // au plus une fois par frame. Les deux doivent être coalescés : les
-  // transformations, le zoom, les masques et plusieurs effets font leur
-  // rendu lourd sur 'input', tandis que Motion utilise surtout 'change'.
-  // Un stylet peut envoyer bien plus de 60 pointermove/s, mais seul le
-  // dernier état avant la prochaine image est visible. Au relâchement on
-  // flush synchroniquement une valeur encore en attente, donc aucun delta
-  // final n'est perdu.
-  //
-  // Contrepartie undo : la plupart de ces handlers commencent par
-  // pushUndo() — un snapshot par tick de drag aurait pollué la pile (des
-  // dizaines d'entrées pour UN geste) et, pire, le snapshot du release
-  // aurait capturé l'état déjà-final (Ctrl+Z = no-op perçu). D'où
-  // window._scrubLiveActive : UN pushUndo réel au premier mouvement du
-  // drag (snapshot pré-geste), puis pushUndoLayers (tweens.js) NO-OP tant
-  // que le flag est levé — y compris pendant le 'change' final du release.
-  // Un geste = une entrée d'undo, qui restaure l'état d'avant le drag.
+  // Legacy scrubs coalesce input/change to one animation frame and flush on
+  // release. Their first movement snapshots pre-gesture undo; subsequent
+  // handlers see _scrubLiveActive and cannot add duplicate history entries.
+  // Native opacity skips those events; its final change makes one Rust history entry.
   var scrubChangeRaf=0,scrubLiveDirty=false;
   function dispatchLiveChange(){
     scrubLiveDirty=true;
@@ -1407,9 +1392,6 @@
     if(max!==null)raw=Math.min(max,raw);
     var decimals=(String(step).split('.')[1]||'').length;
     scrubState.el.value=decimals?raw.toFixed(decimals):Math.round(raw);
-    // The admitted native opacity field is a tentative input until release.
-    // Its one final change enters Rust history; interim legacy changes would
-    // create several undo entries and expose an uncommitted document value.
     if(!scrubState.nativeOpacity)dispatchLiveChange();
   });
   function endScrub(e){
@@ -1422,8 +1404,6 @@
       try{
         if(e.type!=='pointercancel')nativeField.dispatchEvent(new Event('change',{bubbles:true}));
       }finally{
-        // The authoritative projection will repaint after the native receipt.
-        // A cancelled or rejected command must never leave the tentative value.
         nativeField.value=nativeStart;
         window._scrubLiveActive=false;
       }
