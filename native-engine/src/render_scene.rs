@@ -4,6 +4,7 @@
 //! never derives geometry from a frame number or reads mutable document state.
 
 use crate::evaluation;
+use crate::render_geometry::{ClosedCubicPath, LayerShape};
 use crate::scheduler::{
     EvaluationKey, FrameScheduler, OutputSpec, ScheduledFrame, ViewGeneration, WorkId,
 };
@@ -71,6 +72,8 @@ pub struct LayerGeometry {
     bounds: [f64; 4],
     transform: [f64; 6],
     paint: OpaqueSrgbPaint,
+    shape: LayerShape,
+    envelope: Option<[f64; 4]>,
 }
 
 impl LayerGeometry {
@@ -85,6 +88,8 @@ impl LayerGeometry {
             bounds,
             transform,
             paint,
+            shape: LayerShape::Rectangle,
+            envelope: None,
         };
         if layer.layer_uid.is_empty() {
             return Err(RenderSceneError::new(
@@ -115,6 +120,21 @@ impl LayerGeometry {
 
     pub fn layer_uid(&self) -> &str {
         &self.layer_uid
+    }
+
+    pub fn closed_path(
+        layer_uid: impl Into<String>,
+        path: ClosedCubicPath,
+        transform: [f64; 6],
+        paint: OpaqueSrgbPaint,
+    ) -> Result<Self, RenderSceneError> {
+        let envelope = path.transformed_envelope(transform).map_err(|message| {
+            RenderSceneError::new(RenderSceneErrorKind::InvalidInput, message)
+        })?;
+        let mut layer = Self::new(layer_uid, path.control_bounds(), transform, paint)?;
+        layer.shape = LayerShape::ClosedPath(path);
+        layer.envelope = Some(envelope);
+        Ok(layer)
     }
 }
 
@@ -209,6 +229,8 @@ pub(crate) struct PreparedLayer {
     pub(crate) transform: [f64; 6],
     pub(crate) paint: OpaqueSrgbPaint,
     pub(crate) opacity_percent: f64,
+    pub(crate) shape: LayerShape,
+    pub(crate) envelope: Option<[f64; 4]>,
 }
 
 impl RenderScene {
@@ -334,6 +356,8 @@ pub fn prepare(
             transform: layer.transform,
             paint: layer.paint,
             opacity_percent: opacity,
+            shape: layer.shape.clone(),
+            envelope: layer.envelope,
         });
     }
     if !evaluated.is_empty() {
