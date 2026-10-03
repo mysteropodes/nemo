@@ -1,0 +1,45 @@
+{
+  "format": "nemo.native-opacity-document",
+  "formatVersion": 1,
+  "totalFrames": 21,
+  "layers": [
+    {
+      "layerUid": "r08_curve_layer",
+      "motionStatic": {
+        "opacity": [25]
+      },
+      "motion": {
+        "opacity": {
+          "keys": [
+            {
+              "frame": 0,
+              "v": [20],
+              "curvePoints": [
+                { "x": 0, "y": 0 },
+                { "x": 0.25, "y": 0.156 },
+                { "x": 0.5, "y": 0.5 },
+                { "x": 0.75, "y": 0.844 },
+                { "x": 1, "y": 1 }
+              ],
+              "hOut": [0, 0],
+              "hIn": [0, 0]
+            },
+            {
+              "frame": 20,
+              "v": [80],
+              "curvePoints": [
+                { "x": 0, "y": 0 },
+                { "x": 0.25, "y": 0.156 },
+                { "x": 0.5, "y": 0.5 },
+                { "x": 0.75, "y": 0.844 },
+                { "x": 1, "y": 1 }
+              ],
+              "hOut": [0, 0],
+              "hIn": [0, 0]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

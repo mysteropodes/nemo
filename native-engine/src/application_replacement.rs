@@ -112,6 +112,8 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         &mut self,
         document: OpacityDocument,
     ) -> Result<Vec<JobReceipt>, String> {
+        // Any replacement attempt retires catalog provenance, even if A stays fenced.
+        self.reproduction_origin = None;
         if self.release.is_some() {
             return Err("native application authority has been released".into());
         }
