@@ -1,9 +1,6 @@
 // ---- LABS — Opacity diagnostics inspector (T08/#1057) ----
-// A thin, read-only floating panel over the recorded opacity command trace
-// (T05's NemoOpacityDiagnostics, reached through the same
-// NemoApplication.handle('diagnostics.trace', ...) path the diagnostics
-// capability (T08) also uses -- panel and capability observe the exact
-// same underlying trace, never a second copy of it).
+// A thin, read-only floating panel over the native shared-v2 trace (T08B).
+// The async adapter reaches the same native authority as the bundled MCP.
 //
 //   SMLabs.enable('diagnostics-panel')   — opens the floating panel
 //   SMLabs.disable('diagnostics-panel')  — closes it
@@ -30,12 +27,9 @@
     return 'diagnostics-panel:' + identity.instanceId.slice(0, 64) + ':' + minted;
   }
 
-  // Trace fields are NOT trusted text. `requestId` is caller-supplied and only
-  // length-checked by opacity-application.js's validate(), so it reaches here
-  // verbatim from whatever drove the command -- including an MCP client. This
-  // panel builds its rows as an innerHTML string, so every interpolated value
-  // has to be escaped or a requestId can close an attribute and inject markup
-  // into the Tauri webview, where window.__TAURI__ is in scope.
+  // Native validation rejects hostile identifiers before rendering. Keep every
+  // interpolated trace field escaped as a separate presentation boundary: the
+  // Tauri webview must never interpret caller-supplied text as markup.
   var ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function esc(value) { return String(value).replace(/[&<>"']/g, function (c) { return ESCAPES[c]; }); }
 
@@ -59,38 +53,25 @@
 
   function currentIdentity() {
     try {
-      var identity = window.NemoOpacityApplication.meta();
-      return { instanceId: identity.instanceId, documentId: identity.documentId, revision: identity.revision };
+      return window.NemoNativeDiagnosticsQuery.capture(window);
     } catch (_) { return null; }
   }
 
   function sameDocument(a, b) {
-    return !!(a && b && typeof a.instanceId === 'string' && a.instanceId
-      && typeof a.documentId === 'string' && a.documentId
-      && a.instanceId === b.instanceId && a.documentId === b.documentId);
-  }
-
-  function traceResult(response, identity) {
-    if (!response || !response.ok) return { error: (response && response.error && response.error.message) || 'diagnostics.trace failed' };
-    if (!sameDocument(identity, response)) return { error: 'Diagnostics response identity does not match the requested document.' };
-    if (!response.result || !Array.isArray(response.result.entries)) return { error: 'diagnostics.trace returned no command list' };
-    return { entries: response.result.entries, identity: {
-      instanceId: response.instanceId, documentId: response.documentId, revision: response.revision
-    } };
+    return !!(window.NemoNativeDiagnosticsQuery && window.NemoNativeDiagnosticsQuery.same(a, b));
   }
 
   function rowHtml(entry, selectedLayers) {
-    var req = entry.request;
-    var layerId = req.payload && req.payload.layerId;
+    var layerId = entry.targetId;
     var layerIdx = layerId ? layerIndexOf(layerId) : -1;
     var correlated = layerIdx >= 0 && selectedLayers[layerIdx];
     var statusColor = entry.ok ? '#7bd88f' : '#e08787';
     return '<tr data-layer-idx="' + layerIdx + '" style="cursor:' + (layerIdx >= 0 ? 'pointer' : 'default') + ';' +
       (correlated ? 'background:rgba(78,111,242,.25);' : '') + '">' +
       '<td style="padding:1px 8px;color:' + statusColor + ';">' + (entry.ok ? 'ok' : 'fail') + '</td>' +
-      '<td style="padding:1px 8px;">' + esc(req.operation) + '</td>' +
-      '<td style="padding:1px 8px;color:#888;">' + esc(entry.revision) + '</td>' +
-      '<td style="padding:1px 8px;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(req.requestId) + '</td>' +
+      '<td style="padding:1px 8px;">' + esc(entry.operation) + '</td>' +
+      '<td style="padding:1px 8px;color:#888;">' + esc(entry.contentRevision) + '</td>' +
+      '<td style="padding:1px 8px;color:#888;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(entry.requestIdRedacted ? '[redacted]' : entry.requestId) + '</td>' +
       '</tr>';
   }
 
@@ -99,7 +80,7 @@
   // starting fixture bytes. T10A owns an opt-in native synthetic recording;
   // T08B owns its panel binding. Never infer provenance from user state/hash.
   async function buildReport(result) {
-    return { error: result.error || 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.' };
+    return { error: 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.' };
   }
 
   function build() {
@@ -125,19 +106,18 @@
       if (!result.identity) result.identity = identity;
       render(result, target, token);
     }
+    // Controls exist immediately, including when persisted Labs opens before
+    // host scripts load. A later manual Refresh discovers the ready service.
+    render({ error: 'Loading native diagnostics…', identity: identity }, target, token);
     try {
-      if (!identity || !window.NemoApplication) return finish({ error: 'diagnostics application not loaded' });
+      var service = window.NemoNativeDiagnosticsQuery;
+      if (!identity || !service || !service.available(window)) return finish({ error: 'Native diagnostics unavailable in browser/WASM or without an active native document.' });
       var requestId = mintRequestId(identity);
       if (requestId === null) return finish({ error: 'Diagnostics request counter exhausted.' });
-      var response = window.NemoApplication.handle({ apiVersion: 1, requestId: requestId,
-        ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
-      // Keep the synchronous compatibility path; delayed adapters share the
-      // same generation/document fence without updating detached panels.
-      if (response && typeof response.then === 'function') {
-        Promise.resolve(response).then(function (value) { finish(traceResult(value, identity)); },
-          function () { finish({ error: 'diagnostics.trace failed' }); });
-      } else finish(traceResult(response, identity));
-    } catch (_) { finish({ error: 'diagnostics.trace failed' }); }
+      service.recent(window, identity, requestId).then(function (value) {
+        finish({ entries: value.result.records, truncated: value.result.truncated, identity: identity });
+      }, function () { finish({ error: 'Native diagnostics query failed. Refresh to retry.' }); });
+    } catch (_) { finish({ error: 'Native diagnostics query failed. Refresh to retry.' }); }
   }
 
   function render(result, target, token) {
@@ -151,6 +131,7 @@
         ? '<table style="border-collapse:collapse;"><tr><th style="padding:2px 8px;color:#888;">status</th><th style="padding:2px 8px;color:#888;">operation</th><th style="padding:2px 8px;color:#888;">rev</th><th style="padding:2px 8px;color:#888;">requestId</th></tr>'
           + result.entries.slice().reverse().map(function (e) { return rowHtml(e, selectedLayers); }).join('') + '</table>'
         : '<div data-diag-empty style="padding:6px 8px;color:#888;">' + esc(t2('labsDiagnosticsEmpty')) + '</div>');
+    if (result.truncated) body += '<div data-diag-truncated style="padding:6px 8px;color:#888;">Earlier operations omitted by the native trace limit.</div>';
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
       '<b style="font-size:11px;">' + esc(t2('labsDiagnosticsTitle')) + '</b>' +
