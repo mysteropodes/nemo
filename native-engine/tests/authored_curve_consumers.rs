@@ -1,10 +1,11 @@
 use crate::codec::{decode_project, encode_project};
 use crate::compositor::{CompositionResult, Compositor};
 use crate::export_job::{ExportCompositor, ExportJobManager, ExportReadback, JobStatus};
-use crate::export_job_tests::{decode, edit_to_revision_one, request, MemoryPort};
+use crate::export_job_tests::{decode, edit_to_revision_one, geometry, request, MemoryPort};
 use crate::history::NativeOpacityHistory;
-use crate::render_scene::RenderScene;
+use crate::render_scene::{prepare, RenderScene, RenderSceneErrorKind};
 use crate::revision::DocumentSnapshot;
+use crate::scheduler::{EvaluationKey, FrameScheduler, OutputSpec};
 use serde_json::{json, Value};
 
 const FRAMES: [u32; 5] = [0, 5, 10, 15, 20];
@@ -119,4 +120,40 @@ fn authored_overshoot_exports_real_pixels_from_the_pinned_revision() {
         (leases.acquired(), leases.released(), leases.live()),
         (10, 10, 0)
     );
+}
+
+#[test]
+fn finite_native_opacity_outside_gpu_alpha_range_fails_before_scene_publication() {
+    let mut project: Value =
+        serde_json::from_slice(include_bytes!("fixtures/opacity-v2/project.json")).unwrap();
+    project["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"] =
+        json!([{"x":0,"y":0},{"x":1,"y":1e40}]);
+    project["layers"][0]["motion"]["opacity"]["keys"][1]["v"] = json!([60]);
+    let document = decode_project(&serde_json::to_vec(&project).unwrap()).unwrap();
+    let history = NativeOpacityHistory::new("n22b-alpha-boundary", document).unwrap();
+    let snapshot = history.acquire_snapshot(0).unwrap();
+    let before = encode_project(snapshot.document()).unwrap();
+    let value = crate::evaluation::evaluate(&snapshot, "scene-root", 10)
+        .unwrap()
+        .layers()[0]
+        .value();
+    assert!(value.is_finite());
+    assert!(!((value / 100.0) as f32).is_finite());
+    let key = EvaluationKey::new(
+        snapshot.id(),
+        "scene-root",
+        10,
+        "final",
+        OutputSpec::new("frame", "rgba8", 320, 180, "srgb", "straight").unwrap(),
+        [("geometry/r08".to_owned(), "v1".to_owned())],
+    )
+    .unwrap();
+    let mut scheduler = FrameScheduler::new();
+    let work = scheduler.schedule(snapshot.clone(), key).unwrap();
+    let error = prepare(&scheduler, &work, &geometry(0.0)).unwrap_err();
+    assert_eq!(error.kind(), RenderSceneErrorKind::InvalidInput);
+    assert_eq!(history.content_revision(), 0);
+    assert_eq!(encode_project(snapshot.document()).unwrap(), before);
+    scheduler.cancel(work.work_id()).unwrap();
+    assert_eq!(scheduler.lease_counters().live(), 0);
 }

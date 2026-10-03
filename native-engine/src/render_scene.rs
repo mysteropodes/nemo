@@ -356,6 +356,15 @@ pub fn prepare(
                 ),
             )
         })?;
+        // Compositor::compose passes this alpha to the GPU as f32. A finite
+        // native read can still overflow that representation; reject before
+        // constructing a scene instead of passing Infinity to push_layer.
+        if !((opacity / 100.0) as f32).is_finite() {
+            return Err(RenderSceneError::new(
+                RenderSceneErrorKind::InvalidInput,
+                "evaluated opacity exceeds finite GPU alpha representation",
+            ));
+        }
         layers.push(PreparedLayer {
             bounds: layer.bounds,
             transform: layer.transform,

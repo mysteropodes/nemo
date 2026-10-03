@@ -19,7 +19,7 @@ fn history(label: &str) -> NativeOpacityHistory {
     NativeOpacityHistory::new(label, decode_project(PROJECT).unwrap()).unwrap()
 }
 
-fn geometry(offset: f64) -> GeometryPaintInput {
+pub(super) fn geometry(offset: f64) -> GeometryPaintInput {
     GeometryPaintInput::new(
         "geometry/r08",
         "v1",
