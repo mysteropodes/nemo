@@ -122,6 +122,11 @@ impl LayerGeometry {
         &self.layer_uid
     }
 
+    /// Admit one immutable solid cubic contour to the bounded GPU scene.
+    /// Local controls, affine and clip must remain finite/nondegenerate at
+    /// Vello's f32 precision. Encoded transformed controls may differ from f64
+    /// by at most 1/4 output pixel including a conservative f32 arithmetic
+    /// rounding margin; larger drift is rejected, never corrected.
     pub fn closed_path(
         layer_uid: impl Into<String>,
         path: ClosedCubicPath,

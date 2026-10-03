@@ -130,6 +130,98 @@ fn malformed_count_controls_hull_and_transform_are_rejected() {
     }
 }
 
+#[test]
+fn geometry_and_affine_must_survive_gpu_precision() {
+    let scaled = |scale: f64| {
+        segments()
+            .into_iter()
+            .map(|s| CubicSegment {
+                point: s.point.map(|v| v * scale),
+                handle_in: s.handle_in.map(|v| v * scale),
+                handle_out: s.handle_out.map(|v| v * scale),
+            })
+            .collect()
+    };
+    // Finite f64 controls would overflow before a shrinking affine is applied.
+    assert!(ClosedCubicPath::new(scaled(1e40)).is_err());
+    let mut collapsed = segments();
+    for segment in &mut collapsed {
+        segment.point[0] += 1e12;
+    }
+    assert!(ClosedCubicPath::new(collapsed).is_err());
+    // These bounds remain positive after casting, but separate control and
+    // translation casts distort the cap before cancellation on the GPU.
+    let offset = 2_f64.powi(27);
+    let mut cancelled = segments();
+    for segment in &mut cancelled {
+        segment.point[0] += offset;
+    }
+    assert!(ClosedCubicPath::new(cancelled)
+        .unwrap()
+        .transformed_envelope([1.0, 0.0, 0.0, 1.0, -offset, 0.0])
+        .is_err());
+    // Scalar f32 evaluation can look exact while large cancelling products
+    // still have a backend-dependent rounding/FMA error bound.
+    for (offset, admitted) in [(4096.0, true), (1e6, false)] {
+        let mut shifted = segments();
+        for segment in &mut shifted {
+            segment.point[0] += offset;
+        }
+        assert_eq!(
+            ClosedCubicPath::new(shifted)
+                .unwrap()
+                .transformed_envelope([1.0, 0.0, 0.0, 1.0, -offset, 0.0])
+                .is_ok(),
+            admitted
+        );
+    }
+    for (scale, transform) in [
+        (1e-10, [1e40, 0.0, 0.0, 1.0, 0.0, 0.0]),
+        (1.0, [1e-50, 0.0, 0.0, 1.0, 0.0, 0.0]),
+        (1.0, [1.0, 0.0, 0.0, 1.0, 1e12, 0.0]),
+        (1.0, [1e20, 0.0, 0.0, 1e20, 0.0, 0.0]),
+        (1.0, [1.0, 1.0, 1.0, 1.0 + 1e-10, 0.0, 0.0]),
+    ] {
+        assert!(ClosedCubicPath::new(scaled(scale))
+            .unwrap()
+            .transformed_envelope(transform)
+            .is_err());
+    }
+}
+
+#[test]
+fn each_curve_must_survive_vello_local_segment_encoding() {
+    let scale = |factor: f64| {
+        segments()
+            .into_iter()
+            .map(|s| CubicSegment {
+                point: s.point.map(|v| v * factor),
+                handle_in: s.handle_in.map(|v| v * factor),
+                handle_out: s.handle_out.map(|v| v * factor),
+            })
+            .collect()
+    };
+    assert!(ClosedCubicPath::new(scale(1e-15)).is_err());
+    assert!(ClosedCubicPath::new(scale(1e-10))
+        .unwrap()
+        .transformed_envelope([1e10, 0.0, 0.0, 1e10, 0.0, 0.0])
+        .is_ok());
+    let tiny = CubicSegment {
+        point: [1e-13, 1e-13],
+        handle_in: [0.0; 2],
+        handle_out: [0.0; 2],
+    };
+    let origin = CubicSegment {
+        point: [0.0; 2],
+        handle_in: [0.0; 2],
+        handle_out: [0.0; 2],
+    };
+    let cap_end = segments()[1];
+    assert!(ClosedCubicPath::new(vec![origin, tiny, cap_end]).is_err());
+    // The same tiny segment on the closing edge must also be rejected.
+    assert!(ClosedCubicPath::new(vec![tiny, cap_end, origin]).is_err());
+}
+
 // Observe the exact production composition read by the export job. This wrapper
 // adds no GPU owner, pixel generator or alternate composition route.
 #[cfg(feature = "test-export_job")]
