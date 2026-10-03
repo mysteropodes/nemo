@@ -220,6 +220,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.ok(visible && typeof visible === 'object',
       name + ' requires an observation of the installed window, not only a native read or screenshot file');
     assert.deepEqual({ screen: visible.screen, tabName: visible.tabName,
+      selectedLayer: visible.selectedLayer, displayedFrame: visible.displayedFrame,
       opacity: visible.opacity, redRectangleVisible: visible.redRectangleVisible }, expected,
     name + ' must show the admitted document and frame in the actual editor');
   }
@@ -239,7 +240,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     const admittedDocument = await status();
     await capture('motion-ready', 'Close the automatic tutorial and any introductory overlays, enter Motion, and select R08 rectangle. Capture the actual Motion surface and record visible: {canvasW, canvasH, fps, totalFrames, layerName, selectedLayer, opacity} from its controls before editing.');
     const visible = read(path.join(reportDir, 'motion-ready.json')).visible;
-    assert.deepEqual(visible, { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 21,
+    assert.deepEqual({ canvasW: visible.canvasW, canvasH: visible.canvasH, fps: visible.fps,
+      totalFrames: visible.totalFrames, layerName: visible.layerName,
+      selectedLayer: visible.selectedLayer, opacity: visible.opacity },
+    { canvasW: 320, canvasH: 180, fps: 24, totalFrames: 21,
       layerName: 'R08 rectangle', selectedLayer: 'R08 rectangle', opacity: 25 },
     'The visible Motion/editor controls must project the opened native fixture');
     const projectedDocument = await status();
@@ -304,8 +308,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
     phase('reopen', 'Open the saved.json file through the real project-open UI.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
     assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
-    await capture('reopen-visible', 'Show the saved tab, Motion opacity 25 and red rectangle in the actual editor after the replacement. Record visible: {screen, tabName, opacity, redRectangleVisible}.');
+    await capture('reopen-visible', 'Show the saved tab, selected R08 rectangle, displayed frame 1, Motion opacity 25 and red rectangle in the actual editor after the replacement. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
     assertVisibleProjection('reopen-visible', { screen: 'editor', tabName: 'saved',
+      selectedLayer: 'R08 rectangle', displayedFrame: 1,
       opacity: 25, redRectangleVisible: true });
     const replaced = await dispatch('command.document.apply', mutation, { documentId: prior.documentId, expectedRevision: prior.contentRevision });
     assert.equal(replaced.ok, false); assert.equal(replaced.error.code, 'wrong_document'); assert.equal(await opacity(), 25);
@@ -321,8 +326,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
       const evaluated = await dispatch('query.document.evaluate', { atRevision: pinned.contentRevision, contextId: 'scene-root', frame });
       assert.equal(evaluated.ok, true); assert.equal(evaluated.result.layers[0].value, value);
       const checkpoint = 'preview-' + frame;
-      await capture(checkpoint, 'Scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); observe the keyed tab, Motion opacity ' + value + ' and red rectangle in the installed window. Record visible: {screen, tabName, opacity, redRectangleVisible}.');
+      await capture(checkpoint, 'Scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); observe the keyed tab, selected R08 rectangle, displayed frame, Motion opacity ' + value + ' and red rectangle in the installed window. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
       assertVisibleProjection(checkpoint, { screen: 'editor', tabName: 'keyed',
+        selectedLayer: 'R08 rectangle', displayedFrame: frame + 1,
         opacity: value, redRectangleVisible: true });
     }
     await capture('resize-input', 'Resize the actual app window, scrub between frames 0 and 20 and back to 0; record whether preview and controls stay responsive.');
