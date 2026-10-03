@@ -215,6 +215,14 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal(hash(path.join(reportDir, evidence.image)), evidence.sha256);
     report.uiEvidence.push(evidence);
   }
+  function assertVisibleProjection(name, expected) {
+    const visible = read(path.join(reportDir, name + '.json')).visible;
+    assert.ok(visible && typeof visible === 'object',
+      name + ' requires an observation of the installed window, not only a native read or screenshot file');
+    assert.deepEqual({ screen: visible.screen, tabName: visible.tabName,
+      opacity: visible.opacity, redRectangleVisible: visible.redRectangleVisible }, expected,
+    name + ' must show the admitted document and frame in the actual editor');
+  }
   try {
     instance = await controller.start(`n21-opacity-${process.pid}-${Date.now()}`, ['desktop-input', 'gpu-reference']);
     const owned = await controller.status(instance); assert.equal(owned.code, 0); instance.snapshot = owned.value;
@@ -268,6 +276,8 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal(parityWrite.ok, true, 'External native edit failed: ' + JSON.stringify(parityWrite.error));
     assert.equal(await compatibilityValue(), 25);
     await capture('mcp-ui-parity', 'Verify the visible Motion Opacity field changed to 25 after the external MCP write.');
+    assert.equal(read(path.join(reportDir, 'mcp-ui-parity.json')).visibleOpacity, 25,
+      'The installed Motion field must show the acknowledged external revision');
     const unchanged = await status();
     const mutation = { command: 'layer.opacity.set', stableTarget: target, value: 99 };
     const stale = await dispatch('command.document.apply', mutation, { expectedRevision: unchanged.contentRevision - 1 });
@@ -294,6 +304,9 @@ test('installed native opacity: live command oracles and externally driven UI ch
     phase('reopen', 'Open the saved.json file through the real project-open UI.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
     assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
+    await capture('reopen-visible', 'Show the saved tab, Motion opacity 25 and red rectangle in the actual editor after the replacement. Record visible: {screen, tabName, opacity, redRectangleVisible}.');
+    assertVisibleProjection('reopen-visible', { screen: 'editor', tabName: 'saved',
+      opacity: 25, redRectangleVisible: true });
     const replaced = await dispatch('command.document.apply', mutation, { documentId: prior.documentId, expectedRevision: prior.contentRevision });
     assert.equal(replaced.ok, false); assert.equal(replaced.error.code, 'wrong_document'); assert.equal(await opacity(), 25);
     report.checks.push({ checkpoint: 'save-reopen-old-document-rejected', savedSha256: hash(fixtures.saved) });
@@ -307,7 +320,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     for (const [frame, value] of [[0, 20], [10, 50], [20, 80]]) {
       const evaluated = await dispatch('query.document.evaluate', { atRevision: pinned.contentRevision, contextId: 'scene-root', frame });
       assert.equal(evaluated.ok, true); assert.equal(evaluated.result.layers[0].value, value);
-      await capture('preview-' + frame, 'Scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); observe the red rectangle and capture its preview.');
+      const checkpoint = 'preview-' + frame;
+      await capture(checkpoint, 'Scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); observe the keyed tab, Motion opacity ' + value + ' and red rectangle in the installed window. Record visible: {screen, tabName, opacity, redRectangleVisible}.');
+      assertVisibleProjection(checkpoint, { screen: 'editor', tabName: 'keyed',
+        opacity: value, redRectangleVisible: true });
     }
     await capture('resize-input', 'Resize the actual app window, scrub between frames 0 and 20 and back to 0; record whether preview and controls stay responsive.');
     phase('png-export', 'Export PNG sequence, full 21-frame range, scale 1, opaque background, into the export path in phase.json.');
