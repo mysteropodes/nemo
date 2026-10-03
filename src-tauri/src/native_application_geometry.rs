@@ -1,6 +1,6 @@
 //! Strict immutable resource wire admission; native-engine owns cubic geometry.
 
-use super::{bounded_id, host_error, HostResult};
+use crate::native_application_contract::{bounded_id, host_error, HostResult};
 use native_engine::{
     render_geometry::{ClosedCubicPath, CubicSegment},
     render_scene::{GeometryPaintInput, LayerGeometry, OpaqueSrgbPaint},

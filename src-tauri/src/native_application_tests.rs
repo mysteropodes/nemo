@@ -494,7 +494,7 @@ fn cubic_host_admission_resolver_preview_and_export_share_immutable_resources() 
             json!({"contextId":"scene-root","quality":"final","outputHandle":version,
             "frames":([0,10,20].map(|frame| json!({"sourceFrame":frame,"geometryHandle":{"resourceId":"cap","resourceVersion":resource_version}})))})
         };
-        let failed = super::release_tests::dispatch_history(
+        let failed = crate::native_application::release_tests::dispatch_history(
             &mut application,
             &format!("missing-{version}"),
             "job.export.png.begin",
@@ -502,7 +502,7 @@ fn cubic_host_admission_resolver_preview_and_export_share_immutable_resources() 
         );
         assert!(!failed["error"].is_null());
         assert!(!destination.exists());
-        let begun = super::release_tests::dispatch_history(
+        let begun = crate::native_application::release_tests::dispatch_history(
             &mut application,
             &format!("export-{version}"),
             "job.export.png.begin",

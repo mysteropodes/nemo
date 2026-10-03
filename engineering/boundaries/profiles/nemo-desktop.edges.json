@@ -200,6 +200,8 @@
           "export_job::ExternalEffectDisposition",
           "export_job::JobReceipt",
           "export_job::JobStatus",
+          "render_geometry::ClosedCubicPath",
+          "render_geometry::CubicSegment",
           "render_scene::GeometryPaintInput",
           "render_scene::LayerGeometry",
           "render_scene::OpaqueSrgbPaint",
@@ -237,7 +239,9 @@
           "compositor::Compositor"
         ],
         "rust.desktop.native.application.tests": [
-          "compositor::Compositor"
+          "application::ExportResourceResolver",
+          "compositor::Compositor",
+          "export_job::JobStatus"
         ],
         "rust.desktop.native.dispatch": [
           "application::ExportResourceResolver",
