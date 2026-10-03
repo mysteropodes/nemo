@@ -181,6 +181,8 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N24B registers private immutable geometry admission without an edge or size waiver', [
+    'src-tauri/src/native_application_geometry.rs']],
   ['N20R3 registers private host replay and dispatch-test children without an edge or size waiver', [
     'src-tauri/src/native_application_contract_fingerprints.rs',
     'src-tauri/src/native_application_replace_replay.rs',
