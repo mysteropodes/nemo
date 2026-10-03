@@ -27,6 +27,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             replacement: None,
             diagnostics: diagnostics::RecentDiagnostics::default(),
             reproduction_origin: None,
+            reproduction: Default::default(),
         })
     }
 

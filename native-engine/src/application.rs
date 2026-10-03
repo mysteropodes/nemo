@@ -22,6 +22,9 @@ pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgr
 mod construction;
 #[path = "application_diagnostics.rs"]
 mod diagnostics;
+#[path = "application_reproduction.rs"]
+mod reproduction;
+pub use reproduction::{ReproductionReason, ReproductionState, ReproductionStatus};
 #[path = "reproduction_catalog.rs"]
 mod reproduction_catalog;
 pub use reproduction_catalog::{
@@ -90,6 +93,7 @@ pub struct NativeApplication<P, C, R> {
     replacement: Option<ReplacementProgress>,
     diagnostics: diagnostics::RecentDiagnostics,
     reproduction_origin: Option<reproduction_catalog::CatalogOrigin>,
+    reproduction: reproduction::ReproductionJournal,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
@@ -222,6 +226,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 
     pub fn release_transaction_stage(&mut self) -> ApplicationReleaseReceipt {
+        self.reproduction.invalidate(ReproductionReason::Released);
         if matches!(self.release.as_ref(), Some(receipt) if receipt.transaction_stage == ReconciliationStage::Complete)
         {
             return self.release.clone().unwrap();
