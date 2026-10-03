@@ -305,10 +305,10 @@ test('installed native opacity: live command oracles and externally driven UI ch
     await waitFor(() => fs.existsSync(fixtures.saved), stage);
     const saved = read(fixtures.saved); assert.equal(saved.layers[0].layerUid, target.layerUid);
     assert.deepEqual(saved.layers[0].motionStatic.opacity, [25]);
-    phase('reopen', 'Open the saved.json file through the real project-open UI.');
+    phase('reopen', 'Open saved.json through the real project-open UI. After the picker closes, foreground the Nemo window and wait for the saved tab, Motion opacity 25 and red frame-0 preview before recording visible evidence; native admission alone is not UI completion.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== prior.documentId; }, stage);
     assert.equal(await opacity(), 25); assert.equal(await compatibilityValue(true), 25);
-    await capture('reopen-visible', 'Show the saved tab, selected R08 rectangle, displayed frame 1, Motion opacity 25 and red rectangle in the actual editor after the replacement. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
+    await capture('reopen-visible', 'With Nemo foregrounded after the picker, show the saved tab, selected R08 rectangle, displayed frame 1, Motion opacity 25 and red rectangle in the actual editor after the replacement. Wait for the visible frame; record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
     assertVisibleProjection('reopen-visible', { screen: 'editor', tabName: 'saved',
       selectedLayer: 'R08 rectangle', displayedFrame: 1,
       opacity: 25, redRectangleVisible: true });
@@ -316,7 +316,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
     assert.equal(replaced.ok, false); assert.equal(replaced.error.code, 'wrong_document'); assert.equal(await opacity(), 25);
     report.checks.push({ checkpoint: 'save-reopen-old-document-rejected', savedSha256: hash(fixtures.saved) });
     const staticDocument = await status();
-    phase('open-keyed', 'Open keyed.json, enter Motion and select R08 rectangle.');
+    phase('open-keyed', 'Open keyed.json, then foreground the Nemo window after the picker closes. Enter Motion and select R08 rectangle. Wait for the keyed tab, opacity 20 and red frame-0 preview; native admission and property.get may precede the final presented frame.');
     await waitFor(async () => { const s = await status(); return s.available && s.documentId !== staticDocument.documentId; }, stage);
     assert.equal(await compatibilityValue(true), 20);
     const pinned = await status();
@@ -326,7 +326,7 @@ test('installed native opacity: live command oracles and externally driven UI ch
       const evaluated = await dispatch('query.document.evaluate', { atRevision: pinned.contentRevision, contextId: 'scene-root', frame });
       assert.equal(evaluated.ok, true); assert.equal(evaluated.result.layers[0].value, value);
       const checkpoint = 'preview-' + frame;
-      await capture(checkpoint, 'Scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); observe the keyed tab, selected R08 rectangle, displayed frame, Motion opacity ' + value + ' and red rectangle in the installed window. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
+      await capture(checkpoint, 'Keep Nemo foregrounded; scrub to zero-based frame ' + frame + ' (displayed frame ' + (frame + 1) + '); wait for and observe the keyed tab, selected R08 rectangle, displayed frame, Motion opacity ' + value + ' and red rectangle in the installed window. Record visible: {screen, tabName, selectedLayer, displayedFrame, opacity, redRectangleVisible}.');
       assertVisibleProjection(checkpoint, { screen: 'editor', tabName: 'keyed',
         selectedLayer: 'R08 rectangle', displayedFrame: frame + 1,
         opacity: value, redRectangleVisible: true });
