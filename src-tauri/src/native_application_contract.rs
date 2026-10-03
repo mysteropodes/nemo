@@ -6,7 +6,7 @@ use native_engine::{
     desktop_viewport::{CssBounds, PhysicalExtent, ViewportMapping},
     document::OpacityDocument,
     export_job::{CleanupStatus, ExternalEffectDisposition, JobReceipt, JobStatus},
-    render_scene::{GeometryPaintInput, LayerGeometry, OpaqueSrgbPaint},
+    render_scene::GeometryPaintInput,
     resource_leases::WorkId,
     scheduler::OutputSpec,
 };
@@ -17,8 +17,10 @@ use std::collections::BTreeSet;
 
 pub(crate) const HOST_API_VERSION: u32 = NATIVE_API_VERSION;
 const MAX_PROJECTION_BYTES: usize = 1_048_576;
-const MAX_RESOURCES: usize = 64;
-const MAX_LAYERS_PER_RESOURCE: usize = 256;
+
+#[path = "native_application_geometry.rs"]
+mod geometry;
+pub(crate) use geometry::GeometryResourceInput;
 
 pub(crate) type HostResult<T> = Result<T, NativeApplicationError>;
 
@@ -97,31 +99,6 @@ pub(crate) struct NativeViewportRequest {
 pub(crate) struct NativeDisposeRequest {
     pub(crate) api_version: u32,
     pub(crate) instance_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct GeometryResourceInput {
-    resource_id: String,
-    resource_version: String,
-    layers: Vec<GeometryLayerInput>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct GeometryLayerInput {
-    layer_uid: String,
-    bounds: [f64; 4],
-    transform: [f64; 6],
-    paint: PaintInput,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct PaintInput {
-    red: u8,
-    green: u8,
-    blue: u8,
 }
 
 #[derive(Debug, Deserialize)]
@@ -375,7 +352,7 @@ pub(crate) fn admit_project(
 ) -> HostResult<AdmittedProject> {
     let bytes = serde_json::to_vec(projection)
         .map_err(|_| host_error("invalid_request", "projection is not serializable"))?;
-    if bytes.len() > MAX_PROJECTION_BYTES || inputs.is_empty() || inputs.len() > MAX_RESOURCES {
+    if bytes.len() > MAX_PROJECTION_BYTES {
         return Err(host_error(
             "invalid_request",
             "native project exceeds bounded input limits",
@@ -388,47 +365,7 @@ pub(crate) fn admit_project(
         .iter()
         .map(|layer| layer.layer_uid())
         .collect();
-    let mut resources = Vec::with_capacity(inputs.len());
-    for input in inputs {
-        if !bounded_id(&input.resource_id)
-            || !bounded_id(&input.resource_version)
-            || input.layers.is_empty()
-            || input.layers.len() > MAX_LAYERS_PER_RESOURCE
-        {
-            return Err(host_error(
-                "invalid_request",
-                "invalid geometry resource identity or size",
-            ));
-        }
-        let actual: BTreeSet<_> = input
-            .layers
-            .iter()
-            .map(|layer| layer.layer_uid.as_str())
-            .collect();
-        if actual.len() != input.layers.len() || actual != expected {
-            return Err(host_error(
-                "invalid_request",
-                "geometry and projection layerUid sets differ",
-            ));
-        }
-        let layers = input
-            .layers
-            .iter()
-            .map(|layer| {
-                LayerGeometry::new(
-                    &layer.layer_uid,
-                    layer.bounds,
-                    layer.transform,
-                    OpaqueSrgbPaint::new(layer.paint.red, layer.paint.green, layer.paint.blue),
-                )
-                .map_err(|error| host_error("invalid_request", error.to_string()))
-            })
-            .collect::<HostResult<Vec<_>>>()?;
-        resources.push(
-            GeometryPaintInput::new(&input.resource_id, &input.resource_version, layers)
-                .map_err(|error| host_error("invalid_request", error.to_string()))?,
-        );
-    }
+    let resources = geometry::admit_resources(inputs, &expected)?;
     DesktopResourceResolver::new(resources.clone())
         .map_err(|message| host_error("invalid_request", message))?;
     Ok(AdmittedProject {

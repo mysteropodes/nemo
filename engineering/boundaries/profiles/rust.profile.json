@@ -278,7 +278,8 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_contract.rs",
-        "native_application_contract_fingerprints.rs"
+        "native_application_contract_fingerprints.rs",
+        "native_application_geometry.rs"
       ],
       "publicApi": [
         "native_application_contract.rs"
