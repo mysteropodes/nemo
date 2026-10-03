@@ -17,6 +17,20 @@ var NemoDiagnosticsCapability = (function () {
       && win.NemoOpacityApplication && typeof win.NemoOpacityApplication.meta === 'function');
   }
 
+  // T12/#1405: a clipped application identity is a hint; the module counter
+  // distinguishes every mint during this module's lifetime, even across
+  // handlers or identities sharing that hint. Full identity stays in the
+  // envelope. 64 hint characters plus prefix and a safe integer fit within
+  // 128 characters, including the existing ':replay' suffix if appended.
+  // READs are not retained. An arbitrary caller can still choose the same ID
+  // for a retained WRITE, which rejects the READ rather than serving stale data.
+  var minted = 0;
+  function mintRequestId(identity) {
+    if (!Number.isSafeInteger(minted) || minted >= Number.MAX_SAFE_INTEGER) return null;
+    minted += 1;
+    return 'diagnostics-inspect:' + identity.instanceId.slice(0, 64) + ':' + minted;
+  }
+
   // Live environment check for a caller to pass into register()'s optional
   // third argument at actual boot time. Same "not re-evaluated after
   // registration" limitation documented in timelapse-capability.js: a
@@ -92,7 +106,9 @@ var NemoDiagnosticsCapability = (function () {
       if (operation !== 'inspect') return { ok: false, error: { code: 'unknown_operation', message: 'Unsupported operation: ' + operation } };
       var limit = request.payload && request.payload.limit;
       var identity = win.NemoOpacityApplication.meta();
-      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-inspect:' + Math.random(),
+      var requestId = mintRequestId(identity);
+      if (requestId === null) return { ok: false, error: { code: 'unavailable', message: 'Diagnostics request counter exhausted.' } };
+      var traced = win.NemoApplication.handle({ apiVersion: 1, requestId: requestId,
         ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
       if (!traced.ok) return { ok: false, error: traced.error };
       // The bound is the application's to declare, not ours to restate: the

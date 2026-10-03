@@ -18,6 +18,18 @@
 (function () {
   var panel = null, generation = 0;
 
+  // Independent of the capability's load site: the application identity hint
+  // and module counter keep panel mints distinct across refresh/open cycles.
+  // Full identity remains in the envelope; the bounded hint leaves room for
+  // a safe integer counter and ':replay' within the 128-character contract.
+  // This does not reserve IDs against arbitrary callers' retained WRITEs.
+  var minted = 0;
+  function mintRequestId(identity) {
+    if (!Number.isSafeInteger(minted) || minted >= Number.MAX_SAFE_INTEGER) return null;
+    minted += 1;
+    return 'diagnostics-panel:' + identity.instanceId.slice(0, 64) + ':' + minted;
+  }
+
   // Trace fields are NOT trusted text. `requestId` is caller-supplied and only
   // length-checked by opacity-application.js's validate(), so it reaches here
   // verbatim from whatever drove the command -- including an MCP client. This
@@ -115,7 +127,9 @@
     }
     try {
       if (!identity || !window.NemoApplication) return finish({ error: 'diagnostics application not loaded' });
-      var response = window.NemoApplication.handle({ apiVersion: 1, requestId: 'diagnostics-panel:' + Math.random(),
+      var requestId = mintRequestId(identity);
+      if (requestId === null) return finish({ error: 'Diagnostics request counter exhausted.' });
+      var response = window.NemoApplication.handle({ apiVersion: 1, requestId: requestId,
         ...identity, expectedRevision: identity.revision, operation: 'diagnostics.trace', payload: {} });
       // Keep the synchronous compatibility path; delayed adapters share the
       // same generation/document fence without updating detached panels.
