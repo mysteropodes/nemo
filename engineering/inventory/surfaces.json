@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "a1c6ec6ce0e3e8ed18eca4a22ae49134e3b7c824",
-  "describe": "v0.7.0-alpha.4-768-ga1c6ec6c"
+  "head": "fa5958a16b81f068131d4c1004816f2335a96c15",
+  "describe": "v0.7.0-alpha.4-785-gfa5958a1"
  },
- "inputsDigest": "ca8f485dcd29f49f4359f565d70e63831c0920628b4ed1a11c3c0b3ab1a96618",
+ "inputsDigest": "f5b9d3995ef99b9ef21a3e0d473d64b88b39c2f286e2ad5545e0828cfa580519",
  "states": [
   "inventoried",
   "characterized",
@@ -21505,7 +21505,7 @@
    "id": "labs:diagnostics-panel",
    "kind": "labs",
    "surface": "Settings > Labs / SMLabs.diagnostics-panel",
-   "capability": "labsDescribeDiagnosticsPanel",
+   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; click a row to select its layer. Report is currently unavailable.",
    "area": "labs",
    "handler": [
     "src/js/labs/diagnostics-panel.js:177"
