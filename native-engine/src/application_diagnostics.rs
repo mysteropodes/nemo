@@ -71,6 +71,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     /// Each admitted attempt has one terminal record. Retried writes keep the
     /// original response revision; sequence orders attempts, not document edits.
     pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+        let capture = self.prepare_reproduction(&request);
         let eligible = self.release.is_none()
             && self.replacement.is_none()
             && records_operation(&request.operation)
@@ -119,6 +120,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             )
         });
         let response = self.dispatch_inner(request);
+        self.finish_reproduction(capture, &response);
         if let Some((request_id, operation, target_id)) = metadata {
             if self.diagnostics.sequence < MAX_SEQUENCE {
                 self.diagnostics.sequence += 1;
