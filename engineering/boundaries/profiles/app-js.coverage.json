@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "dc5c76b5b4fe2fbd8d7b8b7b798eb39dcc3508cc",
+    "candidateCommit": "095b43136b62238f445860f9913aa621243c9b27",
     "sourceRootTree": "6fa9f25056045d291130371344048c4b338d6dff",
     "applicationTree": {
       "path": "src/js",
       "gitTree": "5917bf1d41c78210afc1bfbce78f9e665aa18c6b",
-      "lastChangedCommit": "dc5c76b5b4fe2fbd8d7b8b7b798eb39dcc3508cc"
+      "lastChangedCommit": "095b43136b62238f445860f9913aa621243c9b27"
     },
     "bootstrap": {
       "path": "src/index.html",
