@@ -3,6 +3,7 @@
 //! N12 neither presents nor encodes. Preview consumers use the opaque native
 //! texture/view and export consumers cross the explicit RGBA8 readback boundary.
 
+use crate::render_geometry::LayerShape;
 use crate::render_scene::{RenderScene, ScheduledFrameIdentity};
 use std::fmt::{Display, Formatter};
 use std::sync::mpsc;
@@ -157,20 +158,45 @@ impl Compositor {
                 layer.bounds[2],
                 layer.bounds[3],
             );
+            // A device-space envelope clips the opacity group, not the curved
+            // edge itself: applying path coverage twice would darken AA pixels.
+            let (clip, clip_transform) = match layer.envelope {
+                Some([x0, y0, x1, y1]) => (
+                    Rect::new(
+                        x0.floor() - 1.0,
+                        y0.floor() - 1.0,
+                        x1.ceil() + 1.0,
+                        y1.ceil() + 1.0,
+                    ),
+                    Affine::IDENTITY,
+                ),
+                None => (rect, Affine::new(layer.transform)),
+            };
             self.scene.push_layer(
                 Fill::NonZero,
                 BlendMode::default(),
                 (layer.opacity_percent / 100.0) as f32,
-                Affine::new(layer.transform),
-                &rect,
+                clip_transform,
+                &clip,
             );
-            self.scene.fill(
-                Fill::NonZero,
-                Affine::new(layer.transform),
-                Color::from_rgb8(red, green, blue),
-                None,
-                &rect,
-            );
+            match &layer.shape {
+                LayerShape::ClosedPath(path) => self.scene.fill(
+                    Fill::NonZero,
+                    Affine::new(layer.transform),
+                    Color::from_rgb8(red, green, blue),
+                    None,
+                    path.path(),
+                ),
+                LayerShape::Rectangle => {
+                    self.scene.fill(
+                        Fill::NonZero,
+                        Affine::new(layer.transform),
+                        Color::from_rgb8(red, green, blue),
+                        None,
+                        &rect,
+                    );
+                }
+            }
             self.scene.pop_layer();
         }
         self.renderer

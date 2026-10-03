@@ -486,3 +486,40 @@ fn extreme_readback_dimensions_fail_without_panicking_or_publishing() {
     assert!(manager.port().staged.is_empty());
     assert_eq!(manager.lease_counters().live(), 0);
 }
+
+#[test]
+fn cubic_png_is_the_exact_pinned_gpu_composition() {
+    use crate::export_geometry_tests::{assert_cap_exports, cap, ObservedCompositor};
+    let mut history = history("n24a-png");
+    let readbacks = Rc::new(RefCell::new(Vec::new()));
+    let gpu = Compositor::new().expect("N24A PNG requires a real native GPU");
+    let mut manager = ExportJobManager::new(
+        MemoryPort::default(),
+        ObservedCompositor {
+            gpu,
+            readbacks: Rc::clone(&readbacks),
+        },
+    );
+    let mut input = request("cubic", 0, &[0, 10, 20]);
+    input.frames = [0, 10, 20]
+        .map(|frame| ExportFrameInput::new(frame, cap(64.0)))
+        .to_vec();
+    let begun = manager.begin(&history, input).unwrap();
+    edit_to_revision_one(&mut history);
+    let receipt = manager.run_to_completion(&begun.job_id).unwrap();
+    assert_eq!(receipt.status, JobStatus::Succeeded);
+    let decoded: Vec<_> = manager
+        .port()
+        .write_log
+        .iter()
+        .map(|write| decode(&write.1))
+        .collect();
+    assert_cap_exports(&decoded, &readbacks.borrow(), &begun.document_snapshot_id);
+    assert_eq!(manager.port().published.len(), 1);
+    assert!(manager.port().staged.is_empty());
+    let counts = manager.lease_counters();
+    assert_eq!(
+        (counts.acquired(), counts.released(), counts.live()),
+        (6, 6, 0)
+    );
+}

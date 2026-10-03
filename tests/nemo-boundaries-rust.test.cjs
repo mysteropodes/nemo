@@ -212,6 +212,8 @@ const REGISTERED_LEAVES = [
     'native-engine/src/resource_leases.rs', 'native-engine/src/scheduler.rs', 'native-engine/tests/scheduler.rs']],
   ['N12 registers the shared compositor without exclusions or a frozen-baseline waiver', [
     'native-engine/src/compositor.rs', 'native-engine/src/render_scene.rs', 'native-engine/tests/compositor.rs']],
+  ['N24A registers bounded cubic geometry without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/render_geometry.rs', 'native-engine/tests/render_geometry.rs']],
   ['N13 registers the staged viewport host and test without exclusions or a frozen-baseline waiver', [
     'native-engine/src/desktop_viewport.rs', 'native-engine/tests/desktop_viewport.rs']],
   ['N14 registers pinned native PNG export without exclusions or a frozen-baseline waiver', [
