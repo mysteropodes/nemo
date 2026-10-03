@@ -232,20 +232,23 @@ test('installed native opacity: live command oracles and externally driven UI ch
       write(path.join(reportDir, 'last-ui-read.json'), observed);
       fs.appendFileSync(path.join(reportDir, 'ui-reads.jsonl'), JSON.stringify(observed) + '\n', { mode: 0o600 });
       // Rust publishes its owner before the UI finishes installing its consumers.
-      // Only document admission may wait for that exact guard, and only boundedly.
-      if (waitForAdmission && response.ok === false && response.error?.code === 'unavailable'
-        && response.error.message === 'Native opacity ownership is not dispatchable.') return false;
+      // A committed revision can also briefly hold the v1 adapter busy while its
+      // presentation receipt catches up. Retry only those two named, same-owner
+      // transient states; other denials must remain failures.
+      if (response.ok === false && response.error?.code === 'unavailable' &&
+        (response.error.message === 'Native opacity synchronization is pending.' ||
+        waitForAdmission && response.error.message === 'Native opacity ownership is not dispatchable.')) return false;
       assert.equal(response.ok, true, 'Live v1 property.get failed: ' +
         (response.error && response.error.code || 'missing error code') + '; see private last-ui-read.json');
       return true;
     }, 'same-document UI admission', 10000); }
     catch (error) {
-      if (!waitForAdmission || error.message !== 'Runtime checkpoint not reached: same-document UI admission') throw error;
+      if (error.message !== 'Runtime checkpoint not reached: same-document UI admission') throw error;
       let finalStatus;
       try { finalStatus = await status(); } catch (statusError) { finalStatus = { error: statusError.message }; }
       write(path.join(reportDir, 'admission-failure.json'), {
         checkpoint: stage, attempts, initialStatus: current, finalStatus, lastResponse: response });
-      throw new Error('Native UI admission did not complete after ' + attempts +
+      throw new Error('Native UI read did not complete after ' + attempts +
         ' property reads; last response ' + (response?.error?.code || 'missing error code'));
     }
     assert.equal(response.documentId, current.documentId, 'Live UI read belongs to a different document');
