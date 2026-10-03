@@ -2017,6 +2017,18 @@
       ]
     },
     {
+      "id": "app.native.diagnostics.query.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-diagnostics-query.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-diagnostics-query.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.legacy-surface.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

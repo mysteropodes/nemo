@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 175,
-    "externalClassicTags": 172,
+    "totalScriptTags": 176,
+    "externalClassicTags": 173,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 168,
+    "retainedClassicTags": 169,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 171,
+    "classicTagsUnderSrcJsIncludingVendors": 172,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -753,6 +753,18 @@
           "path": "src/index.html",
           "line": 2513,
           "scriptOrdinal": 167
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-diagnostics-query.js",
+      "moduleId": "app.native.diagnostics.query.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2522,
+          "scriptOrdinal": 176
         }
       ]
     },
