@@ -139,8 +139,16 @@ test('opaque fixture bytes round-trip and remove, with every operation pending u
   assert.equal(await missing, undefined);
 });
 
-test('completion oracle rejects a deliberately early-resolving control', async () => {
-  await assert.rejects(pending(Promise.resolve(undefined)), /operation must remain pending before commit/);
+test('completion oracle rejects a deliberately early-resolving implementation', async () => {
+  const f = fixture(), window = { indexedDB: f.indexedDb };
+  const source = fs.readFileSync(path.join(__dirname, '../src/js/idb-store.js'), 'utf8');
+  const mutant = source.replace(
+    'tx.oncomplete = function () { resolve(result && result.__req ? result.__req.result : undefined); };',
+    'resolve(result && result.__req ? result.__req.result : undefined);');
+  assert.notEqual(mutant, source, 'control must actually change completion behavior');
+  vm.runInNewContext(mutant, { window }); // isolated control, no production file mutation
+  const result = window.SMIdb.set('nemo-auto', 'control'); f.open();
+  await assert.rejects(pending(result), /operation must remain pending before commit/);
 });
 
 test('unavailable and failed opens remain cached and preserve errors', async () => {
