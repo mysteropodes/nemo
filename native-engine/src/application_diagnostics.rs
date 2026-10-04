@@ -20,6 +20,17 @@ pub(super) struct RecentDiagnostics {
 }
 
 impl RecentDiagnostics {
+    /// At the safe-integer ceiling subsequent attempts cannot advance the token.
+    /// Refuse report freshness from that point, even if no overflow is observed.
+    pub(super) fn report_sequence(&self) -> Option<u64> {
+        (self.sequence < MAX_SEQUENCE).then_some(self.sequence)
+    }
+
+    #[cfg(test)]
+    pub(super) fn set_sequence_for_test(&mut self, sequence: u64) {
+        self.sequence = sequence;
+    }
+
     #[cfg(test)]
     pub(super) fn retained_len(&self) -> usize {
         self.records.len()

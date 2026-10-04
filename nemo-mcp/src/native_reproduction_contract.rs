@@ -3,6 +3,29 @@ use super::{exact, revision};
 use crate::contract::bounded_identifier;
 use serde_json::Value;
 
+pub(super) fn report_request(value: &Value) -> bool {
+    exact(value, &["expectedContentRevision", "expectedSequence"], &[]).is_some_and(|token| {
+        revision(token.get("expectedContentRevision")).is_some()
+            && revision(token.get("expectedSequence")).is_some()
+    })
+}
+
+pub(super) fn report_result(payload: &Value, value: &Value) -> bool {
+    report_request(payload)
+        && exact(
+            value,
+            &["bundle", "verifiedContentRevision", "verifiedSequence"],
+            &[],
+        )
+        .is_some_and(|report| {
+            report.get("verifiedContentRevision") == payload.get("expectedContentRevision")
+                && report.get("verifiedSequence") == payload.get("expectedSequence")
+                && revision(report.get("verifiedSequence"))
+                    .is_some_and(|sequence| sequence < 9_007_199_254_740_991)
+                && report.get("bundle").is_some_and(bundle)
+        })
+}
+
 pub(super) fn bundle(value: &Value) -> bool {
     let Some(wire) = exact(
         value,
@@ -182,6 +205,74 @@ pub(super) fn validate_result(operation: &str, value: &Value) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn report_contract_requires_closed_safe_tokens_and_exact_response_binding() {
+        let payload = json!({"expectedContentRevision":1,"expectedSequence":2});
+        let bundle = json!({
+            "format":"nemo.native-opacity-reproduction", "formatVersion":1, "apiVersion":2,
+            "fixture":{"id":"native-opacity-static", "version":1, "sha256":"a".repeat(64)},
+            "command":"layer.opacity.set", "stableTarget":{"layerUid":"r08_curve_layer"},
+            "clock":null, "seed":null, "versions":{"nativeEngine":"0.1.0"},
+            "commands":[{"id":1,"expectedRevision":0,"value":40,"revision":1,"applied":true}]
+        });
+        let result = json!({"bundle":bundle,"verifiedContentRevision":1,"verifiedSequence":2});
+        let operation = "query.reproduction.report";
+        let mut request = crate::contract::NativeApplicationRequest {
+            api_version: 2,
+            request_id: "report".into(),
+            instance_id: "instance".into(),
+            document_id: "document".into(),
+            operation: operation.into(),
+            payload: payload.clone(),
+            expected_revision: None,
+            cancelled_before_dispatch: false,
+        };
+        assert!(
+            request.validate().is_ok(),
+            "feature declaration must expose report"
+        );
+        assert!(super::super::validate_result(
+            operation, "document", &payload, &result
+        ));
+        request.expected_revision = Some(1);
+        assert!(request.validate().is_err());
+        request.expected_revision = None;
+        for bad in [
+            json!({}),
+            json!([]),
+            json!({"expectedContentRevision":1}),
+            json!({"expectedContentRevision":1,"expectedSequence":"2"}),
+            json!({"expectedContentRevision":1,"expectedSequence":2,"extra":true}),
+            json!({"expectedContentRevision":1,"expectedSequence":-1}),
+            json!({"expectedContentRevision":1,"expectedSequence":1.5}),
+            json!({"expectedContentRevision":9007199254740992_u64,"expectedSequence":2}),
+            json!({"expectedContentRevision":1,"expectedSequence":9007199254740992_u64}),
+        ] {
+            request.payload = bad.clone();
+            assert!(request.validate().is_err());
+            assert!(!report_result(&bad, &result));
+        }
+        for (field, value) in [
+            ("verifiedContentRevision", json!(2)),
+            ("verifiedSequence", json!(1)),
+            ("bundle", json!("escaped")),
+            ("extra", json!(true)),
+        ] {
+            let mut wrong = result.clone();
+            wrong[field] = value;
+            assert!(!report_result(&payload, &wrong));
+        }
+        let mut missing = result.clone();
+        missing.as_object_mut().unwrap().remove("verifiedSequence");
+        assert!(!report_result(&payload, &missing));
+        let mut exhausted = result;
+        exhausted["verifiedSequence"] = json!(9007199254740991_u64);
+        assert!(!report_result(
+            &json!({"expectedContentRevision":1,"expectedSequence":9007199254740991_u64}),
+            &exhausted
+        ));
+    }
 
     #[test]
     fn reproduction_bundle_and_results_are_closed_and_bounded() {

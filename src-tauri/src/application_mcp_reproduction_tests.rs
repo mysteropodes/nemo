@@ -35,6 +35,21 @@ fn native_reproduction_stdio_shares_ui_authority_and_replays_without_live_write(
         ))
         .unwrap();
     let trace = client.call(&host.query());
+    let report_query = control(
+        "report",
+        "query.reproduction.report",
+        json!({
+            "expectedContentRevision":2,"expectedSequence":3
+        }),
+    );
+    let report = client.call(&report_query);
+    assert_eq!(report["ok"], true, "{report}");
+    assert_eq!(
+        report["result"],
+        json!({"bundle":bundle,
+        "verifiedContentRevision":2,"verifiedSequence":3})
+    );
+    assert_eq!(client.call(&host.query())["result"], trace["result"]);
     let replay = client.call(&control(
         "replay",
         "query.reproduction.replay",
@@ -106,6 +121,15 @@ fn native_reproduction_stdio_preserves_adjacent_float_values_through_export_and_
     for (command, expected) in commands.iter().zip([tiny, next, tiny]) {
         assert_eq!(command["value"].as_f64(), Some(expected), "{bundle}");
     }
+    let report = client.call(&control(
+        "report",
+        "query.reproduction.report",
+        json!({
+            "expectedContentRevision":3,"expectedSequence":3
+        }),
+    ));
+    assert_eq!(report["ok"], true, "{report}");
+    assert_eq!(report["result"]["bundle"], bundle);
     let replay = client.call(&control(
         "replay",
         "query.reproduction.replay",
@@ -117,4 +141,87 @@ fn native_reproduction_stdio_preserves_adjacent_float_values_through_export_and_
     for (step, expected) in steps.iter().zip([tiny, next, tiny]) {
         assert_eq!(step["state"]["opacity"].as_f64(), Some(expected));
     }
+}
+
+#[test]
+fn native_reproduction_stdio_report_checks_live_tokens_and_invalid_journal_without_effects() {
+    let host = Host::catalog();
+    host.subscribe();
+    let mut client = Client::start(&host);
+    let control = |id, operation, payload| host.request(id, operation, payload, None);
+    assert_eq!(
+        client.call(&control("opt", "command.reproduction.opt_in", json!({})))["ok"],
+        true
+    );
+    let first = host.set("first", 0, 40);
+    assert_eq!(client.call(&first)["ok"], true);
+    let report = |revision, sequence| {
+        control(
+            "report",
+            "query.reproduction.report",
+            json!({
+                "expectedContentRevision":revision,"expectedSequence":sequence
+            }),
+        )
+    };
+    assert_eq!(client.call(&report(1, 1))["ok"], true);
+    assert_eq!(
+        client.call(&host.set("noop", 1, 40))["result"]["applied"],
+        false
+    );
+    assert_eq!(client.call(&report(1, 1))["error"]["code"], "busy_conflict");
+    assert_eq!(
+        client.call(&report(0, 2))["error"]["code"],
+        "stale_revision"
+    );
+    assert_eq!(client.call(&first)["ok"], true);
+    assert_eq!(client.call(&report(1, 2))["error"]["code"], "busy_conflict");
+    let accepted = client.call(&report(1, 3));
+    assert_eq!(accepted["ok"], true, "{accepted}");
+    assert_eq!(
+        accepted["result"]["bundle"]["commands"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let trace = client.call(&host.query());
+    let malformed = control(
+        "malformed",
+        "query.reproduction.report",
+        json!({
+            "expectedContentRevision":1,"expectedSequence":3,"extra":true
+        }),
+    );
+    assert_eq!(
+        client.call(&malformed)["error"]["code"],
+        "malformed_payload"
+    );
+    let mut collision = report(1, 3);
+    collision.request_id = "first".into();
+    assert_eq!(client.call(&collision)["error"]["code"], "invalid_request");
+    assert_eq!(client.call(&report(1, 3))["result"], accepted["result"]);
+    assert_eq!(client.call(&host.query())["result"], trace["result"]);
+    assert_eq!(
+        client.call(&control(
+            "job",
+            "job.export.png.status",
+            json!({"jobId":"absent"})
+        ))["ok"],
+        false
+    );
+    let rejected = client.call(&report(1, 3));
+    assert_eq!(rejected["error"]["code"], "unavailable");
+    assert!(rejected.get("result").is_none());
+    assert_eq!(client.call(&host.query())["result"], trace["result"]);
+    let ordinary = Host::start();
+    let mut ordinary_client = Client::start(&ordinary);
+    let denied = ordinary_client.call(&ordinary.request(
+        "report",
+        "query.reproduction.report",
+        json!({"expectedContentRevision":0,"expectedSequence":0}),
+        None,
+    ));
+    assert_eq!(denied["error"]["code"], "unavailable");
+    assert!(denied.get("result").is_none());
 }

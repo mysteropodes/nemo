@@ -10,6 +10,7 @@
     "command.reproduction.opt_in",
     "query.reproduction.status",
     "query.reproduction.export",
+    "query.reproduction.report",
     "query.reproduction.replay"
   ],
   "handlerKey": "native-engine::application::NativeApplication::dispatch",
@@ -18,7 +19,8 @@
     "changesHistory": false,
     "retainsQueryReceipts": false,
     "optInChangesBoundedJournalOnly": true,
-    "replayUsesIsolatedCatalogDocument": true
+    "replayUsesIsolatedCatalogDocument": true,
+    "reportAtomicallyVerifiesRevisionSequenceAndJournal": true
   },
   "resourceBoundary": {
     "maxBundleBytes": 3072,
@@ -29,12 +31,14 @@
   },
   "input": {
     "control": { "$ref": "../native-transport-v2.schema.json#/$defs/EmptyPayload" },
-    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayPayload" }
+    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayPayload" },
+    "report": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReportPayload" }
   },
   "output": {
     "status": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionStatusResult" },
     "export": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionExportResult" },
-    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayResult" }
+    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayResult" },
+    "report": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReportResult" }
   },
   "ports": [
     { "label": "mcp", "state": "active" },

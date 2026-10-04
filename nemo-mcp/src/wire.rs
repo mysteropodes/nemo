@@ -168,6 +168,11 @@ fn validate_native_response(
     let disposition_is_valid = match (response.ok, &response.result, &response.error) {
         (true, Some(result), None) => {
             result.is_object()
+                && (request.operation != "query.reproduction.report"
+                    || result
+                        .get("verifiedContentRevision")
+                        .and_then(serde_json::Value::as_u64)
+                        == Some(response.content_revision))
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,
@@ -189,6 +194,47 @@ fn validate_native_response(
         Ok(())
     } else {
         Err(io::Error::other("invalid native application response"))
+    }
+}
+
+#[cfg(test)]
+mod report_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn report_rejects_matching_result_token_in_a_mismatched_revision_envelope() {
+        let request = NativeApplicationRequest {
+            api_version: 2,
+            request_id: "report".into(),
+            instance_id: "instance".into(),
+            document_id: "document".into(),
+            operation: "query.reproduction.report".into(),
+            payload: json!({"expectedContentRevision":1,"expectedSequence":1}),
+            expected_revision: None,
+            cancelled_before_dispatch: false,
+        };
+        let mut response = NativeApplicationResponse {
+            api_version: 2,
+            request_id: "report".into(),
+            instance_id: "instance".into(),
+            document_id: "document".into(),
+            content_revision: 1,
+            ok: true,
+            error: None,
+            result: Some(
+                json!({"verifiedContentRevision":1,"verifiedSequence":1,"bundle":{
+                    "format":"nemo.native-opacity-reproduction","formatVersion":1,"apiVersion":2,
+                    "fixture":{"id":"native-opacity-static","version":1,"sha256":"a".repeat(64)},
+                    "command":"layer.opacity.set","stableTarget":{"layerUid":"r08_curve_layer"},
+                    "clock":null,"seed":null,"versions":{"nativeEngine":"0.1.0"},
+                    "commands":[{"id":1,"expectedRevision":0,"value":40,"revision":1,"applied":true}]
+                }}),
+            ),
+        };
+        assert!(validate_native_response(&response, &request).is_ok());
+        response.content_revision = 2;
+        assert!(validate_native_response(&response, &request).is_err());
     }
 }
 

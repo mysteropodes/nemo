@@ -418,6 +418,9 @@ fn exported_after_first(app: &mut App) -> Value {
 #[path = "reproduction_lifecycle.rs"]
 mod lifecycle;
 
+#[path = "reproduction_report.rs"]
+mod report;
+
 #[test]
 fn v2_reproduction_controls_and_isolated_replay_preserve_live_authority() {
     let mut app = app();
