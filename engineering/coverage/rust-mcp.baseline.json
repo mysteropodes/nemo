@@ -74,6 +74,12 @@
       "functions": 97.36,
       "note": "N19A/#1373 floor measured at bd134dbbf57e93f789bda3b1a6d31b7dbdd1295d with 39 tests passing. Existing T04/P07 per-file and aggregate floors remain unchanged; N19A neither excludes the new validator nor lowers prior ratchets."
     },
+    "nemo-mcp/src/native_reproduction_contract.rs": {
+      "lines": 68.88,
+      "regions": 75,
+      "functions": 68.75,
+      "note": "T10A4/#1558 new private reproduction validator floor measured with cargo-llvm-cov 0.9.1 at the A4 source candidate: 155/225 lines, 264/352 regions, 22/32 functions. Existing file and aggregate floors are unchanged."
+    },
     "nemo-mcp/src/registry.rs": {
       "lines": 69.49,
       "regions": 71.17,

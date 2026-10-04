@@ -373,6 +373,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
       'protocol::OP_JOB_EXPORT_PNG_BEGIN'],
     'rust.desktop.mcp.adapter.tests': [
+      'application::REPRODUCTION_FIXTURE',
       'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
       'codec::decode_project', 'export_job::ExportArtifact', 'export_job::ExportReadback',
       'protocol::OpaqueResourceHandle', 'render_scene::GeometryPaintInput', 'render_scene::RenderScene'],
