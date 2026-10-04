@@ -469,6 +469,18 @@
       ]
     },
     {
+      "id": "app.playback.step.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/animation",
+      "files": [
+        "playback-step.js"
+      ],
+      "publicApi": [
+        "playback-step.js"
+      ],
+      "sizeProfile": "Domain kernel"
+    },
+    {
       "id": "app.psd.import.bridge",
       "layer": "app-legacy",
       "dir": "src/js",
