@@ -195,10 +195,13 @@ test('stale final native Resume presentation restores the start screen without s
   assert.equal(app.mutations, 0);
 });
 
-test('rejected final native Resume presentation restores the start screen without success', async () => {
-  const app = harness({ auto: '{"supported":true}', deferFrames: true });
+for (const storage of ['localStorage', 'IndexedDB']) {
+test(`rejected final native Resume presentation restores the start screen without success (${storage})`, async () => {
+  const app = harness({ auto: storage === 'localStorage' ? '{"supported":true}' : null, deferFrames: true });
   const native = installNativeOpen(app);
+  if (storage === 'IndexedDB') app.window.SMIdb = { get: () => Promise.resolve('{"supported":true}') };
   app.elements.get('start-resume').listeners.click();
+  await new Promise(resolve => setImmediate(resolve));
   native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
   app.flushFrame(); app.flushFrame();
@@ -211,6 +214,7 @@ test('rejected final native Resume presentation restores the start screen withou
   assert.equal(app.elements.get('project-tabs-list').children.length, 0);
   assert.equal(app.mutations, 0);
 });
+}
 
 test('browser Open keeps the file name and normalized clean baseline for later Save', async () => {
   const app = harness();
