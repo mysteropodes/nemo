@@ -189,6 +189,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
                 })
                 .map(|bundle| json!({"bundle": bundle}))
                 .map_err(reason_code),
+            "query.reproduction.report" => self.reproduction_report(&request.payload),
             "query.reproduction.replay" => {
                 let bundle = request
                     .payload
@@ -270,10 +271,54 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         bundle::encode(self.reproduction.commands()?)
     }
 
+    /// The host holds its single authority lock throughout dispatch. Revision,
+    /// attempt sequence, provenance and journal are read in this one borrow;
+    /// no await, retained receipt or second sampled authority participates.
+    fn reproduction_report(&self, payload: &Value) -> Result<Value, DispatchErrorCode> {
+        let object = payload
+            .as_object()
+            .filter(|object| object.len() == 2)
+            .ok_or(DispatchErrorCode::InvalidRequest)?;
+        let token = |key| {
+            object
+                .get(key)
+                .and_then(Value::as_u64)
+                .filter(|value| *value <= 9_007_199_254_740_991)
+                .ok_or(DispatchErrorCode::InvalidRequest)
+        };
+        let expected_revision = token("expectedContentRevision")?;
+        let expected_sequence = token("expectedSequence")?;
+        if expected_revision != self.content_revision() {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        let sequence = self
+            .diagnostics
+            .report_sequence()
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        if expected_sequence != sequence {
+            return Err(DispatchErrorCode::BusyConflict);
+        }
+        if self.reproduction_origin.is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        let bytes = self.export_reproduction_bundle().map_err(reason_code)?;
+        let bundle: Value =
+            serde_json::from_slice(&bytes).map_err(|_| DispatchErrorCode::Internal)?;
+        Ok(
+            json!({"bundle": bundle, "verifiedContentRevision": expected_revision,
+            "verifiedSequence": sequence}),
+        )
+    }
+
     pub(super) fn prepare_reproduction(
         &mut self,
         request: &OpacityRequest,
     ) -> Option<CaptureCandidate> {
+        // Even a malformed report or collision with a retained write is a read.
+        // Normal dispatch still rejects it, without invalidating the journal.
+        if request.operation == "query.reproduction.report" {
+            return None;
+        }
         if !matches!(self.reproduction, ReproductionJournal::Recording(_))
             || request.instance_id != self.instance_id()
             || request.document_id != self.document_id()

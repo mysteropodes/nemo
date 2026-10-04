@@ -106,6 +106,24 @@
       "additionalProperties": false,
       "maxProperties": 0
     },
+    "ReproductionReportPayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["expectedContentRevision", "expectedSequence"],
+      "properties": {
+        "expectedContentRevision": { "$ref": "#/$defs/Revision" },
+        "expectedSequence": { "$ref": "#/$defs/Revision" }
+      }
+    },
+    "ReproductionReportResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundle", "verifiedContentRevision", "verifiedSequence"],
+      "properties": {
+        "bundle": { "$ref": "#/$defs/ReproductionBundle" },
+        "verifiedContentRevision": { "$ref": "#/$defs/Revision" },
+        "verifiedSequence": { "type": "integer", "minimum": 0, "maximum": 9007199254740990 }
+      },
+      "description": "Both verified values equal the request tokens; verifiedContentRevision also equals the response envelope contentRevision. The native authority atomically verifies tokens, catalog provenance and exportable journal. Sequence exhaustion rejects."
+    },
     "ReproductionReplayPayload": {
       "type": "object", "additionalProperties": false,
       "required": ["bundle"],
@@ -238,6 +256,8 @@
           { "properties": { "operation": { "const": "query.reproduction.status" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "query.reproduction.export" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "query.reproduction.report" }, "payload": { "$ref": "#/$defs/ReproductionReportPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "query.reproduction.replay" }, "payload": { "$ref": "#/$defs/ReproductionReplayPayload" } } }] },
         {
@@ -655,6 +675,7 @@
             { "$ref": "#/$defs/DiagnosticsResult" },
             { "$ref": "#/$defs/ReproductionStatusResult" },
             { "$ref": "#/$defs/ReproductionExportResult" },
+            { "$ref": "#/$defs/ReproductionReportResult" },
             { "$ref": "#/$defs/ReproductionReplayResult" },
             { "$ref": "#/$defs/CommandResult" },
             { "$ref": "#/$defs/OpacityQueryResult" },

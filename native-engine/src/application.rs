@@ -195,6 +195,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
             "command.reproduction.opt_in"
             | "query.reproduction.status"
             | "query.reproduction.export"
+            | "query.reproduction.report"
             | "query.reproduction.replay" => self.dispatch_reproduction(&request),
             OP_JOB_EXPORT_PNG_BEGIN => self.begin_export(&request, fingerprint),
             OP_JOB_EXPORT_PNG_STATUS => self.job_stage(&request, fingerprint, false),

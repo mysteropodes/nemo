@@ -56,6 +56,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
             | "command.reproduction.opt_in"
             | "query.reproduction.status"
             | "query.reproduction.export"
+            | "query.reproduction.report"
             | "query.reproduction.replay"
     )
 }
@@ -68,6 +69,7 @@ pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
         | "query.reproduction.export" => exact(payload, &[], &[]).is_some(),
         "query.reproduction.replay" => exact(payload, &["bundle"], &[])
             .is_some_and(|value| value.get("bundle").is_some_and(reproduction::bundle)),
+        "query.reproduction.report" => reproduction::report_request(payload),
         "query.document.serialize" => exact(payload, &["atRevision"], &[])
             .is_some_and(|object| revision(object.get("atRevision")).is_some()),
         "query.document.evaluate" => exact(payload, &["atRevision", "contextId", "frame"], &[])
@@ -204,6 +206,9 @@ pub(crate) fn validate_result(
         return diagnostics_result(result);
     }
     if operation.starts_with("query.reproduction.") || operation == "command.reproduction.opt_in" {
+        if operation == "query.reproduction.report" {
+            return reproduction::report_result(payload, result);
+        }
         return reproduction::validate_result(operation, result);
     }
     if !matches!(

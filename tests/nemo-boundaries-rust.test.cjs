@@ -181,6 +181,8 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['T10C registers atomic reproduction report controls without an edge or size waiver', [
+    'native-engine/tests/reproduction_report.rs']],
   ['N24B registers private immutable geometry admission without an edge or size waiver', [
     'src-tauri/src/native_application_geometry.rs']],
   ['N20R3 registers private host replay and dispatch-test children without an edge or size waiver', [
