@@ -181,6 +181,7 @@
         "src/lib.rs",
         "src/main.rs",
         "src/native_contract.rs",
+        "src/native_reproduction_contract.rs",
         "src/registry.rs",
         "src/schema.rs",
         "src/server.rs",
@@ -232,6 +233,7 @@
       "files": [
         "application_mcp_tests.rs",
         "application_mcp_diagnostics_tests.rs",
+        "application_mcp_reproduction_tests.rs",
         "native_revision_sync_tests.rs"
       ],
       "publicApi": [],

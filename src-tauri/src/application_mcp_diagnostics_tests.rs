@@ -24,19 +24,33 @@ struct Host {
 }
 impl Host {
     fn start() -> Self {
+        Self::start_with_catalog(false)
+    }
+    fn catalog() -> Self {
+        Self::start_with_catalog(true)
+    }
+    fn start_with_catalog(catalog: bool) -> Self {
         let state = Arc::new(ApplicationMcp::default());
-        state
-            .install_native(
-                NativeApplication::new(
-                    state.instance_id.clone(),
-                    document(),
-                    Port,
-                    Compositor,
-                    Resolver,
-                )
-                .unwrap(),
+        let native = if catalog {
+            NativeApplication::from_reproduction_fixture(
+                state.instance_id.clone(),
+                native_engine::application::REPRODUCTION_FIXTURE,
+                Port,
+                Compositor,
+                Resolver,
             )
-            .unwrap();
+            .unwrap()
+        } else {
+            NativeApplication::new(
+                state.instance_id.clone(),
+                document(),
+                Port,
+                Compositor,
+                Resolver,
+            )
+            .unwrap()
+        };
+        state.install_native(native).unwrap();
         let root =
             std::env::temp_dir().join(format!("nemo-native-diagnostics-{}", uuid::Uuid::new_v4()));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -459,3 +473,5 @@ fn native_diagnostics_stdio_observes_ui_and_mcp_edits_on_one_real_authority() {
         "late A bytes cannot contaminate the second B identity"
     );
 }
+
+include!("application_mcp_reproduction_tests.rs");

@@ -106,6 +106,73 @@
       "additionalProperties": false,
       "maxProperties": 0
     },
+    "ReproductionReplayPayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundle"],
+      "properties": { "bundle": { "$ref": "#/$defs/ReproductionBundle" } }
+    },
+    "ReproductionBundle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "formatVersion", "apiVersion", "fixture", "command", "stableTarget", "clock", "seed", "versions", "commands"],
+      "properties": {
+        "format": { "const": "nemo.native-opacity-reproduction" },
+        "formatVersion": { "const": 1 }, "apiVersion": { "const": 2 },
+        "fixture": { "type": "object", "additionalProperties": false,
+          "required": ["id", "version", "sha256"],
+          "properties": { "id": { "type": "string" }, "version": { "const": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } },
+        "command": { "const": "layer.opacity.set" },
+        "stableTarget": { "$ref": "#/$defs/StableTarget" },
+        "clock": { "type": "null" }, "seed": { "type": "null" },
+        "versions": { "type": "object", "additionalProperties": false,
+          "required": ["nativeEngine"], "properties": { "nativeEngine": { "type": "string" } } },
+        "commands": { "type": "array", "minItems": 1, "maxItems": 32,
+          "items": { "type": "object", "additionalProperties": false,
+            "required": ["id", "expectedRevision", "value", "revision", "applied"],
+            "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 32 },
+              "expectedRevision": { "$ref": "#/$defs/Revision" },
+              "value": { "type": "number", "minimum": 0, "maximum": 100 },
+              "revision": { "$ref": "#/$defs/Revision" },
+              "applied": { "type": "boolean" } } } }
+      },
+      "description": "Complete encoded bundle is capped at 3072 bytes before replay. The native decoder additionally validates the pinned catalog identity and entire causal sequence."
+    },
+    "ReproductionStatusResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "reason", "commandCount", "exportable"],
+      "properties": {
+        "state": { "enum": ["disabled", "recording", "invalid"] },
+        "reason": { "anyOf": [{ "type": "null" }, { "enum": ["not_catalog", "not_pristine", "already_opted_in", "not_opted_in", "empty_journal", "failed_mutation", "changed_retry", "unsupported_transition", "released", "replaced", "command_limit", "byte_limit", "invalid_projection"] }] },
+        "commandCount": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "exportable": { "type": "boolean" }
+      }
+    },
+    "ReproductionExportResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundle"],
+      "properties": { "bundle": { "$ref": "#/$defs/ReproductionBundle" } }
+    },
+    "ReproductionReplayState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revision", "opacity", "undoDepth", "redoDepth"],
+      "properties": { "revision": { "$ref": "#/$defs/Revision" },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 100 },
+        "undoDepth": { "type": "integer", "minimum": 0, "maximum": 32 },
+        "redoDepth": { "type": "integer", "minimum": 0, "maximum": 32 } }
+    },
+    "ReproductionReplayResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["initial", "steps"],
+      "properties": {
+        "initial": { "$ref": "#/$defs/ReproductionReplayState" },
+        "steps": { "type": "array", "minItems": 1, "maxItems": 32,
+          "items": { "type": "object", "additionalProperties": false,
+            "required": ["id", "expectedRevision", "applied", "state"],
+            "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 32 },
+              "expectedRevision": { "$ref": "#/$defs/Revision" },
+              "applied": { "type": "boolean" },
+              "state": { "$ref": "#/$defs/ReproductionReplayState" } } } }
+      }
+    },
     "PngBeginPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -165,6 +232,14 @@
     },
     "Request": {
       "oneOf": [
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "command.reproduction.opt_in" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "query.reproduction.status" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "query.reproduction.export" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "query.reproduction.replay" }, "payload": { "$ref": "#/$defs/ReproductionReplayPayload" } } }] },
         {
           "allOf": [
             { "$ref": "#/$defs/ForbiddenRevisionRequest" },
@@ -578,6 +653,9 @@
         "result": {
           "oneOf": [
             { "$ref": "#/$defs/DiagnosticsResult" },
+            { "$ref": "#/$defs/ReproductionStatusResult" },
+            { "$ref": "#/$defs/ReproductionExportResult" },
+            { "$ref": "#/$defs/ReproductionReplayResult" },
             { "$ref": "#/$defs/CommandResult" },
             { "$ref": "#/$defs/OpacityQueryResult" },
             { "$ref": "#/$defs/RevisionQueryResult" },

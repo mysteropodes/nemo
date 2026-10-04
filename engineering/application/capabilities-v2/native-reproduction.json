@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.reproduction",
+  "version": 1,
+  "status": "active",
+  "availability": { "state": "available", "reason": null },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.reproduction.opt_in",
+    "query.reproduction.status",
+    "query.reproduction.export",
+    "query.reproduction.replay"
+  ],
+  "handlerKey": "native-engine::application::NativeApplication::dispatch",
+  "effects": {
+    "changesDocumentRevision": false,
+    "changesHistory": false,
+    "retainsQueryReceipts": false,
+    "optInChangesBoundedJournalOnly": true,
+    "replayUsesIsolatedCatalogDocument": true
+  },
+  "resourceBoundary": {
+    "maxBundleBytes": 3072,
+    "maxCommands": 32,
+    "maxResponseBytes": 4096,
+    "responseSizeIncludesEnvelope": true,
+    "overflow": "Reject the entire response before returning it; never truncate replay steps or write the live document."
+  },
+  "input": {
+    "control": { "$ref": "../native-transport-v2.schema.json#/$defs/EmptyPayload" },
+    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayPayload" }
+  },
+  "output": {
+    "status": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionStatusResult" },
+    "export": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionExportResult" },
+    "replay": { "$ref": "../native-transport-v2.schema.json#/$defs/ReproductionReplayResult" }
+  },
+  "ports": [
+    { "label": "mcp", "state": "active" },
+    { "label": "tauri-native", "state": "active" },
+    { "label": "browser-wasm", "state": "unavailable" }
+  ],
+  "fixture": "native-engine/fixtures/reproduction-opacity-v1.json",
+  "examples": [{
+    "label": "Inspect the opt-in journal without retaining a read receipt",
+    "request": {
+      "apiVersion": 2, "requestId": "reproduction-status-1",
+      "instanceId": "instance-a", "documentId": "native-document-1",
+      "operation": "query.reproduction.status", "payload": {}
+    },
+    "response": {
+      "apiVersion": 2, "requestId": "reproduction-status-1",
+      "instanceId": "instance-a", "documentId": "native-document-1",
+      "contentRevision": 0, "ok": true,
+      "result": { "state": "disabled", "reason": "not_opted_in", "commandCount": 0, "exportable": false }
+    }
+  }]
+}

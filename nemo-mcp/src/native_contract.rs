@@ -4,6 +4,9 @@ use crate::contract::bounded_identifier;
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
+#[path = "native_reproduction_contract.rs"]
+mod reproduction;
+
 const OPACITY_CURVE: [[f64; 2]; 5] = [
     [0.0, 0.0],
     [0.25, 0.156],
@@ -47,13 +50,24 @@ fn frame(value: Option<&Value>) -> Option<u64> {
 pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
-        "query.document.serialize" | "query.document.evaluate" | "query.diagnostics.recent"
+        "query.document.serialize"
+            | "query.document.evaluate"
+            | "query.diagnostics.recent"
+            | "command.reproduction.opt_in"
+            | "query.reproduction.status"
+            | "query.reproduction.export"
+            | "query.reproduction.replay"
     )
 }
 
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
+        "command.reproduction.opt_in"
+        | "query.reproduction.status"
+        | "query.reproduction.export" => exact(payload, &[], &[]).is_some(),
+        "query.reproduction.replay" => exact(payload, &["bundle"], &[])
+            .is_some_and(|value| value.get("bundle").is_some_and(reproduction::bundle)),
         "query.document.serialize" => exact(payload, &["atRevision"], &[])
             .is_some_and(|object| revision(object.get("atRevision")).is_some()),
         "query.document.evaluate" => exact(payload, &["atRevision", "contextId", "frame"], &[])
@@ -188,6 +202,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.diagnostics.recent" {
         return diagnostics_result(result);
+    }
+    if operation.starts_with("query.reproduction.") || operation == "command.reproduction.opt_in" {
+        return reproduction::validate_result(operation, result);
     }
     if !matches!(
         operation,
