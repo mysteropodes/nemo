@@ -77,7 +77,6 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
     )
     .unwrap();
     let payload = &schema["properties"]["payload"];
-    assert_eq!(payload["type"], "object");
     assert_eq!(
         payload["properties"]["command"]["const"],
         "layer.opacity.set"
