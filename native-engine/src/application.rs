@@ -1,5 +1,4 @@
 use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
-use crate::document::OpacityDocument;
 use crate::export_job::{
     ExportBegin, ExportCompositor, ExportFrameInput, ExportJobError, ExportJobErrorKind,
     ExportJobManager, JobReceipt, PendingFrame, ReconciliationStage, StagedArtifactPort,
@@ -19,6 +18,26 @@ use std::collections::HashMap;
 #[path = "application_replacement.rs"]
 mod replacement;
 pub use replacement::{ReplacementFailureKind, ReplacementPhase, ReplacementProgress};
+#[path = "application_construction.rs"]
+mod construction;
+#[path = "application_diagnostics.rs"]
+mod diagnostics;
+#[path = "application_reproduction.rs"]
+mod reproduction;
+pub use reproduction::{
+    replay_reproduction_bundle, ReproductionReason, ReproductionReplayError,
+    ReproductionReplayReport, ReproductionReplayState, ReproductionReplayStep, ReproductionState,
+    ReproductionStatus,
+};
+#[path = "reproduction_catalog.rs"]
+mod reproduction_catalog;
+pub use reproduction_catalog::{
+    ReproductionCatalogError, ReproductionEligibility, ReproductionFixture, REPRODUCTION_FIXTURE,
+};
+
+#[cfg(test)]
+#[path = "../tests/application_diagnostics.rs"]
+mod diagnostics_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceResolutionErrorKind {
@@ -76,28 +95,14 @@ pub struct NativeApplication<P, C, R> {
     requests: HashMap<String, RecordedRequest>,
     release: Option<ApplicationReleaseReceipt>,
     replacement: Option<ReplacementProgress>,
+    diagnostics: diagnostics::RecentDiagnostics,
+    reproduction_origin: Option<reproduction_catalog::CatalogOrigin>,
+    reproduction: reproduction::ReproductionJournal,
 }
 
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     NativeApplication<P, C, R>
 {
-    pub fn new(
-        instance_id: impl Into<String>,
-        document: OpacityDocument,
-        artifact_port: P,
-        compositor: C,
-        resources: R,
-    ) -> Result<Self, &'static str> {
-        Ok(Self {
-            history: NativeOpacityHistory::new(instance_id, document)?,
-            exports: ExportJobManager::new(artifact_port, compositor),
-            resources,
-            requests: HashMap::new(),
-            release: None,
-            replacement: None,
-        })
-    }
-
     pub fn instance_id(&self) -> &str {
         self.history.instance_id()
     }
@@ -117,7 +122,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         self.history.acquire_snapshot(revision)
     }
 
-    pub fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
+    fn dispatch_inner(&mut self, request: OpacityRequest) -> ResponseEnvelope {
         if self.replacement.is_some() {
             return self.failure(
                 &request,
@@ -186,6 +191,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         }
 
         match request.operation.as_str() {
+            diagnostics::QUERY => self.recent_diagnostics(&request),
             OP_JOB_EXPORT_PNG_BEGIN => self.begin_export(&request, fingerprint),
             OP_JOB_EXPORT_PNG_STATUS => self.job_stage(&request, fingerprint, false),
             OP_JOB_EXPORT_PNG_CANCEL => self.job_stage(&request, fingerprint, true),
@@ -224,6 +230,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     }
 
     pub fn release_transaction_stage(&mut self) -> ApplicationReleaseReceipt {
+        self.reproduction.invalidate(ReproductionReason::Released);
         if matches!(self.release.as_ref(), Some(receipt) if receipt.transaction_stage == ReconciliationStage::Complete)
         {
             return self.release.clone().unwrap();

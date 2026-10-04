@@ -973,6 +973,18 @@
       ]
     },
     {
+      "id": "app.labs.diagnostics.panel",
+      "layer": "app-legacy",
+      "dir": "src/js/labs",
+      "files": [
+        "diagnostics-panel.js"
+      ],
+      "sizeProfile": "App JS unclassified (pre-R01)",
+      "publicApi": [
+        "diagnostics-panel.js"
+      ]
+    },
+    {
       "id": "app.app",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -1705,6 +1717,54 @@
       ]
     },
     {
+      "id": "app.native.opacity.replacement",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-replacement.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-replacement.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.export.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-export-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-export-workflow.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.preview.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-preview-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-preview-workflow.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.v1",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-v1.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-v1.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.lifecycle",
       "layer": "application",
       "dir": "src/js/application",
@@ -1714,6 +1774,18 @@
       "sizeProfile": "Domain/application",
       "publicApi": [
         "native-opacity-lifecycle.js"
+      ]
+    },
+    {
+      "id": "app.native.opacity.viewport",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-opacity-viewport.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-viewport.js"
       ]
     },
     {
@@ -1786,6 +1858,18 @@
       "sizeProfile": "Domain/application",
       "publicApi": [
         "timelapse-capability.js"
+      ]
+    },
+    {
+      "id": "app.diagnostics.capability",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "diagnostics-capability.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "diagnostics-capability.js"
       ]
     },
     {
@@ -1873,6 +1957,30 @@
       ]
     },
     {
+      "id": "app.opacity.diagnostics.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/diagnostics",
+      "files": [
+        "opacity-diagnostics.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "opacity-diagnostics.js"
+      ]
+    },
+    {
+      "id": "app.opacity.reproduction.bundle.domain",
+      "layer": "domain",
+      "dir": "src/js/domain/diagnostics",
+      "files": [
+        "opacity-reproduction-bundle.js"
+      ],
+      "sizeProfile": "Domain kernel",
+      "publicApi": [
+        "opacity-reproduction-bundle.js"
+      ]
+    },
+    {
       "id": "app.expression.random.domain",
       "layer": "domain",
       "dir": "src/js/domain/animation",
@@ -1906,6 +2014,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-application.js"
+      ]
+    },
+    {
+      "id": "app.native.diagnostics.query.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-diagnostics-query.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-diagnostics-query.js"
       ]
     },
     {
@@ -1990,6 +2110,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "native-opacity-preview.js"
+      ]
+    },
+    {
+      "id": "adapter.native.opacity.project.entry",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-opacity-project-entry.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-opacity-project-entry.js"
       ]
     },
     {

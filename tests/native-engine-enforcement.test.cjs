@@ -33,7 +33,21 @@ const CANDIDATE_FILES = [
   'native-engine/src/read_queries.rs',
   'native-engine/tests/application_read.rs',
   'native-engine/src/application_replacement.rs',
+  'native-engine/src/application_construction.rs',
+  'native-engine/src/application.rs',
+  'native-engine/src/application_diagnostics.rs',
+  'native-engine/src/application_reproduction.rs',
+  'native-engine/src/reproduction_bundle.rs',
+  'native-engine/src/reproduction_replay.rs',
+  'native-engine/src/reproduction_catalog.rs',
+  'native-engine/fixtures/reproduction-opacity-v1.json',
+  'native-engine/tests/application_diagnostics.rs',
   'native-engine/tests/application_replacement.rs',
+  'native-engine/tests/application_reproduction.rs',
+  'native-engine/tests/reproduction_lifecycle.rs',
+  'native-engine/tests/reproduction_decode.rs',
+  'native-engine/tests/reproduction_replay.rs',
+  'native-engine/tests/reproduction_catalog.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
@@ -43,6 +57,7 @@ const CANDIDATE_FILES = [
   'engineering/inventory/surfaces.json',
   'engineering/inventory/surfaces.csv',
   'engineering/inventory/SURFACES.md',
+  'engineering/boundaries/profiles/app-js.coverage.json',
   'engineering/remediation/EXECUTION_PLAN.en.md',
   'engineering/remediation/EXECUTION_PLAN.fr.md',
 ];
@@ -58,7 +73,7 @@ const EXPECTED_MODULES = [
 ];
 
 const EXPECTED_EDGES = [
-  'application->commands', 'application->document', 'application->export-job', 'application->history',
+  'application->codec', 'application->commands', 'application->document', 'application->export-job', 'application->history',
   'application->protocol', 'application->render-scene', 'application->request-receipts', 'application->revision',
   'codec->document', 'commands->document', 'commands->request-receipts', 'commands->revision',
   'compositor->render-scene', 'desktop-viewport->compositor', 'desktop-viewport->render-scene',
@@ -73,12 +88,12 @@ const EXPECTED_EDGES = [
 ].sort();
 
 const PRODUCTION = {
-  codec: ['codec', 'document'],
+  codec: ['codec', 'document', 'project_structure'],
   commands: ['commands', 'request_receipts', 'revision'],
   history: ['history', 'transaction'],
-  evaluation: ['evaluation'],
+  evaluation: ['evaluation', 'animation_curve'],
   scheduler: ['resource_leases', 'scheduler'],
-  compositor: ['compositor', 'render_scene'],
+  compositor: ['compositor', 'render_scene', 'render_geometry'],
   viewport: ['desktop_viewport'],
   export_job: ['export_job', 'export_job_lifecycle', 'png_output'],
   application: ['application', 'protocol', 'read_queries'],
@@ -176,7 +191,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 43);
+  assert.equal(result.edges.length, 44);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
@@ -194,7 +209,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(testMacros), Object.keys(TEST_TARGETS).map((name) => `test-${name}`));
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
-    if (name === 'export_job') expected.push('export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
+    if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"');
+    if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
+    if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
+      'export_geometry_tests = "../tests/render_geometry.rs"',
+      'export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
     if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
       'application_replacement_tests = "../tests/application_replacement.rs"');
     assert.deepEqual(testMacros[`test-${name}`], expected);

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "e6d058e76808057b55ecb081f18918c2de11550b",
-  "describe": "v0.7.0-alpha.4-561-ge6d058e-dirty"
+  "head": "3761797d856d036ff3ce94a74b89a7568f56c674",
+  "describe": "v0.7.0-alpha.4-851-g3761797d-dirty"
  },
- "inputsDigest": "96355b91fde516b789d7ce690ffa598ae730dbceeeb0440932623c02d2c38db9",
+ "inputsDigest": "2cfa13d2bd80695944d9eb0c14e3fe6385fd7da42a1a1a4bfa87beb176e54d5c",
  "states": [
   "inventoried",
   "characterized",
@@ -26,16 +26,16 @@
   "native"
  ],
  "counts": {
-  "total": 903,
+  "total": 904,
   "byKind": {
    "dom": 484,
-   "labs": 35,
+   "labs": 36,
    "menu": 261,
    "sdk": 73,
    "shortcut": 50
   },
   "byStatus": {
-   "inventoried": 876,
+   "inventoried": 877,
    "unmapped": 26,
    "unavailable-with-reason": 1
   },
@@ -48,15 +48,15 @@
    "effects-masks": 10,
    "preferences-workspace": 39,
    "unclassified": 6,
-   "labs": 60,
+   "labs": 61,
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 243,
+   "native": 247,
    "export": 5,
    "render": 527,
-   "persist": 420,
-   "animation": 465,
+   "persist": 419,
+   "animation": 461,
    "history": 358,
    "selection": 383
   }
@@ -176,7 +176,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11852,
+   "line": 11858,
    "members": 0
   },
   "SMImageMeshUI": {
@@ -236,7 +236,7 @@
   },
   "SMMotion": {
    "file": "src/js/motion.js",
-   "line": 13258,
+   "line": 13267,
    "members": 29
   },
   "SMNativeVideo": {
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 391,
+   "line": 389,
    "members": 2
   },
   "SMPsdImport": {
@@ -421,7 +421,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 23,
     "via": "variable btn",
     "references": [
      "src/js/updater-bridge.js:89 checkForUpdate()"
@@ -465,7 +465,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 98,
+    "functionsVisited": 91,
     "via": "variable btn",
     "references": []
    },
@@ -594,7 +594,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 17,
+    "functionsVisited": 18,
     "via": "variable input",
     "references": []
    },
@@ -639,7 +639,7 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 177,
+    "functionsVisited": 178,
     "via": "chain",
     "references": []
    },
@@ -682,7 +682,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 185,
+    "functionsVisited": 178,
     "via": "variable _btnAlphaBg",
     "references": []
    },
@@ -723,7 +723,7 @@
     "functionsVisited": 6,
     "via": "variable btn",
     "references": [
-     "src/js/motion.js:7266 action()"
+     "src/js/motion.js:7275 action()"
     ]
    },
    "fixtures": [
@@ -1042,7 +1042,7 @@
     "container": "camera-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 227,
+    "functionsVisited": 222,
     "via": "variable addKey",
     "references": [
      "src/js/camera.js:596 updateCameraPanel()"
@@ -1138,10 +1138,10 @@
     "container": "layer-ctrls",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 533,
+    "functionsVisited": 529,
     "via": "variable btn",
     "references": [
-     "src/js/motion.js:7265 action()"
+     "src/js/motion.js:7274 action()"
     ]
    },
    "fixtures": [
@@ -1704,7 +1704,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 90,
+    "functionsVisited": 91,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -2109,7 +2109,7 @@
     "container": "ellipse-arc-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 210,
+    "functionsVisited": 203,
     "via": "chain",
     "references": []
    },
@@ -2195,7 +2195,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 101,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -2240,7 +2240,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 442,
+    "functionsVisited": 441,
     "via": "variable propBtn",
     "references": []
    },
@@ -2324,7 +2324,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 144,
+    "functionsVisited": 143,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -2461,7 +2461,7 @@
     "container": "p-grad-addstop-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 231,
+    "functionsVisited": 226,
     "via": "chain",
     "references": []
    },
@@ -2550,7 +2550,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 192,
+    "functionsVisited": 184,
     "via": "helper el()",
     "references": []
    },
@@ -2598,7 +2598,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 187,
+    "functionsVisited": 188,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9117 action()"
@@ -2754,8 +2754,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1619",
@@ -2765,7 +2767,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 36,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9166 action()"
@@ -2810,7 +2812,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 101,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -2855,7 +2857,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 451,
+    "functionsVisited": 450,
     "via": "variable btn",
     "references": []
    },
@@ -2944,7 +2946,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 396,
+    "functionsVisited": 393,
     "via": "chain",
     "references": []
    },
@@ -2990,7 +2992,7 @@
     "functionsVisited": 138,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13124 setAppMode()",
+     "src/js/motion.js:13133 setAppMode()",
      "src/js/timeline.js:1169 toggleLayerMotionBlur()",
      "src/js/timeline.js:1190 toggleMotionBlurComp()"
     ]
@@ -3029,7 +3031,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 25,
+    "functionsVisited": 33,
     "via": "variable bClean",
     "references": [
      "src/js/media-library.js:691 render()"
@@ -3118,7 +3120,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 94,
+    "functionsVisited": 95,
     "via": "variable bVid",
     "references": []
    },
@@ -3248,11 +3250,11 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 26,
+    "functionsVisited": 23,
     "via": "variable b",
     "references": [
      "src/js/motion-graph.js:457 toggle()",
-     "src/js/motion.js:13120 setAppMode()"
+     "src/js/motion.js:13129 setAppMode()"
     ]
    },
    "fixtures": [
@@ -3292,7 +3294,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 29,
     "via": "chain",
     "references": []
    },
@@ -3333,7 +3335,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 43,
     "via": "chain",
     "references": []
    },
@@ -3417,7 +3419,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 101,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -3446,8 +3448,7 @@
    "sdk": "none",
    "consumers": {
     "native": 1,
-    "persist": 2,
-    "animation": 3
+    "persist": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -3459,7 +3460,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 89,
+    "functionsVisited": 79,
     "via": "chain",
     "references": []
    },
@@ -3694,7 +3695,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 22,
+    "functionsVisited": 28,
     "via": "variable newBtn",
     "references": []
    },
@@ -3733,7 +3734,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 17,
+    "functionsVisited": 14,
     "via": "variable replaceBtn",
     "references": [
      "src/js/palette-panel.js:195 render()"
@@ -3825,7 +3826,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 101,
+    "functionsVisited": 125,
     "via": "chain",
     "references": []
    },
@@ -4173,7 +4174,7 @@
     "container": "revision-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 261,
+    "functionsVisited": 262,
     "via": "chain",
     "references": []
    },
@@ -4218,7 +4219,7 @@
     "container": "revision-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 261,
+    "functionsVisited": 262,
     "via": "chain",
     "references": []
    },
@@ -4261,7 +4262,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 185,
+    "functionsVisited": 178,
     "via": "chain",
     "references": []
    },
@@ -4306,7 +4307,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 214,
+    "functionsVisited": 207,
     "via": "chain",
     "references": []
    },
@@ -4399,7 +4400,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 179,
+    "functionsVisited": 172,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11473 renderRigModeUI()",
@@ -4448,7 +4449,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 179,
+    "functionsVisited": 172,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11473 renderRigModeUI()",
@@ -4497,7 +4498,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 179,
+    "functionsVisited": 172,
     "via": "chain",
     "references": [
      "src/js/timeline.js:11473 renderRigModeUI()",
@@ -4548,7 +4549,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 215,
+    "functionsVisited": 208,
     "via": "chain",
     "references": []
    },
@@ -4665,7 +4666,6 @@
    "consumers": {
     "persist": 1,
     "native": 1,
-    "animation": 3,
     "render": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -4678,7 +4678,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 102,
+    "functionsVisited": 69,
     "via": "chain",
     "references": []
    },
@@ -4707,8 +4707,7 @@
    "consumers": {
     "persist": 1,
     "native": 1,
-    "render": 2,
-    "animation": 3
+    "render": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -4720,7 +4719,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 104,
+    "functionsVisited": 71,
     "via": "chain",
     "references": []
    },
@@ -4761,7 +4760,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 138,
+    "functionsVisited": 141,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:9131 action()",
@@ -4849,7 +4848,7 @@
     "functionsVisited": 122,
     "via": "variable b",
     "references": [
-     "src/js/motion.js:13122 setAppMode()",
+     "src/js/motion.js:13131 setAppMode()",
      "src/js/timeline.js:1210 toggleLayerShy()"
     ]
    },
@@ -5007,8 +5006,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2193",
@@ -5018,7 +5019,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 35,
+    "functionsVisited": 36,
     "via": "variable trigger",
     "references": []
    },
@@ -5058,7 +5059,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 35,
+    "functionsVisited": 43,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5178,7 +5179,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3
+    "native": 2
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -5190,7 +5191,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 60,
     "via": "helper el()",
     "references": []
    },
@@ -5512,7 +5513,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 398,
+    "functionsVisited": 395,
     "via": "variable delBtn",
     "references": [
      "src/js/timeline.js:7823 openCommentPopover()"
@@ -5743,7 +5744,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 404,
+    "functionsVisited": 401,
     "via": "variable saveBtn",
     "references": []
    },
@@ -7206,7 +7207,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 13,
+    "functionsVisited": 14,
     "via": "variable cancelBtn",
     "references": []
    },
@@ -7385,7 +7386,7 @@
    "capability": "Export",
    "area": "media-import-export",
    "handler": [
-    "src/js/timeline.js:11715"
+    "src/js/timeline.js:11716"
    ],
    "events": [
     "click"
@@ -7398,9 +7399,10 @@
    "consumers": {
     "persist": 1,
     "export": 1,
-    "animation": 3
+    "animation": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1678",
@@ -7410,7 +7412,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 82,
     "via": "variable runBtn",
     "references": []
    },
@@ -7850,10 +7852,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "persist": 1,
-    "animation": 2
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -7864,10 +7863,10 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 45,
     "via": "chain",
     "references": [
-     "src/js/project.js:211 openDialog()"
+     "src/js/project.js:209 openDialog()"
     ]
    },
    "fixtures": [
@@ -8067,7 +8066,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 262,
+    "functionsVisited": 257,
     "via": "variable sel",
     "references": []
    },
@@ -8511,7 +8510,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 42,
     "via": "helper el()",
     "references": []
    },
@@ -9005,7 +9004,7 @@
     "container": "lottie-preview-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 101,
+    "functionsVisited": 125,
     "via": "variable playBtn",
     "references": [
      "src/js/lottie-preview.js:90 stopPlayback()"
@@ -9051,7 +9050,7 @@
     "container": "lottie-preview-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 123,
     "via": "variable scrub",
     "references": [
      "src/js/lottie-preview.js:98 goToFrame()",
@@ -9094,7 +9093,7 @@
     "container": "",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 15,
+    "functionsVisited": 16,
     "via": "helper macBtn()",
     "references": [
      "src/js/updater-bridge.js:137 macBtn()",
@@ -9138,7 +9137,7 @@
     "container": "assets-view-media",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 28,
+    "functionsVisited": 35,
     "via": "variable input",
     "references": []
    },
@@ -9195,7 +9194,7 @@
    "capability": "Cancel",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:704 initStartScreen()"
+    "src/js/project.js:703 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9216,7 +9215,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 1,
+    "functionsVisited": 0,
     "via": "chain",
     "references": []
    },
@@ -9232,7 +9231,7 @@
    "capability": "Create",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:708 initStartScreen()"
+    "src/js/project.js:707 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9257,7 +9256,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 49,
     "via": "chain",
     "references": []
    },
@@ -9379,7 +9378,7 @@
    "capability": "np preset",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:705 initStartScreen()"
+    "src/js/project.js:704 initStartScreen()"
    ],
    "events": [
     "change"
@@ -10314,7 +10313,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 174,
+    "functionsVisited": 166,
     "via": "variable currentOutlineChk",
     "references": []
    },
@@ -10576,7 +10575,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 80,
+    "functionsVisited": 81,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6295 paintFillSwatches()"
@@ -10759,7 +10758,7 @@
     "container": "p-fillgapclose-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 372,
+    "functionsVisited": 369,
     "via": "variable gcSel",
     "references": [
      "src/js/timeline.js:3512 updatePropsContext()"
@@ -10807,7 +10806,7 @@
     "container": "p-fillgapsize-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 176,
+    "functionsVisited": 168,
     "via": "variable gsInp",
     "references": [
      "src/js/timeline.js:3514 updatePropsContext()"
@@ -10855,7 +10854,7 @@
     "container": "p-grad-kind-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 223,
+    "functionsVisited": 218,
     "via": "chain",
     "references": [
      "src/js/gradient-bridge.js:88 renderGradientPanel()"
@@ -10994,7 +10993,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 200,
+    "functionsVisited": 193,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11043,7 +11042,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 174,
+    "functionsVisited": 166,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:311 renderImageMeshPanel()"
@@ -11141,7 +11140,7 @@
     "container": "p-imagemesh-body",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 200,
+    "functionsVisited": 193,
     "via": "helper el()",
     "references": [
      "src/js/image-mesh-bridge.js:317 renderImageMeshPanel()",
@@ -11244,7 +11243,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 197,
+    "functionsVisited": 189,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2841 updateMaskPanel()"
@@ -11290,7 +11289,7 @@
     "container": "mask-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 204,
+    "functionsVisited": 196,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2837 updateMaskPanel()"
@@ -11502,7 +11501,7 @@
     "container": "p-nib-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 176,
+    "functionsVisited": 168,
     "via": "variable nibA",
     "references": [
      "src/js/timeline.js:3502 updatePropsContext()"
@@ -11550,7 +11549,7 @@
     "container": "p-nib-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 176,
+    "functionsVisited": 168,
     "via": "variable nibF",
     "references": [
      "src/js/timeline.js:3504 updatePropsContext()"
@@ -11918,7 +11917,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 233,
+    "functionsVisited": 227,
     "via": "variable tr",
     "references": []
    },
@@ -12895,9 +12894,10 @@
     "history": 2,
     "selection": 2,
     "render": 2,
+    "native": 3,
     "animation": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:928",
@@ -12909,7 +12909,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 94,
+    "functionsVisited": 95,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6286 paintStrokeSwatches()"
@@ -12958,7 +12958,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6285 paintStrokeSwatches()"
@@ -13367,7 +13367,7 @@
     "container": "p-textanim-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 48,
+    "functionsVisited": 23,
     "via": "helper el()",
     "references": []
    },
@@ -14027,7 +14027,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 28,
+    "functionsVisited": 25,
     "via": "variable addBtn",
     "references": []
    },
@@ -14178,7 +14178,7 @@
     "container": "swatches-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 16,
+    "functionsVisited": 21,
     "via": "variable scopeSel",
     "references": [
      "src/js/palette-panel.js:193 render()"
@@ -14705,7 +14705,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 51,
+    "functionsVisited": 55,
     "via": "chain",
     "references": []
    },
@@ -14722,7 +14722,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:632"
+    "src/js/project.js:630"
    ],
    "events": [
     "click"
@@ -14749,10 +14749,10 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 172,
+    "functionsVisited": 180,
     "via": "chain",
     "references": [
-     "src/js/project.js:632",
+     "src/js/project.js:630",
      "src/js/timeline.js:9100 action()"
     ]
    },
@@ -14802,7 +14802,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11851 initPropsPanelCollapse()"
+    "src/js/timeline.js:11857 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14826,7 +14826,7 @@
     "functionsVisited": 21,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11844 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11850 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
@@ -14863,7 +14863,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 43,
     "via": "variable input",
     "references": []
    },
@@ -15332,7 +15332,7 @@
     "container": "render-manager-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 61,
+    "functionsVisited": 62,
     "via": "variable renderAllBtn",
     "references": [
      "src/js/render-manager.js:240 setToolbarBusy()"
@@ -15445,7 +15445,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 72,
     "via": "variable resetBtn",
     "references": []
    },
@@ -15759,7 +15759,7 @@
    "capability": "start new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:700 initStartScreen()"
+    "src/js/project.js:701 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15780,7 +15780,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 1,
+    "functionsVisited": 0,
     "via": "chain",
     "references": []
    },
@@ -15796,7 +15796,7 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:703 initStartScreen()"
+    "src/js/project.js:702 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15808,8 +15808,7 @@
    "sdk": "none",
    "consumers": {
     "native": 1,
-    "persist": 2,
-    "animation": 3
+    "persist": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -15821,7 +15820,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 89,
+    "functionsVisited": 79,
     "via": "chain",
     "references": []
    },
@@ -15837,7 +15836,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:675 initStartScreen()"
+    "src/js/project.js:673 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15860,10 +15859,10 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 47,
+    "functionsVisited": 56,
     "via": "chain",
     "references": [
-     "src/js/project.js:663 initStartScreen()"
+     "src/js/project.js:661 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -15996,7 +15995,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 26,
+    "functionsVisited": 27,
     "via": "variable checkBtn",
     "references": []
    },
@@ -16184,7 +16183,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 497,
+    "functionsVisited": 491,
     "via": "variable save",
     "references": []
    },
@@ -16436,9 +16435,10 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 103,
+    "functionsVisited": 127,
     "via": "chain",
     "references": [
+     "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:204 updatePlayhead()",
      "src/js/timeline.js:2795 updateUI()"
     ]
@@ -16527,7 +16527,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 51,
+    "functionsVisited": 55,
     "via": "chain",
     "references": []
    },
@@ -16663,7 +16663,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8709 updateTextPropsPanel()",
@@ -16712,7 +16712,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "variable contentEl",
     "references": [
      "src/js/timeline.js:8698 updateTextPropsPanel()",
@@ -16763,7 +16763,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8722 updateTextPropsPanel()",
@@ -16813,7 +16813,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8705 updateTextPropsPanel()",
@@ -16946,7 +16946,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "variable fontAddInput",
     "references": []
    },
@@ -16994,7 +16994,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8714 updateTextPropsPanel()",
@@ -17045,7 +17045,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8716 updateTextPropsPanel()",
@@ -17096,7 +17096,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8707 updateTextPropsPanel()",
@@ -17147,7 +17147,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 457,
+    "functionsVisited": 456,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8718 updateTextPropsPanel()",
@@ -17542,7 +17542,7 @@
     "container": "canvas-zoom-pills",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 242,
+    "functionsVisited": 236,
     "via": "chain",
     "references": [
      "src/js/app.js:536 updZoom()"
@@ -18719,7 +18719,7 @@
    "capability": "StoryBoard — in development, not yet available in this build",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13158 initModeSwitch()"
+    "src/js/motion.js:13167 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18768,7 +18768,7 @@
    "capability": "2D Animation",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13158 initModeSwitch()"
+    "src/js/motion.js:13167 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -18817,7 +18817,7 @@
    "capability": "Motion — property keyframes (position/rotation/scale/opacity)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:13158 initModeSwitch()"
+    "src/js/motion.js:13167 initModeSwitch()"
    ],
    "events": [
     "click"
@@ -19715,7 +19715,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19761,7 +19761,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19807,7 +19807,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19853,7 +19853,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19899,7 +19899,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19945,7 +19945,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -19991,7 +19991,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -20037,7 +20037,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -20083,7 +20083,7 @@
     "container": "xform-anchor-grid",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 236,
+    "functionsVisited": 231,
     "via": "callback btn",
     "references": []
    },
@@ -21498,6 +21498,34 @@
    "source": "src/js/labs/command-palette.js:111",
    "meta": {
     "functionsVisited": 0
+   },
+   "fixtures": []
+  },
+  {
+   "id": "labs:diagnostics-panel",
+   "kind": "labs",
+   "surface": "Settings > Labs / SMLabs.diagnostics-panel",
+   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; click a row to select its layer. Report is currently unavailable.",
+   "area": "labs",
+   "handler": [
+    "src/js/labs/diagnostics-panel.js:172"
+   ],
+   "events": [],
+   "exposure": [
+    "Labs panel (opt-in prototype)",
+    "script (window.SMLabs)"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "SMLabs",
+   "consumers": {
+    "animation": 2
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
+   "source": "src/js/labs/diagnostics-panel.js:172",
+   "meta": {
+    "functionsVisited": 23
    },
    "fixtures": []
   },
@@ -22930,7 +22958,7 @@
    "source": "src/js/labs/command-palette.js:31",
    "meta": {
     "i18n": "labsCmdInsertFrame",
-    "functionsVisited": 36
+    "functionsVisited": 39
    },
    "fixtures": []
   },
@@ -23157,7 +23185,7 @@
    "source": "src/js/layer-inout.js:1557",
    "meta": {
     "i18n": null,
-    "functionsVisited": 304
+    "functionsVisited": 302
    },
    "fixtures": [
     "static-props",
@@ -23199,7 +23227,7 @@
    "source": "src/js/layer-inout.js:1564",
    "meta": {
     "i18n": null,
-    "functionsVisited": 341
+    "functionsVisited": 342
    },
    "fixtures": [
     "static-props",
@@ -23497,7 +23525,7 @@
    "source": "src/js/layer-inout.js:1581",
    "meta": {
     "i18n": null,
-    "functionsVisited": 25
+    "functionsVisited": 22
    },
    "fixtures": [
     "static-props",
@@ -23576,7 +23604,7 @@
    "source": "src/js/markers.js:146",
    "meta": {
     "i18n": null,
-    "functionsVisited": 97
+    "functionsVisited": 121
    },
    "fixtures": [
     "static-props",
@@ -23731,7 +23759,7 @@
    "source": "src/js/markers.js:204",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 42
    },
    "fixtures": [
     "static-props",
@@ -23772,7 +23800,7 @@
    "source": "src/js/markers.js:205",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 42
    },
    "fixtures": [
     "static-props",
@@ -24003,7 +24031,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 103
+    "functionsVisited": 102
    },
    "fixtures": [
     "mesh",
@@ -24039,7 +24067,7 @@
    "source": "src/js/media-library.js:553",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 72
+    "functionsVisited": 73
    },
    "fixtures": [
     "mesh",
@@ -24071,7 +24099,7 @@
    "source": "src/js/media-library.js:560",
    "meta": {
     "i18n": "ctxDeleteTrack",
-    "functionsVisited": 39
+    "functionsVisited": 38
    },
    "fixtures": [
     "mesh",
@@ -24103,7 +24131,7 @@
    "source": "src/js/media-library.js:564",
    "meta": {
     "i18n": "ctxRemoveFromLibrary",
-    "functionsVisited": 14
+    "functionsVisited": 9
    },
    "fixtures": [
     "mesh",
@@ -24135,7 +24163,7 @@
    "source": "src/js/motion-preset-picker.js:56",
    "meta": {
     "i18n": null,
-    "functionsVisited": 16
+    "functionsVisited": 11
    },
    "fixtures": [
     "static-props",
@@ -24172,7 +24200,7 @@
    "source": "src/js/motion-preset-picker.js:58",
    "meta": {
     "i18n": null,
-    "functionsVisited": 20
+    "functionsVisited": 16
    },
    "fixtures": [
     "static-props",
@@ -24184,13 +24212,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10448",
+   "id": "menu:motion.js:10457",
    "kind": "menu",
    "surface": "dynamic menu (renderDiscreteKeyGridRow)",
    "capability": "Delete this key",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10448 renderDiscreteKeyGridRow()"
+    "src/js/motion.js:10457 renderDiscreteKeyGridRow()"
    ],
    "events": [
     "click"
@@ -24211,10 +24239,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10448",
+   "source": "src/js/motion.js:10457",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 475
+    "functionsVisited": 471
    },
    "fixtures": [
     "static-props",
@@ -24226,13 +24254,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10880",
+   "id": "menu:motion.js:10889",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Delete this key",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10880 trackRowHtml()"
+    "src/js/motion.js:10889 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24253,10 +24281,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10880",
+   "source": "src/js/motion.js:10889",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 266
+    "functionsVisited": 262
    },
    "fixtures": [
     "static-props",
@@ -24268,13 +24296,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10883",
+   "id": "menu:motion.js:10892",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Add a key here",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10883 trackRowHtml()"
+    "src/js/motion.js:10892 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24295,10 +24323,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10883",
+   "source": "src/js/motion.js:10892",
    "meta": {
     "i18n": "ctxAddKeyHere",
-    "functionsVisited": 476
+    "functionsVisited": 472
    },
    "fixtures": [
     "static-props",
@@ -24310,13 +24338,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10889",
+   "id": "menu:motion.js:10898",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Edit the ease curve…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10889 trackRowHtml()"
+    "src/js/motion.js:10898 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24335,7 +24363,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10889",
+   "source": "src/js/motion.js:10898",
    "meta": {
     "i18n": "ctxEditEaseCurve",
     "functionsVisited": 135
@@ -24350,13 +24378,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10905",
+   "id": "menu:motion.js:10914",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Easy Ease  (F9)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10905 trackRowHtml()"
+    "src/js/motion.js:10914 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24373,7 +24401,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10905",
+   "source": "src/js/motion.js:10914",
    "meta": {
     "i18n": "ctxEasyEaseF9",
     "functionsVisited": 10
@@ -24388,13 +24416,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10906",
+   "id": "menu:motion.js:10915",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Easy Ease In  (Shift+F9)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10906 trackRowHtml()"
+    "src/js/motion.js:10915 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24411,85 +24439,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10906",
+   "source": "src/js/motion.js:10915",
    "meta": {
     "i18n": "ctxEasyEaseInShiftF9",
-    "functionsVisited": 10
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:10907",
-   "kind": "menu",
-   "surface": "dynamic menu (trackRowHtml)",
-   "capability": "Easy Ease Out  (Cmd+Shift+F9)",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:10907 trackRowHtml()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10907",
-   "meta": {
-    "i18n": "ctxEasyEaseOutCmdShiftF9",
-    "functionsVisited": 10
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:10908",
-   "kind": "menu",
-   "surface": "dynamic menu (trackRowHtml)",
-   "capability": "Linear  (Cmd+Alt+K)",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:10908 trackRowHtml()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 3,
-    "render": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10908",
-   "meta": {
-    "i18n": "ctxLinearCmdAltK",
     "functionsVisited": 10
    },
    "fixtures": [
@@ -24505,7 +24457,7 @@
    "id": "menu:motion.js:10916",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
-   "capability": "Distribute evenly",
+   "capability": "Easy Ease Out  (Cmd+Shift+F9)",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:10916 trackRowHtml()"
@@ -24519,20 +24471,16 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "history": 1,
-    "render": 1,
-    "animation": 2,
-    "persist": 3,
-    "native": 3,
-    "selection": 3
+    "history": 3,
+    "render": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:10916",
    "meta": {
-    "i18n": "ctxDistributeEvenly",
-    "functionsVisited": 270
+    "i18n": "ctxEasyEaseOutCmdShiftF9",
+    "functionsVisited": 10
    },
    "fixtures": [
     "static-props",
@@ -24547,10 +24495,48 @@
    "id": "menu:motion.js:10917",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
-   "capability": "Flip order",
+   "capability": "Linear  (Cmd+Alt+K)",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:10917 trackRowHtml()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 3,
+    "render": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:10917",
+   "meta": {
+    "i18n": "ctxLinearCmdAltK",
+    "functionsVisited": 10
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:10925",
+   "kind": "menu",
+   "surface": "dynamic menu (trackRowHtml)",
+   "capability": "Distribute evenly",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:10925 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24571,10 +24557,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10917",
+   "source": "src/js/motion.js:10925",
    "meta": {
-    "i18n": "ctxFlipOrder",
-    "functionsVisited": 270
+    "i18n": "ctxDistributeEvenly",
+    "functionsVisited": 266
    },
    "fixtures": [
     "static-props",
@@ -24586,13 +24572,55 @@
    ]
   },
   {
-   "id": "menu:motion.js:10918",
+   "id": "menu:motion.js:10926",
+   "kind": "menu",
+   "surface": "dynamic menu (trackRowHtml)",
+   "capability": "Flip order",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:10926 trackRowHtml()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 1,
+    "render": 1,
+    "animation": 2,
+    "persist": 3,
+    "native": 3,
+    "selection": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:10926",
+   "meta": {
+    "i18n": "ctxFlipOrder",
+    "functionsVisited": 266
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:10927",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Subdivide (key at midpoint)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10918 trackRowHtml()"
+    "src/js/motion.js:10927 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24613,10 +24641,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10918",
+   "source": "src/js/motion.js:10927",
    "meta": {
     "i18n": "ctxSubdivideMidpoint",
-    "functionsVisited": 488
+    "functionsVisited": 484
    },
    "fixtures": [
     "static-props",
@@ -24628,13 +24656,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10919",
+   "id": "menu:motion.js:10928",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Color the keys…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10919 trackRowHtml()"
+    "src/js/motion.js:10928 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24652,7 +24680,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10919",
+   "source": "src/js/motion.js:10928",
    "meta": {
     "i18n": "ctxColorKeysEllipsis",
     "functionsVisited": 43
@@ -24667,13 +24695,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10924",
+   "id": "menu:motion.js:10933",
    "kind": "menu",
    "surface": "dynamic menu (action)",
    "capability": "Remove the color",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10924 action()"
+    "src/js/motion.js:10933 action()"
    ],
    "events": [
     "click"
@@ -24691,7 +24719,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10924",
+   "source": "src/js/motion.js:10933",
    "meta": {
     "i18n": "ctxRemoveColor",
     "functionsVisited": 40
@@ -24706,13 +24734,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10926",
+   "id": "menu:motion.js:10935",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Select every other one",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10926 trackRowHtml()"
+    "src/js/motion.js:10935 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24729,7 +24757,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10926",
+   "source": "src/js/motion.js:10935",
    "meta": {
     "i18n": "ctxSelectEvery2nd",
     "functionsVisited": 41
@@ -24744,13 +24772,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10927",
+   "id": "menu:motion.js:10936",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Select 1 in N…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10927 trackRowHtml()"
+    "src/js/motion.js:10936 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24767,7 +24795,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10927",
+   "source": "src/js/motion.js:10936",
    "meta": {
     "i18n": "ctxSelectEveryNthEllipsis",
     "functionsVisited": 42
@@ -24782,13 +24810,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10931",
+   "id": "menu:motion.js:10940",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Keep at random…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10931 trackRowHtml()"
+    "src/js/motion.js:10940 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24805,7 +24833,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10931",
+   "source": "src/js/motion.js:10940",
    "meta": {
     "i18n": "ctxKeepRandomEllipsis",
     "functionsVisited": 47
@@ -24820,13 +24848,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10936",
+   "id": "menu:motion.js:10945",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Invert the selection",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10936 trackRowHtml()"
+    "src/js/motion.js:10945 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24843,10 +24871,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10936",
+   "source": "src/js/motion.js:10945",
    "meta": {
     "i18n": "ctxInvertSelection",
-    "functionsVisited": 101
+    "functionsVisited": 102
    },
    "fixtures": [
     "static-props",
@@ -24858,13 +24886,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:10946",
+   "id": "menu:motion.js:10955",
    "kind": "menu",
    "surface": "dynamic menu (trackRowHtml)",
    "capability": "Parent in Time — link time to…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:10946 trackRowHtml()"
+    "src/js/motion.js:10955 trackRowHtml()"
    ],
    "events": [
     "click"
@@ -24885,10 +24913,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:10946",
+   "source": "src/js/motion.js:10955",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 341
+    "functionsVisited": 342
    },
    "fixtures": [
     "static-props",
@@ -24900,13 +24928,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:11456",
+   "id": "menu:motion.js:11465",
    "kind": "menu",
    "surface": "dynamic menu (decorateMotionPropertyRow)",
    "capability": "Expression controls…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:11456 decorateMotionPropertyRow()"
+    "src/js/motion.js:11465 decorateMotionPropertyRow()"
    ],
    "events": [
     "click"
@@ -24924,7 +24952,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:11456",
+   "source": "src/js/motion.js:11465",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
     "functionsVisited": 35
@@ -24939,13 +24967,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:11460",
+   "id": "menu:motion.js:11469",
    "kind": "menu",
    "surface": "dynamic menu (decorateMotionPropertyRow)",
    "capability": "Bake expression to keyframes…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:11460 decorateMotionPropertyRow()"
+    "src/js/motion.js:11469 decorateMotionPropertyRow()"
    ],
    "events": [
     "click"
@@ -24963,10 +24991,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:11460",
+   "source": "src/js/motion.js:11469",
    "meta": {
     "i18n": "ctxBakeExpressionEllipsis",
-    "functionsVisited": 145
+    "functionsVisited": 146
    },
    "fixtures": [
     "static-props",
@@ -25213,13 +25241,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7248",
+   "id": "menu:motion.js:7257",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7248 renderLayerListMotion()"
+    "src/js/motion.js:7257 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25237,10 +25265,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7248",
+   "source": "src/js/motion.js:7257",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 78
+    "functionsVisited": 76
    },
    "fixtures": [
     "static-props",
@@ -25252,13 +25280,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7253",
+   "id": "menu:motion.js:7262",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Remove from the folder",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7253 renderLayerListMotion()"
+    "src/js/motion.js:7262 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25279,7 +25307,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7253",
+   "source": "src/js/motion.js:7262",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
     "functionsVisited": 171
@@ -25294,13 +25322,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7263",
+   "id": "menu:motion.js:7272",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Convert to component",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7263 renderLayerListMotion()"
+    "src/js/motion.js:7272 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25320,7 +25348,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7263",
+   "source": "src/js/motion.js:7272",
    "meta": {
     "i18n": "ctxConvertToComponent",
     "functionsVisited": 108
@@ -25335,13 +25363,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7264",
+   "id": "menu:motion.js:7273",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Break apart the component",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7264 renderLayerListMotion()"
+    "src/js/motion.js:7273 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25362,7 +25390,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7264",
+   "source": "src/js/motion.js:7273",
    "meta": {
     "i18n": "ctxBreakApartComponent",
     "functionsVisited": 151
@@ -25377,13 +25405,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7265",
+   "id": "menu:motion.js:7274",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Insert a camera layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7265 renderLayerListMotion()"
+    "src/js/motion.js:7274 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25397,7 +25425,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7265",
+   "source": "src/js/motion.js:7274",
    "meta": {
     "i18n": "ctxInsertCameraLayer",
     "functionsVisited": 2
@@ -25412,13 +25440,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7266",
+   "id": "menu:motion.js:7275",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Import an audio track…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7266 renderLayerListMotion()"
+    "src/js/motion.js:7275 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25432,7 +25460,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7266",
+   "source": "src/js/motion.js:7275",
    "meta": {
     "i18n": "ctxInsertAudioTrack",
     "functionsVisited": 2
@@ -25447,13 +25475,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7267",
+   "id": "menu:motion.js:7276",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Split into layers (one shape per layer)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7267 renderLayerListMotion()"
+    "src/js/motion.js:7276 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25472,7 +25500,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7267",
+   "source": "src/js/motion.js:7276",
    "meta": {
     "i18n": "ctxSplitIntoLayers",
     "functionsVisited": 34
@@ -25487,13 +25515,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7268",
+   "id": "menu:motion.js:7277",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Cut at the playhead  (⌘⇧D)",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7268 renderLayerListMotion()"
+    "src/js/motion.js:7277 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25514,7 +25542,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7268",
+   "source": "src/js/motion.js:7277",
    "meta": {
     "i18n": "ctxCutAtPlayhead",
     "functionsVisited": 194
@@ -25529,13 +25557,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7290",
+   "id": "menu:motion.js:7299",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Parent in Time — link time to…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7290 renderLayerListMotion()"
+    "src/js/motion.js:7299 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25556,10 +25584,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7290",
+   "source": "src/js/motion.js:7299",
    "meta": {
     "i18n": "ctxParentInTimeLinkTimeEllipsis",
-    "functionsVisited": 341
+    "functionsVisited": 342
    },
    "fixtures": [
     "static-props",
@@ -25571,13 +25599,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7298",
+   "id": "menu:motion.js:7307",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Expression controls…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7298 renderLayerListMotion()"
+    "src/js/motion.js:7307 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25595,7 +25623,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7298",
+   "source": "src/js/motion.js:7307",
    "meta": {
     "i18n": "ctxExprControlsEllipsis",
     "functionsVisited": 35
@@ -25610,13 +25638,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7306",
+   "id": "menu:motion.js:7315",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Widget settings…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7306 renderLayerListMotion()"
+    "src/js/motion.js:7315 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25634,7 +25662,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7306",
+   "source": "src/js/motion.js:7315",
    "meta": {
     "i18n": "ctxWidgetSettingsEllipsis",
     "functionsVisited": 23
@@ -25649,13 +25677,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7311",
+   "id": "menu:motion.js:7320",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Add an effector layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7311 renderLayerListMotion()"
+    "src/js/motion.js:7320 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25676,10 +25704,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7311",
+   "source": "src/js/motion.js:7320",
    "meta": {
     "i18n": "ctxAddEffectorLayer",
-    "functionsVisited": 89
+    "functionsVisited": 90
    },
    "fixtures": [
     "static-props",
@@ -25691,13 +25719,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7316",
+   "id": "menu:motion.js:7325",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Add a marker on this layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7316 renderLayerListMotion()"
+    "src/js/motion.js:7325 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25714,7 +25742,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7316",
+   "source": "src/js/motion.js:7325",
    "meta": {
     "i18n": "ctxAddMarkerOnLayer",
     "functionsVisited": 17
@@ -25729,13 +25757,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7327",
+   "id": "menu:motion.js:7336",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Merge the selected layers",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7327 renderLayerListMotion()"
+    "src/js/motion.js:7336 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25756,7 +25784,7 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7327",
+   "source": "src/js/motion.js:7336",
    "meta": {
     "i18n": "ctxMergeSelectedLayers",
     "functionsVisited": 132
@@ -25771,13 +25799,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7328",
+   "id": "menu:motion.js:7337",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Object-mode Duplicator…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7328 renderLayerListMotion()"
+    "src/js/motion.js:7337 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25798,10 +25826,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7328",
+   "source": "src/js/motion.js:7337",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "static-props",
@@ -25813,13 +25841,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7330",
+   "id": "menu:motion.js:7339",
    "kind": "menu",
    "surface": "dynamic menu (renderLayerListMotion)",
    "capability": "Stagger the selected layers…",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7330 renderLayerListMotion()"
+    "src/js/motion.js:7339 renderLayerListMotion()"
    ],
    "events": [
     "click"
@@ -25837,7 +25865,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7330",
+   "source": "src/js/motion.js:7339",
    "meta": {
     "i18n": "ctxStaggerSelectedLayersEllipsis",
     "functionsVisited": 139
@@ -25852,13 +25880,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7746",
+   "id": "menu:motion.js:7755",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Matte layer:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7746 openMatteConfigMenu()"
+    "src/js/motion.js:7755 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25872,7 +25900,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7746",
+   "source": "src/js/motion.js:7755",
    "meta": {
     "i18n": "matteMenuSourceHdr",
     "functionsVisited": 0
@@ -25887,13 +25915,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7752",
+   "id": "menu:motion.js:7761",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "  ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7752 openMatteConfigMenu()"
+    "src/js/motion.js:7761 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25912,7 +25940,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7752",
+   "source": "src/js/motion.js:7761",
    "meta": {
     "i18n": null,
     "functionsVisited": 157
@@ -25927,13 +25955,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7766",
+   "id": "menu:motion.js:7775",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Mode:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7766 openMatteConfigMenu()"
+    "src/js/motion.js:7775 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25947,7 +25975,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7766",
+   "source": "src/js/motion.js:7775",
    "meta": {
     "i18n": "matteMenuModeHdr",
     "functionsVisited": 0
@@ -25962,13 +25990,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7769",
+   "id": "menu:motion.js:7778",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "  ",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7769 openMatteConfigMenu()"
+    "src/js/motion.js:7778 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -25987,7 +26015,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7769",
+   "source": "src/js/motion.js:7778",
    "meta": {
     "i18n": null,
     "functionsVisited": 153
@@ -26002,13 +26030,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:7776",
+   "id": "menu:motion.js:7785",
    "kind": "menu",
    "surface": "dynamic menu (openMatteConfigMenu)",
    "capability": "Remove the matte",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:7776 openMatteConfigMenu()"
+    "src/js/motion.js:7785 openMatteConfigMenu()"
    ],
    "events": [
     "click"
@@ -26027,7 +26055,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7776",
+   "source": "src/js/motion.js:7785",
    "meta": {
     "i18n": "matteMenuRemove",
     "functionsVisited": 153
@@ -26042,85 +26070,10 @@
    ]
   },
   {
-   "id": "menu:motion.js:7824",
-   "kind": "menu",
-   "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "Matte layer:",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:7824 openExtraMatteMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7824",
-   "meta": {
-    "i18n": "matteMenuSourceHdr",
-    "functionsVisited": 0
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:7827",
-   "kind": "menu",
-   "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "  ",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:7827 openExtraMatteMenu()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "history": 1,
-    "persist": 2,
-    "render": 2,
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7827",
-   "meta": {
-    "i18n": null,
-    "functionsVisited": 157
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
    "id": "menu:motion.js:7833",
    "kind": "menu",
    "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "Mode:",
+   "capability": "Matte layer:",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:7833 openExtraMatteMenu()"
@@ -26139,7 +26092,7 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:7833",
    "meta": {
-    "i18n": "matteMenuModeHdr",
+    "i18n": "matteMenuSourceHdr",
     "functionsVisited": 0
    },
    "fixtures": [
@@ -26180,7 +26133,7 @@
    "source": "src/js/motion.js:7836",
    "meta": {
     "i18n": null,
-    "functionsVisited": 153
+    "functionsVisited": 157
    },
    "fixtures": [
     "static-props",
@@ -26195,10 +26148,45 @@
    "id": "menu:motion.js:7842",
    "kind": "menu",
    "surface": "dynamic menu (openExtraMatteMenu)",
-   "capability": "Remove the matte",
+   "capability": "Mode:",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:7842 openExtraMatteMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {},
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:7842",
+   "meta": {
+    "i18n": "matteMenuModeHdr",
+    "functionsVisited": 0
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:7845",
+   "kind": "menu",
+   "surface": "dynamic menu (openExtraMatteMenu)",
+   "capability": "  ",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:7845 openExtraMatteMenu()"
    ],
    "events": [
     "click"
@@ -26217,7 +26205,47 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:7842",
+   "source": "src/js/motion.js:7845",
+   "meta": {
+    "i18n": null,
+    "functionsVisited": 153
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:7851",
+   "kind": "menu",
+   "surface": "dynamic menu (openExtraMatteMenu)",
+   "capability": "Remove the matte",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:7851 openExtraMatteMenu()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "history": 1,
+    "persist": 2,
+    "render": 2,
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:7851",
    "meta": {
     "i18n": "matteMenuRemove",
     "functionsVisited": 153
@@ -26232,13 +26260,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8183",
+   "id": "menu:motion.js:8192",
    "kind": "menu",
    "surface": "dynamic menu (openExtraParentMenu)",
    "capability": "Remove this parent",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8183 openExtraParentMenu()"
+    "src/js/motion.js:8192 openExtraParentMenu()"
    ],
    "events": [
     "click"
@@ -26259,10 +26287,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8183",
+   "source": "src/js/motion.js:8192",
    "meta": {
     "i18n": "menuRemoveThisParent",
-    "functionsVisited": 471
+    "functionsVisited": 467
    },
    "fixtures": [
     "static-props",
@@ -26274,13 +26302,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8260",
+   "id": "menu:motion.js:8269",
    "kind": "menu",
    "surface": "dynamic menu (renderTimeLinkRow)",
    "capability": "Unlink time",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8260 renderTimeLinkRow()"
+    "src/js/motion.js:8269 renderTimeLinkRow()"
    ],
    "events": [
     "click"
@@ -26301,10 +26329,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8260",
+   "source": "src/js/motion.js:8269",
    "meta": {
     "i18n": "ctxUnlinkTime",
-    "functionsVisited": 500
+    "functionsVisited": 498
    },
    "fixtures": [
     "static-props",
@@ -26316,13 +26344,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8349",
+   "id": "menu:motion.js:8358",
    "kind": "menu",
    "surface": "dynamic menu (buildKeyLockMenuItems)",
    "capability": "Lock keyframes on:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8349 buildKeyLockMenuItems()"
+    "src/js/motion.js:8358 buildKeyLockMenuItems()"
    ],
    "events": [
     "click"
@@ -26336,7 +26364,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8349",
+   "source": "src/js/motion.js:8358",
    "meta": {
     "i18n": "ctxLockKeyframesOnColon",
     "functionsVisited": 0
@@ -26351,13 +26379,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8384",
+   "id": "menu:motion.js:8393",
    "kind": "menu",
    "surface": "dynamic menu (buildKeySelectionLockMenuItems)",
    "capability": "Lock keyframes on:",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8384 buildKeySelectionLockMenuItems()"
+    "src/js/motion.js:8393 buildKeySelectionLockMenuItems()"
    ],
    "events": [
     "click"
@@ -26371,121 +26399,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8384",
+   "source": "src/js/motion.js:8393",
    "meta": {
     "i18n": "ctxLockKeyframesOnColon",
     "functionsVisited": 0
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8978",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "value — no change",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8978 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8978",
-   "meta": {
-    "i18n": "exprExValue",
-    "functionsVisited": 10
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8979",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "wiggle — random shake",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8979 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8979",
-   "meta": {
-    "i18n": "exprExWiggle",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8983",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "Math.sin — steady oscillation",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8983 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8983",
-   "meta": {
-    "i18n": "exprExOscillate",
-    "functionsVisited": 11
    },
    "fixtures": [
     "static-props",
@@ -26500,7 +26417,7 @@
    "id": "menu:motion.js:8987",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "stepTime — shake stepped every 4 frames",
+   "capability": "value — no change",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:8987 buildExprEditorRow()"
@@ -26521,8 +26438,8 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:8987",
    "meta": {
-    "i18n": "exprExStepped",
-    "functionsVisited": 15
+    "i18n": "exprExValue",
+    "functionsVisited": 7
    },
    "fixtures": [
     "static-props",
@@ -26534,13 +26451,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:8991",
+   "id": "menu:motion.js:8988",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopAfter('cycle') — repeat after the last keyframe",
+   "capability": "wiggle — random shake",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8991 buildExprEditorRow()"
+    "src/js/motion.js:8988 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26556,10 +26473,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8991",
+   "source": "src/js/motion.js:8988",
    "meta": {
-    "i18n": "exprExLoopCycle",
-    "functionsVisited": 11
+    "i18n": "exprExWiggle",
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26574,7 +26491,7 @@
    "id": "menu:motion.js:8992",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopAfter('pingpong') — repeat back and forth",
+   "capability": "Math.sin — steady oscillation",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:8992 buildExprEditorRow()"
@@ -26595,8 +26512,8 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:8992",
    "meta": {
-    "i18n": "exprExLoopPingpong",
-    "functionsVisited": 11
+    "i18n": "exprExOscillate",
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26608,13 +26525,124 @@
    ]
   },
   {
-   "id": "menu:motion.js:8993",
+   "id": "menu:motion.js:8996",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "stepTime — shake stepped every 4 frames",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:8996 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:8996",
+   "meta": {
+    "i18n": "exprExStepped",
+    "functionsVisited": 12
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9000",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "loopAfter('cycle') — repeat after the last keyframe",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9000 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9000",
+   "meta": {
+    "i18n": "exprExLoopCycle",
+    "functionsVisited": 8
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9001",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "loopAfter('pingpong') — repeat back and forth",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9001 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9001",
+   "meta": {
+    "i18n": "exprExLoopPingpong",
+    "functionsVisited": 8
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9002",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "loopAfter('offset') — repeat, each pass stacking on the last",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:8993 buildExprEditorRow()"
+    "src/js/motion.js:9002 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26630,84 +26658,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8993",
+   "source": "src/js/motion.js:9002",
    "meta": {
     "i18n": "exprExLoopOffset",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8994",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "loopBefore('cycle') — repeat before the first keyframe",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8994 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8994",
-   "meta": {
-    "i18n": "exprExLoopBefore",
-    "functionsVisited": 11
-   },
-   "fixtures": [
-    "static-props",
-    "keyed-props",
-    "expression-props",
-    "held-frames",
-    "text",
-    "migration"
-   ]
-  },
-  {
-   "id": "menu:motion.js:8995",
-   "kind": "menu",
-   "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "Bounce after the last keyframe",
-   "area": "animation-rigs-expressions",
-   "handler": [
-    "src/js/motion.js:8995 buildExprEditorRow()"
-   ],
-   "events": [
-    "click"
-   ],
-   "exposure": [
-    "contextual menu"
-   ],
-   "mcp": "none (R14)",
-   "sdk": "none",
-   "consumers": {
-    "animation": 3
-   },
-   "platforms": "browser and desktop",
-   "status": "inventoried",
-   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:8995",
-   "meta": {
-    "i18n": "exprExBounce",
-    "functionsVisited": 20
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26722,7 +26676,7 @@
    "id": "menu:motion.js:9003",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "remap — driven by another layer’s X",
+   "capability": "loopBefore('cycle') — repeat before the first keyframe",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:9003 buildExprEditorRow()"
@@ -26743,8 +26697,8 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:9003",
    "meta": {
-    "i18n": "exprExRemapOther",
-    "functionsVisited": 11
+    "i18n": "exprExLoopBefore",
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26756,13 +26710,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9008",
+   "id": "menu:motion.js:9004",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "seed + randomFixed — a fixed offset per layer",
+   "capability": "Bounce after the last keyframe",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9008 buildExprEditorRow()"
+    "src/js/motion.js:9004 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26778,10 +26732,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9008",
+   "source": "src/js/motion.js:9004",
    "meta": {
-    "i18n": "exprExStagger",
-    "functionsVisited": 13
+    "i18n": "exprExBounce",
+    "functionsVisited": 17
    },
    "fixtures": [
     "static-props",
@@ -26796,7 +26750,7 @@
    "id": "menu:motion.js:9012",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
-   "capability": "contentBox — fit to what the layer draws",
+   "capability": "remap — driven by another layer’s X",
    "area": "animation-rigs-expressions",
    "handler": [
     "src/js/motion.js:9012 buildExprEditorRow()"
@@ -26817,8 +26771,8 @@
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/js/motion.js:9012",
    "meta": {
-    "i18n": "exprExContentBox",
-    "functionsVisited": 11
+    "i18n": "exprExRemapOther",
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26830,13 +26784,87 @@
    ]
   },
   {
-   "id": "menu:motion.js:9019",
+   "id": "menu:motion.js:9017",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "seed + randomFixed — a fixed offset per layer",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9017 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9017",
+   "meta": {
+    "i18n": "exprExStagger",
+    "functionsVisited": 10
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9021",
+   "kind": "menu",
+   "surface": "dynamic menu (buildExprEditorRow)",
+   "capability": "contentBox — fit to what the layer draws",
+   "area": "animation-rigs-expressions",
+   "handler": [
+    "src/js/motion.js:9021 buildExprEditorRow()"
+   ],
+   "events": [
+    "click"
+   ],
+   "exposure": [
+    "contextual menu"
+   ],
+   "mcp": "none (R14)",
+   "sdk": "none",
+   "consumers": {
+    "animation": 3
+   },
+   "platforms": "browser and desktop",
+   "status": "inventoried",
+   "nextGate": "R12/R13: characterize against a fixture and diagnostics",
+   "source": "src/js/motion.js:9021",
+   "meta": {
+    "i18n": "exprExContentBox",
+    "functionsVisited": 8
+   },
+   "fixtures": [
+    "static-props",
+    "keyed-props",
+    "expression-props",
+    "held-frames",
+    "text",
+    "migration"
+   ]
+  },
+  {
+   "id": "menu:motion.js:9028",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "angleTo — angle between two layers",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9019 buildExprEditorRow()"
+    "src/js/motion.js:9028 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26852,10 +26880,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9019",
+   "source": "src/js/motion.js:9028",
    "meta": {
     "i18n": "exprExAngleTo",
-    "functionsVisited": 12
+    "functionsVisited": 9
    },
    "fixtures": [
     "static-props",
@@ -26867,13 +26895,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9022",
+   "id": "menu:motion.js:9031",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "layer('Layer 1') — follow another layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9022 buildExprEditorRow()"
+    "src/js/motion.js:9031 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26889,10 +26917,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9022",
+   "source": "src/js/motion.js:9031",
    "meta": {
     "i18n": "exprExFollowLayer",
-    "functionsVisited": 11
+    "functionsVisited": 8
    },
    "fixtures": [
     "static-props",
@@ -26904,13 +26932,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9023",
+   "id": "menu:motion.js:9032",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "self.keys.at(1) — hold the first keyframe’s value",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9023 buildExprEditorRow()"
+    "src/js/motion.js:9032 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26926,10 +26954,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9023",
+   "source": "src/js/motion.js:9032",
    "meta": {
     "i18n": "exprExFirstKey",
-    "functionsVisited": 17
+    "functionsVisited": 14
    },
    "fixtures": [
     "static-props",
@@ -26941,13 +26969,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9036",
+   "id": "menu:motion.js:9045",
    "kind": "menu",
    "surface": "dynamic menu (buildExprEditorRow)",
    "capability": "Read a control on this layer",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9036 buildExprEditorRow()"
+    "src/js/motion.js:9045 buildExprEditorRow()"
    ],
    "events": [
     "click"
@@ -26963,10 +26991,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9036",
+   "source": "src/js/motion.js:9045",
    "meta": {
     "i18n": "exprExControl",
-    "functionsVisited": 22
+    "functionsVisited": 19
    },
    "fixtures": [
     "static-props",
@@ -26978,13 +27006,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9745",
+   "id": "menu:motion.js:9754",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9745 renderElementsList()"
+    "src/js/motion.js:9754 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27002,10 +27030,10 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9745",
+   "source": "src/js/motion.js:9754",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 157
+    "functionsVisited": 156
    },
    "fixtures": [
     "static-props",
@@ -27017,13 +27045,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9746",
+   "id": "menu:motion.js:9755",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Select members",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9746 renderElementsList()"
+    "src/js/motion.js:9755 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27042,7 +27070,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9746",
+   "source": "src/js/motion.js:9755",
    "meta": {
     "i18n": "elementsSelectMembers",
     "functionsVisited": 73
@@ -27057,13 +27085,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9747",
+   "id": "menu:motion.js:9756",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Ungroup",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9747 renderElementsList()"
+    "src/js/motion.js:9756 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27084,10 +27112,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9747",
+   "source": "src/js/motion.js:9756",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 490
+    "functionsVisited": 486
    },
    "fixtures": [
     "static-props",
@@ -27099,13 +27127,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9790",
+   "id": "menu:motion.js:9799",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Rename",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9790 renderElementsList()"
+    "src/js/motion.js:9799 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27126,10 +27154,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9790",
+   "source": "src/js/motion.js:9799",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 389
+    "functionsVisited": 390
    },
    "fixtures": [
     "static-props",
@@ -27141,13 +27169,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9791",
+   "id": "menu:motion.js:9800",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Select",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9791 renderElementsList()"
+    "src/js/motion.js:9800 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27166,7 +27194,7 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9791",
+   "source": "src/js/motion.js:9800",
    "meta": {
     "i18n": "elementsSelect",
     "functionsVisited": 73
@@ -27181,13 +27209,13 @@
    ]
   },
   {
-   "id": "menu:motion.js:9792",
+   "id": "menu:motion.js:9801",
    "kind": "menu",
    "surface": "dynamic menu (renderElementsList)",
    "capability": "Delete",
    "area": "animation-rigs-expressions",
    "handler": [
-    "src/js/motion.js:9792 renderElementsList()"
+    "src/js/motion.js:9801 renderElementsList()"
    ],
    "events": [
     "click"
@@ -27208,10 +27236,10 @@
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
-   "source": "src/js/motion.js:9792",
+   "source": "src/js/motion.js:9801",
    "meta": {
     "i18n": "elementsDelete",
-    "functionsVisited": 544
+    "functionsVisited": 542
    },
    "fixtures": [
     "static-props",
@@ -27324,7 +27352,7 @@
    "source": "src/js/palette-panel.js:186",
    "meta": {
     "i18n": null,
-    "functionsVisited": 20
+    "functionsVisited": 28
    },
    "fixtures": [
     "static-props",
@@ -27357,7 +27385,7 @@
    "source": "src/js/palette-panel.js:188",
    "meta": {
     "i18n": null,
-    "functionsVisited": 14
+    "functionsVisited": 9
    },
    "fixtures": [
     "static-props",
@@ -27390,7 +27418,7 @@
    "source": "src/js/palette-panel.js:223",
    "meta": {
     "i18n": null,
-    "functionsVisited": 14
+    "functionsVisited": 9
    },
    "fixtures": [
     "static-props",
@@ -27423,7 +27451,7 @@
    "source": "src/js/palette-panel.js:224",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 14
    },
    "fixtures": [
     "static-props",
@@ -27456,7 +27484,7 @@
    "source": "src/js/palette-panel.js:226",
    "meta": {
     "i18n": null,
-    "functionsVisited": 18
+    "functionsVisited": 15
    },
    "fixtures": [
     "static-props",
@@ -27920,7 +27948,7 @@
    "source": "src/js/select-bridge.js:3085",
    "meta": {
     "i18n": null,
-    "functionsVisited": 205
+    "functionsVisited": 197
    },
    "fixtures": [
     "static-props",
@@ -27960,7 +27988,7 @@
    "source": "src/js/select-bridge.js:3092",
    "meta": {
     "i18n": null,
-    "functionsVisited": 205
+    "functionsVisited": 197
    },
    "fixtures": [
     "static-props",
@@ -28000,7 +28028,7 @@
    "source": "src/js/select-bridge.js:3108",
    "meta": {
     "i18n": null,
-    "functionsVisited": 390
+    "functionsVisited": 387
    },
    "fixtures": [
     "static-props",
@@ -28079,7 +28107,7 @@
    "source": "src/js/select-bridge.js:3191",
    "meta": {
     "i18n": null,
-    "functionsVisited": 261
+    "functionsVisited": 262
    },
    "fixtures": [
     "static-props",
@@ -28119,7 +28147,7 @@
    "source": "src/js/select-bridge.js:3198",
    "meta": {
     "i18n": null,
-    "functionsVisited": 261
+    "functionsVisited": 262
    },
    "fixtures": [
     "static-props",
@@ -28343,7 +28371,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 84
+    "functionsVisited": 82
    },
    "fixtures": [
     "static-props",
@@ -28495,7 +28523,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 84
+    "functionsVisited": 82
    },
    "fixtures": [
     "static-props",
@@ -28573,7 +28601,7 @@
    "source": "src/js/shapes-panel.js:869",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 295
+    "functionsVisited": 290
    },
    "fixtures": [
     "static-props",
@@ -28606,7 +28634,7 @@
    "source": "src/js/storyboard.js:1025",
    "meta": {
     "i18n": null,
-    "functionsVisited": 22
+    "functionsVisited": 17
    },
    "fixtures": [
     "components"
@@ -28666,7 +28694,7 @@
    "source": "src/js/storyboard.js:1029",
    "meta": {
     "i18n": null,
-    "functionsVisited": 25
+    "functionsVisited": 20
    },
    "fixtures": [
     "components"
@@ -28696,7 +28724,7 @@
    "source": "src/js/storyboard.js:1030",
    "meta": {
     "i18n": null,
-    "functionsVisited": 24
+    "functionsVisited": 22
    },
    "fixtures": [
     "components"
@@ -28726,7 +28754,7 @@
    "source": "src/js/storyboard.js:1209",
    "meta": {
     "i18n": null,
-    "functionsVisited": 21
+    "functionsVisited": 16
    },
    "fixtures": [
     "components"
@@ -28786,7 +28814,7 @@
    "source": "src/js/storyboard.js:1213",
    "meta": {
     "i18n": null,
-    "functionsVisited": 29
+    "functionsVisited": 35
    },
    "fixtures": [
     "components"
@@ -28816,7 +28844,7 @@
    "source": "src/js/storyboard.js:1214",
    "meta": {
     "i18n": null,
-    "functionsVisited": 30
+    "functionsVisited": 37
    },
    "fixtures": [
     "components"
@@ -28882,7 +28910,7 @@
    "source": "src/js/storyboard.js:970",
    "meta": {
     "i18n": null,
-    "functionsVisited": 39
+    "functionsVisited": 35
    },
    "fixtures": [
     "components"
@@ -28945,7 +28973,7 @@
    "source": "src/js/storyboard.js:974",
    "meta": {
     "i18n": null,
-    "functionsVisited": 84
+    "functionsVisited": 89
    },
    "fixtures": [
     "components"
@@ -28978,7 +29006,7 @@
    "source": "src/js/storyboard.js:975",
    "meta": {
     "i18n": null,
-    "functionsVisited": 89
+    "functionsVisited": 94
    },
    "fixtures": [
     "components"
@@ -29008,7 +29036,7 @@
    "source": "src/js/storyboard.js:979",
    "meta": {
     "i18n": null,
-    "functionsVisited": 19
+    "functionsVisited": 25
    },
    "fixtures": [
     "components"
@@ -29075,7 +29103,7 @@
    "source": "src/js/storyboard.js:988",
    "meta": {
     "i18n": null,
-    "functionsVisited": 29
+    "functionsVisited": 35
    },
    "fixtures": [
     "components"
@@ -29105,7 +29133,7 @@
    "source": "src/js/storyboard.js:990",
    "meta": {
     "i18n": null,
-    "functionsVisited": 30
+    "functionsVisited": 37
    },
    "fixtures": [
     "components"
@@ -29242,7 +29270,7 @@
    "source": "src/js/timeline.js:11370",
    "meta": {
     "i18n": "ctxInsertLayerNull",
-    "functionsVisited": 92
+    "functionsVisited": 93
    },
    "fixtures": [
     "keyed-props",
@@ -29281,7 +29309,7 @@
    "source": "src/js/timeline.js:11371",
    "meta": {
     "i18n": "ctxInsertLayerFolder",
-    "functionsVisited": 92
+    "functionsVisited": 93
    },
    "fixtures": [
     "keyed-props",
@@ -29320,7 +29348,7 @@
    "source": "src/js/timeline.js:11372",
    "meta": {
     "i18n": "ctxInsertLayerEffect",
-    "functionsVisited": 71
+    "functionsVisited": 72
    },
    "fixtures": [
     "keyed-props",
@@ -29359,7 +29387,7 @@
    "source": "src/js/timeline.js:11373",
    "meta": {
     "i18n": "ctxInsertLayerGuide",
-    "functionsVisited": 71
+    "functionsVisited": 72
    },
    "fixtures": [
     "keyed-props",
@@ -29689,7 +29717,7 @@
    "source": "src/js/timeline.js:5304",
    "meta": {
     "i18n": "ctxInsertFrame",
-    "functionsVisited": 36
+    "functionsVisited": 39
    },
    "fixtures": [
     "keyed-props",
@@ -29922,7 +29950,7 @@
    "source": "src/js/timeline.js:5328",
    "meta": {
     "i18n": null,
-    "functionsVisited": 439
+    "functionsVisited": 438
    },
    "fixtures": [
     "keyed-props",
@@ -29997,7 +30025,7 @@
    "source": "src/js/timeline.js:5556",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 157
+    "functionsVisited": 156
    },
    "fixtures": [
     "keyed-props",
@@ -30073,7 +30101,7 @@
    "source": "src/js/timeline.js:5558",
    "meta": {
     "i18n": "elementsUngroup",
-    "functionsVisited": 490
+    "functionsVisited": 486
    },
    "fixtures": [
     "keyed-props",
@@ -30112,7 +30140,7 @@
    "source": "src/js/timeline.js:5587",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 389
+    "functionsVisited": 390
    },
    "fixtures": [
     "keyed-props",
@@ -30188,7 +30216,7 @@
    "source": "src/js/timeline.js:5589",
    "meta": {
     "i18n": "fxDelete",
-    "functionsVisited": 544
+    "functionsVisited": 542
    },
    "fixtures": [
     "keyed-props",
@@ -30227,7 +30255,7 @@
    "source": "src/js/timeline.js:6014",
    "meta": {
     "i18n": null,
-    "functionsVisited": 205
+    "functionsVisited": 198
    },
    "fixtures": [
     "keyed-props",
@@ -30266,7 +30294,7 @@
    "source": "src/js/timeline.js:6021",
    "meta": {
     "i18n": null,
-    "functionsVisited": 205
+    "functionsVisited": 198
    },
    "fixtures": [
     "keyed-props",
@@ -30305,7 +30333,7 @@
    "source": "src/js/timeline.js:6037",
    "meta": {
     "i18n": null,
-    "functionsVisited": 194
+    "functionsVisited": 187
    },
    "fixtures": [
     "keyed-props",
@@ -30344,7 +30372,7 @@
    "source": "src/js/timeline.js:6044",
    "meta": {
     "i18n": null,
-    "functionsVisited": 194
+    "functionsVisited": 187
    },
    "fixtures": [
     "keyed-props",
@@ -30383,7 +30411,7 @@
    "source": "src/js/timeline.js:6064",
    "meta": {
     "i18n": null,
-    "functionsVisited": 191
+    "functionsVisited": 183
    },
    "fixtures": [
     "keyed-props",
@@ -30422,7 +30450,7 @@
    "source": "src/js/timeline.js:6072",
    "meta": {
     "i18n": null,
-    "functionsVisited": 191
+    "functionsVisited": 183
    },
    "fixtures": [
     "keyed-props",
@@ -30461,7 +30489,7 @@
    "source": "src/js/timeline.js:6095",
    "meta": {
     "i18n": "ctxTimeNoneUnlink",
-    "functionsVisited": 192
+    "functionsVisited": 184
    },
    "fixtures": [
     "keyed-props",
@@ -30538,7 +30566,7 @@
    "source": "src/js/timeline.js:6143",
    "meta": {
     "i18n": null,
-    "functionsVisited": 186
+    "functionsVisited": 178
    },
    "fixtures": [
     "keyed-props",
@@ -30577,7 +30605,7 @@
    "source": "src/js/timeline.js:6153",
    "meta": {
     "i18n": null,
-    "functionsVisited": 186
+    "functionsVisited": 178
    },
    "fixtures": [
     "keyed-props",
@@ -30613,7 +30641,7 @@
    "source": "src/js/timeline.js:6454",
    "meta": {
     "i18n": null,
-    "functionsVisited": 145
+    "functionsVisited": 144
    },
    "fixtures": [
     "keyed-props",
@@ -30761,7 +30789,7 @@
    "source": "src/js/timeline.js:6755",
    "meta": {
     "i18n": "ctxInsertLayerNull",
-    "functionsVisited": 92
+    "functionsVisited": 93
    },
    "fixtures": [
     "keyed-props",
@@ -30800,7 +30828,7 @@
    "source": "src/js/timeline.js:6756",
    "meta": {
     "i18n": "ctxInsertLayerFolder",
-    "functionsVisited": 92
+    "functionsVisited": 93
    },
    "fixtures": [
     "keyed-props",
@@ -30839,7 +30867,7 @@
    "source": "src/js/timeline.js:6757",
    "meta": {
     "i18n": "ctxInsertLayerEffect",
-    "functionsVisited": 71
+    "functionsVisited": 72
    },
    "fixtures": [
     "keyed-props",
@@ -30878,7 +30906,7 @@
    "source": "src/js/timeline.js:6758",
    "meta": {
     "i18n": "ctxInsertLayerGuide",
-    "functionsVisited": 71
+    "functionsVisited": 72
    },
    "fixtures": [
     "keyed-props",
@@ -31100,7 +31128,7 @@
    "source": "src/js/timeline.js:6770",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 78
+    "functionsVisited": 76
    },
    "fixtures": [
     "keyed-props",
@@ -31176,7 +31204,7 @@
    "source": "src/js/timeline.js:6773",
    "meta": {
     "i18n": "ctxObjectDuplicatorEllipsis",
-    "functionsVisited": 167
+    "functionsVisited": 168
    },
    "fixtures": [
     "keyed-props",
@@ -31369,7 +31397,7 @@
    "source": "src/js/timeline.js:6783",
    "meta": {
     "i18n": "ctxRemoveFromFolder",
-    "functionsVisited": 338
+    "functionsVisited": 339
    },
    "fixtures": [
     "keyed-props",
@@ -31594,7 +31622,7 @@
    "source": "src/js/timeline.js:6791",
    "meta": {
     "i18n": "ctxUnlinkFromLFSGroup",
-    "functionsVisited": 338
+    "functionsVisited": 339
    },
    "fixtures": [
     "keyed-props",
@@ -31976,7 +32004,7 @@
    "source": "src/js/timeline.js:6828",
    "meta": {
     "i18n": "ctxMatteSource",
-    "functionsVisited": 338
+    "functionsVisited": 339
    },
    "fixtures": [
     "keyed-props",
@@ -32159,7 +32187,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:442",
    "meta": {
-    "functionsVisited": 339
+    "functionsVisited": 340
    },
    "fixtures": [
     "media",
@@ -32561,7 +32589,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:451",
    "meta": {
-    "functionsVisited": 97
+    "functionsVisited": 121
    },
    "fixtures": [
     "media",
@@ -32596,7 +32624,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 379
+    "functionsVisited": 396
    },
    "fixtures": [
     "media",
@@ -32749,7 +32777,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:290",
    "meta": {
-    "functionsVisited": 176
+    "functionsVisited": 168
    },
    "fixtures": [
     "media",
@@ -33029,7 +33057,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:163",
    "meta": {
-    "functionsVisited": 19
+    "functionsVisited": 14
    },
    "fixtures": [
     "media",
@@ -33092,7 +33120,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:146",
    "meta": {
-    "functionsVisited": 31
+    "functionsVisited": 27
    },
    "fixtures": [
     "media",
@@ -33281,7 +33309,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:294",
    "meta": {
-    "functionsVisited": 176
+    "functionsVisited": 168
    },
    "fixtures": [
     "media",
@@ -33675,7 +33703,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:385",
    "meta": {
-    "functionsVisited": 234
+    "functionsVisited": 252
    },
    "fixtures": [
     "media",
@@ -33980,7 +34008,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:576",
    "meta": {
-    "functionsVisited": 39
+    "functionsVisited": 42
    },
    "fixtures": [
     "media",
@@ -34014,7 +34042,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:577",
    "meta": {
-    "functionsVisited": 39
+    "functionsVisited": 42
    },
    "fixtures": [
     "media",
@@ -34042,7 +34070,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:570",
    "meta": {
-    "functionsVisited": 15
+    "functionsVisited": 20
    },
    "fixtures": [
     "media",
@@ -34105,7 +34133,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:586",
    "meta": {
-    "functionsVisited": 15
+    "functionsVisited": 10
    },
    "fixtures": [
     "media",
@@ -34140,7 +34168,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:590",
    "meta": {
-    "functionsVisited": 382
+    "functionsVisited": 383
    },
    "fixtures": [
     "media",

@@ -589,6 +589,108 @@
               "seconds": "seconds"
             },
             "version": 1
+          },
+          {
+            "availability": {
+              "reason": "missing-dependency",
+              "state": "unavailable"
+            },
+            "effects": {
+              "kind": "query",
+              "lifecycle": [
+                "inspect"
+              ],
+              "scope": "none"
+            },
+            "examples": [
+              {
+                "input": {},
+                "label": "inspect every retained entry",
+                "output": {
+                  "entries": [],
+                  "retentionLimit": 32
+                }
+              },
+              {
+                "input": {
+                  "limit": 5
+                },
+                "label": "inspect the 5 most recent recorded opacity commands",
+                "output": {
+                  "entries": [],
+                  "retentionLimit": 32
+                }
+              }
+            ],
+            "fixture": {
+              "input": {
+                "limit": 5
+              },
+              "label": "inspect the 5 most recent recorded opacity commands",
+              "output": {
+                "entries": [],
+                "retentionLimit": 32
+              }
+            },
+            "handlerKey": "application.diagnostics.inspect",
+            "id": "diagnostics",
+            "input": {
+              "additionalProperties": false,
+              "properties": {
+                "limit": {
+                  "description": "Most recent N entries only. Omit for every retained entry (bounded to the 32-entry retention window regardless).",
+                  "maximum": 32,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "output": {
+              "additionalProperties": false,
+              "properties": {
+                "entries": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "operation": {
+                        "type": "string"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "revision": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "requestId",
+                      "operation",
+                      "revision",
+                      "ok"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "retentionLimit": {
+                  "description": "The trace ring buffer bound (T05); entries never exceeds this.",
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "entries",
+                "retentionLimit"
+              ],
+              "type": "object"
+            },
+            "schemaVersion": 1,
+            "units": {},
+            "version": 1
           }
         ]
       },

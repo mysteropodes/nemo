@@ -14,13 +14,35 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
+  var browserImportDepth = new WeakMap();
+  function hasNativeHost(root) {
+    return !!(root && root.__TAURI__ && root.__TAURI__.core &&
+      typeof root.__TAURI__.core.invoke === 'function');
+  }
   function allowLegacyWrite(root, kind, central) {
     try {
       if (central !== undefined) return typeof central === 'function' && central(kind) === true;
       var admission = root && root.NemoNativeOpacityLegacyAdmission;
-      return admission === undefined || !!admission && typeof admission.allow === 'function' &&
+      if (admission !== undefined) return !!admission && typeof admission.allow === 'function' &&
         admission.allow(kind) === true;
+      // Browser/WASM has no admitted native opacity owner. Import may build a
+      // read-side fixture, but edits must not revive the JavaScript writer.
+      if (!hasNativeHost(root)) return kind === 'document-import' ||
+        kind === 'create-layer' && (!root.NemoApplication || (browserImportDepth.get(root) || 0) > 0);
+      return true;
     } catch (_) { return false; }
+  }
+  function installBrowserReadOnlyImport(root) {
+    if (hasNativeHost(root) || !root || !root.SM || typeof root.SM.importJSON !== 'function') return;
+    var original = root.SM.importJSON;
+    root.SM.importJSON = function (json) {
+      // JSON.parse coerces objects before validating them. A user-defined
+      // toString could reenter a writer while import has create-layer access.
+      if (typeof json !== 'string') return false;
+      browserImportDepth.set(root, (browserImportDepth.get(root) || 0) + 1);
+      try { return original.apply(this, arguments); }
+      finally { browserImportDepth.set(root, browserImportDepth.get(root) - 1); }
+    };
   }
   function requireLegacyWrite(root, kind, central) {
     if (allowLegacyWrite(root, kind, central)) return true;
@@ -100,6 +122,79 @@
       if (root.NemoOpacityApplication.legacy === legacy) root.NemoOpacityApplication.legacy = original.legacy;
     };
   }
+  var projectionStateFields = ['canvasW', 'canvasH', 'canvasBg', 'fps', 'totalFrames',
+    'waIn', 'waOut', 'layers', 'currentFrame', 'activeLayerIdx', 'symbols',
+    'cameraKeys', 'activeSymbolId'];
+  var projectionGlobalFields = ['_curFrame', '_totalF', '_waIn', '_waOut',
+    '_layerSel', '_layerSelAnchor', '_motionCanvasEmptyClick',
+    '_motionExpandedLayer', '_motionExpandedElement', '_motionRevealedLayers',
+    '_motionRevealedElementLayers', '_perObjBoxes', '_nvSelectedLayer',
+    '_idxShadow', 'selectedPaths'];
+  function snapshotUiProjection(root) {
+    function capture(object, fields) {
+      var saved = {};
+      fields.forEach(function (key) { saved[key] = { present: Object.prototype.hasOwnProperty.call(object, key), value: object[key] }; });
+      return saved;
+    }
+    var paper = root.userLayers && root.userLayers.length === 1 ? root.userLayers[0] : null;
+    return { state: capture(root.state, projectionStateFields), globals: capture(root, projectionGlobalFields),
+      selectionFrames: root._sel && root._sel.frames,
+      paper: paper && { group: paper, present: Object.prototype.hasOwnProperty.call(paper, 'visible'), visible: paper.visible } };
+  }
+  function restoreUiProjection(root, snapshot) {
+    function restore(object, fields) {
+      Object.keys(fields).forEach(function (key) {
+        if (fields[key].present) object[key] = fields[key].value;
+        else delete object[key];
+      });
+    }
+    restore(root.state, snapshot.state);
+    restore(root, snapshot.globals);
+    if (root._sel) root._sel.frames = snapshot.selectionFrames;
+    if (snapshot.paper && root.userLayers && root.userLayers[0] === snapshot.paper.group) {
+      if (snapshot.paper.present || snapshot.paper.visible !== undefined) snapshot.paper.group.visible = snapshot.paper.visible;
+      else delete snapshot.paper.group.visible;
+    }
+  }
+  function validatedProjection(root, document) {
+    var prepared = root.SMProjectDocument.prepareNativeOpacity(document);
+    if (!root.userLayers || root.userLayers.length !== 1 ||
+        !root.userLayers[0] || !Array.isArray(root.userLayers[0].children)) {
+      throw new Error('Native UI projection requires one stable Paper group');
+    }
+    return JSON.parse(JSON.stringify(prepared.shell));
+  }
+  function installUiProjection(root, document) {
+    var view = validatedProjection(root, document);
+    root.userLayers[0].visible = false;
+    var state = root.state;
+    state.canvasW = view.canvasW; state.canvasH = view.canvasH; state.canvasBg = view.canvasBg;
+    state.fps = view.fps; state.totalFrames = view.totalFrames;
+    state.waIn = view.waIn; state.waOut = view.waOut;
+    state.layers = view.layers; state.symbols = view.symbols; state.cameraKeys = view.cameraKeys;
+    state.activeSymbolId = null;
+    state.currentFrame = 0; state.activeLayerIdx = 0;
+    root._curFrame = 0; root._totalF = view.totalFrames;
+    root._waIn = view.waIn; root._waOut = view.waOut;
+    root._layerSel = [0]; root._layerSelAnchor = 0;
+    root._motionCanvasEmptyClick = false;
+    root._motionExpandedLayer = null; root._motionExpandedElement = null;
+    root._motionRevealedLayers = []; root._motionRevealedElementLayers = [];
+    root._perObjBoxes = null; root._nvSelectedLayer = null;
+    root._idxShadow = {};
+    if (root._sel) root._sel.frames = [];
+    root.selectedPaths = [];
+  }
+  function refreshUiProjection(root, json) {
+    if (typeof json !== 'string' || !root.state.layers || root.state.layers.length !== 1) {
+      throw new Error('Native UI projection is unavailable');
+    }
+    var view = validatedProjection(root, JSON.parse(json));
+    if (root.state.layers[0].layerUid !== view.layers[0].layerUid) {
+      throw new Error('Native UI projection layer changed identity');
+    }
+    root.state.layers = view.layers;
+  }
   function desktopPorts(root, transport) {
     var tauri = root.__TAURI__, invoke = tauri.core.invoke;
     return Object.freeze({
@@ -124,19 +219,28 @@
       disconnect: function () { return transport.disconnect(); },
       application: function () { return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', transport); },
       release: function (request) { return invoke('nemo_native_release', { request: request }); },
+      replace: function (request) { return invoke('nemo_native_replace', { request: request }); },
       previewHost: function (request) { return invoke('nemo_native_preview', { request: request }); },
       bindOutput: function (request) { return invoke('nemo_native_bind_output', { request: request }); },
       legacyImport: root.SM.importJSON.bind(root.SM),
       capabilities: function () { return root.NemoApplication.capabilities(); },
       currentFrame: function () { return root.state.currentFrame; },
       afterChange: function () {
-        if (root.renderLayerList) root.renderLayerList();
-        if (root.renderTimeline) root.renderTimeline();
         if (root.updateUI) root.updateUI();
         if (root.SMEngineBridge) root.SMEngineBridge.renderNow();
       },
       sleep: function (ms) { return new Promise(function (resolve) { root.setTimeout(resolve, ms); }); },
       surface: Object.freeze({
+        snapshotUiProjection: function () { return snapshotUiProjection(root); },
+        installUiProjection: function (document) { return installUiProjection(root, document); },
+        restoreUiProjection: function (snapshot) { return restoreUiProjection(root, snapshot); },
+        refreshUiProjection: function (json) { return refreshUiProjection(root, json); },
+        paintUiProjection: function () { if (root.updateUI) root.updateUI(); },
+        blockPublication: function () {
+          var start = root.document.getElementById('start-screen');
+          if (start) start.classList.remove('hid');
+          if (root.showToast) root.showToast('Native project replacement could not be verified; reopen Nemo before editing.');
+        },
         installGuard: function (controller) {
           if (!root.SMEngineBridge || typeof root.SMEngineBridge !== 'object') {
             throw new Error('native opacity cutover requires the accepted engine bridge');
@@ -171,6 +275,7 @@
   }
 
   return Object.freeze({ allowLegacyWrite: allowLegacyWrite, requireLegacyWrite: requireLegacyWrite,
+    installBrowserReadOnlyImport: installBrowserReadOnlyImport,
     allowProjectTransition: allowProjectTransition,
     releaseProjectTransition: releaseProjectTransition,
     wrapWriter: wrapWriter,

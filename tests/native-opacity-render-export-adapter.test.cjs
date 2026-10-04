@@ -69,6 +69,34 @@ test('preview binds immutable metadata, discards stale work, presents newest, an
   assert.throws(() => adapter.register({ ...PREVIEW_METADATA, documentSnapshotId: 'other' }, { workId: 'work-2', viewGeneration: 2 }), /rebound|generation/i);
   adapter.dispose(); adapter.dispose();
   assert.throws(() => adapter.register(PREVIEW_METADATA, { workId: 'work-3', viewGeneration: 3 }), /disposed/i);
+  const superseded = create();
+  superseded.register(PREVIEW_METADATA, { workId: 'work-4', viewGeneration: 4 });
+  assert.equal(superseded.receive({ workId: 'work-4', viewGeneration: 4,
+    status: 'stale-discarded' }).status, 'stale-discarded');
+});
+
+test('awaited adapter permits active deferred work to present but rejects terminal receipt replay', async () => {
+  const adapter = preview.createNativeOpacityPreviewAdapter();
+  const hostReceipts = [
+    { workId: 'work-1', viewGeneration: 1, status: 'deferred-timeout' },
+    { workId: 'work-1', viewGeneration: 1, status: 'presented' },
+    { workId: 'work-1', viewGeneration: 1, status: 'presented' },
+  ];
+  const requests = [];
+  const host = async (request) => { requests.push(request); return hostReceipts.shift(); };
+  const present = () => adapter.present('instance-1', 2, PREVIEW_METADATA, host, () => {});
+  assert.equal((await present()).status, 'deferred-timeout');
+  const receipt = await present();
+  assert.equal(receipt.status, 'presented');
+  assert.equal(receipt.lifecycleGeneration, 2);
+  assert.equal(receipt.instanceId, 'instance-1');
+  assert.equal(Object.isFrozen(receipt), true);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[0], requests[1], 'host may deduplicate active same-key work');
+  await assert.rejects(present(), /terminal preview receipt/);
+  assert.equal(requests.length, 3);
+  assert.strictEqual(adapter.receive({ workId: 'work-1', viewGeneration: 1, status: 'presented' }).status,
+    'presented', 'the existing receipt observer remains idempotent');
 });
 
 test('preview/export inputs reject recursive pixels and never traffic full-frame JS data', () => {

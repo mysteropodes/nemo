@@ -394,6 +394,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'codec::decode_project', 'desktop_viewport::CssBounds', 'desktop_viewport::PhysicalExtent',
       'desktop_viewport::ViewportMapping', 'document::OpacityDocument', 'export_job::CleanupStatus',
       'export_job::ExternalEffectDisposition', 'export_job::JobReceipt', 'export_job::JobStatus',
+      'render_geometry::ClosedCubicPath', 'render_geometry::CubicSegment',
       'render_scene::GeometryPaintInput', 'render_scene::LayerGeometry', 'render_scene::OpaqueSrgbPaint',
       'resource_leases::WorkId', 'scheduler::OutputSpec'],
     'rust.desktop.native.application.viewport': [
@@ -409,7 +410,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'resource_leases::FrameFailure', 'resource_leases::FrameFailureKind', 'resource_leases::WorkId',
       'scheduler::EvaluationKey', 'scheduler::FrameScheduler'],
     'rust.desktop.native.application.commands': ['compositor::Compositor'],
-    'rust.desktop.native.application.tests': ['compositor::Compositor'],
+    'rust.desktop.native.application.tests': [
+      'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
     'rust.desktop.native.dispatch': [
       'application::ExportResourceResolver', 'application::NativeApplication',
       'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',

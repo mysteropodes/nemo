@@ -20,8 +20,8 @@
       "id": "rust.native.engine.codec",
       "layer": "native-codec",
       "dir": "native-engine/src",
-      "files": ["codec.rs"],
-      "publicApi": ["codec.rs"],
+      "files": ["codec.rs", "project_structure.rs"],
+      "publicApi": ["codec.rs", "project_structure.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -60,8 +60,8 @@
       "id": "rust.native.engine.evaluation",
       "layer": "native-evaluation",
       "dir": "native-engine/src",
-      "files": ["evaluation.rs"],
-      "publicApi": ["evaluation.rs"],
+      "files": ["evaluation.rs", "animation_curve.rs"],
+      "publicApi": ["evaluation.rs", "animation_curve.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -84,8 +84,8 @@
       "id": "rust.native.engine.render-scene",
       "layer": "native-render-scene",
       "dir": "native-engine/src",
-      "files": ["render_scene.rs"],
-      "publicApi": ["render_scene.rs"],
+      "files": ["render_scene.rs", "render_geometry.rs"],
+      "publicApi": ["render_scene.rs", "render_geometry.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -132,7 +132,7 @@
       "id": "rust.native.engine.application",
       "layer": "native-application",
       "dir": "native-engine/src",
-      "files": ["application.rs", "application_replacement.rs"],
+      "files": ["application.rs", "application_construction.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_bundle.rs", "reproduction_replay.rs", "reproduction_catalog.rs"],
       "publicApi": ["application.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "project_structure.rs", "render_geometry.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
@@ -231,6 +231,7 @@
       "dir": "src-tauri/src",
       "files": [
         "application_mcp_tests.rs",
+        "application_mcp_diagnostics_tests.rs",
         "native_revision_sync_tests.rs"
       ],
       "publicApi": [],
@@ -277,7 +278,8 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_contract.rs",
-        "native_application_contract_fingerprints.rs"
+        "native_application_contract_fingerprints.rs",
+        "native_application_geometry.rs"
       ],
       "publicApi": [
         "native_application_contract.rs"

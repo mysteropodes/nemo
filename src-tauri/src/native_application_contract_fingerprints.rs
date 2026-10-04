@@ -88,6 +88,14 @@ mod tests {
         });
         let typed: NativeReplacementRequest = serde_json::from_value(base.clone()).unwrap();
         let fingerprint = replacement_fingerprint(&typed).unwrap();
+        // Frozen pre-N24B typed bytes: omitted path adds no field or null value.
+        assert_eq!(std::str::from_utf8(&fingerprint).unwrap(), concat!(
+            "{\"apiVersion\":2,\"requestId\":\"replace-a\",\"instanceId\":\"instance-a\",",
+            "\"documentId\":\"document-a\",\"expectedRevision\":0,\"projection\":{\"a\":1,\"z\":2},",
+            "\"resources\":[{\"resourceId\":\"geometry-a\",\"resourceVersion\":\"v1\",\"layers\":[",
+            "{\"layerUid\":\"layer-a\",\"bounds\":[0.0,0.0,10.0,10.0],",
+            "\"transform\":[1.0,0.0,0.0,1.0,0.0,0.0],\"paint\":{\"red\":255,\"green\":0,\"blue\":0}}]}]}"
+        ));
         let reordered: NativeReplacementRequest = serde_json::from_str(&format!(
             "{{\"resources\":{},\"projection\":{{\"a\":1,\"z\":2}},\"expectedRevision\":0,\"documentId\":\"document-a\",\"instanceId\":\"instance-a\",\"requestId\":\"replace-a\",\"apiVersion\":{}}}",
             base["resources"], NATIVE_API_VERSION)).unwrap();
@@ -143,5 +151,29 @@ mod tests {
             replacement_fingerprint(&typed).unwrap_err().code,
             "invalid_request"
         );
+    }
+
+    #[test]
+    fn cubic_controls_participate_in_canonical_retry_identity() {
+        let base = json!({
+            "apiVersion":2,"requestId":"replace-cap","instanceId":"fixture",
+            "documentId":"document","expectedRevision":0,"projection":{},
+            "resources":[{"resourceId":"cap","resourceVersion":"v1","layers":[{
+                "layerUid":"layer","bounds":[40,40,80,80],"transform":[1,0,0,1,0,0],
+                "paint":{"red":255,"green":0,"blue":0},
+                "path":{"version":1,"closed":true,"segments":[
+                    {"point":[40,40],"handleIn":[0,0],"handleOut":[0,40]},
+                    {"point":[80,40],"handleIn":[0,40],"handleOut":[0,0]}
+                ]}
+            }]}]
+        });
+        let typed: NativeReplacementRequest = serde_json::from_value(base.clone()).unwrap();
+        let first = replacement_fingerprint(&typed).unwrap();
+        let retry: NativeReplacementRequest = serde_json::from_slice(&first).unwrap();
+        assert_eq!(first, replacement_fingerprint(&retry).unwrap());
+        let mut changed = base;
+        changed["resources"][0]["layers"][0]["path"]["segments"][0]["handleOut"] = json!([1, 40]);
+        let changed = serde_json::from_value(changed).unwrap();
+        assert_ne!(first, replacement_fingerprint(&changed).unwrap());
     }
 }

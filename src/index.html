@@ -2302,7 +2302,12 @@
 <script src="js/ui.js"></script>
 <script src="js/color-picker.js"></script>
 <script src="js/application/native-opacity-contract.js"></script>
+<script src="js/application/native-opacity-replacement.js"></script>
+<script src="js/application/native-opacity-export-workflow.js"></script>
+<script src="js/application/native-opacity-preview-workflow.js"></script>
+<script src="js/application/native-opacity-v1.js"></script>
 <script src="js/application/native-opacity-lifecycle.js"></script>
+<script src="js/application/native-opacity-viewport.js"></script>
 <script src="js/application/native-opacity-operations.js"></script>
 <script src="js/application/opacity-application.js"></script>
 <script src="js/adapters/native-opacity-legacy-surface.js"></script>
@@ -2355,6 +2360,7 @@
 <script src="js/labs/retime-exposure.js"></script>
 <script src="js/labs/interval-assistant.js"></script>
 <script src="js/labs/xsheet-panel.js"></script>
+<script src="js/labs/diagnostics-panel.js"></script>
 <script src="js/labs/out-of-pegs.js"></script>
 <script src="js/labs/mirror-check.js"></script>
 <script src="js/labs/vector-trim.js"></script>
@@ -2383,6 +2389,14 @@
 <script src="js/text-selector.js"></script>
 <script src="js/animation/curve.js"></script>
 <script src="js/domain/animation/opacity.js"></script>
+<!-- Bounded write-trace and replay-envelope preparation (T05): consumed by
+     opacity-application.js's diagnostics.trace / diagnostics.replay handling.
+     It cannot sit next to its consumer: N20 freezes the exact script ordinals
+     of the native-opacity chain (boundaries-application.test.cjs), and the
+     7 tags before js/app.js are asserted contiguous. Loading before the first
+     create() call -- made by bootstrap/opacity-application.js -- is the real
+     requirement, and this position satisfies it. -->
+<script src="js/domain/diagnostics/opacity-diagnostics.js"></script>
 <script src="js/domain/animation/expression-time.js"></script>
 <script src="js/domain/animation/expression-random.js"></script>
 <script src="js/adapters/motion-canvas-intent.js"></script>
@@ -2444,6 +2458,7 @@
 <script src="js/vectorize-bridge.js"></script>
 <script src="js/project-entry.js"></script>
 <script src="js/adapters/project-native-save.js"></script>
+<script src="js/adapters/native-opacity-project-entry.js"></script>
 <script src="js/project.js"></script>
 <script src="js/feedback-bridge.js"></script>
 <script src="js/history-panel.js"></script>
@@ -2504,5 +2519,6 @@
 <script src="js/bootstrap/opacity-application.js"></script>
 <script src="js/bootstrap/native-opacity-application.js"></script>
 <script src="js/adapters/application-mcp.js"></script>
+<script src="js/adapters/native-diagnostics-query.js"></script>
 </body>
 </html>

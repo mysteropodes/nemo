@@ -200,8 +200,14 @@ Every reviewed claim carries its evidence and is validated by shape:
   spans (three responsibility mappings and one comment boundary), P03C-h/#1427 dispositioned
   four Motion comment/blank preambles, P03C-i/#1430 dispositioned nine Motion expression spans,
   P03C-j/#1433 mapped two Motion key-selection/curve-widget spans, and P03C-k/#1436 dispositioned
-  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans, and
-  P03C-m/#1440 dispositioned eleven MCP contract spans; 102 spans remain undispositioned.
+  five Tween assignment-seam spans, P03C-l/#1438 dispositioned eight Project lifecycle spans,
+  P03C-m/#1440 dispositioned eleven MCP contract spans, and P03C-ae/#1482 dispositioned three
+  `engine-bridge.js` render-entry/boundary spans. P03C-af/#1484 dispositions four more
+  `engine-bridge.js` spans; 33 spans remained undispositioned at that snapshot. P03C-ag/#1486
+  dispositions the final two C03 module headers; 31 spans remained undispositioned at that
+  snapshot. P03C-ah/#1489 dispositions the final six frozen `motion.js` spans; 25 remained
+  at that snapshot. P03C-ai/#1491 dispositions six frozen `tweens.js` spans; 19 remained.
+  P03C-aj/#1493 dispositions two frozen `linked-media.js` spans; 17 remain.
 
 `complete: true` is accepted only when no packet is pending, no note needs reconciliation, no
 executable path is undispositioned and every span is dispositioned. Today the gate exits 1
@@ -304,12 +310,316 @@ P03C-y/#1468 marks frozen `geometry-wasm/src/tween.rs:1-16` as a structural prea
 boundary before pending `C03.wasm-geometry-ops.tween-interpolation-math` at line 17: lines 1-13
 are comments, 14-15 are executable imports, and 16 is blank. It does not extend the boundary into
 the packet or accept it; tween.rs/global computed uncovered counts remain 15/7 185.
-**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 56
+P03C-z/#1470 marks frozen `src/js/playback-cache.js:1-19` as a comment-only boundary: the
+descriptive playback-bake header ends before the executable module IIFE and pending
+`C03.js-effects-and-playback.playback-bake-cache` packet begins at line 20. It claims no covered
+playback behavior or packet acceptance; playback-cache.js/global uncovered counts remain 19/7 185.
+P03C-aa/#1474 maps frozen `src/js/export.js:369-376` (`exportFrameRange`) to pending
+`C05.export.frame-compositor`, and `570-598` (`exportRenderPNGsToDir`) to pending
+`C05.export.tauri-io-ffmpeg`, with its separate engine-routing branch accounted for by the
+pending routing-gate packet. It marks `873-883` as the Lottie comment boundary before
+`lottieHexToRGBA` at 884, then maps line 1255 (blank), 1256 (section heading) and the
+`window.SMExport` facade at 1257-1389 to the applicable pending C05 frame-compositor, Tauri-I/O,
+browser fallback and Lottie packets; the Rive exporter separately augments that facade from
+`rive-export.js`. Accepted P17/#1019 and P18/#1020 remain narrow wrapper/job provenance only.
+These are responsibility and boundary records, not packet admission, numeric coverage or
+export/runtime parity acceptance. The frozen `export.js` uncovered count remains 186 and the
+global count remains 7 185. P03C-ab/#1476 maps frozen `src/js/bootstrap/opacity-application.js`
+spans 30, 40-41 and 44-54 to the still-pending `C07.application-service.bootstrap-bindings`:
+line 30 reuses or creates the capability registry; 40-41 supply the `afterMutation` and
+`capabilities` ports; 44-48 are P06 comments describing opacity self-registration and per-request
+registry dispatch; 49 registers `NemoOpacityCapability`; 50 opens `root.NemoApplication`; 51
+dispatches by the opacity descriptor ID; 52-53 expose `setInstanceId` and `capabilities`; and 54
+closes the object. P05 registry and P06 opacity-registration provenance do not accept C07.
+These are responsibility mappings only: the bootstrap file's 13 uncovered code lines, 762
+pending packets and global 7 185 computed uncovered code lines are unchanged.
+P03C-ac/#1478 maps four frozen C03 spans to pending census responsibilities: `engine.rs:1056-1059`
+to `C03.gpu-engine-core.effect-pipeline-library`, `engine.rs:2741-2771` to
+`C03.gpu-engine-core.composite-scene-pipeline`, the explicitly named `circle_lens_tests` oracle
+at `fill.rs:1000-1037` to `C03.wasm-tween-matching.fill-region-tracer`, and `interp.rs:1-33`
+(including its imports and `FLOW_MAX_SIDE`) to `C03.wasm-geometry-ops.motion-flow-interp`.
+These are responsibility mappings only: all four packets remain pending, and no production
+migration, packet admission or numeric coverage is claimed. The 48 previously undispositioned
+spans become 44; all 762 packets remain pending, computed uncovered lines remain 7 185, and the
+scope remains incomplete.
+P03C-ad/#1480 maps frozen `src-tauri/src/lib.rs:1-13` to the pending C05 composition-root
+responsibility and `178-284` to `run()`'s plugin, command, menu and setup wiring. The `run()`
+call to `start_tablet_pressure_monitor` does not map the monitor implementation. Lines 49-89
+are a boundary because they mix historical comments about removed feedback-token routing with
+Google-font command rationale; they are not assigned to one packet. Lines 131-137 are the
+comment/blank preamble before the tablet-pressure monitor function at 138. These records are
+responsibility/boundary mappings only: C05 remains pending, no implementation or runtime
+acceptance is claimed, the frozen `lib.rs` computed uncovered code lines remain 151, and global
+computed uncovered code lines remain 7 185. The 44 previously undispositioned spans become 40;
+all 762 packets remain pending and the scope remains incomplete.
+P03C-ae/#1482 maps frozen `src/js/engine-bridge.js:4257-4274` (renderNow preamble and
+`viewportRafId`) and `4355-4381` (effects-export rationale and saved render state) to the still-
+pending `C03.js-engine-bridge.render-entry-points` responsibility. It marks `4482-4492` as the
+comment-only second-viewer boundary before the public `window.SMEngineBridge` API at 4493. These
+records cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`; they add no packet admission, numeric range
+coverage or runtime/render/export acceptance. The engine-bridge uncovered count remains 226 and
+global computed uncovered code lines remain 7 185. The 40 previously undispositioned spans become
+37; all 762 packets remain pending and the scope remains incomplete. P03C-af/#1484 dispositions
+the remaining frozen `src/js/engine-bridge.js` spans: `1-10`, `260`, and `4618-4628` are
+comment-only boundaries (the last immediately precedes `autoEnable` at 4629); `91-224` maps
+jointly to pending `C03.js-engine-bridge.render-entry-points` and `engine-lifecycle` for suspended
+render scheduling, `build-scene-json` and `editor-overlay-builders` for color/coordinate rounding
+and scene/overlay serialization, `bounded-image-store` for `registeredImageIds`, and
+`retained-path-store` for its rationale. This explicitly mixed span is not assigned wholesale to
+one packet. The frozen source and C03 census pins remain unchanged; all six cited packets remain
+pending, and no packet admission, computed coverage, or runtime/render acceptance is claimed.
+Engine-bridge retains 226 computed uncovered code lines but has zero undispositioned spans; global
+computed uncovered code remains 7 185. The 37 previously undispositioned spans become 33; all 762
+packets remain pending and the scope remains incomplete.
+P03C-ag/#1486 marks frozen `geometry-wasm/src/timeline.rs:1-13` as a structural boundary:
+lines 1-10 document frame-resolution provenance, 11-12 import `serde`/`wasm_bindgen`, and 13 is
+blank; pending `C03.wasm-geometry-ops.timeline-frame-resolution` starts its implementation at 14.
+It marks frozen `src/js/render-manager.js:1-33` as a comment-only boundary before the batch-queue
+IIFE starts at 34 under pending `C03.js-effects-and-playback.render-manager-queue`. Both records
+cite source `3f6eed2a500f2ce868b711e063816029eb8fefa5` and pinned C03 census blob
+`337c9035f94f5290b2adf898d406550558560bfa`. The two spans add no separate responsibility,
+packet admission, numeric coverage, or native/browser/Tauri/render/export acceptance. The 33
+previously undispositioned spans become 31, with zero C03 spans remaining; all 762 packets stay
+pending and global computed uncovered code remains 7 185.
+P03C-ah/#1489 dispositions all six remaining frozen `src/js/motion.js` spans. `561-580` maps
+the time-link reload helper and `PROP_DIM_LABELS` to pending C02 property metadata while its
+duplicator comments lead into the separate C02 duplicator packet at 581. `13351-13352` is
+the structural `window.SMMotion` API opening. The four interleaved export spans
+`13372-13394`, `13455-13476`, `13565-13621`, and `13808-13825` map their exact operations
+to pending C02/C20 expression, property, transform, selection, Motion UI, text animator,
+element-style and key-writing packets as recorded beside each span in the JSON index. These
+responsibility mappings cite frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+motion blob `6617bac29042c22399cac202bf054c09e4fdf30e`, and pinned C02/C20 census
+packets. Historical C02 numeric-range drift is left untouched. No packet is admitted and no
+code, browser, Tauri, native, render or export behavior is accepted. The 31 previously
+undispositioned spans become 25, with zero `motion.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `motion.js` retains 293
+computed uncovered code lines and 190 overlapping lines.
+P03C-ai/#1491 dispositions all six remaining frozen `src/js/tweens.js` spans. `1-103` maps
+the feature flags to the pending C02 matching, resampling and interpolation packets by their
+actual read sites; notably `TW_CORRECTION_PASS` is read in `_applyFoldCorrection` under the
+resampling packet. The mixed `1564-1958` span maps UID-keyed easing, shared scalar `lerp`,
+persistent tween-arc handles/rekey, style and intrinsic interpolation, crossing probes and
+MLS preparation to separate C02 generation, arc, interpolation and resampling
+responsibilities using frozen `generateTweens`, `renderArcs` and `interpStroke` callers.
+`3735-3742` maps keyframe stroke-ID deduplication used by tween generation. `4810-4811` and
+`4977-4979` map the frame-only capture/apply seams to pending C01 undo/redo, with P21's
+extracted entry as context only. `4992-5016` splits the redo branch from manual reassignment
+lead-in and `_reassign` state. The JSON records the exact subrange evidence against frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, tweens blob
+`6eca7339bbd608b98676b600c9e2f42ca9ce1863`, and pinned C01/C02 censuses. Their
+older numeric-range drift is unchanged. These responsibility mappings admit no packet and
+accept no code, browser, Tauri, native, render, export or history behavior. The 25 previously
+undispositioned spans become 19, with zero `tweens.js` spans remaining; all 762 packets stay
+pending, global computed uncovered code remains 7 185, and frozen `tweens.js` retains 516
+computed uncovered code lines and 158 overlapping lines.
+P03C-aj/#1493 dispositions the two remaining frozen `src/js/linked-media.js` spans. The
+`1-39` comment-only boundary describes the media-mode, linked-reference and persistence/cache
+contract before executable code begins at 40; its historical claims do not establish current
+behavior. The mixed `751-774` public facade maps resolver/cache/handle/relink exports,
+including `readLinkedDesktop` at 758, to pending `C05.media.linked-resolve-core`; conversion
+exports to pending `C05.media.linked-bulk-convert`; and `syncUI` to pending
+`C05.media.mode-setting-ui`. Frozen `app.js`, `images.js`, `media-library.js`,
+`native-video-bridge.js` and `timeline.js` callers support that split. The old C05 census
+does not list `readLinkedDesktop` and its approximate numeric ranges drift; its blob pin
+`725d7875da509cd99a77bc404fc62296280399a0` remains unchanged. The JSON records
+the precise evidence against frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`
+and linked-media blob `ba81900d0ea1805fc206fc19ce992674522de6c5`. No packet is
+admitted and no linked-media, browser, Tauri, render, export or persistence behavior is
+accepted. The 19 previously undispositioned spans become 17, with zero `linked-media.js`
+spans remaining; all 762 packets stay pending, global computed uncovered code remains 7 185,
+and frozen `linked-media.js` retains 61 computed uncovered code lines.
+P03C-ak/#1498 dispositions the frozen `src/js/feedback-bridge.js:572-596` mixed public
+`window.SMFeedback` facade. Its action/click trail, local read and local approval/resolution/
+deletion exports map to pending `C04b.content-tools.feedback-local-log-storage`; the
+`submitFeedback` export bridges that local write and pending
+`C04b.content-tools.feedback-worker-publish`; its declared range also contains the
+best-effort team-Sync write paired with the incoming flow. Incoming team-Sync and GitHub token/issue
+triage exports map to pending `C04b.content-tools.feedback-triage-sync`; incoming import
+uses the local store without making the whole facade a local-storage packet. The JSON
+records exact frozen export and definition lines against source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+feedback-bridge blob `b87a6fc24b20f136c05df123d772b224e81ba212` and pinned C04b census
+blob `f76259d59dedb715edc18b9f84db98ac00ee7cb8`. Its older range declarations stay
+unchanged. The 17 previously undispositioned spans become 16, with zero feedback-bridge
+spans remaining; all 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen feedback-bridge retains 23 computed uncovered code lines. No packet,
+feedback delivery or browser/Tauri behavior is accepted.
+P03C-al/#1500 marks frozen `src/js/vectorize-bridge.js:72-77` as a structural
+`boundary`: line 72 is blank and lines 73-77 explain the vtracer absolute-control to
+Paper.js relative-handle conversion before executable `splineToSegments` begins at 78.
+That function remains in pending `C04b.content-tools.vectorize-shape-fitting`; the
+original C04b range starts at 78 and its pin stays unchanged. The JSON cites frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, vectorize blob
+`3d1e3f817e981cdebc86919502515da64663157e` and C04b census blob
+`f76259d59dedb715edc18b9f84db98ac00ee7cb8`. The 16 previously undispositioned
+spans become 15, with zero vectorize-bridge spans remaining. All 762 packets stay
+pending, global computed uncovered code remains 7 185 and frozen vectorize-bridge
+retains 5 computed uncovered code lines. No packet or runtime behavior is accepted.
+
+P03C-am/#1506 maps frozen `nemo-mcp/src/lib.rs:2-3` to the pending
+`C07.mcp-server.binary-entrypoint` module-root responsibility: the executable
+`capabilities` and `capability_contract` declarations were added by P07 source
+commits `35d7eac66` and `bd907d230`. C07's pinned `lib.rs:1-7` range and
+module-root description support the `covered` responsibility disposition;
+neither module body nor the packet is admitted. The JSON pins this finding to
+frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, `lib.rs` blob
+`2d8f0dd07102d3b2aa1df154b84fcba7eeae5247` and C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. The current protected
+`lib.rs` contains a later `native_contract` declaration and has a different
+blob; this disposition does not classify the current whole file. The 15
+previously undispositioned spans become 14, with zero frozen `lib.rs` spans
+remaining. All 762 packets stay pending, global computed uncovered code remains
+7 185 and frozen `lib.rs` retains 2 computed uncovered code lines. No MCP
+functionality, numeric range coverage or runtime behavior is accepted.
+
+P03C-an/#1508 marks frozen `src/js/layer-inout.js:1-22` as a structural and
+documentary `boundary`. Lines 1-11 and 13-22 are comments, but line 12 is the
+executable `(function () {` IIFE opener enclosing all three pending C02
+layer-inout responsibilities; it is not comment-only or a separate feature
+writer. `inPointOf`/`outPointOf` first begin at line 23 in pending
+`C02.layer-inout.bar-rendering`, with the selection/marquee and drag/batch
+packets owning later areas. The whole preamble is not assigned solely to bar
+rendering. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, layer-inout blob
+`131156e2f419e17e8669c1980c3ae0f77164e786` (also current protected) and
+pinned C02 census blob `3e920d4f112028ed486df697b5885aa4c67df316`.
+The 14 previously undispositioned spans become 13, with zero frozen
+`layer-inout.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `layer-inout.js` retains 74
+computed uncovered code lines. No numeric range coverage, layer behavior,
+browser/Tauri/export or runtime acceptance is claimed.
+
+P03C-ao/#1510 marks frozen `src/js/select-bridge.js:1-23` as a structural and
+documentary `boundary`: lines 1-22 are comments, but line 23 is the executable
+`(function () {` IIFE opener enclosing all pending C04a Select responsibilities.
+It is not comment-only or assigned solely to `C04a.select.hover-helpers`, whose
+first census range starts at line 24. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, select-bridge blob
+`a831eb065ed611f70a77692c61846eaddcd97a5a` and pinned C04a census blob
+`8ffb669c5018190bd448b787a09ade35bd594b30`. The current protected
+`select-bridge.js` has a different blob, so this disposition classifies only
+the frozen span. The 13 previously undispositioned spans become 12, with zero
+frozen `select-bridge.js` spans remaining. All 762 packets stay pending,
+global computed uncovered code remains 7 185 and frozen `select-bridge.js`
+retains 64 computed uncovered code lines. No numeric range coverage, Select
+behavior, browser/native parity or runtime acceptance is claimed.
+
+P03C-ap/#1512 marks frozen `src/js/tools.js:3370-3372` as a comment-only
+`boundary`. Those three lines explain `gapThr` as a plain world-space
+distance, the stroke-end gap still counted as one closed shape, and the Gap
+Size presets without scale/resolution conversion. The separate WASM-path
+comment begins at line 3373 in pending `C04a.fill.find-wasm-js-raster`;
+executable `_wallSegments` begins at 3381. Neither belongs to this span.
+The JSON cites frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`,
+tools blob `3c25962dbe314d5e791489da30b2b642ff899357` and pinned C04a census
+blob `8ffb669c5018190bd448b787a09ade35bd594b30`. Current protected
+`tools.js` has a different blob, so this disposition classifies only the
+frozen span. The 12 previously undispositioned spans become 11, with zero
+frozen `tools.js` spans remaining. All 762 packets stay pending, global
+computed uncovered code remains 7 185 and frozen `tools.js` retains 3
+computed uncovered code lines. No packet admission, numeric range coverage,
+fill behavior, JS/Rust parity or runtime acceptance is claimed.
+
+P03C-aq/#1513 marks frozen `src/js/project.js:1-9` as a structural and
+documentary `boundary`. Lines 1-8 are New/Open/Save/Recent comments; line 9 is
+the executable `(function(){` IIFE opener around the entire project module,
+not comment-only or attributable solely to one C01 packet. First feature
+data `RECENTS_KEY`/`MAX_RECENTS` begins at line 10 in pending
+`C01.project.start-screen`; the opener also encloses the other pending C01
+project responsibilities. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, project blob
+`e2248533b47b0a067a61e4b641f83c7d24b00e79` and pinned C01 census blob
+`d81b618308f9f4849b0ba24fa512af6be90aa72c`. Current protected
+`project.js` has a different blob under native work, so this disposition
+classifies only the frozen span. The 11 previously undispositioned spans
+become 10, with zero frozen `project.js` spans remaining. All 762 packets
+stay pending, global computed uncovered code remains 7 185 and frozen
+`project.js` retains 70 computed uncovered code lines. No packet admission,
+numeric range coverage, project/save/load/browser/Tauri/native behavior or
+runtime acceptance is claimed.
+
+P03C-ar/#1515 maps two frozen `src/js/application/opacity-application.js`
+spans to the accepted P06/#1008 registered-capability discovery seam. Lines
+78-93 define `capabilitySummary()`: it obtains the registry-backed
+`ports.capabilities()`, clones the full descriptors, derives legacy
+`properties` only from descriptors with `property.get`, and returns those
+alongside operations, retention and document identity. Line 96 routes the
+`perform` capabilities operation through that summary. P06 source commit
+`35bcb02392bdd44c8d341c94c3ae6b505eb3379a` introduced both changes;
+the production capability test checks the full export-plus-opacity descriptors,
+opacity-only properties and a fresh registry read. The surrounding `perform`
+command/query route remains in pending `C07.application-service.command-core`;
+the older C07 census described a hard-coded single-opacity response and is
+not being admitted. The JSON cites frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`, opacity core blob
+`d0b10900eb36a43c66237473009027eaa6680d28` and pinned C07 census blob
+`1ccb542a681d1781161e382889dc611b97681f51`. Current protected opacity
+source has a different blob, so these dispositions classify the frozen spans
+only. The 10 previously undispositioned spans become 8, with zero frozen
+opacity-core spans remaining. All 762 packets stay pending, global computed
+uncovered code remains 7 185 and frozen opacity core retains 15 computed
+uncovered code lines. No packet admission, numeric range coverage, capability
+runtime or installed-client behavior is accepted.
+
+## Bounded C01 admissions and residual queue
+
+[P03C-as / #1523](https://github.com/mysteropodes/nemo/issues/1523) admits exactly two
+C01 boundaries: `C01.idb-store.kv` → [P34 / #1520](https://github.com/mysteropodes/nemo/issues/1520)
+under R18.1/#915, and `C01.asset-tree.folder-widget` →
+[P35 / #1521](https://github.com/mysteropodes/nemo/issues/1521) under R18.4/#918.
+These are executable adoption/extraction leaves for existing unclassified modules with
+implicit dependencies, real production consumers and missing direct tests. Admission
+records their whole-file scopes, public API/lifetime contracts, three observable checks
+and known-defect exclusions; it does not claim implementation or accepted behavior.
+
+C01/#1036 remains pinned to source `ded641bd763379f36d629bf1686fcce8a6137a66` and
+census blob `d81b618308f9f4849b0ba24fa512af6be90aa72c`. At the admission base,
+protected `194d275b102a5604bc9ad31281be65c8487bfa5c`, the selected source blobs still
+match that census: `src/js/idb-store.js` is `17fc7be9aba13784625261b496aee7120dc5245b`
+and `src/js/asset-tree.js` is `a9cfc79050e98dd3a194e2eacfdea0c07400cd39`.
+The inventory's own frozen commit, digest, pins and computed range coverage are unchanged.
+
+At the 4 October 2026 readback, both leaves have sole Ilya ownership and Ilya/O
+validation, with Project #2 Blocked / Validation Planned / roadmap Needs work /
+Forecast / Unscheduled. Accepted C01/#1036 is their sole native predecessor. The
+original blocker was the T08/#1057 shared application-profile/provenance slot.
+[T08's source-stage handoff](https://github.com/mysteropodes/nemo/issues/1057#issuecomment-5890957293)
+released its writer slot on 29 September, and
+[T08B's terminal handoff](https://github.com/mysteropodes/nemo/issues/1532#issuecomment-5970737178)
+released its later exclusive shared-file claim on 3 October. The retained Blocked
+board state therefore needs re-evaluation against current capacity and whole-file
+ownership; it does not establish that T08 still holds those files or must close first.
+P34/P35 require fresh board-first Ready review and explicit writer/checkout allocation.
+This inventory change updates neither leaf's board and allocates no implementing
+writer or shared source/profile slot.
+
+The other **eleven C01 packets remain pending**. The following architecture-first
+decompositions are the residual queue from #1523, not source reservations. Live
+characterization, whole-file owner release and ≤90-minute leaf definitions are required
+before Ready; a partial successor never disposes the entire broad packet.
+
+| Pending C01 packet (prefix `C01.` omitted) | Next bounded decomposition and ownership constraint |
+| --- | --- |
+| `project.document-io-and-dirty-tracking` | Separate path/name/dirty-baseline bookkeeping over the existing native serialization port, New/reset orchestration, and file open/save adapters. Serialize whole `project.js` after N20/#1352, N20F–H and N21 owner release. Preserve `NemoNativeOpacityProjectEntry.documentJSON`; do not recreate fixed-revision serialization or a JS document writer. Unsupported families require their own native revision leaves. |
+| `project-document.validation` | [N23A/#1525](https://github.com/mysteropodes/nemo/issues/1525) admits only an immutable Rust structural-codec sub-slice with a production-JS parity oracle and no revision authority. Path helpers and supported-family admission/cutover remain pending. Subtract N20-owned opacity schema/projection/composition; N23A needs a separate Rust registration/wiring slot. |
+| `tweens.undo-redo-engine` | Split full-layer history capture/apply, stack/labels/context policy and native family consumer routing. Exclude accepted P21/#1023 frame-entry work (PR #1171, integrated `b4a4fe249821bc534dd1a63dbb4b037df6455ec3`) and H02/#1059; retain wrong-frame redo and entered-Component limits. N09 already owns native opacity history. Whole `tweens.js` and any `app.js` writes await owner release. |
+| `project.version-history` | Split disk snapshot key/list/retention from restore transactions; preserve native pinned serialization and restore admission. Requires whole `project.js`, replacement port and serializer-contract acceptance. The Untitled shared slug remains a characterized question. |
+| `project.project-tabs` | Split per-tab snapshot/dirty-baseline model, DOM strip and close/switch transitions. Requires the native replacement port and whole `project.js` release; snapshots must not become concurrent writable documents. |
+| `project.close-unsaved-work-guard` | One close-event adapter with injected dirty query/dialog/destroy ports. Verify confirmed destroy does not repeat the close event, cancel preserves the document, and browser beforeunload availability is explicit. Serialize with dirty-baseline and whole `project.js`. |
+| `timeline.autosave-tick` | One stoppable periodic persistence boundary reads one authoritative revision snapshot and sends exact bytes to storage/history, retaining playback skip and timer behavior. Requires serializer/history interfaces and whole `timeline.js` release after P24/#1026 / PR #1473 with native owner coordination; do not enable blocked legacy writes. |
+| `history-panel.ui` | Read/jump presentation over a public history snapshot/command interface after full-layer/stack extraction. The renderer owns DOM only; mutations remain with the accepted authority. Preserve click-time position and known history limits. |
+| `project.start-screen` | Split recent-project storage/list model from New/Open/Resume DOM bindings, preserving N20/N21 first-open/replacement transitions. Requires document I/O, the selected persistence adapter and whole `project.js`; makes no CSS/HTML span decision. |
+| `project.team-sync` | Split shared-folder path/profile storage, publish/list snapshot jobs and merge orchestration. Define the native family boundary of `SM.mergeRemoteSnapshot` outside C01 before writable merge routing; no expanded collaboration infrastructure. |
+| `project-entry.repaint` | First assess whether the existing small, directly tested presentation seam warrants an evidenced covered disposition. Preserve `SMProjectEntry.repaint` and browser/Paper adapter limits. N20D0/N20/N21 owns native viewport presentation; do not invent a duplicate extraction. |
+
+**P03 remains incomplete**: 762 packets total now comprise **760 pending, 2 admitted,
+0 covered and 0 deferred**. `complete:false` remains unchanged; the normal scope gate
+still exits 1 with no notes needing reconciliation, 0 unmapped paths and 8
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the residual `motion.js` spans between adjacent slices as
-`covered`/`boundary` or one last census slice, the small remainders in the original-partition
-files, and `style.css`/`index.html` once Ilya decides census versus `boundary`; split each
-pending packet into ≤90-minute leaves under its family parent or mark it `covered`/`deferred`
-with evidence. The execution plan and leaf issues remain the queue and ownership authority;
-D01 and T05 keep their reservations. No application behavior changes in this index.
+All eight spans are in `style.css`/`index.html` and await Ilya's separate census-versus-
+`boundary` decision. Other pending packets still need bounded leaves under their family
+parents or evidenced `covered`/`deferred` dispositions. The execution plan and live leaf
+issues remain the queue and ownership authority. No C01-family-complete, whole-native-
+engine or whole-remediation denominator, application behavior or runtime acceptance is
+established by these admissions.

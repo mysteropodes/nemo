@@ -10,7 +10,12 @@ const vm = require('node:vm');
 const ProjectDocument = require('../src/js/project-document.js');
 const NativeOpacityContract = require('../src/js/application/native-opacity-contract.js');
 const NativeOpacityLifecycle = require('../src/js/application/native-opacity-lifecycle.js');
+const NativeOpacityReplacement = require('../src/js/application/native-opacity-replacement.js');
+const NativeOpacityExportWorkflow = require('../src/js/application/native-opacity-export-workflow.js');
+const NativeOpacityPreviewWorkflow = require('../src/js/application/native-opacity-preview-workflow.js');
+const NativeOpacityV1 = require('../src/js/application/native-opacity-v1.js');
 const NativeOpacityOperations = require('../src/js/application/native-opacity-operations.js');
+const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
 const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
@@ -272,8 +277,9 @@ function nativeHarness(source, options = {}) {
     async previewHost(request) {
       state.previews.push(request);
       if (options.previewGate) await options.previewGate;
-      return { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
+      const receipt = { workId: `preview-${state.previews.length}`, viewGeneration: state.previews.length,
         status: 'presented' };
+      return options.previewReceipt ? options.previewReceipt(receipt, request, state) : receipt;
     },
     async bindOutput(request) { state.outputs.push(request); },
     currentFrame() { return 10; },
@@ -282,10 +288,13 @@ function nativeHarness(source, options = {}) {
       if (options.afterChange) options.afterChange(controller, state);
     },
     sleep() { return Promise.resolve(); },
-  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract) {
-    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract);
+  }, { contract: NativeOpacityContract, lifecycle: { create(ports, contract, replacement, exportWorkflow) {
+    return state.lifecycle = NativeOpacityLifecycle.create(ports, contract, replacement, exportWorkflow, NativeOpacityPreviewWorkflow);
   } },
-    operations: NativeOpacityOperations, motionSurface: NativeMotionSurface });
+    replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
+    operations: NativeOpacityOperations, v1: NativeOpacityV1,
+    viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -471,7 +480,11 @@ test('retained component app facade keeps admission first and every dependency l
 test('classic startup loads frozen guard modules before the production first-layer creation', () => {
   const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
   const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((match) => match[1]);
-  const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-lifecycle.js',
+  const sequence = ['js/application/native-opacity-contract.js', 'js/application/native-opacity-replacement.js',
+    'js/application/native-opacity-export-workflow.js', 'js/application/native-opacity-preview-workflow.js',
+    'js/application/native-opacity-v1.js',
+    'js/application/native-opacity-lifecycle.js',
+    'js/application/native-opacity-viewport.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
     'js/adapters/native-opacity-legacy-surface.js', 'js/adapters/native-opacity-motion-surface.js',
     'js/domain/component/exposed-properties.js'];
@@ -567,7 +580,10 @@ test('legacy Motion evaluation remains lazy without the surface while native com
   assert.deepEqual(Array.from(motion.SMMotion.valueAtFrame(state.layers[0], 'scale', 0)), [80, 90]);
   motion.sandbox.NemoNativeOpacityCutover = { blocksLegacy: () => true };
   assert.throws(() => motion.SMMotion.valueAtFrame(state.layers[0], 'opacity', 0), /surface is unavailable/);
-  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle, operations: NativeOpacityOperations };
+  const base = { contract: NativeOpacityContract, lifecycle: NativeOpacityLifecycle,
+    replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
+    previewWorkflow: NativeOpacityPreviewWorkflow,
+    operations: NativeOpacityOperations, viewport: NativeOpacityViewport, v1: NativeOpacityV1 };
   for (const surface of [undefined, {}, Object.freeze({ requireAvailable() {} })]) {
     assert.throws(() => OpacityApplication.createNative({}, { ...base, motionSurface: surface }), /Motion surface/);
   }
@@ -1405,6 +1421,119 @@ test('native controller atomically owns evaluation, mutation, history, preview, 
   assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 40);
 });
 
+test('awaited preview resolves only from its current host presentation and shares the boolean preview queue', async () => {
+  let finishHost;
+  const gate = new Promise((resolve) => { finishHost = resolve; });
+  const harness = nativeHarness(staticSource(), { previewGate: gate });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const awaited = harness.state.lifecycle.presentPreview(10);
+  let settled = false;
+  awaited.then(() => { settled = true; });
+  for (let spin = 0; spin < 5 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1);
+  assert.equal(settled, false, 'host presentation is still pending');
+  assert.equal(harness.controller.renderPreview(10), true);
+  assert.equal(harness.state.previews.length, 1, 'the boolean call queues behind the awaited call');
+  finishHost();
+  const presented = await awaited;
+  assert.deepEqual(presented, {
+    instanceId: 'instance-a', lifecycleGeneration: 1,
+    documentSnapshotId: 'native-opacity:native-document-1:0', documentId: 'native-document-1',
+    contentRevision: 0, contextId: 'scene-root', frame: 10, quality: 'final',
+    outputSpec: { kind: 'frame', format: 'rgba8', width: 320, height: 180,
+      colorInterpretation: 'srgb', alphaMode: 'straight' },
+    geometryHandle: harness.prepared.frames[10].geometryHandle,
+    workId: 'preview-1', viewGeneration: 1, status: 'presented',
+  });
+  assert.equal(Object.isFrozen(presented), true);
+  assert.equal(Object.isFrozen(presented.outputSpec), true);
+  assert.equal(Object.isFrozen(presented.geometryHandle), true);
+  await harness.controller.flush();
+  assert.equal(harness.state.previews.length, 2);
+  assert.equal(harness.state.previewConsumers.length, 1, 'both calls use the lifecycle adapter');
+  assert.equal(harness.state.previews[1].documentSnapshotId, presented.documentSnapshotId);
+});
+
+test('awaited preview uses revision-matched metadata after a native revision event', async () => {
+  const harness = nativeHarness(staticSource());
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const before = await harness.state.lifecycle.presentPreview(10);
+  await harness.externalOpacity(55, 'preview-revision-event');
+  const after = await harness.state.lifecycle.presentPreview(10);
+  const mutation = harness.controller.setOpacity('r08_curve_layer', 65);
+  const queued = harness.state.lifecycle.presentPreview(10);
+  await mutation;
+  const afterMutation = await queued;
+  assert.equal(before.contentRevision, 0);
+  assert.equal(after.contentRevision, 1);
+  assert.equal(after.documentSnapshotId, 'native-opacity:native-document-1:1');
+  assert.equal(afterMutation.contentRevision, 2);
+  assert.equal(afterMutation.documentSnapshotId, 'native-opacity:native-document-1:2');
+  assert.equal(after.documentId, before.documentId);
+  assert.equal(after.lifecycleGeneration, before.lifecycleGeneration);
+  assert.notEqual(after.workId, before.workId);
+  assert.deepEqual(harness.state.previews.map(({ contentRevision }) => contentRevision), [0, 1, 2]);
+});
+
+test('awaited preview reports valid non-presented statuses without losing native authority', async () => {
+  for (const status of ['stale-discarded', 'failed-device-lost', 'deferred-occluded']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, status }) });
+    assert.equal(await harness.controller.activate(harness.prepared), true, status);
+    const receipt = await harness.state.lifecycle.presentPreview(10);
+    assert.equal(receipt.status, status);
+    assert.equal(Object.isFrozen(receipt), true, status);
+    assert.equal(harness.controller.status(), 'native', status);
+    assert.equal(harness.state.imports.length, 0, status);
+  }
+});
+
+test('a deferred preview can later present through its still-active host work', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, request, state) {
+    return state.previews.length === 1 ? { ...receipt, status: 'deferred-timeout' }
+      : { workId: 'preview-1', viewGeneration: 1, status: 'presented' };
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const deferred = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(deferred.status, 'deferred-timeout');
+  assert.equal(harness.controller.status(), 'native');
+  const presented = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(presented.status, 'presented');
+  assert.equal(presented.workId, deferred.workId);
+  assert.equal(presented.viewGeneration, deferred.viewGeneration);
+  assert.equal(harness.state.previews.length, 2);
+});
+
+test('malformed host preview receipt fences authority without registering work', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, extra: true }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await assert.rejects(harness.state.lifecycle.presentPreview(10), /receipt/);
+  assert.equal(harness.controller.status(), 'indeterminate');
+  assert.throws(() => harness.state.previewConsumers[0].receive({
+    workId: 'preview-1', viewGeneration: 1, status: 'presented',
+  }), /not registered/);
+});
+
+test('boolean preview consumes a malformed host rejection without an unhandled promise', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, extra: true }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  assert.equal(harness.controller.renderPreview(10), true);
+  await harness.controller.flush();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.controller.status(), 'indeterminate');
+});
+
+test('boolean preview remains fire-and-forget for valid failed and deferred receipts', async () => {
+  for (const status of ['failed-validation', 'deferred-timeout']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, status }) });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    assert.equal(harness.controller.renderPreview(10), true);
+    await harness.controller.flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.controller.status(), 'native', status);
+    assert.equal(harness.state.imports.length, 0, status);
+  }
+});
+
 test('afterChange observes readable post-write caches for UI, v1, and external native mutations', async () => {
   const source = staticSource();
   const observations = [];
@@ -1576,6 +1705,8 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
     String(element.className).includes('motion-val'));
   assert.ok(input && input._listeners.change && input._listeners.change.length === 1,
     'production scrubField installed its opacity change callback');
+  assert.equal(input.dataset.nativeOpacityScrub, 'static',
+    'only the admitted native static opacity row uses the native scrub path');
 
   function commitInput(value) {
     input.value = String(value);
@@ -1607,10 +1738,97 @@ test('rendered opacity input callbacks preserve rapid no-await values and immedi
   assert.equal(harness.state.releases, 0, 'first opacity commands remain native after canvas selection');
   assert.deepEqual(harness.state.history, [25]);
   assert.deepEqual(harness.state.redo, [60]);
+  assert.equal(harness.controller.isActive(), true);
   assert.equal(synchronousRenders, 0, 'native input callbacks defer cache-reading renders to afterChange');
   assert.equal(refreshes, 2, 'activation and the final queued mutation each publish one readable refresh');
   assert.equal(JSON.stringify(source), legacyBytes, 'native UI callbacks never mutate the frozen JS shell');
   assert.equal(JSON.stringify(paperProject), paperBytes, 'native UI callbacks never mutate the Paper mirror');
+
+  // Exercise the shipped generic pointer scrub against the actual rendered
+  // Motion input and native command facade, not a manually invoked callback.
+  const uiSource = fs.readFileSync(path.join(ROOT, 'src/js/ui.js'), 'utf8');
+  const scrubStart = uiSource.indexOf('var scrubState=null;');
+  const scrubEnd = uiSource.indexOf('})();', scrubStart);
+  assert.ok(scrubStart >= 0 && scrubEnd > scrubStart);
+  const scrubListeners = new Map();
+  const nativeScrubIntents = [];
+  const priorLegacyIntent = motion.sandbox.NemoOpacityApplication.legacy;
+  motion.sandbox.NemoOpacityApplication.legacy = (...args) => {
+    nativeScrubIntents.push(args);
+    return priorLegacyIntent(...args);
+  };
+  const scrubDocument = { activeElement: null,
+    addEventListener(type, listener) { scrubListeners.set(type, listener); } };
+  currentInput.closest = (selector) => selector === 'input.scrub' ? currentInput : null;
+  currentInput.min = ''; currentInput.max = '';
+  assert.equal(currentInput._listeners.change.length, 1);
+  currentInput.setPointerCapture = () => {};
+  let scrubChanges = 0;
+  let scrubValueAtChange = null;
+  currentInput.dispatchEvent = (event) => {
+    if (event.type === 'change') { scrubChanges++; scrubValueAtChange = currentInput.value; }
+    for (const listener of currentInput._listeners[event.type] || []) listener(event);
+  };
+  vm.runInNewContext(uiSource.slice(scrubStart, scrubEnd), {
+    document: scrubDocument, window: motion.sandbox, Math,
+    Event: class { constructor(type) { this.type = type; } },
+    requestAnimationFrame() { throw new Error('native pointer scrub dispatched an interim edit'); },
+    cancelAnimationFrame() {},
+  });
+  function pointer(type, x) {
+    scrubListeners.get(type)({ type, target: currentInput, pointerId: 7,
+      clientX: x, preventDefault() {} });
+  }
+  pointer('pointerdown', 100);
+  assert.doesNotThrow(() => pointer('pointermove', 160));
+  assert.equal(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply').length, 2,
+    'pointer movement is tentative and does not enter native history');
+  pointer('pointerup', 160);
+  assert.equal(scrubChanges, 1, 'one release reaches the real Motion change callback');
+  assert.equal(Number(scrubValueAtChange), 55);
+  assert.deepEqual(nativeScrubIntents.map((args) => [args[0], args[2][0]]), [['set', 55]]);
+  assert.equal(Number(currentInput.value), 40, 'field awaits the authoritative native projection');
+  await harness.controller.flush();
+  assert.deepEqual(harness.state.dispatches.filter((request) => request.operation === 'command.document.apply')
+    .map((request) => request.payload.value), [40, 60, 55]);
+  assert.deepEqual(harness.state.history, [25, 40], 'one pointer gesture creates one native history entry');
+  assert.deepEqual(harness.state.redo, [], 'new native command clears the prior redo branch');
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [55]);
+  await harness.controller.historyFromUi('undo', 'ui-undo-pointer-scrub');
+  await harness.controller.flush();
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [40]);
+  await harness.controller.historyFromUi('redo', 'ui-redo-pointer-scrub');
+  await harness.controller.flush();
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [55]);
+  assert.equal(JSON.stringify(source), legacyBytes, 'pointer scrub never mutates the frozen JS shell');
+  assert.equal(JSON.stringify(paperProject), paperBytes, 'pointer scrub never mutates the Paper mirror');
+
+  // A retained field may receive pointerup after an Open replaces its native
+  // session. It must not apply its old drag to the new document.
+  const priorDocumentId = harness.controller.identity().documentId;
+  pointer('pointerdown', 100);
+  pointer('pointermove', 160);
+  await harness.controller.releaseCurrent('replacement-during-opacity-scrub');
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  assert.notEqual(harness.controller.identity().documentId, priorDocumentId);
+  await harness.controller.setOpacity('r08_curve_layer', 80);
+  await harness.controller.flush();
+  const commandsBeforeStaleRelease = harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length;
+  pointer('pointerup', 160);
+  await harness.controller.flush();
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
+  assert.deepEqual(harness.controller.valueAtFrame('r08_curve_layer', 10), [80]);
+  const nativeOwner = motion.sandbox.NemoNativeOpacityCutover;
+  motion.sandbox.NemoNativeOpacityCutover = {
+    ...nativeOwner, identity() { throw new Error('native identity fenced'); },
+  };
+  currentInput.value = '60';
+  assert.doesNotThrow(() => currentInput._listeners.change[0]());
+  motion.sandbox.NemoNativeOpacityCutover = nativeOwner;
+  assert.equal(harness.state.dispatches.filter(
+    (request) => request.operation === 'command.document.apply').length, commandsBeforeStaleRelease);
 });
 
 test('v1 facade rejects stale identity and malformed read payloads as structured failures', async () => {
@@ -2202,6 +2420,87 @@ test('actual bundled transport refreshes UI, save, and release after an external
   assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 55);
 });
 
+test('superseded preview does not poison a subsequent external revision acknowledgment', async () => {
+  let finishPreview;
+  const previewGate = new Promise((resolve) => { finishPreview = resolve; });
+  const harness = nativeHarness(staticSource(), {
+    previewGate,
+    transportFactory: realTauriTransportFactory(),
+  });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await harness.controller.setOpacityFromUi('r08_curve_layer', 40, 'ui-before-external-preview');
+  await harness.externalOpacity(25, 'first-external-preview');
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false);
+  const oldPreview = viewport.presentPreview(10);
+  for (let spin = 0; spin < 10 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1, 'prior-revision preview reached host');
+  const nextRevision = harness.externalOpacity(60, 'second-external-preview');
+  finishPreview();
+  await assert.rejects(oldPreview, /synchronization is pending/);
+  await nextRevision;
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.transportBridge.transport.status().contentRevision, 3);
+  assert.equal(harness.controller.identity().contentRevision, 3);
+  assert.equal(harness.controller.valueAtFrame('r08_curve_layer', 10)[0], 60);
+  assert.equal(harness.transportBridge.calls.filter(([command, args]) => command === 'nemo_native_revision_sync' &&
+    args.request.action === 'acknowledge').length, 2);
+});
+
+test('resize joined to a superseded preview preserves the next external revision acknowledgment', async () => {
+  let finishPreview, scheduledResize;
+  const resizeRevisions = [];
+  const previewGate = new Promise((resolve) => { finishPreview = resolve; });
+  const harness = nativeHarness(staticSource(), {
+    previewGate,
+    transportFactory: realTauriTransportFactory(),
+  });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await harness.controller.setOpacityFromUi('r08_curve_layer', 40, 'ui-before-external-preview');
+  await harness.externalOpacity(25, 'first-external-preview');
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    surface: {
+      defer(callback) { scheduledResize = callback; return 1; },
+      cancel() {},
+      async resize(identity) { resizeRevisions.push(identity.contentRevision); },
+    },
+  }, () => false);
+  const oldPreview = viewport.presentPreview(10);
+  for (let spin = 0; spin < 10 && harness.state.previews.length === 0; spin++) await Promise.resolve();
+  assert.equal(harness.state.previews.length, 1);
+  const nextRevision = harness.externalOpacity(60, 'second-external-preview');
+  viewport.resizeViewport();
+  const resizeWork = scheduledResize();
+  finishPreview();
+  await assert.rejects(oldPreview, /synchronization is pending/);
+  await Promise.all([resizeWork, nextRevision]);
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.transportBridge.transport.status().contentRevision, 3);
+  assert.equal(harness.controller.valueAtFrame('r08_curve_layer', 10)[0], 60);
+  assert.deepEqual(resizeRevisions, [3], 'resize uses the newly acknowledged identity');
+  assert.deepEqual(harness.transportBridge.calls.filter(([command, args]) =>
+    command === 'nemo_native_revision_sync' && args.request.action === 'acknowledge')
+    .map(([, args]) => [args.request.event.fromRevision, args.request.event.toRevision,
+      args.request.event.requestId]),
+  [[1, 2, 'first-external-preview'], [2, 3, 'second-external-preview']]);
+});
+
+test('a genuine current-session resize failure still fences native authority', async () => {
+  let scheduledResize;
+  const harness = nativeHarness(staticSource());
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    surface: {
+      defer(callback) { scheduledResize = callback; return 1; },
+      cancel() {},
+      async resize() { throw new Error('host resize failed'); },
+    },
+  }, () => false);
+  viewport.resizeViewport();
+  await scheduledResize();
+  assert.equal(harness.controller.status(), 'indeterminate');
+  assert.equal(harness.controller.persistenceJSON(), null);
+});
+
 test('revision acknowledgment failure passively disconnects and invalidates refreshed controller caches', async () => {
   const harness = nativeHarness(staticSource(), {
     transportFactory: realTauriTransportFactory({ ackFailure: true }),
@@ -2249,11 +2548,13 @@ test('transport loss while preview host work is pending rejects the stale receip
   const previewGate = new Promise((resolve) => { finishPreview = resolve; });
   const harness = nativeHarness(staticSource(), { previewGate });
   assert.equal(await harness.controller.activate(harness.prepared), true);
-  assert.equal(harness.controller.renderPreview(10), true);
+  const awaited = harness.state.lifecycle.presentPreview(10);
   for (let spin = 0; spin < 5 && harness.state.previews.length === 0; spin++) await Promise.resolve();
   assert.equal(harness.state.previews.length, 1);
   harness.state.connected = false;
-  finishPreview(); await harness.controller.flush();
+  finishPreview();
+  await assert.rejects(awaited, /disconnected/);
+  await harness.controller.flush();
   assert.equal(harness.controller.status(), 'indeterminate');
   assert.equal(harness.controller.persistenceJSON(), null);
   assert.throws(() => harness.state.previewConsumers[0].receive({
@@ -2343,6 +2644,10 @@ test('preview, export, subscription and release state are lifecycle-scoped acros
   assert.equal((await harness.controller.exportPng('/tmp/n20-cycle-two', [10])).status, 'succeeded');
   assert.notStrictEqual(harness.state.previewConsumers[0], harness.state.previewConsumers[1]);
   assert.notStrictEqual(harness.state.exportConsumers[0], harness.state.exportConsumers[1]);
+  const secondPresentation = await harness.state.lifecycle.presentPreview(10);
+  assert.equal(secondPresentation.lifecycleGeneration, 2);
+  assert.equal(secondPresentation.documentId, 'native-document-2');
+  await assert.rejects(firstPreview.present(), /disposed/);
   await assert.rejects(firstSubscription.synchronize({ instanceId: 'instance-a',
     documentId: 'native-document-1', lifecycleGeneration: 1, fromRevision: 0,
     toRevision: 1, requestId: 'late-cycle-one' }), /closed lifecycle/);
@@ -2639,9 +2944,14 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
     NemoNativeOpacityExportAdapter: { createNativeOpacityExportAdapter() { return { kind: 'export' }; } },
     NemoNativeOpacityLegacySurface: NativeLegacySurface,
     NemoNativeOpacityMotionSurface: NativeMotionSurface,
-    NemoOpacityApplicationCore: { createNative(received) {
+    NemoNativeOpacityOperations: NativeOpacityOperations,
+    NemoNativeOpacityV1: NativeOpacityV1,
+    NemoNativeOpacityViewport: NativeOpacityViewport,
+    NemoOpacityApplicationCore: { createNative(received, modules) {
       ports = received; events.push(['create']);
-      return { install() { return NativeOpacityOperations.create(controller, received, NativeOpacityContract).install(); } };
+      assert.strictEqual(modules.viewport, NativeOpacityViewport);
+      return { install() { return modules.operations.create(controller, received, NativeOpacityContract,
+        modules.viewport, modules.v1).install(); } };
     } },
     SMEngineBridge: {},
     SMNativeEditGuard: {
@@ -2656,10 +2966,10 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.strictEqual(desktop.SMEngineBridge.nativeEditGuard, desktop.SMNativeEditGuard);
   assert.equal(Object.isFrozen(desktop.NemoNativeOpacityCutover), true);
   assert.deepEqual(Object.keys(desktop.NemoNativeOpacityCutover).sort(), [
-    'blocksLegacy', 'exportPng', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
-    'prepared', 'projectSelection', 'releaseCurrent', 'renderPreview',
+    'blocksLegacy', 'exportPng', 'getNativeIdentity', 'historyFromUi', 'identity', 'isActive', 'persistenceJSON',
+    'prepared', 'presentPreview', 'projectSelection', 'releaseCurrent', 'renderPreview',
   ]);
-  for (const authorityKey of ['activate', 'requestRelease', 'getNativeIdentity', 'handleV1',
+  for (const authorityKey of ['activate', 'requestRelease', 'handleV1',
     'legacyIntent', 'setOpacity', 'history']) {
     assert.equal(desktop.NemoNativeOpacityCutover[authorityKey], undefined, authorityKey);
   }
@@ -2683,7 +2993,10 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
   panelOpen = 0;
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0);
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
+    'eligible first-open reaches activation, but cannot succeed without the awaited lifecycle receipt');
+  assert.equal(invokes.filter(([command]) => command === 'nemo_native_preview').length, 1,
+    'the import does not use a second direct preview host');
 
   nativeBlocked = true;
   const documentBytes = JSON.stringify(serializedDocument);
@@ -2711,8 +3024,8 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   desktop.SMPlugin.loadArchive({});
   desktop.SMPlugin.loadFiles({});
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('supported-after-extension', false), false);
-  assert.equal(events.filter(([kind]) => kind === 'activate').length, 0,
-    'production imports remain unavailable after page-lifetime extension exposure');
+  assert.equal(events.filter(([kind]) => kind === 'activate').length, 1,
+    'page-lifetime extension exposure prevents another activation attempt');
   retained.layer(0).set('opacity', [66]);
   delayedScript();
   delayedPlugin();

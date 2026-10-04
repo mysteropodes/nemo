@@ -18,7 +18,13 @@
   var tabs=[],activeTabId=null;
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
-  function importProjectJSON(json,silent){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent):window.SM.importJSON(json,silent);}
+  function importProjectJSON(json,silent,allowOccludedAdmission){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent,allowOccludedAdmission):window.SM.importJSON(json,silent);}
+  function projectJSON(){return window.NemoNativeOpacityProjectEntry.documentJSON(window);}
+  function nativeOpenReady(receipt,first){return window.NemoNativeOpacityProjectEntry.ready(window,receipt,first);}
+  function revealOpenedProject(first){return window.NemoNativeOpacityProjectEntry.reveal(window,first,
+    {hide:hideStartScreen,show:showStartScreen,repaint:SMProjectEntry.repaint,
+      raf:function(callback){return window.requestAnimationFrame(callback);}});}
+  function saveFramesIfLegacy(){return window.NemoNativeOpacityProjectEntry.saveFramesIfLegacy(window,saveAllLayerFrames);}
   function afterMaybe(value,next){return value&&typeof value.then==='function'?value.then(next):next(value);}
   function releaseNative(kind){var surface=window.NemoNativeOpacityLegacySurface;if(surface===undefined)return window.NemoNativeOpacityCutover===undefined&&window.NemoNativeOpacityProject===undefined?null:false;try{return surface&&typeof surface.allowProjectTransition==='function'&&typeof surface.releaseProjectTransition==='function'?surface.releaseProjectTransition(window,kind):false;}catch(e){return false;}}
   // Browser-mode autosave: localStorage first (sync, ~5-10MB quota), always
@@ -103,7 +109,7 @@
     try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
     showToast('New project created');
   }
-  function newProject(cfg){return afterMaybe(releaseNative('new-project'),function(admitted){if(admitted===false)return false;return newProjectNow(cfg);});}
+  function newProject(cfg,stillCurrent,onCreationFailure){return afterMaybe(releaseNative('new-project'),function(admitted){if(admitted===false||!stillCurrent()||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return false;try{return newProjectNow(cfg);}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});}
 
   // Last successfully persisted document, for the close-with-unsaved-work
   // guard below. null = "never saved/loaded anything yet" — a brand-new
@@ -117,17 +123,13 @@
     renderTabBar();
   }
   function isDirty(){
-    try{return lastSavedJson!==null&&window.SM.exportJSON()!==lastSavedJson;}
+    try{return lastSavedJson!==null&&projectJSON()!==lastSavedJson;}
     catch(e){return true;} // can't serialize → assume dirty, never skip the warning
   }
 
   async function writeProjectTo(path){
-    var json=window.SM.exportJSON();
-    // Atomic save (temp sibling + rename) and its historical direct-write
-    // fallback live in the adapter now; everything below — path/name, recents,
-    // dirty tracking, autosave — stays here. The JSON handed to the adapter is
-    // the same string markSaved() records, so a save cannot mark clean against
-    // bytes other than the ones written.
+    var json=projectJSON();
+    // Atomic save lives in the adapter; markSaved records those exact bytes.
     await window.NemoProjectNativeSave.writeProjectFile(path,json,{
       writeTextFile:function(p,text){return window.__TAURI__.fs.writeTextFile(p,text);},
       rename:function(from,to){return window.__TAURI__.fs.rename(from,to);},
@@ -158,8 +160,8 @@
     setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }
   function saveAsDownload(){
-    saveAllLayerFrames();
-    var json=window.SM.exportJSON();
+    saveFramesIfLegacy();
+    var json=projectJSON();
     downloadJson((currentName||'Untitled')+'.json',json);
     markSaved(json);
     autosaveWrite(json);
@@ -167,7 +169,7 @@
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
-    saveAllLayerFrames();
+    saveFramesIfLegacy();
     var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;
     // A failed write MUST be loud — without this catch there was no error
@@ -181,31 +183,27 @@
   async function save(){
     if(!tauriOk()){saveAsDownload();return;}
     if(!currentPath){await saveAs();return;}
-    saveAllLayerFrames();
+    saveFramesIfLegacy();
     try{await writeProjectTo(currentPath);}
     catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
     showToast('Saved');
   }
   async function openPath(path){
     if(!tauriOk())return;
+    var json;
+    try{json=await window.__TAURI__.fs.readTextFile(path);}
+    catch(e){showToast('Could not read file — it may have moved or been deleted');return false;}
     try{
-      var json=await window.__TAURI__.fs.readTextFile(path);
-      if(!await importProjectJSON(json,true))throw new Error('Invalid project');
-      // Re-export rather than keeping the file's own text: importJSON
-      // normalizes (fills defaults, pads frames), so the round-tripped
-      // form is what future exportJSON calls will actually produce —
-      // comparing against the raw file text would flag a just-opened
-      // untouched project as dirty forever.
-      try{markSaved(window.SM.exportJSON());}catch(e){}
+      var opened=await importProjectJSON(json,true,true);
+      if(!opened||!nativeOpenReady(opened))throw new Error('Native project admission or replacement failed');
+      await revealOpenedProject(opened);
+      markSaved(projectJSON());
       currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
       touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
       renderRecents();
-      hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();
+      ensureInitialTab();
       showToast('Opened: '+currentName);
-    }catch(e){
-      showToast('Could not open file — it may have moved or been deleted');
-      removeRecent(path);renderRecents();
-    }
+    }catch(e){showToast('Could not open project — native admission or presentation failed');return false;}
   }
   async function openDialog(){
     if(!tauriOk()){document.getElementById('file-input').click();return;}
@@ -388,7 +386,7 @@
     return report;
   }
 
-  window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg){return afterMaybe(newProject(cfg),function(admitted){if(admitted===false)return false;hideStartScreen();ensureInitialTab();});},
+  var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){var generation=++newProjectGeneration;return afterMaybe(newProject(cfg,function(){return generation===newProjectGeneration&&(!isCurrent||isCurrent());},onCreationFailure),function(admitted){if(admitted===false)return false;try{hideStartScreen();ensureInitialTab();}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});},
     // "A project is now open, show the editor" — hideStartScreen +
     // ensureInitialTab, the pair newProject above already runs. Exported
     // (2026-09 QA sweep) because kitsu.js called those two by their bare
@@ -549,17 +547,17 @@
       if(admitted===false)return false;activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:target.name});entered();
     }); // markSaved belongs to the new tab
   }
-  function addTab(){
-    return afterMaybe(releaseNative('tab-add'),function(admitted){
-      if(admitted===false)return false;snapshotActiveIntoTab();
-      var n=tabs.length+1;
-      var id=makeTabId();
+  var tabAddGeneration=0,tabAdmissionMessage=null;
+  function tabAddNotice(message){
+    if(!tabAdmissionMessage){var bar=document.getElementById('project-tabs-bar');tabAdmissionMessage=document.createElement('div');tabAdmissionMessage.setAttribute('role','alert');
+      Object.assign(tabAdmissionMessage.style,{marginLeft:'auto',minWidth:'0',maxWidth:'60%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'#ffb5a8',fontSize:'12px'});bar.appendChild(tabAdmissionMessage);}tabAdmissionMessage.textContent=message;tabAdmissionMessage.style.display=message?'block':'none';return false;}
+  function addTab(){var generation=++tabAddGeneration,initialTab=activeTabId,initialName=currentName,initialPath=currentPath;function denied(){return generation===tabAddGeneration&&activeTabId===initialTab&&currentName===initialName&&currentPath===initialPath?tabAddNotice('New project unavailable — native admission was denied.'):false;}
+    function admitted(ok){
+      if(generation!==tabAddGeneration||activeTabId!==initialTab||currentName!==initialName||currentPath!==initialPath)return false;if(ok===false||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return denied();
+      tabAddNotice('');snapshotActiveIntoTab();var n=tabs.length+1,id=makeTabId();
       tabs.push({id:id,name:'Untitled '+n,json:null,path:null});
-      activeTabId=id;
-      newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});
-      currentPath=null;currentName='Untitled '+n;updateCurrentLabel();
-      renderTabBar();
-    });
+      activeTabId=id;newProjectNow({w:1920,h:1080,fps:24,name:'Untitled '+n});currentPath=null;currentName='Untitled '+n;updateCurrentLabel();renderTabBar();}
+    try{var result=releaseNative('tab-add');return result&&typeof result.then==='function'?result.then(admitted,denied):admitted(result);}catch(e){return denied();}
   }
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
@@ -697,27 +695,29 @@
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
       else applyAuto(null);
     });
-    document.getElementById('start-new').addEventListener('click',function(){
-      document.getElementById('start-newpanel').style.display='block';
-    });
+    var newPanel=document.getElementById('start-newpanel'),admissionMessage=document.createElement('div');
+    admissionMessage.setAttribute('role','alert');admissionMessage.style.display='none';admissionMessage.style.color='#ffb5a8';admissionMessage.style.fontSize='12px';admissionMessage.style.marginTop='8px';newPanel.appendChild(admissionMessage);
+    var createGeneration=0,createInFlight=false;
+    document.getElementById('start-new').addEventListener('click',function(){admissionMessage.style.display='none';newPanel.style.display='block';});
     document.getElementById('start-open').addEventListener('click',openDialog);
-    document.getElementById('np-cancel').addEventListener('click',function(){document.getElementById('start-newpanel').style.display='none';});
+    document.getElementById('np-cancel').addEventListener('click',function(){++createGeneration;createInFlight=false;admissionMessage.style.display='none';newPanel.style.display='none';});
     document.getElementById('np-preset').addEventListener('change',function(){
       document.getElementById('np-custom-row').style.display=this.value==='custom'?'flex':'none';
     });
     document.getElementById('np-create').addEventListener('click',function(){
+      if(createInFlight)return false;
       var preset=document.getElementById('np-preset').value;
       var w,h;
       if(preset==='custom'){w=parseInt(document.getElementById('np-w').value)||1920;h=parseInt(document.getElementById('np-h').value)||1080;}
       else{var parts=preset.split('x');w=parseInt(parts[0]);h=parseInt(parts[1]);}
       var fps=parseInt(document.getElementById('np-fps').value)||24;
       var name=document.getElementById('np-name').value.trim()||'Untitled';
-      // must go through the public wrapper — the bare newProject() above
-      // never hides the start screen itself (only window.SMProject.newProject
-      // does), which is exactly why "Create" was dropping you right back
-      // on the start screen instead of into the canvas.
-      window.SMProject.newProject({w:w,h:h,fps:fps,name:name});
-      document.getElementById('start-newpanel').style.display='none';
+      var generation=++createGeneration,creationFailed=false;createInFlight=true;admissionMessage.style.display='none';
+      function current(){return generation===createGeneration&&newPanel.style.display!=='none'&&!document.getElementById('start-screen').classList.contains('hid');}
+      function unavailable(){if(!current())return false;admissionMessage.textContent=creationFailed?'New project creation failed after admission; the document may have changed. Reopen a project before editing.':'New project unavailable — native admission was denied.';admissionMessage.style.display='block';showToast(admissionMessage.textContent);return false;}
+      function completed(admitted){if(generation!==createGeneration)return false;createInFlight=false;if(admitted===false)return unavailable();newPanel.style.display='none';return admitted;}function failed(){if(generation!==createGeneration)return false;createInFlight=false;return unavailable();}
+      try{var result=window.SMProject.newProject({w:w,h:h,fps:fps,name:name},current,function(){if(generation!==createGeneration)return;creationFailed=true;showStartScreen();newPanel.style.display='block';});return result&&typeof result.then==='function'?result.then(completed,failed):completed(result);}
+      catch(e){return failed();}
     });
 
     // Project panel buttons (right-hand Project section)
@@ -734,7 +734,7 @@
     if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
-      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true),function(imported){if(!imported)throw new Error('Invalid project');markSaved(window.SM.exportJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Opened: '+currentName);});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
+      var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true,true),function(imported){if(!imported||!nativeOpenReady(imported))throw new Error('Invalid or unpresented project');return afterMaybe(revealOpenedProject(imported),function(){markSaved(projectJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();ensureInitialTab();showToast('Opened: '+currentName);});});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
       r.onerror=function(){showToast('Could not open file — it may be invalid or corrupted');};
       r.readAsText(f);e.target.value='';
     });

@@ -13,12 +13,12 @@ macro_rules! engine_modules {
 }
 
 engine_modules! {
-    "codec" => codec, document;
+    "codec" => codec, document, project_structure;
     "commands" => commands, request_receipts, revision;
     "history" => history, transaction;
-    "evaluation" => evaluation;
+    "evaluation" => evaluation, animation_curve;
     "scheduler" => resource_leases, scheduler;
-    "compositor" => compositor, render_scene;
+    "compositor" => compositor, render_scene, render_geometry;
     "viewport" => desktop_viewport;
     "export_job" => export_job, export_job_lifecycle, png_output;
     "application" => application, protocol, read_queries;
@@ -37,13 +37,17 @@ macro_rules! test_modules {
 #[cfg(test)]
 test_modules! {
     "test-codec" => codec_tests = "../tests/codec.rs";
+    "test-codec" => project_structure_tests = "../tests/project_structure.rs";
     "test-commands" => commands_tests = "../tests/commands.rs";
     "test-history" => history_tests = "../tests/history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
+    "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
+    "test-export_job" => authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs";
+    "test-export_job" => export_geometry_tests = "../tests/render_geometry.rs";
     "test-export_job" => export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs";
     "test-application" => application_tests = "../tests/application.rs";
     "test-application" => application_read_tests = "../tests/application_read.rs";

@@ -14,7 +14,12 @@
       var ports = root.NemoNativeOpacityLegacySurface.desktopPorts(root, transport);
       root.NemoOpacityApplicationCore.createNative(ports, {
         contract: root.NemoNativeOpacityContract, lifecycle: root.NemoNativeOpacityLifecycle,
-        operations: root.NemoNativeOpacityOperations, motionSurface: root.NemoNativeOpacityMotionSurface
+        replacement: root.NemoNativeOpacityReplacement,
+        exportWorkflow: root.NemoNativeOpacityExportWorkflow,
+        previewWorkflow: root.NemoNativeOpacityPreviewWorkflow,
+        operations: root.NemoNativeOpacityOperations, viewport: root.NemoNativeOpacityViewport,
+        v1: root.NemoNativeOpacityV1,
+        motionSurface: root.NemoNativeOpacityMotionSurface
       }).install();
     });
   };

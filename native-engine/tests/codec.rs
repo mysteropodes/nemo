@@ -240,6 +240,85 @@ fn round_trip_preserves_the_admitted_tree_and_opaque_identity() {
 }
 
 #[test]
+fn authored_curves_round_trip_without_dropping_optional_fields() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/animation-curves/authored.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let mut project = project_value();
+        project["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"] =
+            case["points"].clone();
+        let document = decode_project(&serde_json::to_vec(&project).unwrap()).unwrap();
+        let encoded = encode_project(&document).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&encoded).unwrap(),
+            project,
+            "{}",
+            case["name"]
+        );
+        assert_eq!(
+            encode_project(&decode_project(&encoded).unwrap()).unwrap(),
+            encoded
+        );
+    }
+}
+
+#[test]
+fn authored_curve_structure_rejects_invalid_candidates_atomically() {
+    use nemo_native_engine::document::OpacityDocument;
+    let admitted = decode_project(PROJECT).unwrap();
+    let before = encode_project(&admitted).unwrap();
+    for points in [
+        json!(null),
+        json!({}),
+        json!([{}]),
+        json!([{"x": 0.2, "y": 0}, {"x": 1, "y": 1}]),
+        json!([{"x": 0, "y": 0}, {"x": 0.8, "y": 1}]),
+        json!([{"x": 0, "y": 0}, {"x": 0, "y": 1}, {"x": 1, "y": 1}]),
+        json!([{"x": 0, "y": 0}, {"x": 0.8, "y": 1}, {"x": 0.2, "y": 0}, {"x": 1, "y": 1}]),
+    ] {
+        let mut candidate = project_value();
+        candidate["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"] = points;
+        assert_eq!(rejected(candidate.clone()).kind(), CodecErrorKind::Invalid);
+        if let Ok(unchecked) = serde_json::from_value::<OpacityDocument>(candidate) {
+            assert_eq!(
+                encode_project(&unchecked).unwrap_err().kind(),
+                CodecErrorKind::Invalid
+            );
+        }
+        assert_eq!(encode_project(&admitted).unwrap(), before);
+    }
+    for field in ["x", "y", "tx", "ty"] {
+        for value in [json!(null), json!("NaN"), json!([]), json!(true)] {
+            let mut candidate = project_value();
+            candidate["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][0][field] = value;
+            assert_eq!(rejected(candidate).kind(), CodecErrorKind::Invalid);
+        }
+        let mut candidate = project_value();
+        candidate["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][0][field] =
+            json!("overflow");
+        let json = serde_json::to_string(&candidate).unwrap();
+        for invalid in ["1e999", "-1e999", "NaN", "Infinity"] {
+            assert_eq!(
+                decode_project(json.replace("\"overflow\"", invalid).as_bytes())
+                    .unwrap_err()
+                    .kind(),
+                CodecErrorKind::Parse
+            );
+        }
+    }
+    let mut missing = project_value();
+    missing["layers"][0]["motion"]["opacity"]["keys"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("curvePoints");
+    assert_eq!(rejected(missing).kind(), CodecErrorKind::Invalid);
+    let mut unknown = project_value();
+    unknown["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][0]["tangent"] = json!(0);
+    assert_eq!(rejected(unknown).kind(), CodecErrorKind::Unsupported);
+    assert_eq!(encode_project(&admitted).unwrap(), before);
+}
+
+#[test]
 fn rejects_duplicate_or_missing_identity_before_admission() {
     let mut duplicate = project_value();
     let repeated = duplicate["layers"][0].clone();

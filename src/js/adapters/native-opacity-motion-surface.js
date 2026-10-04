@@ -235,9 +235,74 @@
     });
     return api;
   }
+  // Native Motion navigation is a UI projection, never a Paper frame edit.
+  // Serialize host presentations so an older completion cannot repaint over
+  // a newer intent; publish the playhead only after a final identity match.
+  function createFrameNavigator(ports) {
+    var methods = ['frame', 'total', 'commit', 'paint', 'syncInput', 'fail', 'controller'];
+    if (!ports || methods.some(function (name) { return typeof ports[name] !== 'function'; })) {
+      throw new TypeError('native frame navigation ports are unavailable');
+    }
+    var queue = Promise.resolve(), intent = 0;
+    function sameIdentity(a, b) {
+      return !!a && !!b && a.instanceId === b.instanceId &&
+        a.documentId === b.documentId && a.contentRevision === b.contentRevision;
+    }
+    function navigate(controller, frame) {
+      ports.syncInput(); // The focused frame input may already show a tentative request.
+      if (!Number.isInteger(frame) || frame < 0 || frame >= ports.total()) return Promise.resolve(false);
+      var request = ++intent, requestedIdentity;
+      try {
+        if (!controller || !controller.isActive()) return Promise.resolve(false);
+        requestedIdentity = controller.identity();
+      } catch (_) { return Promise.resolve(false); }
+      var work = queue.catch(function () {}).then(async function () {
+        if (request !== intent || ports.controller() !== controller || !controller.isActive() ||
+            !sameIdentity(requestedIdentity, controller.identity())) return false;
+        var prior = ports.frame();
+        try {
+          var receipt = await controller.presentPreview(frame);
+          if (request !== intent) return false; // The newer intent will re-present its frame.
+          if (ports.controller() !== controller || !controller.isActive() ||
+              !sameIdentity(requestedIdentity, controller.identity()) ||
+              !receipt || receipt.owner !== 'native' || receipt.status !== 'presented' ||
+              receipt.frame !== frame || !sameIdentity(requestedIdentity, receipt) ||
+              !Number.isInteger(receipt.lifecycleGeneration) ||
+              !Number.isInteger(receipt.viewGeneration) || !receipt.workId) {
+            throw new Error('native frame presentation changed identity');
+          }
+          ports.commit(frame);
+          ports.paint();
+          ports.syncInput();
+        } catch (error) {
+          var sameOwner = false;
+          try { sameOwner = ports.controller() === controller &&
+            sameIdentity(requestedIdentity, controller.identity()); } catch (_) {}
+          if (sameOwner) ports.commit(prior);
+          ports.syncInput();
+          // A failed receipt or UI paint can leave the host on a different
+          // frame. Restore the previous one; failed restoration fences native.
+          if (request === intent && sameOwner && controller.isActive()) {
+            try { await controller.presentPreview(prior); ports.paint(); ports.syncInput(); }
+            catch (_) {}
+          }
+          throw error;
+        }
+        return true;
+      }).catch(function () {
+        ports.syncInput();
+        try { ports.fail(); } catch (_) {}
+        return false;
+      });
+      queue = work;
+      return work;
+    }
+    return Object.freeze({ navigate: navigate });
+  }
   function requireAvailable(value) {
     var methods = ['owns', 'read', 'detachedElementView', 'detachedExpressionView', 'expressionSnapshot',
-      'positionOverlayPlan', 'nativeKeyInteractionPlan', 'renderedOpacityRoute', 'routeIntent', 'routeDimension', 'publishWriters'];
+      'positionOverlayPlan', 'nativeKeyInteractionPlan', 'renderedOpacityRoute', 'routeIntent', 'routeDimension', 'publishWriters',
+      'createFrameNavigator'];
     if (!value || !Object.isFrozen(value) || methods.some(function (name) { return typeof value[name] !== 'function'; })) {
       throw new Error('native Motion surface is unavailable or malformed');
     }
@@ -248,5 +313,6 @@
     positionOverlayPlan: positionOverlayPlan, nativeKeyInteractionPlan: nativeKeyInteractionPlan,
     opacityReadModel: opacityReadModel, renderedOpacityRoute: renderedOpacityRoute,
     routeIntent: routeIntent, routeDimension: routeDimension,
-    publishWriters: publishWriters, requireAvailable: requireAvailable });
+    publishWriters: publishWriters, createFrameNavigator: createFrameNavigator,
+    requireAvailable: requireAvailable });
 }));

@@ -1,0 +1,51 @@
+{
+  "provenance": "N22B/#1524: manual-ease y=2t-t^2 and overshoot y=4t-3t^2 have x=t; opacity=20+40y. Explicit-zero interior values characterized read-only from production src/js/animation/curve.js at 66a3cae36e6fd48feeeba3dc0fa321d2eea98a68; remaining cases use smoothstep or passthrough/collinearity. Never generated from Rust.",
+  "frames": [0, 5, 10, 15, 20],
+  "cases": [
+    {
+      "name": "manual-ease",
+      "points": [{"x": 0, "y": 0, "tx": 1.0, "ty": 2}, {"x": 1, "y": 1, "tx": 1, "ty": 0}],
+      "opacity": [20, 37.5, 50, 57.5, 60]
+    },
+    {
+      "name": "overshoot",
+      "points": [{"x": 0, "y": 0, "tx": 1, "ty": 4}, {"x": 1, "y": 1, "tx": 1, "ty": -2}],
+      "opacity": [20, 52.5, 70, 72.5, 60]
+    },
+    {
+      "name": "explicit-zero-tx-and-absent-ty",
+      "points": [{"x": 0, "y": 0, "tx": 0, "ty": 3}, {"x": 1, "y": 1, "tx": 0}],
+      "opacity": [20, 47.771887963561426, 55, 58.60966928359307, 60]
+    },
+    {
+      "name": "absent-ty-means-zero",
+      "points": [{"x": 0, "y": 0, "tx": 1}, {"x": 1, "y": 1, "tx": 1}],
+      "opacity": [20, 26.25, 40, 53.75, 60]
+    },
+    {
+      "name": "ty-without-tx-is-ignored",
+      "points": [{"x": 0, "y": 0, "ty": 100}, {"x": 1, "y": 1}],
+      "opacity": [20, 30, 40, 50, 60]
+    },
+    {
+      "name": "empty-passthrough",
+      "points": [],
+      "opacity": [20, 30, 40, 50, 60]
+    },
+    {
+      "name": "single-passthrough",
+      "points": [{"x": -4, "y": 7, "tx": 0, "ty": -3}],
+      "opacity": [20, 30, 40, 50, 60]
+    },
+    {
+      "name": "unbounded-authored-y-with-key-endpoint-values",
+      "points": [{"x": 0, "y": -1}, {"x": 1, "y": 2}],
+      "opacity": [20, 10, 40, 70, 60]
+    },
+    {
+      "name": "six-collinear-automatic-points",
+      "points": [{"x": 0, "y": 0}, {"x": 0.1, "y": 0.1}, {"x": 0.3, "y": 0.3}, {"x": 0.6, "y": 0.6}, {"x": 0.8, "y": 0.8}, {"x": 1, "y": 1}],
+      "opacity": [20, 30, 40, 50, 60]
+    }
+  ]
+}

@@ -181,6 +181,8 @@ function assertRegisteredLeaf(required) {
 }
 
 const REGISTERED_LEAVES = [
+  ['N24B registers private immutable geometry admission without an edge or size waiver', [
+    'src-tauri/src/native_application_geometry.rs']],
   ['N20R3 registers private host replay and dispatch-test children without an edge or size waiver', [
     'src-tauri/src/native_application_contract_fingerprints.rs',
     'src-tauri/src/native_application_replace_replay.rs',
@@ -208,10 +210,21 @@ const REGISTERED_LEAVES = [
     'native-engine/src/history.rs', 'native-engine/src/transaction.rs', 'native-engine/tests/history.rs']],
   ['N10 registers immutable evaluation without exclusions or a frozen-baseline waiver', [
     'native-engine/src/evaluation.rs', 'native-engine/tests/evaluation.rs']],
+  ['N22A registers authoritative easing without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/animation_curve.rs', 'native-engine/src/evaluation.rs',
+    'native-engine/tests/evaluation.rs']],
+  ['N22B registers authored-curve consumer evidence without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/codec.rs', 'native-engine/src/document.rs',
+    'native-engine/src/evaluation.rs', 'native-engine/tests/authored_curve_consumers.rs',
+    'native-engine/tests/codec.rs', 'native-engine/tests/evaluation.rs']],
+  ['N23A registers the immutable project-structure codec and parity tests without a waiver', [
+    'native-engine/src/project_structure.rs', 'native-engine/tests/project_structure.rs']],
   ['N11 registers frame scheduling and resource leases without exclusions or a frozen-baseline waiver', [
     'native-engine/src/resource_leases.rs', 'native-engine/src/scheduler.rs', 'native-engine/tests/scheduler.rs']],
   ['N12 registers the shared compositor without exclusions or a frozen-baseline waiver', [
     'native-engine/src/compositor.rs', 'native-engine/src/render_scene.rs', 'native-engine/tests/compositor.rs']],
+  ['N24A registers bounded cubic geometry without exclusions or a frozen-baseline waiver', [
+    'native-engine/src/render_geometry.rs', 'native-engine/tests/render_geometry.rs']],
   ['N13 registers the staged viewport host and test without exclusions or a frozen-baseline waiver', [
     'native-engine/src/desktop_viewport.rs', 'native-engine/tests/desktop_viewport.rs']],
   ['N14 registers pinned native PNG export without exclusions or a frozen-baseline waiver', [

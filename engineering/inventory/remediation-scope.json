@@ -790,12 +790,18 @@
     {
       "id": "C01.idb-store.kv",
       "census": "C01",
-      "admission": "pending"
+      "admission": "admitted",
+      "leaf": "P34",
+      "issue": 1520,
+      "evidence": "P03C-as/#1523 admits the IndexedDB persistence-adapter boundary only, not implementation or coverage. C01/#1036 census source ded641bd763379f36d629bf1686fcce8a6137a66, census blob d81b618308f9f4849b0ba24fa512af6be90aa72c; src/js/idb-store.js blob 17fc7be9aba13784625261b496aee7120dc5245b is unchanged at protected 194d275b102a5604bc9ad31281be65c8487bfa5c. P34/#1520 defines API/lifetime, whole-file scope, consumer checks and known-defect exclusions under R18.1/#915. Native predecessor is accepted C01/#1036 only. The original T08 shared-slot blocker was released by #1057 comment 5890957293 and the later T08B/#1532 exclusive claim by comment 5970737178; the retained Blocked board state needs fresh board-first Ready, capacity and whole-file ownership review. This admission assigns no implementing writer or shared-file slot."
     },
     {
       "id": "C01.asset-tree.folder-widget",
       "census": "C01",
-      "admission": "pending"
+      "admission": "admitted",
+      "leaf": "P35",
+      "issue": 1521,
+      "evidence": "P03C-as/#1523 admits the asset-folder presentation boundary only, not implementation or coverage. C01/#1036 census source ded641bd763379f36d629bf1686fcce8a6137a66, census blob d81b618308f9f4849b0ba24fa512af6be90aa72c; src/js/asset-tree.js blob a9cfc79050e98dd3a194e2eacfdea0c07400cd39 is unchanged at protected 194d275b102a5604bc9ad31281be65c8487bfa5c. P35/#1521 defines API/DOM ownership, whole-file scope, consumer checks and known-defect exclusions under R18.4/#918. Native predecessor is accepted C01/#1036 only. The original T08 shared-slot blocker was released by #1057 comment 5890957293 and the later T08B/#1532 exclusive claim by comment 5970737178; the retained Blocked board state needs fresh board-first Ready, capacity and whole-file ownership review. This admission assigns no implementing writer, shared-file slot or CSS/HTML span disposition."
     },
     {
       "id": "C01.tweens.undo-redo-engine",
@@ -4967,6 +4973,24 @@
           2741,
           2771
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1056,
+            1059
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, engine.rs:1057-1059 is the blend compositor heading and BLEND_SCRATCH_FORMAT at the opening of the pending C03.gpu-engine-core.effect-pipeline-library census responsibility (constructor/pipeline toolbox). The packet remains pending; this adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            2741,
+            2771
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, engine.rs:2741-2771 is the non-wasm-bindgen impl lead-in and atlas keepalive documentation immediately before push_atlas_keepalive at 2772, within the pending C03.gpu-engine-core.composite-scene-pipeline responsibility. The packet remains pending; this adds no packet admission or computed line coverage."
+        }
       ]
     },
     {
@@ -5014,6 +5038,14 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen 3f6eed2, C03/#1038 packet C03.wasm-tween-matching.fill-region-tracer starts at fill.rs:34; lines 1-33 are explanatory design comments and imports preceding fill_find."
+        },
+        {
+          "span": [
+            1000,
+            1037
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, fill.rs:1000-1037 is the #[cfg(test)] circle_lens_tests oracle explicitly named by pending C03.wasm-tween-matching.fill-region-tracer in the pinned C03 census (including two_crossing_circles_lens_is_traced and its captured feedback #116 input/bounds assertions). This maps a test responsibility only; it does not admit the packet, claim production behavior migrated, or add computed line coverage."
         }
       ]
     },
@@ -5049,6 +5081,16 @@
           1,
           33
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ac/#1478 responsibility mapping only: at frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, interp.rs:1-33 contains the motion-flow design preamble, executable crate::track and wasm_bindgen imports at 27-28, and FLOW_MAX_SIDE at 32, which support the implementation beginning at 34 assigned to pending C03.wasm-geometry-ops.motion-flow-interp. This maps file support responsibility only; it does not admit the packet or add computed line coverage."
+        }
       ]
     },
     {
@@ -5112,6 +5154,16 @@
           1,
           13
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, timeline.rs:1-10 is the frame-resolution provenance preamble, 11-12 are structural serde/wasm_bindgen imports, and 13 is blank. The implementation begins with #[derive(Deserialize)] and SymbolPlayback at 14 under pending C03.wasm-geometry-ops.timeline-frame-resolution (#1038; pinned C03 census blob 337c9035f94f5290b2adf898d406550558560bfa). This boundary has no separate packet responsibility, packet admission, or numeric coverage."
+        }
       ]
     },
     {
@@ -5495,6 +5547,16 @@
           2,
           3
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            2,
+            3
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen nemo-mcp/src/lib.rs lines 2-3 declare the capabilities and capability_contract modules at the crate root. The pinned C07 census assigns lib.rs:1-7 to pending C07.mcp-server.binary-entrypoint (#1042) as the module-root responsibility; P07/#1009 source commits 35d7eac66 and bd907d230 establish narrow declaration provenance, not admission of that packet or its module bodies. Evidence uses frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / lib.rs blob 2d8f0dd07102d3b2aa1df154b84fcba7eeae5247 and pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51; current lib.rs has a later native_contract declaration and a different blob. No numeric source coverage, MCP behavior or runtime acceptance is claimed."
+        }
       ]
     },
     {
@@ -5636,6 +5698,40 @@
           178,
           284
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            13
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ad/#1480 responsibility mapping only: at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lib.rs:1-13 supplies Tauri/shell imports and module registrations used by the composition root assigned to pending C05.native-rust.bootstrap in the pinned C05 census (blob 725d7875da509cd99a77bc404fc62296280399a0; census source 419f192631b715b3a6c763575dac29162aefa2d9). The packet remains pending; this adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            49,
+            89
+          ],
+          "kind": "boundary",
+          "evidence": "P03C-ad/#1480 boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 49 is blank; lines 50-64 are historical comments about removed feedback-token routing; lines 65-89 explain the adjacent Google-font command, whose executable attribute begins at line 90. This mixed-topic comment span is not assigned to a single packet and adds no packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            131,
+            137
+          ],
+          "kind": "boundary",
+          "evidence": "P03C-ad/#1480 boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: lib.rs:131-137 is the blank/comment preamble describing the macOS tablet-pressure monitor; start_tablet_pressure_monitor begins at line 138 and belongs to pending C05.native-rust.tablet-pressure-monitor in pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0. The boundary claims no monitor implementation, packet admission or computed line coverage."
+        },
+        {
+          "span": [
+            178,
+            284
+          ],
+          "kind": "covered",
+          "evidence": "P03C-ad/#1480 responsibility mapping only: at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lib.rs:178-284 is run(), composing task-runtime isolation, plugins, invoke commands, update menu and setup, assigned to pending C05.native-rust.bootstrap in pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0. Its call to start_tablet_pressure_monitor does not map or accept that monitor's implementation, which remains a separate pending packet. No packet admission, runtime acceptance or computed line coverage is claimed."
+        }
       ]
     },
     {
@@ -5714,6 +5810,24 @@
           96,
           96
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            78,
+            93
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen opacity-application.js lines 78-93 define capabilitySummary, which reads ports.capabilities(), clones all registered descriptors, derives the legacy properties projection only from descriptors advertising property.get, and includes operations, retry/trace retention and document identity in the response. P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a added this registered-capability discovery seam; bootstrap binds the port to registry.list(), and the production capability test checks full export.svg.frame plus opacity descriptors, opacity-only properties, and a fresh registry read. The older pinned C07.application-service.command-core packet (#1042) covers the surrounding perform route but describes only hard-coded opacity and remains pending; this disposition does not admit it. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core has a different blob. No numeric source coverage, capability runtime, native/browser/Tauri/client or installed behavior acceptance is claimed."
+        },
+        {
+          "span": [
+            96,
+            96
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 96 is the perform capabilities branch that returns capabilitySummary() through response(). P06/#1008 accepted source commit 35bcb02392bdd44c8d341c94c3ae6b505eb3379a replaced the earlier inline hard-coded opacity response with this registered-capability discovery call. The surrounding perform command/query routing belongs to pending C07.application-service.command-core (#1042), not to an accepted whole C07 packet. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / opacity core blob d0b10900eb36a43c66237473009027eaa6680d28; pinned C07 census blob 1ccb542a681d1781161e382889dc611b97681f51. Current opacity core differs; no packet admission, numeric source coverage, runtime or installed behavior acceptance is claimed."
+        }
       ]
     },
     {
@@ -5748,6 +5862,32 @@
           44,
           54
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            30,
+            30
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source line 30 reuses window.NemoCapabilities or creates the registry through NemoCapabilityRegistry.create(); this bootstrap registry binding maps to pending C07.application-service.bootstrap-bindings. P05 registry provenance is not C07 acceptance."
+        },
+        {
+          "span": [
+            40,
+            41
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source lines 40-41 bind afterMutation to refresh and capabilities to registry.list() in the NemoOpacityApplicationCore.create ports; these bootstrap callbacks map to pending C07.application-service.bootstrap-bindings."
+        },
+        {
+          "span": [
+            44,
+            54
+          ],
+          "kind": "covered",
+          "evidence": "Frozen source lines 44-48 are P06 comments describing opacity self-registration and per-request registry dispatch; line 49 registers NemoOpacityCapability with app.handle; line 50 opens root.NemoApplication; line 51 dispatches through registry.handlerFor using the opacity descriptor ID; lines 52-53 expose setInstanceId and capabilities, and line 54 closes the object. This bootstrap binding maps to pending C07.application-service.bootstrap-bindings. P05/P06 provenance does not accept C07."
+        }
       ]
     },
     {
@@ -5849,8 +5989,32 @@
       "dispositions": [
         {
           "span": [
-            628,
-            632
+            1,
+            10
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 1-10 are the module-header comments; the executable IIFE begins at line 11. This boundary has no separate executable responsibility or numeric coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+        {
+          "span": [
+            91,
+            224
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, with C03 census blob 337c9035f94f5290b2adf898d406550558560bfa. This is a mixed span, not one packet: suspended render/engine scheduling maps to pending C03.js-engine-bridge.render-entry-points and C03.js-engine-bridge.engine-lifecycle; cssColorToRgba and r2/roundSegs serialization map to pending C03.js-engine-bridge.build-scene-json and C03.js-engine-bridge.editor-overlay-builders; registeredImageIds maps to pending C03.js-engine-bridge.bounded-image-store; and the retained-path-store rationale maps to pending C03.js-engine-bridge.retained-path-store. All six packets remain pending. No packet admission, numeric range coverage, or runtime/render acceptance is claimed."
+        },
+        {
+          "span": [
+            260,
+            260
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 260 is the final Paper ChangeFlag probe comment; installGeometryHook begins at line 261. This boundary has no separate executable responsibility or numeric coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+      {
+        "span": [
+          628,
+          632
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen lines 628-632 describe the engine-side upload/retirement gate retained beside the P26 image-budget policy, instantiate _imageBudget and define _noteImageRegistered. Pending C03.js-engine-bridge.bounded-image-store (#1038) owns the broader image-store bridge responsibility; accepted P26/#1028 PR #1168 is narrower policy/bookkeeping provenance, not completion of C03 or runtime/pixel acceptance. No numeric range coverage or packet admission is added."
@@ -5926,6 +6090,38 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only: frozen line 4565 exposes setImageBudgetBytes as a public image-budget setter. This maps jointly to pending C03.js-engine-bridge.bounded-image-store and C03.js-engine-bridge.public-api-surface (#1038); it adds no packet admission, numeric coverage or runtime/pixel acceptance."
+        },
+        {
+          "span": [
+            4618,
+            4628
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 4618-4628 are blank/comment-only legacy autoEnable rationale; the executable autoEnable function begins at line 4629 and belongs to pending C03.js-engine-bridge.engine-lifecycle. The comments have no separate executable responsibility or numeric coverage. The C03 census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa."
+        },
+      {
+        "span": [
+          4257,
+          4274
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 lines 4257-4274 contain the renderNow comment and viewportRafId declaration that precede renderNow(); this render-entry responsibility belongs to pending C03.js-engine-bridge.render-entry-points (#1038), whose census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa. No packet admission, numeric coverage or runtime/render acceptance is claimed."
+        },
+        {
+          "span": [
+            4355,
+            4381
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 lines 4355-4381 give the effects-aware export rationale and saved frame/engine-size state immediately before beginEffectsExport(). This is within pending C03.js-engine-bridge.render-entry-points (#1038), whose census blob is pinned as 337c9035f94f5290b2adf898d406550558560bfa. No packet admission, numeric coverage or export/runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            4482,
+            4492
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, lines 4482-4492 are the comment-only second-viewer explanation; the executable window.SMEngineBridge public API starts at 4493. The preamble has no separate executable responsibility and is not packet coverage. The pinned C03 census blob is 337c9035f94f5290b2adf898d406550558560bfa."
         }
       ]
     },
@@ -6000,6 +6196,38 @@
           ],
           "kind": "boundary",
           "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 1161 is blank and lines 1162-1174 are comments introducing Render Manager batch exporters; the first executable function, exportPNGSequenceToDir, begins at 1175. The comments describe the adjacent pending C05.export.tauri-io-ffmpeg responsibility (C05 census source 419f192631b715b3a6c763575dac29162aefa2d9 declares export.js:1176-1251 and batch siblings), but contain no executable responsibility themselves. This is a boundary only, not packet ownership, admission, extraction, export parity or runtime acceptance; numeric range coverage is unchanged."
+        },
+        {
+          "span": [
+            369,
+            376
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 369-376 contain the frame-range lead-in and exportFrameRange helper. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 names exportFrameRange in pending C05.export.frame-compositor (#1040)'s public API, although that packet's numeric source range ends at line 369. This mapping follows the named responsibility and does not extend numeric source coverage, admit a packet, or claim export/runtime parity acceptance."
+        },
+        {
+          "span": [
+            570,
+            598
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen lines 570-598 contain exportRenderPNGsToDir, the shared PNG-sequence loop for raster exports. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 names this symbol in pending C05.export.tauri-io-ffmpeg (#1040), whose census range omits this shared call site; its engine-routing dependency is separately mapped to pending C05.export.engine-routing-gate. The Paper.js and engine-render branches remain distinct. No packet admission, numeric source coverage, export-format parity or runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            873,
+            883
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5, line 873 is blank and lines 874-883 are the Lottie/Bodymovin section heading and explanatory comments; executable lottieHexToRGBA begins at line 884, in the responsibility of pending C05.export.lottie-bodymovin (#1040). These lines contain no executable responsibility and only mark a boundary; no packet admission, numeric source coverage or export/runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            1255,
+            1389
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only: frozen line 1255 is blank, line 1256 is the public-exporters section heading, and lines 1257-1389 define the window.SMExport public facade and its export entry points. The C05 census pinned to source 419f192631b715b3a6c763575dac29162aefa2d9 partitions these responsibilities across pending C05.export.frame-compositor (preview/frame-range/SVG composition), C05.export.tauri-io-ffmpeg (Tauri-backed sequence and file exports), C05.export.browser-native-fallbacks (browser video/GIF paths), and C05.export.lottie-bodymovin (Lottie output). Rive separately augments this object from rive-export.js under C05.export.rive-mcp. Accepted P17/#1019 PR #1160 and P18/#1020 PR #1163 provide only narrow prior wrapper/job provenance. These mappings admit no packet, add no numeric source coverage, and claim no format/runtime/export parity acceptance."
         }
       ]
     },
@@ -6013,6 +6241,16 @@
           572,
           596
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            572,
+            596
+          ],
+          "kind": "covered",
+          "evidence": "Mixed public-facade responsibility mapping at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (feedback-bridge blob b87a6fc24b20f136c05df123d772b224e81ba212): line 572 is blank, 573 opens window.SMFeedback, and 595-596 close the object/IIFE. Action/click trail exports at 574-579 (defined at 72-157), readAllLocal at 581 (defined at 210), and local approve/resolve/delete at 585-587 (defined at 553-571) map to pending C04b.content-tools.feedback-local-log-storage (#1039). submitFeedback at 580 (defined at 281-341) spans that local-write responsibility and pending C04b.content-tools.feedback-worker-publish: it writes locally, then best-effort publishes to the team Sync folder at 316-327 and Worker at 328-340. The Sync write is functionally paired with the pending triage-sync flow but remains inside the worker-publish packet's declared 279-341 range. checkIncomingFeedback/importIncoming/pullAllIncoming at 582-584 (defined at 506-551), plus GitHub token, fetch and issue mutation exports at 588-594 (defined at 433-503), map to pending C04b.content-tools.feedback-triage-sync; incoming import uses the local store but belongs to the triage-sync flow. The pinned C04b census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 and its older range declarations remain unchanged. No single packet owns this whole facade; no packet admission, numeric source coverage, feedback delivery or browser/Tauri behavior acceptance is claimed."
+        }
       ]
     },
     {
@@ -6058,6 +6296,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            22
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only: frozen src/js/layer-inout.js lines 1-11 and 13-22 are explanatory comments about the UI bar and raw-versus-clamped render gate. Line 12 is executable (function () { opening the IIFE around all three pending C02.layer-inout responsibilities; it is not a comment and does not own a separate feature writer. The first feature functions inPointOf/outPointOf begin at line 23 in C02.layer-inout.bar-rendering, while later C02 packets own selection/marquee and drag/batch operations. Frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / layer-inout.js blob 131156e2f419e17e8669c1980c3ae0f77164e786; pinned C02 census blob 3e920d4f112028ed486df697b5885aa4c67df316. This does not assign the entire preamble solely to bar-rendering or admit any C02 packet, numeric source coverage, runtime behavior or browser/Tauri/export acceptance."
+        },
+        {
+          "span": [
             1601,
             1646
           ],
@@ -6088,6 +6334,24 @@
           751,
           774
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            39
+          ],
+          "kind": "boundary",
+          "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (linked-media blob ba81900d0ea1805fc206fc19ce992674522de6c5): lines 1-39 describe the project-wide embedded/linked mode, desktop linkedPath versus web linkedHandleId/opaque handle, serR/desR persistence choke points and a non-persistent resolved-pixel cache. Executable implementation begins with the IIFE at line 40. This header contextualizes pending C05.media.linked-resolve-core and C05.media.mode-setting-ui (#1040), but its historical live-verification statements and persistence claims are not independent proof of current browser, Tauri, save/load or render acceptance. No separate packet, numeric coverage or behavior acceptance is added."
+        },
+        {
+          "span": [
+            751,
+            774
+          ],
+          "kind": "covered",
+          "evidence": "Mixed public-facade responsibility mapping at frozen 3f6eed2 (linked-media blob ba81900): line 751 is a blank separator; 752 opens window.SMLinkedMedia. Resolver/cache/handle/relink exports isWebLinkingSupported/getCachedSrc/primeCache/resolveAsync/resolveOnce/readLinkedDesktop/pickWebImages at 753-759 and pickWebVideo/getHandleFile/forgetHandle/relinkImageEntry/requestPermissionForAll at 762-766 (with a video comment at 760-761) map to pending C05.media.linked-resolve-core (#1040): frozen app.js:1208-1209 calls cache/resolve, images.js:265/498 calls the web pickers, media-library.js:164/553 calls handle/relink, and native-video-bridge.js:853/1347 calls handle/picker. readLinkedDesktop at 758 is the thin _resolveDesktopPath wrapper defined at linked-media.js:224, absent from the older C05 symbol list; resolveOnce at 757 is defined at 423 after the census's approximate ~40-396 core range. Those are source-backed resolver mappings, not invented census entries. syncUI at 767 maps to pending C05.media.mode-setting-ui (timeline.js:2679 calls it after mediaMode load). The conversion comment at 768-769 and convertLinkedToEmbedded/convertEmbeddedToLinked/convertActionSupported exports at 770-772 map to pending C05.media.linked-bulk-convert; 773-774 close the object/IIFE. The pinned C05 census blob 725d7875da509cd99a77bc404fc62296280399a0 and its old numeric ranges remain unchanged. No packet admission, numeric coverage or linked-media/browser/Tauri/render/export acceptance is claimed."
+        }
       ]
     },
     {
@@ -6186,6 +6450,14 @@
         ]
       ],
       "dispositions": [
+        {
+          "span": [
+            561,
+            580
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 561 is reloadIfTimeLinkOffset's conditional loadFrame call for timeLinkInOffset/timeLinkOutOffset, and line 566 declares the PROP_DIM_LABELS property metadata table. Both remain with pending C02.properties-and-curves.properties-and-metadata (#1037); C20f/#1156 and C20o/#1245 identify the helper as a caller-side dependency, not their owned implementation. Lines 567-580 are only rationale for DUP_TARGET_PROPS at 581, the adjacent pending C02.motion-advanced.duplicator-and-effector-props responsibility. This mixed span adds no new writer, packet admission, computed coverage or behavior acceptance."
+        },
         {
           "span": [
             1562,
@@ -6300,6 +6572,46 @@
         },
         {
           "span": [
+            13351,
+            13352
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2 (motion blob 6617bac), line 13351 is blank and line 13352 opens the public window.SMMotion object. This structural API opening defines no independent feature or state authority; the following interleaved exports map to their named pending C02/C20 responsibilities. No packet admission, computed coverage or runtime acceptance follows from this boundary."
+        },
+        {
+          "span": [
+            13372,
+            13394
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 13372 exports hasExpr to pending C02.expressions.expression-runtime (#1037); lines 13374-13383 expose control readers/mutators and registerControlPropMeta to C02.properties-and-curves.properties-and-metadata; line 13387 exports renderMotionPropsPanel to C20d.motion-properties-panel (#1150); line 13392 exports startTimeLinkPickwhip to C02.motion-advanced.canvas-drag-interactions. Intervening comments explain external callers and do not transfer implementations between packets. All named packets remain pending; this adds no numeric coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            13455,
+            13476
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): line 13455 exports hit3DGizmoRing and line 13456 exposes debugMotionDrag under the pending C02.motion-advanced.3d-layers-and-gizmo public API (#1037); the latter is a diagnostic for gizmo projection and hit-test math, with canvas-drag interactions as a consumer. Lines 13459, 13461 and 13467 expose evalTrack, isAnimated and a getLayerValue wrapper through C02.properties-and-curves.keyframe-track-model; line 13460 returns a copy of DEFAULT_CURVE from C20j.easing-curve-constants (#1230). Lines 13468-13476 only introduce the layerMotionPointMap export at 13477, owned by C02.motion-advanced.point-mapping-and-parent-chain. These interleaved API references do not admit any packet or establish numeric coverage or runtime acceptance."
+        },
+        {
+          "span": [
+            13565,
+            13621
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): lines 13565-13566 expose parent-key writers, and 13587-13588 expose computeMotionMat/elementMotionAt, under pending C02.motion-advanced.transform-application (#1037); 13570 exposes liveRefreshVisiblePropertyFields under C02.motion-advanced.canvas-drag-interactions; 13576 and 13603 expose propsFor/registerEffectorPropMeta under C02.properties-and-curves.properties-and-metadata; 13577 exposes setExpressionCode under C20o.widget-wiring-and-expression-bake (#1245). Lines 13589-13590 re-export addTextAnimator/removeTextAnimator, and 13592 exports textAnimatorWeights, under C20a.text-animator-runtime (#1125); line 13591 is the related inline textAnimatorsOf read-only facade, outside C20a's assigned implementation range. Lines 13593-13595 expose element style readers under C20a.element-style-readers. The matteOnAt reader at 13604-13610 uses C02.properties-and-curves.keyframe-track-model's hasKeys/valueAtFrame to answer the render bridge's matte threshold; this maps the reader context without claiming C20d's separate matte UI. Line 13621 exports holderRefOf to C02.properties-and-curves.key-selection-and-clipboard. Comments document consumers; all packets remain pending, with no numeric coverage or behavior acceptance."
+        },
+        {
+          "span": [
+            13808,
+            13825
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (motion blob 6617bac): lines 13810 and 13814 export invalidateSymbolUnionBounds and selectLayerFromGrid to pending C02.motion-advanced.mode-toggle-and-workspace-continuity (#1037); lines 13815-13816 export layerElements/elementLabel to C02.motion-advanced.component-shape-tree; lines 13823-13824 export ensureElementHolder/setKeyAtFrame to C20n.element-holders and C20n.set-key-at-frame (#1238); line 13825 exports registerExposedPropMeta to C02.properties-and-curves.properties-and-metadata. The intervening comments describe callers; no implementation, packet admission, numeric coverage or runtime acceptance is claimed."
+        },
+        {
+          "span": [
             13854,
             13879
           ],
@@ -6333,6 +6645,16 @@
           1,
           19
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            19
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2, src/js/playback-cache.js:1-19 is the descriptive header for the playback-bake fallback. The executable module IIFE and pending C03.js-effects-and-playback.playback-bake-cache responsibility begin at line 20, outside this comment-only span. This boundary does not claim covered playback behavior or accept the packet."
+        }
       ]
     },
     {
@@ -6393,6 +6715,14 @@
         ]
       ],
       "dispositions": [
+        {
+          "span": [
+            1,
+            9
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / project.js blob e2248533b47b0a067a61e4b641f83c7d24b00e79: lines 1-8 are New/Open/Save/Recent project-management header comments, while line 9 is executable (function(){ opening the IIFE around the whole project module. The opener is not comment-only and is not a separate feature writer or solely one C01 responsibility. First feature data RECENTS_KEY/MAX_RECENTS begins at line 10 in pending C01.project.start-screen; other pending C01 packets own document I/O, close guard, tabs, history and team sync. Pinned C01 census blob d81b618308f9f4849b0ba24fa512af6be90aa72c. Current project.js has a different blob under native work, so this classifies only the frozen span. No packet admission, numeric source coverage, project/save/load/browser/Tauri/native behavior or runtime acceptance is claimed."
+        },
         {
           "span": [
             11,
@@ -6469,6 +6799,16 @@
           1,
           33
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            1,
+            33
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen 3f6eed2a500f2ce868b711e063816029eb8fefa5, render-manager.js:1-33 is comment-only batch-queue, current-document, and export-delegation context. The executable IIFE begins at 34 under pending C03.js-effects-and-playback.render-manager-queue (#1038; pinned C03 census blob 337c9035f94f5290b2adf898d406550558560bfa). This preamble has no separate executable responsibility, packet admission, or numeric coverage."
+        }
       ]
     },
     {
@@ -6521,6 +6861,14 @@
         ]
       ],
       "dispositions": [
+        {
+          "span": [
+            1,
+            23
+          ],
+          "kind": "boundary",
+          "evidence": "Structural/documentary boundary only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / select-bridge.js blob a831eb065ed611f70a77692c61846eaddcd97a5a: lines 1-22 are architecture and behavior comments, while line 23 is the executable (function () { IIFE opener around the Select bridge. It is not comment-only and does not own a separate feature; the opener structurally encloses all pending C04a.select responsibilities, not solely C04a.select.hover-helpers, whose first census range begins at line 24. Pinned C04a census blob 8ffb669c5018190bd448b787a09ade35bd594b30. Current select-bridge.js has a different blob, so this disposition classifies only the frozen span. No packet admission, numeric source coverage, selection behavior, browser/native parity or runtime acceptance is claimed."
+        },
         {
           "span": [
             271,
@@ -6667,6 +7015,16 @@
           3370,
           3372
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            3370,
+            3372
+          ],
+          "kind": "boundary",
+          "evidence": "Comment-only boundary at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 / tools.js blob 3c25962dbe314d5e791489da30b2b642ff899357: lines 3370-3372 explain gapThr as a plain world-space distance, the stroke-end gap still counted as one closed shape, and Gap Size presets without scale/resolution conversion. The separate WASM-path comment starts at 3373 in pending C04a.fill.find-wasm-js-raster (#1039), and executable _wallSegments starts at 3381; neither is in this disposition. Pinned C04a census blob 8ffb669c5018190bd448b787a09ade35bd594b30. Current tools.js has a different blob, so this classifies only the frozen span. No packet admission, numeric source coverage, fill behavior, JS/Rust parity or runtime acceptance is claimed."
+        }
       ]
     },
     {
@@ -6731,6 +7089,14 @@
       "dispositions": [
         {
           "span": [
+            1,
+            103
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (tweens blob 6eca733): this is the tween feature-flag preamble, not a separate engine. TW_CURVATURE_DTW (12), TW_CORRECTION_PASS (13), TW_POINT_REDUCTION (14), TW_HANDLE_REHARMONISE (15), and TW_DTW_SYMMETRIC (59) gate C02.tween-engine.resampling-and-nonrigid-warping (#1037): their frozen reads are in DTW at 1124/1142 and correction/reharmonization/reduction at 2202/2122/2385. TW_FOLDBACK_W/FOLDBACK_MIN (26/29), TW_INTRINSIC_ANCHOR (33), TW_FOLD_UNWRAP (49), and TW_ALIGN_HAIRPIN (102) gate C02.tween-engine.interpolation-core, with reads at 3026, 1830, 2881 and 3181/3333. TW_MATCH_RELATIONAL/MATCH_LEN_W (79/88) gate C02.tween-engine.feature-extraction-and-matching, with reads in matchSc/autoMatchJS at 331/431-567. Line 103 is only the heading before buildTP at 104. These pending packet mappings change no flag behavior, packet admission or numeric coverage."
+        },
+        {
+          "span": [
             411,
             415
           ],
@@ -6771,6 +7137,30 @@
         },
         {
           "span": [
+            1564,
+            1958
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2 (tweens blob 6eca733), split by source callers rather than one packet: 1564-1589 holds the tweenSpanKey/getEasingForPair UID-keyed per-pair easing seam; generateTweens calls it at 3773-3774 and renderArcs at 4497, so those callers map to pending C02.tween-engine.tween-generation-and-splitting and C02.tween-engine.arc-rendering-and-reassignment (#1037), with timeline.js as an external settings consumer. Line 1590 separately defines scalar lerp, called by style/intrinsic interpolation at 1731-1753/1816-1818/3107-3115 (C02.tween-engine.interpolation-core), MLS/fold correction at 2007/2375 (C02.tween-engine.resampling-and-nonrigid-warping), and generation ordering/backdrop interpolation at 4229/4236 (C02.tween-engine.tween-generation-and-splitting). The same line defines lerpV, with no other reference in frozen tweens.js; neither the older C02 census nor this mapping claims a separately enumerated helper owner. Lines 1591-1674 define arcKey, getArcHandles, setArcHandle and rekeyTweenPairData: the writer stores state.motionArcs, select-bridge.js/tools.js call it on arc drag, timeline.js calls rekey on frame moves, renderArcs reads handles at 4512 and interpStroke reads them at 2401; assign the arc-state/overlay responsibility to C02.tween-engine.arc-rendering-and-reassignment and retain the interpolation caller separately. Lines 1675-1712 contain rotScalePt, _wrapPI, _segPolyLen and _nearPt for interpolation/crossing probes shared by pending C02.tween-engine.resampling-and-nonrigid-warping and C02.tween-engine.interpolation-core: rotScalePt is called at 2003-2006 and 2510 onward, _wrapPI in DTW at 1108-1136 and intrinsic/interpolation paths, _segPolyLen by interpStroke at 2576-2587, and _nearPt by the crossing probes at 1772/1791. Lines 1713-1756 carry color and persisted stroke style through _lerpHexColor/_carryTweenStyle; interpStroke invokes the style carry at 3109/3115, so these are interpolation-core helpers. Lines 1757-1796 hold _strokeDataPolyLen and self-crossing probes: the former feeds adaptive resampling and tween generation at 3666/4138, while _segsSelfXCount/_segsSelfIntersect feed both C02.tween-engine.resampling-and-nonrigid-warping at 2206/2249/2379 and interpolation-core at 2576 onward. Lines 1797-1870 define _intrinsicSegs, invoked by interpStroke at 2653/2813/3089, under interpolation-core. Lines 1871-1958 introduce and implement _mlsHandleIndices, called by _fitMLSPerVertex beginning at 1959, which the C02 resampling-and-nonrigid-warping packet explicitly names. The older C02 numeric ranges omit parts of this mixed frozen span; this maps existing pending responsibilities and actual callers without amending that census, asserting one owner for all 395 lines, admitting a packet or accepting tween behavior."
+        },
+        {
+          "span": [
+            3735,
+            3742
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 3735-3742 are the body and close of _dedupeFrameStrokeIds. It renames repeated nonempty strokeId values on a keyframe's stroke array to twdup_<frame>_<index>; generateTweens calls it on both source keyframes at 3796-3797 before matching. This keyframe metadata write is a precondition within pending C02.tween-engine.tween-generation-and-splitting (#1037), not a pure helper or a new extracted owner. No packet admission, numeric coverage or save/reload acceptance is claimed."
+        },
+        {
+          "span": [
+            4810,
+            4811
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: line 4810 documents the extracted frame-entry kind and line 4811 calls NemoFrameHistoryEntry.capture inside pushUndoActiveFrame. Pending C01.tweens.undo-redo-engine (#1036) explicitly names pushUndoActiveFrame and its frame-only branch; accepted P21/#1023 supplies the extracted capture module, not acceptance of the entire C01 undo engine. This adds no numeric coverage or undo behavior acceptance."
+        },
+        {
+          "span": [
             4860,
             4860
           ],
@@ -6784,6 +7174,22 @@
           ],
           "kind": "covered",
           "evidence": "Responsibility mapping only at frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5: line 4925 conditionally restores s.layerFolders via NemoFolderCodec.hasFolderMap/restoreFolderMap inside restoreLayersSnapshot. The pinned C01/#1036 census packet C01.tweens.undo-redo-engine names restoreLayersSnapshot and whole-tree undo metadata responsibility. Compatibility comments at 4923-4924 and the distinct layerLinkGroups restore at 4926 are outside this singleton. C01 remains pending; this mapping does not claim codec extraction, undo/redo behavior acceptance, or numeric coverage."
+        },
+        {
+          "span": [
+            4977,
+            4979
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 4977-4978 introduce undo()'s frame-only branch; line 4979 applies the entry through NemoFrameHistoryEntry.apply, pushes its inverse to redo, then refreshes the current frame and UI. Pending C01.tweens.undo-redo-engine (#1036) names undo and this lighter branch; accepted P21/#1023 owns the extracted entry helper but does not accept the full engine. No numeric coverage, history round-trip or runtime acceptance is claimed."
+        },
+        {
+          "span": [
+            4992,
+            5016
+          ],
+          "kind": "covered",
+          "evidence": "Responsibility mapping only at frozen 3f6eed2: lines 4992-4993 are redo()'s frame-only NemoFrameHistoryEntry.apply/inverse-push/refresh branch under pending C01.tweens.undo-redo-engine (#1036), with P21/#1023 as the extracted-entry context. Line 4994 is blank. Lines 4995-5015 are the manual inbetween match-reassignment lead-in, describing state.tweenOverrides and its two-step A/B stroke selection; line 5016 declares the mutable _reassign flow state. That separate pending responsibility is C02.tween-engine.arc-rendering-and-reassignment (#1037), whose reassignStatusEl/startReassign and other named functions follow. C01's old coarse range extends through 5022 and C02's old reassign range starts at 5046; these coordinates are historical drift, not permission to assign the whole mixed span to C01 or silently amend either census. Both packets remain pending; this adds no numeric coverage or behavior acceptance."
         }
       ]
     },
@@ -6811,6 +7217,16 @@
           72,
           77
         ]
+      ],
+      "dispositions": [
+        {
+          "span": [
+            72,
+            77
+          ],
+          "kind": "boundary",
+          "evidence": "At frozen source 3f6eed2a500f2ce868b711e063816029eb8fefa5 (vectorize-bridge blob 3d1e3f817e981cdebc86919502515da64663157e), line 72 is blank and lines 73-77 only explain how splineToSegments converts vtracer's absolute cubic control-point chain into relative Paper.js Segment handles. The executable splineToSegments declaration begins at line 78 in pending C04b.content-tools.vectorize-shape-fitting (#1039), whose pinned census blob f76259d59dedb715edc18b9f84db98ac00ee7cb8 declares lines 78-395 for that responsibility. This preamble has no separate executable owner; the original C04b range, packet admission and numeric computed coverage remain unchanged. No vectorize feature or browser/Tauri/runtime acceptance is claimed."
+        }
       ]
     }
   ],

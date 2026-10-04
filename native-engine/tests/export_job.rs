@@ -19,7 +19,7 @@ fn history(label: &str) -> NativeOpacityHistory {
     NativeOpacityHistory::new(label, decode_project(PROJECT).unwrap()).unwrap()
 }
 
-fn geometry(offset: f64) -> GeometryPaintInput {
+pub(super) fn geometry(offset: f64) -> GeometryPaintInput {
     GeometryPaintInput::new(
         "geometry/r08",
         "v1",
@@ -34,7 +34,7 @@ fn geometry(offset: f64) -> GeometryPaintInput {
     .unwrap()
 }
 
-fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
+pub(super) fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
     ExportBegin {
         request_id: id.into(),
         expected_revision: revision,
@@ -49,10 +49,10 @@ fn request(id: &str, revision: u64, frames: &[u32]) -> ExportBegin {
 }
 
 #[derive(Default)]
-struct MemoryPort {
+pub(super) struct MemoryPort {
     events: Vec<String>,
     staged: Vec<(String, Vec<u8>)>,
-    write_log: Vec<(String, Vec<u8>)>,
+    pub(super) write_log: Vec<(String, Vec<u8>)>,
     published: Vec<ExportArtifact>,
     fail_write: Option<usize>,
     fail_cleanup: bool,
@@ -175,7 +175,7 @@ impl ExportCompositor for ExtremeReadbackCompositor {
     }
 }
 
-fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
+pub(super) fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
     let decoder = png::Decoder::new(Cursor::new(bytes));
     let mut reader = decoder.read_info().unwrap();
     let mut rgba = vec![0; reader.output_buffer_size().unwrap()];
@@ -186,7 +186,7 @@ fn decode(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
     (info.width, info.height, rgba)
 }
 
-fn edit_to_revision_one(history: &mut NativeOpacityHistory) {
+pub(super) fn edit_to_revision_one(history: &mut NativeOpacityHistory) {
     let command = OpacityRequest::command(
         "n14-edit-r1",
         history.instance_id(),
@@ -485,4 +485,41 @@ fn extreme_readback_dimensions_fail_without_panicking_or_publishing() {
     assert!(manager.port().published.is_empty());
     assert!(manager.port().staged.is_empty());
     assert_eq!(manager.lease_counters().live(), 0);
+}
+
+#[test]
+fn cubic_png_is_the_exact_pinned_gpu_composition() {
+    use crate::export_geometry_tests::{assert_cap_exports, cap, ObservedCompositor};
+    let mut history = history("n24a-png");
+    let readbacks = Rc::new(RefCell::new(Vec::new()));
+    let gpu = Compositor::new().expect("N24A PNG requires a real native GPU");
+    let mut manager = ExportJobManager::new(
+        MemoryPort::default(),
+        ObservedCompositor {
+            gpu,
+            readbacks: Rc::clone(&readbacks),
+        },
+    );
+    let mut input = request("cubic", 0, &[0, 10, 20]);
+    input.frames = [0, 10, 20]
+        .map(|frame| ExportFrameInput::new(frame, cap(64.0)))
+        .to_vec();
+    let begun = manager.begin(&history, input).unwrap();
+    edit_to_revision_one(&mut history);
+    let receipt = manager.run_to_completion(&begun.job_id).unwrap();
+    assert_eq!(receipt.status, JobStatus::Succeeded);
+    let decoded: Vec<_> = manager
+        .port()
+        .write_log
+        .iter()
+        .map(|write| decode(&write.1))
+        .collect();
+    assert_cap_exports(&decoded, &readbacks.borrow(), &begun.document_snapshot_id);
+    assert_eq!(manager.port().published.len(), 1);
+    assert!(manager.port().staged.is_empty());
+    let counts = manager.lease_counters();
+    assert_eq!(
+        (counts.acquired(), counts.released(), counts.live()),
+        (6, 6, 0)
+    );
 }

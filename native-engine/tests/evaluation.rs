@@ -1,3 +1,4 @@
+use crate::animation_curve::{evaluate_curve, CurveSample};
 use crate::codec::{decode_project, encode_project, CodecErrorKind};
 use crate::commands::{NativeOpacityApplication, OpacityRequest};
 use crate::document::OpacityDocument;
@@ -65,6 +66,10 @@ fn fixed_curve_evaluates_from_immutable_snapshot_with_stable_identity() {
     }
 
     assert_eq!(encode_project(snapshot.document()).unwrap(), before);
+    let reloaded = application(&before).acquire_snapshot(0).unwrap();
+    for (frame, opacity) in expected {
+        close(value_at(&reloaded, frame).layers()[0].value(), opacity);
+    }
     assert_eq!(snapshot.id(), app.acquire_snapshot(0).unwrap().id());
     assert_eq!(app.content_revision(), 0);
 }
@@ -149,12 +154,12 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
     );
 
     let mut changed_curve = project_value();
-    changed_curve["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][1]["y"] = json!(0.25);
+    changed_curve["layers"][0]["motion"]["opacity"]["keys"][0]["curvePoints"][1]["x"] = json!(0);
     assert_eq!(
         decode_project(&serde_json::to_vec(&changed_curve).unwrap())
             .unwrap_err()
             .kind(),
-        CodecErrorKind::Unsupported
+        CodecErrorKind::Invalid
     );
     assert_eq!(
         evaluate(
@@ -164,7 +169,7 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
         )
         .unwrap_err()
         .kind(),
-        EvaluationErrorKind::Unsupported
+        EvaluationErrorKind::Invalid
     );
 
     let mut nonzero_handle = project_value();
@@ -239,4 +244,256 @@ fn unsupported_or_malformed_interpolation_is_rejected_before_evaluation() {
         .kind(),
         EvaluationErrorKind::Invalid
     );
+}
+
+#[test]
+fn authored_native_curves_match_independent_oracles_at_pinned_revisions() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/animation-curves/authored.json")).unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let mut project = project_value();
+        let keys = &mut project["layers"][0]["motion"]["opacity"]["keys"];
+        keys[0]["curvePoints"] = case["points"].clone();
+        keys[1]["v"] = json!([60]);
+        project["layers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"layerUid":"static", "motionStatic":{"opacity":[25]}}));
+        let mut app = application(&serde_json::to_vec(&project).unwrap());
+        let pinned = app.acquire_snapshot(0).unwrap();
+        let before = encode_project(pinned.document()).unwrap();
+        let response = app.handle(OpacityRequest::command("advance", app.instance_id(), app.document_id(), 0,
+            json!({"command":"layer.opacity.set", "stableTarget":{"layerUid":"static"}, "value":40})));
+        assert!(response.is_ok());
+        assert_eq!(app.content_revision(), 1);
+        let current = app.acquire_snapshot(1).unwrap();
+        for (frame, expected) in fixture["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(case["opacity"].as_array().unwrap())
+        {
+            let frame = frame.as_u64().unwrap() as u32;
+            for snapshot in [&pinned, &current] {
+                let result = value_at(snapshot, frame);
+                close(result.layers()[0].value(), expected.as_f64().unwrap());
+                assert_eq!(result.document_snapshot_id(), snapshot.id());
+                assert_eq!(result.document_id(), pinned.document_id());
+                assert_eq!(result.content_revision(), snapshot.content_revision());
+                close(
+                    result.layers()[1].value(),
+                    if snapshot.content_revision() == 0 {
+                        25.0
+                    } else {
+                        40.0
+                    },
+                );
+            }
+        }
+        assert_eq!(
+            encode_project(pinned.document()).unwrap(),
+            before,
+            "{}",
+            case["name"]
+        );
+        let reloaded = application(&before).acquire_snapshot(0).unwrap();
+        close(
+            value_at(&reloaded, 10).layers()[0].value(),
+            case["opacity"][2].as_f64().unwrap(),
+        );
+    }
+}
+
+#[test]
+fn finite_authored_curve_with_overflowing_opacity_rejects_without_mutation() {
+    let mut project = project_value();
+    let keys = &mut project["layers"][0]["motion"]["opacity"]["keys"];
+    keys[0]["curvePoints"] = json!([{"x":0,"y":0}, {"x":1,"y":1e308}]);
+    keys[1]["v"] = json!([60]);
+    let app = application(&serde_json::to_vec(&project).unwrap());
+    let snapshot = app.acquire_snapshot(0).unwrap();
+    let before = encode_project(snapshot.document()).unwrap();
+    assert_eq!(
+        encode_project(&decode_project(&before).unwrap()).unwrap(),
+        before
+    );
+    // The curve's midpoint is finite (5e307), but 20 + 40*5e307 overflows.
+    let error = evaluate(&snapshot, SUPPORTED_CONTEXT_ID, 10).unwrap_err();
+    assert_eq!(error.kind(), EvaluationErrorKind::Invalid);
+    assert!(error.message().contains("finite"));
+    close(value_at(&snapshot, 0).layers()[0].value(), 20.0);
+    close(value_at(&snapshot, 20).layers()[0].value(), 60.0);
+    let after = app.acquire_snapshot(0).unwrap();
+    assert_eq!(after.id(), snapshot.id());
+    assert_eq!(after.document_id(), snapshot.document_id());
+    assert_eq!(after.content_revision(), 0);
+    assert_eq!(app.content_revision(), 0);
+    assert_eq!(encode_project(after.document()).unwrap(), before);
+}
+
+fn sample(x: f64, y: f64) -> CurveSample {
+    CurveSample {
+        x,
+        y,
+        tx: None,
+        ty: None,
+    }
+}
+
+fn authored(x: f64, y: f64, tx: f64, ty: f64) -> CurveSample {
+    CurveSample {
+        x,
+        y,
+        tx: Some(tx),
+        ty: Some(ty),
+    }
+}
+
+fn close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() <= 1e-12,
+        "expected {expected}, got {actual}"
+    );
+}
+
+#[test]
+fn authored_tangents_match_independent_polynomial_oracles() {
+    // Both x controls are 1/3 and 2/3, hence x(t)=t. The independent
+    // polynomials are 2t-t² and 4t-3t², respectively.
+    let cases = [
+        (
+            [authored(0.0, 0.0, 1.0, 2.0), authored(1.0, 1.0, 1.0, 0.0)],
+            [0.0, 0.4375, 0.75, 0.9375, 1.0],
+        ),
+        (
+            [authored(0.0, 0.0, 1.0, 4.0), authored(1.0, 1.0, 1.0, -2.0)],
+            [0.0, 0.8125, 1.25, 1.3125, 1.0],
+        ),
+    ];
+    for (points, expected) in cases {
+        let before = points;
+        for (x, y) in [0.0, 0.25, 0.5, 0.75, 1.0].into_iter().zip(expected) {
+            close(evaluate_curve(&points, x), y);
+        }
+        assert_eq!(points, before);
+    }
+}
+
+#[test]
+fn overshoot_oracle_rejects_clamped_output_negative_control() {
+    let points = [authored(0.0, 0.0, 1.0, -6.0), authored(1.0, 1.0, 1.0, -6.0)];
+    // x(t)=t; y(t)=-6t+21t²-14t³ crosses both endpoint values.
+    for (x, expected) in [(0.25, -0.40625), (0.75, 1.40625)] {
+        let actual = evaluate_curve(&points, x);
+        close(actual, expected);
+        let deliberately_wrong = actual.clamp(0.0, 1.0);
+        assert!((deliberately_wrong - expected).abs() > 0.4);
+    }
+}
+
+#[test]
+fn short_curves_pass_raw_input_but_long_curves_clamp_input_only() {
+    for points in [&[][..], &[sample(0.5, 7.0)][..]] {
+        for x in [-2.0, 0.0, 0.3, 1.0, 2.0] {
+            assert_eq!(evaluate_curve(points, x), x);
+        }
+    }
+    let points = [sample(0.0, -1.0), sample(1.0, 2.0)];
+    for (x, expected) in [
+        (-2.0, -1.0),
+        (0.0, -1.0),
+        (0.25, -0.25),
+        (1.0, 2.0),
+        (2.0, 2.0),
+    ] {
+        close(evaluate_curve(&points, x), expected);
+    }
+}
+
+#[test]
+fn authored_zero_and_missing_tangent_components_preserve_their_meaning() {
+    let zero = [authored(0.0, 0.0, 0.0, 3.0), authored(1.0, 1.0, 0.0, 0.0)];
+    // Zero x tangents still give x(1/2)=1/2; y(1/2)=7/8.
+    close(evaluate_curve(&zero, 0.5), 0.875);
+    close(
+        evaluate_curve(&[sample(0.0, 0.0), sample(1.0, 1.0)], 0.5),
+        0.5,
+    );
+    let horizontal = [
+        CurveSample {
+            tx: Some(1.0),
+            ..sample(0.0, 0.0)
+        },
+        CurveSample {
+            tx: Some(1.0),
+            ..sample(1.0, 1.0)
+        },
+    ];
+    // Missing ty means zero, so y(t)=3t²-2t³ and x(t)=t.
+    close(evaluate_curve(&horizontal, 0.25), 0.15625);
+    let automatic = [
+        CurveSample {
+            ty: Some(100.0),
+            ..sample(0.0, 0.0)
+        },
+        sample(1.0, 1.0),
+    ];
+    close(evaluate_curve(&automatic, 0.25), 0.25);
+}
+
+#[test]
+fn automatic_tangents_preserve_endpoints_plateaus_turns_and_slope_limit() {
+    let peak = [sample(0.0, 0.0), sample(0.5, 1.0), sample(1.0, 0.0)];
+    let plateau = [sample(0.0, 0.0), sample(0.5, 0.0), sample(1.0, 1.0)];
+    // At Bezier t=1/2, x=7/32 in the first segment and 25/32 in
+    // the second. Endpoint slopes are one-sided; turning slopes are zero.
+    for (x, expected) in [
+        (7.0 / 32.0, 9.0 / 16.0),
+        (0.5, 1.0),
+        (25.0 / 32.0, 9.0 / 16.0),
+    ] {
+        close(evaluate_curve(&peak, x), expected);
+    }
+    close(evaluate_curve(&plateau, 7.0 / 32.0), 0.0);
+    close(evaluate_curve(&plateau, 25.0 / 32.0), 7.0 / 16.0);
+    for sign in [-1.0, 1.0] {
+        let limited = [
+            sample(0.0, 0.0),
+            sample(0.5, sign * 0.05),
+            sample(1.0, sign),
+        ];
+        // Adjacent slopes .1 and 1.9 have average 1, limited to .3.
+        // The first segment's y(1/2)=3/320 (negated for a falling curve).
+        close(evaluate_curve(&limited, 7.0 / 32.0), sign * 3.0 / 320.0);
+    }
+    let collinear = [sample(0.0, -1.0), sample(0.2, -0.4), sample(1.0, 2.0)];
+    for x in [0.0, 0.1, 0.2, 0.4, 0.75, 1.0] {
+        close(evaluate_curve(&collinear, x), 3.0 * x - 1.0);
+    }
+}
+
+#[test]
+fn degenerate_spans_keep_strict_segment_selection_and_derivative_early_exit() {
+    let duplicate = [sample(0.0, 0.0), sample(0.5, 0.25), sample(0.5, 0.75)];
+    close(evaluate_curve(&duplicate, 0.5), 0.25);
+    let zero_derivative = [authored(0.0, 0.2, 0.0, 3.0), authored(0.0, 0.8, 0.0, 3.0)];
+    close(evaluate_curve(&zero_derivative, 0.5), 0.2);
+    for span in [0.0, 1e-9, 1e-6] {
+        let tiny = [sample(0.0, 0.2), sample(span, 0.8)];
+        // The initial parameter is zero and the derivative span/2 is
+        // below 1e-6, so no corrective solve or fallback runs.
+        close(evaluate_curve(&tiny, span / 2.0), 0.2);
+    }
+    let larger = [sample(0.0, 0.2), sample(2e-6, 0.8)];
+    close(evaluate_curve(&larger, 1e-6), 0.5);
+}
+
+#[test]
+fn newton_iteration_limit_preserves_characterized_nonconvergent_handles() {
+    let points = [authored(0.0, 0.0, 4.0, 2.0), authored(1.0, 1.0, 4.0, 0.0)];
+    // Frozen from the production JS at base 7554a3a before this extraction.
+    // These nonmonotone x handles distinguish eight clamped iterations from
+    // seven (1, 0), nine (~.9340, ~.4478), or a different root-finding method.
+    close(evaluate_curve(&points, 0.4), 0.9775);
+    close(evaluate_curve(&points, 0.6), 0.2775);
 }

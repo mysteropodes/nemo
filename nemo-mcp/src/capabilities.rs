@@ -15,14 +15,16 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities/opacity.json"),
     include_str!("../../engineering/application/capabilities/export-job.json"),
     include_str!("../../engineering/application/capabilities/timelapse.json"),
+    include_str!("../../engineering/application/capabilities/diagnostics.json"),
 ];
 
 /// Native v2 declarations are deliberately version-separated from the legacy
 /// catalog above. N16 consumes the feature-owned descriptor but does not add it
 /// to v1 discovery or turn it into another MCP tool.
-pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[include_str!(
-    "../../engineering/application/capabilities-v2/native-opacity.json"
-)];
+pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
+    include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
+];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CapabilityAvailability {

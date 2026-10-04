@@ -1,20 +1,12 @@
 //! Strict admission and serialization for the bounded opacity document.
 
 use crate::document::{
-    CurvePoint, OpacityDocument, OpacityKey, OPACITY_DOCUMENT_FORMAT,
+    validate_curve_points, OpacityDocument, OpacityKey, OPACITY_DOCUMENT_FORMAT,
     OPACITY_DOCUMENT_FORMAT_VERSION,
 };
 use serde_json::{Number, Value};
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-
-const DEFAULT_CURVE: [[f64; 2]; 5] = [
-    [0.0, 0.0],
-    [0.25, 0.156],
-    [0.5, 0.5],
-    [0.75, 0.844],
-    [1.0, 1.0],
-];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodecErrorKind {
@@ -142,7 +134,8 @@ fn validate_track(keys: &[OpacityKey], total_frames: u32) -> Result<(), CodecErr
         }
         previous = Some(key.frame);
         validate_opacity(&key.v[0], "motion.opacity.keys[].v[0]")?;
-        validate_curve(&key.curve_points)?;
+        validate_curve_points(&key.curve_points)
+            .map_err(|message| CodecError::new(CodecErrorKind::Invalid, message))?;
         validate_zero_handle(&key.h_out, "hOut")?;
         validate_zero_handle(&key.h_in, "hIn")?;
     }
@@ -155,24 +148,6 @@ fn validate_opacity(value: &Number, context: &str) -> Result<(), CodecError> {
     };
     if !(0.0..=100.0).contains(&value) {
         return invalid(format!("{context} must be in the range 0..100"));
-    }
-    Ok(())
-}
-
-fn validate_curve(points: &[CurvePoint]) -> Result<(), CodecError> {
-    if points.len() != DEFAULT_CURVE.len() {
-        return invalid("curvePoints must contain the five characterized points");
-    }
-    for (index, (point, expected)) in points.iter().zip(DEFAULT_CURVE).enumerate() {
-        let actual = [
-            number(&point.x, "curvePoints.x")?,
-            number(&point.y, "curvePoints.y")?,
-        ];
-        if actual != expected {
-            return unsupported(format!(
-                "curvePoints[{index}] differs from the characterized opacity curve"
-            ));
-        }
     }
     Ok(())
 }
