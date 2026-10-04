@@ -102,6 +102,16 @@ for (const mode of ['unavailable', 'fenced', 'throwing', 'missing-persistence', 
   });
 }
 
+for (const controller of [null, undefined]) {
+  test(`explicitly present ${controller === null ? 'null' : 'undefined'} controller cannot admit legacy autosave`, () => {
+    const fixture = harness({ native: controller });
+    assert.equal('NemoNativeOpacityCutover' in fixture.window, true);
+    assert.equal(fixture.tick().status, 'unavailable');
+    assert.deepEqual(fixture.effects, []);
+    assert.equal(fixture.warnings.length, 1);
+  });
+}
+
 for (const controller of [0, '', false, {}, { blocksLegacy: () => null }, { blocksLegacy: () => 'legacy' },
   { blocksLegacy() { throw new Error('ownership unavailable'); } }]) {
   test('malformed or ambiguous ownership never admits a legacy writer', () => {
@@ -110,6 +120,16 @@ for (const controller of [0, '', false, {}, { blocksLegacy: () => null }, { bloc
     assert.deepEqual(fixture.effects, []);
   });
 }
+
+test('throwing native-controller getter returns unavailable before every effect', () => {
+  const fixture = harness();
+  Object.defineProperty(fixture.window, 'NemoNativeOpacityCutover', {
+    get() { throw new Error('controller unavailable'); },
+  });
+  assert.equal(fixture.tick().status, 'unavailable');
+  assert.deepEqual(fixture.effects, []);
+  assert.equal(fixture.warnings.length, 1);
+});
 
 for (const phase of ['installing', 'replacing', 'release-requested', 'releasing', 'closed', 'indeterminate']) {
   test(`${phase} remains native-blocking even though isActive is false`, () => {
@@ -174,7 +194,7 @@ test('native-ready localStorage fallback stores the same pinned bytes once', () 
 
 for (const controller of [undefined, { blocksLegacy: () => false }]) {
   test(`legacy ${controller ? 'released' : 'browser'} tick preserves frame-save and adapter order`, () => {
-    const fixture = harness({ native: controller });
+    const fixture = harness(controller === undefined ? {} : { native: controller });
     fixture.tick();
     assert.deepEqual(fixture.effects, [
       ['legacy-save'], ['legacy-json'], ['autosave', 'legacy-json'],
@@ -194,7 +214,7 @@ test('legacy browser localStorage fallback retains its existing save and seriali
 
 for (const native of [undefined, nativePin()]) {
   test(`production autosave adapter mirrors exact ${native ? 'native' : 'browser'} bytes to localStorage and IndexedDB`, () => {
-    const fixture = harness({ native: native && native.controller });
+    const fixture = harness(native ? { native: native.controller } : {});
     fixture.window.SMIdb = {
       set(key, json) { fixture.effects.push(['IndexedDB', key, json]); return Promise.resolve(); },
     };
@@ -213,7 +233,7 @@ for (const native of [undefined, nativePin()]) {
 
 for (const native of [undefined, nativePin().controller]) {
   test(`playing skips the entire ${native ? 'native' : 'legacy'} tick`, () => {
-    const fixture = harness({ native, playing: true });
+    const fixture = harness(native ? { native, playing: true } : { playing: true });
     fixture.tick();
     assert.deepEqual(fixture.effects, []);
     assert.equal(fixture.warnings.length, 0);

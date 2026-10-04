@@ -11766,9 +11766,11 @@ window.updateCombinePanel=updateCombinePanel;
 
 setInterval(function(){
   if(state.playing)return;
-  var json,native=window.NemoNativeOpacityCutover;
+  var json;
   try{
-    var blocked=native==null?false:native.blocksLegacy();
+    var nativePresent='NemoNativeOpacityCutover' in window;
+    var native=nativePresent?window.NemoNativeOpacityCutover:null;
+    var blocked=nativePresent?native.blocksLegacy():false;
     if(blocked===false){
       saveAllLayerFrames();
       json=window.SM.exportJSON();
