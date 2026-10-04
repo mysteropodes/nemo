@@ -6,7 +6,7 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function create(lifecycle, ports, isOpening) {
+  function create(lifecycle, ports, isOpening, isPublished) {
     var resize = null, resizing = null, presenting = null, lastPresentedFrame = null;
 
     function disposeSession(session) {
@@ -70,6 +70,7 @@
     async function presentPreview(frame, allowOccludedAdmission) {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
       var observed = lifecycle.inspect(), current = lifecycle.identity();
+      var retryable = false;
       try {
         var presented;
         do {
@@ -79,10 +80,11 @@
           try { presented = await work; }
           finally { if (presenting === work) presenting = null; }
           // A resize can arrive while the host presents. Finish it and retry.
-        } while ((resize && resize.session === observed.session) ||
-                 (resizing && resizing.session === observed.session));
+        } while (presented.status === 'presented' &&
+                 ((resize && resize.session === observed.session) ||
+                  (resizing && resizing.session === observed.session)));
         var latest = lifecycle.inspect();
-        if (!['presented', 'deferred-occluded'].includes(presented.status) ||
+        if (!['presented', 'deferred-occluded', 'deferred-timeout'].includes(presented.status) ||
             presented.frame !== frame ||
             presented.lifecycleGeneration !== observed.generation ||
             presented.instanceId !== current.instanceId ||
@@ -99,17 +101,24 @@
         // The start screen can occlude the native layer before reveal. This
         // receipt admits only the handoff, never an Open success; reveal must
         // obtain a fresh, strictly presented receipt at the same identity.
-        if (presented.status === 'deferred-occluded') {
-          if (!allowOccludedAdmission || !isOpening()) {
-            throw new Error('native opacity frame was not presented at the admitted revision');
-          }
+        if (presented.status === 'deferred-occluded' && allowOccludedAdmission && isOpening()) {
           return Object.freeze(Object.assign({ owner: 'native' }, presented));
+        }
+        if (presented.status !== 'presented') {
+          if (typeof isPublished === 'function' && isPublished(observed.session)) {
+            var deferred = new Error('native opacity frame presentation is deferred');
+            deferred.code = 'native_preview_deferred';
+            deferred.status = presented.status;
+            retryable = true;
+            throw deferred;
+          }
+          throw new Error('native opacity frame was not presented at the admitted revision');
         }
         lastPresentedFrame = frame;
         return Object.freeze(Object.assign({ owner: 'native' }, presented));
       } catch (error) {
         var failed = lifecycle.inspect();
-        if ((!error || error.code !== 'native_preview_superseded') &&
+        if (!retryable && (!error || error.code !== 'native_preview_superseded') &&
             failed.phase === 'native' && failed.session === observed.session) lifecycle.fence(error);
         throw error;
       }

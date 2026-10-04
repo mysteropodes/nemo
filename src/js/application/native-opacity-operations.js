@@ -17,7 +17,9 @@
     // Extension capabilities outlive a document; opening is one import at a time.
     var extensionExposed = false, installation = null, opening = false;
     var pendingOpen = null, publishedSession = null, admissionStarted = false;
-    var viewport = viewportModule.create(lifecycle, ports, function () { return opening; });
+    var viewport = viewportModule.create(lifecycle, ports,
+      function () { return opening; },
+      function (session) { return publishedSession === session; });
     var v1 = v1Module.create(lifecycle, ports, contract);
 
     function ensureActive() {

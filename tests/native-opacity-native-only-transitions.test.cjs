@@ -559,6 +559,68 @@ test('occlusion on the second native presentation fails closed after reveal', as
   assert.equal(h.state.imports.length, 0);
 });
 
+test('a presented first admission still cannot publish an occluded reveal', async () => {
+  const source = staticSource();
+  const h = surfaceHarness(source, { previewReceipt(receipt) {
+    return { ...receipt, status: h.state.previews.length === 1 ? 'presented' : 'deferred-occluded' };
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
+  assert.equal(first.status, 'presented');
+  const root = { NemoNativeOpacityProject: h.published().project,
+    NemoNativeOpacityCutover: h.published().cutover };
+  await assert.rejects(NativeProjectEntry.reveal(root, first, {
+    hide() {}, show() {}, repaint() { throw new Error('Paper repaint'); },
+    raf(callback) { callback(); },
+  }), /not presented/);
+  assert.equal(h.controller.status(), 'indeterminate');
+  assert.equal(h.state.imports.length, 0);
+});
+
+test('published native session survives deferred presentation and retries only with a presented receipt', async () => {
+  const source = staticSource();
+  let paints = 0;
+  const h = surfaceHarness(source, { paintUiProjection() { paints++; }, previewReceipt(receipt) {
+    return { ...receipt, status: h.state.previews.length === 3 ? 'deferred-occluded' : 'presented' };
+  } });
+  const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
+  assert.equal(first.status, 'presented');
+  await h.published().project.finishOpenAfterReveal(first);
+  const identity = h.controller.identity(), beforePaint = paints;
+  await assert.rejects(h.published().cutover.presentPreview(10), error =>
+    error && error.code === 'native_preview_deferred' && error.status === 'deferred-occluded');
+  assert.equal(h.controller.status(), 'native');
+  assert.deepEqual(h.controller.identity(), identity);
+  assert.equal(paints, beforePaint, 'a deferred host frame cannot publish UI');
+  const retried = await h.published().cutover.presentPreview(10);
+  assert.equal(retried.status, 'presented');
+  assert.equal(retried.frame, 10);
+  assert.equal(h.state.previews.length, 4);
+});
+
+test('deferred preview recovery stays scoped to the published session across close and reentry', async () => {
+  const h = surfaceHarness(staticSource(), { previewReceipt(receipt) {
+    return { ...receipt, status: [3, 6].includes(h.state.previews.length)
+      ? 'deferred-timeout' : 'presented' };
+  } });
+  const firstA = await h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await h.published().project.finishOpenAfterReveal(firstA);
+  const sessionA = h.state.lifecycle.inspect().session;
+  await assert.rejects(h.published().cutover.presentPreview(10), { code: 'native_preview_deferred' });
+  assert.equal(h.controller.status(), 'native');
+  await h.controller.releaseCurrent('deferred-reentry');
+  assert.equal(h.controller.status(), 'closed');
+
+  const firstB = await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true);
+  await h.published().project.finishOpenAfterReveal(firstB);
+  assert.notStrictEqual(h.state.lifecycle.inspect().session, sessionA);
+  await assert.rejects(h.published().cutover.presentPreview(10), { code: 'native_preview_deferred' });
+  assert.equal(h.controller.status(), 'native');
+  const retried = await h.published().cutover.presentPreview(10);
+  assert.equal(retried.status, 'presented');
+  assert.equal(retried.documentId, 'native-document-2');
+  assert.equal(h.state.previews.length, 7);
+});
+
 test('failed, deferred and malformed first presentations cannot publish an open or reenter Paper', async () => {
   for (const status of ['failed-validation', 'deferred-timeout', 'deferred-occluded', 'stale-discarded', 'malformed']) {
     const h = surfaceHarness(staticSource(), { previewReceipt(receipt) {
