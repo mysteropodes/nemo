@@ -46,6 +46,14 @@ function fixture(existing = false) {
     open() { opens[0].onupgradeneeded(); opens[0].onsuccess(); } };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
+test('adopted adapter registration has no unclassified or size exception', () => {
+  const profile = JSON.parse(fs.readFileSync(path.join(__dirname, '../engineering/boundaries/profiles/app-js.profile.json')));
+  const module = profile.modules.find(entry => entry.id === 'app.idb.store');
+  assert.equal(module.layer, 'adapters');
+  assert.equal(module.sizeProfile, 'Platform/engine adapter');
+  assert.deepEqual(module.publicApi, ['idb-store.js']);
+  assert.equal(profile.exceptions.some(entry => entry.path === 'src/js/idb-store.js'), false);
+});
 async function pending(promise) {
   let settled = false;
   promise.then(() => { settled = true; }, () => { settled = true; });

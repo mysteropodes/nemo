@@ -38,10 +38,13 @@ slot when its write hits quota. Startup checks `SMIdb.get('nemo-auto')` only whe
 localStorage is missing; Resume similarly falls through to get and catches failures as
 `applyAuto(null)`. These orderings and silent catches are unchanged.
 
-Storage availability in the browser does not grant native document admission or restore
-the unavailable legacy Resume/import workflow. Browser tests exercise the real Resume
-control and require its denied import to preserve document/history and keep the start
-screen visible. Undo/redo, selection, animation, render/export and native bridges gain
+Storage availability in the browser does not grant native document admission or establish
+a usable Resume workflow. With the curve-workflow fixture, the real Resume control
+imports `r08_curve_layer` but keeps the start screen visible: editor reveal is unavailable.
+An isolated comparison substituting only the exact protected-base `c20d01e` adapter
+observed identical stored bytes, layers/frames, history, current frame, start-screen
+visibility and page errors. The browser test retains this partial baseline, without
+relaxing admission guards or claiming restored editing. Undo/redo, selection, animation, render/export and native bridges gain
 no writers or document transformations. The fixture's exact text survives storage/reload.
 Tauri filesystem autosave is separate; this script can exist in its webview, but actual
 installed Tauri IndexedDB availability is unverified by this browser-only slice. No

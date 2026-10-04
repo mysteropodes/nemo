@@ -9,7 +9,7 @@ const bytes = fs.readFileSync(path.join(root, 'tests/animation/fixtures/curve-wo
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 test.use({ channel: 'chrome' });
 
-test('production IndexedDB facade persists opaque autosave across reload, removes it, and preserves Resume denial', async ({ browser }, testInfo) => {
+test('production IndexedDB facade persists opaque autosave across reload, removes it, and preserves partial Resume behavior', async ({ browser }, testInfo) => {
   test.setTimeout(60000);
   const runtime = await startBrowserRuntime({ taskId: `p34-idb-${process.pid}-${Date.now()}`, port: 0 });
   let context;
@@ -32,11 +32,13 @@ test('production IndexedDB facade persists opaque autosave across reload, remove
     await page.reload({ waitUntil: 'networkidle' });
     expect(await page.evaluate(() => SMIdb.get('nemo-auto'))).toBe(bytes);
     await expect(page.locator('#start-resume')).toBeVisible();
-    // Exercise the real consumer; storage presence does not admit legacy editing.
-    const snapshot = () => page.evaluate(() => ({ layers: JSON.stringify(state.layers),
+    // Protected-base characterization: Resume imports this fixture but cannot
+    // finish revealing the editor. Do not relax any admission guard to pass.
+    const snapshot = () => page.evaluate(() => ({
       undo: JSON.stringify(state.undoStack), redo: JSON.stringify(state.redoStack), frame: state.currentFrame }));
     const before = await snapshot();
     await page.locator('#start-resume').click();
+    await expect.poll(() => page.evaluate(() => state.layers[0].layerUid)).toBe('r08_curve_layer');
     await expect(page.locator('#start-screen')).toBeVisible();
     expect(await snapshot()).toEqual(before);
     expect(await page.evaluate(() => SMIdb.get('nemo-auto'))).toBe(bytes);
@@ -49,7 +51,7 @@ test('production IndexedDB facade persists opaque autosave across reload, remove
     await testInfo.attach('p34-browser-storage', { contentType: 'application/json', body: Buffer.from(JSON.stringify({
       sourceSha: identity.source.startup.head, browserVersion: browser.version(), adapterSha256: sha(shipped),
       fixtureSha256: sha(bytes), roundTripAfterReload: true, removedAfterReload: true,
-      resume: 'unavailable; preserved document', tauri: 'not present; no installed-native acceptance', pageErrors: errors,
+      resume: 'partial baseline: fixture imported, editor reveal unavailable', tauri: 'not present; no installed-native acceptance', pageErrors: errors,
     }, null, 2)) });
   } finally {
     try { if (context) await context.close(); } finally { await runtime.close(); }
