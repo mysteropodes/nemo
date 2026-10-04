@@ -19,7 +19,9 @@ function fixture(existing = false) {
         objectStore(storeName) {
           assert.equal(storeName, 'kv');
           return Object.fromEntries(['get', 'put', 'delete'].map(operation => [operation, (...args) => {
-            const request = { operation, args, result: undefined };
+            const request = { operation, args, result: undefined,
+              succeed(value) { request.result = value; if (request.onsuccess) request.onsuccess({ target: request }); },
+            };
             requests.push(request);
             return request;
           }]));
@@ -124,12 +126,14 @@ test('opaque fixture bytes round-trip and remove, with every operation pending u
   const bytes = fs.readFileSync(path.join(__dirname, 'animation/fixtures/curve-workflow.json'), 'utf8');
   const written = store.set('nemo-auto', bytes); f.open(); await tick();
   assert.deepEqual(f.transactions[0].requests[0].args, [bytes, 'nemo-auto']);
+  f.transactions[0].requests[0].succeed('nemo-auto');
   await pending(written); f.transactions[0].commit(); assert.equal(await written, undefined);
   const read = store.get('nemo-auto'); await tick();
   // Simulate an early successful request independently of transaction completion.
-  f.transactions[1].requests[0].result = bytes;
+  f.transactions[1].requests[0].succeed(bytes);
   await pending(read); f.transactions[1].commit(); assert.equal(await read, bytes);
   const removed = store.remove('nemo-auto'); await tick();
+  f.transactions[2].requests[0].succeed(undefined);
   await pending(removed); f.transactions[2].commit(); assert.equal(await removed, undefined);
   const missing = store.get('nemo-auto'); await tick(); f.transactions[3].commit();
   assert.equal(await missing, undefined);
