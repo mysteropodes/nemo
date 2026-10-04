@@ -1503,6 +1503,63 @@ test('a deferred preview can later present through its still-active host work', 
   assert.equal(harness.state.previews.length, 2);
 });
 
+test('post-admission viewport deferral does not fence the native document and needs a fresh presentation', async () => {
+  for (const status of ['deferred-occluded', 'deferred-timeout']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+      return state.previews.length === 2 ? { ...receipt, status } : receipt;
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false, () => true);
+    const first = await viewport.presentPreview(0);
+    await assert.rejects(viewport.presentPreview(10), error =>
+      error && error.code === 'native_preview_deferred' && error.status === status);
+    assert.equal(harness.controller.status(), 'native', status);
+    assert.deepEqual(harness.controller.identity(), {
+      instanceId: first.instanceId, documentId: first.documentId,
+      contentRevision: first.contentRevision,
+    });
+    const retried = await viewport.presentPreview(10);
+    assert.equal(retried.status, 'presented');
+    assert.equal(retried.frame, 10);
+    assert.equal(harness.state.previews.length, 3);
+    assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 25);
+  }
+});
+
+test('resize after a deferred frame re-presents the last visible frame without a retry loop', async () => {
+  let scheduledResize;
+  const resized = [];
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 2 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, { surface: {
+    defer(callback) { scheduledResize = callback; return 1; },
+    cancel() {},
+    async resize(identity) { resized.push(identity); },
+  } }, () => false, () => true);
+  await viewport.presentPreview(0);
+  await assert.rejects(viewport.presentPreview(10), { code: 'native_preview_deferred' });
+  viewport.resizeViewport();
+  await scheduledResize();
+  assert.deepEqual(harness.state.previews.map(request => request.frame), [0, 10, 0]);
+  assert.equal(resized.length, 1);
+  assert.deepEqual(resized[0], harness.controller.identity());
+  assert.equal(harness.controller.status(), 'native');
+});
+
+test('a published session still fences a fatal native presentation', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length === 2 ? { ...receipt, status: 'failed-device-lost' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false, () => true);
+  await viewport.presentPreview(0);
+  await assert.rejects(viewport.presentPreview(10), /not presented/);
+  assert.equal(harness.controller.status(), 'indeterminate');
+  assert.equal(harness.controller.blocksLegacy(), true);
+});
+
 test('malformed host preview receipt fences authority without registering work', async () => {
   const harness = nativeHarness(staticSource(), { previewReceipt: (receipt) => ({ ...receipt, extra: true }) });
   assert.equal(await harness.controller.activate(harness.prepared), true);
