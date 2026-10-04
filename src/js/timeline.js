@@ -27,6 +27,20 @@ async function smConfirm(msg, title) {
 // ---- PLAYBACK (optimized: no DOM rebuild during play) ----
 var playInt=null;
 var playRaf=null;
+var nativePlayScheduler=null;
+function startNativePlay(controller){
+  if(!nativePlayScheduler)nativePlayScheduler=NemoNativeOpacityMotionSurface.createPlaybackScheduler({
+    frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
+    playing:function(){return state.playing;},controller:function(){return window.NemoNativeOpacityCutover;},
+    advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
+    now:function(){return performance.now();},request:requestAnimationFrame,cancel:cancelAnimationFrame
+  });
+  if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
+  state.playing=true;state.playDir=1;
+  document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
+  document.getElementById('btn-play').classList.add('playing');
+  if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
+}
 // One logical frame step, preserving the exact edge semantics the old
 // setInterval body had (loop, ping-pong direction flip, audio onLoop,
 // stop at the work-area edge). Returns the next frame, or null meaning
@@ -48,6 +62,10 @@ function advancePlayFrame(cur){
   return next;
 }
 function startPlay(){if(state.playing)return;
+  var nativeOpacity=window.NemoNativeOpacityCutover;
+  if(nativeOpacity&&nativeOpacity.blocksLegacy()){
+    startNativePlay(nativeOpacity);return;
+  }
   // A brush-menu hover-preview mutates live paths with no pushUndo/save (see
   // brush-menu-bridge.js) — if playback starts while one is active, the next
   // frame change's saveAllLayerFrames() would bake the uncommitted preview
@@ -144,6 +162,9 @@ function startPlay(){if(state.playing)return;
 // range (playback-cache.js), then resumes. Also callable directly from the
 // manual "cache de lecture" fallback button (#btn-bake-cache).
 function autoBakeThenResume(){
+  if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy()){
+    showToast('Native playback cache is unavailable','warn');return;
+  }
   if(!window.SMPlaybackCache||SMPlaybackCache.isBaking())return;
   var savedDir=state.playDir;
   var from=state.waIn,to=state.waOut;
@@ -164,6 +185,9 @@ function autoBakeThenResume(){
 // does NOT auto-start playback afterward, unlike autoBakeThenResume: the
 // user asked for the cache to be ready, not for playback to begin.
 function manualBakeCache(){
+  if(window.NemoNativeOpacityCutover&&window.NemoNativeOpacityCutover.blocksLegacy()){
+    showToast('Native playback cache is unavailable','warn');return;
+  }
   if(!window.SMPlaybackCache){return;}
   if(SMPlaybackCache.isBaking()){showToast(SM.t('toastPlaybackCacheInProgress'),'info');return;}
   if(state.playing)stopPlay();
@@ -177,11 +201,18 @@ function manualBakeCache(){
   });
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;
+  var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
   clearInterval(playInt);playInt=null;
   if(window.SMAudio)SMAudio.onPlayStop();
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e037}</span>';
   document.getElementById('btn-play').classList.remove('playing');
+  if(nativeStop&&nativeStop.wasNative){
+    // A same-frame request supersedes a pending playback intent and restores
+    // its last committed frame. A replaced/released owner must not receive it.
+    if(nativeStop.restore)goToFrame(state.currentFrame);
+    updateUI(true);return;
+  }
   renderOS();renderArcs();updateUI();
 }
 function togglePlay(){if(state.playing)stopPlay();else startPlay();}
