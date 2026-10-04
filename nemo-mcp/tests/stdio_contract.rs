@@ -76,6 +76,18 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
             .as_ref(),
     )
     .unwrap();
+    assert_eq!(schema["type"], "object");
+    assert!(schema["properties"].is_object());
+    assert!(schema["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("apiVersion")));
+    for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
+        assert!(
+            schema.get(keyword).is_none(),
+            "direct root cannot hide behind {keyword}"
+        );
+    }
     let payload = &schema["properties"]["payload"];
     assert_eq!(
         payload["properties"]["command"]["const"],

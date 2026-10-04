@@ -91,14 +91,19 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     native_object.remove("oneOf");
     native_object.insert("$ref".into(), json!("#/$defs/Request"));
     assert_eq!(command_schema["$defs"]["native"], expected_native);
+    assert_eq!(command_schema["type"], "object");
+    for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
+        assert!(
+            command_schema.get(keyword).is_none(),
+            "root has no {keyword}"
+        );
+    }
     assert_eq!(
-        command_schema["allOf"][0]["oneOf"],
-        json!([
-            {"$ref": "#/$defs/legacy"},
-            {"$ref": "#/$defs/native"}
-        ])
+        command_schema["if"],
+        json!({"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}})
     );
-    assert!(command_schema.get("oneOf").is_none());
+    assert_eq!(command_schema["then"], json!({"$ref": "#/$defs/legacy"}));
+    assert_eq!(command_schema["else"], json!({"$ref": "#/$defs/native"}));
     assert_eq!(
         command_schema["properties"]["apiVersion"]["enum"],
         json!([1, 2])
@@ -211,6 +216,61 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     assert!(!validator.is_valid(&wrong_legacy_version));
     let native_response = native_transport["$defs"]["Response"]["examples"][0].clone();
     assert!(!validator.is_valid(&native_response));
+
+    // Compare the conditional advertisement with the previously accepted exact
+    // union, including cross-version bodies and missing/mistyped envelope fields.
+    let mut previous = command_schema.clone();
+    for keyword in ["if", "then", "else"] {
+        previous.as_object_mut().unwrap().remove(keyword);
+    }
+    previous["allOf"] =
+        json!([{"oneOf": [{"$ref": "#/$defs/legacy"}, {"$ref": "#/$defs/native"}]}]);
+    let previous_validator = jsonschema::draft202012::new(&previous).unwrap();
+    let mut corpus = command_schema["examples"].as_array().unwrap().clone();
+    corpus.extend([legacy_request, native_response]);
+    for request in corpus {
+        assert_eq!(
+            validator.is_valid(&request),
+            previous_validator.is_valid(&request)
+        );
+        for field in [
+            "apiVersion",
+            "requestId",
+            "instanceId",
+            "documentId",
+            "expectedRevision",
+            "operation",
+            "payload",
+            "cancelledBeforeDispatch",
+            "unexpectedField",
+        ] {
+            let mut missing = request.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert_eq!(
+                validator.is_valid(&missing),
+                previous_validator.is_valid(&missing),
+                "missing {field}: {missing}"
+            );
+            for value in [
+                Value::Null,
+                json!(-1),
+                json!(1),
+                json!(2),
+                json!(3),
+                json!("2"),
+                json!({}),
+                json!([]),
+            ] {
+                let mut changed = request.clone();
+                changed[field] = value;
+                assert_eq!(
+                    validator.is_valid(&changed),
+                    previous_validator.is_valid(&changed),
+                    "changed {field}: {changed}"
+                );
+            }
+        }
+    }
 
     let mut tools = tools
         .into_iter()
