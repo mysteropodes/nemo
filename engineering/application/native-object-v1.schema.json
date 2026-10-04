@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nemo.local/schemas/native-object-v1.schema.json",
+  "title": "N25A staged frame-scoped native object record",
+  "description": "Contract only. Not an active stored project format, transport operation, capability or importer. Root validates exactly one object record; prospective protocol shapes are separate definitions.",
+  "$ref": "#/$defs/ObjectRecord",
+  "$defs": {
+    "OpaqueId": { "type": "string", "minLength": 1, "description": "Preserve existing opaque bytes. Numeric indices are not IDs; string syntax cannot establish provenance or uniqueness." },
+    "Frame": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "Revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "FrameScope": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "frame"],
+      "properties": { "kind": { "enum": ["authored", "reference"] }, "frame": { "$ref": "#/$defs/Frame" } }
+    },
+    "Target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contextId", "frameScope", "layerUid", "strokeId"],
+      "properties": {
+        "contextId": { "const": "scene-root" }, "frameScope": { "$ref": "#/$defs/FrameScope" },
+        "layerUid": { "$ref": "#/$defs/OpaqueId" }, "strokeId": { "$ref": "#/$defs/OpaqueId" }
+      }
+    },
+    "Point": {
+      "type": "object", "additionalProperties": false, "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "Segment": {
+      "type": "object", "additionalProperties": false, "required": ["point", "handleIn", "handleOut"],
+      "properties": {
+        "point": { "$ref": "#/$defs/Point" }, "handleIn": { "$ref": "#/$defs/Point" }, "handleOut": { "$ref": "#/$defs/Point" }
+      }
+    },
+    "Geometry": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "closed", "coordinateSpace", "handleSpace", "segments"],
+      "properties": {
+        "kind": { "const": "cubic-path" }, "closed": { "const": true },
+        "coordinateSpace": { "const": "document-world" }, "handleSpace": { "const": "relative" },
+        "segments": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/Segment" } }
+      }
+    },
+    "SolidFill": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "r", "g", "b", "a"],
+      "properties": {
+        "kind": { "const": "solid" },
+        "r": { "type": "number", "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "ObjectRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "family", "target", "geometry", "fill"],
+      "properties": {
+        "schemaVersion": { "const": 1 }, "family": { "const": "closed-solid-fill-cubic-path" },
+        "target": { "$ref": "#/$defs/Target" }, "geometry": { "$ref": "#/$defs/Geometry" }, "fill": { "$ref": "#/$defs/SolidFill" }
+      }
+    },
+    "ReadRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "operation", "payload"],
+      "properties": {
+        "apiVersion": { "const": 2 }, "requestId": { "$ref": "#/$defs/OpaqueId" },
+        "instanceId": { "$ref": "#/$defs/OpaqueId" }, "documentId": { "$ref": "#/$defs/OpaqueId" },
+        "operation": { "const": "query.document.object" },
+        "payload": {
+          "type": "object", "additionalProperties": false, "required": ["atRevision", "stableTarget"],
+          "properties": { "atRevision": { "$ref": "#/$defs/Revision" }, "stableTarget": { "$ref": "#/$defs/Target" } }
+        }
+      }
+    },
+    "CommandRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "operation", "expectedRevision", "payload"],
+      "properties": {
+        "apiVersion": { "const": 2 }, "requestId": { "$ref": "#/$defs/OpaqueId" },
+        "instanceId": { "$ref": "#/$defs/OpaqueId" }, "documentId": { "$ref": "#/$defs/OpaqueId" },
+        "operation": { "const": "command.document.apply" }, "expectedRevision": { "$ref": "#/$defs/Revision" },
+        "payload": {
+          "type": "object", "additionalProperties": false, "required": ["command", "stableTarget", "fill"],
+          "properties": {
+            "command": { "const": "object.fill.set" }, "stableTarget": { "$ref": "#/$defs/Target" }, "fill": { "$ref": "#/$defs/SolidFill" }
+          }
+        }
+      }
+    },
+    "ReadResult": {
+      "type": "object", "additionalProperties": false, "required": ["atRevision", "documentSnapshotId", "object"],
+      "properties": {
+        "atRevision": { "$ref": "#/$defs/Revision" }, "documentSnapshotId": { "$ref": "#/$defs/OpaqueId" }, "object": { "$ref": "#/$defs/ObjectRecord" }
+      }
+    },
+    "CommandResult": {
+      "type": "object", "additionalProperties": false, "required": ["applied", "historyEntriesAdded"],
+      "properties": { "applied": { "const": true }, "historyEntriesAdded": { "const": 1 } }
+    },
+    "Error": {
+      "type": "object", "additionalProperties": false, "required": ["code", "message"],
+      "properties": {
+        "code": { "enum": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "busy_conflict", "unavailable", "not_found", "cancelled_before_dispatch", "internal"] },
+        "message": { "type": "string", "minLength": 1 },
+        "details": { "type": "object", "additionalProperties": false, "required": ["requestedDocumentId"], "properties": { "requestedDocumentId": { "$ref": "#/$defs/OpaqueId" } } }
+      }
+    },
+    "ReadResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "contentRevision", "ok", "result"],
+      "properties": {
+        "apiVersion": { "const": 2 }, "requestId": { "$ref": "#/$defs/OpaqueId" }, "instanceId": { "$ref": "#/$defs/OpaqueId" },
+        "documentId": { "$ref": "#/$defs/OpaqueId" }, "contentRevision": { "$ref": "#/$defs/Revision" }, "ok": { "const": true }, "result": { "$ref": "#/$defs/ReadResult" }
+      }
+    },
+    "CommandResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "contentRevision", "ok", "result"],
+      "properties": {
+        "apiVersion": { "const": 2 }, "requestId": { "$ref": "#/$defs/OpaqueId" }, "instanceId": { "$ref": "#/$defs/OpaqueId" },
+        "documentId": { "$ref": "#/$defs/OpaqueId" }, "contentRevision": { "$ref": "#/$defs/Revision" }, "ok": { "const": true }, "result": { "$ref": "#/$defs/CommandResult" }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "requestId", "instanceId", "documentId", "contentRevision", "ok", "error"],
+      "properties": {
+        "apiVersion": { "const": 2 }, "requestId": { "$ref": "#/$defs/OpaqueId" }, "instanceId": { "$ref": "#/$defs/OpaqueId" },
+        "documentId": { "$ref": "#/$defs/OpaqueId" }, "contentRevision": { "$ref": "#/$defs/Revision" }, "ok": { "const": false }, "error": { "$ref": "#/$defs/Error" }
+      }
+    }
+  }
+}
