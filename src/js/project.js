@@ -680,12 +680,14 @@
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
       var applyAuto=function(auto){
         function applied(imported){
-          if(auto&&!imported){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}
-          currentPath=null;currentName='Untitled';updateCurrentLabel();
-          hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Session resumed');
+          if(auto&&(!imported||!nativeOpenReady(imported)))throw new Error('Invalid or unpresented autosave');
+          return afterMaybe(revealOpenedProject(imported),function(){
+            currentPath=null;currentName='Untitled';updateCurrentLabel();
+            ensureInitialTab();showToast('Session resumed');
+          });
         }
         try{
-          var importing=auto?importProjectJSON(auto,true):true;
+          var importing=auto?importProjectJSON(auto,true,true):true;
           var result=afterMaybe(importing,applied);
           if(result&&typeof result.catch==='function')result.catch(function(){showToast(SM.t('toastCannotResumeSessionCorrupt'));});
           return result;

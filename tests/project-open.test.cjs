@@ -118,6 +118,7 @@ function installNativeOpen(app) {
     return visible.promise.then(result => {
       if (result.status !== 'presented' || result.lifecycleGeneration !== incoming.lifecycleGeneration ||
           result.instanceId !== incoming.instanceId || result.documentId !== incoming.documentId ||
+          result.contentRevision !== incoming.contentRevision ||
           result.documentSnapshotId !== incoming.documentSnapshotId) {
         throw new Error('Native viewport is not current after reveal');
       }
@@ -127,6 +128,72 @@ function installNativeOpen(app) {
   return { receipt, first, visible, get presentations() { return presentations; },
     get deferredAllowed() { return deferredAllowed; } };
 }
+
+test('browser Resume preserves normalized imported data and the existing repaint', () => {
+  const app = harness({ auto: '{"title":"autosaved"}' });
+  app.elements.get('start-resume').listeners.click();
+  assert.deepEqual(JSON.parse(app.json), { title: 'autosaved', normalized: true });
+  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.repaints, 1);
+  assert.equal(app.toasts.at(-1), 'Session resumed');
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+});
+
+test('native Resume permits occluded admission and waits for final visible publication', async () => {
+  const app = harness({ auto: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  app.elements.get('start-resume').listeners.click();
+  assert.equal(native.deferredAllowed, true);
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.toasts.includes('Session resumed'), false);
+  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(native.presentations, 1);
+  assert.equal(app.repaints, 0);
+  native.visible.resolve({ ...native.receipt, workId: 'visible-resume' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.toasts.at(-1), 'Session resumed');
+  assert.equal(app.elements.get('project-tabs-list').children.length, 1);
+  assert.equal(app.mutations, 0);
+});
+
+for (const rejected of [false, { instanceId: 'stale-instance' }, { documentId: 'stale-document' },
+  { contentRevision: 1 }, { status: 'failed' }]) {
+  test(`denied or stale native Resume admission leaves the start screen visible (${JSON.stringify(rejected)})`, async () => {
+    const app = harness({ auto: '{"supported":true}', deferFrames: true });
+    const native = installNativeOpen(app);
+    app.elements.get('start-resume').listeners.click();
+    native.first.resolve(rejected === false ? false : { ...native.receipt, ...rejected });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(app.startScreen.classList.contains('hid'), false);
+    assert.equal(app.toasts.includes('Session resumed'), false);
+    assert.equal(app.toasts.at(-1), 'toastCannotResumeSessionCorrupt');
+    assert.equal(native.presentations, 0);
+    assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+    assert.equal(app.mutations, 0);
+  });
+}
+
+test('stale final native Resume presentation restores the start screen without success', async () => {
+  const app = harness({ auto: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  app.elements.get('start-resume').listeners.click();
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  native.visible.resolve({ ...native.receipt, contentRevision: 1 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(app.toasts.includes('Session resumed'), false);
+  assert.equal(app.toasts.at(-1), 'toastCannotResumeSessionCorrupt');
+  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  assert.equal(app.mutations, 0);
+});
 
 test('browser Open keeps the file name and normalized clean baseline for later Save', async () => {
   const app = harness();
