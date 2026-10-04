@@ -61,8 +61,8 @@
       },
       {
         "path": "THIRD_PARTY_NOTICES.md",
-        "gitBlob": "7886b7fad14b2015815e21b6ae268327658afe14",
-        "sha256": "049f872f54b5499d256513eb81b2800c0419313162e98cc6550bdf14833ac211"
+        "gitBlob": "65a7854563869fbf16572fe4e1bac21cc07275d9",
+        "sha256": "f3363410e3d6f25f9a341f8a747a3c423efa076f85096e3a2d76fec078827ba2"
       },
       {
         "path": "src/wasm/package.json",
