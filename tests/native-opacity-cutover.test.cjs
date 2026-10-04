@@ -1548,6 +1548,74 @@ test('resize after a deferred frame re-presents the last visible frame without a
   assert.equal(harness.controller.status(), 'native');
 });
 
+test('revisiting deferred native work after a newer frame requires fresh presented work', async () => {
+  const harness = nativeHarness(keyedSource(), { previewReceipt(receipt, _request, state) {
+    if (state.previews.length === 2) return { ...receipt, status: 'deferred-occluded' };
+    // The native scheduler keeps deferred work alive by evaluation key. Once
+    // a newer generation presents, the retained work terminalizes as stale.
+    if (state.previews.length === 4) return { workId: 'preview-2', viewGeneration: 2, status: 'stale-discarded' };
+    return receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false, () => true);
+  const first = await viewport.presentPreview(20);
+  await assert.rejects(viewport.presentPreview(10), { code: 'native_preview_deferred' });
+  await viewport.presentPreview(0);
+  const revisited = await viewport.presentPreview(10);
+  assert.equal(revisited.status, 'presented');
+  assert.equal(revisited.frame, 10);
+  assert.equal(revisited.workId, 'preview-5');
+  assert.equal(revisited.viewGeneration, 5);
+  assert.equal(revisited.instanceId, first.instanceId);
+  assert.equal(revisited.documentId, first.documentId);
+  assert.equal(revisited.contentRevision, first.contentRevision);
+  assert.deepEqual(harness.state.previews.map(request => request.frame), [20, 10, 0, 10, 10]);
+  assert.equal(harness.controller.status(), 'native');
+  assert.equal(harness.state.document.layers[0].motionStatic.opacity[0], 25);
+});
+
+test('fresh native work retry is bounded and cannot turn deferral or fatal work into presentation', async () => {
+  for (const status of ['stale-discarded', 'deferred-timeout', 'failed-device-lost']) {
+    const harness = nativeHarness(keyedSource(), { previewReceipt(receipt, _request, state) {
+      if (state.previews.length === 2) return { ...receipt, status: 'deferred-occluded' };
+      if (state.previews.length === 4) return { workId: 'preview-2', viewGeneration: 2, status: 'stale-discarded' };
+      if (state.previews.length === 5) return { ...receipt, status };
+      return receipt;
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false, () => true);
+    await viewport.presentPreview(20);
+    await assert.rejects(viewport.presentPreview(10), { code: 'native_preview_deferred' });
+    await viewport.presentPreview(0);
+    await assert.rejects(viewport.presentPreview(10));
+    assert.equal(harness.state.previews.length, 5, status);
+    assert.equal(harness.controller.status(), status === 'failed-device-lost' ? 'indeterminate' : 'native', status);
+  }
+});
+
+test('stale preview retry cannot cross a changed native transport identity or admit unpublished work', async () => {
+  for (const mode of ['changed-document', 'unpublished']) {
+    const harness = nativeHarness(keyedSource(), { previewReceipt(receipt, _request, state) {
+      if (state.previews.length === 2) return { ...receipt, status: 'deferred-occluded' };
+      if (state.previews.length === 4) {
+        if (mode === 'changed-document') state.identity.documentId = 'different-native-document';
+        return { workId: 'preview-2', viewGeneration: 2, status: 'stale-discarded' };
+      }
+      return receipt;
+    } });
+    assert.equal(await harness.controller.activate(harness.prepared), true);
+    let published = true;
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {}, () => false, () => published);
+    await viewport.presentPreview(20);
+    await assert.rejects(viewport.presentPreview(10), { code: 'native_preview_deferred' });
+    await viewport.presentPreview(0);
+    if (mode === 'unpublished') published = false;
+    await assert.rejects(viewport.presentPreview(10));
+    assert.equal(harness.state.previews.length, 4, mode);
+    assert.equal(harness.controller.status(), 'indeterminate', mode);
+  }
+});
+
 test('a published session still fences a fatal native presentation', async () => {
   const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
     return state.previews.length === 2 ? { ...receipt, status: 'failed-device-lost' } : receipt;
