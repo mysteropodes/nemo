@@ -321,13 +321,16 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_commands.rs",
+        "native_reproduction_session.rs",
+        "native_reproduction_session_tests.rs",
         "native_application_replace_commands_acceptance_tests.rs",
         "native_application_replace_commands.rs",
         "native_application_replace_replay.rs",
         "native_application_replace_viewport_tests.rs"
       ],
       "publicApi": [
-        "native_application_commands.rs"
+        "native_application_commands.rs",
+        "native_reproduction_session.rs"
       ],
       "sizeProfile": "Rust production module"
     },

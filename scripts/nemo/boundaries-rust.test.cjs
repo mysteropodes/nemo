@@ -404,13 +404,17 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId'],
     'rust.desktop.native.application': [
       'application::ApplicationReleaseReceipt', 'application::NativeApplication',
+      'application::ReproductionStatus', 'application::REPRODUCTION_FIXTURE',
       'commands::OpacityRequest', 'commands::ResponseEnvelope',
       'compositor::CompositionResult', 'document::OpacityDocument',
       'export_job::JobReceipt', 'export_job::PendingFrame', 'export_job::ReconciliationStage',
       'render_scene',
       'resource_leases::FrameFailure', 'resource_leases::FrameFailureKind', 'resource_leases::WorkId',
       'scheduler::EvaluationKey', 'scheduler::FrameScheduler'],
-    'rust.desktop.native.application.commands': ['compositor::Compositor'],
+    'rust.desktop.native.application.commands': [
+      'application::ReproductionFixture', 'application::ReproductionStatus',
+      'application::REPRODUCTION_FIXTURE', 'application::replay_reproduction_bundle',
+      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'compositor::Compositor'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
     'rust.desktop.native.dispatch': [

@@ -222,6 +222,8 @@
         "rust.desktop.native.application": [
           "application::ApplicationReleaseReceipt",
           "application::NativeApplication",
+          "application::ReproductionStatus",
+          "application::REPRODUCTION_FIXTURE",
           "commands::OpacityRequest",
           "commands::ResponseEnvelope",
           "compositor::CompositionResult",
@@ -237,6 +239,12 @@
           "scheduler::FrameScheduler"
         ],
         "rust.desktop.native.application.commands": [
+          "application::ReproductionFixture",
+          "application::ReproductionStatus",
+          "application::REPRODUCTION_FIXTURE",
+          "application::replay_reproduction_bundle",
+          "commands::OpacityRequest",
+          "commands::ResponseEnvelope",
           "compositor::Compositor"
         ],
         "rust.desktop.native.application.tests": [
