@@ -12,7 +12,9 @@ use crate::{
     native_dispatch::NativeDispatch,
 };
 use native_engine::{
-    application::{ApplicationReleaseReceipt, NativeApplication},
+    application::{
+        ApplicationReleaseReceipt, NativeApplication, ReproductionStatus, REPRODUCTION_FIXTURE,
+    },
     compositor::CompositionResult,
     document::OpacityDocument,
     export_job::{JobReceipt, PendingFrame, ReconciliationStage},
@@ -90,7 +92,39 @@ impl DesktopNativeApplication {
             resources.clone(),
         )
         .map_err(|message| host_error("invalid_request", message))?;
-        Ok(Self {
+        Ok(Self::from_core(core, resources, compositor, bindings))
+    }
+
+    /// Only the explicit catalog-session host route grants synthetic provenance.
+    /// Ordinary bootstrap and replacement always keep their existing constructors.
+    pub(crate) fn from_reproduction_fixture(
+        instance_id: String,
+        artifacts: DesktopArtifactPort,
+        compositor: SharedCompositor,
+    ) -> HostResult<Self> {
+        let bindings = artifacts.bindings();
+        let resources = DesktopResourceResolver::new(Vec::new())
+            .map_err(|message| host_error("internal", message))?;
+        let mut core = NativeApplication::from_reproduction_fixture(
+            instance_id,
+            REPRODUCTION_FIXTURE,
+            artifacts,
+            compositor.clone(),
+            resources.clone(),
+        )
+        .map_err(|_| host_error("unavailable", "native reproduction catalog unavailable"))?;
+        core.opt_in_reproduction()
+            .map_err(|_| host_error("unavailable", "native reproduction opt-in unavailable"))?;
+        Ok(Self::from_core(core, resources, compositor, bindings))
+    }
+
+    fn from_core(
+        core: DesktopCore,
+        resources: DesktopResourceResolver,
+        compositor: SharedCompositor,
+        bindings: DesktopArtifactBindings,
+    ) -> Self {
+        Self {
             core,
             preview_resources: resources,
             preview_compositor: compositor,
@@ -106,7 +140,11 @@ impl DesktopNativeApplication {
             panic_release_after_preview_jobs: None,
             #[cfg(test)]
             fail_release_preview_cancel_at: None,
-        })
+        }
+    }
+
+    pub(crate) fn reproduction_status(&self) -> ReproductionStatus {
+        self.core.reproduction_status()
     }
 
     pub(crate) fn instance_id(&self) -> &str {

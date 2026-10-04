@@ -397,7 +397,7 @@ fn active_generation(native: &NativeState) -> HostResult<u64> {
         .map_err(|message| host_error("unavailable", message))
 }
 
-fn with_install_reservation<T>(
+pub(crate) fn with_install_reservation<T>(
     native: &NativeState,
     generation: u64,
     operation: impl FnOnce(&mut NativeAuthority) -> HostResult<T>,
