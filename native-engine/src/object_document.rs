@@ -37,11 +37,26 @@ pub struct FrameScope {
     pub(crate) frame: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FrameScopeKind {
     Authored,
     Reference,
+}
+
+impl<'de> Deserialize<'de> for FrameScopeKind {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        // Derived enum decoding also admits externally tagged object variants.
+        // The frozen contract permits only these two literal JSON strings.
+        match String::deserialize(deserializer)?.as_str() {
+            "authored" => Ok(Self::Authored),
+            "reference" => Ok(Self::Reference),
+            other => Err(serde::de::Error::unknown_variant(
+                other,
+                &["authored", "reference"],
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

@@ -272,3 +272,30 @@ fn positional_read_envelopes_payloads_and_targets_fail_without_mutation() {
     assert_eq!(query(&owner, &original).unwrap(), expected);
     assert_eq!(encode_project(owner.document()).unwrap(), before);
 }
+
+#[test]
+fn nonstring_scope_kinds_cannot_select_an_authored_or_reference_record() {
+    let owner = snapshot();
+    let original = request(&owner);
+    let expected = query(&owner, &original).unwrap();
+    let before = encode_project(owner.document()).unwrap();
+    for invalid in [
+        json!({"authored":null}),
+        json!({"reference":null}),
+        json!(["authored"]),
+        Value::Null,
+        json!(7),
+        json!(true),
+        json!("other"),
+    ] {
+        let mut candidate = original.clone();
+        candidate["payload"]["stableTarget"]["frameScope"]["kind"] = invalid.clone();
+        assert_eq!(
+            query(&owner, &candidate).unwrap_err(),
+            DispatchErrorCode::InvalidRequest,
+            "kind {invalid}"
+        );
+    }
+    assert_eq!(query(&owner, &original).unwrap(), expected);
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}

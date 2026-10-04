@@ -222,3 +222,20 @@ fn positional_arrays_cannot_substitute_for_any_schema_object() {
     }
     assert!(decode_project(br#"["nemo.native-object-document",1,21,[["layer"]],[]]"#).is_err());
 }
+
+#[test]
+fn frame_scope_kind_is_a_literal_string_and_never_a_tagged_enum_object() {
+    for invalid in [
+        json!({"authored":null}),
+        json!({"reference":null}),
+        json!(["authored"]),
+        Value::Null,
+        json!(7),
+        json!(true),
+        json!("other"),
+    ] {
+        let mut value = fixture();
+        value["objects"][0]["target"]["frameScope"]["kind"] = invalid.clone();
+        assert!(decode(&value).is_err(), "kind {invalid}");
+    }
+}

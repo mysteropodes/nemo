@@ -27,6 +27,8 @@ objects are supported; totalFrames must be positive and layers nonempty.
 
 The decoder requires map/object input at every DTO layer, including read
 envelopes and payloads; positional arrays cannot substitute for schema objects.
+Scope kinds must be literal `authored`/`reference` strings; tagged enum objects
+are rejected.
 It parses directly into strict typed fields, rejecting duplicate raw JSON members
 and unknown fields before admission. The whole document fails for
 unsupported versions/families, duplicate layer IDs or complete scoped object
