@@ -98,6 +98,27 @@ test('browser host lookup remains lazy and throwing getter rejection is cached',
   assert.equal(lookups, 1);
 });
 
+test('CommonJS host bootstrap executes the same browser open port for present and unavailable storage', async () => {
+  const modulePath = require.resolve('../src/js/idb-store.js');
+  const cached = require.cache[modulePath], previousWindow = global.window;
+  try {
+    for (const available of [true, false]) {
+      const f = fixture();
+      global.window = { indexedDB: available ? f.indexedDb : undefined };
+      delete require.cache[modulePath]; require(modulePath);
+      const result = global.window.SMIdb.get('absent');
+      if (available) {
+        f.open(); await tick(); f.transactions[0].commit();
+        assert.equal(await result, undefined);
+      } else await assert.rejects(result, /indexedDB unavailable/);
+    }
+  } finally {
+    require.cache[modulePath] = cached;
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+  }
+});
+
 test('opaque fixture bytes round-trip and remove, with every operation pending until commit', async () => {
   const f = fixture(), store = createIndexedDbStore(f.indexedDb);
   const bytes = fs.readFileSync(path.join(__dirname, 'animation/fixtures/curve-workflow.json'), 'utf8');
