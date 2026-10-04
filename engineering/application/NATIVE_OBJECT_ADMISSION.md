@@ -1,9 +1,10 @@
 # N25B: staged native object admission and immutable reads
 
-This library slice implements the persisted records frozen by
-[N25A](NATIVE_OBJECT_IDENTITY.md). It does not activate object admission in the
-running opacity application. N25C transport/read binding and N25D fill/history
-are separate admission and acceptance gates. P03 object consumers remain pending.
+N25B implements the persisted records frozen by
+[N25A](NATIVE_OBJECT_IDENTITY.md). N25C1 adds a staged common-envelope read API
+over those immutable snapshots. Neither activates object admission in the
+running opacity application. N25C2 host/MCP binding and N25D fill/history remain
+separate admission and acceptance gates. P03 object consumers remain pending.
 
 ## Persisted format and admission
 
@@ -89,17 +90,60 @@ wrong instance/document fail as `WrongInstance`/`WrongDocument`; an unavailable
 revision or scoped target fails as `NotFound`. Revisions above the JavaScript
 safe-integer limit fail. Queries and failures do not alter stored content.
 
-Errors are typed library results, not transport failure envelopes. A future
-admitted transport must provide correlated failures and its existing byte/resource
-limits; this standalone API does not claim those transport protections. Its
+`query_json` errors remain typed library results, not transport failure envelopes.
+This standalone byte entry does not impose transport byte/resource limits. Its
 process-local identity must not be interpreted as durable identity across restarts.
+
+## N25C1 staged common-envelope reads
+
+`ObjectSnapshot::dispatch(&self, OpacityRequest)` returns
+`Result<ResponseEnvelope, DispatchErrorCode>` using the existing native application
+envelope types. It reads the same admitted immutable snapshot without a mutable
+head, request cache, second authority, command/history entry or host installation.
+Only `query.document.object` is supported; `expectedRevision` is forbidden.
+Success returns the complete selected record, exact scoped target, revision zero
+and snapshot ID in a correlated common envelope. Repeated reads and retained
+snapshots survive construction of separate document incarnations unchanged.
+
+Envelope requestId, instanceId, documentId and operation use the existing separate
+transport identifier rule: 1..128 ASCII characters, first character alphanumeric,
+then alphanumeric or `._:/-`. Object layerUid and strokeId remain opaque nonempty
+strings, including spaces and numeric-looking strings. The standalone snapshot
+constructor retains N25B's broader nonempty instance-ID boundary; a snapshot with
+an instance ID unsuitable for an envelope cannot dispatch through this API.
+
+Invalid/unrepresentable correlation IDs return `Err(InvalidRequest)` before an
+envelope is constructed. They are not echoed, truncated or replaced with fabricated
+IDs, and receive no correlated-envelope claim. With representable identities,
+invalid version/operation/payload, unsupported writes, expectedRevision and requests
+above 4096 encoded bytes return `Ok` containing an `invalid_request` failure
+envelope. Wrong instance/document return their closed codes with the actual owner
+identity; wrong-document details preserve the requested document ID. Cancellation
+after envelope/identity preflight returns `cancelled_before_dispatch`. Missing
+revision/fully scoped target returns `not_found`; malformed selectors return
+`invalid_request`. Every such read or failure preserves snapshot data.
+
+The entire serialized success envelope must fit 4096 bytes. A codec-admitted
+record whose complete result cannot fit returns a bounded `unavailable` failure;
+no geometry, identity, handles or fill is truncated or simplified. This deliberately
+does not promise transport parity for every admitted 2..256-segment record.
+The typed request entry cannot detect duplicate raw JSON members already lost
+in its payload Value; callers needing that evidence retain `query_json(bytes)`
+and its strict duplicate-member regression controls.
+
+N25C1 does not register a capability, install an object owner, enable host/MCP/UI
+dispatch, or change active opacity admission. N25C2 must separately prove one-slot
+host installation/release, strict MCP request/result validation, capability
+availability, byte policy and the real common-host round trip. N25D remains the
+native fill/revision/history successor. No browser, installed, visual projection
+or P03 C04a acceptance follows from this staged library API.
 
 ## Consumer and acceptance boundaries
 
 | Consumer | N25B evidence or remaining gate |
 |---|---|
 | Persistence | Native codec round trip and temporary disk reopen preserve records. Active user save/load remains unavailable for this new family. |
-| Read/selection | Immutable exact-target library reads pass. Active selection and common transport binding require N25C acceptance. |
+| Read/selection | Immutable exact-target raw and staged common-envelope library reads. Active selection and host/MCP binding require separate acceptance. |
 | Edit/history | Unavailable; N25D must prove native fill commits, pinned old reads and undo/redo. |
 | Animation | Frame-scoped records preserve authored/reference distinctions; no interpolation or cross-frame identity is inferred. |
 | Render/export | Unavailable for this family. Finite coordinates and 2–256 segments establish schema admission, not GPU-safe geometry, nondegeneracy or render/export parity. |
