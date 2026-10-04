@@ -208,6 +208,7 @@
         "stdio_reconnect.rs",
         "stdio_rejection.rs",
         "stdio_roundtrip.rs",
+        "stdio_tracing.rs",
         "transport.rs"
       ],
       "publicApi": [],

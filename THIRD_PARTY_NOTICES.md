@@ -54,6 +54,26 @@ permissive and all redistributable inside a GPL-3.0-or-later work.
 Both `Cargo.toml` files declare `license = "GPL-3.0-or-later"` so tooling reports
 Nemo's own crates correctly instead of `N/A`.
 
+### T06 MCP tracing addition (2026-10-04)
+
+The 2026-08-30 raw license files above are audit snapshots, not a live count
+of the current lockfiles. T06 adds a direct `tracing` dependency (already in
+the desktop dependency graph) and `tracing-subscriber` for opt-in stderr
+diagnostics. The new desktop lockfile packages were checked with
+`cargo license --json --avoid-dev-deps` in `src-tauri`:
+
+| Package | License |
+|---|---|
+| `tracing-subscriber` 0.3.23 | MIT |
+| `sharded-slab` 0.1.7 | MIT |
+| `lazy_static` 1.5.1 | Apache-2.0 OR MIT |
+| `thread_local` 1.1.10 | Apache-2.0 OR MIT |
+
+No new license family is introduced by this bounded addition. Exact package
+versions and checksums are pinned in `nemo-mcp/Cargo.lock` and
+`src-tauri/Cargo.lock`; later distribution audits must use those current
+lockfiles rather than treating the 2026-08-30 raw output as current.
+
 ## Removed during this audit
 
 | Component | Where | Why removed |
