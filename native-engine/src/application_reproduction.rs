@@ -10,6 +10,23 @@ use serde_json::Number;
 #[path = "reproduction_bundle.rs"]
 mod bundle;
 use bundle::{CapturedCommand, MAX_COMMANDS, TARGET};
+#[path = "reproduction_replay.rs"]
+mod replay;
+pub use replay::{
+    replay_reproduction_bundle, ReproductionReplayReport, ReproductionReplayState,
+    ReproductionReplayStep,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReproductionReplayError {
+    ByteLimit,
+    InvalidBundle,
+    IncompatibleBundle,
+    InvalidSequence,
+    CatalogUnavailable,
+    ReplayMismatch,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
