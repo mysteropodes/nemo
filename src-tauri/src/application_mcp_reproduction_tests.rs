@@ -74,3 +74,47 @@ fn native_reproduction_stdio_shares_ui_authority_and_replays_without_live_write(
         "malformed_payload"
     );
 }
+
+#[test]
+fn native_reproduction_stdio_preserves_adjacent_float_values_through_export_and_replay() {
+    let host = Host::catalog();
+    host.subscribe();
+    let mut client = Client::start(&host);
+    let control = |id, operation, payload| host.request(id, operation, payload, None);
+    assert_eq!(
+        client.call(&control("opt", "command.reproduction.opt_in", json!({})))["ok"],
+        true
+    );
+    let tiny: f64 = "1.2500000000000003e-300".parse().unwrap();
+    let next: f64 = "1.2500000000000005e-300".parse().unwrap();
+    assert_ne!(tiny, next);
+    for (index, value) in [tiny, next, tiny].into_iter().enumerate() {
+        let request = host.request(
+            &format!("write-{index}"),
+            "command.document.apply",
+            json!({"command":"layer.opacity.set","stableTarget":{"layerUid":"r08_curve_layer"},"value":value}),
+            Some(index as u64),
+        );
+        let response = client.call(&request);
+        assert_eq!(response["result"]["applied"], true, "{response}");
+    }
+    let exported = client.call(&control("export", "query.reproduction.export", json!({})));
+    assert_eq!(exported["ok"], true, "{exported}");
+    let bundle = exported["result"]["bundle"].clone();
+    let commands = bundle["commands"].as_array().unwrap();
+    assert_eq!(commands.len(), 3);
+    for (command, expected) in commands.iter().zip([tiny, next, tiny]) {
+        assert_eq!(command["value"].as_f64(), Some(expected), "{bundle}");
+    }
+    let replay = client.call(&control(
+        "replay",
+        "query.reproduction.replay",
+        json!({"bundle":bundle}),
+    ));
+    assert_eq!(replay["ok"], true, "{replay}");
+    let steps = replay["result"]["steps"].as_array().unwrap();
+    assert_eq!(steps.len(), 3);
+    for (step, expected) in steps.iter().zip([tiny, next, tiny]) {
+        assert_eq!(step["state"]["opacity"].as_f64(), Some(expected));
+    }
+}
