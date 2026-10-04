@@ -64,6 +64,98 @@ fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
 }
 
 #[tokio::test]
+async fn root_native_templates_construct_calls_without_nested_schema_knowledge() {
+    let client = client().await;
+    let tools = client.list_all_tools().await.unwrap();
+    let schema = serde_json::to_value(
+        tools
+            .iter()
+            .find(|tool| tool.name == "nemo_command")
+            .unwrap()
+            .input_schema
+            .as_ref(),
+    )
+    .unwrap();
+    let payload = &schema["properties"]["payload"];
+    assert_eq!(payload["type"], "object");
+    assert_eq!(
+        payload["properties"]["command"]["const"],
+        "layer.opacity.set"
+    );
+    assert_eq!(
+        payload["properties"]["stableTarget"]["required"],
+        json!(["layerUid"])
+    );
+    assert!(payload["properties"]["value"].is_object());
+    let examples = schema["examples"].as_array().unwrap();
+    assert_eq!(examples.len(), 3);
+    for (example, operation) in
+        examples
+            .iter()
+            .zip(["command.document.apply", "history.undo", "history.redo"])
+    {
+        assert_eq!(example["operation"], operation);
+        let response = client
+            .call_tool(
+                CallToolRequestParams::new("nemo_command")
+                    .with_arguments(arguments(example.clone())),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.structured_content.unwrap()["error"]["code"],
+            "unavailable",
+            "{operation} passes admission before lookup"
+        );
+        for version in [json!(3), json!("2"), Value::Null] {
+            let mut invalid = example.clone();
+            invalid["apiVersion"] = version;
+            let rejected = client
+                .call_tool(
+                    CallToolRequestParams::new("nemo_command").with_arguments(arguments(invalid)),
+                )
+                .await
+                .unwrap();
+            assert_eq!(rejected.is_error, Some(true));
+        }
+        let mut unknown = example.clone();
+        unknown["unexpectedField"] = json!(true);
+        let rejected = client
+            .call_tool(
+                CallToolRequestParams::new("nemo_command").with_arguments(arguments(unknown)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rejected.is_error, Some(true));
+        let mut malformed = example.clone();
+        malformed["payload"] = json!("{}");
+        let response = client
+            .call_tool(
+                CallToolRequestParams::new("nemo_command").with_arguments(arguments(malformed)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.structured_content.unwrap()["error"]["code"],
+            "malformed_payload"
+        );
+        let mut unsupported = example.clone();
+        unsupported["operation"] = json!("command.not_registered");
+        let response = client
+            .call_tool(
+                CallToolRequestParams::new("nemo_command").with_arguments(arguments(unsupported)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.structured_content.unwrap()["error"]["code"],
+            "invalid_request"
+        );
+    }
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
 async fn advertised_payload_schema_names_every_key_and_operation_template() {
     let client = client().await;
     let tools = client.list_all_tools().await.unwrap();
