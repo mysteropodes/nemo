@@ -24,7 +24,11 @@ mod construction;
 mod diagnostics;
 #[path = "application_reproduction.rs"]
 mod reproduction;
-pub use reproduction::{ReproductionReason, ReproductionState, ReproductionStatus};
+pub use reproduction::{
+    replay_reproduction_bundle, ReproductionReason, ReproductionReplayError,
+    ReproductionReplayReport, ReproductionReplayState, ReproductionReplayStep, ReproductionState,
+    ReproductionStatus,
+};
 #[path = "reproduction_catalog.rs"]
 mod reproduction_catalog;
 pub use reproduction_catalog::{
