@@ -233,3 +233,42 @@ mod active_dispatcher {
         );
     }
 }
+
+#[test]
+fn positional_read_envelopes_payloads_and_targets_fail_without_mutation() {
+    let owner = snapshot();
+    let original = request(&owner);
+    let before = encode_project(owner.document()).unwrap();
+    let expected = query(&owner, &original).unwrap();
+    for (pointer, keys) in [
+        (
+            "",
+            vec![
+                "apiVersion",
+                "requestId",
+                "instanceId",
+                "documentId",
+                "operation",
+                "payload",
+            ],
+        ),
+        ("/payload", vec!["atRevision", "stableTarget"]),
+        (
+            "/payload/stableTarget",
+            vec!["contextId", "frameScope", "layerUid", "strokeId"],
+        ),
+        ("/payload/stableTarget/frameScope", vec!["kind", "frame"]),
+    ] {
+        let mut candidate = original.clone();
+        let object = candidate.pointer(pointer).unwrap();
+        let positional = Value::Array(keys.iter().map(|key| object[*key].clone()).collect());
+        *candidate.pointer_mut(pointer).unwrap() = positional;
+        assert_eq!(
+            query(&owner, &candidate).unwrap_err(),
+            DispatchErrorCode::InvalidRequest,
+            "{pointer}"
+        );
+    }
+    assert_eq!(query(&owner, &original).unwrap(), expected);
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}

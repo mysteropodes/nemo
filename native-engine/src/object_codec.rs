@@ -1,4 +1,6 @@
 //! Atomic admission and semantic JSON round-trip for staged native objects.
+#[cfg(feature = "commands")]
+pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{ObjectDocument, ObjectRecord, ObjectTarget};
 use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};

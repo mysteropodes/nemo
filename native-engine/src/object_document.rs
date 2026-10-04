@@ -5,7 +5,7 @@ use serde_json::Number;
 pub const OBJECT_DOCUMENT_FORMAT: &str = "nemo.native-object-document";
 pub const OBJECT_DOCUMENT_FORMAT_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
     pub(crate) format: String,
@@ -15,13 +15,13 @@ pub struct ObjectDocument {
     pub(crate) objects: Vec<ObjectRecord>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectLayer {
     pub(crate) layer_uid: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectTarget {
     pub(crate) context_id: String,
@@ -30,7 +30,7 @@ pub struct ObjectTarget {
     pub(crate) stroke_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FrameScope {
     pub(crate) kind: FrameScopeKind,
@@ -44,7 +44,7 @@ pub enum FrameScopeKind {
     Reference,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectRecord {
     pub(crate) schema_version: u32,
@@ -54,7 +54,7 @@ pub struct ObjectRecord {
     pub(crate) fill: SolidFill,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectGeometry {
     pub(crate) kind: String,
@@ -64,7 +64,7 @@ pub struct ObjectGeometry {
     pub(crate) segments: Vec<ObjectSegment>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectSegment {
     pub(crate) point: ObjectPoint,
@@ -72,14 +72,14 @@ pub struct ObjectSegment {
     pub(crate) handle_out: ObjectPoint,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ObjectPoint {
     pub(crate) x: Number,
     pub(crate) y: Number,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SolidFill {
     pub(crate) kind: String,
@@ -88,6 +88,73 @@ pub struct SolidFill {
     pub(crate) b: Number,
     pub(crate) a: Number,
 }
+
+// Serde's derived struct decoder also accepts positional sequences. These
+// schema objects must enter through visit_map; Fields retains strict duplicate
+// and unknown-member checks while nested DTOs apply the same object-only rule.
+macro_rules! object_deserialize {
+    ($name:ident { $($field:ident: $ty:ty),* $(,)? }) => {
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct ObjectVisitor;
+                impl<'de> serde::de::Visitor<'de> for ObjectVisitor {
+                    type Value = $name;
+                    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        f.write_str("a JSON object")
+                    }
+                    fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<$name, A::Error> {
+                        #[derive(serde::Deserialize)]
+                        #[serde(deny_unknown_fields, rename_all = "camelCase")]
+                        struct Fields { $($field: $ty),* }
+                        let fields = Fields::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+                        Ok($name { $($field: fields.$field),* })
+                    }
+                }
+                deserializer.deserialize_map(ObjectVisitor)
+            }
+        }
+    };
+}
+pub(crate) use object_deserialize;
+
+object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
+    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord> });
+object_deserialize!(ObjectLayer { layer_uid: String });
+object_deserialize!(ObjectTarget {
+    context_id: String,
+    frame_scope: FrameScope,
+    layer_uid: String,
+    stroke_id: String
+});
+object_deserialize!(FrameScope {
+    kind: FrameScopeKind,
+    frame: u32
+});
+object_deserialize!(ObjectRecord {
+    schema_version: u32,
+    family: String,
+    target: ObjectTarget,
+    geometry: ObjectGeometry,
+    fill: SolidFill
+});
+object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
+    handle_space: String, segments: Vec<ObjectSegment> });
+object_deserialize!(ObjectSegment {
+    point: ObjectPoint,
+    handle_in: ObjectPoint,
+    handle_out: ObjectPoint
+});
+object_deserialize!(ObjectPoint {
+    x: Number,
+    y: Number
+});
+object_deserialize!(SolidFill {
+    kind: String,
+    r: Number,
+    g: Number,
+    b: Number,
+    a: Number
+});
 
 impl ObjectDocument {
     pub fn total_frames(&self) -> u32 {

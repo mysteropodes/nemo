@@ -25,8 +25,10 @@ version 1: target, cubic segments and solid fill. See the independently frozen
 identified declarations, not the active opacity layer representation. Empty
 objects are supported; totalFrames must be positive and layers nonempty.
 
-The decoder parses directly into strict typed structs, rejecting duplicate raw
-JSON members and unknown fields before admission. The whole document fails for
+The decoder requires map/object input at every DTO layer, including read
+envelopes and payloads; positional arrays cannot substitute for schema objects.
+It parses directly into strict typed fields, rejecting duplicate raw JSON members
+and unknown fields before admission. The whole document fails for
 unsupported versions/families, duplicate layer IDs or complete scoped object
 keys, unresolved layer references, empty IDs, unknown context, out-of-range
 frames, malformed segment counts or nonfinite coordinates, and invalid fill

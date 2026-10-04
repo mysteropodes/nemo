@@ -171,3 +171,54 @@ fn active_opacity_codec_remains_closed_to_objects() {
     assert!(crate::codec::decode_project(&serde_json::to_vec(&opacity).unwrap()).is_err());
     assert!(decode_project(include_bytes!("fixtures/opacity-v2/project.json")).is_err());
 }
+
+#[test]
+fn positional_arrays_cannot_substitute_for_any_schema_object() {
+    for (pointer, keys) in [
+        (
+            "",
+            vec![
+                "format",
+                "formatVersion",
+                "totalFrames",
+                "layers",
+                "objects",
+            ],
+        ),
+        ("/layers/0", vec!["layerUid"]),
+        (
+            "/objects/0",
+            vec!["schemaVersion", "family", "target", "geometry", "fill"],
+        ),
+        (
+            "/objects/0/target",
+            vec!["contextId", "frameScope", "layerUid", "strokeId"],
+        ),
+        ("/objects/0/target/frameScope", vec!["kind", "frame"]),
+        (
+            "/objects/0/geometry",
+            vec![
+                "kind",
+                "closed",
+                "coordinateSpace",
+                "handleSpace",
+                "segments",
+            ],
+        ),
+        (
+            "/objects/0/geometry/segments/0",
+            vec!["point", "handleIn", "handleOut"],
+        ),
+        ("/objects/0/geometry/segments/0/point", vec!["x", "y"]),
+        ("/objects/0/geometry/segments/0/handleIn", vec!["x", "y"]),
+        ("/objects/0/geometry/segments/0/handleOut", vec!["x", "y"]),
+        ("/objects/0/fill", vec!["kind", "r", "g", "b", "a"]),
+    ] {
+        let mut value = fixture();
+        let object = value.pointer(pointer).unwrap();
+        let positional = Value::Array(keys.iter().map(|key| object[*key].clone()).collect());
+        *value.pointer_mut(pointer).unwrap() = positional;
+        assert!(decode(&value).is_err(), "positional array at {pointer}");
+    }
+    assert!(decode_project(br#"["nemo.native-object-document",1,21,[["layer"]],[]]"#).is_err());
+}

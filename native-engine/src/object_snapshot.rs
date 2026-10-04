@@ -1,6 +1,7 @@
 //! Immutable staged object admission/read. No dispatcher or command activation.
 use crate::object_codec::{
-    self, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument, ObjectRecord, ObjectTarget,
+    self, object_deserialize, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument, ObjectRecord,
+    ObjectTarget,
 };
 use crate::request_receipts::DispatchErrorCode;
 use serde::{Deserialize, Serialize};
@@ -19,8 +20,7 @@ pub struct ObjectSnapshot {
     document: Arc<ObjectDocument>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug)]
 struct ReadRequest {
     api_version: u32,
     request_id: String,
@@ -29,12 +29,24 @@ struct ReadRequest {
     operation: String,
     payload: ReadPayload,
 }
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug)]
 struct ReadPayload {
     at_revision: u64,
     stable_target: ObjectTarget,
 }
+
+object_deserialize!(ReadRequest {
+    api_version: u32,
+    request_id: String,
+    instance_id: String,
+    document_id: String,
+    operation: String,
+    payload: ReadPayload
+});
+object_deserialize!(ReadPayload {
+    at_revision: u64,
+    stable_target: ObjectTarget
+});
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
