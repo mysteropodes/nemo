@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "0f18e3b68ec1e99fe8597509070b58cc05a9ac7b",
-  "describe": "v0.7.0-alpha.4-916-g0f18e3b6-dirty"
+  "head": "71a51d86c726d17ddeb58edd5ce00cf65df128d9",
+  "describe": "v0.7.0-alpha.4-917-g71a51d86-dirty"
  },
- "inputsDigest": "fe3a970ae374b84623b6d6746499a4fc2431cb357adffd21045e394b7f271c4a",
+ "inputsDigest": "943aea14a325fd41c0adbe909686f03855c1c7425c184a3589088ff0f53e00d6",
  "states": [
   "inventoried",
   "characterized",
@@ -15385,7 +15385,7 @@
    "capability": "settings language",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/i18n.js:4273 initLanguage()"
+    "src/js/i18n.js:4233 initLanguage()"
    ],
    "events": [
     "change"
@@ -15409,7 +15409,7 @@
     "functionsVisited": 11,
     "via": "variable sel",
     "references": [
-     "src/js/i18n.js:4238 applyI18n()",
+     "src/js/i18n.js:4198 applyI18n()",
      "src/js/tutorial.js:1023 measure()"
     ]
    },
