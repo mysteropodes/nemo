@@ -671,24 +671,23 @@
     renderRecents();
 
     document.getElementById('start-resume').addEventListener('click',function(){
-      // Was never actually loading the autosave — just hid the start
-      // screen and left the blank project created at boot untouched, so
-      // "Resume" silently discarded a real, present nemo-auto snapshot
-      // (confirmed live: state.layers[*].frames all empty after clicking
-      // Resume despite localStorage holding real stroke data).
+      // Load autosave explicitly; boot may still hold a blank project.
+      // Native Resume follows Open's occluded admission and final revealed
+      // presentation before publishing its tab or success.
       var auto=null;
       try{auto=localStorage.getItem('nemo-auto');}catch(e){}
       var applyAuto=function(auto){
         function applied(imported){
-          if(auto&&!imported){showToast(SM.t('toastCannotResumeSessionCorrupt'));return;}
-          currentPath=null;currentName='Untitled';updateCurrentLabel();
-          hideStartScreen();ensureInitialTab();SMProjectEntry.repaint();showToast('Session resumed');
+          if(auto&&(!imported||!nativeOpenReady(imported)))throw new Error('Invalid or unpresented autosave');
+          return afterMaybe(revealOpenedProject(imported),function(){
+            currentPath=null;currentName='Untitled';updateCurrentLabel();
+            ensureInitialTab();showToast('Session resumed');
+          });
         }
         try{
-          var importing=auto?importProjectJSON(auto,true):true;
+          var importing=auto?importProjectJSON(auto,true,true):true;
           var result=afterMaybe(importing,applied);
-          if(result&&typeof result.catch==='function')result.catch(function(){showToast(SM.t('toastCannotResumeSessionCorrupt'));});
-          return result;
+          return result&&typeof result.catch==='function'?result.catch(function(){showToast(SM.t('toastCannotResumeSessionCorrupt'));}):result;
         }catch(e){showToast(SM.t('toastCannotResumeSessionCorrupt'));}
       };
       if(auto)applyAuto(auto);
