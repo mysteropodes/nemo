@@ -156,25 +156,40 @@ test('failed native receipt stops without publishing or falling through to legac
 });
 
 test('Play can retry after an occluded frame when native authority remains active', async () => {
-  let frameFiveAttempts = 0;
-  const h = harness({ present: async (frame, identity) => receipt(frame, identity,
-    frame === 5 && frameFiveAttempts++ === 0 ? 'deferred-occluded' : 'presented') });
+  let occluded = true;
+  const attempts = [];
+  const h = harness({ present: async (frame, identity) => {
+    attempts.push(frame);
+    if (occluded) {
+      const error = new Error('native opacity frame presentation is deferred');
+      error.code = 'native_preview_deferred';
+      throw error;
+    }
+    return receipt(frame, identity);
+  } });
   h.startPlay();
   await h.tick(500); // The host defers frame 5 while the window is occluded.
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.playing, false);
   assert.equal(h.state.currentFrame, 0, 'the deferred frame was never published');
   assert.equal(h.controller.isActive(), true, 'the native document is still available');
-  assert.deepEqual(h.hostFrames, [5, 0, 0], 'failed navigation and Stop reassert the visible frame');
+  assert.deepEqual(h.paints, [[0, true]], 'Stop redraws only the prior UI frame');
+  assert.equal(attempts[0], 5);
+  assert.ok(attempts.slice(1).length > 0 && attempts.slice(1).every(frame => frame === 0),
+    'all deferred restoration attempts target the visible frame');
 
+  const deferredAttempts = attempts.length;
+  occluded = false;
   h.startPlay(); // Window is visible again; a fresh host request must present.
   await h.tick(1000);
   assert.equal(h.state.playing, true);
   assert.equal(h.state.currentFrame, 5);
-  assert.deepEqual(h.hostFrames, [5, 0, 0, 5]);
+  assert.deepEqual(h.hostFrames, [5]);
   h.stopPlay();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.state.playing, false);
-  assert.deepEqual(h.hostFrames, [5, 0, 0, 5, 5]);
+  assert.deepEqual(h.hostFrames, [5, 5]);
+  assert.deepEqual(attempts.slice(deferredAttempts), [5, 5]);
   assert.equal(h.identity.contentRevision, 0);
   assert.deepEqual(h.legacy, []);
 });
