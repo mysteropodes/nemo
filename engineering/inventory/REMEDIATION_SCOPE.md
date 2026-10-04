@@ -583,9 +583,16 @@ The inventory's own frozen commit, digest, pins and computed range coverage are 
 At the 4 October 2026 readback, both leaves have sole Ilya ownership and Ilya/O
 validation, with Project #2 Blocked / Validation Planned / roadmap Needs work /
 Forecast / Unscheduled. Accepted C01/#1036 is their sole native predecessor. The
-required T08/#1057 shared application-profile/provenance release is a separate
-issue-note and claim gate, not a dependency on all T08 work closing. This inventory
-change allocates no implementing writer and releases no shared source/profile slot.
+original blocker was the T08/#1057 shared application-profile/provenance slot.
+[T08's source-stage handoff](https://github.com/mysteropodes/nemo/issues/1057#issuecomment-5890957293)
+released its writer slot on 29 September, and
+[T08B's terminal handoff](https://github.com/mysteropodes/nemo/issues/1532#issuecomment-5970737178)
+released its later exclusive shared-file claim on 3 October. The retained Blocked
+board state therefore needs re-evaluation against current capacity and whole-file
+ownership; it does not establish that T08 still holds those files or must close first.
+P34/P35 require fresh board-first Ready review and explicit writer/checkout allocation.
+This inventory change updates neither leaf's board and allocates no implementing
+writer or shared source/profile slot.
 
 The other **eleven C01 packets remain pending**. The following architecture-first
 decompositions are the residual queue from #1523, not source reservations. Live
