@@ -12,6 +12,6 @@
   "enforcedLayers": ["domain", "application", "adapters", "bootstrap"],
   "enforcedRules": ["layer-violation", "private-import", "global-state", "cycle", "unsupported-import", "unprofiled-local-import", "unsupported-global", "expired-exception"],
   "legacyLayers": ["app-legacy", "app-domain", "app-presentation-adapter"],
-  "legacyUnresolvedCeiling": 449,
-  "legacyUnresolvedNote": "Count of checker findings in legacy layers at adoption (main b4a4fe249821bc534dd1a63dbb4b037df6455ec3: 439 global-state + 4 unsupported-global + 2 unsupported-import + 1 unprofiled-local-import in app-legacy, 1 global-state in app-domain, 2 global-state in app-presentation-adapter). The ceiling may only go down; lowering it is the ordinary change that accompanies a migration or repair."
+  "legacyUnresolvedCeiling": 448,
+  "legacyUnresolvedNote": "Count of checker findings in legacy layers at adoption was 449 (main b4a4fe249821bc534dd1a63dbb4b037df6455ec3: 439 global-state + 4 unsupported-global + 2 unsupported-import + 1 unprofiled-local-import in app-legacy, 1 global-state in app-domain, 2 global-state in app-presentation-adapter). P34/#1520 adopts app.idb.store into adapters, removing its one legacy global-state finding and ratcheting the ceiling to 448. The ceiling may only go down; lowering it is the ordinary change that accompanies a migration or repair."
 }

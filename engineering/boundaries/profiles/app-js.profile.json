@@ -278,12 +278,12 @@
     },
     {
       "id": "app.idb.store",
-      "layer": "app-legacy",
+      "layer": "adapters",
       "dir": "src/js",
       "files": [
         "idb-store.js"
       ],
-      "sizeProfile": "App JS unclassified (pre-R01)",
+      "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "idb-store.js"
       ]

@@ -1,20 +1,17 @@
-// Minimal async key/value store on IndexedDB, used as the large-capacity
-// autosave backend for the browser (no-Tauri) mode. localStorage's ~5-10MB
-// quota silently throws (or truncates via a caught exception, losing the
-// autosave) once a project embeds real media (base64 images/video) — see
-// project-nemo-web-public-beta memory. IndexedDB has no such practical
-// ceiling. Kept deliberately tiny: get/set/remove on a single object store,
-// nothing else — this is not a general storage layer, just enough to back
-// the existing single-slot 'nemo-auto' autosave.
-window.SMIdb = (function () {
+// P34: opaque browser autosave persistence adapter. IndexedDB remains subject
+// to browser quota/eviction; this is not a document writer or recovery service.
+// Each factory instance owns one cached open promise and connection for its
+// lifetime. The browser facade below is the sole production instance.
+function createIndexedDbStore(indexedDb) {
+  'use strict';
   var DB_NAME = 'nemo-store', STORE = 'kv', VERSION = 1;
   var dbPromise = null;
 
   function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
-      if (!window.indexedDB) { reject(new Error('indexedDB unavailable')); return; }
-      var req = indexedDB.open(DB_NAME, VERSION);
+      if (!indexedDb) { reject(new Error('indexedDB unavailable')); return; }
+      var req = indexedDb.open(DB_NAME, VERSION);
       req.onupgradeneeded = function () {
         if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
       };
@@ -30,8 +27,10 @@ window.SMIdb = (function () {
         var tx = db.transaction(STORE, mode);
         var store = tx.objectStore(STORE);
         var result = fn(store);
+        // Request success is not transaction commit, including for reads.
         tx.oncomplete = function () { resolve(result && result.__req ? result.__req.result : undefined); };
         tx.onerror = function () { reject(tx.error); };
+        // Preserve baseline: no abort-only handler, retry, close or recovery.
       });
     });
   }
@@ -47,4 +46,13 @@ window.SMIdb = (function () {
   }
 
   return { get: get, set: set, remove: remove };
-})();
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = { createIndexedDbStore: createIndexedDbStore };
+if (typeof window !== 'undefined') window.SMIdb = createIndexedDbStore({
+  // Preserve lazy host access: an unavailable/throwing getter rejects the
+  // first operation rather than failing classic-script bootstrap.
+  open: function (name, version) {
+    if (!window.indexedDB) throw new Error('indexedDB unavailable');
+    return window.indexedDB.open(name, version);
+  }
+});
