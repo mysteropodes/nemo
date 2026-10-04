@@ -76,6 +76,18 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
             .as_ref(),
     )
     .unwrap();
+    assert_eq!(schema["type"], "object");
+    assert!(schema["properties"].is_object());
+    assert!(schema["required"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("apiVersion")));
+    for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
+        assert!(
+            schema.get(keyword).is_none(),
+            "direct root cannot hide behind {keyword}"
+        );
+    }
     let payload = &schema["properties"]["payload"];
     assert_eq!(
         payload["properties"]["command"]["const"],
@@ -88,11 +100,8 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
     assert!(payload["properties"]["value"].is_object());
     let examples = schema["examples"].as_array().unwrap();
     assert_eq!(examples.len(), 3);
-    for (example, operation) in
-        examples
-            .iter()
-            .zip(["command.document.apply", "history.undo", "history.redo"])
-    {
+    let operations = ["command.document.apply", "history.undo", "history.redo"];
+    for (example, operation) in examples.iter().zip(operations) {
         assert_eq!(example["operation"], operation);
         let response = client
             .call_tool(
@@ -106,9 +115,14 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
             "unavailable",
             "{operation} passes admission before lookup"
         );
-        for version in [json!(3), json!("2"), Value::Null] {
+        for (field, value) in [
+            ("apiVersion", json!(3)),
+            ("apiVersion", json!("2")),
+            ("apiVersion", Value::Null),
+            ("unexpectedField", json!(true)),
+        ] {
             let mut invalid = example.clone();
-            invalid["apiVersion"] = version;
+            invalid[field] = value;
             let rejected = client
                 .call_tool(
                     CallToolRequestParams::new("nemo_command").with_arguments(arguments(invalid)),
@@ -117,39 +131,24 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
                 .unwrap();
             assert_eq!(rejected.is_error, Some(true));
         }
-        let mut unknown = example.clone();
-        unknown["unexpectedField"] = json!(true);
-        let rejected = client
-            .call_tool(
-                CallToolRequestParams::new("nemo_command").with_arguments(arguments(unknown)),
-            )
-            .await
-            .unwrap();
-        assert_eq!(rejected.is_error, Some(true));
-        let mut malformed = example.clone();
-        malformed["payload"] = json!("{}");
-        let response = client
-            .call_tool(
-                CallToolRequestParams::new("nemo_command").with_arguments(arguments(malformed)),
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            response.structured_content.unwrap()["error"]["code"],
-            "malformed_payload"
-        );
-        let mut unsupported = example.clone();
-        unsupported["operation"] = json!("command.not_registered");
-        let response = client
-            .call_tool(
-                CallToolRequestParams::new("nemo_command").with_arguments(arguments(unsupported)),
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            response.structured_content.unwrap()["error"]["code"],
-            "invalid_request"
-        );
+        for (field, value, code) in [
+            ("payload", json!("{}"), "malformed_payload"),
+            (
+                "operation",
+                json!("command.not_registered"),
+                "invalid_request",
+            ),
+        ] {
+            let mut invalid = example.clone();
+            invalid[field] = value;
+            let response = client
+                .call_tool(
+                    CallToolRequestParams::new("nemo_command").with_arguments(arguments(invalid)),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.structured_content.unwrap()["error"]["code"], code);
+        }
     }
     client.cancel().await.unwrap();
 }
