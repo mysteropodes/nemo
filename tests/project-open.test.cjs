@@ -195,6 +195,23 @@ test('stale final native Resume presentation restores the start screen without s
   assert.equal(app.mutations, 0);
 });
 
+test('rejected final native Resume presentation restores the start screen without success', async () => {
+  const app = harness({ auto: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  app.elements.get('start-resume').listeners.click();
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  app.flushFrame(); app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  native.visible.reject(new Error('native reveal presentation rejected'));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(app.toasts.includes('Session resumed'), false);
+  assert.equal(app.toasts.at(-1), 'toastCannotResumeSessionCorrupt');
+  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  assert.equal(app.mutations, 0);
+});
+
 test('browser Open keeps the file name and normalized clean baseline for later Save', async () => {
   const app = harness();
   select(app, { name: 'Story.JSON', text: '{"title":"story"}' });
