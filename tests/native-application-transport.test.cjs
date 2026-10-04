@@ -11,6 +11,20 @@ const {
 } = require('../src/js/adapters/native-application.js');
 
 const ROOT = path.resolve(__dirname, '..');
+test('native report admits only its closed freshness token and matches the response to it', async () => {
+  const request = { apiVersion: 2, requestId: 'report', instanceId: 'instance', documentId: 'catalog', operation: 'query.reproduction.report',
+    payload: { expectedContentRevision: 1, expectedSequence: 2 } };
+  assert.doesNotThrow(() => validateRequest(request));
+  for (const payload of [{}, { ...request.payload, extra: true }, { ...request.payload, expectedSequence: -1 }]) {
+    assert.throws(() => validateRequest({ ...request, payload }));
+  }
+  const response = { apiVersion: 2, requestId: 'report', instanceId: 'instance', documentId: 'catalog', contentRevision: 1, ok: true,
+    result: { bundle: {}, verifiedContentRevision: 1, verifiedSequence: 2 } };
+  for (const mutate of [r => r.documentId = 'other', r => r.result.verifiedSequence = 3, r => r.contentRevision = 2]) {
+    const changed = structuredClone(response); mutate(changed);
+    await assert.rejects(createNativeApplicationAdapter('test', { dispatch: () => changed }).dispatch(request));
+  }
+});
 const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/native-transport-v2.schema.json'), 'utf8'));
 const declaration = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-opacity.json'), 'utf8'));
 
