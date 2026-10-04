@@ -281,14 +281,16 @@ impl Drop for RequestTrace {
 
 fn safe_identifier(value: &str) -> String {
     let mut bytes = value.bytes();
-    let safe = value.len() < 36
+    let allowed_bytes = value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte));
+    let safe_short = value.len() < 36
         && bytes
             .next()
             .is_some_and(|byte| byte.is_ascii_alphanumeric())
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte));
-    if safe {
+        && allowed_bytes;
+    let safe_uuid = value.len() == 36 && uuid::Uuid::parse_str(value).is_ok() && allowed_bytes;
+    if safe_short || safe_uuid {
         value.to_owned()
     } else {
         "redacted".to_owned()
@@ -453,11 +455,11 @@ impl NemoServer {
         }
         .instrument(trace.span())
         .await;
-        trace.finish(if cancellation.is_cancelled() {
-            "cancelled"
+        if cancellation.is_cancelled() {
+            drop(trace);
         } else {
-            status
-        });
+            trace.finish(status);
+        }
         response
     }
 }

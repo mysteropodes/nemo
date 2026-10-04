@@ -77,6 +77,46 @@ fn command(request_id: &str, instance_id: &str) -> CallToolRequestParams {
     )
 }
 
+fn assert_trace_pair(logs: &str, application_id: &str, terminal_status: &str) {
+    let marker = format!("application_request_id={application_id}}}");
+    let events: Vec<_> = logs.lines().filter(|line| line.contains(&marker)).collect();
+    assert_eq!(
+        events.len(),
+        2,
+        "expected one start and terminal: {events:?}"
+    );
+    let mcp_ids: Vec<_> = events
+        .iter()
+        .map(|line| {
+            line.split_once("mcp_request_id=")
+                .unwrap()
+                .1
+                .split_whitespace()
+                .next()
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(mcp_ids[0], mcp_ids[1], "MCP identity changed: {events:?}");
+    assert_eq!(
+        events
+            .iter()
+            .filter(|line| line.contains("event=\"started\""))
+            .count(),
+        1,
+        "missing or duplicate start: {events:?}"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|line| {
+                line.contains(&format!("event=\"terminal\" status=\"{terminal_status}\""))
+            })
+            .count(),
+        1,
+        "missing or misclassified terminal: {events:?}"
+    );
+}
+
 async fn call(
     client: &rmcp::service::RunningService<rmcp::RoleClient, ()>,
     args: CallToolRequestParams,
@@ -182,23 +222,10 @@ async fn compiled_stdio_tracing_correlates_outcomes_without_payload_or_path_leak
         .await
         .unwrap();
     let logs = String::from_utf8(captured).unwrap();
-    for id in [success_id, error_id, transport_id, cancellation_id] {
-        assert!(
-            logs.contains(id),
-            "missing correlated request ID {id}: {logs}"
-        );
-    }
-    for status in [
-        "success",
-        "structured_error",
-        "transport_error",
-        "cancelled",
-    ] {
-        assert!(
-            logs.contains(status),
-            "missing terminal status {status}: {logs}"
-        );
-    }
+    assert_trace_pair(&logs, success_id, "success");
+    assert_trace_pair(&logs, error_id, "structured_error");
+    assert_trace_pair(&logs, transport_id, "transport_error");
+    assert_trace_pair(&logs, cancellation_id, "cancelled");
     assert!(!logs.contains(SECRET_SENTINEL));
     assert!(!logs.contains(PRIVATE_PATH_SENTINEL));
     assert!(
@@ -216,19 +243,36 @@ async fn compiled_stdio_tracing_correlates_outcomes_without_payload_or_path_leak
 #[tokio::test]
 async fn compiled_stdio_tracing_is_off_by_default() {
     let root = tempfile::tempdir().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: uuid::Uuid::new_v4().to_string(),
+        port: listener.local_addr().unwrap().port(),
+        secret: SECRET_SENTINEL.into(),
+        build_id: "tracing-default-off".into(),
+    };
+    let _registration = Registration::create(root.path(), &endpoint).unwrap();
+    let mut application = EndpointTask(tokio::spawn({
+        let instance_id = endpoint.instance_id.clone();
+        async move {
+            let success = reply(&listener, &instance_id, true).await;
+            assert_eq!(success.request.operation, Operation::PropertySet);
+        }
+    }));
     let mut process = tokio::process::Command::new(env!("CARGO_BIN_EXE_nemo-mcp"));
     process
         .env("NEMO_MCP_REGISTRY", root.path())
+        .env_remove("NEMO_MCP_TRACE")
         .kill_on_drop(true);
     let (transport, mut stderr) = TokioChildProcess::builder(process)
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
     let client = bounded(().serve(transport)).await.unwrap();
-    let discover = bounded(client.call_tool(CallToolRequestParams::new("nemo_discover")))
-        .await
-        .unwrap();
-    assert_eq!(discover.structured_content.unwrap()["instances"], json!([]));
+    let request_id = "default-off-command-1";
+    let response = call(&client, command(request_id, &endpoint.instance_id)).await;
+    assert_eq!(response["requestId"], request_id);
+    assert_eq!(response["ok"], true);
+    bounded(&mut application.0).await.unwrap();
     bounded(client.cancel()).await.unwrap();
 
     let mut captured = Vec::new();
@@ -335,7 +379,7 @@ server.listen(0, '127.0.0.1', () => console.log(JSON.stringify({port: server.add
         .unwrap();
     let client = bounded(().serve(transport)).await.unwrap();
 
-    let request_id = "opacity-command-1";
+    let request_id = "db95a760-edce-4a04-9576-8a4b8054d995";
     let mut request = command(request_id, &instance_id).arguments.unwrap();
     request.insert("documentId".into(), json!("document-2"));
     request.insert("expectedRevision".into(), json!(0));
@@ -376,7 +420,7 @@ server.listen(0, '127.0.0.1', () => console.log(JSON.stringify({port: server.add
         .await
         .unwrap();
     let logs = String::from_utf8(captured).unwrap();
-    assert!(logs.contains(request_id));
+    assert_trace_pair(&logs, request_id, "success");
     assert!(!logs.contains(SECRET_SENTINEL));
     assert!(!logs.contains(PRIVATE_PATH_SENTINEL));
     assert!(logs.len() <= MAX_TRACE_TOTAL_BYTES);
