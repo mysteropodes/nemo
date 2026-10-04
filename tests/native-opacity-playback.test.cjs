@@ -155,6 +155,30 @@ test('failed native receipt stops without publishing or falling through to legac
   assert.equal(h.toasts.length, 1);
 });
 
+test('Play can retry after an occluded frame when native authority remains active', async () => {
+  let frameFiveAttempts = 0;
+  const h = harness({ present: async (frame, identity) => receipt(frame, identity,
+    frame === 5 && frameFiveAttempts++ === 0 ? 'deferred-occluded' : 'presented') });
+  h.startPlay();
+  await h.tick(500); // The host defers frame 5 while the window is occluded.
+  assert.equal(h.state.playing, false);
+  assert.equal(h.state.currentFrame, 0, 'the deferred frame was never published');
+  assert.equal(h.controller.isActive(), true, 'the native document is still available');
+  assert.deepEqual(h.hostFrames, [5, 0, 0], 'failed navigation and Stop reassert the visible frame');
+
+  h.startPlay(); // Window is visible again; a fresh host request must present.
+  await h.tick(1000);
+  assert.equal(h.state.playing, true);
+  assert.equal(h.state.currentFrame, 5);
+  assert.deepEqual(h.hostFrames, [5, 0, 0, 5]);
+  h.stopPlay();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.playing, false);
+  assert.deepEqual(h.hostFrames, [5, 0, 0, 5, 5]);
+  assert.equal(h.identity.contentRevision, 0);
+  assert.deepEqual(h.legacy, []);
+});
+
 test('rapid Stop and restart cannot publish a presentation from the former run', async () => {
   const entered = deferred(), finish = deferred();
   let first = true;
