@@ -106,14 +106,60 @@ impl JsonSchema for CommandRequest {
             .expect("native transport declares its request/response union");
         native_object.insert("$ref".into(), json!("#/$defs/Request"));
 
+        // Clients that project only root properties must still see constructible
+        // arguments. The exact version branches remain the validation authority.
+        let mut properties = legacy["properties"].clone();
+        properties["apiVersion"] = json!({"type": "integer", "enum": [1, 2]});
+        properties["operation"] = json!({"type": "string", "description": "Native v2: command.document.apply, history.undo or history.redo. Legacy v1 operations use their payload templates below."});
+        properties["cancelledBeforeDispatch"] = json!({"type": "boolean"});
+        let mut payload = legacy["properties"]["payload"].clone();
+        let payload_object = payload
+            .as_object_mut()
+            .expect("payload schema is an object");
+        payload_object.remove("anyOf");
+        let mut payload_properties = serde_json::Map::new();
+        for branch in legacy["properties"]["payload"]["anyOf"].as_array().unwrap() {
+            if let Some(fields) = branch["properties"].as_object() {
+                for (key, field) in fields {
+                    payload_properties
+                        .entry(key.clone())
+                        .or_insert_with(|| field.clone());
+                }
+            }
+        }
+        payload_properties.insert(
+            "command".into(),
+            json!({"type": "string", "const": "layer.opacity.set"}),
+        );
+        payload_properties.insert(
+            "stableTarget".into(),
+            json!({
+                "type": "object", "additionalProperties": false, "required": ["layerUid"],
+                "properties": {"layerUid": native_transport["$defs"]["Identifier"]}
+            }),
+        );
+        payload_object.insert("properties".into(), payload_properties.into());
+        properties["payload"] = payload;
+        let examples = ["command.document.apply", "history.undo", "history.redo"].map(|operation| json!({
+            "apiVersion": 2, "requestId": "unique-request-id", "instanceId": "discovered-instance-id",
+            "documentId": "snapshot-document-id", "expectedRevision": 0, "operation": operation,
+            "payload": if operation == "command.document.apply" {
+                json!({"command": "layer.opacity.set", "stableTarget": {"layerUid": "snapshot-layer-uid"}, "value": 25})
+            } else { json!({}) }
+        }));
+
         json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
+            "properties": properties,
+            "required": ["apiVersion", "requestId", "operation", "payload"],
+            "description": "Use apiVersion 2 for native writes. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
+            "examples": examples,
             "$defs": {"legacy": legacy, "native": native},
-            "oneOf": [
+            "allOf": [{"oneOf": [
                 {"$ref": "#/$defs/legacy"},
                 {"$ref": "#/$defs/native"}
-            ],
+            ]}],
             "x-nemo-nativeApiVersion": NATIVE_API_VERSION,
             "x-nemo-nativeTransportV2": native_transport,
             "x-nemo-registeredNativeCapabilities": capabilities::native_catalog().descriptors()

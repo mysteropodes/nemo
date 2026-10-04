@@ -51,7 +51,7 @@ fn schema_binary_preserves_v1_bytes_and_prints_the_accepted_v2_contract() {
 }
 
 #[tokio::test]
-async fn executable_advertises_valid_command_union_and_reports_no_running_app() {
+async fn executable_advertises_constructible_command_and_reports_no_running_app() {
     let root = tempfile::tempdir().unwrap();
     let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_nemo-mcp"));
     command.env("NEMO_MCP_REGISTRY", root.path());
@@ -92,12 +92,30 @@ async fn executable_advertises_valid_command_union_and_reports_no_running_app() 
     native_object.insert("$ref".into(), json!("#/$defs/Request"));
     assert_eq!(command_schema["$defs"]["native"], expected_native);
     assert_eq!(
-        command_schema["oneOf"],
+        command_schema["allOf"][0]["oneOf"],
         json!([
             {"$ref": "#/$defs/legacy"},
             {"$ref": "#/$defs/native"}
         ])
     );
+    assert!(command_schema.get("oneOf").is_none());
+    assert_eq!(
+        command_schema["properties"]["apiVersion"]["enum"],
+        json!([1, 2])
+    );
+    for field in [
+        "requestId",
+        "instanceId",
+        "documentId",
+        "expectedRevision",
+        "operation",
+        "payload",
+    ] {
+        assert!(
+            command_schema["properties"][field].is_object(),
+            "{field} is directly advertised"
+        );
+    }
     assert_eq!(command_schema["x-nemo-nativeApiVersion"], 2);
     assert_eq!(command_schema["x-nemo-nativeTransportV2"], native_transport);
     assert_eq!(
@@ -108,6 +126,24 @@ async fn executable_advertises_valid_command_union_and_reports_no_running_app() 
         .expect("advertised command schema is valid Draft 2020-12");
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
+    for example in command_schema["examples"].as_array().unwrap() {
+        assert!(
+            validator.is_valid(example),
+            "copyable native example: {example}"
+        );
+        let mut malformed = example.clone();
+        malformed["payload"] = json!("{}");
+        assert!(!validator.is_valid(&malformed));
+        let mut missing_revision = example.clone();
+        missing_revision
+            .as_object_mut()
+            .unwrap()
+            .remove("expectedRevision");
+        assert!(!validator.is_valid(&missing_revision));
+        let mut unsupported = example.clone();
+        unsupported["operation"] = json!("command.not_registered");
+        assert!(!validator.is_valid(&unsupported));
+    }
     let legacy_request = json!({
         "apiVersion": 1,
         "requestId": "fixture-v1",
@@ -118,6 +154,28 @@ async fn executable_advertises_valid_command_union_and_reports_no_running_app() 
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 25}
     });
     assert!(validator.is_valid(&legacy_request));
+    for (field, value) in [
+        ("operation", json!("property.not_registered")),
+        ("payload", json!("{}")),
+        ("unexpectedField", json!(true)),
+    ] {
+        let mut invalid = legacy_request.clone();
+        invalid[field] = value;
+        assert!(!validator.is_valid(&invalid), "legacy rejects {field}");
+    }
+    let native_apply = &command_schema["examples"][0];
+    for payload in [
+        json!({"command": "layer.opacity.set", "stableTarget": {"layerId": "wrong-key"}, "value": 25}),
+        json!({"command": "layer.opacity.set", "stableTarget": {"layerUid": "layer-a"}, "value": 101}),
+        json!({"command": "layer.opacity.set", "stableTarget": {"layerUid": "layer-a"}, "value": 25, "extra": true}),
+    ] {
+        let mut invalid = native_apply.clone();
+        invalid["payload"] = payload;
+        assert!(
+            !validator.is_valid(&invalid),
+            "native rejects malformed body"
+        );
+    }
 
     let mut native_requests = native_transport["$defs"]["Request"]["examples"]
         .as_array()
