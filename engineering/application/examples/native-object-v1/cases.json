@@ -1,0 +1,122 @@
+{
+  "oracleVersion": "nemo.native-object-cases/1",
+  "status": "prospective-contract-only",
+  "records": [
+    {
+      "schemaVersion": 1, "family": "closed-solid-fill-cubic-path",
+      "target": { "contextId": "scene-root", "frameScope": { "kind": "authored", "frame": 7 }, "layerUid": "legacy layer:alpha", "strokeId": "ink/path_A" },
+      "geometry": {
+        "kind": "cubic-path", "closed": true, "coordinateSpace": "document-world", "handleSpace": "relative",
+        "segments": [
+          { "point": { "x": 10.125, "y": 20 }, "handleIn": { "x": -2, "y": 0 }, "handleOut": { "x": 3.25, "y": -1 } },
+          { "point": { "x": 40, "y": 20 }, "handleIn": { "x": -3, "y": 2 }, "handleOut": { "x": 0, "y": 6 } },
+          { "point": { "x": 25, "y": 50 }, "handleIn": { "x": 4, "y": -2 }, "handleOut": { "x": -5, "y": -3 } }
+        ]
+      },
+      "fill": { "kind": "solid", "r": 0.2, "g": 0.4, "b": 0.6, "a": 0.75 }
+    },
+    {
+      "schemaVersion": 1, "family": "closed-solid-fill-cubic-path",
+      "target": { "contextId": "scene-root", "frameScope": { "kind": "reference", "frame": 12 }, "layerUid": "0", "strokeId": "0001" },
+      "geometry": {
+        "kind": "cubic-path", "closed": true, "coordinateSpace": "document-world", "handleSpace": "relative",
+        "segments": [
+          { "point": { "x": -10, "y": 0 }, "handleIn": { "x": 0, "y": 0 }, "handleOut": { "x": 0, "y": 0 } },
+          { "point": { "x": 10, "y": 0 }, "handleIn": { "x": 0, "y": 0 }, "handleOut": { "x": 0, "y": 0 } },
+          { "point": { "x": 0, "y": 10 }, "handleIn": { "x": 0, "y": 0 }, "handleOut": { "x": 0, "y": 0 } }
+        ]
+      },
+      "fill": { "kind": "solid", "r": 1, "g": 0, "b": 0, "a": 1 }
+    }
+  ],
+  "segmentCountControls": [
+    { "count": 1, "valid": false }, { "count": 2, "valid": true },
+    { "count": 256, "valid": true }, { "count": 257, "valid": false }
+  ],
+  "invalidRecords": [
+    { "label": "overflowing JSON anchor", "path": ["geometry", "segments", 0, "point", "x"], "jsonValue": "1e400" },
+    { "label": "negative overflowing JSON handle", "path": ["geometry", "segments", 0, "handleIn", "y"], "jsonValue": "-1e400" },
+    { "label": "missing frame scope", "path": ["target", "frameScope"], "delete": true },
+    { "label": "missing frame", "path": ["target", "frameScope", "frame"], "delete": true },
+    { "label": "fractional frame", "path": ["target", "frameScope", "frame"], "value": 7.5 },
+    { "label": "cross-frame scope", "path": ["target", "frameScope", "kind"], "value": "all-frames" },
+    { "label": "inferred cross-frame link", "path": ["target", "sameShapeAtFrame"], "value": 8 },
+    { "label": "numeric layer index", "path": ["target", "layerUid"], "value": 0 },
+    { "label": "numeric stroke index", "path": ["target", "strokeId"], "value": 1 },
+    { "label": "empty ID", "path": ["target", "strokeId"], "value": "" },
+    { "label": "missing ID", "path": ["target", "strokeId"], "delete": true },
+    { "label": "index target", "path": ["target", "layerIndex"], "value": 0 },
+    { "label": "renumber instruction", "path": ["renumber"], "value": true },
+    { "label": "assign instruction", "path": ["assignIds"], "value": true },
+    { "label": "foreign context", "path": ["target", "contextId"], "value": "component-1" },
+    { "label": "null geometry", "path": ["geometry"], "value": null },
+    { "label": "unknown geometry", "path": ["geometry", "kind"], "value": "mesh" },
+    { "label": "open path", "path": ["geometry", "closed"], "value": false },
+    { "label": "absolute handles", "path": ["geometry", "handleSpace"], "value": "absolute" },
+    { "label": "screen coordinates", "path": ["geometry", "coordinateSpace"], "value": "screen" },
+    { "label": "too few anchors", "path": ["geometry", "segments"], "value": [] },
+    { "label": "null point", "path": ["geometry", "segments", 0, "point"], "value": null },
+    { "label": "missing handle", "path": ["geometry", "segments", 0, "handleIn"], "delete": true },
+    { "label": "gradient fill", "path": ["fill", "kind"], "value": "gradient" },
+    { "label": "out of range alpha", "path": ["fill", "a"], "value": 1.1 },
+    { "label": "stroke family", "path": ["stroke"], "value": {} },
+    { "label": "brush companion", "path": ["brushGroupId"], "value": "brush-a" },
+    { "label": "group family", "path": ["family"], "value": "group" },
+    { "label": "transform", "path": ["transform"], "value": {} },
+    { "label": "stored-format confusion", "path": ["formatVersion"], "value": 1 },
+    { "label": "API version confusion", "path": ["schemaVersion"], "value": 2 }
+  ],
+  "read": {
+    "request": {
+      "apiVersion": 2, "requestId": "object-read-7", "instanceId": "instance-A", "documentId": "document-A",
+      "operation": "query.document.object",
+      "payload": { "atRevision": 7, "stableTarget": { "contextId": "scene-root", "frameScope": { "kind": "authored", "frame": 7 }, "layerUid": "legacy layer:alpha", "strokeId": "ink/path_A" } }
+    },
+    "response": {
+      "apiVersion": 2, "requestId": "object-read-7", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 9, "ok": true,
+      "result": {
+        "atRevision": 7, "documentSnapshotId": "snapshot-A-seven",
+        "object": {
+          "schemaVersion": 1, "family": "closed-solid-fill-cubic-path",
+          "target": { "contextId": "scene-root", "frameScope": { "kind": "authored", "frame": 7 }, "layerUid": "legacy layer:alpha", "strokeId": "ink/path_A" },
+          "geometry": {
+            "kind": "cubic-path", "closed": true, "coordinateSpace": "document-world", "handleSpace": "relative",
+            "segments": [
+              { "point": { "x": 10.125, "y": 20 }, "handleIn": { "x": -2, "y": 0 }, "handleOut": { "x": 3.25, "y": -1 } },
+              { "point": { "x": 40, "y": 20 }, "handleIn": { "x": -3, "y": 2 }, "handleOut": { "x": 0, "y": 6 } },
+              { "point": { "x": 25, "y": 50 }, "handleIn": { "x": 4, "y": -2 }, "handleOut": { "x": -5, "y": -3 } }
+            ]
+          },
+          "fill": { "kind": "solid", "r": 0.2, "g": 0.4, "b": 0.6, "a": 0.75 }
+        }
+      }
+    }
+  },
+  "command": {
+    "request": {
+      "apiVersion": 2, "requestId": "object-fill-9", "instanceId": "instance-A", "documentId": "document-A", "operation": "command.document.apply", "expectedRevision": 9,
+      "payload": { "command": "object.fill.set", "stableTarget": { "contextId": "scene-root", "frameScope": { "kind": "authored", "frame": 7 }, "layerUid": "legacy layer:alpha", "strokeId": "ink/path_A" }, "fill": { "kind": "solid", "r": 0.8, "g": 0.1, "b": 0.3, "a": 1 } }
+    },
+    "response": { "apiVersion": 2, "requestId": "object-fill-9", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 10, "ok": true, "result": { "applied": true, "historyEntriesAdded": 1 } },
+    "preservationOracle": { "beforeRecordIndex": 0, "unchanged": ["schemaVersion", "family", "target", "geometry"], "changed": "fill" },
+    "afterRecord": {
+      "schemaVersion": 1, "family": "closed-solid-fill-cubic-path",
+      "target": { "contextId": "scene-root", "frameScope": { "kind": "authored", "frame": 7 }, "layerUid": "legacy layer:alpha", "strokeId": "ink/path_A" },
+      "geometry": {
+        "kind": "cubic-path", "closed": true, "coordinateSpace": "document-world", "handleSpace": "relative",
+        "segments": [
+          { "point": { "x": 10.125, "y": 20 }, "handleIn": { "x": -2, "y": 0 }, "handleOut": { "x": 3.25, "y": -1 } },
+          { "point": { "x": 40, "y": 20 }, "handleIn": { "x": -3, "y": 2 }, "handleOut": { "x": 0, "y": 6 } },
+          { "point": { "x": 25, "y": 50 }, "handleIn": { "x": 4, "y": -2 }, "handleOut": { "x": -5, "y": -3 } }
+        ]
+      },
+      "fill": { "kind": "solid", "r": 0.8, "g": 0.1, "b": 0.3, "a": 1 }
+    }
+  },
+  "failures": [
+    { "label": "replaced document read", "requestKind": "read", "requestChanges": [{ "path": ["documentId"], "value": "document-old" }], "response": { "apiVersion": 2, "requestId": "object-read-7", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 9, "ok": false, "error": { "code": "wrong_document", "message": "Document replaced", "details": { "requestedDocumentId": "document-old" } } } },
+    { "label": "missing scoped target", "requestKind": "read", "requestChanges": [{ "path": ["payload", "stableTarget", "strokeId"], "value": "missing" }], "response": { "apiVersion": 2, "requestId": "object-read-7", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 9, "ok": false, "error": { "code": "not_found", "message": "No object at the specified frame" } } },
+    { "label": "family unavailable", "requestKind": "read", "requestChanges": [], "response": { "apiVersion": 2, "requestId": "object-read-7", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 9, "ok": false, "error": { "code": "unavailable", "message": "Target family has no native object admission" } } },
+    { "label": "stale write", "requestKind": "command", "requestChanges": [{ "path": ["expectedRevision"], "value": 8 }], "response": { "apiVersion": 2, "requestId": "object-fill-9", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 9, "ok": false, "error": { "code": "stale_revision", "message": "Expected revision differs; no content or history changed" } } }
+  ]
+}
