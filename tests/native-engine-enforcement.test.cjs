@@ -31,6 +31,11 @@ const CANDIDATE_FILES = [
   'native-engine/tests/export_job_lifecycle.rs',
   'native-engine/src/request_receipts.rs',
   'native-engine/src/read_queries.rs',
+  'native-engine/src/object_document.rs',
+  'native-engine/src/object_codec.rs',
+  'native-engine/src/object_snapshot.rs',
+  'native-engine/tests/object_codec.rs',
+  'native-engine/tests/object_read.rs',
   'native-engine/tests/application_read.rs',
   'native-engine/src/application_replacement.rs',
   'native-engine/src/application_construction.rs',
@@ -88,8 +93,8 @@ const EXPECTED_EDGES = [
 ].sort();
 
 const PRODUCTION = {
-  codec: ['codec', 'document', 'project_structure'],
-  commands: ['commands', 'request_receipts', 'revision'],
+  codec: ['codec', 'document', 'project_structure', 'object_document', 'object_codec'],
+  commands: ['commands', 'request_receipts', 'revision', 'object_snapshot'],
   history: ['history', 'transaction'],
   evaluation: ['evaluation', 'animation_curve'],
   scheduler: ['resource_leases', 'scheduler'],
@@ -209,13 +214,16 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(testMacros), Object.keys(TEST_TARGETS).map((name) => `test-${name}`));
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
-    if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"');
+    if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"',
+      'object_codec_tests = "../tests/object_codec.rs"');
+    if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
       'export_geometry_tests = "../tests/render_geometry.rs"',
       'export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
     if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
-      'application_replacement_tests = "../tests/application_replacement.rs"');
+      'application_replacement_tests = "../tests/application_replacement.rs"',
+      'object_application_read_tests = "../tests/object_read.rs"');
     assert.deepEqual(testMacros[`test-${name}`], expected);
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });
   }

@@ -13,8 +13,8 @@ macro_rules! engine_modules {
 }
 
 engine_modules! {
-    "codec" => codec, document, project_structure;
-    "commands" => commands, request_receipts, revision;
+    "codec" => codec, document, project_structure, object_document, object_codec;
+    "commands" => commands, request_receipts, revision, object_snapshot;
     "history" => history, transaction;
     "evaluation" => evaluation, animation_curve;
     "scheduler" => resource_leases, scheduler;
@@ -38,7 +38,9 @@ macro_rules! test_modules {
 test_modules! {
     "test-codec" => codec_tests = "../tests/codec.rs";
     "test-codec" => project_structure_tests = "../tests/project_structure.rs";
+    "test-codec" => object_codec_tests = "../tests/object_codec.rs";
     "test-commands" => commands_tests = "../tests/commands.rs";
+    "test-commands" => object_read_tests = "../tests/object_read.rs";
     "test-history" => history_tests = "../tests/history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
@@ -52,4 +54,5 @@ test_modules! {
     "test-application" => application_tests = "../tests/application.rs";
     "test-application" => application_read_tests = "../tests/application_read.rs";
     "test-application" => application_replacement_tests = "../tests/application_replacement.rs";
+    "test-application" => object_application_read_tests = "../tests/object_read.rs";
 }

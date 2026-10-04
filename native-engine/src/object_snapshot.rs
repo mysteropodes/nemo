@@ -1,0 +1,150 @@
+//! Immutable staged object admission/read. No dispatcher or command activation.
+use crate::object_codec::{
+    self, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument, ObjectRecord, ObjectTarget,
+};
+use crate::request_receipts::DispatchErrorCode;
+use serde::{Deserialize, Serialize};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
+
+static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug, Clone)]
+pub struct ObjectSnapshot {
+    instance_id: String,
+    document_id: String,
+    snapshot_id: String,
+    document: Arc<ObjectDocument>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ReadRequest {
+    api_version: u32,
+    request_id: String,
+    instance_id: String,
+    document_id: String,
+    operation: String,
+    payload: ReadPayload,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ReadPayload {
+    at_revision: u64,
+    stable_target: ObjectTarget,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectReadResponse {
+    api_version: u32,
+    request_id: String,
+    instance_id: String,
+    document_id: String,
+    content_revision: u64,
+    ok: bool,
+    result: ObjectReadResult,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ObjectReadResult {
+    at_revision: u64,
+    document_snapshot_id: String,
+    object: ObjectRecord,
+}
+
+impl ObjectSnapshot {
+    /// Constructor revalidates even a caller's directly deserialized struct.
+    /// Each admitted instance is a fresh incarnation; nothing edits revision 0.
+    pub fn new(
+        instance_id: impl Into<String>,
+        document: ObjectDocument,
+    ) -> Result<Self, ObjectCodecError> {
+        object_codec::validate(&document)?;
+        let instance_id = instance_id.into();
+        if instance_id.is_empty() {
+            return Err(ObjectCodecError::new(
+                ObjectCodecErrorKind::Invalid,
+                "instanceId must be nonempty",
+            ));
+        }
+        let sequence = NEXT_OBJECT_DOCUMENT
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
+            .map_err(|_| {
+                ObjectCodecError::new(
+                    ObjectCodecErrorKind::Invalid,
+                    "object document identity sequence exhausted",
+                )
+            })?;
+        let document_id = format!("native-object-document-{sequence}");
+        Ok(Self {
+            instance_id,
+            snapshot_id: format!("native-object:{document_id}:0"),
+            document_id,
+            document: Arc::new(document),
+        })
+    }
+    pub fn instance_id(&self) -> &str {
+        &self.instance_id
+    }
+    pub fn document_id(&self) -> &str {
+        &self.document_id
+    }
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+    pub fn content_revision(&self) -> u64 {
+        0
+    }
+    pub fn document(&self) -> &ObjectDocument {
+        &self.document
+    }
+
+    /// Direct bytes preserve duplicate-member rejection. Typed errors must be
+    /// wrapped by a later admitted transport; this is not the active dispatcher.
+    pub fn query_json(&self, bytes: &[u8]) -> Result<ObjectReadResponse, DispatchErrorCode> {
+        let request: ReadRequest =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        if request.api_version != 2
+            || request.operation != "query.document.object"
+            || request.request_id.is_empty()
+            || request.instance_id.is_empty()
+            || request.document_id.is_empty()
+            || request.payload.at_revision > 9_007_199_254_740_991
+            || !request.payload.stable_target.valid()
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        if request.instance_id != self.instance_id {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if request.document_id != self.document_id {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if request.payload.at_revision != 0 {
+            return Err(DispatchErrorCode::NotFound);
+        }
+        let object = self
+            .document
+            .objects()
+            .iter()
+            .find(|object| object.target() == &request.payload.stable_target)
+            .ok_or(DispatchErrorCode::NotFound)?
+            .clone();
+        Ok(ObjectReadResponse {
+            api_version: 2,
+            request_id: request.request_id,
+            instance_id: self.instance_id.clone(),
+            document_id: self.document_id.clone(),
+            content_revision: 0,
+            ok: true,
+            result: ObjectReadResult {
+                at_revision: 0,
+                document_snapshot_id: self.snapshot_id.clone(),
+                object,
+            },
+        })
+    }
+}
