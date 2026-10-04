@@ -1,11 +1,11 @@
 //! Opt-in capture at the native dispatch boundary, separate from terminal metadata.
 use crate::application::{ExportResourceResolver, NativeApplication, ReproductionEligibility};
-use crate::commands::{OpacityRequest, ResponseEnvelope};
+use crate::commands::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::export_job::{ExportCompositor, StagedArtifactPort};
 use crate::protocol;
 use crate::request_receipts::{ApplyOpacity, RequestFingerprint};
 use serde::Serialize;
-use serde_json::Number;
+use serde_json::{json, Number, Value};
 
 #[path = "reproduction_bundle.rs"]
 mod bundle;
@@ -147,6 +147,10 @@ fn read_only(operation: &str) -> bool {
             | "query.document.serialize"
             | "query.document.evaluate"
             | "query.diagnostics.recent"
+            | "command.reproduction.opt_in"
+            | "query.reproduction.status"
+            | "query.reproduction.export"
+            | "query.reproduction.replay"
             | "transaction.status"
     )
 }
@@ -154,6 +158,78 @@ fn read_only(operation: &str) -> bool {
 impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
     NativeApplication<P, C, R>
 {
+    /// Control reads have no dispatch receipt and never mutate the document.
+    /// The one opt-in transition only changes the bounded journal.
+    pub(super) fn dispatch_reproduction(&mut self, request: &OpacityRequest) -> ResponseEnvelope {
+        let empty = request
+            .payload
+            .as_object()
+            .is_some_and(|object| object.is_empty());
+        if request.expected_revision.is_some() {
+            return self.failure(
+                request,
+                DispatchErrorCode::InvalidRequest,
+                "Reproduction operations forbid expectedRevision.",
+            );
+        }
+        let result = match request.operation.as_str() {
+            "command.reproduction.opt_in" if empty => self
+                .opt_in_reproduction()
+                .map(|status| serde_json::to_value(status).expect("status is serializable"))
+                .map_err(reason_code),
+            "query.reproduction.status" if empty => {
+                Ok(serde_json::to_value(self.reproduction_status())
+                    .expect("status is serializable"))
+            }
+            "query.reproduction.export" if empty => self
+                .export_reproduction_bundle()
+                .and_then(|bytes| {
+                    serde_json::from_slice::<Value>(&bytes)
+                        .map_err(|_| ReproductionReason::InvalidProjection)
+                })
+                .map(|bundle| json!({"bundle": bundle}))
+                .map_err(reason_code),
+            "query.reproduction.replay" => {
+                let bundle = request
+                    .payload
+                    .as_object()
+                    .filter(|object| object.len() == 1)
+                    .and_then(|object| object.get("bundle"))
+                    .filter(|bundle| bundle.is_object());
+                match bundle.and_then(|bundle| serde_json::to_vec(bundle).ok()) {
+                    Some(bytes) => replay_reproduction_bundle(&bytes)
+                        .map(|report| serde_json::to_value(report).expect("report is serializable"))
+                        .map_err(replay_code),
+                    None => Err(DispatchErrorCode::InvalidRequest),
+                }
+            }
+            _ => Err(DispatchErrorCode::InvalidRequest),
+        };
+        let result = match result {
+            Ok(result) => result,
+            Err(code) => return self.failure(request, code, "Reproduction request was rejected."),
+        };
+        let response = ResponseEnvelope {
+            api_version: 2,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            result: Some(result),
+            error: None,
+        };
+        if serde_json::to_vec(&response).is_ok_and(|bytes| bytes.len() <= 4096) {
+            response
+        } else {
+            self.failure(
+                request,
+                DispatchErrorCode::InvalidRequest,
+                "Reproduction response exceeds the 4096-byte transport limit.",
+            )
+        }
+    }
+
     pub fn opt_in_reproduction(&mut self) -> Result<ReproductionStatus, ReproductionReason> {
         if !matches!(self.reproduction, ReproductionJournal::Disabled) {
             return Err(ReproductionReason::AlreadyOptedIn);
@@ -268,6 +344,25 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
         if let Some(candidate) = candidate {
             self.reproduction.append(candidate, response);
         }
+    }
+}
+
+fn reason_code(reason: ReproductionReason) -> DispatchErrorCode {
+    match reason {
+        ReproductionReason::InvalidProjection => DispatchErrorCode::Internal,
+        ReproductionReason::NotCatalog
+        | ReproductionReason::NotPristine
+        | ReproductionReason::AlreadyOptedIn => DispatchErrorCode::InvalidRequest,
+        _ => DispatchErrorCode::Unavailable,
+    }
+}
+
+fn replay_code(error: ReproductionReplayError) -> DispatchErrorCode {
+    match error {
+        ReproductionReplayError::CatalogUnavailable | ReproductionReplayError::ReplayMismatch => {
+            DispatchErrorCode::Internal
+        }
+        _ => DispatchErrorCode::InvalidRequest,
     }
 }
 

@@ -417,3 +417,91 @@ fn exported_after_first(app: &mut App) -> Value {
 
 #[path = "reproduction_lifecycle.rs"]
 mod lifecycle;
+
+#[test]
+fn v2_reproduction_controls_and_isolated_replay_preserve_live_authority() {
+    let mut app = app();
+    let status = app.dispatch(request(
+        &app,
+        "status-0",
+        "query.reproduction.status",
+        json!({}),
+    ));
+    assert!(status.is_ok());
+    assert_eq!(status.result().unwrap()["state"], "disabled");
+    let opted = app.dispatch(request(
+        &app,
+        "opt-in",
+        "command.reproduction.opt_in",
+        json!({}),
+    ));
+    assert!(opted.is_ok());
+    assert_eq!(opted.result().unwrap()["state"], "recording");
+    assert_eq!(app.diagnostics.retained_len(), 0);
+    assert!(app.dispatch(set(&app, "ui-40", json!(40))).is_ok());
+    assert!(app.dispatch(set(&app, "mcp-60", json!(60))).is_ok());
+    assert!(app.dispatch(set(&app, "no-op-60", json!(60))).is_ok());
+    let exported = app.dispatch(request(
+        &app,
+        "export",
+        "query.reproduction.export",
+        json!({}),
+    ));
+    assert!(exported.is_ok());
+    let bundle = exported.result().unwrap()["bundle"].clone();
+    assert_eq!(bundle["commands"].as_array().unwrap().len(), 3);
+    let before = stores(&app);
+    let replay = app.dispatch(request(
+        &app,
+        "replay",
+        "query.reproduction.replay",
+        json!({"bundle":bundle}),
+    ));
+    assert!(replay.is_ok());
+    assert_eq!(replay.result().unwrap()["steps"][2]["state"]["revision"], 2);
+    assert_eq!(replay.result().unwrap()["steps"][2]["applied"], false);
+    assert_eq!(
+        stores(&app),
+        before,
+        "replay must not touch any live state or receipt"
+    );
+    assert_eq!(app.diagnostics.retained_len(), 3);
+    for response in [&status, &opted, &exported, &replay] {
+        assert!(serde_json::to_vec(response).unwrap().len() <= 4096);
+    }
+}
+
+#[test]
+fn v2_replay_rejects_oversized_response_without_live_effects() {
+    let mut app = App::from_reproduction_fixture(
+        "i".repeat(128),
+        REPRODUCTION_FIXTURE,
+        Port::default(),
+        Compositor,
+        Resolver,
+    )
+    .unwrap();
+    app.opt_in_reproduction().unwrap();
+    for index in 0..32 {
+        let value = if index % 2 == 0 { 40.123 } else { 60.456 };
+        assert!(app
+            .dispatch(set(&app, &format!("write-{index}"), json!(value)))
+            .is_ok());
+    }
+    let bundle = exported(&app);
+    assert!(replay_reproduction_bundle(&serde_json::to_vec(&bundle).unwrap()).is_ok());
+    let before = stores(&app);
+    let replay = app.dispatch(request(
+        &app,
+        &"r".repeat(128),
+        "query.reproduction.replay",
+        json!({"bundle":bundle}),
+    ));
+    assert_eq!(
+        replay.error().unwrap().code,
+        DispatchErrorCode::InvalidRequest
+    );
+    assert!(replay.error().unwrap().message.contains("4096-byte"));
+    assert!(serde_json::to_vec(&replay).unwrap().len() <= 4096);
+    assert_eq!(stores(&app), before);
+}

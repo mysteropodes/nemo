@@ -4,7 +4,7 @@
       "id": "mcp.transport",
       "layer": "adapters",
       "dir": "nemo-mcp",
-      "files": ["build.rs", "src/capabilities.rs", "src/capability_contract.rs", "src/contract.rs", "src/contract_tests.rs", "src/lib.rs", "src/main.rs", "src/native_contract.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs"],
+      "files": ["build.rs", "src/capabilities.rs", "src/capability_contract.rs", "src/contract.rs", "src/contract_tests.rs", "src/lib.rs", "src/main.rs", "src/native_contract.rs", "src/native_reproduction_contract.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs"],
       "publicApi": ["src/capabilities.rs", "src/lib.rs", "src/contract.rs", "src/registry.rs", "src/wire.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -20,7 +20,7 @@
       "id": "mcp.desktop.tests",
       "layer": "tests",
       "dir": "src-tauri/src",
-      "files": ["application_mcp_tests.rs", "application_mcp_diagnostics_tests.rs", "native_revision_sync_tests.rs"],
+      "files": ["application_mcp_tests.rs", "application_mcp_diagnostics_tests.rs", "application_mcp_reproduction_tests.rs", "native_revision_sync_tests.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     }

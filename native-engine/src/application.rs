@@ -192,6 +192,10 @@ impl<P: StagedArtifactPort, C: ExportCompositor, R: ExportResourceResolver>
 
         match request.operation.as_str() {
             diagnostics::QUERY => self.recent_diagnostics(&request),
+            "command.reproduction.opt_in"
+            | "query.reproduction.status"
+            | "query.reproduction.export"
+            | "query.reproduction.replay" => self.dispatch_reproduction(&request),
             OP_JOB_EXPORT_PNG_BEGIN => self.begin_export(&request, fingerprint),
             OP_JOB_EXPORT_PNG_STATUS => self.job_stage(&request, fingerprint, false),
             OP_JOB_EXPORT_PNG_CANCEL => self.job_stage(&request, fingerprint, true),
