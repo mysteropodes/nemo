@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d57156b2040bd220fee2a15dcd58351ddbdef33c",
-  "describe": "v0.7.0-alpha.4-906-gd57156b2-dirty"
+  "head": "0f18e3b68ec1e99fe8597509070b58cc05a9ac7b",
+  "describe": "v0.7.0-alpha.4-916-g0f18e3b6-dirty"
  },
- "inputsDigest": "0c1f7c734bef99b4aa07ad98652e7238b35b72c0f6a76971c1c497b82db5068f",
+ "inputsDigest": "fe3a970ae374b84623b6d6746499a4fc2431cb357adffd21045e394b7f271c4a",
  "states": [
   "inventoried",
   "characterized",
@@ -421,7 +421,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 24,
+    "functionsVisited": 29,
     "via": "variable btn",
     "references": [
      "src/js/updater-bridge.js:89 checkForUpdate()"
@@ -2685,7 +2685,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 218,
+    "functionsVisited": 219,
     "via": "chain",
     "references": [
      "src/js/images.js:706",
@@ -2767,7 +2767,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 39,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9166 action()"
@@ -4760,7 +4760,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 142,
+    "functionsVisited": 144,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:9131 action()",
@@ -5019,7 +5019,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 36,
+    "functionsVisited": 37,
     "via": "variable trigger",
     "references": []
    },
@@ -7412,7 +7412,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 83,
+    "functionsVisited": 84,
     "via": "variable runBtn",
     "references": []
    },
@@ -8066,7 +8066,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 257,
+    "functionsVisited": 258,
     "via": "variable sel",
     "references": []
    },
@@ -9256,7 +9256,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 49,
+    "functionsVisited": 51,
     "via": "chain",
     "references": []
    },
@@ -12909,7 +12909,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 95,
+    "functionsVisited": 97,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6286 paintStrokeSwatches()"
@@ -15385,7 +15385,7 @@
    "capability": "settings language",
    "area": "preferences-workspace",
    "handler": [
-    "src/js/i18n.js:4233 initLanguage()"
+    "src/js/i18n.js:4273 initLanguage()"
    ],
    "events": [
     "change"
@@ -15409,7 +15409,7 @@
     "functionsVisited": 11,
     "via": "variable sel",
     "references": [
-     "src/js/i18n.js:4198 applyI18n()",
+     "src/js/i18n.js:4238 applyI18n()",
      "src/js/tutorial.js:1023 measure()"
     ]
    },
@@ -15445,7 +15445,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 75,
     "via": "variable resetBtn",
     "references": []
    },
@@ -16902,7 +16902,7 @@
     "container": "tp-font-add-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 115,
+    "functionsVisited": 116,
     "via": "variable fontAddConfirm",
     "references": []
    },
@@ -21505,10 +21505,10 @@
    "id": "labs:diagnostics-panel",
    "kind": "labs",
    "surface": "Settings > Labs / SMLabs.diagnostics-panel",
-   "capability": "Diagnostics inspector: read-only view of the recorded opacity command trace; click a row to select its layer. Report is currently unavailable.",
+   "capability": "Diagnostics inspector: read-only opacity command trace and layer selection. An explicit disposable synthetic session can download a native reproduction; ordinary documents cannot.",
    "area": "labs",
    "handler": [
-    "src/js/labs/diagnostics-panel.js:172"
+    "src/js/labs/diagnostics-panel.js:223"
    ],
    "events": [],
    "exposure": [
@@ -21523,9 +21523,9 @@
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
-   "source": "src/js/labs/diagnostics-panel.js:172",
+   "source": "src/js/labs/diagnostics-panel.js:223",
    "meta": {
-    "functionsVisited": 23
+    "functionsVisited": 28
    },
    "fixtures": []
   },
