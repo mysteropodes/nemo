@@ -12,16 +12,16 @@
       "id": "rust.native.engine.document",
       "layer": "native-document",
       "dir": "native-engine/src",
-      "files": ["document.rs"],
-      "publicApi": ["document.rs"],
+      "files": ["document.rs", "object_document.rs"],
+      "publicApi": ["document.rs", "object_document.rs"],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "rust.native.engine.codec",
       "layer": "native-codec",
       "dir": "native-engine/src",
-      "files": ["codec.rs", "project_structure.rs"],
-      "publicApi": ["codec.rs", "project_structure.rs"],
+      "files": ["codec.rs", "project_structure.rs", "object_codec.rs"],
+      "publicApi": ["codec.rs", "project_structure.rs", "object_codec.rs"],
       "sizeProfile": "Rust production module"
     },
     {
@@ -140,15 +140,15 @@
       "id": "rust.native.engine.read-queries",
       "layer": "native-read-queries",
       "dir": "native-engine/src",
-      "files": ["read_queries.rs"],
-      "publicApi": ["read_queries.rs"],
+      "files": ["read_queries.rs", "object_snapshot.rs"],
+      "publicApi": ["read_queries.rs", "object_snapshot.rs"],
       "sizeProfile": "Rust production module"
     },
     {
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "project_structure.rs", "render_geometry.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "project_structure.rs", "render_geometry.rs", "scheduler.rs", "object_codec.rs", "object_read.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
