@@ -48,4 +48,11 @@ function createIndexedDbStore(indexedDb) {
   return { get: get, set: set, remove: remove };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = { createIndexedDbStore: createIndexedDbStore };
-if (typeof window !== 'undefined') window.SMIdb = createIndexedDbStore(window.indexedDB);
+if (typeof window !== 'undefined') window.SMIdb = createIndexedDbStore({
+  // Preserve lazy host access: an unavailable/throwing getter rejects the
+  // first operation rather than failing classic-script bootstrap.
+  open: function (name, version) {
+    if (!window.indexedDB) throw new Error('indexedDB unavailable');
+    return window.indexedDB.open(name, version);
+  }
+});

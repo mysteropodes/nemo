@@ -86,6 +86,18 @@ test('single cached open, upgrade only creates missing kv, and concurrent caller
   }
 });
 
+test('browser host lookup remains lazy and throwing getter rejection is cached', async () => {
+  const error = new Error('host denied');
+  let lookups = 0;
+  const window = {};
+  Object.defineProperty(window, 'indexedDB', { get() { lookups++; throw error; } });
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/js/idb-store.js'), 'utf8'), { window });
+  assert.equal(lookups, 0);
+  await assert.rejects(window.SMIdb.get('x'), value => value === error);
+  await assert.rejects(window.SMIdb.remove('x'), value => value === error);
+  assert.equal(lookups, 1);
+});
+
 test('opaque fixture bytes round-trip and remove, with every operation pending until commit', async () => {
   const f = fixture(), store = createIndexedDbStore(f.indexedDb);
   const bytes = fs.readFileSync(path.join(__dirname, 'animation/fixtures/curve-workflow.json'), 'utf8');

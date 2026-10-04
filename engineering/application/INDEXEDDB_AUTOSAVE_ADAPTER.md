@@ -4,7 +4,9 @@
 feature. Owner: Ilya (`ivg-design`); independent reviewer: Ilya/O. Its public CommonJS
 factory is `createIndexedDbStore(indexedDb)`, returning async `get(key)`, `set(key,value)`
 and `remove(key)`. The existing classic script creates exactly one production instance
-as `window.SMIdb`, injecting `window.indexedDB`. No script-order or consumer change is
+as `window.SMIdb`, injecting an open port that lazily reads `window.indexedDB`, as the
+baseline did. A throwing host getter rejects the first operation and keeps that failure
+cached instead of breaking script bootstrap. No script-order or consumer change is
 needed. This internal helper is not a separately discoverable capability or MCP operation.
 
 The adapter owns the `nemo-store` database, version 1, and its sole `kv` object store.
