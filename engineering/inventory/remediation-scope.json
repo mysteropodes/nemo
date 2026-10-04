@@ -790,12 +790,18 @@
     {
       "id": "C01.idb-store.kv",
       "census": "C01",
-      "admission": "pending"
+      "admission": "admitted",
+      "leaf": "P34",
+      "issue": 1520,
+      "evidence": "P03C-as/#1523 admits the IndexedDB persistence-adapter boundary only, not implementation or coverage. C01/#1036 census source ded641bd763379f36d629bf1686fcce8a6137a66, census blob d81b618308f9f4849b0ba24fa512af6be90aa72c; src/js/idb-store.js blob 17fc7be9aba13784625261b496aee7120dc5245b is unchanged at protected 194d275b102a5604bc9ad31281be65c8487bfa5c. P34/#1520 defines API/lifetime, whole-file scope, consumer checks and known-defect exclusions under R18.1/#915. Native predecessor is accepted C01/#1036 only. The original T08 shared-slot blocker was released by #1057 comment 5890957293 and the later T08B/#1532 exclusive claim by comment 5970737178; the retained Blocked board state needs fresh board-first Ready, capacity and whole-file ownership review. This admission assigns no implementing writer or shared-file slot."
     },
     {
       "id": "C01.asset-tree.folder-widget",
       "census": "C01",
-      "admission": "pending"
+      "admission": "admitted",
+      "leaf": "P35",
+      "issue": 1521,
+      "evidence": "P03C-as/#1523 admits the asset-folder presentation boundary only, not implementation or coverage. C01/#1036 census source ded641bd763379f36d629bf1686fcce8a6137a66, census blob d81b618308f9f4849b0ba24fa512af6be90aa72c; src/js/asset-tree.js blob a9cfc79050e98dd3a194e2eacfdea0c07400cd39 is unchanged at protected 194d275b102a5604bc9ad31281be65c8487bfa5c. P35/#1521 defines API/DOM ownership, whole-file scope, consumer checks and known-defect exclusions under R18.4/#918. Native predecessor is accepted C01/#1036 only. The original T08 shared-slot blocker was released by #1057 comment 5890957293 and the later T08B/#1532 exclusive claim by comment 5970737178; the retained Blocked board state needs fresh board-first Ready, capacity and whole-file ownership review. This admission assigns no implementing writer, shared-file slot or CSS/HTML span disposition."
     },
     {
       "id": "C01.tweens.undo-redo-engine",

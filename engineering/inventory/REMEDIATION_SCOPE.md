@@ -562,12 +562,64 @@ uncovered code remains 7 185 and frozen opacity core retains 15 computed
 uncovered code lines. No packet admission, numeric range coverage, capability
 runtime or installed-client behavior is accepted.
 
-**P03 is not complete and no extraction is admitted**: the gate still exits 1 with 762
-pending packets, no notes needing reconciliation, 0 unmapped paths and 8
+## Bounded C01 admissions and residual queue
+
+[P03C-as / #1523](https://github.com/mysteropodes/nemo/issues/1523) admits exactly two
+C01 boundaries: `C01.idb-store.kv` → [P34 / #1520](https://github.com/mysteropodes/nemo/issues/1520)
+under R18.1/#915, and `C01.asset-tree.folder-widget` →
+[P35 / #1521](https://github.com/mysteropodes/nemo/issues/1521) under R18.4/#918.
+These are executable adoption/extraction leaves for existing unclassified modules with
+implicit dependencies, real production consumers and missing direct tests. Admission
+records their whole-file scopes, public API/lifetime contracts, three observable checks
+and known-defect exclusions; it does not claim implementation or accepted behavior.
+
+C01/#1036 remains pinned to source `ded641bd763379f36d629bf1686fcce8a6137a66` and
+census blob `d81b618308f9f4849b0ba24fa512af6be90aa72c`. At the admission base,
+protected `194d275b102a5604bc9ad31281be65c8487bfa5c`, the selected source blobs still
+match that census: `src/js/idb-store.js` is `17fc7be9aba13784625261b496aee7120dc5245b`
+and `src/js/asset-tree.js` is `a9cfc79050e98dd3a194e2eacfdea0c07400cd39`.
+The inventory's own frozen commit, digest, pins and computed range coverage are unchanged.
+
+At the 4 October 2026 readback, both leaves have sole Ilya ownership and Ilya/O
+validation, with Project #2 Blocked / Validation Planned / roadmap Needs work /
+Forecast / Unscheduled. Accepted C01/#1036 is their sole native predecessor. The
+original blocker was the T08/#1057 shared application-profile/provenance slot.
+[T08's source-stage handoff](https://github.com/mysteropodes/nemo/issues/1057#issuecomment-5890957293)
+released its writer slot on 29 September, and
+[T08B's terminal handoff](https://github.com/mysteropodes/nemo/issues/1532#issuecomment-5970737178)
+released its later exclusive shared-file claim on 3 October. The retained Blocked
+board state therefore needs re-evaluation against current capacity and whole-file
+ownership; it does not establish that T08 still holds those files or must close first.
+P34/P35 require fresh board-first Ready review and explicit writer/checkout allocation.
+This inventory change updates neither leaf's board and allocates no implementing
+writer or shared source/profile slot.
+
+The other **eleven C01 packets remain pending**. The following architecture-first
+decompositions are the residual queue from #1523, not source reservations. Live
+characterization, whole-file owner release and ≤90-minute leaf definitions are required
+before Ready; a partial successor never disposes the entire broad packet.
+
+| Pending C01 packet (prefix `C01.` omitted) | Next bounded decomposition and ownership constraint |
+| --- | --- |
+| `project.document-io-and-dirty-tracking` | Separate path/name/dirty-baseline bookkeeping over the existing native serialization port, New/reset orchestration, and file open/save adapters. Serialize whole `project.js` after N20/#1352, N20F–H and N21 owner release. Preserve `NemoNativeOpacityProjectEntry.documentJSON`; do not recreate fixed-revision serialization or a JS document writer. Unsupported families require their own native revision leaves. |
+| `project-document.validation` | [N23A/#1525](https://github.com/mysteropodes/nemo/issues/1525) admits only an immutable Rust structural-codec sub-slice with a production-JS parity oracle and no revision authority. Path helpers and supported-family admission/cutover remain pending. Subtract N20-owned opacity schema/projection/composition; N23A needs a separate Rust registration/wiring slot. |
+| `tweens.undo-redo-engine` | Split full-layer history capture/apply, stack/labels/context policy and native family consumer routing. Exclude accepted P21/#1023 frame-entry work (PR #1171, integrated `b4a4fe249821bc534dd1a63dbb4b037df6455ec3`) and H02/#1059; retain wrong-frame redo and entered-Component limits. N09 already owns native opacity history. Whole `tweens.js` and any `app.js` writes await owner release. |
+| `project.version-history` | Split disk snapshot key/list/retention from restore transactions; preserve native pinned serialization and restore admission. Requires whole `project.js`, replacement port and serializer-contract acceptance. The Untitled shared slug remains a characterized question. |
+| `project.project-tabs` | Split per-tab snapshot/dirty-baseline model, DOM strip and close/switch transitions. Requires the native replacement port and whole `project.js` release; snapshots must not become concurrent writable documents. |
+| `project.close-unsaved-work-guard` | One close-event adapter with injected dirty query/dialog/destroy ports. Verify confirmed destroy does not repeat the close event, cancel preserves the document, and browser beforeunload availability is explicit. Serialize with dirty-baseline and whole `project.js`. |
+| `timeline.autosave-tick` | One stoppable periodic persistence boundary reads one authoritative revision snapshot and sends exact bytes to storage/history, retaining playback skip and timer behavior. Requires serializer/history interfaces and whole `timeline.js` release after P24/#1026 / PR #1473 with native owner coordination; do not enable blocked legacy writes. |
+| `history-panel.ui` | Read/jump presentation over a public history snapshot/command interface after full-layer/stack extraction. The renderer owns DOM only; mutations remain with the accepted authority. Preserve click-time position and known history limits. |
+| `project.start-screen` | Split recent-project storage/list model from New/Open/Resume DOM bindings, preserving N20/N21 first-open/replacement transitions. Requires document I/O, the selected persistence adapter and whole `project.js`; makes no CSS/HTML span decision. |
+| `project.team-sync` | Split shared-folder path/profile storage, publish/list snapshot jobs and merge orchestration. Define the native family boundary of `SM.mergeRemoteSnapshot` outside C01 before writable merge routing; no expanded collaboration infrastructure. |
+| `project-entry.repaint` | First assess whether the existing small, directly tested presentation seam warrants an evidenced covered disposition. Preserve `SMProjectEntry.repaint` and browser/Paper adapter limits. N20D0/N20/N21 owns native viewport presentation; do not invent a duplicate extraction. |
+
+**P03 remains incomplete**: 762 packets total now comprise **760 pending, 2 admitted,
+0 covered and 0 deferred**. `complete:false` remains unchanged; the normal scope gate
+still exits 1 with no notes needing reconciliation, 0 unmapped paths and 8
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
-What remains, in order: disposition the remaining small remainders in other
-original-partition files, and `style.css`/`index.html` once Ilya decides census versus
-`boundary`; split each pending packet into ≤90-minute leaves under its family parent or mark it
-`covered`/`deferred`
-with evidence. The execution plan and leaf issues remain the queue and ownership authority;
-D01 and T05 keep their reservations. No application behavior changes in this index.
+All eight spans are in `style.css`/`index.html` and await Ilya's separate census-versus-
+`boundary` decision. Other pending packets still need bounded leaves under their family
+parents or evidenced `covered`/`deferred` dispositions. The execution plan and live leaf
+issues remain the queue and ownership authority. No C01-family-complete, whole-native-
+engine or whole-remediation denominator, application behavior or runtime acceptance is
+established by these admissions.
