@@ -1,6 +1,5 @@
 //! Closed portable projection: raw bytes are fully admitted before replay.
-use super::ReproductionReplayError;
-use crate::application::{ReproductionReason, REPRODUCTION_FIXTURE};
+use crate::application::{ReproductionReason, ReproductionReplayError, REPRODUCTION_FIXTURE};
 use serde::de::{value::MapAccessDeserializer, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{json, Number};

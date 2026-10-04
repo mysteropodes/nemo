@@ -1,8 +1,7 @@
 //! Replay owns a fresh catalog authority with no caller-supplied side-effect ports.
-use super::bundle::{self, ValidatedBundle, TARGET};
-use super::ReproductionReplayError;
+use crate::application::reproduction::bundle::{self, ValidatedBundle, TARGET};
 use crate::application::{
-    ExportResourceResolver, NativeApplication, ResourceResolutionError,
+    ExportResourceResolver, NativeApplication, ReproductionReplayError, ResourceResolutionError,
     ResourceResolutionErrorKind, REPRODUCTION_FIXTURE,
 };
 use crate::commands::OpacityRequest;
