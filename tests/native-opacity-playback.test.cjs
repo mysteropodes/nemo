@@ -49,8 +49,16 @@ function harness(options = {}) {
     NemoNativeOpacityMotionSurface: surface,
     document: { getElementById: id => id === 'btn-play' ? playButton : frameInput },
     performance: { now: () => now },
-    requestAnimationFrame: fn => { rafs.set(++nextRaf, fn); return nextRaf; },
-    cancelAnimationFrame: id => rafs.delete(id), clearInterval() {},
+    requestAnimationFrame: function (fn) {
+      assert.ok(this === undefined || this === window,
+        'requestAnimationFrame must not receive the scheduler ports');
+      rafs.set(++nextRaf, fn); return nextRaf;
+    },
+    cancelAnimationFrame: function (id) {
+      assert.ok(this === undefined || this === window,
+        'cancelAnimationFrame must not receive the scheduler ports');
+      rafs.delete(id);
+    }, clearInterval() {},
     showToast: message => toasts.push(message),
     updateUI: frameOnly => paints.push([state.currentFrame, frameOnly]),
     updatePlayhead: () => legacy.push('playhead'),
@@ -58,6 +66,8 @@ function harness(options = {}) {
     loadFrame: () => legacy.push('load'),
     renderOS: () => legacy.push('onion'), renderArcs: () => legacy.push('arcs'),
     BrushMenu: null, selectedPaths: [], _nodeSel: [] };
+  window.requestAnimationFrame = sandbox.requestAnimationFrame;
+  window.cancelAnimationFrame = sandbox.cancelAnimationFrame;
   vm.createContext(sandbox);
   vm.runInContext(source, sandbox);
   async function tick(at) {
@@ -206,6 +216,22 @@ test('blocked but inactive native owner cannot start Play or enter legacy playba
   assert.deepEqual(h.hostFrames, []);
   assert.deepEqual(h.legacy, []);
   assert.deepEqual(h.toasts, ['Native playback is unavailable']);
+});
+
+test('a rejected animation-frame registration leaves native Play retryable', () => {
+  const owner = { isActive: () => true, identity: () =>
+    ({ instanceId: 'instance-a', documentId: 'document-a', contentRevision: 0 }) };
+  let requests = 0;
+  const scheduler = surface.createPlaybackScheduler({
+    frame: () => 0, fps: () => 24, playing: () => false, controller: () => owner,
+    advance: frame => frame + 1, navigate: () => Promise.resolve(true), stop: () => {},
+    now: () => 0, request: () => { if (++requests === 1) throw new Error('frame API unavailable'); return 1; },
+    cancel: () => {}
+  });
+  assert.equal(scheduler.start(owner), false);
+  assert.equal(scheduler.start(owner), true);
+  assert.equal(requests, 2);
+  assert.equal(scheduler.stop().wasNative, true);
 });
 
 test('native cache command is unavailable; legacy Play still takes its existing frame writer', async () => {

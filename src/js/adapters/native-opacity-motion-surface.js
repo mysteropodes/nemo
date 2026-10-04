@@ -358,7 +358,8 @@
         }
         raf = ports.request(step);
       }
-      raf = ports.request(step);
+      try { raf = ports.request(step); }
+      catch (_) { ++generation; controller = null; identity = null; return false; }
       return true;
     }
     function stop() {

@@ -33,7 +33,7 @@ function startNativePlay(controller){
     frame:function(){return state.currentFrame;},fps:function(){return state.fps;},
     playing:function(){return state.playing;},controller:function(){return window.NemoNativeOpacityCutover;},
     advance:advancePlayFrame,navigate:goToFrame,stop:stopPlay,
-    now:function(){return performance.now();},request:requestAnimationFrame,cancel:cancelAnimationFrame
+    now:function(){return performance.now();},request:function(step){return window.requestAnimationFrame(step);},cancel:function(id){window.cancelAnimationFrame(id);}
   });
   if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
   state.playing=true;state.playDir=1;
