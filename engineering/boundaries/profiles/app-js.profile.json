@@ -38,12 +38,12 @@
     },
     {
       "id": "app.asset.tree",
-      "layer": "app-legacy",
+      "layer": "app-presentation-adapter",
       "dir": "src/js",
       "files": [
         "asset-tree.js"
       ],
-      "sizeProfile": "App JS unclassified (pre-R01)",
+      "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "asset-tree.js"
       ]
