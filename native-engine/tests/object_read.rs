@@ -1,6 +1,6 @@
 use crate::object_codec::{decode_project, encode_project};
 use crate::object_snapshot::ObjectSnapshot;
-use crate::request_receipts::DispatchErrorCode;
+use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use serde_json::{json, Value};
 
 fn source() -> Value {
@@ -297,5 +297,201 @@ fn nonstring_scope_kinds_cannot_select_an_authored_or_reference_record() {
         );
     }
     assert_eq!(query(&owner, &original).unwrap(), expected);
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}
+
+fn common_read(owner: &ObjectSnapshot, value: Value) -> Value {
+    let request: OpacityRequest = serde_json::from_value(value).unwrap();
+    let response = owner.dispatch(request).unwrap();
+    let bytes = serde_json::to_vec(&response).unwrap();
+    assert!(bytes.len() <= 4096);
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+#[test]
+fn common_envelope_preserves_frozen_records_and_old_incarnations() {
+    let owner = snapshot();
+    let retained = owner.clone();
+    let before = encode_project(owner.document()).unwrap();
+    for record in source()["objects"].as_array().unwrap() {
+        let mut value = request(&owner);
+        value["payload"]["stableTarget"] = record["target"].clone();
+        let actual = common_read(&owner, value.clone());
+        assert_eq!(actual, query(&owner, &value).unwrap());
+        assert_eq!(actual["result"]["object"], *record);
+        assert_eq!(common_read(&owner, value.clone()), actual);
+        let mut detached = actual.clone();
+        detached["result"]["object"]["fill"]["a"] = json!(0);
+        detached["result"]["object"]["geometry"]["segments"][0]["point"]["x"] = json!(999);
+        assert_eq!(common_read(&owner, value), actual);
+    }
+    let value = request(&owner);
+    let expected = common_read(&owner, value.clone());
+    let fresh = snapshot();
+    let stale = common_read(&fresh, value.clone());
+    assert_eq!(stale["error"]["code"], "wrong_document");
+    assert_eq!(stale["documentId"], fresh.document_id());
+    assert_eq!(
+        stale["error"]["details"]["requestedDocumentId"],
+        owner.document_id()
+    );
+    drop(owner);
+    assert_eq!(common_read(&retained, value), expected);
+    assert_eq!(encode_project(retained.document()).unwrap(), before);
+}
+
+#[test]
+fn common_envelope_failures_are_correlated_and_never_mutate() {
+    let owner = snapshot();
+    let before = encode_project(owner.document()).unwrap();
+    let original = request(&owner);
+    for (pointer, value, code) in [
+        ("/apiVersion", json!(1), "invalid_request"),
+        ("/instanceId", json!("other-instance"), "wrong_instance"),
+        ("/documentId", json!("other-document"), "wrong_document"),
+        ("/payload/atRevision", json!(1), "not_found"),
+        (
+            "/payload/atRevision",
+            json!(9007199254740992u64),
+            "invalid_request",
+        ),
+        (
+            "/payload/stableTarget/strokeId",
+            json!("missing"),
+            "not_found",
+        ),
+        (
+            "/payload/stableTarget/frameScope/kind",
+            json!("reference"),
+            "not_found",
+        ),
+        (
+            "/payload/stableTarget/frameScope/frame",
+            json!(8),
+            "not_found",
+        ),
+        (
+            "/payload/stableTarget/frameScope/kind",
+            json!({"authored":null}),
+            "invalid_request",
+        ),
+        (
+            "/payload/stableTarget",
+            json!(["scene-root", 7, "0", "0"]),
+            "invalid_request",
+        ),
+        ("/payload", Value::Null, "invalid_request"),
+        (
+            "/payload",
+            json!({"atRevision":0,"stableTarget":original["payload"]["stableTarget"],"extra":true}),
+            "invalid_request",
+        ),
+        (
+            "/operation",
+            json!("command.document.apply"),
+            "invalid_request",
+        ),
+        ("/operation", json!("object.fill.set"), "invalid_request"),
+    ] {
+        let mut candidate = original.clone();
+        *candidate.pointer_mut(pointer).unwrap() = value;
+        let response = common_read(&owner, candidate);
+        assert_eq!(response["error"]["code"], code, "{pointer}");
+        assert_eq!(response["requestId"], original["requestId"]);
+        assert_eq!(response["instanceId"], owner.instance_id());
+        assert_eq!(response["documentId"], owner.document_id());
+        assert_eq!(response["apiVersion"], 2);
+        assert_eq!(response["contentRevision"], 0);
+        assert_eq!(response["ok"], false);
+        assert!(response.get("result").is_none());
+    }
+    let mut write_revision = original.clone();
+    write_revision["expectedRevision"] = json!(0);
+    assert_eq!(
+        common_read(&owner, write_revision)["error"]["code"],
+        "invalid_request"
+    );
+    let cancelled = serde_json::from_value::<OpacityRequest>(original.clone())
+        .unwrap()
+        .cancelled();
+    let response = owner.dispatch(cancelled).unwrap();
+    assert_eq!(
+        response.error().unwrap().code(),
+        DispatchErrorCode::CancelledBeforeDispatch
+    );
+    assert_eq!(
+        common_read(&owner, original.clone()),
+        query(&owner, &original).unwrap()
+    );
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}
+
+#[test]
+fn common_envelope_request_limit_includes_exact_threshold() {
+    let owner = snapshot();
+    let before = encode_project(owner.document()).unwrap();
+    let mut value = request(&owner);
+    value["payload"]["stableTarget"]["strokeId"] = json!("");
+    let base_len = serde_json::to_vec(&value).unwrap().len();
+    for (limit, code) in [
+        (4095, "not_found"),
+        (4096, "not_found"),
+        (4097, "invalid_request"),
+    ] {
+        value["payload"]["stableTarget"]["strokeId"] = json!("x".repeat(limit - base_len));
+        assert_eq!(serde_json::to_vec(&value).unwrap().len(), limit);
+        assert_eq!(common_read(&owner, value.clone())["error"]["code"], code);
+    }
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}
+
+#[test]
+fn common_envelope_rejects_unrepresentable_identity_before_response() {
+    let owner = snapshot();
+    let before = encode_project(owner.document()).unwrap();
+    for pointer in ["/requestId", "/instanceId", "/documentId"] {
+        for invalid in [
+            String::new(),
+            "bad id".into(),
+            "x".repeat(129),
+            "x".repeat(5000),
+        ] {
+            let mut value = request(&owner);
+            *value.pointer_mut(pointer).unwrap() = json!(invalid);
+            let response = owner.dispatch(serde_json::from_value(value).unwrap());
+            assert_eq!(response.unwrap_err(), DispatchErrorCode::InvalidRequest);
+        }
+    }
+    let mut threshold = request(&owner);
+    threshold["requestId"] = json!("x".repeat(128));
+    assert_eq!(common_read(&owner, threshold)["ok"], true);
+    let standalone =
+        ObjectSnapshot::new("unbounded instance".repeat(500), owner.document().clone()).unwrap();
+    let request = serde_json::from_value(request(&standalone)).unwrap();
+    assert_eq!(
+        standalone.dispatch(request).unwrap_err(),
+        DispatchErrorCode::InvalidRequest
+    );
+    assert_eq!(encode_project(owner.document()).unwrap(), before);
+}
+
+#[test]
+fn common_envelope_never_truncates_an_oversized_codec_admitted_record() {
+    let mut value = source();
+    let segment = value["objects"][0]["geometry"]["segments"][0].clone();
+    value["objects"][0]["geometry"]["segments"] = Value::Array(vec![segment; 256]);
+    let owner = ObjectSnapshot::new(
+        "bounded-instance",
+        decode_project(&serde_json::to_vec(&value).unwrap()).unwrap(),
+    )
+    .unwrap();
+    let before = encode_project(owner.document()).unwrap();
+    let raw = request(&owner);
+    let unbounded = query(&owner, &raw).unwrap();
+    assert_eq!(unbounded["result"]["object"], value["objects"][0]);
+    assert!(serde_json::to_vec(&unbounded).unwrap().len() > 4096);
+    let response = common_read(&owner, raw);
+    assert_eq!(response["error"]["code"], "unavailable");
+    assert!(response.get("result").is_none());
     assert_eq!(encode_project(owner.document()).unwrap(), before);
 }
