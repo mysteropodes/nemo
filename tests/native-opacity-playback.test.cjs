@@ -81,6 +81,28 @@ function harness(options = {}) {
     tick, rafs, replace: () => { identity.documentId = 'document-b'; } };
 }
 
+test('shared playback step preserves work-area loop, ping-pong and audio boundaries', () => {
+  const cases = [
+    { cur: 4, dir: 1, loop: false, ping: false, next: null, afterDir: 1, audio: [] },
+    { cur: 4, dir: 1, loop: true, ping: false, next: 2, afterDir: 1, audio: [['loop', 2]] },
+    { cur: 4, dir: 1, loop: true, ping: true, next: 3, afterDir: -1, audio: [] },
+    { cur: 2, dir: -1, loop: true, ping: true, next: 3, afterDir: 1, audio: [] },
+    { cur: 2, dir: -1, loop: false, ping: false, next: null, afterDir: -1, audio: [] },
+    { cur: 2, dir: 1, loop: true, ping: true, out: 2, next: 2, afterDir: -1, audio: [] },
+  ];
+  for (const c of cases) {
+    const h = harness();
+    Object.assign(h.state, { waIn: 2, waOut: c.out ?? 4, playDir: c.dir,
+      loopPlayback: c.loop, pingPongPlayback: c.ping });
+    assert.equal(h.advancePlayFrame(c.cur), c.next);
+    assert.equal(h.state.playDir, c.afterDir);
+    assert.equal(h.state.currentFrame, 0);
+    assert.deepEqual(h.audio, c.audio);
+    assert.deepEqual(h.hostFrames, []);
+    assert.deepEqual(h.legacy, []);
+  }
+});
+
 test('native Play presents wall-clock frames before publishing UI and never enters legacy cache or Paper', async () => {
   const h = harness();
   h.startPlay();

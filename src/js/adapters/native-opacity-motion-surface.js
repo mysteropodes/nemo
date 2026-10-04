@@ -6,6 +6,29 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var UNHANDLED = Object.freeze({ handled: false });
+  // One logical frame step, preserving the original loop, ping-pong and
+  // audio boundary behavior. This changes only the UI playback direction;
+  // document evaluation and presentation remain the native navigator's job.
+  // Ping-pong reverses only beyond the work-area edge, including a one-frame
+  // work area. Ordinary looping notifies audio when wrapping to the start.
+  function advancePlaybackFrame(state, audio, cur) {
+    var next = cur + state.playDir;
+    if (next > state.waOut) {
+      if (state.loopPlayback && state.pingPongPlayback) {
+        state.playDir = -1; next = cur - 1;
+        if (next < state.waIn) next = state.waIn;
+      } else if (state.loopPlayback) {
+        next = state.waIn;
+        if (audio) audio.onLoop(next);
+      } else return null;
+    } else if (next < state.waIn) {
+      if (state.loopPlayback && state.pingPongPlayback) {
+        state.playDir = 1; next = cur + 1;
+        if (next > state.waOut) next = state.waOut;
+      } else return null;
+    }
+    return next;
+  }
   function freeze(value) {
     if (value && typeof value === 'object') {
       Object.keys(value).forEach(function (key) { freeze(value[key]); });
@@ -377,7 +400,7 @@
   function requireAvailable(value) {
     var methods = ['owns', 'read', 'detachedElementView', 'detachedExpressionView', 'expressionSnapshot',
       'positionOverlayPlan', 'nativeKeyInteractionPlan', 'renderedOpacityRoute', 'routeIntent', 'routeDimension', 'publishWriters',
-      'createFrameNavigator', 'createPlaybackScheduler'];
+      'createFrameNavigator', 'createPlaybackScheduler', 'advancePlaybackFrame'];
     if (!value || !Object.isFrozen(value) || methods.some(function (name) { return typeof value[name] !== 'function'; })) {
       throw new Error('native Motion surface is unavailable or malformed');
     }
@@ -390,5 +413,6 @@
     routeIntent: routeIntent, routeDimension: routeDimension,
     publishWriters: publishWriters, createFrameNavigator: createFrameNavigator,
     createPlaybackScheduler: createPlaybackScheduler,
+    advancePlaybackFrame: advancePlaybackFrame,
     requireAvailable: requireAvailable });
 }));

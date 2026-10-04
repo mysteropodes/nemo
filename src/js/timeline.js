@@ -41,25 +41,8 @@ function startNativePlay(controller){
   document.getElementById('btn-play').classList.add('playing');
   if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
 }
-// One logical frame step, preserving the exact edge semantics the old
-// setInterval body had (loop, ping-pong direction flip, audio onLoop,
-// stop at the work-area edge). Returns the next frame, or null meaning
-// "playback ends here". Mutates state.playDir like before.
-// Ping-pong (right-click btn-loop, feedback: "quand on clic sur le
-// lecture loop... il faut switché aussi sur une lecture en pingpong")
-// bounces back and forth across the work area instead of hard-cutting
-// back to waIn every pass — direction only flips at the OUT-of-bounds edge.
 function advancePlayFrame(cur){
-  var next=cur+state.playDir;
-  if(next>state.waOut){
-    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=-1;next=cur-1;if(next<state.waIn)next=state.waIn;}
-    else if(state.loopPlayback){next=state.waIn;if(window.SMAudio)SMAudio.onLoop(next);}
-    else return null;
-  }else if(next<state.waIn){
-    if(state.loopPlayback&&state.pingPongPlayback){state.playDir=1;next=cur+1;if(next>state.waOut)next=state.waOut;}
-    else return null;
-  }
-  return next;
+  return NemoNativeOpacityMotionSurface.advancePlaybackFrame(state,window.SMAudio,cur);
 }
 function startPlay(){if(state.playing)return;
   var nativeOpacity=window.NemoNativeOpacityCutover;
