@@ -20,6 +20,7 @@ test('production Media and Transplant consumers retain rows and selection across
     page.on('pageerror', error => pageErrors.push(error.message));
     await page.goto(runtime.origin, { waitUntil: 'networkidle' });
     await expect.poll(() => page.evaluate(() => !!(window.SMAssetTree && window.SMMediaLibrary && window.state && window.SMProject))).toBe(true);
+    expect(await page.evaluate(() => Object.hasOwn(window, 'createAssetTree'))).toBe(false);
     await page.evaluate(() => document.getElementById('start-screen').classList.add('hid'));
     if (await page.locator('#assets-sec > .pbdy').evaluate(element => element.classList.contains('hid'))) {
       await page.locator('#assets-sec > .phdr').click();

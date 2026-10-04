@@ -6,6 +6,8 @@ asset/media presentation module, not a separate document, folder-management,
 MCP or native capability. The source remains at its existing classic-script
 path and creates the browser `window.SMAssetTree` facade from the same
 `createAssetTree(domDocument, translate)` factory exported to CommonJS tests.
+The factory and its bootstrap are privately scoped; the classic script adds no
+`window.createAssetTree` global.
 
 The injected document creates only folder, header, chevron, icon, label, count
 and body elements. The helper appends the folder to the caller's container and

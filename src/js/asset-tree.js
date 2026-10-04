@@ -1,5 +1,6 @@
 // Shared presentation helper for the Media grid and Transplant picker.
 // It owns folder headers and collapse listeners; callers own body rows.
+(function () {
 function createAssetTree(domDocument, translate) {
   'use strict';
   var FOLDER_COLORS = {
@@ -64,3 +65,4 @@ if (typeof window !== 'undefined') {
     folderGroup: function (container, opts) { return browserAssetTree.folderGroup(container, opts); },
   };
 }
+})();

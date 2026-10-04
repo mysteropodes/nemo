@@ -88,7 +88,9 @@ test('browser facade uses the same implementation and reads current translation 
   const window = { document, SM: { t: key => translations[language][key] } };
   Object.defineProperty(window, 'localStorage', { get() { throw new Error('storage must remain untouched'); } });
   const source = fs.readFileSync(path.join(__dirname, '../src/js/asset-tree.js'), 'utf8');
-  vm.runInNewContext(source, { window });
+  const context = { window };
+  vm.runInNewContext(source, context);
+  assert.equal(Object.hasOwn(context, 'createAssetTree'), false, 'classic script must not add a global factory');
   assert.deepEqual(Object.keys(window.SMAssetTree), Object.keys(createAssetTree(document, (_, fallback) => fallback)));
   assert.equal(window.SMAssetTree.KIND_GROUP_LABEL.image, 'Images FR');
   assert.equal(window.SMAssetTree.componentsLabel(), 'Composants FR');
