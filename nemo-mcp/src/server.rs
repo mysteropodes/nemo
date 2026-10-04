@@ -106,8 +106,8 @@ impl JsonSchema for CommandRequest {
             .expect("native transport declares its request/response union");
         native_object.insert("$ref".into(), json!("#/$defs/Request"));
 
-        // Clients that project only root properties must still see constructible
-        // arguments. The exact version branches remain the validation authority.
+        // Root unions project as unknown arguments in Codex. Keep a direct object
+        // and select the exact version branch with JSON Schema conditionals.
         let mut properties = legacy["properties"].clone();
         properties["apiVersion"] = json!({"type": "integer", "enum": [1, 2]});
         properties["operation"] = json!({"type": "string", "description": "Native v2: command.document.apply, history.undo or history.redo. Legacy v1 operations use their payload templates below."});
@@ -156,16 +156,15 @@ impl JsonSchema for CommandRequest {
             "description": "Use apiVersion 2 for native writes. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
             "examples": examples,
             "$defs": {"legacy": legacy, "native": native},
-            "allOf": [{"oneOf": [
-                {"$ref": "#/$defs/legacy"},
-                {"$ref": "#/$defs/native"}
-            ]}],
+            "if": {"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}},
+            "then": {"$ref": "#/$defs/legacy"},
+            "else": {"$ref": "#/$defs/native"},
             "x-nemo-nativeApiVersion": NATIVE_API_VERSION,
             "x-nemo-nativeTransportV2": native_transport,
             "x-nemo-registeredNativeCapabilities": capabilities::native_catalog().descriptors()
         })
         .try_into()
-        .expect("command union is a schema object")
+        .expect("conditional command schema is an object")
     }
 }
 
