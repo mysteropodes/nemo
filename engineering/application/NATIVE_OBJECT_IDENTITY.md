@@ -34,14 +34,21 @@ accepted. No claim of global or cross-frame uniqueness is made.
 
 ## Geometry and supported family
 
-The staged path has at least three ordered anchors, each with a `point` position
+The staged path has 2..256 ordered anchors, matching `ClosedCubicPath::new` in
+`native-engine/src/render_geometry.rs`, each with a `point` position
 and relative `handleIn`/`handleOut` vectors in document/world units (x right,
 y down). For anchors A and B, one cubic uses A.point,
 A.point + A.handleOut, B.point + B.handleIn, B.point; the final segment wraps
 to the first anchor because `closed` is exactly true. Zero handles are valid.
 Preserve numeric values and segment order; do not flatten handles into absolute
-control points or screen coordinates. JSON numbers are finite; non-JSON numeric
-values are outside this contract. No new precision or rounding rule is imposed:
+control points or screen coordinates. Coordinates and handles are bounded to
+[-1.7976931348623157e308, 1.7976931348623157e308], the finite f64 range. Supported
+schema minimum/maximum checks reject JSON exponent tokens such as `1e400` that
+JavaScript parses as Infinity; JSON syntax alone does not guarantee finiteness.
+NaN is not a JSON value and is outside this JSON-data contract. Finite values do
+not guarantee finite sums, GPU representation, nondegenerate segments or positive
+control-hull area: the renderer's additional checks remain later admission gates.
+No new precision or rounding rule is imposed:
 the existing `serP` serializer uses three-decimal `_r3` rounding, and a future
 adapter must characterize that boundary rather than repeatedly round values.
 
@@ -89,7 +96,11 @@ separately admitted command leaf must implement owner checks and fail atomically
 Run `node --test tests/native-object-contract.test.cjs`. The tests reuse the
 repository's existing schema subset validator, validate every fixed positive
 and negative case, and mutate identity, frame, geometry, fill and protocol fields
-to demonstrate that controls fail. Paired case checks enforce the fixed read
+to demonstrate that controls fail. The shared validator does not implement
+`maxItems`; the test oracle explicitly supplements the declared segment maximum
+and demonstrates that the shared validator alone accepts 257 segments. Fixed
+1/2/256/257 count controls establish this contract boundary only; they do not
+prove the generated contours survive native rendering. Paired case checks enforce the fixed read
 correlation and command identity/geometry oracle; they are not a runtime mock.
 Active opacity schema/adapter controls continue to reject object fields and
 commands.

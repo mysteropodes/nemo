@@ -29,7 +29,13 @@
       "fill": { "kind": "solid", "r": 1, "g": 0, "b": 0, "a": 1 }
     }
   ],
+  "segmentCountControls": [
+    { "count": 1, "valid": false }, { "count": 2, "valid": true },
+    { "count": 256, "valid": true }, { "count": 257, "valid": false }
+  ],
   "invalidRecords": [
+    { "label": "overflowing JSON anchor", "path": ["geometry", "segments", 0, "point", "x"], "jsonValue": "1e400" },
+    { "label": "negative overflowing JSON handle", "path": ["geometry", "segments", 0, "handleIn", "y"], "jsonValue": "-1e400" },
     { "label": "missing frame scope", "path": ["target", "frameScope"], "delete": true },
     { "label": "missing frame", "path": ["target", "frameScope", "frame"], "delete": true },
     { "label": "fractional frame", "path": ["target", "frameScope", "frame"], "value": 7.5 },

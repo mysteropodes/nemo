@@ -10,26 +10,39 @@ const root = path.resolve(__dirname, '..');
 const load = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 const schema = load('engineering/application/native-object-v1.schema.json');
 const cases = load('engineering/application/examples/native-object-v1/cases.json');
-const check = (name, value) => validate(schema.$defs[name], value, schema.$defs);
+const check = (name, value) => {
+  const errors = validate(schema.$defs[name], value, schema.$defs);
+  const record = name === 'ObjectRecord' ? value
+    : name === 'ReadResult' ? value?.object : name === 'ReadResponse' ? value?.result?.object : null;
+  // Explicit contract-oracle supplement: the shipped subset validator has no
+  // maxItems support. This does not implement admission or modify that validator.
+  const segments = record?.geometry?.segments;
+  if (Array.isArray(segments) && segments.length > schema.$defs.Geometry.properties.segments.maxItems) {
+    errors.push('geometry.segments: exceeds declared maxItems 256');
+  }
+  return errors;
+};
 
 function changed(value, change) {
   const copy = structuredClone(value);
   const parent = change.path.slice(0, -1).reduce((node, key) => node[key], copy);
   const key = change.path.at(-1);
   if (change.delete) delete parent[key];
-  else parent[key] = change.value;
+  else parent[key] = 'jsonValue' in change ? JSON.parse(change.jsonValue) : change.value;
   return copy;
 }
 
-test('schema uses only constraints implemented by the shared subset validator', () => {
-  // Do not silently add unsupported JSON Schema keywords to this executable oracle.
+test('schema uses shared constraints plus one explicitly checked maxItems boundary', () => {
+  // Do not silently add unsupported keywords; only the one declared segment
+  // maxItems is permitted and supplemented above, with a negative control below.
   const supported = new Set(['$schema', '$id', 'title', 'description', '$defs', '$ref', 'type',
     'const', 'enum', 'minLength', 'pattern', 'minimum', 'maximum', 'minItems', 'items',
     'required', 'properties', 'additionalProperties']);
   function visit(node) {
     assert.equal(typeof node, 'object');
     for (const [key, value] of Object.entries(node)) {
-      assert.ok(supported.has(key), `unsupported schema keyword ${key}`);
+      assert.ok(supported.has(key) || (key === 'maxItems' && node === schema.$defs.Geometry.properties.segments),
+        `unsupported schema keyword ${key}`);
       if (key === '$defs' || key === 'properties') Object.values(value).forEach(visit);
       if (key === 'items') visit(value);
       if (key === '$ref') assert.ok(schema.$defs[value.replace('#/$defs/', '')], value);
@@ -39,12 +52,14 @@ test('schema uses only constraints implemented by the shared subset validator', 
   assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
   assert.equal(cases.oracleVersion, 'nemo.native-object-cases/1');
   assert.equal(cases.status, 'prospective-contract-only');
+  assert.equal(schema.$defs.Geometry.properties.segments.minItems, 2);
+  assert.equal(schema.$defs.Geometry.properties.segments.maxItems, 256);
 });
 
 test('fixed authored/reference records preserve opaque IDs and relative cubic geometry', () => {
   assert.equal(cases.records.length, 2);
   for (const record of cases.records) {
-    assert.deepEqual(validate(schema, record), []);
+    assert.deepEqual(check('ObjectRecord', record), []);
     assert.deepEqual(JSON.parse(JSON.stringify(record)), record);
   }
   const authored = cases.records[0];
@@ -60,10 +75,32 @@ test('fixed authored/reference records preserve opaque IDs and relative cubic ge
 test('every fixed negative record mutation is rejected', () => {
   assert.ok(cases.invalidRecords.length >= 25);
   for (const change of cases.invalidRecords) {
-    assert.notDeepEqual(validate(schema, changed(cases.records[0], change)), [], change.label);
+    assert.notDeepEqual(check('ObjectRecord', changed(cases.records[0], change)), [], change.label);
   }
   for (const family of ['compound-path', 'component', 'brush', 'gradient', 'text', 'raster', 'mesh', 'media']) {
     assert.notDeepEqual(check('ObjectRecord', { ...cases.records[0], family }), [], family);
+  }
+});
+
+test('JSON numeric overflow is rejected by supported bounds for every coordinate and handle', () => {
+  for (const jsonValue of ['1e400', '-1e400']) {
+    assert.equal(Number.isFinite(JSON.parse(jsonValue)), false);
+    for (const field of ['point', 'handleIn', 'handleOut']) {
+      for (const axis of ['x', 'y']) {
+        const record = changed(cases.records[0], { path: ['geometry', 'segments', 0, field, axis], jsonValue });
+        assert.notDeepEqual(validate(schema, record), [], `${field}.${axis}: ${jsonValue}`);
+      }
+    }
+  }
+});
+
+test('segment counts match 2..256 with an explicit oracle maximum supplement', () => {
+  assert.deepEqual(cases.segmentCountControls.map(({ count }) => count), [1, 2, 256, 257]);
+  for (const { count, valid } of cases.segmentCountControls) {
+    const record = structuredClone(cases.records[0]);
+    record.geometry.segments = Array.from({ length: count }, (_, i) => structuredClone(cases.records[0].geometry.segments[i % 3]));
+    assert.equal(check('ObjectRecord', record).length === 0, valid, `contract count ${count}`);
+    if (count === 257) assert.deepEqual(validate(schema, record), [], 'shared validator alone does not check maxItems');
   }
 });
 

@@ -22,7 +22,10 @@
     },
     "Point": {
       "type": "object", "additionalProperties": false, "required": ["x", "y"],
-      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+      "properties": {
+        "x": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 },
+        "y": { "type": "number", "minimum": -1.7976931348623157e308, "maximum": 1.7976931348623157e308 }
+      }
     },
     "Segment": {
       "type": "object", "additionalProperties": false, "required": ["point", "handleIn", "handleOut"],
@@ -35,7 +38,7 @@
       "properties": {
         "kind": { "const": "cubic-path" }, "closed": { "const": true },
         "coordinateSpace": { "const": "document-world" }, "handleSpace": { "const": "relative" },
-        "segments": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/Segment" } }
+        "segments": { "type": "array", "minItems": 2, "maxItems": 256, "items": { "$ref": "#/$defs/Segment" }, "description": "Matches the accepted renderer count boundary. Shared subset validator does not implement maxItems; N25A tests explicitly check this bound, not runtime admission." }
       }
     },
     "SolidFill": {
