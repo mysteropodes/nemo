@@ -152,7 +152,12 @@ fn explicit_catalog_admission_installs_one_authority_and_shared_v2_capture() {
         assert_eq!(app.document_id(), receipt.document_id);
     }
     let command = set(&state, "set-40", json!(40));
-    assert!(dispatch(&state, command.clone()).is_ok());
+    let ui_response = state
+        .dispatch_native(serde_json::from_value(serde_json::to_value(&command).unwrap()).unwrap())
+        .unwrap();
+    assert!(ui_response.ok);
+    assert_eq!(ui_response.content_revision, 1);
+    assert_eq!(ui_response.document_id, receipt.document_id);
     assert!(dispatch(&state, command).is_ok()); // Identical retry never appends twice.
     assert_eq!(status(&state)["commandCount"], 1);
     let export = query(&state, "export", "query.reproduction.export");
@@ -247,15 +252,29 @@ fn byte_identical_ordinary_import_remains_ineligible_and_is_never_replaced() {
         .unwrap();
     assert!(!query(&state, "opt-in", "command.reproduction.opt_in").is_ok());
     assert_eq!(status(&state)["state"], "disabled");
-    let before = query(&state, "serialize-before", "query.document.serialize");
+    let serialize = |id| {
+        dispatch(
+            &state,
+            OpacityRequest::query(
+                id,
+                state.instance_id(),
+                &document,
+                "query.document.serialize",
+                json!({"atRevision":0}),
+            ),
+        )
+    };
+    let before = serialize("serialize-before");
+    assert!(before.is_ok());
     assert_eq!(
         denied(open_session(&state, request(&state), || panic!(
             "must not construct ports"
         ))),
         "duplicate_bootstrap"
     );
-    let after = query(&state, "serialize-after", "query.document.serialize");
-    assert_eq!(before.result(), after.result());
+    let after = serialize("serialize-after");
+    assert!(after.is_ok());
+    assert_eq!(before.result().unwrap(), after.result().unwrap());
     let native = state.native_state();
     let guard = native.lock().unwrap();
     assert_eq!(guard.active_generation().unwrap(), reservation.generation());
