@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "3c5b08f80d464acc448416b797363a9c54b48d2b",
-  "describe": "v0.7.0-alpha.4-904-g3c5b08f8-dirty"
+  "head": "d57156b2040bd220fee2a15dcd58351ddbdef33c",
+  "describe": "v0.7.0-alpha.4-906-gd57156b2-dirty"
  },
- "inputsDigest": "6e140ada2ac1de67627f762e807decae21aa3ccdeab50244659eaedbb0c0b93b",
+ "inputsDigest": "0c1f7c734bef99b4aa07ad98652e7238b35b72c0f6a76971c1c497b82db5068f",
  "states": [
   "inventoried",
   "characterized",
@@ -111,7 +111,7 @@
   },
   "SMAssetTree": {
    "file": "src/js/asset-tree.js",
-   "line": 58,
+   "line": 59,
    "members": 4
   },
   "SMAudio": {
