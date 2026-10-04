@@ -17,6 +17,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{de::Error as _, Deserialize, Deserializer};
 use serde_json::{json, Value};
 use std::{borrow::Cow, path::PathBuf};
+use tracing::{Instrument, Span};
 
 #[derive(Clone)]
 pub struct NemoServer {
@@ -134,38 +135,56 @@ impl NemoServer {
         &self,
         request: ApplicationRequest,
         context: RequestContext<RoleServer>,
-    ) -> CallToolResult {
+    ) -> (CallToolResult, &'static str) {
         let Some(instance) = request.instance_id.as_deref() else {
-            return failure(
-                "invalid_request",
-                "Select an instance with nemo_discover first",
+            return (
+                failure(
+                    "invalid_request",
+                    "Select an instance with nemo_discover first",
+                ),
+                "structured_error",
             );
         };
         let endpoints = match registry::read_endpoints(&self.root) {
             Ok(endpoints) => endpoints,
-            Err(_) => return failure("unavailable", "Nemo discovery registry is unavailable"),
+            Err(_) => {
+                return (
+                    failure("unavailable", "Nemo discovery registry is unavailable"),
+                    "structured_error",
+                )
+            }
         };
         let Some(endpoint) = endpoints
             .into_iter()
             .find(|record| record.instance_id == instance)
         else {
-            return failure(
-                "unavailable",
-                "Selected instance is absent; discover again after reconnect",
+            return (
+                failure(
+                    "unavailable",
+                    "Selected instance is absent; discover again after reconnect",
+                ),
+                "structured_error",
             );
         };
-        match wire::call(&endpoint, request, context.ct).await {
+        match wire::call(&endpoint, request, context.ct.clone()).await {
             Ok(response) => {
                 let ok = response.ok;
                 let value =
                     serde_json::to_value(response).expect("serializable application response");
                 if ok {
-                    CallToolResult::structured(value)
+                    (CallToolResult::structured(value), "success")
                 } else {
-                    CallToolResult::structured_error(value)
+                    (CallToolResult::structured_error(value), "structured_error")
                 }
             }
-            Err(error) => failure("unavailable", &error.to_string()),
+            Err(error) => (
+                failure("unavailable", &error.to_string()),
+                if context.ct.is_cancelled() {
+                    "cancelled"
+                } else {
+                    "transport_error"
+                },
+            ),
         }
     }
 
@@ -173,32 +192,106 @@ impl NemoServer {
         &self,
         request: NativeApplicationRequest,
         context: RequestContext<RoleServer>,
-    ) -> CallToolResult {
+    ) -> (CallToolResult, &'static str) {
         let endpoints = match registry::read_endpoints(&self.root) {
             Ok(endpoints) => endpoints,
-            Err(_) => return failure("unavailable", "Nemo discovery registry is unavailable"),
+            Err(_) => {
+                return (
+                    failure("unavailable", "Nemo discovery registry is unavailable"),
+                    "structured_error",
+                )
+            }
         };
         let Some(endpoint) = endpoints
             .into_iter()
             .find(|record| record.instance_id == request.instance_id)
         else {
-            return failure(
-                "unavailable",
-                "Selected instance is absent; discover again after reconnect",
+            return (
+                failure(
+                    "unavailable",
+                    "Selected instance is absent; discover again after reconnect",
+                ),
+                "structured_error",
             );
         };
-        match wire::call_native(&endpoint, request, context.ct).await {
+        match wire::call_native(&endpoint, request, context.ct.clone()).await {
             Ok(response) => {
                 let ok = response.ok;
                 let value = serde_json::to_value(response).expect("serializable native response");
                 if ok {
-                    CallToolResult::structured(value)
+                    (CallToolResult::structured(value), "success")
                 } else {
-                    CallToolResult::structured_error(value)
+                    (CallToolResult::structured_error(value), "structured_error")
                 }
             }
-            Err(error) => failure("unavailable", &error.to_string()),
+            Err(error) => (
+                failure("unavailable", &error.to_string()),
+                if context.ct.is_cancelled() {
+                    "cancelled"
+                } else {
+                    "transport_error"
+                },
+            ),
         }
+    }
+}
+
+struct RequestTrace {
+    span: Span,
+    finished: bool,
+}
+
+impl RequestTrace {
+    fn start(context: &RequestContext<RoleServer>, request_id: &str) -> Self {
+        let mcp_request_id = match &context.id {
+            rmcp::model::RequestId::Number(value) => value.to_string(),
+            rmcp::model::RequestId::String(value) => safe_identifier(value),
+        };
+        let application_request_id = safe_identifier(request_id);
+        let span = tracing::info_span!(
+            "mcp_request",
+            tool = "nemo_command",
+            mcp_request_id = %mcp_request_id,
+            application_request_id = %application_request_id
+        );
+        tracing::info!(parent: &span, event = "started");
+        Self {
+            span,
+            finished: false,
+        }
+    }
+
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    fn finish(mut self, status: &'static str) {
+        tracing::info!(parent: &self.span, event = "terminal", status);
+        self.finished = true;
+    }
+}
+
+impl Drop for RequestTrace {
+    fn drop(&mut self) {
+        if !self.finished {
+            tracing::info!(parent: &self.span, event = "terminal", status = "cancelled");
+        }
+    }
+}
+
+fn safe_identifier(value: &str) -> String {
+    let mut bytes = value.bytes();
+    let safe = value.len() < 36
+        && bytes
+            .next()
+            .is_some_and(|byte| byte.is_ascii_alphanumeric())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte));
+    if safe {
+        value.to_owned()
+    } else {
+        "redacted".to_owned()
     }
 }
 
@@ -319,7 +412,7 @@ impl NemoServer {
         if let Err(error) = request.validate() {
             return failure(error.code(), error.message());
         }
-        self.call_legacy(request, context).await
+        self.call_legacy(request, context).await.0
     }
 
     #[tool(
@@ -330,23 +423,42 @@ impl NemoServer {
         Parameters(request): Parameters<CommandRequest>,
         context: RequestContext<RoleServer>,
     ) -> CallToolResult {
-        match request {
-            CommandRequest::Legacy(request) => {
-                if request.operation.is_query() {
-                    return failure("invalid_request", "Use nemo_query for reads");
+        let request_id = match &request {
+            CommandRequest::Legacy(request) => request.request_id.as_str(),
+            CommandRequest::Native(request) => request.request_id.as_str(),
+        };
+        let trace = RequestTrace::start(&context, request_id);
+        let cancellation = context.ct.clone();
+        let (response, status) = async {
+            match request {
+                CommandRequest::Legacy(request) => {
+                    if request.operation.is_query() {
+                        return (
+                            failure("invalid_request", "Use nemo_query for reads"),
+                            "structured_error",
+                        );
+                    }
+                    if let Err(error) = request.validate() {
+                        return (failure(error.code(), error.message()), "structured_error");
+                    }
+                    self.call_legacy(request, context).await
                 }
-                if let Err(error) = request.validate() {
-                    return failure(error.code(), error.message());
+                CommandRequest::Native(request) => {
+                    if let Err(error) = request.validate() {
+                        return (failure(error.code(), error.message()), "structured_error");
+                    }
+                    self.call_native(request, context).await
                 }
-                self.call_legacy(request, context).await
-            }
-            CommandRequest::Native(request) => {
-                if let Err(error) = request.validate() {
-                    return failure(error.code(), error.message());
-                }
-                self.call_native(request, context).await
             }
         }
+        .instrument(trace.span())
+        .await;
+        trace.finish(if cancellation.is_cancelled() {
+            "cancelled"
+        } else {
+            status
+        });
+        response
     }
 }
 
