@@ -132,7 +132,7 @@
       "id": "rust.native.engine.application",
       "layer": "native-application",
       "dir": "native-engine/src",
-      "files": ["application.rs", "application_construction.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_bundle.rs", "reproduction_catalog.rs"],
+      "files": ["application.rs", "application_construction.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_bundle.rs", "reproduction_replay.rs", "reproduction_catalog.rs"],
       "publicApi": ["application.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "project_structure.rs", "render_geometry.rs", "scheduler.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "history.rs", "project_structure.rs", "render_geometry.rs", "scheduler.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
