@@ -2029,6 +2029,18 @@
       ]
     },
     {
+      "id": "app.native.reproduction.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-reproduction.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-reproduction.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.legacy-surface.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

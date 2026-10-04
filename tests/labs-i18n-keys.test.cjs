@@ -111,7 +111,7 @@ test('the diagnostics panel keys specifically resolve to real text, not to their
   }
 });
 
-test('production SM.t resolves all six diagnostics keys in every locale', () => {
+test('production SM.t resolves catalog-only diagnostics controls in every locale', () => {
   const source = fs.readFileSync(path.join(ROOT, 'src/js/i18n.js'), 'utf8');
   const state = { language: 'en' };
   const window = { state };
@@ -124,14 +124,19 @@ test('production SM.t resolves all six diagnostics keys in every locale', () => 
   vm.runInNewContext(source, { window, state, document, localStorage: { setItem() {} } },
     { filename: 'src/js/i18n.js' });
   const keys = ['labsDiagnosticsTitle', 'labsDiagnosticsRefresh', 'labsDiagnosticsReport',
-    'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics'];
-  // T10 leaves Report unavailable until a native recording with a recoverable
-  // fixture exists; the Labs tooltip must not promise a bundle meanwhile.
-  const unavailable = {
-    en: /Report is currently unavailable/,
-    fr: /rapport est actuellement indisponible/,
-    ja: /レポートは現在利用できません/,
-    es: /informe no está disponible actualmente/,
+    'labsDiagnosticsEmpty', 'labsDescribeDiagnosticsPanel', 'labsPanelLabelDiagnostics',
+    'labsDiagnosticsSyntheticSession', 'labsDiagnosticsSyntheticOpacity',
+    'labsDiagnosticsSyntheticApply', 'labsDiagnosticsSyntheticEnd',
+    'labsDiagnosticsSyntheticHelp', 'labsDiagnosticsStartSynthetic',
+    'labsDiagnosticsSyntheticUnavailable', 'labsDiagnosticsReportDownloaded',
+    'labsDiagnosticsReportStale', 'labsDiagnosticsReproductionUnavailable'];
+  // Only explicit disposable native catalog sessions may download a report;
+  // the tooltip must not promise one for an ordinary document.
+  const catalogOnly = {
+    en: /synthetic session.*ordinary documents cannot/i,
+    fr: /session synthétique.*documents ordinaires ne le peuvent pas/i,
+    ja: /合成セッション.*通常の文書ではできません/,
+    es: /sesión sintética.*documentos normales no/i,
   };
   for (const locale of LOCALES) {
     window.SM.setLanguage(locale);
@@ -140,7 +145,7 @@ test('production SM.t resolves all six diagnostics keys in every locale', () => 
       assert.ok(typeof value === 'string' && value.trim(), `${locale}: ${key} has text`);
       assert.notEqual(value, key, `${locale}: ${key} did not fall through to the raw key`);
     }
-    assert.match(window.SM.t('labsDescribeDiagnosticsPanel'), unavailable[locale],
-      `${locale}: diagnostics tooltip must describe Report as unavailable`);
+    assert.match(window.SM.t('labsDescribeDiagnosticsPanel'), catalogOnly[locale],
+      `${locale}: diagnostics tooltip must limit reports to an explicit synthetic session`);
   }
 });

@@ -10,7 +10,7 @@
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
-    'query.diagnostics.recent',
+    'query.diagnostics.recent', 'query.reproduction.report',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
     'job.export.png.begin', 'job.export.png.status', 'job.export.png.cancel',
@@ -91,6 +91,9 @@
       exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
       revision(payload.atRevision, 'atRevision');
       if (evaluate) { id(payload.contextId, 'contextId'); frame(payload.frame); }
+    } else if (operation === 'query.reproduction.report') {
+      exact(payload, ['expectedContentRevision', 'expectedSequence'], [], 'report token');
+      revision(payload.expectedContentRevision, 'expectedContentRevision'); revision(payload.expectedSequence, 'expectedSequence');
     } else if (operation === 'query.diagnostics.recent') empty(payload, operation);
     else if (operation === 'command.document.apply') {
       exact(payload, ['command', 'stableTarget', 'value'], [], 'command payload');
@@ -234,6 +237,10 @@
         if (record.ok === has(record, 'errorCode') ||
             (has(record, 'errorCode') && !commonErrors.has(record.errorCode))) throw new TypeError('invalid diagnostics error code');
       });
+    } else if (operation === 'query.reproduction.report') {
+      exact(value, ['bundle', 'verifiedContentRevision', 'verifiedSequence'], [], 'report result');
+      revision(value.verifiedContentRevision, 'verifiedContentRevision'); revision(value.verifiedSequence, 'verifiedSequence');
+      if (!plain(value.bundle)) throw new TypeError('native bundle must be an object');
     } else if (operation === 'query.document.serialize') {
       exact(value, ['atRevision', 'documentSnapshotId', 'document'], [], 'serialize result');
       revision(value.atRevision, 'atRevision'); id(value.documentSnapshotId, 'documentSnapshotId');
@@ -276,7 +283,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value);
-    if (['query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent'].includes(operation)) {
+    if (['query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -308,8 +315,12 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (outbound.operation === 'query.diagnostics.recent' &&
+          if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
               (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');
+          if (outbound.operation === 'query.reproduction.report' && response.ok &&
+              (response.contentRevision !== outbound.payload.expectedContentRevision ||
+                response.result.verifiedContentRevision !== outbound.payload.expectedContentRevision ||
+                response.result.verifiedSequence !== outbound.payload.expectedSequence)) throw new TypeError('report freshness mismatch');
           if (response.ok && ['query.document.serialize', 'query.document.evaluate'].includes(outbound.operation)) {
             const result = response.result, evaluate = outbound.operation === 'query.document.evaluate';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId ||

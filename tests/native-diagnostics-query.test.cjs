@@ -7,6 +7,10 @@ const vm = require('node:vm');
 const adapter = require('../src/js/adapters/native-application.js');
 const nativeOperations = require('../src/js/application/native-opacity-operations.js');
 const legacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
+const nativeFixture = { id: 'native-opacity-static', version: 1, sha256: '895ca05a43295104301c472287149b1c01aa6ef681db80dcbb79e58a55b36050' };
+function nativeBundle() { return { format: 'nemo.native-opacity-reproduction', formatVersion: 1, apiVersion: 2, fixture: nativeFixture,
+  command: 'layer.opacity.set', stableTarget: { layerUid: 'r08_curve_layer' }, clock: null, seed: null, versions: { nativeEngine: '0.1.0' },
+  commands: [{ id: 1, expectedRevision: 0, value: 40, revision: 1, applied: true }] }; }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 const query = () => ({ apiVersion: 2, requestId: 'read', instanceId: 'instance', documentId: 'document', operation: 'query.diagnostics.recent', payload: {} });
 const record = (sequence = 1) => ({ sequence, operation: 'command.document.apply', requestId: 'edit-' + sequence, targetId: 'layer', contentRevision: sequence, ok: true });
@@ -80,16 +84,18 @@ function element() {
       this._html = value; this.found = {}; this.rows = [];
       for (const match of value.matchAll(/<tr data-layer-idx="(-?\d+)"/g)) { const row = element(); row.getAttribute = () => match[1]; this.rows.push(row); }
     },
-    appendChild() {}, remove() {}, addEventListener(type, listener) { (listeners[type] ||= []).push(listener); },
+    appendChild() {}, remove() { this.removed = true; }, addEventListener(type, listener) { (listeners[type] ||= []).push(listener); },
     click() { for (const listener of listeners.click || []) listener(); },
     querySelector(selector) { return this.found[selector] ||= element(); }, querySelectorAll() { return this.rows; },
   };
 }
 function harness(options = {}) {
-  const flags = {}, nodes = [], calls = [], selections = [];
+  const flags = {}, nodes = [], calls = [], selections = [], downloads = [], revoked = [], timers = new Map();
   const model = { instanceId: options.instanceId || 'instance', documentId: 'document', generation: 1, contentRevision: 2,
-    records: [record()], truncated: false, active: true, history: [100, 80], serialized: '{opacity:80}' };
-  const ctx = { console, TextEncoder, state: { layers: [{ layerUid: 'layer' }], activeLayerIdx: 0 }, _layerSel: [],
+    records: [record()], truncated: false, active: !options.catalogIdle, history: [100, 80], serialized: '{opacity:80}' };
+  const ctx = { console, TextEncoder, Blob, setTimeout(fn) { timers.set(timers.size + 1, fn); return timers.size; }, clearTimeout(id) { timers.delete(id); },
+    URL: { createObjectURL(blob) { downloads.push(blob); return 'blob:owned'; }, revokeObjectURL(url) { revoked.push(url); } },
+    state: { layers: [{ layerUid: 'layer' }], activeLayerIdx: 0 }, _layerSel: [],
     SM: { t: (key) => key, setActiveLayer: (...args) => selections.push(args), importJSON() {} },
     localStorage: { getItem: (key) => flags[key] ? '1' : null, setItem: (key, value) => { flags[key] = value === '1'; } },
     document: { createElement() { const el = element(); nodes.push(el); return el; }, body: element() },
@@ -109,10 +115,37 @@ function harness(options = {}) {
     { create: () => ({}) }, { create: () => ({ handle: () => null }) }).install();
   let invoke = async (command, args) => {
     calls.push({ command, args });
-    if (command === 'nemo_native_status') return { apiVersion: 2, available: true, ...model };
+    if (command === 'nemo_native_status') return { apiVersion: 2, available: model.active, ...model, documentId: model.active ? model.documentId : null };
+    if (command === 'nemo_mcp_identity') return { instanceId: model.instanceId };
+    if (command === 'nemo_native_revision_sync') return { ...model, lifecycleGeneration: model.generation, subscriptionId: 'binding' };
+    if (command === 'nemo_native_reproduction_session') {
+      model.active = true; model.documentId = 'catalog'; model.generation++; model.contentRevision = 0; model.records = [];
+      model.opacity = 25; model.reportBundle = nativeBundle(); model.reportBundle.commands = [];
+      return { apiVersion: 2, instanceId: model.instanceId, documentId: model.documentId, contentRevision: 0,
+        lifecycleGeneration: model.generation, origin: 'embedded_catalog', fixture: nativeFixture,
+        reproduction: { state: 'recording', reason: null, commandCount: 0, exportable: false }, viewportAvailable: false, resourceCount: 0 };
+    }
+    if (command === 'nemo_native_release') {
+      model.active = false; model.generation++;
+      return { apiVersion: 2, requestId: args.request.requestId, ...model, lifecycleGeneration: model.generation,
+        status: 'succeeded', authorityRemovalCompleted: true, reentryAvailable: true };
+    }
     assert.equal(command, 'nemo_native_dispatch');
+    if (args.request.operation === 'command.document.apply') {
+      const expectedRevision = model.contentRevision, value = args.request.payload.value, applied = value !== model.opacity;
+      model.contentRevision += applied ? 1 : 0; model.opacity = value;
+      model.records.push({ ...record(model.records.length + 1), contentRevision: model.contentRevision, targetId: 'r08_curve_layer' });
+      model.reportBundle.commands.push({ id: model.reportBundle.commands.length + 1, expectedRevision, value, revision: model.contentRevision, applied });
+      return { apiVersion: 2, requestId: args.request.requestId, instanceId: model.instanceId, documentId: model.documentId,
+        contentRevision: model.contentRevision, ok: true, result: { applied, historyEntriesAdded: applied ? 1 : 0 } };
+    }
+    if (args.request.operation === 'query.reproduction.report') {
+      const payload = args.request.payload;
+      return { apiVersion: 2, requestId: args.request.requestId, instanceId: model.instanceId, documentId: model.documentId,
+        contentRevision: model.contentRevision, ok: true, result: { bundle: model.reportBundle || nativeBundle(), verifiedContentRevision: payload.expectedContentRevision, verifiedSequence: payload.expectedSequence } };
+    }
     assert.equal(args.request.operation, 'query.diagnostics.recent');
-    const value = response(args.request, model.records); value.result.truncated = model.truncated;
+    const value = response(args.request, model.records); value.contentRevision = model.contentRevision; value.result.truncated = model.truncated;
     return value;
   };
   ctx.window = ctx; vm.createContext(ctx);
@@ -124,16 +157,93 @@ function harness(options = {}) {
     vm.runInContext(code, ctx, { filename: file });
   }
   function host() {
-    load('adapters/native-application.js'); load('adapters/application-mcp.js'); load('adapters/native-diagnostics-query.js');
+    load('adapters/native-application.js'); load('adapters/application-mcp.js'); load('adapters/native-reproduction.js'); load('adapters/native-diagnostics-query.js');
     vm.runInContext('window.__TAURI__ = {core: {invoke: async (...args) => JSON.parse(await hostInvoke(...args))}}', ctx);
   }
   if (!options.early) host();
   load('labs/labs-core.js'); load('labs/diagnostics-panel.js');
   ctx.SMLabs.enable('diagnostics-panel');
-  return { ctx, model, calls, nodes, selections, host, get panel() { return nodes.at(-1); },
+  return { ctx, model, calls, nodes, selections, downloads, revoked, host, flush() { for (const fn of [...timers.values()]) fn(); }, get panel() { return nodes.find(n => n.id === 'labs-diagnostics' && !n.removed) || nodes.at(-1); },
     setInvoke(fn) { const previous = invoke; invoke = fn; return previous; },
     refresh() { this.panel.querySelector('[data-diag-refresh]').click(); } };
 }
+
+test('explicit Start, catalog edit, atomic displayed-token Report download and End use production adapters', async () => {
+  const h = harness({ catalogIdle: true }); await settle();
+  assert.equal(h.calls.length, 0, 'panel enable must not admit a session');
+  assert.match(h.panel.innerHTML, /data-diag-start/);
+  h.panel.querySelector('[data-diag-start]').click(); await settle();
+  assert.match(h.panel.innerHTML, /Synthetic catalog session/);
+  h.panel.querySelector('[data-diag-opacity]').value = '40'; h.panel.querySelector('[data-diag-apply]').click(); await settle();
+  const before = JSON.stringify(h.model);
+  h.panel.querySelector('[data-diag-report]').click(); await settle();
+  assert.equal(h.downloads.length, 1); assert.deepEqual(JSON.parse(await h.downloads[0].text()), nativeBundle());
+  assert.deepEqual(h.revoked, []); h.flush(); assert.deepEqual(h.revoked, ['blob:owned']); assert.equal(JSON.stringify(h.model), before);
+  const r = h.calls.find(c => c.args?.request?.operation === 'query.reproduction.report').args.request;
+  assert.deepEqual(JSON.parse(JSON.stringify(r.payload)), { expectedContentRevision: 1, expectedSequence: 1 }); assert.equal(r.expectedRevision, undefined);
+  h.panel.querySelector('[data-diag-end]').click(); await settle(); assert.equal(h.model.active, false);
+});
+
+test('atomic report rejection, hostile bundle and delayed refresh/reopen/replacement never download', async () => {
+  for (const transition of ['stale_revision', 'busy_conflict', 'unavailable', 'private', 'refresh', 'disable', 'reopen', 'replacement']) {
+    const h = harness({ catalogIdle: true });
+    h.panel.querySelector('[data-diag-start]').click(); await settle();
+    h.panel.querySelector('[data-diag-opacity]').value = '40'; h.panel.querySelector('[data-diag-apply]').click(); await settle();
+    let complete, pendingRequest;
+    const prior = h.setInvoke(async (command, args) => {
+      if (args?.request?.operation !== 'query.reproduction.report') return prior(command, args);
+      pendingRequest = args.request;
+      return new Promise(resolve => { complete = resolve; });
+    });
+    h.panel.querySelector('[data-diag-report]').click(); await settle(); assert.ok(pendingRequest);
+    const response = { apiVersion: 2, requestId: pendingRequest.requestId, instanceId: h.model.instanceId, documentId: h.model.documentId,
+      contentRevision: 1, ok: true, result: { bundle: nativeBundle(), verifiedContentRevision: 1, verifiedSequence: 1 } };
+    if (['stale_revision', 'busy_conflict', 'unavailable'].includes(transition)) { response.ok = false; delete response.result; response.error = { code: transition, message: '/private/sentinel' }; }
+    if (transition === 'private') response.result.bundle.private = '/private/sentinel';
+    if (transition === 'refresh') h.refresh();
+    if (transition === 'disable') h.ctx.SMLabs.disable('diagnostics-panel');
+    if (transition === 'reopen') { h.ctx.SMLabs.disable('diagnostics-panel'); h.ctx.SMLabs.enable('diagnostics-panel'); }
+    if (transition === 'replacement') h.model.generation += 2;
+    complete(response); await settle(); assert.equal(h.downloads.length, 0); assert.doesNotMatch(h.panel.innerHTML, /sentinel/);
+  }
+});
+test('panel disposal fences queued Start and delayed admission without implicit reentry', async () => {
+  const queued = harness({ catalogIdle: true }); queued.panel.querySelector('[data-diag-start]').click();
+  queued.ctx.SMLabs.disable('diagnostics-panel'); await settle(); assert.equal(queued.calls.length, 0);
+  const h = harness({ catalogIdle: true }); let complete;
+  const prior = h.setInvoke(async (command, args) => {
+    if (command !== 'nemo_native_reproduction_session') return prior(command, args);
+    const admitted = await prior(command, args); return new Promise(resolve => { complete = () => resolve(admitted); });
+  });
+  const oldPanel = h.panel; oldPanel.querySelector('[data-diag-start]').click(); await settle();
+  assert.equal(h.calls.filter(c => c.command === 'nemo_native_reproduction_session').length, 1);
+  h.ctx.SMLabs.disable('diagnostics-panel'); const oldMarkup = oldPanel.innerHTML;
+  complete(); await settle(); assert.equal(oldPanel.innerHTML, oldMarkup); assert.equal(h.downloads.length, 0);
+  h.ctx.SMLabs.enable('diagnostics-panel'); await settle(); assert.match(h.panel.innerHTML, /Synthetic catalog session/);
+  assert.equal(h.calls.filter(c => c.command === 'nemo_native_reproduction_session').length, 1);
+  h.panel.querySelector('[data-diag-report]').click(); await settle(); assert.equal(h.downloads.length, 0, 'empty native journal has no portable report');
+});
+test('same-revision no-op and retry preserve displayed sequence, portable capture and URL retirement', async () => {
+  const h = harness({ catalogIdle: true }); h.panel.querySelector('[data-diag-start]').click(); await settle();
+  for (const value of ['40', '60', '60']) {
+    h.panel.querySelector('[data-diag-opacity]').value = value; h.panel.querySelector('[data-diag-apply]').click(); await settle();
+  }
+  assert.equal(h.model.contentRevision, 2); assert.equal(h.model.records.at(-1).sequence, 3);
+  h.panel.querySelector('[data-diag-report]').click(); await settle();
+  const downloaded = JSON.parse(await h.downloads[0].text());
+  assert.deepEqual(downloaded.commands, [
+    { id: 1, expectedRevision: 0, value: 40, revision: 1, applied: true },
+    { id: 2, expectedRevision: 1, value: 60, revision: 2, applied: true },
+    { id: 3, expectedRevision: 2, value: 60, revision: 2, applied: false },
+  ]);
+  assert.deepEqual(h.revoked, []); h.refresh(); assert.deepEqual(h.revoked, ['blob:owned']); await settle();
+  h.model.records.push({ ...record(4), contentRevision: 2 }); h.refresh(); await settle();
+  h.panel.querySelector('[data-diag-report]').click(); await settle();
+  const r = h.calls.filter(c => c.args?.request?.operation === 'query.reproduction.report').at(-1).args.request;
+  assert.equal(r.payload.expectedContentRevision, 2); assert.equal(r.payload.expectedSequence, 4);
+  assert.deepEqual(JSON.parse(await h.downloads[1].text()), downloaded, 'native retry is trace detail, not a new journal command');
+  h.ctx.SMLabs.disable('diagnostics-panel'); assert.equal(h.revoked.length, 2); h.flush(); assert.equal(h.revoked.length, 2);
+});
 
 test('real panel/service/adapter/transport query only, render sequence, redact IDs and preserve selection', async () => {
   const h = harness();

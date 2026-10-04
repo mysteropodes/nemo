@@ -76,11 +76,15 @@
   }
 
   // ---- report link (T10/#1399) -------------------------------------------
-  // Source-stage only: neither the v1 trace nor T08A's metadata has recoverable
-  // starting fixture bytes. T10A owns an opt-in native synthetic recording;
-  // T08B owns its panel binding. Never infer provenance from user state/hash.
+  // Native catalog provenance is granted only by an explicit host admission.
+  // The displayed revision/attempt sequence are checked atomically by Rust.
   async function buildReport(result) {
-    return { error: 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.' };
+    if (result.error || !result.identity || !result.identity.catalog || !result.reportToken) {
+      throw new Error('Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.');
+    }
+    var requestId = mintRequestId(result.identity);
+    if (requestId === null) throw new Error('Diagnostics request counter exhausted.');
+    return window.NemoNativeDiagnosticsQuery.report(window, result.identity, result.reportToken, requestId);
   }
 
   function build() {
@@ -99,6 +103,7 @@
 
   function refresh() {
     if (!panel) return;
+    if (window.NemoNativeReproduction) window.NemoNativeReproduction.disposeDownloads(window);
     var target = panel, token = ++generation, identity = currentIdentity();
     function finish(result) {
       if (panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
@@ -115,7 +120,10 @@
       var requestId = mintRequestId(identity);
       if (requestId === null) return finish({ error: 'Diagnostics request counter exhausted.' });
       service.recent(window, identity, requestId).then(function (value) {
-        finish({ entries: value.result.records, truncated: value.result.truncated, identity: identity });
+        var records = value.result.records;
+        finish({ entries: records, truncated: value.result.truncated, identity: identity,
+          reportToken: Object.freeze({ expectedContentRevision: value.contentRevision,
+            expectedSequence: records.length ? records[records.length - 1].sequence : 0 }) });
       }, function () { finish({ error: 'Native diagnostics query failed. Refresh to retry.' }); });
     } catch (_) { finish({ error: 'Native diagnostics query failed. Refresh to retry.' }); }
   }
@@ -123,6 +131,7 @@
   function render(result, target, token) {
     var selectedLayers = correlatedLayerIndices();
     var t2 = (typeof SM !== 'undefined' && SM.t) ? SM.t : function (k) { return k; };
+    function text(key, fallback) { var value = t2(key); return value === key ? fallback : value; }
     var reportLabel = t2('labsDiagnosticsReport');
     if (reportLabel === 'labsDiagnosticsReport') reportLabel = 'Report';
     var body = result.error
@@ -132,19 +141,54 @@
           + result.entries.slice().reverse().map(function (e) { return rowHtml(e, selectedLayers); }).join('') + '</table>'
         : '<div data-diag-empty style="padding:6px 8px;color:#888;">' + esc(t2('labsDiagnosticsEmpty')) + '</div>');
     if (result.truncated) body += '<div data-diag-truncated style="padding:6px 8px;color:#888;">Earlier operations omitted by the native trace limit.</div>';
+    var catalog = window.NemoNativeReproduction && window.NemoNativeReproduction.capture(window);
+    var sessionHtml = catalog
+      ? '<div style="padding:6px 8px;">' + esc(text('labsDiagnosticsSyntheticSession', 'Synthetic catalog session · opacity (0–100)')) +
+        ' <input data-diag-opacity type="number" min="0" max="100" step="1" value="40" aria-label="' + esc(text('labsDiagnosticsSyntheticOpacity', 'Synthetic opacity')) +
+        '" style="width:55px;"> <button type="button" data-diag-apply>' + esc(text('labsDiagnosticsSyntheticApply', 'Apply')) + '</button> <button type="button" data-diag-end>' + esc(text('labsDiagnosticsSyntheticEnd', 'End session')) + '</button></div>'
+      : '<div style="padding:6px 8px;color:#aaa;">' + esc(text('labsDiagnosticsSyntheticHelp', 'Start an opt-in disposable synthetic session after closing the active native document.')) +
+        ' <button type="button" data-diag-start>' + esc(text('labsDiagnosticsStartSynthetic', 'Start synthetic session')) + '</button></div>';
     panel.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px 6px;border-bottom:1px solid rgba(255,255,255,.08);">' +
       '<b style="font-size:11px;">' + esc(t2('labsDiagnosticsTitle')) + '</b>' +
       '<span>' +
       '<button type="button" data-diag-report style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;margin-right:4px;">' + esc(reportLabel) + '</button>' +
       '<button type="button" data-diag-refresh style="cursor:pointer;background:none;border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#eceae7;font:11px ui-monospace,monospace;padding:1px 6px;">' + esc(t2('labsDiagnosticsRefresh')) + '</button>' +
-      '</span></div>' + body + '<div data-diag-report-status style="padding:2px 8px;color:#888;"></div>';
+      '</span></div>' + sessionHtml + body + '<div data-diag-report-status style="padding:2px 8px;color:#888;"></div>';
+    function current() { return panel === target && generation === token && SMLabs.isOn('diagnostics-panel'); }
+    var sessionPending = false;
+    function sessionAction(action) {
+      if (!current() || sessionPending) return;
+      var status = target.querySelector('[data-diag-report-status]');
+      sessionPending = true;
+      Promise.resolve().then(function () { if (!current()) throw new Error('Panel changed.'); return action(); }).then(function () { if (current()) refresh(); }, function () {
+        if (current() && status) status.textContent = text('labsDiagnosticsSyntheticUnavailable', 'Native synthetic session unavailable or changed. Refresh to retry.');
+      }).finally(function () { sessionPending = false; });
+    }
+    var start = panel.querySelector('[data-diag-start]');
+    if (start) start.addEventListener('click', function () { sessionAction(function () { return window.NemoNativeReproduction.start(window, true); }); });
+    var apply = panel.querySelector('[data-diag-apply]');
+    if (apply) apply.addEventListener('click', function () {
+      var input = target.querySelector('[data-diag-opacity]'), value = input && input.value.trim();
+      sessionAction(function () {
+        var id = catalog && mintRequestId(catalog);
+        if (!id || !value) throw new Error('Invalid synthetic opacity.');
+        return window.NemoNativeReproduction.setOpacity(window, catalog, Number(value), id);
+      });
+    });
+    var end = panel.querySelector('[data-diag-end]');
+    if (end) end.addEventListener('click', function () { sessionAction(function () {
+      var id = catalog && mintRequestId(catalog);
+      if (!id) throw new Error('Invalid session identity.');
+      return window.NemoNativeReproduction.end(window, catalog, id);
+    }); });
     var refreshBtn = panel.querySelector('[data-diag-refresh]');
     if (refreshBtn) refreshBtn.addEventListener('click', refresh);
     var reportBtn = panel.querySelector('[data-diag-report]');
+    var reportPending = false;
     if (reportBtn) {
       reportBtn.addEventListener('click', function () {
-        if (panel !== target || generation !== token) return;
+        if (!current() || reportPending) return;
         var status = target.querySelector('[data-diag-report-status]');
         if (result.identity && !sameDocument(result.identity, currentIdentity())) {
           if (status) status.textContent = 'Document changed; refresh diagnostics before reporting.';
@@ -152,11 +196,18 @@
         }
         // Fence completion even when disable/re-enable recreates a panel or
         // Refresh starts another read before this continuation is scheduled.
-        buildReport(result).then(function (out) {
-          if (!status || panel !== target || generation !== token || !SMLabs.isOn('diagnostics-panel')) return;
-          if (result.identity && !sameDocument(result.identity, currentIdentity())) return;
-          status.textContent = out.error;
-        });
+        reportPending = true;
+        function valid() { return current() && sameDocument(result.identity, currentIdentity()); }
+        buildReport(result).then(function (bundle) {
+          if (!status || !valid()) return;
+          window.NemoNativeReproduction.download(window, bundle, valid);
+          status.textContent = text('labsDiagnosticsReportDownloaded', 'Native reproduction downloaded.');
+        }).catch(function () {
+          if (!status || !current() || (result.identity && !sameDocument(result.identity, currentIdentity()))) return;
+          status.textContent = result.identity && result.identity.catalog
+            ? text('labsDiagnosticsReportStale', 'Native report unavailable or stale. Refresh diagnostics to retry.')
+            : text('labsDiagnosticsReproductionUnavailable', 'Reproduction unavailable: no native synthetic recording with a recoverable fixture is connected.');
+        }).finally(function () { reportPending = false; });
       });
     }
     panel.querySelectorAll('tr[data-layer-idx]').forEach(function (tr) {
@@ -173,7 +224,7 @@
     flag: 'nemo-labs-diagnostics-panel',
     describe: 'labsDescribeDiagnosticsPanel',
     onEnable: function () { build(); },
-    onDisable: function () { generation++; if (panel) { panel.remove(); panel = null; } },
+    onDisable: function () { generation++; if (window.NemoNativeReproduction) window.NemoNativeReproduction.disposeDownloads(window); if (panel) { panel.remove(); panel = null; } },
   });
   if (SMLabs.isOn('diagnostics-panel')) build();
 })();
