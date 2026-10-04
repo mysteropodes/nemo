@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { extractFunction } = require('./fixtures/lib/sandbox.cjs');
 
 const source = fs.readFileSync(path.join(__dirname, '../src/js/timeline.js'), 'utf8');
 const start = source.indexOf('setInterval(function(){\n  if(state.playing)return;');
@@ -36,7 +37,7 @@ function harness(options = {}) {
   };
   vm.runInNewContext(timerSource, sandbox, { filename: 'timeline-autosave.js' });
   assert.equal(delay, 30000);
-  return { tick, state, window, effects, warnings };
+  return { tick, state, window, effects, warnings, sandbox };
 }
 
 function nativePin() {
@@ -190,6 +191,25 @@ test('legacy browser localStorage fallback retains its existing save and seriali
     ['legacy-save'], ['legacy-json'], ['localStorage', 'nemo-auto', 'legacy-json'],
   ]);
 });
+
+for (const native of [undefined, nativePin()]) {
+  test(`production autosave adapter mirrors exact ${native ? 'native' : 'browser'} bytes to localStorage and IndexedDB`, () => {
+    const fixture = harness({ native: native && native.controller });
+    fixture.window.SMIdb = {
+      set(key, json) { fixture.effects.push(['IndexedDB', key, json]); return Promise.resolve(); },
+    };
+    const project = fs.readFileSync(path.join(__dirname, '../src/js/project.js'), 'utf8');
+    vm.runInNewContext(extractFunction(project, 'autosaveWrite'), fixture.sandbox);
+    fixture.window.SMProject.autosaveWrite = fixture.sandbox.autosaveWrite;
+    fixture.tick();
+    const bytes = native ? native.json : 'legacy-json';
+    assert.deepEqual(fixture.effects, [
+      ...native ? [] : [['legacy-save'], ['legacy-json']],
+      ['localStorage', 'nemo-auto', bytes], ['IndexedDB', 'nemo-auto', bytes],
+      ['snapshot', bytes], ['dirty-dot', bytes],
+    ]);
+  });
+}
 
 for (const native of [undefined, nativePin().controller]) {
   test(`playing skips the entire ${native ? 'native' : 'legacy'} tick`, () => {

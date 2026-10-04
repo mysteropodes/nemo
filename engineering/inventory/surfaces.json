@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "cf99a52773369a2fc3db08296aa4f557762510ef",
-  "describe": "v0.7.0-alpha.4-924-gcf99a527-dirty"
+  "head": "f269a2a81309e4be9c0a8142ebb5bea6b6549050",
+  "describe": "v0.7.0-alpha.4-934-gf269a2a8-dirty"
  },
- "inputsDigest": "ba6f858adffb2f4df9abb2cfaa8519e3463e979597bf3a8b582dd7c95b665be4",
+ "inputsDigest": "f4f9c21be5f8fb0ffdba3580dc47115307ff6ea42ba0a071caab7f7581023576",
  "states": [
   "inventoried",
   "characterized",
@@ -176,7 +176,7 @@
   },
   "SM": {
    "file": "src/js/timeline.js",
-   "line": 11858,
+   "line": 11881,
    "members": 0
   },
   "SMImageMeshUI": {
@@ -14802,7 +14802,7 @@
    "capability": "Collapse panel",
    "area": "timeline-layers-frames",
    "handler": [
-    "src/js/timeline.js:11857 initPropsPanelCollapse()"
+    "src/js/timeline.js:11880 initPropsPanelCollapse()"
    ],
    "events": [
     "click"
@@ -14826,7 +14826,7 @@
     "functionsVisited": 21,
     "via": "variable btn",
     "references": [
-     "src/js/timeline.js:11850 syncPropsPanelCollapseTitle()"
+     "src/js/timeline.js:11873 syncPropsPanelCollapseTitle()"
     ]
    },
    "fixtures": [
