@@ -110,7 +110,7 @@
           receipt.status !== 'succeeded' || receipt.authorityRemovalCompleted !== true || receipt.reentryAvailable !== true) throw new Error('Native catalog release unavailable.');
       var after = await invoke(root, 'nemo_native_status');
       if (!same(identity, capture(root)) || !after || after.apiVersion !== 2 || after.instanceId !== identity.instanceId ||
-          after.available !== false || after.documentId !== null) throw new Error('Native catalog release changed.');
+          after.available !== false || (after.documentId !== null && after.documentId !== undefined)) throw new Error('Native catalog release changed.');
       local.identity = null;
       disposeDownloads(root);
       return receipt;

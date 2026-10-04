@@ -18,7 +18,12 @@ function host() {
     document: { createElement() { return { click() {}, remove() {} }; }, body: { appendChild() {} } } };
   let invoke = async (command, args) => {
     calls.push({ command, args });
-    if (command === 'nemo_native_status') return { ...status };
+    if (command === 'nemo_native_status') {
+      // Rust serializes inactive Option fields as absent, not explicit nulls.
+      const response = { ...status };
+      if (!response.available) { delete response.documentId; delete response.contentRevision; }
+      return response;
+    }
     if (command === 'nemo_native_revision_sync') { assert.deepEqual(args.request, { action: 'binding' }); return { ...status, subscriptionId: 'read-binding' }; }
     if (command === 'nemo_mcp_identity') return { instanceId: 'instance' };
     if (command === 'nemo_native_reproduction_session') {
