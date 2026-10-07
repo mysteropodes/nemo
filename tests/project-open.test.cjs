@@ -789,3 +789,21 @@ test('native Version Restore final failure restores modal visibility without bac
   assert.equal(h.app.element('history-modal').style.display, 'flex');
   assert.equal(h.identity.documentId, 'B', 'test does not manufacture rollback to A after native replacement');
 });
+
+test('desktop Version Restore with no published native globals denies before every legacy or file effect', async () => {
+  const version = fs.readFileSync('tests/animation/fixtures/curve-workflow.json', 'utf8');
+  const app = harness({ version });
+  let reads = 0, exports = 0;
+  app.window.__TAURI__.core = { invoke: async () => { throw Error('must not invoke'); } };
+  app.window.__TAURI__.fs.readTextFile = async () => { reads++; return version; };
+  app.window.SM.exportJSON = () => { exports++; return '{"keep":true}'; };
+  const before = app.json;
+  assert.equal(await app.project.restoreVersion('/owned-history/version.json'), false);
+  assert.equal(reads, 0, 'missing native pin denies before file read');
+  assert.equal(exports, 0);
+  assert.equal(app.mutations, 0);
+  assert.equal(app.writes.length, 0);
+  assert.equal(app.json, before);
+  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  assert.equal(app.toasts.includes('toastVersionRestored'), false);
+});

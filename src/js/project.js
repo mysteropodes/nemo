@@ -252,7 +252,7 @@
     unavailable:function(){showToast('Could not finish restoring this version.');}
   });
   async function restoreVersion(path){
-    if('NemoNativeOpacityCutover' in window||'NemoNativeOpacityProject' in window)return nativeVersionRestore.restore(path);
+    if(tauriOk()||'NemoNativeOpacityCutover' in window||'NemoNativeOpacityProject' in window)return nativeVersionRestore.restore(path);
     // Capture the current document before import, then record that snapshot
     // only after a successful restore. Rejected input must leave both the
     // current project and its version history unchanged.
