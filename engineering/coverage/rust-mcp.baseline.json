@@ -112,6 +112,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "N25C2b/#1607: cargo-llvm-cov 0.9.1 measured clean source 159e9062c8ce2e25e40b57f93f35f4fb761275f9. The report contains no executable regions for this cfg(test) child; it is explicitly listed, not excluded."
+    },
+    "nemo-mcp/src/raw_envelope.rs": {
+      "lines": 96.12,
+      "regions": 95.91,
+      "functions": 93.75,
+      "note": "N25C2c/#1621: pinned cargo-llvm-cov 0.9.1 measured clean source ba150cd28b92fb5a203702262f1cf78692c3b416 through the named coverage job with 78 tests passing and none failing. 124/129 lines, 188/196 regions, 15/16 functions; observed percentages rounded down to two decimals. Artifact: reports/20261007T210343Z-ba150cd/coverage-rust/coverage.json. Existing file and aggregate floors remain unchanged."
+    },
+    "nemo-mcp/src/raw_envelope_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "N25C2c/#1621: pinned cargo-llvm-cov 0.9.1 measured clean source ba150cd28b92fb5a203702262f1cf78692c3b416. The named export reports no file record or executable regions for this cfg(test) child; it is explicitly listed, not excluded. Artifact: reports/20261007T210343Z-ba150cd/coverage-rust/coverage.json."
     }
   },
   "nativeObjectContractRegistration": {
@@ -125,5 +136,20 @@
       "failed": 0
     },
     "scope": "Only two new per-file entries; all pre-existing file/aggregate floors, tool pin and exclusions preserved. Whole-crate ratchet remains an open gate; this registration is not a coverage pass."
+  },
+  "nativeObjectRawEnvelopeRegistration": {
+    "issue": "N25C2c/#1621",
+    "sourceSha": "ba150cd28b92fb5a203702262f1cf78692c3b416",
+    "crateDirty": false,
+    "report": "reports/20261007T210343Z-ba150cd/coverage-rust/coverage.json",
+    "lcov": "reports/20261007T210343Z-ba150cd/coverage-rust/lcov.info",
+    "html": "reports/20261007T210343Z-ba150cd/coverage-rust/html/html/index.html",
+    "tool": "cargo-llvm-cov 0.9.1",
+    "tests": {
+      "binaries": 13,
+      "passed": 78,
+      "failed": 0
+    },
+    "scope": "Only two new per-file entries; every pre-existing entry, aggregate floor, recorded provenance, tool pin, test metadata and exclusion remains unchanged. The named job retains 18 inherited ratchet violations after registration. Whole-crate coverage remains red; this registration is not a coverage pass."
   }
 }
