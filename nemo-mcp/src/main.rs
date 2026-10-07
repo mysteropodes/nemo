@@ -78,8 +78,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing()?;
     // stdout belongs exclusively to the MCP protocol.
     let server = nemo_mcp::server::NemoServer::new(nemo_mcp::registry::registry_root()?);
+    let (input, output) = rmcp::transport::stdio();
     server
-        .serve(rmcp::transport::stdio())
+        .serve((nemo_mcp::wire::guarded_stdio_input(input), output))
         .await?
         .waiting()
         .await?;

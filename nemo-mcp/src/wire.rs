@@ -1,4 +1,6 @@
 //! Bounded local IPC; no shell, eval, document mirror, or public network listener.
+#[path = "raw_envelope.rs"]
+mod raw_envelope;
 use crate::{
     contract::{
         bounded_identifier, ApplicationRequest, ApplicationResponse, NativeApplicationRequest,
@@ -67,6 +69,14 @@ pub async fn read_json<T: serde::de::DeserializeOwned>(
     read_json_bounded(reader, MAX_MESSAGE_BYTES - 2).await
 }
 
+/// Guard the SDK's input before it deserializes nested arguments into Value.
+/// Original CR/BOM bytes count toward the existing v1 outer framing budget.
+pub fn guarded_stdio_input<R: AsyncRead + Unpin + Send + 'static>(
+    reader: R,
+) -> impl AsyncRead + Unpin + Send + 'static {
+    raw_envelope::GuardedInput::new(reader, MAX_MESSAGE_BYTES - 2)
+}
+
 async fn read_json_bounded<T: serde::de::DeserializeOwned>(
     reader: impl AsyncRead + Unpin,
     max_content_bytes: usize,
@@ -80,6 +90,12 @@ async fn read_json_bounded<T: serde::de::DeserializeOwned>(
     if bytes.last() != Some(&b'\n') || bytes.len() > limit {
         return Err(io::Error::other("incomplete or oversized message"));
     }
+    raw_envelope::check_unique(&bytes).map_err(|error| match error {
+        raw_envelope::RawEnvelopeError::Duplicate => {
+            io::Error::new(io::ErrorKind::InvalidData, "duplicate JSON member")
+        }
+        raw_envelope::RawEnvelopeError::Malformed(error) => io::Error::from(error),
+    })?;
     Ok(serde_json::from_slice(&bytes)?)
 }
 
