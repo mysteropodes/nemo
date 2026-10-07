@@ -115,16 +115,15 @@
   // guard below. null = "never saved/loaded anything yet" — a brand-new
   // empty document counts as clean until it's actually drawn on (newProject
   // and openPath both stamp it).
-  var lastSavedJson=null;
+  var dirtyBaseline=window.NemoProjectDirtyBaseline.create();
   function markSaved(json){
-    lastSavedJson=json;
+    dirtyBaseline.markSaved(json);
     var t=activeTab();
     if(t)t.dirty=false;
     renderTabBar();
   }
   function isDirty(){
-    try{return lastSavedJson!==null&&projectJSON()!==lastSavedJson;}
-    catch(e){return true;} // can't serialize → assume dirty, never skip the warning
+    return dirtyBaseline.isDirty(projectJSON);
   }
 
   async function writeProjectTo(path){
@@ -496,7 +495,7 @@
     saveAllLayerFrames();
     t.json=window.SM.exportJSON();
     // Captured HERE, before any import happens — isDirty()'s raw-string
-    // comparison against lastSavedJson is only trustworthy same-generation
+    // comparison against the saved baseline is only trustworthy same-generation
     // (live export vs. live export). Carrying this as a plain boolean past
     // an import boundary avoids the trap below (see switchToTab).
     t.dirty=isDirty();
@@ -539,7 +538,7 @@
         // openPath's own comment already documents), so a fresh exportJSON()
         // right after this import can differ textually from target.json even
         // with zero real changes. target.dirty was captured pre-import.
-        lastSavedJson=target.dirty?'':window.SM.exportJSON();
+        dirtyBaseline.restoreTab(target.dirty,function(){return window.SM.exportJSON();});
         entered();
       });
     }
@@ -572,7 +571,7 @@
       return afterMaybe(importProjectJSON(next.json,true),function(imported){
         if(!imported)return;
         activeTabId=next.id;
-        lastSavedJson=next.dirty?'':window.SM.exportJSON(); // see switchToTab's comment for why
+        dirtyBaseline.restoreTab(next.dirty,function(){return window.SM.exportJSON();}); // see switchToTab's comment for why
         currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();
       });
     }
@@ -625,7 +624,7 @@
   function refreshActiveTabDirtyDot(liveJson){
     var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(!el)return;
-    el.classList.toggle('dirty',lastSavedJson!==null&&liveJson!==lastSavedJson);
+    el.classList.toggle('dirty',dirtyBaseline.isDirtyBytes(liveJson));
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 
