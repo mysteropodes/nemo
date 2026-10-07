@@ -72,7 +72,8 @@ count canceled coexistence work as delivered final functionality.
   Disconnect or remove superseded runtime code as its responsibility migrates, even
   before that feature reaches final parity. Its fixtures and pending obligation remain
   visible. At desktop promotion, **100% of agreed baseline desktop functionality and
-  applicable desktop surfaces** must be accepted or have an exact documented baseline-defect disposition.
+  applicable desktop surfaces** must be accepted or have an exact documented
+  baseline-defect disposition.
   This includes old-project import, expression behavior and public scripting/plugin
   semantics; temporary unavailability never closes a feature obligation.
 - Preserve the existing issues, owners, accepted native modules, extracted UI/domain

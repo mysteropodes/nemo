@@ -13,7 +13,7 @@ Ce document est le plan opérationnel unique de la remédiation en cours. Il rem
 ## Objectif de livraison actuel — application de bureau d’abord, 7 octobre 2026
 
 **Cet amendement fixe le périmètre actuel des surfaces et de l’achèvement.**
-Livrer une application de bureau **installée, stable et extensible**, dont le
+Livrer une application de bureau **installée, stable et capable de monter en charge**, dont le
 moteur Rust natif est l’unique autorité d’écriture pour les documents/révisions,
 l’historique, l’évaluation/ordonnancement, les médias/ressources/GPU, le viewport
 et l’export, avec Tauri et HTML/CSS/JavaScript pour l’interface. Paper.js ne
