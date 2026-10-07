@@ -18,6 +18,36 @@ use std::{
 
 pub(crate) struct TerminalPump(pub(crate) Arc<AtomicUsize>);
 
+#[test]
+fn dispatch_refusal_is_fallible_without_document_revision_or_generation_change() {
+    let observations = Arc::new(AtomicUsize::new(0));
+    let mut authority = NativeAuthority::default();
+    let generation = authority.reserve_install().unwrap();
+    authority
+        .install(generation, Box::new(TerminalPump(observations.clone())))
+        .unwrap();
+    let request = OpacityRequest::query(
+        "refused",
+        "pump-fixture",
+        "document-fixture",
+        "query.document.revision",
+        serde_json::json!({}),
+    );
+    let result: Result<ResponseEnvelope, String> =
+        authority.active_mut(generation).unwrap().dispatch(request);
+    assert_eq!(
+        result.unwrap_err(),
+        "terminal pump has no document dispatcher"
+    );
+    assert_eq!(authority.active_generation().unwrap(), generation);
+    assert_eq!(authority.active().unwrap().1.content_revision(), 0);
+    assert_eq!(
+        authority.active().unwrap().1.document_id(),
+        "document-fixture"
+    );
+    assert_eq!(observations.load(Ordering::SeqCst), 1);
+}
+
 impl NativeDispatch for TerminalPump {
     fn instance_id(&self) -> &str {
         "pump-fixture"
@@ -28,8 +58,9 @@ impl NativeDispatch for TerminalPump {
     fn content_revision(&self) -> u64 {
         0
     }
-    fn dispatch(&mut self, _: OpacityRequest) -> ResponseEnvelope {
-        unreachable!("pump test does not dispatch transport requests")
+    fn dispatch(&mut self, _: OpacityRequest) -> Result<ResponseEnvelope, String> {
+        self.0.fetch_add(1, Ordering::SeqCst); // Observation only; no document writer.
+        Err("terminal pump has no document dispatcher".into())
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         unreachable!("pump test does not replace documents")

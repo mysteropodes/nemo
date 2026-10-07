@@ -281,7 +281,7 @@ mod tests {
                 }
             }))
             .unwrap();
-            let response = application.dispatch(request);
+            let response = application.dispatch(request).unwrap();
             assert!(response.is_ok());
             let job_id = response.result().unwrap()["jobId"].as_str().unwrap();
             let held = application
