@@ -82,13 +82,16 @@ Target ownership on `codex/native-remediation`:
 - TypeScript/ESM for UI, inspectors, tools and SDK bindings.
 - Paper.js only for justified geometry, hit-testing or presentation; it is not an
   alternative persistent editor, evaluator or fallback writer.
-- Native desktop and worker/WASM browser adapters with explicit capability differences.
+- Native desktop adapters for the current delivery milestone; worker/WASM browser
+  adapters remain a separately tracked later stage with explicit capability differences.
 
 Each migrated aggregate has exactly one writable native authority. An unmigrated feature
 may be explicitly unavailable on the integration branch and must not invoke an old
 writable engine. Existing UI/scripting consumers are adapted to the shared application
-API. Full agreed baseline behavior, project import and covered browser capabilities remain
-mandatory before final promotion; temporary unavailability is not a completion disposition.
+API. Full agreed desktop baseline behavior and project import remain mandatory
+before desktop promotion; covered browser capabilities are deferred to R24/#1619
+and are not claimed by that promotion. Temporary unavailability of a required
+desktop feature is not a completion disposition.
 
 ## Future performance direction
 

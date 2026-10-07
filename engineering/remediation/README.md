@@ -14,9 +14,12 @@ model/effort guidance, tests, check-ins, Git workflow, board updates and complet
 The baseline is the exact observed state, including defects. The goal is modular ownership,
 testing, enforced boundaries and feature contracts served through the bundled Rust MCP.
 Since the 2026-09-22 separation, operational `main` is preserved and remediation task PRs
-target protected `codex/native-remediation`. Intermediate features may be explicitly
-unavailable without old-engine fallback; final promotion requires every agreed baseline
-workflow and applicable surface, not merely completion of the first native slice.
+target protected `codex/native-remediation`. Ilya's 2026-10-07 desktop-first target
+requires a stable, scalable installed Rust-engine desktop app with every agreed
+desktop baseline workflow accepted; browser/WASM compatibility is deferred to
+[R24/#1619](https://github.com/mysteropodes/nemo/issues/1619). Intermediate
+desktop features may be explicitly unavailable without old-engine fallback, but
+temporary unavailability does not count toward desktop completion.
 
 Track execution on [Cyrill's Project #2](https://github.com/users/mysteropodes/projects/2/views/1)
 and team summaries in the [shared hourly log](https://github.com/mysteropodes/nemo/issues/1062).

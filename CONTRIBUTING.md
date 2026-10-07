@@ -19,8 +19,9 @@ say so in the PR before it's merged, not after.
   (`geometry-wasm/`, stateless WebGPU renderer via vello) app running in Tauri. The
   protected `codex/native-remediation` branch migrates persistent document, evaluation,
   media/GPU, viewport and export authority to Rust without a writable Paper.js fallback.
-  Its intermediate builds may declare unmigrated features unavailable; final acceptance
-  still requires the full agreed baseline functionality. The root
+  Its intermediate builds may declare unmigrated features unavailable; current final
+  acceptance still requires the full agreed desktop baseline functionality. Browser/WASM
+  compatibility follows later under R24/#1619, without an old writable fallback. The root
   [CLAUDE.md](CLAUDE.md) is the real engineering guide — it documents
   invariants and past-bug postmortems that aren't obvious from reading the
   code once (e.g. the "new item type/tag handled in one consumer but not

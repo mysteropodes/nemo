@@ -1,12 +1,47 @@
 # Nemo — remediation execution checklist
 
-Approved strategy: **7 September 2026**; native-engine amendment approved **20 September 2026**; native-only separation approved **22 September 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
+Approved strategy: **7 September 2026**; native-engine amendment approved **20 September 2026**; native-only separation approved **22 September 2026**; desktop-first delivery target approved **7 October 2026**. Humans: **Ilya** (`ivg-design`) and **Cyrill** (`mysteropodes`). [French copy](EXECUTION_PLAN.fr.md).
 
 This is the single operating plan for the current remediation. It supersedes the execution order, forecasts, global blocking gates, remote-agent assumptions and reporting requirements in the older R00–R22 plan and local-agent playbooks. Existing architecture and source documentation remain references; this document governs scope and workflow where they conflict. GitHub issues hold live claims and handoffs; the checklist defines outcomes. The [shared hourly progress log #1062](https://github.com/mysteropodes/nemo/issues/1062) is the one central report destination; do not create competing sprint ledgers or report PRs.
 
-## 0. Current native-only separation — 22 September 2026
+## Current delivery target — desktop first, 7 October 2026
 
-**This is the current operating amendment.** It supersedes later transitional text that
+**This is the current surface and completion-scope amendment.** Deliver a stable,
+scalable **installed desktop app** with the native Rust engine as sole writable
+document/revision/history, evaluation/scheduling, media/resource/GPU, viewport and
+export authority, and Tauri plus HTML/CSS/JavaScript as the interface. Keep
+Paper.js only for justified geometry, hit-testing or presentation. UI, scripting,
+SDK and bundled Rust MCP use the same versioned application API; no old
+JavaScript/Paper writer or silent fallback may coexist with the native owner.
+
+The desktop milestone requires **100% of the agreed baseline desktop features
+and workflows**, or exact dispositions for independently characterized
+pre-existing defects. Preserve old-project import without silent loss, document
+identity/history, expressions, public scripting/plugin behavior, and every
+applicable desktop save/load, undo/redo, selection, animation, render/export,
+Tauri, UI/API/MCP and installed-client consumer. Source-only completion,
+temporary unavailability and a passing development subset do not close these
+obligations. Desktop stability, lifecycle/recovery, scalability boundaries and
+normal local validation are part of acceptance, not optional polish.
+[R19 / #921](https://github.com/mysteropodes/nemo/issues/921) retains observed
+workload baselines and bounded no-regression evidence; broad new performance
+targets or optimization campaigns are not silently added to remediation.
+
+**Browser/WASM compatibility is a later, separately tracked stage** in
+[R24 / #1619](https://github.com/mysteropodes/nemo/issues/1619). Browser parity
+and real-browser tests are not prerequisites for the current desktop milestone,
+P24's desktop outcome or P33's desktop final audit. Preserve existing browser
+fixtures/evidence and declare capability differences; do not count deferred
+browser behavior as accepted or reintroduce an old writable browser authority.
+Browser-specific criteria and source work require later bounded admission under
+R24. Where older sections below mention browser evidence as a final gate, this
+amendment moves only that evidence to R24. The native-only branch separation,
+single-authority rule, full desktop functional denominator, issue ownership,
+independent review and protected integration remain in force.
+
+## 0. Native-only separation — 22 September 2026
+
+**This remains the current state-authority amendment.** It supersedes later transitional text that
 requires native-to-legacy document release, a dormant pass-through old writer, or complete
 feature parity before disconnecting that writer. Accepted earlier implementation and
 receipts remain evidence, not instructions to keep two editing engines working together.
@@ -30,14 +65,15 @@ count canceled coexistence work as delivered final functionality.
   export. JavaScript remains the UI/scripting/presentation layer; Paper.js may supply
   justified geometry, hit-testing or presentation, never a second writable document or
   authoritative evaluator. UI, SDK, MCP and applicable scripting consumers use the
-  shared command/query/job API. Covered browser behavior uses the declared WASM/host
-  adapter, not an independent old JavaScript authority.
+  shared command/query/job API. Later covered browser behavior uses the declared
+  WASM/host adapter, not an independent old JavaScript authority.
 - An unmigrated operation may be visibly unavailable on the integration branch and must
   reject before mutating a document; it cannot fall back to an old writable engine.
   Disconnect or remove superseded runtime code as its responsibility migrates, even
   before that feature reaches final parity. Its fixtures and pending obligation remain
-  visible. At final promotion, **100% of agreed baseline functionality and applicable
-  surfaces** must be accepted or have an exact documented baseline-defect disposition.
+  visible. At desktop promotion, **100% of agreed baseline desktop functionality and
+  applicable desktop surfaces** must be accepted or have an exact documented
+  baseline-defect disposition.
   This includes old-project import, expression behavior and public scripting/plugin
   semantics; temporary unavailability never closes a feature obligation.
 - Preserve the existing issues, owners, accepted native modules, extracted UI/domain
@@ -52,7 +88,7 @@ count canceled coexistence work as delivered final functionality.
 The remaining sequence uses existing bounded leaves: **A** preserve `main`, isolate the
 development app/data and connect a first native shell/viewport; **B** complete native
 document/edit/history/persistence; **C** animation and direct editing; **D** complex scene
-families; **E** media/output and all UI/API/browser consumers; **F** structural closure,
+families; **E** media/output and all desktop UI/API/MCP consumers; **F** structural closure,
 fixed-denominator parity, installed/client acceptance and protected final promotion.
 Renderer/viewport, save/history and relevant export checks start with the first usable
 feature, not at the end of Wave E. Parallelize independent owners after the common
@@ -67,8 +103,9 @@ For each changed test, retain independent behavior oracles, adapt obsolete call-
 assertions, retire tests solely of removed ownership handoff and keep required temporarily
 unavailable behavior visibly pending. A passing development subset is not full acceptance.
 Each accepted task branch integrates progressively into the protected branch with its
-actual checks; final promotion requires the complete baseline parity matrix, clean
-checkout/installed/visual/browser/client evidence and normal human review.
+actual checks; desktop promotion requires the complete desktop baseline parity matrix,
+clean checkout/installed/visual/client evidence and normal human review. Later
+browser evidence is owned by R24.
 
 ### Earlier native-engine pivot and ordered admission — 20 September 2026
 
@@ -83,7 +120,7 @@ The 20 September pivot kept the Tauri/JavaScript interface while making a native
 - [x] **[N03 / #1330](https://github.com/mysteropodes/nemo/issues/1330)** and **[N04 / #1332](https://github.com/mysteropodes/nemo/issues/1332):** after N02, independently prove headless Rust evaluation and a native Tauri viewport on representative fixtures. Record measured failure/unsupported outcomes honestly; a compile-only result is not feasibility acceptance.
 - [x] **[N05 / #1333](https://github.com/mysteropodes/nemo/issues/1333):** only after both feasibility gates, admit the bounded production implementation queue with exact owners, files, predecessor SHAs, parity fixtures, consumer matrices, retirement conditions and local validation commands.
 
-The production migration proceeds through characterized responsibilities and the same versioned application commands, queries and jobs used by the UI and bundled Rust MCP. Start from the accepted opacity fixture and move persistent revision ownership, immutable evaluation, native scheduling/resources, desktop presentation and fixed-revision export behind the frozen contracts. On the separated branch, an obsolete legacy writer may be disconnected or removed before its replacement reaches final parity; mark the missing feature pending and deny its operation without fallback. Applicable save/load, undo/redo, selection, animation, render, export, native bridge, browser and installed-desktop evidence remains required for final acceptance at identified candidates.
+The production migration proceeds through characterized responsibilities and the same versioned application commands, queries and jobs used by the UI and bundled Rust MCP. Start from the accepted opacity fixture and move persistent revision ownership, immutable evaluation, native scheduling/resources, desktop presentation and fixed-revision export behind the frozen contracts. On the separated branch, an obsolete legacy writer may be disconnected or removed before its replacement reaches final parity; mark the missing feature pending and deny its operation without fallback. Applicable save/load, undo/redo, selection, animation, render, export, native bridge and installed-desktop evidence remains required for this milestone at identified candidates. Browser evidence remains tracked under R24.
 
 This amendment preserves accepted remediation work and existing ownership. In particular, [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005), [P16 / #1018](https://github.com/mysteropodes/nemo/issues/1018), [#1316](https://github.com/mysteropodes/nemo/issues/1316) and its current [PR #1323](https://github.com/mysteropodes/nemo/pull/1323) are not silently reassigned or closed. R23 is a tracking parent; only the named executable leaves and native blocked-by relations gate work.
 
@@ -1017,9 +1054,9 @@ N07–N19A supplied accepted native save/load, identity, command/history, evalua
 
   1. Independent cases cover forward edge, non-loop stop, normal wrap, ping-pong reversal and single-frame work area.
   2. Wrapper preserves direction mutation and exactly the same audio-loop calls; real `startPlay` still calls the extracted kernel.
-  3. Fixed-clock browser playback reaches expected frames; no change to frame dropping, auto-bake or fps storage, and domain limits/global prohibition pass.
+  3. Fixed-clock installed-desktop playback reaches expected frames through the native owner; no change to frame dropping, auto-bake or fps storage, and domain limits/global prohibition pass. The former browser case is deferred to R24/#1619, not waived as a passing test.
 
-  Limit: Scope: `timeline.js:29`, `advancePlayFrame(cur)`; new domain playback step function returns next frame/direction/loop-event, wrapper applies state and calls `SMAudio.onLoop`. `startPlay` rAF accumulator/auto-bake remains outside this leaf. Suggested Ilya D1.
+  Limit: Scope: `timeline.js:29`, `advancePlayFrame(cur)`; new domain playback step function returns next frame/direction/loop-event, wrapper applies state and calls `SMAudio.onLoop`. `startPlay` rAF accumulator/auto-bake remains outside this leaf. Before restacking draft PR #1473, decide whether the extracted JavaScript step remains only a desktop UI coordinator or must yield to Rust-owned scheduling; no second frame authority is accepted. Suggested Ilya D1.
 
 - [ ] **[H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060) — Map one rotate-selection gesture and cancellation boundary**
 
@@ -1150,18 +1187,23 @@ N07–N19A supplied accepted native save/load, identity, command/history, evalua
 ## 9. Final acceptance — the finish line
 
 - [x] N00–N05 have exact accepted receipts: board/plan installation, current-main queue reconciliation, frozen authority/transition contracts, headless-evaluation feasibility, native-viewport feasibility and the admitted bounded production queue. A tracking-parent percentage or feasibility prototype alone is not production completion.
-- [ ] The native Rust engine is the sole writable authority for the agreed document revision, command/history, evaluation/scheduling, media/resource/GPU, viewport-production and export paths. Tauri/JavaScript remains the interface; Paper.js and browser/WASM are capability-declared edge adapters, not concurrent authorities.
-- [ ] Every required baseline family has an independent fixed-revision parity oracle and passes its applicable save/load, undo/redo, selection, animation, render, export, native-bridge, real-browser and installed-desktop checks at the identified final candidate. A legacy writer may have been removed earlier on the integration branch, but that family remains pending until these checks pass. Packaged acceptance, browser acceptance and source-level parity are recorded separately at exact SHAs.
-- [ ] The fixed baseline-workflow denominator reaches 100% accepted coverage on agreed surfaces, apart from exact documented baseline-defect dispositions. Older project formats import without silently dropping content; expressions and public scripting/plugin behavior are accounted for. A temporarily unavailable required feature cannot be counted Done.
+- [ ] The native Rust engine is the sole writable authority for the agreed document revision, command/history, evaluation/scheduling, media/resource/GPU, viewport-production and export paths. Tauri/HTML/CSS/JavaScript remains the desktop interface; Paper.js is only a justified geometry, hit-testing or presentation edge, not a concurrent authority.
+- [ ] Every required desktop baseline family has an independent fixed-revision parity oracle and passes its applicable save/load, undo/redo, selection, animation, render, export, native-bridge and installed-desktop checks at the identified final candidate. A legacy writer may have been removed earlier on the integration branch, but that family remains pending until these checks pass. Packaged desktop acceptance and source-level parity are recorded separately at exact SHAs; browser acceptance belongs to R24.
+- [ ] The fixed baseline-workflow denominator reaches 100% accepted coverage on agreed desktop surfaces, apart from exact documented baseline-defect dispositions. Older project formats import without silently dropping content; expressions and public scripting/plugin behavior are accounted for. A temporarily unavailable required desktop feature cannot be counted Done.
 - [ ] P03's frozen source/consumer census is complete, including subsequently admitted small leaves. No handwritten monolith remains hidden under a legacy exception; legitimate generated/vendor/data files have explicit dispositions.
 - [ ] Each feature has a coherent public API, one state authority, applicable lifecycle/resource contracts and a capability registration. Existing UI/API/MCP consumers use the same implementation; obsolete writers and bypasses are removed.
-- [ ] Relevant unit, regression, browser and native checks protect migrated behavior. Coverage and failure reports are inspectable at the final source SHA. Known defects are explicit product debt, not repair prerequisites or concealed passing tests.
+- [ ] Relevant unit, regression and native/installed-desktop checks protect migrated behavior. Coverage and failure reports are inspectable at the final source SHA. Existing browser results are reported honestly but are not a desktop gate; their remaining compatibility obligations stay open in R24. Known defects are explicit product debt, not repair prerequisites or concealed passing tests.
+- [ ] Representative installed-desktop playback, render/export and resource-lifetime workloads have identified baseline and final-candidate no-regression/recovery evidence under R19. A new performance target is not inferred from this structural gate, and source-only or short smoke tests are not described as soak acceptance.
 - [ ] Normal local validation enforces adopted boundaries, size profiles, schema freshness and registration completeness. Each checker has a meaningful failing negative control.
 - [ ] A fresh agent can add a feature declaration using the documented convention and exercise it through the bundled Rust MCP without editing a central dispatcher. Both real clients have identified installed acceptance evidence for the supported macOS slice.
 - [ ] Debugging provides bounded correlated inspection and a reproducible isolated fixture path. Protocol stdout, document ownership and user data remain intact.
 - [ ] Ilya and Cyrill accept the full functional and structural result and its explicit pre-existing product/platform limitations. Preserve a recoverable operational source/artifact, reconcile the final integration diff against current `main`, and promote only through a normally protected reviewed PR. Close the remaining tracking parents, reconcile the primary board and final central report, and release completed branch/worktree/runtime ownership.
 
 No assertion above requires all pre-existing product bugs to be fixed. No open extraction, unowned state writer or missing architecture evidence may be renamed product debt just to declare remediation finished.
+
+After this desktop milestone, R24 separately admits and accepts the covered
+browser/WASM capabilities. Desktop completion must neither close R24 nor describe
+browser parity as delivered.
 
 ## 10. Buzz, hourly reports and the two startup packets
 

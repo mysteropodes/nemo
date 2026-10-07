@@ -23,7 +23,8 @@ médias/ressources GPU, la production du viewport et l’export. Sur la branche 
 `codex/native-remediation`, Paper.js ne peut servir qu’à la géométrie, au hit-test ou à la
 présentation justifiés, jamais de propriétaire alternatif d’un document éditable. Une
 fonction non migrée peut être temporairement indisponible sans repli vers l’ancien writer ;
-la parité fonctionnelle convenue reste obligatoire avant la promotion finale vers `main`.
+la parité fonctionnelle bureau convenue reste obligatoire avant la promotion finale vers
+`main`. La compatibilité navigateur/WASM est différée vers R24/#1619.
 
 Ces guidelines viennent d'un audit complet (bugs, perf, cohérence Rust/JS) après plusieurs
 tours de régressions sur l'éraseur/les booléennes/le brush preset — toutes causées par la
