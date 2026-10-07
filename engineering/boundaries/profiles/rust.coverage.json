@@ -101,5 +101,6 @@
       "Whole-repository Cargo dependency/module-graph enforcement remains outside this source-size packet; adopted crate-local policies run separately.",
       "Rust source is not wired into scripts/nemo/ci.cjs applicability; that file is shared and serialized."
     ]
-  }
+  },
+  "nativeObjectMcpContractRegistration": "N25C2b/#1607 registers native_object_contract.rs and native_object_contract_tests.rs as private children in the existing rust.mcp.transport module. Typed shape validation and unavailable discovery only; no host activation, new edge, layer, size ceiling, baseline or exclusion change."
 }

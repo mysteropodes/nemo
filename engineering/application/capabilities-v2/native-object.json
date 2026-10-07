@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object",
+  "version": 1,
+  "status": "staged",
+  "availability": {
+    "state": "unavailable",
+    "reason": "Object reads are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "query.document.object"
+  ],
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "not_found",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated envelope or typed unavailable; never truncate or simplify geometry.",
+    "accepted": [
+      "complete closed-solid-fill-cubic-path record within envelope byte limit"
+    ]
+  },
+  "typedValueBoundary": "Closed typed shapes only; duplicate raw JSON keys already lost by Value parsing are not detectable. Availability requires a later strict raw-envelope gate.",
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Staged selector; valid admission returns unavailable before endpoint lookup",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "object-read-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "operation": "query.document.object",
+        "payload": {
+          "atRevision": 7,
+          "stableTarget": {
+            "contextId": "scene-root",
+            "frameScope": {
+              "kind": "authored",
+              "frame": 7
+            },
+            "layerUid": "legacy layer:alpha",
+            "strokeId": "ink/path_A"
+          }
+        }
+      },
+      "error": {
+        "code": "unavailable",
+        "message": "Object reads are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+      }
+    }
+  ]
+}

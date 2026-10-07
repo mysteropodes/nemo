@@ -207,3 +207,61 @@ test('active opacity adapter and stored schema reject staged object admission an
     result: { atRevision: 9, documentSnapshotId: 'snapshot-A-nine', document: extra } };
   assert.throws(() => validateResponse(response, response.requestId, 'query.document.serialize'));
 });
+
+const descriptor = load('engineering/application/capabilities-v2/native-object.json');
+const transport = load('engineering/application/native-transport-v2.schema.json');
+
+test('registered object read remains staged with pending ports and a complete-result byte policy', () => {
+  assert.equal(descriptor.id, 'native.object');
+  assert.equal(descriptor.status, 'staged');
+  assert.deepEqual(descriptor.operations, ['query.document.object']);
+  assert.equal(descriptor.availability.state, 'unavailable');
+  assert.match(descriptor.availability.reason, /raw-envelope.*host installation.*UI\/MCP/);
+  assert.deepEqual(descriptor.ports, [{ label: 'ui', state: 'pending' }, { label: 'mcp', state: 'pending' }]);
+  assert.equal(descriptor.resourceBoundary.maxReadResponseBytes, 4096);
+  assert.match(descriptor.resourceBoundary.policy, /never truncate or simplify/);
+  assert.match(descriptor.typedValueBoundary, /duplicate raw JSON keys/);
+  assert.deepEqual(descriptor.examples[0].request, cases.read.request);
+  assert.equal(descriptor.examples[0].error.code, 'unavailable');
+  assert.throws(() => validateRequest(descriptor.examples[0].request), 'browser activation remains a later gate');
+  assert.equal(load('engineering/application/capabilities-v2/native-opacity.json').availability.state, 'available');
+});
+
+test('transport object selector carries the frozen closed scope and bounded envelope contract', () => {
+  const branch = transport.$defs.Request.oneOf.find((entry) =>
+    entry.allOf?.some((part) => part.properties?.operation?.const === 'query.document.object'));
+  assert.ok(branch);
+  assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest');
+  assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectQueryPayload');
+  const payload = transport.$defs.ObjectQueryPayload;
+  assert.equal(payload.additionalProperties, false);
+  assert.deepEqual(payload.required, ['atRevision', 'stableTarget']);
+  assert.deepEqual(validate(payload, cases.read.request.payload, transport.$defs), []);
+  for (const change of [
+    { path: ['atRevision'], delete: true }, { path: ['atRevision'], value: -1 },
+    { path: ['stableTarget', 'strokeId'], value: 1 },
+    { path: ['stableTarget', 'frameScope', 'kind'], value: { authored: true } },
+    { path: ['stableTarget', 'frameScope', 'frame'], value: 4294967296 },
+    { path: ['stableTarget', 'contextId'], value: 'other' },
+    { path: ['stableTarget', 'allFrames'], value: true },
+  ]) assert.notDeepEqual(validate(payload, changed(cases.read.request.payload, change), transport.$defs), [], change.path.join('.'));
+  assert.equal(transport.$defs.Identifier.pattern, '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$');
+  assert.equal(transport.$defs.ObjectOpaqueId.minLength, 1);
+  assert.equal('pattern' in transport.$defs.ObjectOpaqueId, false);
+});
+
+test('transport complete-record definitions preserve each frozen field constraint', () => {
+  function renamed(value) {
+    if (Array.isArray(value)) return value.map(renamed);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, renamed(entry)]));
+    if (typeof value === 'string' && value.startsWith('#/$defs/')) {
+      const name = value.slice(8);
+      if (['OpaqueId', 'Frame', 'FrameScope', 'Target', 'Point', 'Segment', 'Geometry', 'SolidFill'].includes(name)) return `#/$defs/Object${name}`;
+    }
+    return value;
+  }
+  for (const name of ['OpaqueId', 'Frame', 'FrameScope', 'Target', 'Point', 'Segment', 'Geometry', 'SolidFill', 'ObjectRecord']) {
+    assert.deepEqual(transport.$defs[name === 'ObjectRecord' ? name : `Object${name}`], renamed(schema.$defs[name]), name);
+  }
+  for (const record of cases.records) assert.deepEqual(validate(transport.$defs.ObjectRecord, record, transport.$defs), []);
+});

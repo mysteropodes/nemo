@@ -163,6 +163,38 @@ the complete-result 4096-byte policy remain separate. N25D fill/history, C04a
 visible selection, browser, installed desktop and full parity remain unavailable
 or pending as recorded below.
 
+## N25C2b staged typed MCP contract
+
+The bundled MCP catalog now registers only `query.document.object` under
+`native.object`, with explicit `unavailable` availability and pending UI/MCP ports.
+A well-shaped request returns typed `unavailable` before endpoint lookup or TCP
+connection. Malformed typed selectors return `invalid_request`; unsupported
+object writes remain unregistered. The existing opacity capability stays available.
+
+The private transport validator checks closed map shapes, required safe-integer
+atRevision, scene-root context, authored/reference u32 frame scope and nonempty
+opaque layer/stroke IDs. Transport envelope IDs retain their separate syntax.
+Results require the complete frozen record, exact scoped target and selected
+revision, and `native-object:<documentId>:<atRevision>` snapshot token. The staged
+immutable common-envelope result requires outer contentRevision equal atRevision;
+this does not activate the prospective later-head/history contract. Closed cubic
+geometry retains every finite point and relative handle, solid fill channels in
+0..1, and 2..256 segments. These shape checks cannot establish document provenance,
+resolved layer references, GPU safety or visible selection.
+
+Typed Value validation cannot detect duplicate raw members already collapsed by
+JSON parsing. N25A/N25B strict raw-byte admission remains unchanged. A separately
+admitted strict raw-envelope/host gate must resolve that boundary before making
+object reads available. Neither catalog registration nor private response tests
+install an object owner or establish a real common UI/MCP object round trip.
+
+The existing 4096-byte reader preserves the complete envelope or rejects it.
+Record schema admission remains separate from transport fit; no geometry, handle,
+identity or fill is truncated to make an overlarge response fit. The existing
+N25C1 source dispatcher retains its bounded typed-unavailable failure policy.
+N25D history, P03 C04a, user save/load, browser, render/export and installed desktop
+acceptance remain separate gates.
+
 ## Consumer and acceptance boundaries
 
 | Consumer | N25B evidence or remaining gate |
@@ -172,7 +204,7 @@ or pending as recorded below.
 | Edit/history | Unavailable; N25D must prove native fill commits, pinned old reads and undo/redo. |
 | Animation | Frame-scoped records preserve authored/reference distinctions; no interpolation or cross-frame identity is inferred. |
 | Render/export | Unavailable for this family. Finite coordinates and 2–256 segments establish schema admission, not GPU-safe geometry, nondegeneracy or render/export parity. |
-| Native bridges/browser/Tauri | No capability activation. Active opacity codec and common Rust dispatcher continue rejecting object documents/operations; N25A contract checks also preserve JS rejection. No installed/browser acceptance credit. |
+| Native bridges/browser/Tauri | Staged typed MCP validation and explicitly unavailable object discovery; no capability activation. Active opacity codec and common Rust dispatcher continue rejecting object documents/operations; N25A contract checks also preserve JS rejection. No installed/browser acceptance credit. |
 
 Register these modules in the existing Rust boundary profile without new edge
 allowances, policy changes or size exemptions. N25B acceptance requires focused

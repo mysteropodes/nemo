@@ -72,6 +72,234 @@
       "required": ["stableTarget"],
       "properties": { "stableTarget": { "$ref": "#/$defs/StableTarget" } }
     },
+    "ObjectOpaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Preserve existing opaque bytes. Numeric indices are not IDs; string syntax cannot establish provenance or uniqueness."
+    },
+    "ObjectFrame": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "ObjectFrameScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "frame"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "authored",
+            "reference"
+          ]
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectFrame"
+        }
+      }
+    },
+    "ObjectTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contextId",
+        "frameScope",
+        "layerUid",
+        "strokeId"
+      ],
+      "properties": {
+        "contextId": {
+          "const": "scene-root"
+        },
+        "frameScope": {
+          "$ref": "#/$defs/ObjectFrameScope"
+        },
+        "layerUid": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "strokeId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        }
+      }
+    },
+    "ObjectPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308
+        },
+        "y": {
+          "type": "number",
+          "minimum": -1.7976931348623157e+308,
+          "maximum": 1.7976931348623157e+308
+        }
+      }
+    },
+    "ObjectSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "handleIn",
+        "handleOut"
+      ],
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleIn": {
+          "$ref": "#/$defs/ObjectPoint"
+        },
+        "handleOut": {
+          "$ref": "#/$defs/ObjectPoint"
+        }
+      }
+    },
+    "ObjectGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "closed",
+        "coordinateSpace",
+        "handleSpace",
+        "segments"
+      ],
+      "properties": {
+        "kind": {
+          "const": "cubic-path"
+        },
+        "closed": {
+          "const": true
+        },
+        "coordinateSpace": {
+          "const": "document-world"
+        },
+        "handleSpace": {
+          "const": "relative"
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/ObjectSegment"
+          },
+          "description": "Matches the accepted renderer count boundary. Shared subset validator does not implement maxItems; N25A tests explicitly check this bound, not runtime admission."
+        }
+      }
+    },
+    "ObjectSolidFill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "r",
+        "g",
+        "b",
+        "a"
+      ],
+      "properties": {
+        "kind": {
+          "const": "solid"
+        },
+        "r": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "g": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "b": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "a": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ObjectRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "family",
+        "target",
+        "geometry",
+        "fill"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "family": {
+          "const": "closed-solid-fill-cubic-path"
+        },
+        "target": {
+          "$ref": "#/$defs/ObjectTarget"
+        },
+        "geometry": {
+          "$ref": "#/$defs/ObjectGeometry"
+        },
+        "fill": {
+          "$ref": "#/$defs/ObjectSolidFill"
+        }
+      }
+    },
+    "ObjectQueryPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "stableTarget"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "stableTarget": {
+          "$ref": "#/$defs/ObjectTarget"
+        }
+      }
+    },
+    "ObjectQueryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "object"
+      ],
+      "properties": {
+        "atRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "documentSnapshotId": {
+          "$ref": "#/$defs/ObjectOpaqueId"
+        },
+        "object": {
+          "$ref": "#/$defs/ObjectRecord"
+        }
+      },
+      "description": "Staged immutable common-envelope result: atRevision equals outer contentRevision; snapshot token is native-object:<documentId>:<atRevision>. Complete envelope is limited to 4096 bytes."
+    },
     "SerializeQueryPayload": {
       "type": "object", "additionalProperties": false,
       "required": ["atRevision"],
@@ -250,6 +478,10 @@
     },
     "Request": {
       "oneOf": [
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
+          { "properties": { "operation": { "const": "query.document.object" },
+            "payload": { "$ref": "#/$defs/ObjectQueryPayload" } } }] },
+
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "command.reproduction.opt_in" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
