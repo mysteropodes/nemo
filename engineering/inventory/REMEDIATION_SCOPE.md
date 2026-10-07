@@ -969,7 +969,8 @@ controller code below is evidence of a consumer, not permission to run its write
 | Text animator per-character weight ramp | 2831–2839 | `text-animator-panel.js:391+` creates `.ta-ramp` bars or `.ta-ramp-empty`, reading `textAnimatorWeights` and inline bar heights. The renderer also consumes those weights; common input is source evidence, not proof that evaluation and rendered glyphs agree at runtime. |
 | Text animator direct-row spacing and separators | 2840–2850 | Static `#p-textanim-list` (`index.html:1124`) receives direct rows from text-animator-panel and `.ta-sep` at its builder. Flex gap owns list rhythm while separator margin stays absent; animator order/selection, animation storage and render/export behavior remain outside this presentation interval. |
 
-Load contract: `index.html:17` loads the shared CSS before DOM/classic scripts.
+Load contract: `index.html:17` loads the shared CSS in the head before body DOM
+and downstream app/controller scripts, after the classic gpu-gate/Paper bootstrap.
 Motion precedes expression catalog/panel, graph and script consumers; nemo-panel
 precedes nemo-script/nemo-plugin, and text-animator precedes its panel. Timeline/UI
 provide parent/work-area faces; markers/BPM/effects/storyboard supply their later
