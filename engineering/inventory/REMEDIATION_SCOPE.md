@@ -998,3 +998,86 @@ rejects omission/duplication/C06 or sibling intrusion, compares the frozen/curre
 slice at offset +4 and checks representative DOM/controller/load tokens. The
 integrity-only check and 53 scope tests establish consistency, not semantic
 completeness. Normal completeness still fails while packet admissions remain open.
+
+## P03C-ay frozen start-screen, canvas and tool HTML shell
+
+[P03C-ay / #1597](https://github.com/mysteropodes/nemo/issues/1597) maps frozen
+`src/index.html` 1–356 except bootstrap script tags 9–10 into named UI
+presentation responsibilities. Frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`
+/ HTML blob `0f928bd885b0acd32acde1d52726f1e42f1370c5`; inspected protected base
+`33426c3fa4e460161491d4c177ce7c95a89de828` / HTML blob
+`8eb7b2e2ca81284c9e00b22251391d2292654de9`. The entire 1–356 slice is
+byte-identical at current coordinates. Current HTML changes occur after this
+slice, beginning with the export-cancel insertion after frozen 1678; later
+script changes do not shift these early coordinates. DOM/controller references
+below identify the protected source, not a browser or installed behavioral run.
+
+Each row owns its exact HTML presentation interval, including comments/blanks
+and structural closure. These are supplemental census names, not admitted
+packets. CSS/HTML remains UI; stateful behavior requires the Rust-backed shared
+application command/query/job API or explicit unavailability without an old
+writable fallback. A retained controller or legacy comment is not runtime credit.
+
+| Named UI responsibility | Frozen HTML lines | Public DOM/load interface, CSS/controller consumers and state boundary |
+|---|---:|---|
+| Document language, metadata, title and favicon shell | 1–8 | Doctype, `html[lang=fr]`, UTF-8, viewport, versioned title and two PNG favicon links define document metadata. `i18n.js` supplies language at runtime; version/title fallbacks must remain consistent with version policy. Initial language/title are source facts, not runtime localization/version acceptance. |
+| Font/style resources and head/body boundary | 11–20 | Google Manrope preconnect/font stylesheet, then `css/style.css` and `css/tutorial.css`, precede body DOM/downstream app controllers. Earlier classic gpu-gate/Paper tags 9–10 remain bootstrap ownership. CSS font fallbacks cover offline presentation; successful network font loading/CSP and startup order require surface evidence. |
+| Start overlay branding and tagline | 21–31 | `#start-screen/#start-inner/#start-brand*` and decorative logo `alt=""` use shared start CSS; `data-i18n=startTagline` supplies translation. `project.js` toggles `.hid`. Branding shell does not open, replace or own a project. |
+| New/open/resume action cards | 32–49 | `#start-new/#start-open/#start-resume/#start-resume-sub` are div cards; resume starts inline display:none. `project.js:659+` adds `.has-resume`, clears display after localStorage/IndexedDB discovery and uses native open/resume admission and reveal paths. CSS/visible card is not valid autosave, successful replacement or keyboard-button semantics. |
+| Kitsu project-opening entry | 50–58 | `#start-kitsu.start-row` includes translated production text and decorative SVG. `kitsu.js:423+` binds the entry; network/auth/project selection stays in that controller and application entry service. A start-screen link grants no remote synchronization or document acceptance. |
+| Start tutorial entry | 59–67 | Div `#btn-open-tutorial` reuses start-row CSS; `tutorial.js:1896+` binds this and the topbar button. Text describes lessons while the tutorial owns its state/spotlight/steps. Clickable div semantics and first-run behavior are not accepted by this host row. |
+| New-project parameters and actions | 68–86 | `#start-newpanel`, name/preset/custom dimensions/FPS inputs and create/cancel buttons reuse `.phdr/.pbdy/.pr/.pi/.psel/.pbtn/.scrub`. `project.js:697+` controls custom-row display and guarded async `SMProject.newProject` admission, with a generated alert on failure. Form defaults/min values are not authoritative validation or successful project creation; span captions are not associated labels. |
+| Recent-project list host | 87–90 | `#start-recent/#start-recent-list` accepts dynamic rows from `project.js:637+`; removal stops propagation, opening uses `openPath`. Empty host and translated heading are presentation; recent paths, missing files and persisted list integrity retain controller obligations. |
+| Alpha disclosure | 91–105 | Static `#start-alpha-note/.start-alpha-badge/.start-alpha-text` mirrors README wording with translated text. Comment claims visibility without scrolling; this census records no viewport trial to establish it. Disclosure does not prove backup, recovery or format stability. |
+| Repository/community anchors and start closure | 106–111 | `#start-social`, real `#start-github/#start-discord` anchors use target=_blank/rel=noopener and aria-hidden icon SVGs, closing the start containers. CSS wraps the links. Outbound navigation is a browser/host action, not project mutation or a verified destination response. |
+| macOS titlebar/update anchors and application root | 112–122 | `#mac-titlebar-strip[data-tauri-drag-region]`, blank-title `#mac-update-btn` and `#app` use macOS overlay CSS. The comment names `mac-chrome-init.js`, but no such file exists: `updater-bridge.js:162+` sets `.mac-overlay-titlebar` and update states. Desktop drag/update/relaunch and accessible button naming require actual host evidence. |
+| Topbar/menu shell | 123–129 | `#app-topbar/#app-menu-btn` hosts native button/SVG with translated title. Shared CSS positions it above canvas-scoped tabs; `timeline.js:9075+` opens the context menu. Menu actions remain application operations, not HTML authority. |
+| Mode switch and spacer | 130–141 | `#app-mode-switch .app-mode-btn[data-mode]` declares disabled `.in-dev-locked` Storyboard, active anim2d and Motion; spacer fills remaining width. `motion.js.setAppMode` reads C06 `SM_FROZEN_IN_DEV` and changes mode classes. Storyboard stays unavailable; active HTML/default titles grant no animation-mode/native parity acceptance. |
+| Comment tool and feedback hosts | 142–152 | `#topbar-comment-btn.tool-btn[data-tool=comment]` retains location-independent tool wiring; `#fb-avatars/#fb-avatars-pop` receive timeline feedback DOM. `.tool-btn` active state is shared with the tools panel. Comment data, identity and remote feedback operations remain their controller/API responsibilities. |
+| History trigger and popover | 153–159 | `#history-btn/#history-pop` supply button and host for `history-panel.js:125+`. The comment describes session undoStack/redoStack snapshots; current native history/denial contracts govern authoritative undo/redo. Host placement is not history replay, persisted history or jump acceptance. |
+| Topbar tutorial/settings triggers and closure | 160–162 | `#btn-open-tutorial-topbar` and `#project-tabs-settings` are titled native buttons. Tutorial binds the former; C06 settings-modal controller consumes the latter (`timeline.js:8986+`). This row owns trigger markup/closure only, not C06 modal/tab behavior or translated settings semantics. |
+| Top-area/tools-container shell | 163–174 | `#top-area/#tools-panel` establishes the dockable tools sibling layout. Its multi-project comment describes historical serialized snapshots; native project/tab authority must govern current admission. `tools-panel-dock.js`/shared CSS position the panel and retain localStorage dock preference. |
+| Selection tool group | 175–183 | Native `.tool-btn[data-tool=select/subselect/fsselect]`, shortcut labels, SVGs and separator preserve exact selectors consumed by timeline/tool bridges and tutorial spotlights. Legacy aspect-selection commentary is not persistent fill/stroke selection or native editing acceptance. |
+| Drawing and rig tool group | 184–200 | Draw/pen/fillbrush/rig buttons, initial `.active` draw and `.in-dev` rig use shared tool CSS and `SM.setTool`; draw/pen/rig bridges own gestures. Rig's older unfreeze comment describes bootstrap gating, not native implementation parity. No brush/pressure/bone/undo behavior is granted by visible controls. |
+| Shape-tool stack | 201–217 | `#shape-tool-stack.tool-stack` retains five real `.tool-btn[data-tool]` buttons; timeline's `SMShapeGroup` toggles `.stack-front`, hiding others with visibility rather than display. Tutorial relies on their real rectangles/selectors. Stack geometry is UI; shape creation/parameters and keyboard picking need their owning operations. |
+| Text/eraser/fill/eyedropper tool group | 218–225 | Data-tool text/eraser/fill/eyedropper buttons and separators retain title/shortcut/Motion-key conflicts and icon interfaces. Global setTool wiring, respective bridges and tutorial consume them. Raster/vector text, erase/fill/color sampling and selection/history obligations are not HTML functionality. |
+| Hand/zoom/rotate group and removed-tool commentary | 226–242 | Hand/zoom/rotate data-tool buttons retain pan/zoom/rotation cursors/shortcuts via tool controller. Comment records comment-tool relocation and perspective/symmetry entry through Labs. Labs owns those prototype toggles; old 'fully functional' wording is not native/runtime evidence. |
+| Stroke/fill swatches, toggles and swap | 243–265 | `#stroke-well/#fill-well.none`, native color inputs, `.cw-eye` enable divs and `#tools-invert-btn` preserve stable IDs. Timeline binds fill/stroke enabling and color callbacks; `ui.js:740+` binds swap. CSS faces/hex6 input defaults do not replace CLAUDE.md hex8 alpha codec contract or accept selection/persistence/history. |
+| Tools docking handle and resize anchor | 266–275 | `#tools-panel-handle.tools-dock-handle` is last child; `#tools-panel-resize` follows the panel. `tools-panel-dock.js` finds handle by ID and persists dock position; UI sizing/shared CSS handles resize and `.tools-docked-away`. Pointer div handles are not keyboard docking/resize acceptance. |
+| Canvas-column project-tab hosts | 276–282 | `#canvas-col/#project-tabs-bar/#project-tabs-list/#project-tab-add` scope dynamic tabs to canvas width. `project.js:630+` binds add and builds tabs; CSS/expr-code-panel consume the column layout. Tab publication and outgoing/incoming save/load must preserve native admission; DOM hosts do not accept multi-project behavior. |
+| Linked-media permission banner | 283–292 | `#linked-media-banner` and message/request/dismiss IDs use `.linked-media-banner*` CSS. `linked-media.js` toggles `.show` from pending browser handles, requests permissions on real button clicks and hides without granting permission on dismiss. Native linked paths/browser FileSystemFileHandles retain distinct capability/lifetime contracts. |
+| Canvas viewport/input anchor | 293–294 | `#canvas-area` wraps `<canvas id=drawing-canvas resize>`; app/engine/tool bridges attach sizing, input and presentation. `engine-bridge.js:4055+` locates the canvas and split-editor moves rather than recreates it. Paper resize attribute is legacy host wiring, not authoritative native viewport/frame production. |
+| Ruler canvases and corner | 295–304 | `#ruler-corner/#ruler-h/#ruler-v` overlay the viewport in explicit DOM order. Shared CSS places them; `rulers-bridge.js:394+` draws/wires rulers and body `.rulers-off`, with document-level capture handling before canvas tool interception. Guide persistence/snapping and input ordering are separate operations/validation, not ruler pixels. |
+| Component-navigation commentary and canvas readouts | 305–322 | Component/precomp comment refers to app/motion symbol entry and sibling symbol-tabs elsewhere. `#canvas-info/#info-frame/#info-badge/#info-strokes/#info-sel` are readouts updated by timeline. Inline hidden badge and selection text/color are UI; component identity, frame timing and authoritative selection remain state/API obligations. |
+| Match readout and zoom/fit controls | 323–335 | `#match-info/#canvas-zoom-pills/#canvas-fit-btn/#zoom-scrub.scrub` use shared canvas CSS. Timeline:11046+ applies zoom input and fit context actions; app syncs zoom value, UI generic scrub supplies pointer behavior. Numeric bounds/fit div are presentation interfaces, not native camera/viewport or keyboard acceptance. |
+| Canvas closure and Labs sibling-layout lead-in | 336–356 | Closes `#canvas-area`, then the comment explains why Labs must be a sibling to avoid capture interception. Actual Labs DOM starts frozen 357, owned by C06.labs.float-panel; no Labs element/position/state ownership is added here. The historical synthetic-pointer observation in the comment is not a new live validation receipt. |
+
+Load/cascade contract: excluded tags 9–10 execute before head styles. Shared and
+tutorial CSS precede body markup; downstream classic app/controller scripts find
+these exact IDs/classes/data attributes after their declaration. `i18n.js` owns
+the app-wide data-i18n/title sweep, not each translated DOM node's presentation.
+Accepted P03C-at/au/aw/ax CSS census rows are read-only cascade dependencies, not
+duplicate code-line claims. Controller-generated tabs/recents/feedback/history
+and inline display, dock classes, active/tool/mode state, canvas dimensions and
+permission `.show` are part of the DOM interface.
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | Start/open/resume/new-project/tab surfaces invoke project admission and persistence; stored autosave existence alone is not a valid/revealed native document. History UI must use native history or deny unavailable actions. Color/style defaults, project dimensions, guides and tool-derived mutations retain codecs/history obligations; dock preference is localStorage UI state. No persistence/history trial occurred. |
+| Selection and animation | Tool/mode/default active faces, aspect selection, shape-stack geometry, component navigation, frame/badge/count readouts and tutorials mirror controller state. Stateful tool gestures, component entry, feedback and animation require native API support or explicit unavailability. Disabled/frozen Storyboard is not feature completion, and inherited comments cannot establish current parity. |
+| Render/export and native bridge | Drawing/ruler canvases, viewport shell, overlays and zoom/readout fields are presentation/input consumers. Native engine owns authoritative document evaluation, viewport/render/export production and media resources. Open/new/resume/tab publication must retain native admission/reveal; macOS chrome/update is host-specific. No GPU, export, native callback or packaged viewport acceptance is claimed. |
+| Browser and installed desktop | Shared shell applies to browser/WebView; macOS drag/update and linked permission capabilities differ. Font fallback/network, overlay stacking, tool capture, docking, resizing, focus/title/localization and responsive start visibility need actual surface evidence. Native buttons/anchors/inputs coexist with div action cards, fit/eye/drag controls, span captions and an initially blank-title update button. No accessibility, browser or installed behavior acceptance occurred. |
+
+The 31 intervals cover **354 frozen lines exactly once**: 1–8 and 11–356.
+Excluded bootstrap 9–10, C06 Labs 357–366, settings 1743–1933 and feature flags
+2285–2297 remain untouched. The settings trigger is a C06 consumer interface,
+not its controller ownership. No numeric C06 overlap occurs here; any later
+cross-leaf reconciliation belongs to P03C-bc/#1601. No source identities, original
+packet/admission, JSON file order/classifications, `rangeCoverage`, whole-span
+disposition or `complete:false` changes; 760 original packets remain pending.
+
+Focused checks parse this table against independent 1–356 minus 9–10, reject
+omission/duplication/bootstrap/C06/sibling intrusion, compare frozen/current
+coordinates and verify representative DOM/CSS/controller/load tokens. Integrity
+and 53 scope tests establish consistency, not semantic completeness or behavior;
+normal completeness remains failing while the wider packet queue stays pending.
