@@ -695,3 +695,70 @@ and HTML plus the cited JS consumers. The existing integrity-only checker and
 `nemo-remediation-scope.test.cjs` verify the unchanged mechanical index. They
 do not validate this presentation mapping's semantic completeness or certify
 browser, Tauri, installed desktop, or feature behavior.
+
+## P03C-au frozen Motion controls and property-row presentation
+
+[P03C-au / #1593](https://github.com/mysteropodes/nemo/issues/1593) adds the
+following inventory-only UI responsibility packets for frozen `src/css/style.css`
+898–1356. Source pin: `3f6eed2a500f2ce868b711e063816029eb8fefa5`, CSS blob
+`383eeec4be64457fdc7f2028f6d9b04cac32dbc8`; inspected protected source/base:
+`5374eed51a806a87f5fba4b8fc0c979e5c137995`, CSS blob
+`a4a9e3cab070289eaa57f07c9188ec00bc203335`. The four added current CSS lines
+follow frozen line 2132; this leaf's coordinates and bytes are unchanged. JS/DOM
+locations below refer to the inspected protected source, not the frozen CSS tree.
+
+Each name owns only presentation in its exact interval, including adjoining
+comments/blanks. The public interface is the listed selector/DOM contract; named
+controllers own its state and actions. This supplemental map is preserved through
+the CSS JSON `reason` pointer, not a new top-level field that refreeze would drop.
+
+| Named UI responsibility | Frozen CSS lines | Selector/DOM, consumer and accessibility/state contract |
+|---|---:|---|
+| Timeline shell and vertical resize | 898–901 | `index.html:2117–2118` supplies `#timeline-area`/`#tl-resize`; `ui.js:774–797` handles pointer resize and restores/saves `nemo-timeline-height`. Cursor/hover reflect that gesture; the handle is a div, not a keyboard button. |
+| Toolbar layout, mode visibility and customization | 902–933 | `#tl-toolbar`, `.toolbar-user-hidden`, eight `body.mode-motion #btn-*` drawing controls, `.toolbar-custom-*`; `timeline.js:11118–11191` creates labeled checkbox rows and persists `nemo-timeline-toolbar-hidden`, protecting six transport buttons from hiding. `motion.js` mode switch supplies the body class. The static customize button has title and `aria-label`; CSS mode hiding is separate from the stored user choice. |
+| Transport and timing control faces | 934–943 | `.tb.active/.playing/.pingpong`, `.ti` numeric fields; `index.html:2122–2144` buttons have titles; FPS/Frames inputs at `index.html:2155–2156` have `scrub`/bounds. `timeline.js:41,192,537` sets play/loop classes and title; `setFps` and `#tl-total` handlers own timing. Spin-button removal and `outline:none` are existing CSS, not proof of keyboard accessibility. |
+| Split panel, layer rows and reorder feedback | 944–957 | Static `#tl-content`, `#layer-panel`, `#layer-list`, titled `#layer-panel-resize`; `ui.js:817–822` toggles resize `.active` and stores width. `timeline.js:6896–7005` creates `.layer-reorder-grip`, `.layer-drag-ghost`, `.layer-drop-indicator`; `.frow/.lrow.dragging` dims the source. Overlay pointer-events prevent interception; cursor/grip feedback does not establish keyboard reordering. |
+| Paired camera row and key marks | 958–975 | `.lrow/.frow.camrow.compact`, `.fc.camkey`; `camera.js:361,408–414,504` builds both halves, shrinks them together to 16px and marks actual keys. Camera tool state supplies `.act`/`.compact`; CSS diamond pseudo-elements have no independent command or accessible name. |
+| Motion group headings and unanimated filter | 976–1001 | `.motion-group-row`, `#frame-grid` padding override, `.motion-filter-btn.on` rotated SVG; `motion.js:8533–8551` builds a titled span filter and rerenders both sides; `renderPathGroupTrackRow` and grid spacers consume the shared heading. Rotation augments color; the span click handler is not a native keyboard button. |
+| Property-row selection and mixed-value faces | 1002–1007 | `.motion-prop-row`, `.motion-prop-select-target`, `.motion-track-row.prop-selected`, `.motion-val.mixed`; `motion.js:11343,11437–11439` applies paired selection and targets, `scrubField` at 6637–6648 creates `pi scrub motion-val` number inputs with mixed placeholder/title. CSS does not aggregate or commit values. |
+| Element rows and color/icon swatches | 1008–1020 | `.motion-elem-row`, `.motion-elem-swatch.has-motion/.icon`; `motion.js:9710–9771`, `timeline.js:5544–5585` and `shapes-panel.js:603,669` construct element/group rows. Swatch SVG/color is presentation; `.has-motion` is animation indication, not an enabled editing capability. |
+| Property key toggle and expression editor | 1021–1041 | `.motion-stopwatch.on`, `.motion-expr-btn.on/.err`, `.motion-expr-editor`, checkbox label, textarea `.motion-expr-code:focus` and error text; `motion.js:8595,8647–8658,8870+` builds these, with three-state key titles from `stopwatchTitle`. Inline SVG controls fill versus outline; `.err` reflects expression error state. Textarea focus gets an accent border; controls' labels/titles belong to DOM, not CSS. |
+| Anchor picker and scale lock | 1042–1057 | `.motion-anchor-grid-btn.on`, `.motion-scale-lock.on`, `.motion-anchor-grid-row`, `.motion-anchor-cell.center`; `motion.js:8669,8787,8821+` creates the controls and nine button cells. Center marker and hover are visual; anchor and scale writes remain controller operations. |
+| Inspector mirror and numeric field layout | 1058–1089 | Static `#motion-props-sec`/`#motion-props-body` at `index.html:1239–1241`; `renderMotionPropsPanel` (`motion.js:7431+`) builds `.motion-props-layername`, `.motion-prop-name`, `.motion-fields`, `.pi.motion-val`, unit/dimension labels. Mode hides the whole section; expression rows override fixed inspector height. Dimension labels are visual; actual numeric inputs own interaction. |
+| Boolean/color fields and right-edge key control | 1090–1100 | `.motion-ctrl-check`, `.motion-ctrl-swatch`, stopwatch margin; `motion.js:8705,8717` creates nonnumeric controls beside the common property fields. Native checkbox semantics remain in DOM; a clickable color swatch is not itself evidence of keyboard access. Row height remains shared with tracks. |
+| Property tracks and key silhouettes | 1101–1146 | `.motion-track-row`, `.fc.motion-fc`, `.motion-key.cur/.sel/.linear/.hold/.smooth/.tinted`; `trackRowHtml` (`motion.js:10600–10722`) builds tracks/diamonds and derives interpolation, selection and current-frame classes. Relative z-index preserves diamond hit priority over connectors; shape/color reflects data without evaluating animation. |
+| Key connectors, tint and Alt retime cursor | 1147–1183 | SVG `.motion-key-connect:hover/.sel/.tinted`, `--key-color`, `#frame-grid.timelink-alt`; `motion.js:10643–10676` creates connector rects and their event targets, `layer-inout.js:1602` toggles shared Alt class. Cascade order retains user tint under hover/selection. The retime cursor is an affordance; commands and modifier interpretation stay with the gesture controllers. |
+| Marquee, selection box and stagger/space handles | 1184–1242 | `.motion-marquee-rect`, `.motion-keysel-box/fill/edge-*`, `.grabbing`; `motion.js:11842,11932–11969,12051,12235` creates screen-fixed overlays for keys/layers. Frame ignores pointer events; fill/edges enable them, with corner z-order and grab/resize cursors. `updateKeySelectionBox`/`updateLayerStaggerBox` own geometry; CSS provides no keyboard alternative or key mutation. |
+| Motion density and paired active/selected state | 1243–1291 | `body.mode-motion` panel width, 22px `.lrow/.frow/.fc`, expression auto-height, compact icons/keys, `.act.motion-selected` in both halves. `motion.js:53` `ROW_H=22`, `renderLayerListMotion`/`renderTimelineMotion` and selection synchronization supply matching rows/classes. Highlight overlay is pointer-transparent; active position and selected state remain distinct. |
+| Shared layer icons, names and element visibility | 1292–1313 | `.lrow.act/.sel`, `.lnm`, `.lico.off`, `.solo-btn.on`, `.elem-vis`, `.elem-hidden`; `timeline.js` layer-list renderer and `motion.js:7046–7052` supply titled visibility/lock/solo controls; `shapes-panel.js:642–644` supplies element hidden/eye state. Ellipsis truncates text visually; title/control semantics stay with DOM. |
+| Aligned layer header and Motion context trigger | 1314–1337 | Static `#layer-hdr`/`#layer-ctrls` and titled add/camera/audio/delete/duplicate/component buttons (`index.html:2212–2230`); `ensureMotionHeaderTools` (`motion.js:6844–6862`) adds `#motion-header-tools`, titled context label and native button `#motion-filter-trigger`. 42px header matches grid header/bars; Motion narrows button spacing without hiding creation controls. |
+| Motion filter popover and column presets | 1338–1356 | `.motion-filter-pop/search:focus/select/check/hint`, `#layer-panel[data-motion-columns]` and `.motion-col-*`; `motion.js:6862–6895` creates native search/select/checkbox controls, focuses search and persists filter/columns/snap local preferences. `motion.js:7049–7117` adds column tokens; CSS hides only specified Motion columns. Visible label text/placeholder are existing DOM, not a claim of programmatic label association. |
+
+All packets apply to the shared browser and Tauri WebView UI. Source inspection
+establishes selector/consumer responsibilities only; no browser, Tauri, installed
+desktop, accessibility interaction or functional test was performed for this map.
+CSS/HTML/JS were read-only and the application was not launched.
+
+The downstream applicability is explicit:
+
+| Packet family | Save/load and undo/redo | Selection and animation | Render/export and native/API boundary |
+|---|---|---|---|
+| Shell, customization, split layout, header and filters | UI controllers own local/workspace preferences; `ui.js` height/width and toolbar/filter localStorage are not Rust document history. Search/context/drag overlays are transient. Workspace inclusion is owned by `SMWorkspace`, not CSS. | Layout/filter controllers must render matching list/grid row plans; snap is gesture configuration. These packets do not store keyframes or select objects. | UI layout is not image/frame output. No persistent document, evaluator or native bridge is introduced by selectors. Any creation button still needs its declared command/capability. |
+| Transport/timing and camera | FPS/total-frame and camera data need authoritative document save/load/history where applicable; playback/loop face state is not a history record. | Navigation/playback/camera keys belong to timeline/camera and native adapters; CSS only reflects frame/tool/key state. | Timeline native playback uses `NemoNativeOpacityCutover` (`timeline.js:34+`); applicable camera evaluation/frame production/export remains native-owned or unavailable. A visible button/diamond cannot grant camera or timing capability. |
+| Property, element, expression, anchor, numeric, checkbox/color and key-track/connector packets | Document values, expression definitions, interpolation, user key color and keys require authoritative codec/history support. DOM/mixed-value/error state does not save or undo them. | Selection targets, holder identity, current keys, interpolation and expression evaluation remain Motion/application contracts. `propsFor`/row plans must keep inspector/list/grid coherent. | `motion.js:2727–2733` resolves the native Motion surface and throws if blocked legacy authority lacks that surface; `renderedOpacityRoute` at 8573 and `native-opacity-motion-surface.js` own native routing. Only supported native operations may mutate; unmigrated transforms, elements, expressions and other controls must remain explicitly unavailable, without a legacy writer fallback. CSS does not certify those gates or accepted save/render/export behavior. |
+| Reorder, marquee, selection/stagger and shared layer/element states | Reorder, visibility, lock/solo and retime writes require applicable native command/history and persistence; overlays and selection are transient intent. | Motion and layer-inout controllers own selection/drag/modifier semantics. Shape/element identity and unsupported gestures retain their separate native admission obligations. | Render/export consume authoritative revision state elsewhere; overlay CSS does not alter output or own GPU/viewport resources. Native opacity adapters and admission guards are boundaries to inspect for a later behavioral leaf, not acceptance gained here. |
+
+The 19 intervals cover **898–1356 exactly once (459 total lines)**. They are
+disjoint from accepted P03C-at's last line 897, the next P03C-av leaf starting
+1357, and C06's 91–104, 422–461 and 2132–2163. No `rangeCoverage`, whole-span
+disposition, original packet count/admission, source identity or `complete:false`
+changes: partial-span maps cannot disposition the whole frozen 462–2131 span.
+The 19 UI packet names are supplemental human-reviewed responsibilities, not
+additional mechanically pinned/admitted census packets or Rust port obligations.
+
+Focused validation parses this section's range table against independent expected
+898–1356, rejects an omitted line and a duplicated line, checks C06/sibling
+exclusions and byte identity with the protected CSS, and verifies representative
+selectors/DOM/JS consumers. The integrity-only checker and 53 focused scope tests
+cover index consistency, not semantic or runtime acceptance. Normal completeness
+remains failing while the wider packet/disposition queue is pending.
