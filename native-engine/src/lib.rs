@@ -43,6 +43,7 @@ test_modules! {
     "test-commands" => object_read_tests = "../tests/object_read.rs";
     "test-commands" => object_fill_tests = "../tests/object_fill.rs";
     "test-history" => history_tests = "../tests/history.rs";
+    "test-history" => object_history_tests = "../tests/object_history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
