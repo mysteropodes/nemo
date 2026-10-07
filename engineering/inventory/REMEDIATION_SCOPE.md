@@ -1174,3 +1174,107 @@ duplicate, sibling/C06 intrusion and reassignment of line 367 to a Labs behavior
 owner, compare frozen/current bytes and check representative DOM/CSS/controller/load
 consumers. Integrity-only and 53 scope tests establish consistency, not semantic
 completeness; normal completeness remains failing while the wider queue stays open.
+
+## P03C-ba frozen advanced property, media and export HTML
+
+[P03C-ba / #1599](https://github.com/mysteropodes/nemo/issues/1599) maps frozen
+`src/index.html` 1099–1742 into named UI presentation responsibilities. Frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5` / HTML blob
+`0f928bd885b0acd32acde1d52726f1e42f1370c5`; inspected protected base
+`a631d0cb73d792f389c977f85df847280194bc63` / HTML blob
+`8eb7b2e2ca81284c9e00b22251391d2292654de9`. Frozen 1099–1678 is byte-identical
+at current 1099–1678 (580 lines); frozen 1679–1742 is byte-identical at current
+1683–1746 (64 lines). Current 1679–1682 inserts the export-cancel comment/button
+after frozen 1678. Record that four-line insertion as current-only drift, not a
+new frozen packet or part of this 644-line union. Later script changes do not
+affect these body coordinates. Consumer references below are inspected source,
+not browser/installed behavior or output-job acceptance.
+
+Each row owns its exact presentation interval, including comments/blanks and
+closure. These are supplemental census responsibilities, not admitted packets.
+HTML/CSS remains UI; persistent state, evaluation, media, viewport and export
+operations must use the Rust-backed shared application command/query/job API or
+explicitly report unavailable without an old writable fallback. A visible format,
+legacy callback or historical comment does not establish native availability.
+
+| Named UI responsibility | Frozen HTML lines | DOM/CSS/controller/load interface and state boundary |
+|---|---:|---|
+| Text animator/split interface | 1099–1136 | Hidden `#p-textanim-sec` hosts text-split row/button, animator list/add/empty rows and hidden old preset button. `text-animator-panel.js:438+` builds selector/property controls; timeline owns text split, text-animator the old action. Shared section/ramp CSS is presentation; animator records, text geometry, timing and native history/evaluation remain separate obligations. |
+| Brush tool-option preset interface | 1137–1156 | `#tool-opts-sec` hosts `#p-toolpreset-row/#btn-toolpreset-save/#toolpreset-grid.asset-tree`. `brush-tool-presets.js:126+` saves/builds settings presets; shared brush grid styles and UI sections supply layout. Tool-option preset versus vector-brush style preset is a distinct data contract; markup grants neither storage nor application acceptance. |
+| Drawing pipeline and placement fields | 1157–1174 | `p-stab/p-smooth/p-drawmode` and hidden fillbrush placement icon group bind timeline/SM tool settings and UI data-value handling. Comment orders stabilizer before smoothing; fields/options describe intended UI pipeline, not measured geometry, stylus latency or native tool support. |
+| Fill gap/propagation/thickness options | 1175–1178 | Conditional fill gap close/size, propagation and fillbrush size rows use timeline context routing and fill/draw bridges. Hidden controls/ranges cannot authorize all-frame propagation or infer native geometry/history parity. |
+| Vector-brush pressure/nib/live input interface | 1179–1188 | Vector brush, pressure min/max/curve, nib, custom pressure curve, invert and live pressure readout use timeline/UI/draw settings. Actual stylus events and drawing/rendering own input interpretation; a live DOM value is not pressure-device acceptance or persistent stroke codec proof. |
+| Taper/trim/shadow/mask/eraser options and closure | 1189–1195 | Taper/trim-ends/shadow/mask toggles and eraser width end Tool Options. Timeline controls visibility/settings; bridges own gestures and tags. Shadow guide versus artwork/mask semantics must survive save/load/render/export; this map does not accept tag writers or eraser operations. |
+| Palette tabs/new/list hosts | 1196–1204 | `#swatches-sec` has a stable ID for UI panel-order preference; `#palette-tabs/#btn-palette-new/#palette-grid` are populated by palette-panel.js. Empty hosts/native button do not own palette storage, selected colors or replacement operations. |
+| Palette add/swap/replace actions and scope | 1205–1225 | Add fill/stroke, swap and replace buttons plus `#palette-replace-scope` bind palette-panel. Scope UI distinguishes frame/layer/selection (selected layers) targets; armed/match/replace faces use CSS. Replace must preserve all applicable identities, frames and history through native commands or denial, not merely color the active face. |
+| Removed-section commentary and Motion lead-in | 1226–1238 | Comments record perspective/symmetry removal to Labs, reference relocation and Motion-only visibility. This interval adds no Labs/reference behavior owner; inherited functionality assertions are historical evidence without native acceptance. |
+| Motion inspector dynamic body | 1239–1242 | `#motion-props-sec/#motion-props-body` is hidden outside body.mode-motion by CSS; `motion.js:7431+` populates current-layer properties. Dynamic rows share timeline holder/value contracts. DOM mirror must not become a second document/evaluation authority. |
+| Unified assets top tabs and media pane opening | 1243–1250 | `#assets-sec`, media/presets tabs and `#assets-view-media` use settings-style tab CSS. `assets-panel.js` owns active/display switching only; media-library/motion-preset-picker own contents. Shared C06 tab styling is a cascade dependency, not settings ownership. |
+| Media search/settings trigger toolbar | 1251–1280 | Comments describe merged media panel/drop-zone changes; `#media-search/#media-search-clear/#media-settings-btn` bind media-library.js search and popup display. Toolbar/search/icon CSS and transient query state are presentation, not import or resource authority. |
+| Media embedded/linked/convert settings | 1281–1291 | `#media-settings-pop`, embedded/linked buttons and convert action bind linked-media.js/media-library settings. Native paths and browser handles differ; mode face or conversion button does not grant permissions, successful conversion, portability or media lifetime acceptance. |
+| Media filter/count/density/expansion controls | 1292–1306 | Filter chips/count and view/expand toggles bind media-library, which emits compact/grid classes and `.expanded`. Density is localStorage UI preference; filters/session count are readouts. Hidden metadata and expanded height cannot establish asset availability or native collection state. |
+| Media grid/status/import/transplant actions | 1307–1326 | `#media-grid` hosts dynamic folders/rows/drop hints; status/import/cleanup/transplant buttons bind media-library/drop/linked-media/transplant. Drag/drop routes through real grid despite hint rebuilds. Missing cleanup, decode/import and transplant require operation policy/history rather than status colors or DOM count. |
+| Motion-preset pane actions and catalog hosts | 1327–1336 | `#assets-view-presets`, save/new-tab buttons and motion-preset tabs/grid bind motion-preset-picker.js. Asset top tabs gate visibility; catalog/preset actions retain their own persistence, target identity and application contracts, not native editing acceptance. |
+| Transplant file input and tween parameters/actions | 1337–1350 | Hidden `#transplant-file-input` is a transplant reader interface, followed by tween section step/resample/manual/harmonize, generate/reassign/status controls. Timeline/tweens own interpolation and identity paths. File picker/defaults/status grant no native import, tween evaluation or history acceptance. |
+| Easing canvas, resize, presets and coordinates | 1351–1367 | `#easing-sec/#curve-canvas-wrap/#curve-canvas/#curve-resize-handle`, preset/custom/save/coords hosts use UI shared easing editor and curve services. The closing onion relocation comment assigns no new onion owner. Canvas drawing/editor dimensions are presentation; authoritative interpolation, target segment, stored curve and animation must be validated separately. |
+| Footage metadata/dimensions/count interface | 1368–1384 | Hidden `#footage-sec`, kind/name/dimensions/count rows are synchronized by timeline:7096+ from image/sequence/video state. Counts and source names are readouts, not successful decode, resource lifetime or save/load portability. |
+| Footage tracking pick/run/apply/status interface | 1385–1404 | `#footage-track-sec`, point/range inputs, pick/run/target/apply/status bind tracker-panel/tracker services. UI comment names the tracking kernel; geometry results, jobs, cancellation and application/history require native service acceptance or explicit unavailability. |
+| Footage interpolation/replacement controls | 1405–1415 | Blend row/interpolation select and replace button bind timeline plus image/native-video paths. Time-remap-dependent visibility does not accept frame blending, media replacement identity or export/evaluation parity. |
+| Component instance playback/preview/entry interface | 1416–1430 | `#comp-instance-sec` playmode/singleframe/speed/offset, frame-strip/preview/enter controls bind timeline, comp-preview and app/motion symbol entry. Preview strip is UI; nested component timing, parent identity, persistence and native evaluated output remain obligations. |
+| Component lipsync and detach interface | 1431–1451 | Audio track/range/sensitivity/hold/chart/apply and component detach controls bind timeline/lipsync.js. Chart/readouts are UI; audio analysis, generated keys, component duplication/detach and history require native commands or denial. No lipsync availability is inferred. |
+| Duplicator mode and object-source pool interface | 1452–1479 | Hidden `#duplicator-sec`, dup-mode and object-source add/list are synchronized by timeline from duplicator configuration/sourceLayerUids. Static source-pool presentation differs from animated per-copy deltas; pool identities/dependencies and serialization retain native authority. |
+| Duplicator grid/radial/path layout controls | 1480–1495 | Rows/cols/spacing/count/radius/startangle/orientation/path-layer/alignment inputs are shown by duplicator mode and bound by timeline. UI bounds/hidden branches do not validate instance geometry, transforms, source selection or evaluation. |
+| Duplicator seed/randomization toggles | 1496–1504 | Seed/reseed and random position/rotation/scale/opacity/hue controls bind timeline duplicator state. Seeded determinism, evaluation order, persistent records and history are not established by checkbox values. |
+| Duplicator temporal stagger controls | 1505–1524 | dup-anim enabled/offset/direction rows and translated descriptions bind timeline/motion duplicator timing. Enabled face/default values are not frame scheduling, per-copy time-remap or animation/export parity. |
+| Duplicator effectors and source-edit entry | 1525–1539 | Add-effector/list/edit-source hosts bind timeline and effector-layer services. Dynamic rows depend on duplicator.effectors; falloff/stack combination, source editing/history and native API availability remain operation contracts. |
+| Rig workflow modes and assignment interface | 1540–1576 | Hidden `#rig-opts-sec`, draw/assign/move buttons, active-bone readout and conditional auto-assign row bind timeline/rig-bridge. `.ac`/mode visibility is UI; bone drawing, assignment identity and topology/history must use native commands or be unavailable. |
+| Rig weight/falloff/rotation/drive-target interface | 1577–1588 | Weight radius/softness/rotation and shapes/mesh drive checkboxes bind rig settings. Shape/mesh target kinds retain distinct readers and native evaluation/media obligations; fields and comments provide no deformation parity. |
+| Rig commit/reset/hint and section closure | 1589–1595 | Freeze-pose/reset native buttons and translated hint bind rig-bridge/timeline. Destructive pose baking versus reset requires exact document/history semantics; native button presence is not operation acceptance. |
+| Removed onion/project-section commentary | 1596–1610 | Comments explain old right-panel removal and preserved ID anchors. This interval names historical placement only; it neither reintroduces panels nor transfers project/settings controllers. |
+| Hidden legacy project/import/action anchors | 1611–1627 | `#legacy-project-actions` retains save/open/new/history/settings/Kitsu/export/import button IDs and hidden JSON/image/video/PSD inputs so controllers find them. C06 consumes btn-settings as an interface; actual settings shell remains C06. Invisible anchors preserve wiring, not browser focus, project API or media/import/export acceptance. |
+| Legacy action/inspector/application structural closure | 1628–1631 | Closes legacy-project-actions, props-panel and app before body-level modals. Structural markup owns no extra controller or native window lifecycle. |
+| Export modal shell, format options and external hints | 1632–1650 | Hidden `#export-modal`, shared modal classes, close and exp-format/hints bind timeline:11636+ and SMExport. SVG/PNG/TIFF/GIF/video/Lottie/Rive/AE options are advertised UI, not capability availability or codec output proof; Rive/AE client requirements remain explicit hints. |
+| Export range/scale/custom dimensions interface | 1651–1673 | exp-range/scale/custom W/H fields bind timeline visibility/size calculations, with generic scrub. Work-area/all and custom bounds are requested inputs; pinned revision/time range, scale fidelity and encoder output require native export acceptance. |
+| Export alpha/shadow/progress/run interface | 1674–1678 | Alpha/shadow flags, progress host and run button bind timeline/export services. Runtime alpha-format visibility is controller policy; progress text/disabled state is not job completion. Current-only cancel insertion follows this interval and is recorded separately below. |
+| Export modal closure after current-only insertion | 1679–1683 | Frozen closing row/body/box/modal plus blank boundary maps to current 1683–1687. No new frozen cancel owner is invented; native cancel/job UI sits in the separately recorded four-line drift before these closures. |
+| Render-manager modal/queue/progress/global fields | 1684–1715 | `#render-manager-modal`, add/delete/render buttons, progress, dynamic index/offset and queue/empty hosts bind render-manager.js:496+. It orchestrates export service calls, not frame encoding itself. Toggle render/cancel, queue state, source/revision pinning, destinations and truthful progress remain service obligations; shared modal/queue CSS owns presentation only. |
+| Lottie preview canvas/play/scrub/readout interface | 1716–1732 | Hidden `#lottie-preview-modal`, canvas/play/range/frame label/description bind lottie-preview.js. Playback interprets exported JSON in its preview path; successful canvas preview would not establish authoritative native animation or export parity. No preview run occurred. |
+| Version-history modal/list interface | 1733–1742 | Hidden `#history-modal`, close/description/list bind project.js:278+ version snapshots, distinct from the topbar undo history panel. Historical 30-second snapshot text is not accepted recovery cadence or current native persistence. This row ends at the blank before C06 settings shell frozen 1743. |
+
+Current-only drift: current 1679–1682 adds the exp-cancel lead-in and button.
+The comment names bounded SVG sequence cancellation (P19); inspected timeline
+also wires native PNG AbortController cancellation, while SVG uses its job API.
+This is a separately observed consumer/availability contract, not frozen census
+coverage, a refreeze, acceptance of either cancellation path or a new packet.
+No drift line or current-only control is assigned to C06 settings ownership.
+
+Load/cascade contract: shared head CSS follows the separately owned early
+gpu-gate/Paper scripts and precedes body DOM. Later classic controllers find
+these stable IDs/classes/data attributes after declaration. UI/timeline/motion
+provide section/scrub/icon and property bindings; brush/palette/assets/media/
+presets/rig/tracker/lipsync/export/preview/project controllers supply specialized
+consumers. asset-tree precedes media/transplant/motion-preset-picker/assets-panel.
+Shared settings-tab/modal/psec/context and P03C-aw/ax media/render CSS are cascade
+dependencies, not duplicate interval ownership. Inline display, active classes,
+values, data-value/target IDs, dynamic children and canvas dimensions are public UI
+interfaces; body.mode-motion gates its mirror inspector.
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | Text/brush/palette/tween/curve, media/footage/component, duplicator/effector/rig and export parameters retain every applicable persistent codec/history consumer. Catalog/density/panel-order preferences differ from document records. Hidden legacy anchors do not authorize old project writers; version snapshots differ from undo history. Native import/admission, durable save/reload and recovery remain untested here. |
+| Selection and animation | Inspector target/visibility, media/preset choices, tween reassignments, easing/camera/component playback, tracking/lipsync and duplicator/rig faces mirror controller state. CSS keyframes/progress/preview UI do not establish evaluated animation. Stateful creation/application must use native APIs or reject unavailable operations without fallback; no gesture, time-remap or nested animation parity is accepted. |
+| Render/export and native bridge | Media/font/thumbnail/curve/Lottie canvases are presentation readers, not authoritative production. Native services own evaluation, decode/resources, viewport and fixed-revision export. Format menus, external Rive/AE hints, render queue progress and observed cancel wiring require exact host/client/job validation. Neither a source callback nor preview output establishes a completed export, successful cancellation or installed/native acceptance. |
+| Browser and installed desktop | Common markup/CSS has platform-specific file/linked-handle/decode/export and external-client capabilities. Media drop/import, floating settings/queue modals, dynamic list scroll, pressure controls, fonts, scrub/focus/title/label/keyboard and hidden legacy anchors need actual surface checks. Native buttons/labels coexist with caption-only controls and dynamic icon actions. No browser, installed, accessibility or reduced-motion behavior run occurred. |
+
+The 41 intervals cover **644 frozen lines exactly once**, disjoint from P03C-az
+through 1098 and C06 settings starting 1743 (current 1747). C06's other intervals,
+prior HTML/CSS siblings and current-only export-cancel drift remain preserved.
+No original source identity, JSON order/classification, packet/admission,
+`rangeCoverage`, whole-span disposition or `complete:false` changes; exactly
+760 original packets remain pending.
+
+Focused checks parse the table against independent 1099–1742 and reject omission,
+duplicate and C06/sibling intrusion; compare both drift pieces and the exact
+four-line current insertion; verify representative DOM/CSS/controller/load tokens.
+Integrity-only and 53 scope tests establish index consistency, not semantic
+completeness. Normal completeness still fails while the wider queue stays pending.
