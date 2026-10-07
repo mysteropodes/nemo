@@ -474,3 +474,7 @@ pub(crate) fn run_export_pump_interleaved(
 #[cfg(test)]
 #[path = "native_dispatch_tests.rs"]
 pub(crate) mod tests;
+
+#[cfg(test)]
+#[path = "native_object_host_tests.rs"]
+mod object_host_baseline_tests;
