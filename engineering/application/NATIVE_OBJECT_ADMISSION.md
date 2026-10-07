@@ -358,6 +358,53 @@ ingress and complete 4096-byte read policies are unchanged. Whole-MCP coverage
 retains its inherited red disposition and reviewed floors; source-tree identity
 does not constitute a fresh coverage measurement.
 
+## N25C2e strict raw desktop bootstrap
+
+The registered main-window Tauri command `nemo_native_object_bootstrap` accepts
+`requestJson`, a string containing the complete original JSON wrapper. The strict
+wrapper requires `apiVersion: 2`, bounded `requestId`, the current host `instanceId`
+and `documentJson`, itself a string of original object-document JSON. Optional
+`cancelledBeforeDispatch` is a boolean. The complete UTF-8 wrapper, including
+escaped document bytes, is bounded to 1,048,576 bytes before parsing. This is a
+bootstrap input limit; the complete 4096-byte object read policy is unchanged.
+
+Both JSON layers enter strict object admission directly, without a `Value`
+intermediate. Duplicate decoded keys, including escaped duplicates, unknown or
+missing members, invalid types, arrays, trailing input and unsupported/invalid
+document content are refused. Version/instance/correlation and cancellation
+checks precede installation. The existing codec semantically admits the entire
+document before the existing typed installer constructs its fresh owner and
+reserves the one application slot. No caller-supplied document identity exists.
+
+The installer returns its actual generated identity/revision captured before
+moving the owner into the slot, only after successful commit. The correlated
+receipt records that commit: API/request/instance/document identity, revision
+zero, `resourceCount: 0` and `viewportAvailable: false`. It is not a subsequent
+mutable-status read, UI publication, presentation receipt or capability claim.
+An occupied slot refuses duplicate attempts without evicting either an opacity
+or object owner or invalidating its revision subscriber. There is no new retry
+registry; ambiguous transport outcomes must be reconciled before another attempt.
+
+Independent controls exercise original raw bytes, exact/over-limit UTF-8 input,
+strict wrappers/documents, real owner/subscriber preservation and actual C2a
+release/re-entry with retained terminal receipt identity. The main-window guard
+and handler registration have source controls; those alone do not establish an
+installed Tauri invocation. The initial characterization is a missing production
+source/registration RED, separately retained from the older zero-executed E0599.
+
+Only `object_codec::decode_project` is added to the existing desktop command
+adapter's engine ports, with one dedicated test-only edge from host-release tests
+to that adapter. Ordinary Rust 500-line budgets, coverage floors, frozen baselines
+and exclusions remain unchanged. No GPU, filesystem, viewport or writable JS
+mirror is created. Existing opacity bootstrap and common dispatch remain intact.
+
+This source bootstrap can install the real typed owner but does not activate
+`native.object`: its descriptor remains unavailable/pending. Common object reads,
+fill/history routing, UI import/selection, native rendering, common UI/MCP round
+trip, C04a and installed desktop save/load/history/animation/render/export and
+full baseline acceptance remain separate gates. No automatic startup caller is
+added. Browser/WASM compatibility remains the later R24 scope.
+
 ## Consumer and acceptance boundaries
 
 | Consumer | Staged source evidence or remaining gate |
