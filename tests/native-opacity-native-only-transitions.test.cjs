@@ -19,6 +19,7 @@ const NativeOpacityOperations = require('../src/js/application/native-opacity-op
 const NativeOpacityViewport = require('../src/js/application/native-opacity-viewport.js');
 const NativeLegacySurface = require('../src/js/adapters/native-opacity-legacy-surface.js');
 const NativeProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
+const NativeVersionRestore = require('../src/js/adapters/project-native-version-restore.js');
 const NativeMotionSurface = require('../src/js/adapters/native-opacity-motion-surface.js');
 const MotionCanvasIntent = require('../src/js/adapters/motion-canvas-intent.js');
 const SelectCanvasIntent = require('../src/js/adapters/select-canvas-intent.js');
@@ -300,6 +301,91 @@ function surfaceHarness(source, options = {}) {
   h.controller.install();
   return { ...h, ui, published: () => publications, resizeCallback: () => resized };
 }
+
+test('P37 composed Restore separates real native publication from pending or failed UI continuation', async (t) => {
+  for (const scenario of ['success', 'blocked-raf', 'blocked-resize', 'failed-paint']) {
+    await t.test(scenario, async () => {
+      const previous = staticSource(60), version = staticSource(40);
+      const resizeGate = deferred(), rafs = [], events = [];
+      let restoring = false;
+      const h = surfaceHarness(previous, {
+        resize: () => scenario === 'blocked-resize' ? resizeGate.promise : Promise.resolve(),
+        paintUiProjection() {
+          if (restoring && scenario === 'failed-paint') throw new Error('controlled projection paint failure');
+        },
+      });
+      const published = h.published();
+      const initial = await published.project.importJSON(JSON.stringify(previous));
+      await published.project.finishOpenAfterReveal(initial);
+      assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60);
+      const root = h.ui;
+      root.NemoNativeOpacityCutover = published.cutover;
+      root.NemoNativeOpacityProject = published.project;
+      root.NemoNativeOpacityProjectEntry = NativeProjectEntry;
+      root.SM.exportJSON = () => { throw new Error('legacy export forbidden'); };
+      root.__TAURI__.fs = { readTextFile: async () => JSON.stringify(version) };
+      const modal = { style: { display: 'flex' } };
+      const restore = NativeVersionRestore.bind(root, {
+        metadata: () => ({ path: '/owned/A.json', name: 'A' }),
+        backupTarget: async () => '/owned/history/A',
+        modal: () => modal,
+        reveal: first => NativeProjectEntry.reveal(root, first, {
+          hide() { if (scenario === 'blocked-resize') published.resize(); },
+          show() { events.push('show'); },
+          repaint() { throw new Error('legacy repaint forbidden'); },
+          raf(callback) { rafs.push(callback); },
+        }),
+        backup: async (bytes, target) => events.push(['backup', bytes, target]),
+        backupFailed(error) { throw error; },
+        restored() { events.push('restored'); },
+        unavailable(error) { events.push(['unavailable', error.message]); },
+      });
+      restoring = true;
+      let settled = false;
+      const pending = restore.restore('/owned/history/version40.json').finally(() => { settled = true; });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 40, 'host has already installed B');
+      assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60, 'host mutation is not final UI publication');
+      assert.equal(settled, false);
+      assert.equal(events.some(e => e === 'restored' || Array.isArray(e) && e[0] === 'backup'), false);
+      assert.equal(rafs.length, 1);
+      if (scenario === 'blocked-raf') {
+        const requests = h.state.previews.length;
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(settled, false);
+        assert.equal(h.state.previews.length, requests, 'no final preview starts before the withheld RAF');
+        assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60);
+        assert.deepEqual(events, []);
+      }
+      // A withheld real reveal RAF models a possible publication wait. Releasing
+      // it is a test control, never evidence about the installed callback timing.
+      rafs.shift()();
+      assert.equal(rafs.length, 1);
+      rafs.shift()();
+      await new Promise(resolve => setImmediate(resolve));
+      if (scenario === 'blocked-resize') {
+        assert.equal(settled, false, 'a queued resize must finish before the final receipt');
+        assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60);
+        assert.equal(events.length, 0);
+        resizeGate.resolve();
+      }
+      if (scenario === 'failed-paint') {
+        assert.equal(await pending, false);
+        assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 60, 'UI projection rolls back');
+        assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 40, 'no JS rollback of Rust B');
+        assert.equal(h.controller.status(), 'indeterminate');
+        assert.equal(modal.style.display, 'flex');
+        assert.equal(events.some(e => e === 'restored' || Array.isArray(e) && e[0] === 'backup'), false);
+      } else {
+        assert.equal(await pending, true);
+        assert.equal(h.ui.state.layers[0].motionStatic.opacity[0], 40);
+        assert.equal(h.controller.status(), 'native');
+        assert.equal(modal.style.display, 'none');
+        assert.deepEqual(events, [['backup', JSON.stringify(previous), '/owned/history/A'], 'restored']);
+      }
+    });
+  }
+});
 
 test('terminal desktop UI paint does not enqueue an unverified native frame', () => {
   let paints = 0, presentations = 0;
