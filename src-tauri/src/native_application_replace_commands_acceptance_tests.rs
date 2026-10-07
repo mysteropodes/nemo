@@ -326,14 +326,16 @@ fn external_waiter_survives_rejected_admission_then_cancels_on_reservation() {
 }
 
 fn snapshot_id(application: &mut DesktopNativeApplication, request_id: &str) -> String {
-    let response = application.dispatch(
-        serde_json::from_value(json!({
-            "apiVersion":NATIVE_API_VERSION, "requestId":request_id,
-            "instanceId":application.instance_id(), "documentId":application.document_id(),
-            "operation":"query.document.snapshot.acquire", "payload":{}
-        }))
-        .unwrap(),
-    );
+    let response = application
+        .dispatch(
+            serde_json::from_value(json!({
+                "apiVersion":NATIVE_API_VERSION, "requestId":request_id,
+                "instanceId":application.instance_id(), "documentId":application.document_id(),
+                "operation":"query.document.snapshot.acquire", "payload":{}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
     assert!(response.is_ok());
     response.result().unwrap()["documentSnapshotId"]
         .as_str()
@@ -464,17 +466,19 @@ fn distinct_a_preview_reconciles_and_b_preview_export_use_only_b_resources() {
     desktop
         .bind_output("output-b".into(), scratch.0.join("render-b"))
         .unwrap();
-    let response = desktop.dispatch(
-        serde_json::from_value(json!({
-            "apiVersion":NATIVE_API_VERSION, "requestId":"export-b",
-            "instanceId":"native-fixture", "documentId":receipt.document_id,
-            "expectedRevision":0, "operation":"job.export.png.begin",
-            "payload":{"contextId":"scene-root", "quality":"final", "outputHandle":"output-b",
-                "frames":[{"sourceFrame":0,"geometryHandle":{
-                    "resourceId":"geometry-b","resourceVersion":"v2"}}]}
-        }))
-        .unwrap(),
-    );
+    let response = desktop
+        .dispatch(
+            serde_json::from_value(json!({
+                "apiVersion":NATIVE_API_VERSION, "requestId":"export-b",
+                "instanceId":"native-fixture", "documentId":receipt.document_id,
+                "expectedRevision":0, "operation":"job.export.png.begin",
+                "payload":{"contextId":"scene-root", "quality":"final", "outputHandle":"output-b",
+                    "frames":[{"sourceFrame":0,"geometryHandle":{
+                        "resourceId":"geometry-b","resourceVersion":"v2"}}]}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
     assert!(response.is_ok());
     let job_id = response.result().unwrap()["jobId"].as_str().unwrap();
     let pending = desktop.start_next_export_frame(job_id).unwrap().unwrap();
@@ -485,17 +489,19 @@ fn distinct_a_preview_reconciles_and_b_preview_export_use_only_b_resources() {
     desktop
         .bind_output("output-old".into(), scratch.0.join("render-old"))
         .unwrap();
-    let response = desktop.dispatch(
-        serde_json::from_value(json!({
-            "apiVersion":NATIVE_API_VERSION, "requestId":"export-old-resource",
-            "instanceId":"native-fixture", "documentId":receipt.document_id,
-            "expectedRevision":0, "operation":"job.export.png.begin",
-            "payload":{"contextId":"scene-root", "quality":"final", "outputHandle":"output-old",
-                "frames":[{"sourceFrame":0,"geometryHandle":{
-                    "resourceId":"geometry-a","resourceVersion":"v1"}}]}
-        }))
-        .unwrap(),
-    );
+    let response = desktop
+        .dispatch(
+            serde_json::from_value(json!({
+                "apiVersion":NATIVE_API_VERSION, "requestId":"export-old-resource",
+                "instanceId":"native-fixture", "documentId":receipt.document_id,
+                "expectedRevision":0, "operation":"job.export.png.begin",
+                "payload":{"contextId":"scene-root", "quality":"final", "outputHandle":"output-old",
+                    "frames":[{"sourceFrame":0,"geometryHandle":{
+                        "resourceId":"geometry-a","resourceVersion":"v1"}}]}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
     assert!(!response.is_ok());
     assert_eq!(
         format!("{:?}", response.error().unwrap().code()),

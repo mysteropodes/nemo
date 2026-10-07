@@ -128,7 +128,7 @@ impl crate::native_dispatch::NativeDispatch for CleanupOwner {
     fn dispatch(
         &mut self,
         _: native_engine::commands::OpacityRequest,
-    ) -> native_engine::commands::ResponseEnvelope {
+    ) -> Result<native_engine::commands::ResponseEnvelope, String> {
         unreachable!()
     }
     fn replace_document(

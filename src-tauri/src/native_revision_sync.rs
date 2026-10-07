@@ -350,11 +350,9 @@ fn invoke_dispatch(
     let native_request: OpacityRequest =
         serde_json::from_value(serde_json::to_value(request).map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
-    serde_json::from_value(
-        serde_json::to_value(application.dispatch(native_request))
-            .map_err(|error| error.to_string())?,
-    )
-    .map_err(|error| error.to_string())
+    let response = application.dispatch(native_request)?;
+    serde_json::from_value(serde_json::to_value(response).map_err(|error| error.to_string())?)
+        .map_err(|error| error.to_string())
 }
 
 fn unavailable(
@@ -431,3 +429,63 @@ pub(super) fn dispatch_native(
 #[cfg(test)]
 #[path = "native_revision_sync_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod refusal_tests {
+    use super::*;
+    use crate::{application_mcp::ApplicationMcp, native_dispatch::TerminalPump};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn refusal_propagates_without_envelope_retry_revision_or_notification() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut owner = TerminalPump(calls.clone());
+        let request = serde_json::from_value(serde_json::json!({
+            "apiVersion":2,"requestId":"refused","instanceId":"pump-fixture",
+            "documentId":"document-fixture","expectedRevision":0,"operation":"command.document.apply",
+            "payload":{"command":"layer.opacity.set","stableTarget":{"layerUid":"layer"},"value":25}
+        })).unwrap();
+        assert_eq!(
+            invoke_dispatch(&mut owner, &request).unwrap_err(),
+            "terminal pump has no document dispatcher"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let mut state = ApplicationMcp::default();
+        state.instance_id = "pump-fixture".into();
+        let reservation = state.reserve_native_install().unwrap();
+        let generation = reservation.generation();
+        state.install_dispatch(generation, Box::new(owner)).unwrap();
+        assert_eq!(
+            state
+                .revisions
+                .dispatch(state.instance_id(), &state.native, request.clone(), false)
+                .err()
+                .unwrap(),
+            "terminal pump has no document dispatcher"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(state.revisions.0.lock().unwrap().pending.is_none());
+        let authority = state.native.lock().unwrap();
+        let (current, owner) = authority.active().unwrap();
+        assert_eq!(current, generation);
+        assert_eq!(owner.content_revision(), 0);
+        assert_eq!(owner.document_id(), "document-fixture");
+        drop(authority);
+        for (field, invalid) in [
+            ("requestId", serde_json::json!("bad id")),
+            ("instanceId", serde_json::json!("")),
+            ("documentId", serde_json::json!("x".repeat(129))),
+        ] {
+            let mut value = serde_json::to_value(&request).unwrap();
+            value[field] = invalid;
+            assert!(state
+                .dispatch_native(serde_json::from_value(value).unwrap())
+                .is_err());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                2,
+                "invalid external identity reached owner"
+            );
+        }
+    }
+}
