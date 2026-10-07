@@ -1278,3 +1278,85 @@ duplicate and C06/sibling intrusion; compare both drift pieces and the exact
 four-line current insertion; verify representative DOM/CSS/controller/load tokens.
 Integrity-only and 53 scope tests establish index consistency, not semantic
 completeness. Normal completeness still fails while the wider queue stays pending.
+
+## P03C-bb frozen collaboration, popover and timeline HTML
+
+[P03C-bb / #1600](https://github.com/mysteropodes/nemo/issues/1600) maps frozen
+`src/index.html` 1934–2284 into named UI presentation responsibilities. Frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5` / HTML blob
+`0f928bd885b0acd32acde1d52726f1e42f1370c5`; inspected protected base
+`63225ce6f1be17eb8e2ec48c7fb6ba741df97b94` / HTML blob
+`8eb7b2e2ca81284c9e00b22251391d2292654de9`. All 351 frozen lines are
+byte-identical at current 1938–2288, shifted +4 by the separately recorded
+export-cancel insertion. C06 settings ends frozen 1933 (current 1937); C06
+bootstrap starts frozen 2285 (current 2289). Neither boundary is claimed here.
+Consumer references below describe inspected source, not a new behavior trial.
+
+Each row owns its exact presentation interval, including comments/blanks and
+closure. These supplemental names are not admitted/completed packets. HTML/CSS
+remains UI; stateful operations must use the Rust-backed application command/query/
+job API or explicitly report unavailable without an old writable fallback. Remote
+feedback/collaboration capabilities require their own host/auth/service contracts;
+source bindings, UI labels and legacy comments grant no operation acceptance.
+
+| Named UI responsibility | Frozen HTML lines | DOM/CSS/controller interface and applicability boundary |
+|---|---:|---|
+| Feedback dashboard modal and filters/list | 1934–1956 | `#fb-dashboard-modal`, close, status/tag filters, refresh and list use shared modal/feedback-card CSS; timeline:9392+ builds and binds the triage dashboard through feedback services. Separate wide modal is not the C06 settings shell. Remote issue editing/resolution/auth and inline text handling remain service/controller responsibilities, not UI permission or acceptance. |
+| Kitsu login/browse modal | 1957–1983 | `#kitsu-modal`, login URL/email/password/error/button and browse breadcrumb/list/back/logout bind kitsu.js:309+,435+. Native password input and error host are presentation, not successful authentication, safe credential storage or production/project download acceptance. No credentials are copied into this census. |
+| Text editing popover and stale lead-in | 1984–2009 | Hidden `#text-popover`, text/size/font/color/align/apply/cancel controls bind timeline text handling (7980+,8525+). The preceding comment describes an anchored comment pin editor, but this is the text host; actual comment host starts at 2056. Record the stale comment, not a second comment owner. Text geometry/metadata/history/rendering require native support or denial. |
+| Onion mode/outline/opacity interface | 2010–2021 | Hidden `#onion-pop`, status/mode/current-outline and previous/next opacity controls bind timeline onion popup handlers. CSS popover placement and fields expose UI parameters; evaluated ghost frames, persistent settings and native render authority remain separate obligations. |
+| Onion marker-range presets | 2022–2033 | `#om-span-1/2/5/all` buttons bind timeline marker-span logic and share the former range-control entry. Preset selection is UI; exact frame bounds, marker identity/drag and animation/render readers need native operation acceptance. |
+| Onion previous/next tint controls | 2034–2042 | Previous/next color inputs and reset use timeline onion tint synchronization. Native color widgets/labels do not establish ghost color fidelity, alpha codecs, persistence or native viewport parity. |
+| Onion temporary shift/trace and follow controls | 2043–2055 | X/Y shift/reset/next and marker-follow checkbox bind timeline:11336+. Comment distinguishes temporary ghost shift from document geometry; controller state/lifetime and actual ghost positioning must preserve that boundary. No new persistent writer or evaluated frame acceptance is introduced. |
+| Comment popover core text/author host | 2056–2058 | Hidden `#comment-popover`, author row and textarea bind timeline comment handlers (7802+), distinct from text-popover. Placement relative to a canvas point is a UI interface; comment identity/document storage, access and native mutation require owning operations. |
+| Feedback action-recording/tags/blocking controls | 2059–2073 | `#comment-record/#comment-record-status/#comment-fb-tags/#comment-fb-blocking` supplement feedback mode via timeline/feedback-bridge. Recording status and tag faces do not prove captured actions, diagnostic scope, permission or successful remote issue submission. |
+| Feedback optional name/email interface | 2074–2086 | Optional name/email rows bind feedback/comment controller modes. Translated labels and conditional visibility provide context; profile attribution, persistence and remote data handling remain explicit service contracts, not inferred from form inputs. |
+| Feedback screenshot attachment hosts | 2087–2103 | Drop area/thumbnails/hidden multi-image input bind timeline:7876+ and feedback-bridge attachment handling. Drop/file UI and thumbnail display do not prove valid capture, storage/upload, resource cleanup or submitted attachments. No screenshot evidence was captured here. |
+| Comment resolution/delete/save/feedback actions | 2104–2112 | Resolved checkbox, delete, save and feedback-save buttons bind timeline:7858+,7901+. Local document comment versus remote feedback submission are separate operations. Button state/text is not approval, successful issue creation or history/persistence acceptance. |
+| Timeline shell/resize and symbol-tab host | 2113–2125 | `#timeline-area/#tl-resize/#tl-toolbar/#symbol-tabs` use shared timeline/resize/tab CSS; timeline and UI populate tabs and resize the panel. Symbol navigation/close/re-entry retain native document identity and availability; host height and tab active state do not accept component behavior. |
+| Current-frame and transport/loop controls | 2126–2139 | `#tl-cf/#tl-tf`, first/previous/play/next/last and loop buttons bind timeline playback/frame navigation and UI scrubbing. Visible frame value/icons are readouts/request inputs, not clock authority, evaluated revision or native animation timing acceptance. |
+| Playback bake-cache trigger | 2140–2149 | `#btn-bake-cache` binds timeline:11114+ manualBakeCache/playback-cache.js; comment describes an automatic/manual fallback. Presence of a button or historical performance description does not establish native cache/resource lifetime, correct fixed-revision frames or playback reliability. |
+| Timeline FPS/frame-count fields and separators | 2150–2154 | `.ti` contains `#tl-fps/#tl-total`, synchronized from document values and bound at timeline:11362+. Shared scrub/range UI mirrors Document fields elsewhere. Defaults/limits do not authorize timing/length mutation or truncated stored data; all native save/history/evaluation/export consumers remain required. |
+| Onion/outline and ghost-selection toolbar toggles | 2155–2161 | `#btn-os/#btn-os-outline/#btn-ghost-all/#btn-ghost-select` plus removed-marker-control comment bind timeline/UI onion/ghost state. CSS/icon active faces are presentation; cross-frame ghost selection/rendering and range gestures need native support or explicit unavailability. |
+| Shadow/revision/cycle/tween-curve visibility controls | 2162–2172 | Shadow guides, revision view, cycle and tween-curve buttons bind timeline and bridge rendering. Guide versus artwork/export, original/revision comparison and animated curve overlays retain separate data readers. Toggle visibility alone accepts no document mutation or rendered output. |
+| Motion graph/shy/BPM/blur mode switches | 2173–2184 | BPM/blur/shy/graph buttons use mode-dependent visibility and timeline/motion/motion-graph/bpm-grid bindings. Comments describe intended panel hiding and effects. CSS/header switches are not accepted layer selection, timing conversion, motion-blur evaluation or native graph edits. |
+| Timeline toolbar customization entry | 2185–2190 | `#btn-toolbar-customize` uses SVG/title and timeline:11119+ menu/persistence logic. Toolbar preference is UI state; hiding a control neither changes capability availability nor satisfies accessibility/keyboard acceptance. Toolbar closure adds no operation owner. |
+| Timeline content/layer shell and paired header | 2191–2208 | `#tl-content/#layer-panel/#layer-hdr` establish the left-column header. CSS height 42 matches frame-header 20 plus bars-row 22; comments/CLAUDE.md §11 require paired panel/grid rows and 1:1 scroll. Static geometry is not a live alignment or reflow check. |
+| Layer create/camera/audio/delete/duplicate/component actions | 2209–2225 | `#layer-ctrls` contains layer/camera/audio/delete/duplicate/component buttons and hidden audio input. Timeline/audio-bridge bind operations and import. Native button/file interfaces do not establish persistent layer IDs, audio decode, destructive history or component extraction acceptance. |
+| Layer-list host and resize/column lead-in | 2226–2231 | `#layer-list/#layer-panel-resize` accept dynamic rows and UI width sizing. Following comment explains the grid column wrapper. Native selection/order/history and layer-scroll-sync are controller contracts; DOM row count/resize position is not state authority. |
+| Frame-grid column/scroll/header/bars shell | 2232–2243 | `#fg-col/#fg-wrap/#frame-hdr/#bars-row` preserve ruler-before-bars DOM order and scrolling host, used by timeline/Motion/timeline-zoom/layer-scroll-sync. Sticky offsets and hidden native scrollbar must preserve CLAUDE.md §11; no timing/hit-test/native viewport acceptance is granted by layout. |
+| Onion/work-area range marker hosts | 2244–2248 | `#onion-bar/#wa-bar/#om-in/#om-out` provide range bars/handles inside bars-row. UI/timeline marker logic positions them with frame scale. Bounds, drag/history, follow-playhead and export-range semantics remain operation obligations. |
+| Frame-grid dynamic rows and work-area tint | 2249–2258 | `#frame-grid/#wa-tint` receive timeline/Motion rows and pointer-inert work-area shading. Dynamic keys/markers/BPM/grid row alignment depend on the same frame/selection contracts. Shading is not accepted work-area data, selection or evaluated animation. |
+| Audio strip and viewport-pinned playhead/flag | 2259–2272 | `#audio-strip` receives audio rows; `#playhead/#playhead-flag` exposes the draggable flag while the stem is pointer-inert. Timeline viewport pinning and motion/audio handlers preserve hit-testing/scroll and timing identity. DOM waveform/playhead is not decoded playback, synced audio, native clock or export acceptance. |
+| Timeline structural closures | 2273–2277 | Closes frame/layer content and timeline containers before status bar. This is structural ownership only, with no extra document, scrolling or native window lifecycle authority. |
+| Status/help/version readout and surrounding closure | 2278–2282 | `#statusbar/#statusbar-help/#status-text` use shared status CSS and timeline contextual hints/version text. Static shortcut/version fallback is not verified keyboard routing, current runtime/build identity or tool availability. Final surrounding closure creates no additional state owner. |
+| Transient toast host and bootstrap boundary blank | 2283–2284 | Empty `#toast` receives showToast messages/classes/timeouts from timeline/UI, with pointer-inert opacity/translation CSS. Text/status presentation is not completed work or accepted notification/accessibility behavior. Last blank precedes C06 bootstrap comment at 2285. |
+
+Load/cascade contract: early separately owned gpu-gate/Paper tags precede head
+styles; shared styles precede these body nodes and later classic controllers.
+Stable IDs/data attributes and dynamic list children bind timeline/UI/Motion,
+feedback, Kitsu, playback-cache, audio and scrolling/zoom consumers. i18n owns
+translated text/title/placeholder sweeps. Shared modal/feedback/onion/transport/
+grid/audio/status CSS from prior censuses is a cascade dependency, not duplicate
+numeric ownership. Inline hidden display, active/resolved/mode classes, frame
+values, positions, scroll offsets and paired row/header dimensions are DOM inputs.
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | Text/document comments, frame/FPS/length/loop/onion/BPM/blur/shy settings, layer/component/audio identities and ranges retain applicable codecs/history. Remote feedback/Kitsu state and optional identity/attachment forms follow their own service contracts; toolbar/scroll preferences differ from project records. Legacy handlers cannot serve as native write fallback; no persistence/history or remote operation trial occurred. |
+| Selection and animation | Transport/frame fields, graph/shy/layer/grid keys, onion/ghost/range markers, revision/curve overlays and playhead/audio faces mirror controller state. All stateful tool/frame/layer/animation operations require native API support or explicit denial. Comment/text hosts are distinct despite the stale lead-in. CSS toast animation and cache descriptions grant no playback, evaluated timing or native parity acceptance. |
+| Render/export and native bridge | DOM grids/overlays/playhead/audio and text/capture previews are UI readers. Native services own document evaluation, media/resource lifetime, fixed-revision viewport/render/export and applicable clock behavior. Guide visibility, work-area markers and cache frames must preserve production consumers. Feedback recordings/screenshots and Kitsu data require real capture/service validation, not a successful source lookup. No render/export/native callback acceptance occurred. |
+| Browser and installed desktop | Shared shell requires host-specific authentication/network/media/capture/viewport checks. Grid reflow, paired scroll, sticky headers, resize, capture listeners, drag flags, custom popovers/drop zones, focus/labels/keyboard/shortcuts and password/attachment lifetimes need actual surface evidence. Native form/buttons coexist with div drag/marker/status hosts. No browser, installed, accessibility or reduced-motion behavior trial occurred. |
+
+The 30 intervals cover **351 frozen lines exactly once**, disjoint from C06
+settings 1743–1933 and bootstrap/flags from 2285, and from the earlier HTML
+siblings. Any full-file reconciliation remains P03C-bc/#1601. No original source
+identity, JSON order/classification, packet/admission, `rangeCoverage`, whole-span
+disposition or `complete:false` changes; exactly 760 original packets stay pending.
+
+Focused checks parse against independent 1934–2284, reject omission/duplicate/
+C06 or adjacent-sibling intrusion, compare protected bytes at offset +4, verify
+actual text/comment host bindings and reject the stale-comment interpretation.
+Representative DOM/CSS/controller/load controls, integrity and 53 scope tests
+establish consistency, not semantic completeness. Normal completeness remains
+failing while the wider packet queue stays pending.
