@@ -11540,7 +11540,7 @@
         "C06.labs.float-panel",
         "C06.preferences.settings-modal-shell"
       ],
-      "reason": "Tracked handwritten UI presentation/shader source. P03C-at/#1592 maps only frozen 1-90, 105-421 and 462-897 into 14 named, nonoverlapping responsibilities in REMEDIATION_SCOPE.md; C06 retains 91-104, 422-461 and 2132-2163. This partial human-reviewed map does not disposition the whole CSS spans, admit packets or establish runtime acceptance."
+      "reason": "Tracked handwritten UI presentation/shader source. P03C-at/#1592 maps frozen 1-90, 105-421 and 462-897 into 14 named responsibilities; P03C-au/#1593 maps frozen 898-1356 into 19 named responsibilities in REMEDIATION_SCOPE.md. These nonoverlapping UI maps preserve C06's 91-104, 422-461 and 2132-2163. This partial human-reviewed map does not disposition the whole CSS spans, admit packets or establish runtime acceptance."
     },
     {
       "path": "src/css/tutorial.css",
