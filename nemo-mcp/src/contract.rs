@@ -370,6 +370,13 @@ impl NativeApplicationRequest {
                 "native pinned reads forbid expectedRevision".into(),
             ));
         }
+        if self.operation == "query.document.object"
+            && !crate::native_contract::validate_request(&self.operation, &self.payload)
+        {
+            return Err(RequestError::InvalidRequest(
+                "native object selector does not match its declared contract".into(),
+            ));
+        }
         if !self.payload.is_object() {
             return Err(RequestError::MalformedPayload(
                 "native payload must be a JSON object".into(),
@@ -380,15 +387,6 @@ impl NativeApplicationRequest {
                 "native pinned-read payload does not match its declared contract".into(),
             ));
         }
-        if capabilities::native_catalog()
-            .capability_for_operation(&self.operation)
-            .is_none()
-        {
-            return Err(RequestError::InvalidRequest(format!(
-                "operation {} is not declared by a registered native capability",
-                self.operation
-            )));
-        }
         if !matches!(
             serde_json::to_vec(self).map(|bytes| bytes.len()),
             Ok(0..=NATIVE_MAX_MESSAGE_BYTES)
@@ -397,7 +395,7 @@ impl NativeApplicationRequest {
                 "native requests are limited to 4096 encoded bytes".into(),
             ));
         }
-        Ok(())
+        capabilities::validate_native_operation(&self.operation)
     }
 }
 

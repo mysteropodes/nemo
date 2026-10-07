@@ -1,8 +1,5 @@
-//! The payload contract a client actually reads, checked against the compiled
-//! executable. Both installed clients failed their first edit against a `payload`
-//! advertised as `true` ("any value validates"): one sent a JSON-encoded string,
-//! the other guessed `propertyId`. Neither mistake is possible to diagnose from a
-//! schema that types nothing, so the schema and the rejection are asserted here.
+//! Client-visible payload schemas and typed rejections checked against the compiled
+//! stdio executable, including staged native discovery and availability denial.
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use serde_json::{json, Map, Value};
 use std::process::Command;
@@ -32,6 +29,29 @@ async fn client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
 
 fn arguments(value: Value) -> Map<String, Value> {
     value.as_object().unwrap().clone()
+}
+
+async fn tool_response(
+    client: &rmcp::service::RunningService<rmcp::RoleClient, ()>,
+    tool: &'static str,
+    input: Map<String, Value>,
+) -> rmcp::model::CallToolResult {
+    client
+        .call_tool(CallToolRequestParams::new(tool).with_arguments(input))
+        .await
+        .unwrap()
+}
+
+fn tool_schema(tools: &[rmcp::model::Tool], name: &str) -> Value {
+    serde_json::to_value(
+        tools
+            .iter()
+            .find(|tool| tool.name == name)
+            .unwrap_or_else(|| panic!("{name} is advertised"))
+            .input_schema
+            .as_ref(),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -67,15 +87,7 @@ fn compiled_schema_binary_matches_the_committed_contract_and_descriptors() {
 async fn root_native_templates_construct_calls_without_nested_schema_knowledge() {
     let client = client().await;
     let tools = client.list_all_tools().await.unwrap();
-    let schema = serde_json::to_value(
-        tools
-            .iter()
-            .find(|tool| tool.name == "nemo_command")
-            .unwrap()
-            .input_schema
-            .as_ref(),
-    )
-    .unwrap();
+    let schema = tool_schema(&tools, "nemo_command");
     assert_eq!(schema["type"], "object");
     assert!(schema["properties"].is_object());
     assert!(schema["required"]
@@ -103,13 +115,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
     let operations = ["command.document.apply", "history.undo", "history.redo"];
     for (example, operation) in examples.iter().zip(operations) {
         assert_eq!(example["operation"], operation);
-        let response = client
-            .call_tool(
-                CallToolRequestParams::new("nemo_command")
-                    .with_arguments(arguments(example.clone())),
-            )
-            .await
-            .unwrap();
+        let response = tool_response(&client, "nemo_command", arguments(example.clone())).await;
         assert_eq!(
             response.structured_content.unwrap()["error"]["code"],
             "unavailable",
@@ -123,12 +129,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
         ] {
             let mut invalid = example.clone();
             invalid[field] = value;
-            let rejected = client
-                .call_tool(
-                    CallToolRequestParams::new("nemo_command").with_arguments(arguments(invalid)),
-                )
-                .await
-                .unwrap();
+            let rejected = tool_response(&client, "nemo_command", arguments(invalid)).await;
             assert_eq!(rejected.is_error, Some(true));
         }
         for (field, value, code) in [
@@ -141,12 +142,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
         ] {
             let mut invalid = example.clone();
             invalid[field] = value;
-            let response = client
-                .call_tool(
-                    CallToolRequestParams::new("nemo_command").with_arguments(arguments(invalid)),
-                )
-                .await
-                .unwrap();
+            let response = tool_response(&client, "nemo_command", arguments(invalid)).await;
             assert_eq!(response.structured_content.unwrap()["error"]["code"], code);
         }
     }
@@ -157,17 +153,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
 async fn advertised_payload_schema_names_every_key_and_operation_template() {
     let client = client().await;
     let tools = client.list_all_tools().await.unwrap();
-    let schema = |name: &str| {
-        serde_json::to_value(
-            tools
-                .iter()
-                .find(|tool| tool.name == name)
-                .unwrap_or_else(|| panic!("{name} is advertised"))
-                .input_schema
-                .as_ref(),
-        )
-        .unwrap()
-    };
+    let schema = |name: &str| tool_schema(&tools, name);
 
     let command = schema("nemo_command");
     let payload = &command["$defs"]["legacy"]["properties"]["payload"];
@@ -249,6 +235,52 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
     assert_eq!(body["apiVersion"], 1);
     assert_eq!(body["instances"], json!([]));
     assert_eq!(body["registeredCapabilities"], registered_capabilities());
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap();
+    let request = cases["read"]["request"].clone();
+    let native = Value::Array(
+        nemo_mcp::capabilities::NATIVE_CAPABILITY_SOURCES
+            .iter()
+            .map(|source| serde_json::from_str(source).unwrap())
+            .collect(),
+    );
+    assert_eq!(body["registeredNativeCapabilities"], native);
+    let object = native
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["id"] == "native.object")
+        .unwrap();
+    assert_eq!(object["availability"]["state"], "unavailable");
+    assert_eq!(
+        object["ports"],
+        json!([{"label":"ui","state":"pending"},{"label":"mcp","state":"pending"}])
+    );
+    let result = tool_response(&client, "nemo_command", arguments(request.clone())).await;
+    assert_eq!(result.is_error, Some(true));
+    let error = result.structured_content.unwrap()["error"].clone();
+    assert_eq!(error["code"], "unavailable");
+    assert_eq!(
+        error["message"], object["availability"]["reason"],
+        "denied before missing-endpoint lookup"
+    );
+    for (field, value) in [
+        ("payload", json!({})),
+        ("payload", json!("{}")),
+        ("expectedRevision", json!(7)),
+        ("operation", json!("query.document.object.fill")),
+    ] {
+        let mut invalid = request.clone();
+        invalid[field] = value;
+        let result = tool_response(&client, "nemo_command", arguments(invalid)).await;
+        assert_eq!(result.is_error, Some(true));
+        assert_eq!(
+            result.structured_content.unwrap()["error"]["code"],
+            "invalid_request"
+        );
+    }
     client.cancel().await.unwrap();
 }
 
@@ -301,12 +333,7 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
         ),
     ];
     for (label, payload, fragments) in cases {
-        let response = client
-            .call_tool(
-                CallToolRequestParams::new("nemo_command").with_arguments(with_payload(payload)),
-            )
-            .await
-            .unwrap();
+        let response = tool_response(&client, "nemo_command", with_payload(payload)).await;
         assert_eq!(response.is_error, Some(true), "{label}");
         let body = response.structured_content.unwrap();
         // A malformed body is its own typed code (P07/#1009), distinct from
@@ -321,14 +348,12 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
 
     // A payload the schema does describe passes validation and fails later, on the
     // absent instance — proving the rejections above are the contract, not the app.
-    let response = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_command").with_arguments(with_payload(
-                json!({"layerId": "layer-a", "property": "opacity", "value": 37}),
-            )),
-        )
-        .await
-        .unwrap();
+    let response = tool_response(
+        &client,
+        "nemo_command",
+        with_payload(json!({"layerId": "layer-a", "property": "opacity", "value": 37})),
+    )
+    .await;
     assert_eq!(
         response.structured_content.unwrap()["error"]["code"],
         "unavailable"
@@ -336,14 +361,12 @@ async fn rejected_payloads_name_the_shape_the_operation_expects() {
 
     // `property` naming no registered capability is its own typed code (P07/#1009),
     // distinct from a malformed body — the shape is fine, the target does not exist.
-    let response = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_command").with_arguments(with_payload(
-                json!({"layerId": "layer-a", "property": "banana", "value": 37}),
-            )),
-        )
-        .await
-        .unwrap();
+    let response = tool_response(
+        &client,
+        "nemo_command",
+        with_payload(json!({"layerId": "layer-a", "property": "banana", "value": 37})),
+    )
+    .await;
     let body = response.structured_content.unwrap();
     assert_eq!(body["error"]["code"], "unsupported_capability");
     assert!(body["error"]["message"]
@@ -366,10 +389,7 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     let mut incomplete = base.clone();
     incomplete["payload"] = json!({"request": {"operation": "property.set",
         "payload": {"property": "opacity"}}});
-    let response = client
-        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(incomplete)))
-        .await
-        .unwrap();
+    let response = tool_response(&client, "nemo_command", arguments(incomplete)).await;
     assert_eq!(response.is_error, Some(true));
     let body = response.structured_content.unwrap();
     // The nested command's own body is malformed, same typed code check_payload
@@ -388,13 +408,7 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     // the unit-level descriptor seam.
     let mut non_object_request = base.clone();
     non_object_request["payload"] = json!({"request": false});
-    let response = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_command")
-                .with_arguments(arguments(non_object_request)),
-        )
-        .await
-        .unwrap();
+    let response = tool_response(&client, "nemo_command", arguments(non_object_request)).await;
     assert_eq!(
         response.structured_content.unwrap()["error"]["code"],
         "malformed_payload"
@@ -404,12 +418,7 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     unknown_operation["payload"] = json!({
         "request": {"operation": "property.unknown", "payload": {}}
     });
-    let response = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_command").with_arguments(arguments(unknown_operation)),
-        )
-        .await
-        .unwrap();
+    let response = tool_response(&client, "nemo_command", arguments(unknown_operation)).await;
     assert_eq!(
         response.structured_content.unwrap()["error"]["code"],
         "malformed_payload"
@@ -430,10 +439,7 @@ async fn replay_payload_validates_the_nested_recorded_command() {
         "operation": "property.set",
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 37}
     }});
-    let response = client
-        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(traced)))
-        .await
-        .unwrap();
+    let response = tool_response(&client, "nemo_command", arguments(traced)).await;
     assert_eq!(
         response.structured_content.unwrap()["error"]["code"],
         "unavailable",
@@ -445,10 +451,7 @@ async fn replay_payload_validates_the_nested_recorded_command() {
     let mut complete = base.clone();
     complete["payload"] = json!({"request": {"operation": "property.set",
         "payload": {"layerId": "layer-a", "property": "opacity", "value": 37}}});
-    let response = client
-        .call_tool(CallToolRequestParams::new("nemo_command").with_arguments(arguments(complete)))
-        .await
-        .unwrap();
+    let response = tool_response(&client, "nemo_command", arguments(complete)).await;
     assert_eq!(
         response.structured_content.unwrap()["error"]["code"],
         "unavailable"
@@ -459,15 +462,13 @@ async fn replay_payload_validates_the_nested_recorded_command() {
 #[tokio::test]
 async fn reads_keep_their_own_templates_and_identity_spelling() {
     let client = client().await;
-    let missing_target = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_query").with_arguments(arguments(
-                json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
-                "operation": "property.get", "payload": {}}),
-            )),
-        )
-        .await
-        .unwrap();
+    let missing_target = tool_response(
+        &client,
+        "nemo_query",
+        arguments(json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
+                "operation": "property.get", "payload": {}})),
+    )
+    .await;
     let body = missing_target.structured_content.unwrap();
     // `property` is unresolved (absent), so only it — not the capability-declared
     // `layerId` a resolved capability would also require — can be reported yet
@@ -480,15 +481,13 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
 
     // Supplying `property` resolves the capability, and the rest of its declared
     // requirement surfaces on the next attempt.
-    let missing_layer = client
-        .call_tool(
-            CallToolRequestParams::new("nemo_query").with_arguments(arguments(
-                json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
-                "operation": "property.get", "payload": {"property": "opacity"}}),
-            )),
-        )
-        .await
-        .unwrap();
+    let missing_layer = tool_response(
+        &client,
+        "nemo_query",
+        arguments(json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61",
+                "operation": "property.get", "payload": {"property": "opacity"}})),
+    )
+    .await;
     let body = missing_layer.structured_content.unwrap();
     assert_eq!(body["error"]["code"], "malformed_payload");
     assert!(body["error"]["message"]
@@ -497,12 +496,14 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
         .contains("missing layerId"));
 
     // The pre-camelCase spelling still deserializes, so an existing caller is kept.
-    let legacy = client
-        .call_tool(CallToolRequestParams::new("nemo_query").with_arguments(arguments(
+    let legacy = tool_response(
+        &client,
+        "nemo_query",
+        arguments(
             json!({"instance_id": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61", "operation": "snapshot"}),
-        )))
-        .await
-        .unwrap();
+        ),
+    )
+    .await;
     assert_eq!(
         legacy.structured_content.unwrap()["error"]["code"],
         "unavailable"
@@ -512,12 +513,14 @@ async fn reads_keep_their_own_templates_and_identity_spelling() {
     // nemo_command's ApplicationRequest already has. This fails during parameter
     // deserialization itself (rmcp's own path, before our error mapping runs), so
     // the message lands in `content`, not the app's usual `structured_content`.
-    let typo = client
-        .call_tool(CallToolRequestParams::new("nemo_query").with_arguments(arguments(
+    let typo = tool_response(
+        &client,
+        "nemo_query",
+        arguments(
             json!({"instanceId": "a68d0f2d-6b4f-4f5b-8a4b-6b8f0f2a4d61", "operatoin": "snapshot"}),
-        )))
-        .await
-        .unwrap();
+        ),
+    )
+    .await;
     assert_eq!(typo.is_error, Some(true), "{typo:?}");
     let text = typo.content[0].as_text().unwrap().text.as_str();
     assert!(text.contains("unknown field `operatoin`"), "{text}");

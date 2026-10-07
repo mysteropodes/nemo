@@ -7,6 +7,9 @@ use std::collections::HashSet;
 #[path = "native_reproduction_contract.rs"]
 mod reproduction;
 
+#[path = "native_object_contract.rs"]
+mod object;
+
 const OPACITY_CURVE: [[f64; 2]; 5] = [
     [0.0, 0.0],
     [0.25, 0.156],
@@ -50,7 +53,8 @@ fn frame(value: Option<&Value>) -> Option<u64> {
 pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
-        "query.document.serialize"
+        "query.document.object"
+            | "query.document.serialize"
             | "query.document.evaluate"
             | "query.diagnostics.recent"
             | "command.reproduction.opt_in"
@@ -63,6 +67,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
+        "query.document.object" => object::request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
         | "query.reproduction.status"
@@ -201,6 +206,9 @@ pub(crate) fn validate_result(
 ) -> bool {
     if !validate_request(operation, payload) {
         return false;
+    }
+    if operation == "query.document.object" {
+        return object::result(request_document_id, payload, result);
     }
     if operation == "query.diagnostics.recent" {
         return diagnostics_result(result);

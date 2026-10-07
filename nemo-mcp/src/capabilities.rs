@@ -23,6 +23,7 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
 /// to v1 discovery or turn it into another MCP tool.
 pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
 ];
@@ -241,4 +242,29 @@ pub fn native_catalog() -> &'static NativeCapabilityCatalog {
         NativeCapabilityCatalog::from_sources(NATIVE_CAPABILITY_SOURCES)
             .expect("embedded native capability catalog is valid and unambiguous")
     })
+}
+
+/// Registration does not imply an installed native owner or active transport.
+pub(crate) fn validate_native_operation(
+    operation: &str,
+) -> Result<(), crate::contract::RequestError> {
+    use crate::contract::RequestError;
+    let descriptor = native_catalog()
+        .capability_for_operation(operation)
+        .ok_or_else(|| {
+            RequestError::InvalidRequest(format!(
+                "operation {operation} is not declared by a registered native capability"
+            ))
+        })?;
+    if descriptor["availability"]["state"] == "available" {
+        Ok(())
+    } else {
+        Err(RequestError::Unavailable(
+            descriptor["availability"]["reason"]
+                .as_str()
+                .filter(|reason| !reason.is_empty())
+                .unwrap_or("native capability is unavailable")
+                .to_owned(),
+        ))
+    }
 }

@@ -181,6 +181,8 @@
         "src/lib.rs",
         "src/main.rs",
         "src/native_contract.rs",
+        "src/native_object_contract.rs",
+        "src/native_object_contract_tests.rs",
         "src/native_reproduction_contract.rs",
         "src/registry.rs",
         "src/schema.rs",

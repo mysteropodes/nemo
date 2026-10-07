@@ -134,8 +134,12 @@ impl JsonSchema for CommandRequest {
         payload_properties.insert(
             "stableTarget".into(),
             json!({
-                "type": "object", "additionalProperties": false, "required": ["layerUid"],
-                "properties": {"layerUid": native_transport["$defs"]["Identifier"]}
+                "type": "object", "required": ["layerUid"],
+                "properties": {"layerUid": {"type": "string", "minLength": 1}},
+                "anyOf": [
+                    {"$ref": format!("{}#/$defs/StableTarget", native_transport["$id"].as_str().unwrap())},
+                    {"$ref": format!("{}#/$defs/ObjectTarget", native_transport["$id"].as_str().unwrap())}
+                ]
             }),
         );
         payload_object.insert("properties".into(), payload_properties.into());
