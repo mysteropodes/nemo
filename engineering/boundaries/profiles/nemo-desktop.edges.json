@@ -64,8 +64,8 @@
       "meaning": "native_dispatch.rs owns the shared boxed application seam and export pump. It is depended on by owners, but does not reach back into the MCP adapter, application bootstrap or viewport."
     },
     "host-release-tests": {
-      "allowedLayers": ["bootstrap", "host-contract", "host-seam", "mcp-adapter"],
-      "meaning": "N25C2a/C2d private host lifecycle tests reach only the existing application owner, strict host contract, boxed dispatch seam and production typed installation adapter"
+      "allowedLayers": ["bootstrap", "host-contract", "host-seam", "mcp-adapter", "command-adapter"],
+      "meaning": "N25C2a/C2d private host lifecycle tests reach only the existing application owner, strict host contract, boxed dispatch seam and production typed installation adapter. N25C2e controls also reach only the strict raw-bootstrap command-adapter owner."
     },
     "tests": {
       "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
@@ -109,7 +109,8 @@
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application.contract (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.dispatch (native_application_dispatch_release_tests.rs: explicit import)",
-      "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)"
+      "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)",
+      "rust.desktop.native.host.release.tests -> rust.desktop.native.application.commands (native_object_bootstrap_tests.rs: raw production bootstrap controls)"
     ]
   },
   "exportedPort": {
@@ -255,7 +256,8 @@
           "application::replay_reproduction_bundle",
           "commands::OpacityRequest",
           "commands::ResponseEnvelope",
-          "compositor::Compositor"
+          "compositor::Compositor",
+          "object_codec::decode_project"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
