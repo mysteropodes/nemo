@@ -1360,3 +1360,141 @@ actual text/comment host bindings and reject the stale-comment interpretation.
 Representative DOM/CSS/controller/load controls, integrity and 53 scope tests
 establish consistency, not semantic completeness. Normal completeness remains
 failing while the wider packet queue stays pending.
+
+## P03C-bc frozen bootstrap loader and C06 boundary reconciliation
+
+[P03C-bc / #1601](https://github.com/mysteropodes/nemo/issues/1601) maps frozen
+`src/index.html` 9–10 and 2298–2485 into 31 named loader/presentation
+responsibilities, **190 frozen lines exactly once**. Frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5` / HTML blob
+`0f928bd885b0acd32acde1d52726f1e42f1370c5`; inspected protected base
+`66694c8410433e5ed16d052dd365e4381ee41b06` / HTML blob
+`8eb7b2e2ca81284c9e00b22251391d2292654de9`. Ilya/O serializes the two
+inventory artifacts; runtime files and C06 behavior owners remain read-only.
+Each row owns only its exact HTML interval, including comments and closures.
+Supplemental names do not admit or complete packets or transfer the loaded
+module's responsibility. Module paths below are relative to `src/js/` unless
+explicitly qualified. Source references describe inspected bindings, not trials.
+
+| Named loader responsibility | Frozen HTML lines | Loaded entries, public interface and consumer/load boundary |
+|---|---:|---|
+| Browser GPU admission tag | 9–9 | `gpu-gate.js` runs in the head before all subsequent scripts. It checks `window.__TAURI__`/`navigator.gpu`, otherwise stops loading and installs `#gpu-gate` at DOM readiness. Gate source and historical platform comments do not prove present browser/installed support. |
+| Paper library prerequisite tag | 10–10 | `src/paper-full.min.js` supplies `paper` before app's C06 `paper.install(window)`/DOM-constructor restoration/`paper.setup(#drawing-canvas)` slice. The tag owns load order only; Paper remains justified geometry/hit-testing/presentation, not a writable native-document fallback. |
+| UI, color and application entry sequence | 2298–2300 | `ui.js`, `color-picker.js`, `app.js` follow the body DOM and C06 flags. App supplies shared state/geometry setup; C06 storage-key migration stays before downstream Labs/i18n/profile reads. Current native guard chain is inserted before app, separately recorded below. |
+| Folder metadata codec prerequisite | 2301–2305 | `domain/document/folder-codec.js` exposes `NemoFolderCodec` before tweens snapshot/restore and timeline export/import consumers. Exact folder codec/save/history behavior belongs to its module, not this loader interval. |
+| Tween assignment solver prerequisite | 2306–2307 | `domain/tween/assignment.js` exposes `NemoTweenAssignment.solve`, called by tweens matching. Registration before tweens permits later matching calls; tag presence accepts no pairing/geometry behavior. |
+| Frame history kind and tween entry | 2308–2310 | `application/history/frame-entry.js` exposes `NemoFrameHistoryEntry` before `tweens.js` capture/apply/undo/redo consumers. History identity and native availability remain operation obligations. |
+| Stroke, tool, font and brush entry sequence | 2311–2317 | `stroke-modeler.js`, `tools.js`, vendored `opentype.min.js`, `vector-text-bridge.js`, `brush-preset-picker.js`, `brush-tool-presets.js`, `brush-editor.js` bind the drawing/text/brush interfaces. Font parser and modeler globals precede their downstream bridges; no input, shaping, pressure or persistent brush acceptance. |
+| SVG adapters before export entry | 2318–2322 | `adapters/export-svg-frame.js`, `adapters/export-svg-sequence.js`, `export.js`. Sequence adapter consumes later `application/export-job.js` at export-call time; adjacency is not required, availability before the user/API job is. SVG data/job state requires the native command/query/job contract or explicit denial. |
+| Render queue and format export entries | 2323–2325 | `render-manager.js`, `rive-export.js`, `ae-camera-export.js` bind modal/format consumers after export. Format, queue, fixed-revision output and resource completion remain their own capability/host obligations. |
+| Labs registry, prototype and panel sequence | 2326–2360 | `labs/labs-core.js` precedes predictive-stroke, multiframe-draw, lagoon-menu, pingpong-cycle, move-to-layer, canvas-grid, timeline-markers, flip-roll, retime-exposure, interval-assistant, xsheet-panel, out-of-pegs, mirror-check, vector-trim, view-filter, speed-lines, reference-fill, pose-library, reference-3d, boil-effect, follow-path, vector-sculpt, french-curve, labs-panel and labs-float-panel (all `labs/*.js`). `SMLabs.register` exists before registration; predictive mutation precedes copies. Flag storage is Labs preference state, distinct from C06 frozen flags. No prototype writer is admitted by inclusion. |
+| Dock, storage, document, timeline and localization entries | 2361–2367 | `tools-panel-dock.js`, `lottie-preview.js`, `idb-store.js`, `linked-media.js`, `project-document.js`, `timeline.js`, `i18n.js`. Timeline installs shared `SM`; C06 owns namespace/profile/preferences behavior and i18n sweeps stable DOM attributes. Storage/document/media writers require native authority; preferences differ from project data. |
+| Layer, import, camera, text and animation prerequisites | 2368–2376 | `layer-kind.js`, `svg-import.js`, `camera.js`, `text-selector.js`, `animation/curve.js`, `domain/animation/opacity.js`, `domain/animation/expression-time.js`, `domain/animation/expression-random.js`, `motion.js`. Curve/opacity/expression helpers precede Motion consumers. Import/selection/animation evaluation remains native-owned or unavailable. |
+| Capability registry and application service sequence | 2377–2381 | `application/capability-registry.js`, `application/opacity-capability.js`, `application/opacity-application.js` expose registry/descriptor/core before later bootstrap creation. Current core tag moved to current 2312 ahead of app; registry and capability remain later. Define-before-create is distinct from define-before-registry. |
+| Export job deferred-use prerequisite | 2382–2383 | `application/export-job.js` supplies the bounded job used by the earlier SVG sequence adapter at call time. Loaded dependency does not prove cancellation, export or MCP completion. |
+| Expression catalogs before editor entry | 2384–2392 | `expr-examples.js`, `expr-functions.js`, `expr-code-panel.js` define `SM_EXPR_EXAMPLES`/`SM_EXPR_FUNCTIONS` before panel menu reads and `SMExprPanel` before applicable row construction. A catalog/menu is not expression execution or scripting acceptance. |
+| Expression baking deferred entry | 2393–2397 | `expr-bake.js` is called lazily from Motion property-row actions. It follows Motion safely only if defined before invocation; reduction/key persistence remains an independent native operation. |
+| Effector and Motion scripting panel sequence | 2398–2406 | `effector-layer.js`, `shapes-panel.js`, `text-animator.js`, `motion-graph.js`, `nemo-panel.js`, `nemo-script.js`, `nemo-plugin.js`. Effector uses Motion value resolution, which precedes it; script/plugin UI cannot create a second document/evaluation authority. |
+| Layer, timing, contacts, audio and reference entries | 2407–2414 | `layer-inout.js`, `layer-scroll-sync.js`, `markers.js`, `bpm-grid.js`, `timeline-zoom.js`, `p2p-contacts.js`, `audio-bridge.js`, `reference-bridge.js` bind stable layer/grid/media/contact interfaces. Scroll/preferences and service state are distinct from native timing/media/document operations. |
+| MP4 demux prerequisite and video bridge | 2415–2419 | Vendored `mp4box.all.min.js` precedes `native-video-bridge.js`; browser backend reads `MP4Box`/`DataStream` plus `VideoDecoder`, desktop uses its host bridge. Demux loading neither proves decode support nor native resource lifetime. |
+| Storyboard, import, effect, tracking and vectorize entries | 2420–2432 | `storyboard.js`, `drop-import.js`, `palette-panel.js`, `color-manager.js`, `effects-panel.js`, `shader-effects-library.js`, `path-fx.js`, `lipsync.js`, `comp-preview.js`, `tracker.js`, `tracker-panel.js`, `custom-effects.js`, `vectorize-bridge.js`. Storyboard remains flag-gated despite inclusion. Worker vectorization calls occur after deferred loader readiness, not necessarily at this tag's parse time. |
+| Project, feedback, history, updater and image entries | 2433–2439 | `project-entry.js`, `project.js`, `feedback-bridge.js`, `history-panel.js`, `updater-bridge.js`, `kitsu.js`, `images.js`. Actual project load/save route through current native entry/save adapters; service/network/update/auth bindings and history display require their own acceptance. |
+| Triangulation prerequisite and image mesh entries | 2440–2445 | Vendored `delaunator.vendor.js` precedes `image-mesh.js`/`image-mesh-bridge.js`; mesh construction reads `window.Delaunator.from`. Geometry availability is distinct from image metadata codecs, selection/deformation/history or native render support. |
+| Rig, text, import and asset panel entries | 2446–2454 | `rig-widget.js`, `text-animator-panel.js`, `psd-import-bridge.js`, `figma-import.js`, `asset-tree.js`, `media-library.js`, `transplant.js`, `motion-preset-picker.js`, `assets-panel.js`. Panel/controller callbacks are consumers, not permission for a legacy persistent writer; C06 Rig flag is a separate gate. |
+| Deferred module WASM loader tags | 2455–2456 | `geometry-wasm-loader.js` and `vectorize-wasm-loader.js` are `type="module"`, unlike surrounding classic tags. Geometry exposes `GeometryWasm.ready` after asynchronous import; vectorize exposes `VectorizeWasm.vectorize` and starts its worker lazily. Readiness/Promise checks govern consumers; textual position does not guarantee a ready WASM engine before classic bridges execute. Historical fallback comments do not amend native-only policy. |
+| Image budget prerequisite and engine entry | 2457–2459 | `application/render/image-budget.js` exposes `NemoImageBudget` before `engine-bridge.js` immediately calls `.create`. Budget bookkeeping is separate from GPU ownership/evaluated scene/viewport/export production; no native resource acceptance follows from load order. |
+| Viewer, cache, perspective and brush bridge sequence | 2460–2470 | `second-viewer.js`, `playback-cache.js`, `perspective-bridge.js`, `symmetry-bridge.js`, `gradient-bridge.js`, `viewtools-bridge.js`, `abr-import.js`, `bitmap-brush.js`, `bitmap-tip-picker.js`, `brush-menu-bridge.js`, `shadow-brush-bridge.js`. Controller visibility/cache/brush reads retain surface/resource requirements; source inclusion proves no timing/render/import parity. |
+| Drawing, selection and geometry bridge sequence | 2471–2480 | `draw-bridge.js`, `group-bridge.js`, `select-bridge.js`, `subselect-bridge.js`, `shape-bridge.js`, `eraser-bridge.js`, `rulers-bridge.js`, `fill-bridge.js`, `pen-bridge.js`, `rig-bridge.js`. Public tool/intent hooks bind drawing-canvas UI and shared selection; persistent edits must enter native operations or reject before mutation. |
+| Tutorial entry tag | 2481–2481 | `tutorial.js` binds onboarding triggers and DOM after tools. C06 explicitly excludes tutorial behavior; this interval introduces no tutorial ownership transfer or first-run acceptance. |
+| Application bootstrap tag | 2482–2482 | `bootstrap/opacity-application.js` composes core/domain/Motion/history/display ports after prerequisites and exposes `NemoApplication`/`NemoOpacityApplication`. Current browser descriptor declares native opacity unavailable; desktop native bootstrap is a separately added tag. No old writer fallback is authorized. |
+| Application MCP transport tag | 2483–2483 | `adapters/application-mcp.js` exposes `NemoApplicationMcpTransport.createNativeTauriTransport` and guards host startup with Tauri core/event availability. Current native bootstrap schedules composition via `setTimeout(0)`, allowing this later tag to define the transport before callback use. MCP handshake/reply/revision/cancel evidence remains independent. |
+| Body and document closures | 2484–2485 | Closes body/html after application/adapter tags. Structural ownership only; no window teardown, transport disposal, native close/re-entry or renderer lifetime acceptance. |
+
+### Frozen-to-protected loader drift
+
+The following blocks are byte-identical at their mapped current coordinates;
+the removed frozen tag at 2381 is uniquely found at current 2312. A uniform +4
+offset is valid for C06 flags, not the whole loader. Frozen/current totals are
+2485/2525 HTML lines and 150/177 script tags (including the inline flag script).
+
+| Frozen HTML lines | Current HTML lines |
+|---:|---:|
+| 9–10 | 9–10 |
+| 2298–2299 | 2302–2303 |
+| 2300–2346 | 2316–2362 |
+| 2347–2365 | 2364–2382 |
+| 2366–2373 | 2384–2391 |
+| 2374–2375 | 2400–2401 |
+| 2376–2380 | 2403–2407 |
+| 2381 | 2312 |
+| 2382–2433 | 2408–2459 |
+| 2434–2472 | 2462–2500 |
+| 2473–2481 | 2502–2510 |
+| 2482 | 2519 |
+| 2483 | 2521 |
+| 2484–2485 | 2524–2525 |
+
+Current-only drift stays outside the frozen line denominator: export cancel
+1679–1682 (P03C-ba); native contract/replacement/export/preview/v1/lifecycle/
+viewport/operations, moved core, legacy/Motion surfaces and exposed-properties
+chain 2304–2315; Labs diagnostics 2363; shortcut registry 2383; diagnostics
+lead-in/module 2392–2399; Motion intent adapter 2402; native save/project-entry
+adapters 2460–2461; selection intent adapter 2501; native consumer lead-in,
+application/editor/selection/preview/export adapters and edit guard 2511–2518;
+native bootstrap 2520; reproduction/diagnostics adapters 2522–2523. Moved core
+2312 is recorded once as frozen 2381's counterpart, not a current-only module.
+The actual twelve-tag pre-app sequence is asserted by
+`tests/native-opacity-cutover.test.cjs`'s classic startup control; current
+diagnostics prose describing seven tags is historical, not the current oracle.
+
+### C06 flags, shortcuts overlap and Labs closure
+
+| Frozen interval | Sole effective line responsibility | Other evidence retained |
+|---:|---|---|
+| 357–366 | `C06.labs.float-panel` | C06 owns Labs DOM/behavior. P03C-ay ends 356. |
+| 367 | P03C-az structural-closure marker only | Closes Labs opened at 357; C06 stays its consumer/behavior reference, per [#1601 boundary note](https://github.com/mysteropodes/nemo/issues/1601#issuecomment-6043259956). |
+| 1743–1875, 1884–1933 | `C06.preferences.settings-modal-shell` | Modal/tab-switching shell retains references to its nested shortcuts pane. |
+| 1876–1883 | `C06.preferences.shortcuts-system` | Exactly eight historically double-referenced lines, current 1880–1887, belong to the shortcuts pane: `.settings-pane[data-pane="shortcuts"]`, heading/description, `#shortcuts-list`, `#shortcuts-reset` and wrappers. Settings shell is a consumer/reference, not a second effective line owner. |
+| 2285–2297 | `C06.bootstrap.feature-flags` | Current 2289–2301 at +4, byte-identical; inline `window.SM_FROZEN_IN_DEV={rig:false,storyboard:true,import3d:true}` stays C06-owned. |
+
+This reconciles all eight full-file numeric overlaps once without changing the
+pinned C06 declaration or `rangeCoverage.overlap:8`. Its recorded broad shell
+1743–1933 and nested pane 1876–1883 remain historical evidence; the effective
+partition above excludes the pane from shell line ownership. No C06 behavior,
+controller, provenance or accepted census is reassigned. All sibling HTML maps
+remain numerically disjoint from this leaf; line 367 is structural, not Labs
+behavior, and flags 2285–2297 are excluded from the 190-line union.
+
+Flag readers at inspected protected source: `timeline.js:410` gates Rig at
+`SM.setTool`, `timeline.js:9155` selects disabled import3d menu versus
+`openObjReference`/`SMLabs.open3DReference`, and `motion.js:13047` gates
+`SMMotion.setAppMode('storyboard')`, including scripting callers. No flag read
+is added or moved. Flags hold session bootstrap configuration, distinct from
+Labs localStorage toggles and native capability availability; `rig:false`
+does not mean native Rig parity. C06/header prose says flags precede ANY other
+script, but head GPU/Paper tags and body parsing already occurred. The actual
+contract is definition before body application flag consumers, not first script
+in the document. Stale prose is recorded here; source remains untouched.
+
+### Consumer applicability and independent checks
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | Folder codec, frame history, project/document/storage/media/import/mesh and scripting entry points expose persistent consumers; actual native revision/command/history/codecs must support each operation or reject it. C06 migration/profile/shortcuts/Labs preferences are distinct local configuration. Loader tags do not accept save/reload/history or authorize old writers. |
+| Selection and animation | Tool/selection/Rig bridges, frame/timing/marker/Motion/expression/effector consumers depend on initialized globals and later readiness. Flags and loaded controls do not accept native selection, animation evaluation, expression/plugin semantics or temporarily unavailable feature parity. |
+| Render/export and native bridge | Image budget, engine/viewer/cache/video/audio/WASM and SVG/format jobs require native resource/evaluation/viewport/fixed-revision output authority. Capability registry/bootstrap and MCP transport share application commands/queries/jobs; host guard, tag order or source comments alone do not prove a native invoke, revision event, result or actual client acceptance. |
+| Browser and installed desktop | GPU gate is browser-only; native bootstrap returns without Tauri core and current browser opacity descriptor is unavailable. Classic scripts execute in parser order, module loaders defer and complete asynchronously, vectorization starts a worker lazily, native composition defers transport lookup. Real network/vendor/CSP/WASM loading, DOM readiness, lifecycle, focus and host startup require actual browser/installed evidence. No surface trial occurred. |
+
+Focused controls parse the 31 responsibility rows against independent
+`[9,10] + [2298,2485]`, reject omission/duplication/C06 or sibling intrusion,
+compare every drift block and unique moved-core tag, and verify current-only
+insertions separately. Full-file controls preserve the eight historical
+overlaps while checking one effective owner per covered HTML line, flags before
+their readers, the line367 structural boundary, and representative real global/
+DOM/classic/module/deferred-call consumers. Integrity and 53 scope tests check
+inventory consistency; exact-head independent review remains required. No source
+identity, classification/order, pinned census, packet admission, computed range
+or whole-span disposition changes; **760 original packets remain pending** and
+`complete:false` remains. This completes only the bounded loader census and
+overlap reconciliation; normal completeness still fails while wider admissions
+remain pending. No runtime, browser/installed or whole-P03 acceptance is implied.
