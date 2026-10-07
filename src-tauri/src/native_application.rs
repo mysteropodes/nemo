@@ -9,7 +9,7 @@ use crate::{
     native_application_ports::{
         DesktopArtifactBindings, DesktopArtifactPort, DesktopResourceResolver, SharedCompositor,
     },
-    native_dispatch::NativeDispatch,
+    native_dispatch::{NativeDispatch, NativeReleaseProgress},
 };
 use native_engine::{
     application::{
@@ -41,14 +41,6 @@ type DesktopCore =
 pub(crate) struct PreparedPreview {
     pub(crate) result: CompositionResult,
     pub(crate) identity: ScheduledFrameIdentity,
-}
-
-pub(crate) struct DesktopRelease {
-    pub(crate) application: ApplicationReleaseReceipt,
-    pub(crate) cancelled_preview: Vec<WorkId>,
-    pub(crate) unresolved_preview: Vec<WorkId>,
-    pub(crate) preview_error: Option<String>,
-    pub(crate) preview_stage: ReconciliationStage,
 }
 
 struct PreviewReleaseProgress {
@@ -275,14 +267,14 @@ impl DesktopNativeApplication {
         Ok(())
     }
 
-    pub(crate) fn release_project(&mut self) -> DesktopRelease {
+    pub(crate) fn release_project(&mut self) -> NativeReleaseProgress {
         self.core.release_transaction_stage();
         #[cfg(test)]
         if self.panic_release_after_transaction {
             panic!("injected core release panic after transaction reconciliation");
         }
         #[cfg(test)]
-        let application = {
+        let application: ApplicationReleaseReceipt = {
             let mut reconciled = 0;
             let panic_after = self.panic_release_after_export_jobs;
             self.core.release_export_stage_with_checkpoint(|| {
@@ -293,7 +285,7 @@ impl DesktopNativeApplication {
             })
         };
         #[cfg(not(test))]
-        let application = self.core.release_export_stage();
+        let application: ApplicationReleaseReceipt = self.core.release_export_stage();
         let pending = self.preview_work.clone();
         self.preview_release = Some(PreviewReleaseProgress {
             cancelled: BTreeSet::new(),
@@ -325,7 +317,7 @@ impl DesktopNativeApplication {
             }
         }
         let progress = self.preview_release.as_ref().unwrap();
-        DesktopRelease {
+        NativeReleaseProgress {
             application,
             cancelled_preview: progress.cancelled.iter().copied().collect(),
             unresolved_preview: progress.unresolved.iter().copied().collect(),
@@ -338,7 +330,7 @@ impl DesktopNativeApplication {
         }
     }
 
-    fn release_progress(&self) -> Option<DesktopRelease> {
+    fn release_progress(&self) -> Option<NativeReleaseProgress> {
         self.core.release_progress().map(|application| {
             let (cancelled, unresolved) = self.preview_release.as_ref().map_or_else(
                 || (Vec::new(), self.preview_work.iter().copied().collect()),
@@ -349,7 +341,7 @@ impl DesktopNativeApplication {
                     )
                 },
             );
-            DesktopRelease {
+            NativeReleaseProgress {
                 application,
                 cancelled_preview: cancelled,
                 unresolved_preview: unresolved,
@@ -431,6 +423,12 @@ impl NativeDispatch for DesktopNativeApplication {
             .finish_export_frame(pending)
             .map_err(|error| error.message)
     }
+    fn release_project(&mut self) -> Result<NativeReleaseProgress, String> {
+        Ok(DesktopNativeApplication::release_project(self))
+    }
+    fn release_progress(&self) -> Option<NativeReleaseProgress> {
+        DesktopNativeApplication::release_progress(self)
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
@@ -443,3 +441,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_application_release_tests.rs"]
 mod release_tests;
+
+#[cfg(test)]
+#[path = "native_application_dispatch_release_tests.rs"]
+mod dispatch_release_tests;
