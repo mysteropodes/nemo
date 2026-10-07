@@ -195,6 +195,41 @@ N25C1 source dispatcher retains its bounded typed-unavailable failure policy.
 N25D history, P03 C04a, user save/load, browser, render/export and installed desktop
 acceptance remain separate gates.
 
+## N25D1 detached solid-fill preparation
+
+`commands::prepare_object_fill_json(snapshot, payload_bytes)` prepares a detached
+candidate from an admitted immutable object snapshot. Its payload is exactly
+`command: "object.fill.set"`, the full frame-scoped `stableTarget`, and a complete
+solid `fill`. The byte entry parses directly through the existing strict map-only
+DTOs; duplicate members, positional arrays, missing/unknown fields and malformed
+numbers fail before a Value intermediary can discard evidence. It validates the
+scene-root target, authored/reference frame scope and finite fill channels in 0..1.
+Malformed payloads return `InvalidRequest`; a well-shaped absent scoped target
+returns `NotFound`, without a partial candidate or changing the source snapshot.
+
+The candidate exposes only immutable borrows of its complete codec-valid document
+and target. Only the selected record's fill changes; geometry, layers, other scoped
+objects, opaque IDs and numeric values remain intact. Numeric-equivalent channels
+are a semantic no-op that keeps the original fill representation and document bytes.
+Repeated preparation from the same snapshot/payload is deterministic. Encoding and
+redecoding the candidate preserves the fixed N25A afterRecord/preservation oracle.
+
+`base_instance_id`, `base_document_id`, `base_snapshot_id` and
+`base_content_revision` identify the preparation origin. They do not assign the
+changed document to that authoritative snapshot or establish a new revision. The
+original snapshot's pinned reads still return the original record. N25D1 has no
+owner commit, revision advance, history/retry cache, undo/redo, ID assignment or
+host installation. A future D2 owner must separately check origin/current revision
+and atomically commit or reject under its sole state authority.
+
+This raw **payload** entry is not whole JSON-RPC/TCP request/result admission and
+claims no transport envelope byte limit. Existing common-envelope 4096-byte policy
+is unchanged. Strict raw-envelope MCP admission, real one-slot object host and
+common UI/MCP round trip still precede capability availability. `native.object`
+remains unavailable/pending, and active opacity continues denying object commands.
+No C04a, browser/installed, user save/load/history, animation or render/export
+acceptance follows from this pure preparation API.
+
 ## Consumer and acceptance boundaries
 
 | Consumer | N25B evidence or remaining gate |

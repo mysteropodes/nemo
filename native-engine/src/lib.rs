@@ -41,6 +41,7 @@ test_modules! {
     "test-codec" => object_codec_tests = "../tests/object_codec.rs";
     "test-commands" => commands_tests = "../tests/commands.rs";
     "test-commands" => object_read_tests = "../tests/object_read.rs";
+    "test-commands" => object_fill_tests = "../tests/object_fill.rs";
     "test-history" => history_tests = "../tests/history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";

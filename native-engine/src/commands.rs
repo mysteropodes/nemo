@@ -1,5 +1,9 @@
 //! Typed v2 commands and queries for the admitted native opacity document.
 
+#[path = "object_fill.rs"]
+mod object_fill;
+pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
+
 use crate::document::OpacityDocument;
 use crate::request_receipts::{
     ApplyOpacity, QueryOpacity, ReceiptDisposition, ReceiptLookup, RequestFingerprint,

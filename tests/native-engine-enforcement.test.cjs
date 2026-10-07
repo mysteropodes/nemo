@@ -34,8 +34,10 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_document.rs',
   'native-engine/src/object_codec.rs',
   'native-engine/src/object_snapshot.rs',
+  'native-engine/src/object_fill.rs',
   'native-engine/tests/object_codec.rs',
   'native-engine/tests/object_read.rs',
+  'native-engine/tests/object_fill.rs',
   'native-engine/tests/application_read.rs',
   'native-engine/src/application_replacement.rs',
   'native-engine/src/application_construction.rs',
@@ -216,7 +218,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     const expected = [`${name}_tests = "${source}"`];
     if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"',
       'object_codec_tests = "../tests/object_codec.rs"');
-    if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"');
+    if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"',
+      'object_fill_tests = "../tests/object_fill.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
       'export_geometry_tests = "../tests/render_geometry.rs"',

@@ -102,5 +102,6 @@
       "Rust source is not wired into scripts/nemo/ci.cjs applicability; that file is shared and serialized."
     ]
   },
-  "nativeObjectMcpContractRegistration": "N25C2b/#1607 registers native_object_contract.rs and native_object_contract_tests.rs as private children in the existing rust.mcp.transport module. Typed shape validation and unavailable discovery only; no host activation, new edge, layer, size ceiling, baseline or exclusion change."
+  "nativeObjectMcpContractRegistration": "N25C2b/#1607 registers native_object_contract.rs and native_object_contract_tests.rs as private children in the existing rust.mcp.transport module. Typed shape validation and unavailable discovery only; no host activation, new edge, layer, size ceiling, baseline or exclusion change.",
+  "nativeObjectFillPreparationRegistration": "N25D1/#1612 registers object_fill.rs as a private commands child and tests/object_fill.rs under existing test-commands. Detached candidate preparation only; ordinary budgets, frozen baseline, exclusions, Cargo features and existing graph directions remain unchanged."
 }
