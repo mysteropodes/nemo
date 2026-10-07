@@ -101,6 +101,29 @@
       "lines": 96.55,
       "regions": 87.05,
       "functions": 87.5
+    },
+    "nemo-mcp/src/native_object_contract.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "N25C2b/#1607: cargo-llvm-cov 0.9.1 measured clean source 159e9062c8ce2e25e40b57f93f35f4fb761275f9. 126/126 lines, 217/217 regions, 26/26 functions."
+    },
+    "nemo-mcp/src/native_object_contract_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "N25C2b/#1607: cargo-llvm-cov 0.9.1 measured clean source 159e9062c8ce2e25e40b57f93f35f4fb761275f9. The report contains no executable regions for this cfg(test) child; it is explicitly listed, not excluded."
     }
+  },
+  "nativeObjectContractRegistration": {
+    "issue": "N25C2b/#1607",
+    "sourceSha": "159e9062c8ce2e25e40b57f93f35f4fb761275f9",
+    "crateDirty": false,
+    "report": "reports/n25c2b-coverage-159e906/coverage.json",
+    "tool": "cargo-llvm-cov 0.9.1",
+    "tests": {
+      "passed": 58,
+      "failed": 0
+    },
+    "scope": "Only two new per-file entries; all pre-existing file/aggregate floors, tool pin and exclusions preserved. Whole-crate ratchet remains an open gate; this registration is not a coverage pass."
   }
 }

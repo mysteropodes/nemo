@@ -233,3 +233,28 @@ fn request_admission_denies_staged_objects_without_hiding_malformed_or_oversized
     assert_eq!(admission(&value).unwrap_err().code(), "invalid_request");
     assert!(crate::capabilities::validate_native_operation("query.document.opacity").is_ok());
 }
+
+#[test]
+fn generic_object_result_front_door_rejects_a_malformed_selector() {
+    let payload = cases()["read"]["request"]["payload"].clone();
+    let value = json!({"atRevision":7,"documentSnapshotId":"native-object:document:7",
+        "object":cases()["records"][0]});
+    assert!(crate::native_contract::validate_result(
+        "query.document.object",
+        "document",
+        &payload,
+        &value
+    ));
+    for invalid in [
+        json!({}),
+        json!([]),
+        json!({"atRevision":7,"stableTarget":{}}),
+    ] {
+        assert!(!crate::native_contract::validate_result(
+            "query.document.object",
+            "document",
+            &invalid,
+            &value
+        ));
+    }
+}
