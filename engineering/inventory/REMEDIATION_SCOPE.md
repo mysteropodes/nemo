@@ -762,3 +762,71 @@ exclusions and byte identity with the protected CSS, and verifies representative
 selectors/DOM/JS consumers. The integrity-only checker and 53 focused scope tests
 cover index consistency, not semantic or runtime acceptance. Normal completeness
 remains failing while the wider packet/disposition queue is pending.
+
+## P03C-av frozen frame-grid and in/out presentation
+
+[P03C-av / #1594](https://github.com/mysteropodes/nemo/issues/1594) maps frozen
+`src/css/style.css` 1357–1855 into the following inventory-only UI responsibility
+packets. Frozen source `3f6eed2a500f2ce868b711e063816029eb8fefa5`, CSS blob
+`383eeec4be64457fdc7f2028f6d9b04cac32dbc8`; inspected protected source/base
+`28abfc97c994bf37fa4c538e9871ae1da438d3e7`, CSS blob
+`a4a9e3cab070289eaa57f07c9188ec00bc203335`. The current CSS adds four lines
+after frozen 2132; this slice retains identical coordinates and bytes. DOM/JS
+locations below refer to that inspected protected source.
+
+Each named owner owns only presentation in its exact interval, including comments
+and blanks. Controllers own state, gestures and commands; no owner here acquires
+document, evaluation or native authority. The JSON CSS `reason` points to this
+supplemental map without adding fields that refreeze would discard.
+
+| Named UI responsibility | Frozen CSS lines | Selector/DOM, consumer and accessibility/state contract |
+|---|---:|---|
+| Compact property faces and paired group/discrete row alignment | 1357–1373 | `body.mode-motion #layer-list` hides `.motion-expr-btn`/`.motion-anchor-grid-btn` while keeping `.pi.motion-val`; paired `.motion-group-row` height/margin and right `.motion-discrete-row` margin preserve alignment. `motion.js:8534,10285,10373,11101` creates both sides; `renderDiscreteKeyGridRow` explains shared selection class versus plain left property row. Hidden editors remain in the inspector; CSS does not commit numeric values. |
+| Motion snap guide and text badge | 1374–1375 | `.motion-snap-guide`/`::after` paints a nonintercepting vertical line and `data-label`. `showMotionSnapGuide`/`clearMotionSnapGuide` (`motion.js:12820–12830`) creates/removes it inside `#fg-wrap` and positions it from frame/FC. Snap computation and retime commands remain Motion operations; generated text is visual feedback. |
+| Paired bottom band and grid scroll viewport | 1376–1390 | `#layer-panel`, `#fg-col`, `#fg-wrap` share 8px bottom reserve; `index.html:2236–2237` supplies the right wrappers. `timeline-zoom.js:61,108,152` shares `BOTTOM_BAND_PX=8`, `--fc` and scrollbar positioning; `layer-scroll-sync.js` mirrors list/grid vertical scroll. Overflow and padding own layout only, not a second scroll or frame authority. |
+| Sticky work-area/onion strip and header alignment | 1391–1419 | Static `#bars-row` follows `#frame-hdr` (`index.html:2246–2252`); sticky top 20px plus height 22px matches `#layer-hdr` (`index.html:2212`), whose 42px height comes from `style.css:1317` in P03C-au's interval. Frozen CSS comment 1407's inline-height attribution is stale; the DOM has no inline height. `timeline.js:4188+` sets strip width after ruler rebuild. z-index 2 keeps both headers above the grid; DOM order and height must move together. |
+| Work-area body, edge handles and passive grid tint | 1420–1444 | `#wa-bar .wa-handle.left/.right` and `#wa-tint` come from `index.html:2249,2262`. `ui.js:975–1006` (`updateWaBar`) mirrors frame range/FC into left/width and tint height; `initWaDrag` owns dragging. Tint is pointer-inert while bar/handles carry grab/resize cursors. These divs gain no keyboard semantics from CSS. |
+| Onion range edge markers | 1445–1457 | `.onion-marker.om-in/.om-out` are titled static divs (`index.html:2250–2251`), positioned in the lower strip at top 15px. `ui.js:1027+` (`initOmDrag`) updates frame datasets and calls `SM.setOnionRange`; `updateOmMarkers` controls visibility. Red/blue differentiates endpoints visually, without establishing an accessible noncolor alternative. |
+| Layer range capsule and overflow caps | 1458–1481 | `.layer-inout-bar.full-range`, `.layer-inout-overflow-left/right`; `buildBar` (`layer-inout.js:1459+`) creates the titled bar, `updateBar` (153–215) sizes it, toggles full range and creates hatched overflow overlays. Inline per-layer color overrides base fill/border. Caps are pointer-inert; duration/range writes remain controller/API obligations. |
+| In/out pill handles, expanded hitbox and hot/selected states | 1482–1538 | `.layer-inout-handle.left/right`, `::before`, Motion width override, `.hot/.sel`; `layer-inout.js:1462–1469` creates titled div handles, `applySelClasses` (384–398) selects edges, and onDown/mouseup (627,982) retains/removes hot state. Invisible hitbox expands beyond the pill; the cascade retains dark selected core and visible halo. Mouse handlers are not keyboard acceptance. |
+| Parent-in-Time anchor visibility, position and role faces | 1539–1599 | `.timelink-anchor.in/.out/.whole`, `.is-child/.is-parent`, `#frame-grid.timelink-alt` and `.has-timelink`; `layer-inout.js:1481–1498` creates titled anchors and delegates mousedown to `SMMotion.startTimeLinkPickwhip`. `setTimeLinkAltReveal` (1600–1606) toggles on Alt and clears on keyup/blur; updateBar toggles bar hint. Engaged points remain visible; free points require Alt. Role fill/border and expanded hitbox confer no cycle/history or native-link acceptance. |
+| In/out marquee, whole-bar selection and dimmed cells | 1600–1610 | `.layer-inout-bar.sel`, `.layer-inout-marquee-rect`, `.fc.io-dim`; `layer-inout.js:384–403` applies selection and creates the fixed pointer-inert marquee; updateBar (211–215) dims cells outside the range. Motion's shared marquee forwarding (`CLAUDE.md` section 11) remains controller-owned. Visual selection and trim bounds are distinct states. |
+| Drawing-key ticks inside and outside the range | 1611–1629 | `.layer-inout-key:hover/.outside`; `renderKeyTicks` (`layer-inout.js:298–330`) creates full drawing-key ticks, titles/frame positions and outside state. CSS z-index 6 keeps them above playhead 5. Frozen CSS comments call outside ticks inert, but inspected JS binds mousedown to every tick (feedback #772), including outside; preserve this explicit comment/implementation discrepancy rather than treating dark styling as denial. Retime routes to `SM.moveKeyframe`, not CSS. |
+| Empty drawing-gap overlays and hollow endpoints | 1630–1638 | `.layer-inout-seg-gap`/`.layer-inout-segdot`; `renderContentGaps` (`layer-inout.js:240–276`) removes/recreates gap spans and hollow blank-key endpoints from drawing frames. Pointer-events none allows bar gestures through both; CSS neither classifies content nor changes drawings. |
+| Onion range gradient body | 1639–1643 | `#onion-bar` is static (`index.html:2248`); `updateOnionBar` (`ui.js:1012–1024`) uses endpoint geometry for left/width, and `updateOmMarkers` toggles display. Top/height aligns with the separate endpoint packet. Pointer-inert gradient is a range readout, not onion-rendering ownership. |
+| Frame ruler, labels and tick/current/second hierarchy | 1644–1682 | `#frame-hdr`, `.fhc.tick/.tickMaj/.cur/.sec` and pseudo ticks; `timeline.js:4160–4180` emits per-frame labels/tick classes with seconds at zero-based `i%fps===0`; `updatePlayhead` (216–227) marks current header cell. `--fc` aligns ruler/grid widths. CSS hierarchy follows emitted classes, not the historical comment's nth-child claim. Sticky sizing must agree with bars-row and left header. |
+| Grid stacking context, paired frame rows and frame cell lattice | 1683–1719 | `#frame-grid` z-index 1 contains descendants below sticky headers; `.frow.act`, `.fc:nth-child(5n)/:hover/.cur` supply 34px rows and grid ticks. `timeline.js:4377,4830` builds drawing rows/cells; Motion uses its separate shorter track overrides and paired row plan. Current/active classes are state readouts; CSS does not select a frame or evaluate a scene. |
+| Full/empty drawing-key and held-span tint | 1720–1744 | `.fc.kf-full/.kf-empty/.span-full/.span-empty` and pointer-inert `::before`; `renderKeyframeCellsInto` (`timeline.js:4802–4862`) derives full/empty/held content, component outer placement and `--dot-color/--dot-rgb` from owning layer color. Tint is presentation of drawing content, not Motion property keys or authoritative evaluation. |
+| Held-span end handle and trim-drag preview cascade | 1745–1797 | `.span-end`, `.span-drag-band/.span-drag-preview/.span-drag-dot-cell`, `.tl-outdrag-source-end/key`, `.km.drag-key-preview`; `timeline.js:4898–5063` creates/clears source and moving preview states. Source dims, same-cell preview restores opacity, bordering key preview occupies the adjacent cell. Real trim/retime writes and undo remain controller/API work; CSS's old grab-zone comments must not substitute for current full-cell handler. |
+| Drawing-key silhouettes and automatic/manual tween markers | 1798–1813 | `.fc.tw/.tw-manual`, `.km.fl/.hl/.td/.manual`; `timeline.js:4840–4850` constructs square full/hollow key markers or smaller tween ticks and manual correction state. Hover scales the marker; shape plus color differentiates key/tween. The cursor is an affordance, not permission to mutate or evidence that manual tween protection works. |
+| Playhead line and draggable frame-number flag | 1814–1845 | `#playhead`/`#playhead-flag` from `index.html:2275`; `timeline.js:215–227` positions the line and updates 1-based text. Parent is pointer-inert, flag overrides to auto with title; `translateZ(0)` retains the documented WKWebView compositing workaround. `syncPlayheadToViewport` (`timeline.js:4031–4057`) pins the playhead on scroll/resize; frame navigation and actual browser/Tauri painting need separate acceptance. |
+| Work-area dimming, frame selection and key-drag ghosts | 1846–1855 | `.fc.outside-wa/.sel/.sel.cur`, `.tl-drag-ghost .fc`, `.fc.tl-drag-fading`; `timeline.js:4830–4831` paints range/selection, 5414 builds ghost, 5468–5478 removes/applies source-span fading. Ghost is pointer-inert and above cells; `.sel.cur` preserves stronger selected-current cue. Selection/clipboard/drag state remains timeline intent and command responsibility. |
+
+Load contract: `index.html:17` loads `css/style.css` before the static timeline
+DOM and ordered classic scripts: timeline at 2384, Motion at 2403, layer-inout at
+2433, layer-scroll-sync at 2434 and timeline-zoom at 2437. The stylesheet consumes
+their DOM/classes/custom properties; it does not own initialization or commands.
+Exact order, paired row plans, `--fc`, inline bar tint and later Motion overrides
+must be preserved by a future UI extraction. Titles and frame text reside in DOM;
+generated snap text, cursor/hover/color and div handles do not prove keyboard or
+assistive-technology accessibility. No accessibility repair is included here.
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | CSS selectors, overlays and classes are not persistent fields or history entries. Drawing keys, in/out points, time links, property values, work-area configuration and any persisted onion preferences retain their owning codec/history obligations. Inspect the corresponding controller/application API before modifying a persistent field; this map does not accept those consumers. |
+| Selection and animation | Timeline/Motion/layer-inout own selection intent, modifiers, row plans, snap calculations, frame navigation, drawing retime and link gestures. `renderKeyTicks` shows the explicit outside-tick comment/handler discrepancy above. Frame/key colors and range readouts do not establish animation evaluation or enabled native editing. |
+| Render/export and native bridge | Render/export consume authoritative revision/evaluation elsewhere, not these DOM overlays. `timeline.js:48–50,2102–2104` routes native playback/persistence when cutover blocks legacy; `motion.js:2727–2733` requires its native Motion surface. This inspection supplies no end-to-end proof that all drawing/range/link gestures are guarded or supported. Stateful operations require the Rust-backed shared API or explicit unavailability; no CSS fallback writer or new native admission is authorized. |
+| Browser and installed desktop | Static DOM and CSS apply on both UI surfaces, including the documented WebKit playhead workaround. Browser/WASM availability and installed Tauri row alignment, pointer targets, scrolling, playback and painting remain separate behavioral checks. No browser run, installed artifact or physical interaction was tested or accepted by this census. |
+
+The 20 intervals cover **1357–1855 exactly once (499 total lines)**, disjoint
+from P03C-at/au through 1356, the next CSS leaf at 1856, and C06's 91–104,
+422–461 and 2132–2163. No original packet, `rangeCoverage`, source identity,
+whole-span disposition or `complete:false` changes. These are supplemental UI
+responsibility names, not mechanically admitted packets or Rust port obligations.
+
+Focused validation parses this table against independent expected 1357–1855,
+rejects omitted/duplicated lines, checks sibling/C06 exclusion and frozen/current
+byte identity, and verifies representative selectors, DOM anchors and controller
+consumers. Integrity-only and the 53 scope tests verify index consistency, not
+semantic completeness or behavior. Normal completeness remains failing while the
+wider packet/disposition queue remains pending.
