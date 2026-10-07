@@ -617,9 +617,81 @@ before Ready; a partial successor never disposes the entire broad packet.
 0 covered and 0 deferred**. `complete:false` remains unchanged; the normal scope gate
 still exits 1 with no notes needing reconciliation, 0 unmapped paths and 8
 undispositioned spans; the computed range report still has 7 185 uncovered code lines.
-All eight spans are in `style.css`/`index.html` and await Ilya's separate census-versus-
-`boundary` decision. Other pending packets still need bounded leaves under their family
+All eight spans are in `style.css`/`index.html`; Ilya's presentation-census decision
+is recorded in [P03/#1005 comment 6038377096](https://github.com/mysteropodes/nemo/issues/1005#issuecomment-6038377096),
+and the bounded leaves are listed in [P03 comment 6038585344](https://github.com/mysteropodes/nemo/issues/1005#issuecomment-6038585344).
+Other pending packets still need bounded leaves under their family
 parents or evidenced `covered`/`deferred` dispositions. The execution plan and live leaf
 issues remain the queue and ownership authority. No C01-family-complete, whole-native-
 engine or whole-remediation denominator, application behavior or runtime acceptance is
 established by these admissions.
+
+## P03C-at frozen shell, titlebar and properties presentation
+
+[P03C-at / #1592](https://github.com/mysteropodes/nemo/issues/1592) records a
+human-reviewed, inventory-only partition in this document, referenced by the
+CSS file entry's preserved `reason` in the JSON index. Its source remains
+the frozen `3f6eed2…` CSS blob `383eeec4…`; the protected `c9a53b8…` blob is
+`a4a9e3c…`. The only protected CSS addition is after frozen line 2132, so lines
+1–897 in this leaf have the same coordinates and content. The index source digest,
+mechanical `rangeCoverage`, packet admissions and `complete: false` are unchanged.
+
+| Named responsibility | Frozen CSS lines | Primary selectors and consumer boundary |
+|---|---:|---|
+| UI tokens and icon typography | 1–24 | `:root`, bundled Material Symbols; shared stylesheet |
+| In-place text overlay | 25–47 | `#tp-inplace-editor`, resize handle; `timeline.js`/vector text bridge own behavior |
+| App layout | 48–69 | `html,body`, `#app`, `#top-area`; dock controller owns placement |
+| Topbar mode and comment tool | 70–90 | `#app-topbar`, `.app-mode-btn`; mode/tool controllers own state |
+| Topbar spacer | 105 | `#app-topbar-spacer`; layout only |
+| macOS titlebar/update badge | 106–133 | `body.mac-overlay-titlebar`, `#mac-update-btn`; updater bridge and Tauri configuration |
+| Tabs/history/popovers | 134–220 | `.project-tab`, `#history-pop`; project/history controllers own document/history state |
+| Tools dock/rail | 221–368 | `#tools-panel`, `.tool-btn`, flyout, wells; dock/tool/color controllers own behavior |
+| Canvas chrome | 369–421 | viewport, rulers, guides and zoom; the trailing Labs comment describes C06-owned selectors |
+| Canvas state tail | 462–466 | sculpt cursor and zoom focus/scrub; C06 Labs and zoom controllers own behavior |
+| Properties controls | 467–682 | collapse rail, sections, form states; panel controllers/application APIs own values |
+| Effects menu and thumbnails | 683–830 | `.fx-row`, `.fx-addmenu`, `.fx-prev-*`; effect menu previews are CSS approximations |
+| Paired property grids | 831–883 | `.pair-grid`, `.sp-xform-row`, lock button; document/selection controllers own values |
+| Easing curve widget | 884–897 | curve canvas and presets; Motion/tween APIs own easing data |
+
+The owner named above is the **UI presentation responsibility**, not a transfer of
+state or document ownership. The consumer/state matrix makes the split explicit:
+
+| Responsibility | DOM/JS consumer and accessibility/state selectors | Platform and downstream state boundary |
+|---|---|---|
+| UI tokens and icon typography | Material Symbol spans in `index.html`; `:root` tokens and `.material-symbols-rounded` ligatures. Icon-only controls retain their HTML `title`/label semantics. | Browser + Tauri. No stored field, history, selection, animation, render, export or native bridge in the font/token CSS. |
+| In-place text overlay | `timeline.js` creates `#tp-inplace-editor` textarea and `#tp-inplace-resize-handle`; `vector-text-bridge.js` supplies glyph font assets. Textarea focus/edit state is native DOM, not a CSS command. | Browser + Tauri. The text controller owns the selected item's text, fixed width, save/load, history and glyph render/export; CSS only mirrors the face and handle. |
+| App layout | `index.html` owns `#app`/`#top-area`; `tools-panel-dock.js` anchors overlays there. `html,body` suppress selection during dragging, including WebKit-prefixed behavior. | Browser + Tauri, with the prefixed selection rule pertinent to macOS WebKit. No document state or native bridge in layout CSS. |
+| Topbar mode and comment tool | `index.html` button titles and mode labels; `motion.js` toggles `.app-mode-btn.active`/disabled availability, and tool selection supplies `.tool-btn.active` to `#topbar-comment-btn`. | Browser + Tauri. Mode/tool commands and unavailable capability decisions remain controller/API work; CSS cannot prove the mode works or persists. |
+| Topbar spacer | `index.html` `#app-topbar-spacer` flex item; no interaction or state class. | Browser + Tauri. No downstream state dimensions. |
+| macOS titlebar/update badge | `index.html` `#mac-titlebar-strip` drag region and `#mac-update-btn`; `updater-bridge.js` adds `body.mac-overlay-titlebar`, `.state-available`, `.state-downloading`, `.state-installed`. Button semantics remain in HTML. | Tauri/macOS overlay only; browser keeps the strip/button hidden. Updater transport/install availability is native bridge behavior, not CSS acceptance. |
+| Tabs/history/popovers | `project.js` builds `.project-tab.act`/`.dirty`; `history-panel.js` toggles `#history-pop.open`, `.hist-item.current`/`.future`; `rig-bridge.js` builds `.rig-weight-popover`. HTML has tab/history button titles; project admission feedback uses a live `role=alert`. | Browser + Tauri. Project save/load and tab snapshot state belong to project APIs; undo/redo and jump history belong to history APIs. CSS does not own revisions. |
+| Tools dock/rail | `tools-panel-dock.js` toggles dock body classes and `.tools-dock-zone.active`; `timeline.js` builds `.shape-tool-flyout-item.active`; HTML tool buttons have titles/shortcuts. `.tool-btn.active`, `.stack-front`, `#fill-well.none`, `.phdr-toggle.off` show current state. | Browser + Tauri. Dock preference, tool selection, fill/stroke values, selection and history remain with their existing UI/application controllers; render/export consume document color elsewhere. |
+| Canvas chrome | `rulers-bridge.js` toggles `body.rulers-off` and guide elements; `timeline.js`/`app.js` read `#zoom-scrub`; `index.html` provides zoom/ruler anchors and titles. | Browser + Tauri. Guides and zoom alter viewport/UI state through their controllers; selection, animation, frame production, render/export and native presentation stay with those APIs. The 410–421 comment is context for C06's 422–461 selectors. |
+| Canvas state tail | `labs/vector-sculpt.js` creates `#vector-sculpt-cursor.resizing`; `ui.js` toggles `#zoom-scrub.scrubbing`/focus interaction; zoom field remains an HTML input. | Browser + Tauri. Sculpt command and selection effects stay in C06 Labs/tool APIs; zoom stays with viewport state, not CSS. |
+| Properties controls | `index.html` inspector form labels, titles and inputs; `timeline.js` toggles `#props-panel.collapsed` and renders `#props-panel-rail`; `ui.js` manages `.psec.floating`/drag, `.phdr.closed`, `.pbdy.hid`, `.pi.scrub.scrubbing`. `input[type=checkbox]:focus-visible` preserves visible keyboard focus; `.icon-btn.sel` and `.color-eye-toggle.off` show values. | Browser + Tauri. Selection drives visible sections; field values and any save/load, undo/redo, animation, render/export or native bridge effects remain with the owning panels/application API. Disabled-looking controls do not prove capability availability. |
+| Effects menu and thumbnails | `effects-panel.js` creates `.fx-row.expanded`/`.disabled`, `.fx-addmenu-search:focus` and dynamic `.fx-prev-*` classes; `timeline.js` builds `#blend-pop`/`#matte-pop` with `.sel`. HTML provides effect section/button titles. | Browser + Tauri. CSS preview filters/gradients are deterministic menu art, not effect frame evaluation. Effect enablement, parameters, history, persistence, animation and render/export/native consumers remain in the effects/application pipeline. |
+| Paired property grids | `index.html` document/selection `.pair-grid` and `.sp-xform-row`, labeled `#sp-rot`, titled lock buttons; `timeline.js` toggles `.dims-lock-btn.on` for document/selection fields. | Browser + Tauri. Width/height, position, rotation, selection and aspect-lock command/state, with applicable save/history/animation/render/export consumers, stay in document and selection APIs. |
+| Easing curve widget | `index.html` `#curve-canvas`, presets, resize handle and titles; `ui.js` renders preset buttons and handle, `motion-graph.js` interacts with shared widget. `.active` and `#curve-custom-presets:empty` are display state. | Browser + Tauri. Easing curves and selected keys belong to Motion/tween data, history, animation, render/export and any native evaluation bridge; CSS has no authority over them. |
+
+These 14 ranges cover the three assigned spans exactly once: 1–90, 105–421 and
+462–897 (843 total lines). They do not claim C06's accepted 91–104 and 422–461
+feature flag/Labs presentation, or its separate 2132–2163 interval. The JSON
+`reason` is a durable pointer: the refreeze builder preserves that field, whereas
+it would drop an unrecognized top-level map. The existing checker does not
+mechanically enforce this human-reviewed mapping. The CSS selectors only render
+UI state; save/load, undo/redo,
+selection, animation, render, export and native bridge behavior stays with the
+named controllers and application contracts where applicable. Desktop-only
+titlebar/updater states have no browser updater claim. No CSS or HTML was edited,
+no existing census packet was admitted, and no runtime behavior was tested by
+this index change. Partial-span presentation mapping is recorded separately
+because `rangeCoverage.dispositions` accepts only a whole uncovered span; later
+leaves must reconcile the full CSS spans before declaring them dispositioned.
+
+Focused checks for this leaf compare the range union and an omitted/duplicate-line
+negative control against the frozen CSS, verify protected/frozen slice identity
+and the C06 exclusions, and inspect the named selectors in frozen/current CSS
+and HTML plus the cited JS consumers. The existing integrity-only checker and
+`nemo-remediation-scope.test.cjs` verify the unchanged mechanical index. They
+do not validate this presentation mapping's semantic completeness or certify
+browser, Tauri, installed desktop, or feature behavior.
