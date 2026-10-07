@@ -128,6 +128,51 @@ async fn bounded_reader_rejects_incomplete_and_oversized_input() {
 }
 
 #[tokio::test]
+async fn raw_reader_rejects_nested_request_and_response_duplicates_before_value_collapse() {
+    let request = json!({"secret":"secret","nativeRequest":native_request()});
+    let encoded = serde_json::to_string(&request).unwrap();
+    for fragment in [
+        "\"secret\":\"secret\"",
+        "\"apiVersion\":2",
+        "\"requestId\":\"native-1\"",
+        "\"layerUid\":\"layer\"",
+    ] {
+        assert!(encoded.contains(fragment));
+        let duplicate = encoded.replacen(fragment, &format!("{fragment},{fragment}"), 1);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&duplicate).unwrap(),
+            request
+        );
+        assert!(wire::read_json::<wire::AuthenticatedWireRequest>(
+            format!("{duplicate}\n").as_bytes()
+        )
+        .await
+        .is_err());
+    }
+    assert!(
+        wire::read_json::<wire::AuthenticatedWireRequest>(format!("{encoded}\n").as_bytes())
+            .await
+            .is_ok()
+    );
+    let response = b"{\"apiVersion\":2,\"requestId\":\"native-1\",\"instanceId\":\"instance\",\"documentId\":\"native-document\",\"contentRevision\":0,\"ok\":true,\"result\":{\"nested\":[{\"value\":1,\"value\":1}]}}\n";
+    assert!(
+        wire::read_json::<NativeApplicationResponse>(response.as_slice())
+            .await
+            .is_err()
+    );
+    let escaped = b"{\"secret\":\"secret\",\"\\u0073ecret\":\"secret\"}\n";
+    assert!(wire::read_json::<serde_json::Value>(escaped.as_slice())
+        .await
+        .is_err());
+    assert!(
+        wire::read_json::<serde_json::Value>(b"\xef\xbb\xbf{}\n".as_slice())
+            .await
+            .is_err(),
+        "wire retains its BOM rejection"
+    );
+}
+
+#[tokio::test]
 async fn call_preserves_command_and_checks_response_identity() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = Endpoint {

@@ -183,9 +183,10 @@ geometry retains every finite point and relative handle, solid fill channels in
 resolved layer references, GPU safety or visible selection.
 
 Typed Value validation cannot detect duplicate raw members already collapsed by
-JSON parsing. N25A/N25B strict raw-byte admission remains unchanged. A separately
-admitted strict raw-envelope/host gate must resolve that boundary before making
-object reads available. Neither catalog registration nor private response tests
+JSON parsing. N25A/N25B strict raw-byte admission remains unchanged. N25C2c's
+separate raw-envelope gate below retains that evidence before Value parsing;
+the real object host gate still precedes object availability.
+Neither catalog registration nor private response tests
 install an object owner or establish a real common UI/MCP object round trip.
 
 The existing 4096-byte reader preserves the complete envelope or rejects it.
@@ -224,7 +225,7 @@ and atomically commit or reject under its sole state authority.
 
 This raw **payload** entry is not whole JSON-RPC/TCP request/result admission and
 claims no transport envelope byte limit. Existing common-envelope 4096-byte policy
-is unchanged. Strict raw-envelope MCP admission, real one-slot object host and
+is unchanged. N25C2c raw-envelope admission below, real one-slot object host and
 common UI/MCP round trip still precede capability availability. `native.object`
 remains unavailable/pending, and active opacity continues denying object commands.
 No C04a, browser/installed, user save/load/history, animation or render/export
@@ -266,7 +267,53 @@ This is typed staged library ownership only. It does not admit a raw transport
 envelope, install a host owner, activate `native.object`, add UI/MCP round-trip or
 C04a acceptance, or establish browser/installed, user save/load, animation or
 render/export behavior. The common-envelope 4096-byte policy and active opacity
-denial remain unchanged. Later host/raw/runtime gates remain separately admitted.
+denial remain unchanged. N25C2c adds the raw ingress below; host/runtime gates
+remain separately admitted.
+
+## N25C2c complete raw-envelope admission
+
+The shared `wire` bounded TCP reader checks complete raw JSON before decoding an
+authenticated request, native response or host-status DTO. One private recursive
+visitor retains decoded keys within each map, including maps nested in arrays.
+Duplicate keys, including escaped-equivalent spellings, fail before a typed DTO
+or Value can lose them. Keys in separate maps and JSON-like text inside strings
+remain valid. The visitor parses all values and the complete end of input before
+classifying a duplicate; malformed syntax, excessive nesting, trailing JSON and
+numeric overflow retain their parser failure. No document or transport payload
+is reconstructed from the visitor. TCP framing limits, required newline and BOM
+rejection remain unchanged.
+
+The bundled MCP executable wraps SDK stdin in a stateful `AsyncRead` guard before
+the SDK parses JSON-RPC params and tool arguments into Value. Valid input reaches
+the SDK byte-for-byte, including CRLF, leading BOM, numeric spelling, blank lines
+and a valid nonempty final EOF fragment. Only the check view strips a leading BOM.
+The guard retains partial input, pending output and oversize drain state across
+polls and cancelled reads. It buffers at most one input frame plus its underlying
+8 KiB reader and reads/drains at most 64 KiB of input per poll. Complete-frame
+validation is bounded by the outer byte cap. It drains a rejected frame through
+newline or EOF before recovering the next message.
+
+STDIO now admits at most 1,048,574 content bytes: content plus LF must be strictly
+smaller than the existing 1 MiB v1 framing budget. Original CR and BOM bytes count;
+a final EOF fragment uses the same content limit. The SDK previously had no stdin
+length cap. This outer budget is distinct from native's existing 4096-byte
+encoded-request and complete-response policy; it does not impose a 4096-byte raw
+tool-arguments limit. Neither limit, old coverage floor nor exclusion is relaxed.
+
+Each duplicate or oversized frame becomes one fixed protocol-invalid JSON scalar
+at the SDK boundary. The SDK's existing invalid-request path returns `-32600`
+with **id omitted** (decoded `None`); it does not echo a tainted correlation ID,
+payload or secret. This follows rmcp 3.2's serialization of uncorrelatable errors;
+there is no custom stdout encoder or SDK change. Within-budget malformed syntax
+is forwarded unchanged for the SDK's existing syntax handling. Rejections precede
+tool dispatch, registry selection and endpoint connection; a subsequent valid
+legacy request still reaches its registered endpoint.
+
+The compiled raw-stdio controls and shared TCP tests establish transport admission
+only. `native.object` remains unavailable/pending and its writes unregistered.
+Real object one-slot host installation, terminal cleanup/re-entry and the common
+UI/MCP round trip remain separate gates before capability availability, C04a or
+installed desktop/user workflow acceptance.
 
 ## Consumer and acceptance boundaries
 
