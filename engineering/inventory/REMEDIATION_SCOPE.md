@@ -1081,3 +1081,96 @@ omission/duplication/bootstrap/C06/sibling intrusion, compare frozen/current
 coordinates and verify representative DOM/CSS/controller/load tokens. Integrity
 and 53 scope tests establish consistency, not semantic completeness or behavior;
 normal completeness remains failing while the wider packet queue stays pending.
+
+## P03C-az frozen inspector and document-control HTML
+
+[P03C-az / #1598](https://github.com/mysteropodes/nemo/issues/1598) maps frozen
+`src/index.html` 367–1098 into named UI presentation responsibilities. Frozen
+source `3f6eed2a500f2ce868b711e063816029eb8fefa5` / HTML blob
+`0f928bd885b0acd32acde1d52726f1e42f1370c5`; inspected protected base
+`1913e8d5662d16724eff688d693918b386b99050` / HTML blob
+`8eb7b2e2ca81284c9e00b22251391d2292654de9`. The 732-line slice is
+byte-identical at current coordinates; later export-modal/script insertions do
+not shift it. Consumer references below describe that protected source, not a
+browser or installed behavioral trial.
+
+Each interval names exactly one presentation owner, including comments/blanks
+and closure. Line 367 is a structural-closure marker for C06, not a second Labs
+behavior owner: it closes `#labs-float-panel` opened at 357, while C06's numeric
+claim ends at 366. Preserve this semantic boundary for the single reconciliation
+in [P03C-bc / #1601 comment 6043259956](https://github.com/mysteropodes/nemo/issues/1601#issuecomment-6043259956).
+These supplemental names neither admit nor complete packets. HTML/CSS remains
+UI; stateful operations require the Rust-backed application command/query/job API
+or explicit unavailability, without an old writable fallback. Legacy controllers
+and comments are consumer evidence, not native behavior acceptance.
+
+| Named UI responsibility | Frozen HTML lines | DOM/CSS/controller interface and state boundary |
+|---|---:|---|
+| C06 Labs structural closure boundary | 367–367 | Closing div for `#labs-float-panel` opened at 357. C06.labs.float-panel retains all panel behavior/DOM ownership; this marker completes the numeric slice without assigning another Labs controller. See #1601 reconciliation above. |
+| Tween reassignment badge host | 368–378 | Hidden `#tween-reassign-badge` is a fixed sibling of canvas-area to escape tool capture. `tweens.js.updateReassignBadge` positions/tints it and wires reassignment. Badge visibility/legacy next-key commentary is not native target identity, animation/history or reassignment acceptance. |
+| Tracking marker and canvas-column closure | 379–384 | Hidden pointer-inert `#track-marker` has inline fixed geometry/z-index, updated by `tracker-panel.js:28+`; outer canvas column then closes. DOM marker avoids live document items, but tracking results/transforms and native service availability remain separate. |
+| Inspector resize anchor | 385–386 | `#props-panel-resize` uses the shared tools/props resize CSS and UI sizing bindings. Translated title is an affordance; width persistence, input capture and keyboard resize need surface checks. |
+| Inspector context header and collapse rail | 387–408 | `#props-panel`, context/header row, collapse button and rail use CSS `.collapsed` and `timeline.js:11828+` rail rendering. Collapse persists in localStorage; state-dependent title uses afterI18n, deliberately avoiding a static data-i18n-title. Context selection/relevant-section routing remains controller-owned, not document authority. |
+| Selection identity wrapper | 409–410 | Hidden `#sel-props-sec` and padded `.pbdy` host selection controls. `timeline.js.updatePropsContext/updateSelPropsPanel` drives visibility/values and moves related sections. Initial hidden wrapper accepts no selection or persistence semantics. |
+| Align/distribute toolbar | 411–435 | Hidden `#align-toolbar`, `.align-btn[data-align/data-distribute]` native buttons and `#sel-count` use shared toolbar CSS; timeline:10718+ dispatches align/distribute. Data attributes/geometry are public UI inputs, not accepted native selection transforms or undo. |
+| Selection transform fields and proportion lock | 436–451 | `sp-x/sp-y/sp-w/sp-h/sp-rot`, `.sp-xform-row/.scrub` and size-lock button align numeric position/size/rotation. Timeline selection panel and UI generic scrub bind them. Bounds/defaults/title are UI, not authoritative limits, transform evaluation or stable pivot/history. |
+| Transform anchor picker | 452–467 | `#xform-anchor-grid .xa-dot[data-key]` emits nine native buttons, center glyph and titles. Timeline:10698+ toggles `.xa-active` and writes per-stroke xformAnchorKey/save data despite the older no-undo/no-render comment. Preserve that discrepancy; this DOM map does not validate pivot codec or render consumers. |
+| Selected-point type buttons | 468–472 | Hidden `#sp-pointtype-row` hosts corner/smooth/symmetric buttons; timeline shows it for subselect node selection and corresponding handlers change handles. Native button names do not accept tangent geometry, selection or native history. |
+| Destructive boolean controls and selection closure | 473–485 | Hidden `#sp-boolean-row` contains four `btn-bool-*` SVG buttons. Timeline routes immediate union/subtract/intersect/exclude separately from combined-shape controls below. Titles and monochrome icons do not accept geometry/destructive mutation or undo. |
+| Revision accept/reject interface | 486–495 | Hidden `#revision-sec`, author row and accept/reject native buttons are filled/wired by timeline:3012+. Document correction/original identity and history are operation obligations; header/empty row are not accepted collaboration or revision application. |
+| Mask mode/feather/unset controls | 496–503 | Hidden `#mask-sec`, `p-mask-mode`, feather scrub and unset button are synchronized/bound by timeline:2851+. Modes/500px UI cap describe input interface; mask persistence, compound readers, rendering and export require owning native operations or denial. |
+| Dynamic rounded-corner controls | 504–519 | Hidden `#corners-sec`, labeled linked-corners checkbox, four scrub inputs and conditional rows bind timeline:2896+. Linking/shape parameter writes are not CSS state. Live rebuild, save/load/history and renderer parity remain pending where native support is unavailable. |
+| Dynamic ellipse arc/donut controls | 520–528 | Hidden `#ellipse-arc-sec`, conversion button and hidden start/sweep/inner rows use timeline arc editing (2937+). Numeric UI limits and conversion visibility do not validate dynamic geometry or record/replay behavior. |
+| Dynamic star/polygon controls | 529–536 | Hidden `#star-sec` hosts point count/inner radius/corner scrubs; timeline:2975+ synchronizes and commits parameters. Visible labels/ranges are not native shape construction or persistent metadata acceptance. |
+| Typography content/font/style/spacing interface | 537–609 | Hidden `#text-props-sec` hosts tp-content, font/add-font controls, size/color, alignment/style/case buttons, spacing and wrap/fixed-width fields. Timeline:8712+ reads/writes text metadata; external Google font loading and generic scrub supply UI resources/input. Text rasterization, alpha, metadata codecs, frame history and expression/animation consumers need separate acceptance; labeled spacing fields coexist with other caption/title-only inputs. |
+| Effects stack and target readout hosts | 610–637 | Hidden `#effects-stack-sec`, adjustment/element-target hints and `#effects-list` are filled by effects-panel.js from its target contract. Comment explicitly distinguishes this ID from older effects-sec naming. Hint/stack DOM is not native effect discovery, resource ownership, persistence or evaluated results. |
+| Path-effects list and add selector | 638–646 | `#path-fx-sec/#path-fx-list/#path-fx-add` distinguishes geometry path effects from the visual effect stack. Effects-panel wires add/rendering with path-fx services. Native select/host do not establish geometry mutation/evaluation or available capability. |
+| Effects catalog flyout trigger and closure | 647–655 | `#p-add-effect-btn` opens the categorized menu generated by effects-panel.js:876+ with previews. This markup closes stack body/section; catalog/thumbnail presence is not effect registration or application acceptance. |
+| Camera key/easing controls | 656–667 | Hidden `#camera-sec`, `#cam-key-info`, add-key/ease buttons use timeline/motion camera state and shared curve editor elsewhere. No duplicate easing-widget ownership. Key timing, camera evaluation and render/export/history require native APIs or explicit unavailable results. |
+| Layer blend/matte selector shells | 668–689 | Hidden `#layer-sec`, `#p-blendmode/#p-mattemode` are custom div `.psel` controls with role=button/tabindex=0 and data-value. Timeline builds menus/live previews; motion property paths also consume layer state. Role/focus supplies an interface, not full keyboard/accessibility or compositor/matte acceptance. |
+| Reference-media import/popover controls | 690–735 | `#p-ref-menu`, hidden file input/popover, import/remove, name, on checkbox and opacity/offset scrubs bind reference-bridge.js. Disabled initial remove and global state.refMedia commentary distinguish this from per-layer identity. Browser/native decode, references/permission lifetime, persistence and export exclusions remain operation contracts. |
+| Elements tree host | 736–751 | Hidden `#shapes-sec/#shapes-list` receives shape/group rows from shapes-panel.js and shared motion-element CSS. Tree selection/order/visibility/group operations and persistent identities are not admitted by a host div; Animation2D/Motion surfaces retain their own acceptance. |
+| Document dimension/lock interface | 752–769 | `#canvas-sec` hosts p-cw/p-ch scrubs and `#btn-dims-lock`; timeline moves it into document identity context (`.psec-identity`) and synchronizes values. Max dimensions/lock are UI hints; native document resize, content effects, persistence/history and viewport/export must be validated separately. |
+| Document FPS/frame-count fields | 770–778 | `#proj-fps/#proj-frames` bind timeline document timing handlers, using generic scrub and bounds/defaults. Fields do not authorize truncating stored frames/markers or accept timing/animation/export parity; native timing authority remains required. |
+| Document background/view-overlay row and closure | 779–828 | `#p-cbg` and fit/reset/clip/safety/rulers/alpha buttons share `.doc-bg-row` with an aria-hidden separator and wrapping CSS. Timeline/app/rulers/engine consume toggles; comment records media-mode relocation outside this section. Background persistence versus view/UI preference and authoritative viewport remain distinct, unaccepted by this layout. |
+| Combined-shape create/mode/remove/flatten controls | 829–865 | `#combine-opts-sec`, four `.combine-mode-btn[data-mode]`, existing/remove/flatten row and hint use timeline combine helpers (11555+) and selection-context `.psec-inline`. Parametric combination and destructive flatten are distinct operations; shared icons with booleans do not imply identical mutation/history semantics. |
+| Fill swatch/hex/alpha/enable interface | 866–897 | `#fill-sec`, pm-fill/color input, hidden p-fill-on, p-fill-hex, p-opacity and eye/gradient trigger bind timeline color synchronization and shared ColorPicker. p-opacity represents fill color alpha per timeline:6310+, not an interchangeable layer-opacity command. Hex8 codec/selection/history obligations survive native unavailability; dim/hidden fields supply no denial. |
+| Fill-gradient editor host and controls | 898–914 | Hidden `#p-fill-gradient-editor`, on/kind controls, stops-list/add-stop/hint bind timeline gradient helpers; canvas gradient-bridge handles gestures. Dynamic stop DOM and inline visibility are interfaces, not color interpolation, document codec, rendering/export or native operation acceptance. |
+| Stroke swatch/hex/alpha/enable interface | 915–931 | `#stroke-sec`, pm-stroke/color input, p-stroke-hex/p-stroke-alpha and eye div mirror the fill pattern via timeline/color picker. Stroke color alpha is separate from fill/layer opacity. Span/div faces and hex6 input defaults do not supersede persistent hex8 or enable/history contracts. |
+| Stroke-along-path gradient interface | 932–942 | Labeled `#p-strokegrad-along` checkbox and from/to swatches bind timeline:10373+. This gradient follows path length, unlike fill spatial gradients. Endpoint values, serialization/evaluation/rendering and undo remain owning operations. |
+| Stroke width/style and one-shot smooth interface | 943–956 | `#p-sw/#p-strokestyle` and selected-stroke smoothing scrub bind timeline style/geometry handlers. Comment distinguishes one-shot selected geometry smoothing from future-stroke Tool Options smoothing. UI bounds and shared width defaults are not geometry/history/native acceptance. |
+| Stroke cap/join/miter/paint-order/dash interface | 957–972 | `#p-cap-grp/#p-join-grp/#p-paintorder-grp` buttons use data-value, with miter/dash scrubs. Timeline/UI icon-group bindings synchronize choices. Order labels/icons must retain actual render/codec semantics; no stroke preparation/export parity is implied. |
+| Vector-brush preset preview and hidden selector | 973–1001 | `#p-brushpreset-btn` contains preview canvas/label; hidden `#p-brushpreset` retains catalog values. Brush-preset-picker builds presentation/catalog and timeline consumes current choice. Thumbnail/selection is not brush renderer, resource lifetime or preset metadata persistence. |
+| Brush favorites host and removed-control commentary | 1002–1024 | Hidden `#p-brushfav-row` receives picker favorites. Comment describes removed Apply/Bitmap Brush sections and remaining UI entry paths; this is historical placement evidence, not native bitmap/vector support. Favorite storage and preset application remain controller obligations; stroke body/section closes here. |
+| Selected-colors dynamic body | 1025–1043 | `#selected-colors-sec/#selected-colors-body/#selected-colors-empty` receives color-manager.js rows for selection/project colors; UI collapse sweep explicitly spares this body. Comment distinguishes serialized data from live Paper objects. Palette edits must retain codecs, selection and all-frame/history semantics through native commands or denial. |
+| Image-mesh activation/grid/reset controls | 1044–1068 | Hidden `#p-imagemesh-sec/body`, labeled on/edit checkboxes, cols/rows/info/reset bind image-mesh-bridge.js:293+. Mesh outline also masks the image per CLAUDE.md §12; no independent image-mask owner is created. State.imageMeshes, frame/media readers, render/export/history/native bridges remain separate obligations. |
+| Rig-widget size/axis range/rest/link controls | 1069–1098 | Hidden `#p-widget-sec` contains size and X/Y range/rest/link controls; rig-widget.js:563+ fills them and conditionally hides Y rows by widget kind. Axis labels/limits/link buttons are UI interfaces, not rig target identity, pose evaluation, history/persistence or native acceptance. |
+
+Load/cascade contract: head styles precede this body markup; the separately
+owned gpu-gate/Paper bootstrap precedes styles. Later classic UI/timeline/motion
+and specialty controllers locate stable IDs/classes/data attributes after DOM
+declaration. UI generic scrubs, icon groups and psec collapse are shared readers;
+i18n owns translated text/title sweeps, with afterI18n for collapse's dynamic title.
+P03C-at/au/aw/ax CSS rows supply inspector/form/context/preview cascade dependencies,
+not duplicate interval ownership. Inline display, `.collapsed/.hid/.ac`, values,
+canvas sizes, selection/context and generated list children remain public DOM inputs.
+
+| Applicable consumer dimension | Boundary retained by this inventory map |
+|---|---|
+| Save/load and undo/redo | Persistent transform anchors, shapes/text/masks, camera/layer/matte/effects, document size/timing/background, colors/gradients/brushes, mesh and widget fields must retain every applicable codec/history consumer. Revisions, tween targets and reference identities require exact ownership. Inspector collapse/width and catalog favorites may be UI preferences, not document fields. Legacy snapshots/callbacks do not establish native persistence; no save/reload/history trial occurred. |
+| Selection and animation | Context visibility, counts, active/selected controls, rail entries, tracker/tween markers and effects targeting mirror controller state. Boolean/point/shape/text/mesh/widget edits and camera/FPS/key/reassignment evaluation must use native APIs or explicitly reject unavailable operations. Fill alpha is not layer opacity. No gesture, timing, expression or native parity acceptance is granted. |
+| Render/export and native bridge | Preview canvases, typography/font resources, reference images, badges and overlay toggles are UI readers, not authoritative evaluation/viewport/export production. Persistent styling/geometry/mesh/rig/effect/media consumers require native services, fixed-revision render/export and resource/permission lifetime checks. This census ports no UI to Rust and accepts no native callback, GPU or encoded output. |
+| Browser and installed desktop | Common DOM/CSS has host-specific media/font/native viewport differences. Inspector reflow, collapse rail, canvas capture exclusion, popovers/stacking, scrub limits/focus, input labels and keyboard controls need surface checks. Native buttons/labels coexist with caption-only inputs, color eye divs and custom role/button selectors. No browser, installed, accessibility or reduced-motion behavior run occurred. |
+
+The 39 intervals cover **732 frozen lines exactly once**. Sibling P03C-ay ends
+at 356; C06 Labs 357–366 stays owned there, with 367 only the explicit closure
+marker; the next HTML sibling starts at 1099. C06 settings 1743–1933/flags
+2285–2297 and all other ranges remain untouched. No source identity, original
+packet/admission, JSON order/classification, `rangeCoverage`, whole-span
+disposition or `complete:false` changes; exactly 760 original packets stay pending.
+
+Focused checks parse this table against independent 367–1098, reject omission,
+duplicate, sibling/C06 intrusion and reassignment of line 367 to a Labs behavior
+owner, compare frozen/current bytes and check representative DOM/CSS/controller/load
+consumers. Integrity-only and 53 scope tests establish consistency, not semantic
+completeness; normal completeness remains failing while the wider queue stays open.
