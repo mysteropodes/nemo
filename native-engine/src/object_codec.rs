@@ -131,10 +131,7 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         if fill.kind != "solid" {
             return Err(reject(Unsupported, "only solid fill is supported"));
         }
-        if ![&fill.r, &fill.g, &fill.b, &fill.a].into_iter().all(|n| {
-            n.as_f64()
-                .is_some_and(|v| v.is_finite() && (0.0..=1.0).contains(&v))
-        }) {
+        if !fill.valid_channels() {
             return Err(reject(
                 Invalid,
                 "solid fill channels must be finite and within 0..1",

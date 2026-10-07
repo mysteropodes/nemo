@@ -187,6 +187,14 @@ impl ObjectRecord {
         &self.target
     }
 }
+impl SolidFill {
+    pub(crate) fn valid_channels(&self) -> bool {
+        [&self.r, &self.g, &self.b, &self.a].into_iter().all(|n| {
+            n.as_f64()
+                .is_some_and(|v| v.is_finite() && (0.0..=1.0).contains(&v))
+        })
+    }
+}
 impl ObjectLayer {
     pub fn layer_uid(&self) -> &str {
         &self.layer_uid
