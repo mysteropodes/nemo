@@ -1498,3 +1498,36 @@ or whole-span disposition changes; **760 original packets remain pending** and
 `complete:false` remains. This completes only the bounded loader census and
 overlap reconciliation; normal completeness still fails while wider admissions
 remain pending. No runtime, browser/installed or whole-P03 acceptance is implied.
+
+## P03C-bd frozen desktop UI-shell span reconciliation
+
+[P03C-bd / #1622](https://github.com/mysteropodes/nemo/issues/1622) records the
+eight remaining `rangeCoverage` dispositions at the unchanged frozen source
+`3f6eed2a500f2ce868b711e063816029eb8fefa5`. The named UI-shell and loader
+maps below were accepted in P03C-at through P03C-bc; this leaf only connects
+those maps to the checker’s exact four CSS and four HTML spans. The inspected
+desktop integration source was `9bafb0c8410729f7feec1c30c87e42c5cb41184b`.
+Its current HTML/CSS drift is already recorded in the owning maps and does not
+change frozen line ownership.
+
+| Frozen source span | Complete named responsibility map | Adjacent or internal boundary |
+|---|---|---|
+| `src/css/style.css:1-90` | P03C-at/#1592 | C06 starts at 91 |
+| `src/css/style.css:105-421` | P03C-at/#1592 | C06 owns 91-104 and 422-461 |
+| `src/css/style.css:462-2131` | P03C-at/#1592 462-897; au/#1593 898-1356; av/#1594 1357-1855; aw/#1595 1856-2131 | C06 resumes at 2132 |
+| `src/css/style.css:2164-2850` | P03C-aw/#1595 2164-2381; ax/#1596 2382-2850 | C06 ends at 2163 |
+| `src/index.html:1-356` | P03C-ay/#1597 1-8 and 11-356; bc/#1601 loader tags 9-10 | C06 Labs begins at 357 |
+| `src/index.html:367-1742` | P03C-az/#1598 367-1098; ba/#1599 1099-1742 | Line 367 closes C06 Labs structurally; C06 settings begins at 1743 |
+| `src/index.html:1934-2284` | P03C-bb/#1600 | C06 settings ends at 1933 and flags begin at 2285 |
+| `src/index.html:2298-2485` | P03C-bc/#1601 | C06 flags end at 2297 |
+
+All eight dispositions are `covered` **responsibility mappings only**. HTML/CSS
+remains the desktop presentation shell; its stateful controls still require
+the Rust-backed shared application API or explicit unavailability. The C06
+shortcuts pane’s eight historical HTML overlap lines 1876-1883 retain their
+single effective owner from P03C-bc; computed overlap and coverage counts are
+unchanged. This leaf admits no packet, changes no product/source/generated
+artifact, and claims no feature, browser, installed-client or whole-P03
+acceptance. The expected integrity result is `undispositionedSpans:0` with
+`pendingPackets:760` and `complete:false`; those pending references remain
+visible for later P03 admission/disposition rather than being renamed Done.
