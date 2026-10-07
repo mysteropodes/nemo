@@ -72,50 +72,62 @@
       var observed = lifecycle.inspect(), current = lifecycle.identity();
       var retryable = false;
       try {
-        var presented;
-        do {
+        var staleRetries = 0;
+        for (;;) {
           await settleResize(observed.session);
           var work = lifecycle.presentPreview(frame);
           presenting = work;
+          var presented;
           try { presented = await work; }
           finally { if (presenting === work) presenting = null; }
+          var latest = lifecycle.inspect();
+          if (!['presented', 'deferred-occluded', 'deferred-timeout', 'stale-discarded'].includes(presented.status) ||
+              presented.frame !== frame ||
+              presented.lifecycleGeneration !== observed.generation ||
+              presented.instanceId !== current.instanceId ||
+              presented.documentId !== current.documentId ||
+              presented.contentRevision !== current.contentRevision ||
+              latest.phase !== 'native' || latest.session !== observed.session ||
+              latest.generation !== observed.generation ||
+              !latest.identity || latest.identity.instanceId !== current.instanceId ||
+              latest.identity.documentId !== current.documentId ||
+              latest.identity.contentRevision !== current.contentRevision ||
+              typeof lifecycle.persistenceJSON() !== 'string') {
+            throw new Error('native opacity frame was not presented at the admitted revision');
+          }
+          // Deferred native work remains keyed by evaluation until terminal.
+          // After a newer view presents, revisiting it retires the stale work;
+          // one new request must prove a fresh presentation before publication.
+          if (presented.status === 'stale-discarded' &&
+              typeof isPublished === 'function' && isPublished(observed.session)) {
+            if (staleRetries++ === 0) continue;
+            var stale = new Error('native opacity frame presentation remains stale');
+            stale.code = 'native_preview_superseded';
+            throw stale;
+          }
           // A resize can arrive while the host presents. Finish it and retry.
-        } while (presented.status === 'presented' &&
-                 ((resize && resize.session === observed.session) ||
-                  (resizing && resizing.session === observed.session)));
-        var latest = lifecycle.inspect();
-        if (!['presented', 'deferred-occluded', 'deferred-timeout'].includes(presented.status) ||
-            presented.frame !== frame ||
-            presented.lifecycleGeneration !== observed.generation ||
-            presented.instanceId !== current.instanceId ||
-            presented.documentId !== current.documentId ||
-            presented.contentRevision !== current.contentRevision ||
-            latest.phase !== 'native' || latest.session !== observed.session ||
-            latest.generation !== observed.generation ||
-            !latest.identity || latest.identity.instanceId !== current.instanceId ||
-            latest.identity.documentId !== current.documentId ||
-            latest.identity.contentRevision !== current.contentRevision ||
-            typeof lifecycle.persistenceJSON() !== 'string') {
-          throw new Error('native opacity frame was not presented at the admitted revision');
-        }
-        // The start screen can occlude the native layer before reveal. This
-        // receipt admits only the handoff, never an Open success; reveal must
-        // obtain a fresh, strictly presented receipt at the same identity.
-        if (presented.status === 'deferred-occluded' && allowOccludedAdmission && isOpening()) {
+          if (presented.status === 'presented' &&
+              ((resize && resize.session === observed.session) ||
+               (resizing && resizing.session === observed.session))) continue;
+          // The start screen can occlude the native layer before reveal. This
+          // receipt admits only the handoff, never an Open success; reveal must
+          // obtain a fresh, strictly presented receipt at the same identity.
+          if (presented.status === 'deferred-occluded' && allowOccludedAdmission && isOpening()) {
+            return Object.freeze(Object.assign({ owner: 'native' }, presented));
+          }
+          if (presented.status !== 'presented') {
+            if (typeof isPublished === 'function' && isPublished(observed.session)) {
+              var deferred = new Error('native opacity frame presentation is deferred');
+              deferred.code = 'native_preview_deferred';
+              deferred.status = presented.status;
+              retryable = true;
+              throw deferred;
+            }
+            throw new Error('native opacity frame was not presented at the admitted revision');
+          }
+          lastPresentedFrame = frame;
           return Object.freeze(Object.assign({ owner: 'native' }, presented));
         }
-        if (presented.status !== 'presented') {
-          if (typeof isPublished === 'function' && isPublished(observed.session)) {
-            var deferred = new Error('native opacity frame presentation is deferred');
-            deferred.code = 'native_preview_deferred';
-            deferred.status = presented.status;
-            retryable = true;
-            throw deferred;
-          }
-          throw new Error('native opacity frame was not presented at the admitted revision');
-        }
-        lastPresentedFrame = frame;
-        return Object.freeze(Object.assign({ owner: 'native' }, presented));
       } catch (error) {
         var failed = lifecycle.inspect();
         if (!retryable && (!error || error.code !== 'native_preview_superseded') &&
