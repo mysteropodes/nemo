@@ -407,8 +407,8 @@ impl NativeDispatch for DesktopNativeApplication {
     fn dispatch(
         &mut self,
         request: native_engine::commands::OpacityRequest,
-    ) -> native_engine::commands::ResponseEnvelope {
-        self.core.dispatch(request)
+    ) -> Result<native_engine::commands::ResponseEnvelope, String> {
+        Ok(self.core.dispatch(request))
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         Err("desktop replacement requires validated projection resources".into())
@@ -445,3 +445,39 @@ mod release_tests;
 #[cfg(test)]
 #[path = "native_application_dispatch_release_tests.rs"]
 mod dispatch_release_tests;
+
+#[cfg(test)]
+mod dispatch_envelope_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn opacity_success_and_failure_envelope_bytes_match_the_unchanged_core() {
+        let scratch = release_tests::Scratch::new();
+        let mut application = release_tests::desktop(&scratch, None);
+        for (operation, payload, success) in [
+            ("query.document.revision", json!({}), true),
+            (
+                "query.document.opacity",
+                json!({"stableTarget":{"layerUid":"missing"}}),
+                false,
+            ),
+        ] {
+            let request = native_engine::commands::OpacityRequest::query(
+                operation,
+                application.instance_id(),
+                application.document_id(),
+                operation,
+                payload,
+            );
+            let expected = application.core.dispatch(request.clone());
+            assert_eq!(expected.is_ok(), success);
+            let actual = NativeDispatch::dispatch(&mut application, request).unwrap();
+            assert_eq!(actual.is_ok(), success);
+            assert_eq!(
+                serde_json::to_vec(&actual).unwrap(),
+                serde_json::to_vec(&expected).unwrap()
+            );
+        }
+    }
+}

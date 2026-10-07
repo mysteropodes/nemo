@@ -346,7 +346,9 @@ pub(crate) trait NativeDispatch: Send {
     fn instance_id(&self) -> &str;
     fn document_id(&self) -> &str;
     fn content_revision(&self) -> u64;
-    fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope;
+    /// Err refuses dispatch before any mutation or content revision advance.
+    /// A committed operation must return its envelope, never a refusal.
+    fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String>;
     fn replace_document(&mut self, document: OpacityDocument) -> Result<Vec<JobReceipt>, String>;
     fn start_next_export_frame(&mut self, job_id: &str) -> Result<Option<PendingFrame>, String>;
     fn finish_export_frame(&mut self, pending: PendingFrame) -> Result<JobReceipt, String>;
@@ -371,8 +373,8 @@ where
     fn content_revision(&self) -> u64 {
         NativeApplication::content_revision(self)
     }
-    fn dispatch(&mut self, request: OpacityRequest) -> ResponseEnvelope {
-        NativeApplication::dispatch(self, request)
+    fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String> {
+        Ok(NativeApplication::dispatch(self, request))
     }
     fn replace_document(&mut self, document: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         NativeApplication::replace_document(self, document)
@@ -474,6 +476,8 @@ pub(crate) fn run_export_pump_interleaved(
 #[cfg(test)]
 #[path = "native_dispatch_tests.rs"]
 pub(crate) mod tests;
+#[cfg(test)]
+pub(crate) use tests::TerminalPump;
 
 #[cfg(test)]
 #[path = "native_object_host_tests.rs"]

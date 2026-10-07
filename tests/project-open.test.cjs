@@ -28,7 +28,7 @@ function realImportJSON() {
   return { calls, importJSON, state };
 }
 
-function harness({ auto = null, version = null, deferFrames = false, dirtyDot = false } = {}) {
+function harness({ auto = null, version = null, deferFrames = false, dirtyDot = false, nativeGuard = false } = {}) {
   const elements = new Map();
   const downloads = [], toasts = [], frames = [], writes = [];
   let repaints = 0, mutations = 0;
@@ -58,10 +58,14 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
   window.NemoNativeOpacityProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
   window.NemoProjectNativeSave = require('../src/js/adapters/project-native-save.js');
   window.NemoProjectDirtyBaseline = require('../src/js/adapters/project-dirty-baseline.js');
+  window.NemoProjectNativeVersionRestore = require('../src/js/adapters/project-native-version-restore.js');
   class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem(key, value) { writes.push([key, value]); }, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
-    requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() { mutations++; }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
+    requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() {
+      if (nativeGuard) window.NemoNativeOpacityLegacySurface.requireLegacyWrite(window, 'save-all-layer-frames');
+      mutations++;
+    }, createUserLayer() { mutations++; }, activateUL() {}, drawStage() {}, loadFrame() {}, renderOS() {}, renderArcs() {}, updateUI() {}, renderSymbolTabs() {}, syncDocFields() {}, exitToScene() {}, setTimeout, console };
   window.requestAnimationFrame = function (fn) {
     assert.strictEqual(this, window, 'WebKit requestAnimationFrame requires a Window receiver');
     return context.requestAnimationFrame(fn);
@@ -709,4 +713,112 @@ test('real tab switch and active close retain clean versus dirty normalized base
     assert.equal(app.elements.get('project-tabs-list').children.length, 1);
     assert.equal(app.project.isDirty(), dirty, 'active close preserves target-tab dirty flag');
   }
+});
+
+function versionRestoreHarness() {
+  const shell = JSON.parse(fs.readFileSync('tests/animation/fixtures/curve-workflow.json', 'utf8'));
+  shell.layers[0].motionStatic = { opacity: [60] };
+  const previous = JSON.stringify(shell);
+  shell.layers[0].motionStatic.opacity = [40];
+  const version = JSON.stringify(shell);
+  const app = harness({ version, deferFrames: true, nativeGuard: true });
+  app.json = previous;
+  app.project.markSaved();
+  let current = previous, identity = { instanceId: 'native-instance', documentId: 'A', contentRevision: 2 };
+  const writes = [], visible = deferred(), first = { owner: 'native', status: 'presented', frame: 0,
+    instanceId: 'native-instance', documentId: 'B', contentRevision: 0,
+    lifecycleGeneration: 2, documentSnapshotId: 'snapshot-B' };
+  app.window.NemoNativeOpacityLegacyAdmission = { allow: () => false };
+  app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
+    identity: () => identity, persistenceJSON: () => current };
+  app.window.SM.exportJSON = () => { throw Error('legacy export forbidden'); };
+  Object.assign(app.window.__TAURI__, { path: { appDataDir: async () => '/owned-app-data' } });
+  Object.assign(app.window.__TAURI__.fs, { mkdir: async () => {},
+    writeTextFile: async (path, bytes) => writes.push([path, bytes]), readDir: async () => [] });
+  app.window.NemoNativeOpacityProject = {
+    importJSON: async (bytes, silent, allowOccluded) => {
+      assert.equal(bytes, version); assert.equal(silent, true); assert.equal(allowOccluded, true);
+      current = version; identity = { ...identity, documentId: 'B', contentRevision: 0 }; return first;
+    },
+    finishOpenAfterReveal: receipt => {
+      assert.equal(receipt, first);
+      return visible.promise.then(final => {
+        if (final.status !== 'presented' || final.documentId !== first.documentId ||
+            final.contentRevision !== first.contentRevision || final.lifecycleGeneration !== first.lifecycleGeneration)
+          throw Error('native final presentation failed');
+        return final;
+      });
+    },
+  };
+  app.element('history-modal').style.display = 'flex';
+  return { app, previous, version, writes, visible, first, get identity() { return identity; } };
+}
+
+test('native Version Restore never reaches legacy writers and waits for final presentation before backup/success', async () => {
+  const h = versionRestoreHarness();
+  const pending = h.app.project.restoreVersion('/owned-history/version.json');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.app.mutations, 0);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.app.toasts.includes('toastVersionRestored'), false);
+  assert.equal(h.app.pendingFrames, 1);
+  h.app.flushFrame(); h.app.flushFrame();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.writes.length, 0);
+  h.visible.resolve({ ...h.first, status: 'presented' });
+  assert.equal(await pending, true);
+  assert.equal(h.writes.length, 1);
+  assert.equal(h.writes[0][1], h.previous, 'backup is previous native pin, never a legacy export or restored version');
+  assert.match(h.writes[0][0], /^\/owned-app-data\/history\/untitled-autosave\/\d+\.json$/);
+  assert.equal(h.app.mutations, 0);
+  assert.equal(h.app.project.isDirty(), true, 'version restoration does not mark the new content saved');
+  assert.equal(h.app.project.getCurrentLabel(), 'Untitled (not saved)');
+  assert.equal(h.app.element('history-modal').style.display, 'none');
+});
+
+test('native Version Restore final failure restores modal visibility without backup or false success', async () => {
+  const h = versionRestoreHarness();
+  const pending = h.app.project.restoreVersion('/owned-history/version.json');
+  await new Promise(resolve => setImmediate(resolve));
+  h.app.flushFrame(); h.app.flushFrame();
+  h.visible.resolve({ ...h.first, status: 'deferred-occluded' });
+  assert.equal(await pending, false);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.app.mutations, 0);
+  assert.equal(h.app.toasts.includes('toastVersionRestored'), false);
+  assert.equal(h.app.element('history-modal').style.display, 'flex');
+  assert.equal(h.identity.documentId, 'B', 'test does not manufacture rollback to A after native replacement');
+});
+
+test('desktop Version Restore with no published native globals denies before every legacy or file effect', async () => {
+  const version = fs.readFileSync('tests/animation/fixtures/curve-workflow.json', 'utf8');
+  const app = harness({ version });
+  let reads = 0, exports = 0;
+  app.window.__TAURI__.core = { invoke: async () => { throw Error('must not invoke'); } };
+  app.window.__TAURI__.fs.readTextFile = async () => { reads++; return version; };
+  app.window.SM.exportJSON = () => { exports++; return '{"keep":true}'; };
+  const before = app.json;
+  assert.equal(await app.project.restoreVersion('/owned-history/version.json'), false);
+  assert.equal(reads, 0, 'missing native pin denies before file read');
+  assert.equal(exports, 0);
+  assert.equal(app.mutations, 0);
+  assert.equal(app.writes.length, 0);
+  assert.equal(app.json, before);
+  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  assert.equal(app.toasts.includes('toastVersionRestored'), false);
+});
+
+test('native Version Restore rejected import preserves the existing document, baseline and modal', async () => {
+  const h = versionRestoreHarness();
+  const before = { identity: { ...h.identity }, label: h.app.project.getCurrentLabel(), dirty: h.app.project.isDirty() };
+  h.app.window.NemoNativeOpacityProject.importJSON = async () => false;
+  assert.equal(await h.app.project.restoreVersion('/owned-history/version.json'), false);
+  assert.deepEqual(h.identity, before.identity);
+  assert.equal(h.app.project.getCurrentLabel(), before.label);
+  assert.equal(h.app.project.isDirty(), before.dirty);
+  assert.equal(h.app.mutations, 0);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.app.pendingFrames, 0);
+  assert.equal(h.app.element('history-modal').style.display, 'flex');
+  assert.equal(h.app.toasts.includes('toastVersionRestored'), false);
 });

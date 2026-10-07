@@ -225,19 +225,11 @@
     var base=await window.__TAURI__.path.appDataDir();
     return base.replace(/[\\/]+$/,'')+'/history/'+historyKey();
   }
+  function writeVersionSnapshot(json,dir){return window.NemoProjectNativeVersionRestore.writeSnapshot(json,dir,window.__TAURI__.fs,HISTORY_MAX,function(){return Date.now();});}
   async function pushVersionSnapshot(json){
     if(!tauriOk())return; // browser preview: 'nemo-auto' single-slot fallback only
-    try{
-      var dir=await historyDir();
-      await window.__TAURI__.fs.mkdir(dir,{recursive:true});
-      await window.__TAURI__.fs.writeTextFile(dir+'/'+Date.now()+'.json',json);
-      var entries=await window.__TAURI__.fs.readDir(dir);
-      var names=entries.filter(function(e){return /\.json$/.test(e.name);}).map(function(e){return e.name;}).sort();
-      while(names.length>HISTORY_MAX){
-        var victim=names.shift();
-        try{await window.__TAURI__.fs.remove(dir+'/'+victim);}catch(e){}
-      }
-    }catch(e){console.warn('[history] snapshot failed',e);}
+    try{await writeVersionSnapshot(json,await historyDir());}
+    catch(e){console.warn('[history] snapshot failed',e);}
   }
   async function listVersionHistory(){
     if(!tauriOk())return [];
@@ -250,7 +242,17 @@
         .sort(function(a,b){return b.ts-a.ts;});
     }catch(e){return [];}
   }
+  var nativeVersionRestore=window.NemoProjectNativeVersionRestore.bind(window,{
+    metadata:function(){return {path:currentPath,name:currentName};},
+    backupTarget:historyDir,reveal:revealOpenedProject,
+    modal:function(){return document.getElementById('history-modal');},
+    backup:writeVersionSnapshot,
+    backupFailed:function(error){console.warn('[history] pre-restore snapshot failed',error);},
+    restored:function(){ensureInitialTab();showToast(SM.t('toastVersionRestored'));},
+    unavailable:function(){showToast('Could not finish restoring this version.');}
+  });
   async function restoreVersion(path){
+    if(tauriOk()||'NemoNativeOpacityCutover' in window||'NemoNativeOpacityProject' in window)return nativeVersionRestore.restore(path);
     // Capture the current document before import, then record that snapshot
     // only after a successful restore. Rejected input must leave both the
     // current project and its version history unchanged.

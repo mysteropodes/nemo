@@ -51,7 +51,11 @@ fn dispatch(state: &ApplicationMcp, request: OpacityRequest) -> ResponseEnvelope
     let native = state.native_state();
     let mut authority = native.lock().unwrap();
     let generation = authority.active_generation().unwrap();
-    authority.active_mut(generation).unwrap().dispatch(request)
+    authority
+        .active_mut(generation)
+        .unwrap()
+        .dispatch(request)
+        .unwrap()
 }
 fn query(state: &ApplicationMcp, id: &str, operation: &str) -> ResponseEnvelope {
     let document = state
