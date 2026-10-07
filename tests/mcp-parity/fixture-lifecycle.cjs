@@ -24,12 +24,18 @@ const {
   deriveFromExamples,
   resolveAgainstSnapshot,
   instanceFieldName,
+  payloadSchemaForVersion,
   binary,
   label,
 } = require('./schema-acceptance.cjs');
 
 function derive(payloadSchema, operation) {
-  if (payloadSchema === undefined || payloadSchema === true || typeof payloadSchema !== 'object') {
+  if (
+    payloadSchema === null ||
+    payloadSchema === undefined ||
+    payloadSchema === true ||
+    typeof payloadSchema !== 'object'
+  ) {
     return null;
   }
   return (
@@ -56,7 +62,7 @@ async function main() {
 
   const tools = await client.listTools();
   const command = (tools.result?.tools || []).find((t) => t.name === 'nemo_command');
-  const payloadSchema = command?.inputSchema?.properties?.payload;
+  const payloadSchema = payloadSchemaForVersion(command, 1);
 
   // --- discover -------------------------------------------------------------
   const discover = structured(await client.callTool('nemo_discover', {}));

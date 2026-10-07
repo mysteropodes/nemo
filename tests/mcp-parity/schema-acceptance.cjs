@@ -90,6 +90,30 @@ function instanceFieldName(tools) {
   return required.find((name) => name !== 'operation' && name !== 'payload') || 'instanceId';
 }
 
+// The current tool advertises a broad root payload projection for clients,
+// while its version-specific v1 contract lives behind a local conditional
+// $ref. Derive from the branch selected by the version we actually send;
+// otherwise the broad projection hides required v1 fields such as a selector.
+function payloadSchemaForVersion(command, apiVersion) {
+  const schema = command?.inputSchema;
+  if (!schema || typeof schema !== 'object') return null;
+  if (!schema.if) return schema.properties?.payload ?? null;
+
+  const selected = schema.if?.properties?.apiVersion?.const === apiVersion
+    ? schema.then
+    : schema.else;
+  if (!selected || typeof selected !== 'object') return null;
+  let branch = selected;
+  if (typeof selected.$ref === 'string') {
+    if (!selected.$ref.startsWith('#/')) return null;
+    branch = selected.$ref.slice(2).split('/').reduce((value, segment) => {
+      const key = segment.replace(/~1/g, '/').replace(/~0/g, '~');
+      return value?.[key];
+    }, schema);
+  }
+  return branch?.properties?.payload ?? null;
+}
+
 function deriveFromRegisteredCapabilities(payloadSchema, operation = OPERATION) {
   const registered = payloadSchema?.['x-nemo-registeredCapabilities'];
   if (!Array.isArray(registered)) return null;
@@ -200,10 +224,13 @@ async function main() {
   const tools = await client.listTools();
   const command = (tools.result?.tools || []).find((t) => t.name === 'nemo_command');
   if (!command) throw new Error('nemo_command is not advertised');
-  const payloadSchema = command.inputSchema?.properties?.payload;
+  const payloadSchema = payloadSchemaForVersion(command, 1);
 
   const describes =
-    payloadSchema !== undefined && payloadSchema !== true && typeof payloadSchema === 'object';
+    payloadSchema !== null &&
+    payloadSchema !== undefined &&
+    payloadSchema !== true &&
+    typeof payloadSchema === 'object';
   console.log(`advertised payload schema: ${describes ? 'described' : JSON.stringify(payloadSchema)}`);
 
   const derivation =
@@ -289,6 +316,7 @@ module.exports = {
   deriveFromExamples,
   resolveAgainstSnapshot,
   instanceFieldName,
+  payloadSchemaForVersion,
   binary,
   label,
 };
