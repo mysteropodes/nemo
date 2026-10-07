@@ -1,10 +1,14 @@
 //! Shared boxed native-application seam used by the UI and bundled MCP host.
 
 use native_engine::{
-    application::{ExportResourceResolver, NativeApplication},
+    application::{ApplicationReleaseReceipt, ExportResourceResolver, NativeApplication},
     commands::{OpacityRequest, ResponseEnvelope},
     document::OpacityDocument,
-    export_job::{ExportCompositor, JobReceipt, JobStatus, PendingFrame, StagedArtifactPort},
+    export_job::{
+        ExportCompositor, JobReceipt, JobStatus, PendingFrame, ReconciliationStage,
+        StagedArtifactPort,
+    },
+    resource_leases::WorkId,
 };
 use std::{
     any::Any,
@@ -319,6 +323,25 @@ impl NativeAuthority {
     }
 }
 
+/// Retained cleanup evidence, including stages completed before a terminal error.
+/// A host owner must reconcile its own preview work before allowing re-entry.
+pub(crate) struct NativeReleaseProgress {
+    pub(crate) application: ApplicationReleaseReceipt,
+    pub(crate) cancelled_preview: Vec<WorkId>,
+    pub(crate) unresolved_preview: Vec<WorkId>,
+    pub(crate) preview_error: Option<String>,
+    pub(crate) preview_stage: ReconciliationStage,
+}
+
+impl NativeReleaseProgress {
+    pub(crate) fn reconciliation_complete(&self) -> bool {
+        self.application.transaction_stage == ReconciliationStage::Complete
+            && self.application.cleanup_complete()
+            && self.preview_stage == ReconciliationStage::Complete
+            && self.unresolved_preview.is_empty()
+    }
+}
+
 pub(crate) trait NativeDispatch: Send {
     fn instance_id(&self) -> &str;
     fn document_id(&self) -> &str;
@@ -327,6 +350,9 @@ pub(crate) trait NativeDispatch: Send {
     fn replace_document(&mut self, document: OpacityDocument) -> Result<Vec<JobReceipt>, String>;
     fn start_next_export_frame(&mut self, job_id: &str) -> Result<Option<PendingFrame>, String>;
     fn finish_export_frame(&mut self, pending: PendingFrame) -> Result<JobReceipt, String>;
+    /// No successful default: each owner explicitly supports or rejects cleanup.
+    fn release_project(&mut self) -> Result<NativeReleaseProgress, String>;
+    fn release_progress(&self) -> Option<NativeReleaseProgress>;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
@@ -356,6 +382,12 @@ where
     }
     fn finish_export_frame(&mut self, pending: PendingFrame) -> Result<JobReceipt, String> {
         NativeApplication::finish_export_frame(self, pending).map_err(|error| error.message)
+    }
+    fn release_project(&mut self) -> Result<NativeReleaseProgress, String> {
+        Err("native application has no host preview cleanup owner".into())
+    }
+    fn release_progress(&self) -> Option<NativeReleaseProgress> {
+        None
     }
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
