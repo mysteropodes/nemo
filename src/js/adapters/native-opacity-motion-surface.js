@@ -6,6 +6,29 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   var UNHANDLED = Object.freeze({ handled: false });
+  // One logical frame step, preserving the original loop, ping-pong and
+  // audio boundary behavior. This changes only the UI playback direction;
+  // document evaluation and presentation remain the native navigator's job.
+  // Ping-pong reverses only beyond the work-area edge, including a one-frame
+  // work area. Ordinary looping notifies audio when wrapping to the start.
+  function advancePlaybackFrame(state, audio, cur) {
+    var next = cur + state.playDir;
+    if (next > state.waOut) {
+      if (state.loopPlayback && state.pingPongPlayback) {
+        state.playDir = -1; next = cur - 1;
+        if (next < state.waIn) next = state.waIn;
+      } else if (state.loopPlayback) {
+        next = state.waIn;
+        if (audio) audio.onLoop(next);
+      } else return null;
+    } else if (next < state.waIn) {
+      if (state.loopPlayback && state.pingPongPlayback) {
+        state.playDir = 1; next = cur + 1;
+        if (next > state.waOut) next = state.waOut;
+      } else return null;
+    }
+    return next;
+  }
   function freeze(value) {
     if (value && typeof value === 'object') {
       Object.keys(value).forEach(function (key) { freeze(value[key]); });
@@ -299,10 +322,85 @@
     }
     return Object.freeze({ navigate: navigate });
   }
+  // Playback owns only a clock and a cancellable presentation intent. The
+  // navigator above remains the sole route that can publish a UI frame.
+  function createPlaybackScheduler(ports) {
+    var methods = ['frame', 'fps', 'playing', 'controller', 'advance', 'navigate',
+      'stop', 'now', 'request', 'cancel'];
+    if (!ports || methods.some(function (name) { return typeof ports[name] !== 'function'; })) {
+      throw new TypeError('native playback ports are unavailable');
+    }
+    var generation = 0, controller = null, identity = null, raf = null;
+    function sameIdentity(a, b) {
+      return !!a && !!b && a.instanceId === b.instanceId &&
+        a.documentId === b.documentId && a.contentRevision === b.contentRevision;
+    }
+    function current(run) {
+      try { return run === generation && ports.playing() &&
+        ports.controller() === controller && controller.isActive() &&
+        sameIdentity(identity, controller.identity()); }
+      catch (_) { return false; }
+    }
+    function start(owner) {
+      if (controller) return false;
+      var initial;
+      try { initial = owner && owner.isActive() && owner.identity(); }
+      catch (_) { return false; }
+      if (ports.controller() !== owner || !initial ||
+          typeof initial.instanceId !== 'string' || !initial.instanceId ||
+          typeof initial.documentId !== 'string' || !initial.documentId ||
+          !Number.isSafeInteger(initial.contentRevision) || initial.contentRevision < 0 ||
+          !Number.isFinite(ports.fps()) || ports.fps() <= 0) return false;
+      controller = owner; identity = initial;
+      var run = ++generation, frameMs = 1000 / ports.fps(), clock = ports.now();
+      var pending = false;
+      function step(now) {
+        raf = null;
+        if (!current(run)) { if (run === generation && ports.playing()) ports.stop(); return; }
+        if (!pending) {
+          var steps = Math.floor((now - clock) / frameMs);
+          if (steps > 0) {
+            if (steps > ports.fps() * 2) { steps = 1; clock = now; }
+            else clock += steps * frameMs;
+            var next = ports.frame(), ending = false;
+            for (var k = 0; k < steps; k++) {
+              var advanced = ports.advance(next);
+              if (advanced === null) { ending = true; break; }
+              next = advanced;
+            }
+            if (next !== ports.frame()) {
+              pending = true;
+              try {
+                Promise.resolve(ports.navigate(next)).then(function (presented) {
+                  pending = false;
+                  if (current(run) && (!presented || ending)) ports.stop();
+                }, function () { pending = false; if (current(run)) ports.stop(); });
+              } catch (_) { pending = false; ports.stop(); return; }
+            } else if (ending) { ports.stop(); return; }
+          }
+        }
+        raf = ports.request(step);
+      }
+      try { raf = ports.request(step); }
+      catch (_) { ++generation; controller = null; identity = null; return false; }
+      return true;
+    }
+    function stop() {
+      var wasNative = !!controller, restore = false;
+      if (wasNative) {
+        try { restore = ports.controller() === controller && controller.isActive() &&
+          sameIdentity(identity, controller.identity()); } catch (_) {}
+      }
+      ++generation; controller = null; identity = null;
+      if (raf !== null) { ports.cancel(raf); raf = null; }
+      return Object.freeze({ wasNative: wasNative, restore: restore });
+    }
+    return Object.freeze({ start: start, stop: stop });
+  }
   function requireAvailable(value) {
     var methods = ['owns', 'read', 'detachedElementView', 'detachedExpressionView', 'expressionSnapshot',
       'positionOverlayPlan', 'nativeKeyInteractionPlan', 'renderedOpacityRoute', 'routeIntent', 'routeDimension', 'publishWriters',
-      'createFrameNavigator'];
+      'createFrameNavigator', 'createPlaybackScheduler', 'advancePlaybackFrame'];
     if (!value || !Object.isFrozen(value) || methods.some(function (name) { return typeof value[name] !== 'function'; })) {
       throw new Error('native Motion surface is unavailable or malformed');
     }
@@ -314,5 +412,7 @@
     opacityReadModel: opacityReadModel, renderedOpacityRoute: renderedOpacityRoute,
     routeIntent: routeIntent, routeDimension: routeDimension,
     publishWriters: publishWriters, createFrameNavigator: createFrameNavigator,
+    createPlaybackScheduler: createPlaybackScheduler,
+    advancePlaybackFrame: advancePlaybackFrame,
     requireAvailable: requireAvailable });
 }));
