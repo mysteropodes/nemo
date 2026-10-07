@@ -11663,7 +11663,7 @@
         "C06.preferences.settings-modal-shell",
         "C06.preferences.shortcuts-system"
       ],
-      "reason": "Tracked handwritten runtime/presentation/shader source. P03C-ay/#1597 maps frozen 1-356 except bootstrap script tags 9-10 into 31 named UI presentation responsibilities in REMEDIATION_SCOPE.md, preserving C06 Labs 357-366, settings 1743-1933 and feature flags 2285-2297. This partial human-reviewed map does not disposition whole HTML spans, admit packets or establish runtime acceptance."
+      "reason": "Tracked handwritten runtime/presentation/shader source. P03C-ay/#1597 maps frozen 1-356 except bootstrap script tags 9-10 into 31 named UI presentation responsibilities; P03C-az/#1598 maps frozen 367-1098 into 39 named responsibilities in REMEDIATION_SCOPE.md, with line 367 only a C06 Labs structural-closure marker (reconciliation #1601 comment 6043259956). These maps preserve C06 Labs 357-366, settings 1743-1933 and feature flags 2285-2297. This partial human-reviewed map does not disposition whole HTML spans, admit packets or establish runtime acceptance."
     },
     {
       "path": "src/js/abr-import.js",
