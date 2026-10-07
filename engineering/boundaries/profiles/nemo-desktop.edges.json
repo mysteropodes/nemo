@@ -19,12 +19,13 @@
     "rust.desktop.native.application",
     "rust.desktop.native.application.commands",
     "rust.desktop.native.application.tests",
+    "rust.desktop.native.host.release.tests",
     "rust.desktop.native.dispatch",
     "rust.desktop.media",
     "rust.desktop.tasks",
     "rust.desktop.tasks.tests"
   ],
-  "profileModulesNote": "The fifteen profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
+  "profileModulesNote": "The sixteen profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
   "layerRules": {
     "desktop-shell": {
       "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-seam", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
@@ -61,6 +62,10 @@
     "host-seam": {
       "allowedLayers": [],
       "meaning": "native_dispatch.rs owns the shared boxed application seam and export pump. It is depended on by owners, but does not reach back into the MCP adapter, application bootstrap or viewport."
+    },
+    "host-release-tests": {
+      "allowedLayers": ["bootstrap", "host-contract", "host-seam"],
+      "meaning": "N25C2a private terminal lifecycle tests reach only the existing application owner, strict host contract and boxed dispatch seam"
     },
     "tests": {
       "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
@@ -100,6 +105,9 @@
       "rust.desktop.native.application.ports.tests -> rust.desktop.native.application.ports (native_application_ports_tests.rs: use crate::native_application_ports::*;)",
       "rust.desktop.native.application.viewport -> rust.desktop.native.application.contract (native_application_viewport.rs: use crate::native_application_contract::{...};)",
       "rust.desktop.native.application.viewport -> rust.desktop.native.viewport (native_application_viewport.rs: use crate::native_viewport::NativeViewport;)",
+      "rust.desktop.native.host.release.tests -> rust.desktop.native.application (native_application_dispatch_release_tests.rs: explicit import)",
+      "rust.desktop.native.host.release.tests -> rust.desktop.native.application.contract (native_application_dispatch_release_tests.rs: explicit import)",
+      "rust.desktop.native.host.release.tests -> rust.desktop.native.dispatch (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)"
     ]
   },
@@ -252,7 +260,11 @@
           "compositor::Compositor",
           "export_job::JobStatus"
         ],
-        "rust.desktop.native.dispatch": [
+        "rust.desktop.native.host.release.tests": [
+        "application::ApplicationReleaseReceipt", "commands::OpacityRequest", "commands::ResponseEnvelope", "document::OpacityDocument", "export_job::ExportReleaseReconciliation", "export_job::JobReceipt", "export_job::PendingFrame", "export_job::ReconciliationStage"
+      ],
+      "rust.desktop.native.dispatch": [
+        "application::ApplicationReleaseReceipt", "export_job::ReconciliationStage", "resource_leases::WorkId",
           "application::ExportResourceResolver",
           "application::NativeApplication",
           "commands::OpacityRequest",

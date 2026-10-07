@@ -347,6 +347,16 @@
       "sizeProfile": "Rust production module"
     },
     {
+      "id": "rust.desktop.native.host.release.tests",
+      "layer": "host-release-tests",
+      "dir": "src-tauri/src",
+      "files": [
+        "native_application_dispatch_release_tests.rs"
+      ],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
       "id": "rust.desktop.native.dispatch",
       "layer": "host-seam",
       "dir": "src-tauri/src",

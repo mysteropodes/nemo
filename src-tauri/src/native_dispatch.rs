@@ -333,6 +333,15 @@ pub(crate) struct NativeReleaseProgress {
     pub(crate) preview_stage: ReconciliationStage,
 }
 
+impl NativeReleaseProgress {
+    pub(crate) fn reconciliation_complete(&self) -> bool {
+        self.application.transaction_stage == ReconciliationStage::Complete
+            && self.application.cleanup_complete()
+            && self.preview_stage == ReconciliationStage::Complete
+            && self.unresolved_preview.is_empty()
+    }
+}
+
 pub(crate) trait NativeDispatch: Send {
     fn instance_id(&self) -> &str;
     fn document_id(&self) -> &str;

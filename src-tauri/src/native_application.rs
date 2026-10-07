@@ -12,7 +12,9 @@ use crate::{
     native_dispatch::{NativeDispatch, NativeReleaseProgress},
 };
 use native_engine::{
-    application::{NativeApplication, ReproductionStatus, REPRODUCTION_FIXTURE},
+    application::{
+        ApplicationReleaseReceipt, NativeApplication, ReproductionStatus, REPRODUCTION_FIXTURE,
+    },
     compositor::CompositionResult,
     document::OpacityDocument,
     export_job::{JobReceipt, PendingFrame, ReconciliationStage},
@@ -272,7 +274,7 @@ impl DesktopNativeApplication {
             panic!("injected core release panic after transaction reconciliation");
         }
         #[cfg(test)]
-        let application = {
+        let application: ApplicationReleaseReceipt = {
             let mut reconciled = 0;
             let panic_after = self.panic_release_after_export_jobs;
             self.core.release_export_stage_with_checkpoint(|| {
@@ -283,7 +285,7 @@ impl DesktopNativeApplication {
             })
         };
         #[cfg(not(test))]
-        let application = self.core.release_export_stage();
+        let application: ApplicationReleaseReceipt = self.core.release_export_stage();
         let pending = self.preview_work.clone();
         self.preview_release = Some(PreviewReleaseProgress {
             cancelled: BTreeSet::new(),
@@ -439,3 +441,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_application_release_tests.rs"]
 mod release_tests;
+
+#[cfg(test)]
+#[path = "native_application_dispatch_release_tests.rs"]
+mod dispatch_release_tests;

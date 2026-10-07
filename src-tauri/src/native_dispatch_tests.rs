@@ -1,6 +1,7 @@
 use crate::native_dispatch::{
-    replacement, spawn_export_pump_with, NativeAuthority, NativeDispatch, NativePhase, NativeState,
-    ReleaseAdmission, ReleaseTombstone, ReplacementAdmission, ReplacementReplay, ReplacementStage,
+    replacement, spawn_export_pump_with, NativeAuthority, NativeDispatch, NativePhase,
+    NativeReleaseProgress, NativeState, ReleaseAdmission, ReleaseTombstone, ReplacementAdmission,
+    ReplacementReplay, ReplacementStage,
 };
 use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
@@ -40,10 +41,10 @@ impl NativeDispatch for TerminalPump {
     fn finish_export_frame(&mut self, _: PendingFrame) -> Result<JobReceipt, String> {
         unreachable!("terminal pump has no pending frame")
     }
-    fn release_project(&mut self) -> Result<super::NativeReleaseProgress, String> {
+    fn release_project(&mut self) -> Result<NativeReleaseProgress, String> {
         Err("terminal pump does not support host cleanup".into())
     }
-    fn release_progress(&self) -> Option<super::NativeReleaseProgress> {
+    fn release_progress(&self) -> Option<NativeReleaseProgress> {
         None
     }
     fn as_any_mut(&mut self) -> &mut dyn Any {

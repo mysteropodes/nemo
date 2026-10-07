@@ -321,6 +321,9 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.tests->rust.desktop.native.application.ports',
     'rust.desktop.native.application.viewport->rust.desktop.native.application.contract',
     'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
+    'rust.desktop.native.host.release.tests->rust.desktop.native.application',
+    'rust.desktop.native.host.release.tests->rust.desktop.native.application.contract',
+    'rust.desktop.native.host.release.tests->rust.desktop.native.dispatch',
     'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
     'rust.desktop.shell->rust.desktop.native.application',
     'rust.desktop.shell->rust.desktop.native.application.commands',
@@ -417,7 +420,12 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'commands::OpacityRequest', 'commands::ResponseEnvelope', 'compositor::Compositor'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
+    'rust.desktop.native.host.release.tests': [
+      'application::ApplicationReleaseReceipt', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+      'document::OpacityDocument', 'export_job::ExportReleaseReconciliation', 'export_job::JobReceipt',
+      'export_job::PendingFrame', 'export_job::ReconciliationStage'],
     'rust.desktop.native.dispatch': [
+      'application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
       'application::ExportResourceResolver', 'application::NativeApplication',
       'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',
       'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::JobStatus',
@@ -478,4 +486,48 @@ test('desktop policy rejects a native_engine extern-crate alias before it can hi
   assert.ok(r.violations.some((v) => v.rule === 'external-crate-violation'
     && v.module === 'rust.desktop.native.application'
     && v.detail.crate === 'native_engine' && v.detail.alias === 'hidden_engine'));
+});
+
+
+test('N25C2a private release registration and exact lifecycle grants fail closed', (t) => {
+  const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
+  const id = 'rust.desktop.native.host.release.tests', seam = 'rust.desktop.native.dispatch';
+  const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
+  const module = profile.modules.find((m) => m.id === id);
+  assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
+    files: [path.basename(file)], publicApi: [], sizeProfile: 'Rust production module' });
+  assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
+  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam']);
+  assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
+  for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId']],
+    [id, policy.externalCratePorts.native_engine.moduleItems[id]]]) for (const item of items) {
+    const denied = structuredClone(policy);
+    denied.externalCratePorts.native_engine.moduleItems[owner] = denied.externalCratePorts.native_engine.moduleItems[owner].filter((x) => x !== item);
+    assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) =>
+      v.rule === 'private-port-access' && v.module === owner && v.detail.path === item), `${owner}: ${item}`);
+  }
+  const removed = structuredClone(profile);
+  removed.modules = removed.modules.filter((m) => m.id !== id);
+  const coverage = require('./lib/boundaries-coverage.cjs').checkSourceCoverage(removed, { root: ROOT, sourcePaths: [file] });
+  assert.ok(coverage.violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === file));
+  const misclassified = structuredClone(profile);
+  misclassified.modules.find((m) => m.id === id).layer = 'tests';
+  assert.ok(R.checkRustCrate(misclassified, policy, { root: ROOT }).violations.some((v) =>
+    v.rule === 'layer-violation' && v.module === id && v.detail.targetModule === seam));
+  for (const raw of [false, true]) {
+    const root = desktopFixture(t), prefix = raw ? 'r#' : '';
+    appendSource(root, 'src-tauri/src/native_application_tests.rs', `use crate::${prefix}native_dispatch::NativeDispatch;
+use ${prefix}native_engine::application::ApplicationReleaseReceipt;`);
+    appendSource(root, file, `use crate::${prefix}application_mcp::ApplicationMcp;
+use crate::${prefix}native_viewport::NativeViewport;
+use ${prefix}native_engine::compositor::Compositor;`);
+    const violations = R.checkRustCrate(profile, policy, { root }).violations;
+    for (const target of ['rust.desktop.mcp.adapter', 'rust.desktop.native.viewport']) {
+      assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === id && v.detail.targetModule === target));
+    }
+    assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === 'rust.desktop.native.application.tests' && v.detail.targetModule === seam));
+    for (const [owner, item] of [[id, 'compositor::Compositor'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
+      assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === owner && v.detail.path === item));
+    }
+  }
 });

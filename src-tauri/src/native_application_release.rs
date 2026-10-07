@@ -135,6 +135,7 @@ where
         Err,
     );
     drop(application);
+    let stages_complete = released.reconciliation_complete();
     let mut cleanup_error = authority_poisoned
         .then(|| host_error("cleanup_failed", "native authority lock was poisoned"))
         .or(core_error)
@@ -160,19 +161,13 @@ where
             "native export cleanup remained indeterminate",
         ));
     }
-    if cleanup_error.is_none()
-        && (released.application.transaction_stage != ReconciliationStage::Complete
-            || released.preview_stage != ReconciliationStage::Complete
-            || !released.unresolved_preview.is_empty())
-    {
+    if cleanup_error.is_none() && !stages_complete {
         cleanup_error = Some(host_error(
             "cleanup_failed",
             "native cleanup stages remained indeterminate",
         ));
     }
-    let cleanup_complete = released.application.cleanup_complete()
-        && released.preview_stage == ReconciliationStage::Complete
-        && cleanup_error.is_none();
+    let cleanup_complete = stages_complete && cleanup_error.is_none();
     let cancelled_preview: BTreeSet<WorkId> = released.cancelled_preview.into_iter().collect();
     let disposed_viewport: BTreeSet<WorkId> = viewport
         .as_ref()
