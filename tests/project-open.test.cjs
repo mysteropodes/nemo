@@ -28,7 +28,7 @@ function realImportJSON() {
   return { calls, importJSON, state };
 }
 
-function harness({ auto = null, version = null, deferFrames = false } = {}) {
+function harness({ auto = null, version = null, deferFrames = false, dirtyDot = false } = {}) {
   const elements = new Map();
   const downloads = [], toasts = [], frames = [], writes = [];
   let repaints = 0, mutations = 0;
@@ -37,7 +37,7 @@ function harness({ auto = null, version = null, deferFrames = false } = {}) {
     const classes = new Set();
     const el = { style: {}, dataset: {}, value: '', files: [], children: [], classList: {
       add(name) { classes.add(name); }, remove(name) { classes.delete(name); },
-      toggle(name) { if (classes.has(name)) classes.delete(name); else classes.add(name); },
+      toggle(name, force) { if (force === false || force === undefined && classes.has(name)) classes.delete(name); else classes.add(name); },
       contains(name) { return classes.has(name); } },
       addEventListener(type, fn) { this.listeners ||= {}; this.listeners[type] = fn; }, appendChild(child) { this.children.push(child); },
       setAttribute(name, value) { this.attributes ||= {}; this.attributes[name] = value; },
@@ -46,14 +46,18 @@ function harness({ auto = null, version = null, deferFrames = false } = {}) {
     Object.defineProperty(el, 'innerHTML', { get() { return ''; }, set() { this.children = []; } });
     return el;
   }
+  const dot = element();
   const document = { readyState: 'loading', body: element(), addEventListener(type, fn) { if (type === 'DOMContentLoaded') this.ready = fn; },
-    getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element, querySelector() { return null; } };
+    getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element,
+    querySelector(selector) { return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null; } };
   let rejectNextImport = false;
   const window = { NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
   window.NemoNativeOpacityProjectEntry = require('../src/js/adapters/native-opacity-project-entry.js');
+  window.NemoProjectNativeSave = require('../src/js/adapters/project-native-save.js');
+  window.NemoProjectDirtyBaseline = require('../src/js/adapters/project-dirty-baseline.js');
   class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
     localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem(key, value) { writes.push([key, value]); }, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
@@ -71,7 +75,7 @@ function harness({ auto = null, version = null, deferFrames = false } = {}) {
   document.ready();
   return { window, input: document.getElementById('file-input'), startScreen: document.getElementById('start-screen'),
     element(id) { return document.getElementById(id); },
-    downloads, toasts, writes, project: window.SMProject, elements,
+    downloads, toasts, writes, project: window.SMProject, elements, dot,
     flushFrame() { assert.ok(frames.length, 'an animation frame is queued'); frames.shift()(); },
     get pendingFrames() { return frames.length; },
     rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; }, get mutations() { return mutations; } };
@@ -93,6 +97,8 @@ test('production loads the native project-entry adapter before its project consu
   const adapter = html.indexOf('js/adapters/native-opacity-project-entry.js');
   const project = html.indexOf('js/project.js', adapter);
   assert.ok(adapter >= 0 && project > adapter);
+  const dirty = html.indexOf('js/adapters/project-dirty-baseline.js');
+  assert.ok(dirty >= 0 && dirty < project, 'dirty baseline is loaded before its real consumer');
 });
 function deferred() { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; }
 function installNativeOpen(app) {
@@ -639,4 +645,68 @@ test('post-admission creation failure reports possible partial state instead of 
   assert.match(admissionMessage(form).textContent, /creation failed.*may have changed/i);
   assert.doesNotMatch(admissionMessage(form).textContent, /admission.*denied/i);
   assert.equal(app.toasts.includes('New project created'), false);
+});
+
+test('real project dirty consumers preserve exact bytes and reuse supplied autosave bytes', () => {
+  const app = harness({ dirtyDot: true });
+  const saved = '{"label":"☃\\r\\n","opacity":[20,80]}\r\n';
+  app.json = saved;
+  app.project.markSaved();
+  assert.equal(app.project.isDirty(), false);
+  app.json = saved + ' ';
+  assert.equal(app.project.isDirty(), true);
+  app.json = saved;
+  assert.equal(app.project.isDirty(), false, 'undo to saved bytes is clean');
+  app.window.SM.exportJSON = () => { throw Error('native persistence unavailable'); };
+  assert.equal(app.project.isDirty(), true, 'failed read must guard close');
+  app.project.refreshActiveTabDirtyDot(saved);
+  assert.equal(app.dot.classList.contains('dirty'), false);
+  app.project.refreshActiveTabDirtyDot(saved + ' ');
+  assert.equal(app.dot.classList.contains('dirty'), true);
+});
+
+test('native save failure preserves dirty baseline and skips all legacy frame writes', async () => {
+  const app = harness();
+  app.json = '{"saved":true}';
+  app.project.markSaved();
+  const edited = '{"saved":false,"opacity":[20,80]}';
+  const writes = [];
+  app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, persistenceJSON: () => edited };
+  app.window.SM.exportJSON = () => { throw Error('legacy exporter forbidden'); };
+  app.window.__TAURI__ = {
+    dialog: { save: async () => '/disposable/edited.json' },
+    fs: { writeTextFile: async (path, bytes) => { writes.push([path, bytes]); throw Error('disk unavailable'); },
+      rename: async () => { throw Error('must not rename'); }, remove: async () => {} },
+  };
+  const before = app.mutations;
+  await assert.rejects(app.project.saveAs(), /disk unavailable/);
+  assert.equal(app.project.isDirty(), true);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  assert.equal(app.mutations, before);
+  assert.deepEqual(writes, [['/disposable/edited.json.saving', edited], ['/disposable/edited.json', edited]]);
+  assert.ok(app.toasts.some(message => message.includes('disk unavailable')));
+});
+
+test('real tab switch and active close retain clean versus dirty normalized baselines', () => {
+  for (const dirty of [false, true]) {
+    const app = harness();
+    app.project.enterEditor();
+    app.json = '{"title":"first"}';
+    app.project.markSaved();
+    if (dirty) app.json = '{"title":"first","edited":true}';
+    const firstId = app.elements.get('project-tabs-list').children[0].dataset.tab;
+    app.elements.get('project-tab-add').listeners.click();
+    app.json = '{"title":"second"}';
+    app.project.markSaved();
+    app.elements.get('project-tabs-list').children.find(row => row.dataset.tab === firstId).listeners.click();
+    assert.equal(JSON.parse(app.json).normalized, true);
+    assert.equal(app.project.isDirty(), dirty, 'normalized import preserves first-tab dirty flag');
+    // Switching back captures first-tab status; closing second restores first
+    // through the separate closeTab baseline assignment.
+    app.elements.get('project-tabs-list').children.find(row => row.dataset.tab !== firstId).listeners.click();
+    const activeSecond = app.elements.get('project-tabs-list').children.find(row => row.dataset.tab !== firstId);
+    activeSecond.children[3].listeners.click({ stopPropagation() {} });
+    assert.equal(app.elements.get('project-tabs-list').children.length, 1);
+    assert.equal(app.project.isDirty(), dirty, 'active close preserves target-tab dirty flag');
+  }
 });
