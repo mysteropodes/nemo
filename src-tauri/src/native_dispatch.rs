@@ -19,6 +19,30 @@ use std::{
 
 pub(crate) type NativeState = Arc<Mutex<NativeAuthority>>;
 
+#[path = "native_object_host.rs"]
+mod object_host;
+pub(crate) use object_host::NativeObjectHost;
+
+pub(crate) struct NativeInstallReservation {
+    native: NativeState,
+    generation: u64,
+}
+impl NativeInstallReservation {
+    pub(crate) fn new(native: NativeState, generation: u64) -> Self {
+        Self { native, generation }
+    }
+    pub(crate) fn generation(&self) -> u64 {
+        self.generation
+    }
+}
+impl Drop for NativeInstallReservation {
+    fn drop(&mut self) {
+        if let Ok(mut native) = self.native.lock() {
+            native.rollback_install(self.generation);
+        }
+    }
+}
+
 #[path = "native_dispatch_replacement.rs"]
 mod replacement;
 pub(crate) use replacement::{

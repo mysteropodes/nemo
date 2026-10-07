@@ -1,11 +1,13 @@
 //! Native transport port for the single application command authority in the webview.
+pub(crate) use crate::native_dispatch::NativeInstallReservation;
 #[cfg(test)]
 use crate::native_dispatch::ReleaseTombstone;
-use crate::native_dispatch::{NativeAuthority, NativeDispatch, NativeState};
+use crate::native_dispatch::{NativeAuthority, NativeDispatch, NativeObjectHost, NativeState};
 use native_engine::{
     application::{ExportResourceResolver, NativeApplication},
     document::OpacityDocument,
     export_job::{ExportCompositor, JobReceipt, StagedArtifactPort},
+    object_document::ObjectDocument,
 };
 use nemo_mcp::{
     contract::{
@@ -48,25 +50,6 @@ pub struct ApplicationMcp {
     revisions: RevisionSync,
 }
 
-pub(crate) struct NativeInstallReservation {
-    native: NativeState,
-    generation: u64,
-}
-
-impl NativeInstallReservation {
-    pub(crate) fn generation(&self) -> u64 {
-        self.generation
-    }
-}
-
-impl Drop for NativeInstallReservation {
-    fn drop(&mut self) {
-        if let Ok(mut native) = self.native.lock() {
-            native.rollback_install(self.generation);
-        }
-    }
-}
-
 impl Default for ApplicationMcp {
     fn default() -> Self {
         Self {
@@ -92,10 +75,10 @@ impl ApplicationMcp {
         let generation = native.reserve_install()?;
         self.revisions.invalidate();
         drop(native);
-        Ok(NativeInstallReservation {
-            native: Arc::clone(&self.native),
+        Ok(NativeInstallReservation::new(
+            Arc::clone(&self.native),
             generation,
-        })
+        ))
     }
 
     pub(crate) fn native_state(&self) -> NativeState {
@@ -134,6 +117,13 @@ impl ApplicationMcp {
             .lock()
             .map_err(|_| "native application lock unavailable")?;
         native.install(generation, application)
+    }
+
+    /// Typed host prerequisite only; no Tauri route or object capability activation.
+    pub(crate) fn install_native_object(&self, document: ObjectDocument) -> Result<(), String> {
+        let owner = NativeObjectHost::new(self.instance_id.clone(), document)?;
+        let reservation = self.reserve_native_install()?;
+        self.install_dispatch(reservation.generation(), Box::new(owner))
     }
 
     pub(crate) fn install_native<P, C, R>(

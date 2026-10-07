@@ -315,6 +315,49 @@ Real object one-slot host installation, terminal cleanup/re-entry and the common
 UI/MCP round trip remain separate gates before capability availability, C04a or
 installed desktop/user workflow acceptance.
 
+## N25C2d typed host installation and terminal lifecycle
+
+`ApplicationMcp::install_native_object(ObjectDocument)` is a production typed
+installation port. It constructs and semantically revalidates a fresh non-Clone
+`NativeObjectHistory` before requesting the existing installation reservation.
+The host supplies its own UUID instance identity; the engine supplies the fresh
+document identity. Both actual envelope identities are checked before install
+commit. Layer and stroke identifiers retain their separate opaque-ID contract.
+Invalid data does not reserve a slot, invalidate revision subscriptions or evict
+an existing owner.
+
+The same `NativeAuthority` holds exactly one boxed owner. Active opacity and object
+owners cannot coexist; duplicate or stale installations leave the active owner
+unchanged. The existing reservation type moves to the dispatch seam while retaining
+its `ApplicationMcp` type-path re-export, generation accessor, lock-poison handling,
+rollback and Drop semantics. There is no second application state or cloned owner.
+
+This object owner creates no transactions, export jobs, preview/viewport work,
+GPU resources or filesystem artifacts. Its terminal cleanup captures its real
+identity, revision and history depths, with explicitly complete empty resource
+stages. Cleanup progress is retained and ordinary dispatch remains fenced after
+release. The existing C2a terminal path drops the actual owner, retains the full
+receipt and permits exclusive re-entry only after successful cleanup. Replay of an
+old successful release does not touch a newer owner; stale callbacks, changed retry
+bodies and failed cleanup retain their existing rejection/tombstone behavior.
+Old immutable library snapshots remain readable after the host owner is dropped.
+
+Ordinary object dispatch returns a fixed nonmutating `Err` through the accepted
+fallible seam. Replacement and export are explicitly unsupported; there is no
+typed object read/mutation host port, envelope fabrication, Tauri invocation or
+automatic bootstrap. The real-opacity preservation control wraps the production
+opacity core in a test adapter; it is not DesktopNativeApplication or installed
+desktop evidence. The original missing-installer E0599 characterization remains
+a zero-executed compile baseline, not a runtime failure or pass.
+
+This slice establishes typed host installation/lifecycle only. `native.object`
+remains unavailable/pending and writes remain unregistered. Common UI/MCP object
+round trip, capability availability, C04a selection, installed desktop and user
+save/load/history/animation/render/export remain separate gates. The existing raw
+ingress and complete 4096-byte read policies are unchanged. Whole-MCP coverage
+retains its inherited red disposition and reviewed floors; source-tree identity
+does not constitute a fresh coverage measurement.
+
 ## Consumer and acceptance boundaries
 
 | Consumer | Staged source evidence or remaining gate |

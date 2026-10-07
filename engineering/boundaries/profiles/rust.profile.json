@@ -356,7 +356,8 @@
       "layer": "host-release-tests",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_dispatch_release_tests.rs"
+        "native_application_dispatch_release_tests.rs",
+        "native_object_host_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -367,6 +368,7 @@
       "dir": "src-tauri/src",
       "files": [
         "native_dispatch.rs",
+        "native_object_host.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs"
       ],

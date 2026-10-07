@@ -321,6 +321,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.tests->rust.desktop.native.application.ports',
     'rust.desktop.native.application.viewport->rust.desktop.native.application.contract',
     'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
+    'rust.desktop.native.host.release.tests->rust.desktop.mcp.adapter',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.contract',
     'rust.desktop.native.host.release.tests->rust.desktop.native.dispatch',
@@ -372,7 +373,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   assert.deepEqual(policy.externalCratePorts.native_engine.moduleItems, {
     'rust.desktop.mcp.adapter': [
       'application::ExportResourceResolver', 'application::NativeApplication',
-      'commands::OpacityRequest', 'document::OpacityDocument',
+      'commands::OpacityRequest', 'document::OpacityDocument', 'object_document::ObjectDocument',
       'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
       'protocol::OP_JOB_EXPORT_PNG_BEGIN'],
     'rust.desktop.mcp.adapter.tests': [
@@ -423,8 +424,10 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.host.release.tests': [
       'application::ApplicationReleaseReceipt', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
       'document::OpacityDocument', 'export_job::ExportReleaseReconciliation', 'export_job::JobReceipt',
-      'export_job::PendingFrame', 'export_job::ReconciliationStage'],
+      'export_job::PendingFrame', 'export_job::ReconciliationStage', 'object_codec::decode_project',
+      'commands::NativeOpacityApplication', 'codec::decode_project'],
     'rust.desktop.native.dispatch': [
+      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'export_job::ExportReleaseReconciliation',
       'application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
       'application::ExportResourceResolver', 'application::NativeApplication',
       'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',
@@ -489,27 +492,37 @@ test('desktop policy rejects a native_engine extern-crate alias before it can hi
 });
 
 
-test('N25C2a private release registration and exact lifecycle grants fail closed', (t) => {
+test('N25C2a/C2d private host registration and exact lifecycle grants fail closed', (t) => {
   const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
   const id = 'rust.desktop.native.host.release.tests', seam = 'rust.desktop.native.dispatch';
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file)], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
-  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam']);
+  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
-  for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId']],
+  for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
+      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'export_job::ExportReleaseReconciliation']],
+    ['rust.desktop.mcp.adapter', ['object_document::ObjectDocument']],
     [id, policy.externalCratePorts.native_engine.moduleItems[id]]]) for (const item of items) {
     const denied = structuredClone(policy);
     denied.externalCratePorts.native_engine.moduleItems[owner] = denied.externalCratePorts.native_engine.moduleItems[owner].filter((x) => x !== item);
     assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) =>
       v.rule === 'private-port-access' && v.module === owner && v.detail.path === item), `${owner}: ${item}`);
   }
+  const edgeDenied = structuredClone(policy);
+  edgeDenied.layerRules['host-release-tests'].allowedLayers = edgeDenied.layerRules['host-release-tests'].allowedLayers.filter((x) => x !== 'mcp-adapter');
+  assert.ok(R.checkRustCrate(profile, edgeDenied, { root: ROOT }).violations.some((v) => v.rule === 'layer-violation' && v.module === id && v.detail.targetModule === 'rust.desktop.mcp.adapter'));
   const removed = structuredClone(profile);
   removed.modules = removed.modules.filter((m) => m.id !== id);
   const coverage = require('./lib/boundaries-coverage.cjs').checkSourceCoverage(removed, { root: ROOT, sourcePaths: [file] });
   assert.ok(coverage.violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === file));
+  for (const source of ['native_object_host.rs', 'native_object_host_tests.rs']) {
+    const candidate = structuredClone(profile), relative = `src-tauri/src/${source}`;
+    for (const owner of candidate.modules) owner.files = owner.files.filter((x) => x !== source);
+    assert.ok(require('./lib/boundaries-coverage.cjs').checkSourceCoverage(candidate, { root: ROOT, sourcePaths: [relative] }).violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === relative));
+  }
   const misclassified = structuredClone(profile);
   misclassified.modules.find((m) => m.id === id).layer = 'tests';
   assert.ok(R.checkRustCrate(misclassified, policy, { root: ROOT }).violations.some((v) =>
@@ -521,10 +534,17 @@ use ${prefix}native_engine::application::ApplicationReleaseReceipt;`);
     appendSource(root, file, `use crate::${prefix}application_mcp::ApplicationMcp;
 use crate::${prefix}native_viewport::NativeViewport;
 use ${prefix}native_engine::compositor::Compositor;`);
+    appendSource(root, 'src-tauri/src/native_object_host.rs', `use crate::${prefix}application_mcp::ApplicationMcp;`);
+    appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::history::NativeObjectHistory;`);
+    appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::commands::NativeOpacityApplication;`);
     const violations = R.checkRustCrate(profile, policy, { root }).violations;
-    for (const target of ['rust.desktop.mcp.adapter', 'rust.desktop.native.viewport']) {
+    for (const target of ['rust.desktop.native.viewport']) {
       assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === id && v.detail.targetModule === target));
     }
+    assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === seam && v.detail.targetModule === 'rust.desktop.mcp.adapter'));
+    assert.ok(violations.some((v) => v.rule === 'cycle'), 'synthetic production back-edge must close and fail the MCP/host cycle');
+    assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'history::NativeObjectHistory'));
+    assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'commands::NativeOpacityApplication'));
     assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === 'rust.desktop.native.application.tests' && v.detail.targetModule === seam));
     for (const [owner, item] of [[id, 'compositor::Compositor'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
       assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === owner && v.detail.path === item));
