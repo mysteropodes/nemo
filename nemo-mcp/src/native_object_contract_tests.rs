@@ -258,3 +258,25 @@ fn generic_object_result_front_door_rejects_a_malformed_selector() {
         ));
     }
 }
+
+#[test]
+fn registered_examples_keep_existing_feature_admission_while_objects_are_unavailable() {
+    for descriptor in crate::capabilities::native_catalog().descriptors() {
+        for example in descriptor["examples"].as_array().unwrap() {
+            let request: NativeApplicationRequest =
+                serde_json::from_value(example["request"].clone()).unwrap();
+            let outcome = request.validate();
+            if descriptor["id"] == "native.object" {
+                let error = outcome.unwrap_err();
+                assert_eq!(error.code(), "unavailable");
+                assert_eq!(error.message(), descriptor["availability"]["reason"]);
+            } else {
+                assert!(
+                    outcome.is_ok(),
+                    "existing feature {}: {outcome:?}",
+                    descriptor["id"]
+                );
+            }
+        }
+    }
+}
