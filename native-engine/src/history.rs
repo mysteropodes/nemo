@@ -1,5 +1,9 @@
 //! N09 history-aware facade over the N08 native opacity application.
 
+#[path = "object_history.rs"]
+mod object_history;
+pub use object_history::NativeObjectHistory;
+
 use crate::commands::{
     DispatchError, DispatchErrorCode, NativeOpacityApplication, OpacityRequest, ResponseEnvelope,
     APPLICATION_API_VERSION, OP_COMMAND_APPLY, OP_QUERY_OPACITY, OP_QUERY_REVISION,

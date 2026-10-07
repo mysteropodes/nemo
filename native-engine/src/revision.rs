@@ -1,5 +1,11 @@
 //! Native document identity, monotonic content revisions, and immutable snapshots.
 
+#[path = "object_revision.rs"]
+mod object_revision;
+#[cfg(feature = "history")]
+pub(crate) use object_revision::ObjectRevisionOwner;
+pub use object_revision::ObjectSnapshot;
+
 use crate::document::OpacityDocument;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};

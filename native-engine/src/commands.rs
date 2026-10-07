@@ -3,6 +3,11 @@
 #[path = "object_fill.rs"]
 mod object_fill;
 pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
+#[path = "object_fill_owner.rs"]
+#[cfg(feature = "history")]
+mod object_fill_owner;
+#[cfg(feature = "history")]
+pub(crate) use object_fill_owner::ObjectFillOwner;
 
 use crate::document::OpacityDocument;
 use crate::request_receipts::{

@@ -6,13 +6,8 @@ use crate::object_codec::{
 use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
+pub use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
-
-static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 const MAX_MESSAGE_BYTES: usize = 4096;
 
 fn envelope_identifier(value: &str) -> bool {
@@ -23,14 +18,6 @@ fn envelope_identifier(value: &str) -> bool {
         && bytes
             .iter()
             .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
-}
-
-#[derive(Debug, Clone)]
-pub struct ObjectSnapshot {
-    instance_id: String,
-    document_id: String,
-    snapshot_id: String,
-    document: Arc<ObjectDocument>,
 }
 
 #[derive(Debug)]
@@ -95,36 +82,8 @@ impl ObjectSnapshot {
                 "instanceId must be nonempty",
             ));
         }
-        let sequence = NEXT_OBJECT_DOCUMENT
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
-            .map_err(|_| {
-                ObjectCodecError::new(
-                    ObjectCodecErrorKind::Invalid,
-                    "object document identity sequence exhausted",
-                )
-            })?;
-        let document_id = format!("native-object-document-{sequence}");
-        Ok(Self {
-            instance_id,
-            snapshot_id: format!("native-object:{document_id}:0"),
-            document_id,
-            document: Arc::new(document),
-        })
-    }
-    pub fn instance_id(&self) -> &str {
-        &self.instance_id
-    }
-    pub fn document_id(&self) -> &str {
-        &self.document_id
-    }
-    pub fn snapshot_id(&self) -> &str {
-        &self.snapshot_id
-    }
-    pub fn content_revision(&self) -> u64 {
-        0
-    }
-    pub fn document(&self) -> &ObjectDocument {
-        &self.document
+        Self::from_admitted(instance_id, document)
+            .map_err(|message| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, message))
     }
 
     /// Staged shared-envelope read only. Unrepresentable correlation identities
@@ -156,13 +115,13 @@ impl ObjectSnapshot {
                 "Invalid bounded object read request.",
             );
         }
-        if request.instance_id != self.instance_id {
+        if request.instance_id != self.instance_id() {
             return failure(
                 DispatchErrorCode::WrongInstance,
                 "Object read targets a different instance.",
             );
         }
-        if request.document_id != self.document_id {
+        if request.document_id != self.document_id() {
             return failure(
                 DispatchErrorCode::WrongDocument,
                 "Object read targets a different document.",
@@ -187,9 +146,9 @@ impl ObjectSnapshot {
         let response = ResponseEnvelope {
             api_version: APPLICATION_API_VERSION,
             request_id: request.request_id.clone(),
-            instance_id: self.instance_id.clone(),
-            document_id: self.document_id.clone(),
-            content_revision: 0,
+            instance_id: self.instance_id().to_owned(),
+            document_id: self.document_id().to_owned(),
+            content_revision: self.content_revision(),
             ok: true,
             result: Some(
                 serde_json::to_value(read.result).map_err(|_| DispatchErrorCode::Internal)?,
@@ -217,9 +176,9 @@ impl ObjectSnapshot {
         ResponseEnvelope {
             api_version: APPLICATION_API_VERSION,
             request_id: request.request_id.clone(),
-            instance_id: self.instance_id.clone(),
-            document_id: self.document_id.clone(),
-            content_revision: 0,
+            instance_id: self.instance_id().to_owned(),
+            document_id: self.document_id().to_owned(),
+            content_revision: self.content_revision(),
             ok: false,
             result: None,
             error: Some(DispatchError {
@@ -246,17 +205,17 @@ impl ObjectSnapshot {
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        if request.instance_id != self.instance_id {
+        if request.instance_id != self.instance_id() {
             return Err(DispatchErrorCode::WrongInstance);
         }
-        if request.document_id != self.document_id {
+        if request.document_id != self.document_id() {
             return Err(DispatchErrorCode::WrongDocument);
         }
-        if request.payload.at_revision != 0 {
+        if request.payload.at_revision != self.content_revision() {
             return Err(DispatchErrorCode::NotFound);
         }
         let object = self
-            .document
+            .document()
             .objects()
             .iter()
             .find(|object| object.target() == &request.payload.stable_target)
@@ -265,13 +224,13 @@ impl ObjectSnapshot {
         Ok(ObjectReadResponse {
             api_version: 2,
             request_id: request.request_id,
-            instance_id: self.instance_id.clone(),
-            document_id: self.document_id.clone(),
-            content_revision: 0,
+            instance_id: self.instance_id().to_owned(),
+            document_id: self.document_id().to_owned(),
+            content_revision: self.content_revision(),
             ok: true,
             result: ObjectReadResult {
-                at_revision: 0,
-                document_snapshot_id: self.snapshot_id.clone(),
+                at_revision: self.content_revision(),
+                document_snapshot_id: self.snapshot_id().to_owned(),
                 object,
             },
         })

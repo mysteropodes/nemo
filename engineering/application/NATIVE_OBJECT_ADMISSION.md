@@ -1,10 +1,10 @@
-# N25B: staged native object admission and immutable reads
+# Staged native object admission, immutable reads and fill history
 
 N25B implements the persisted records frozen by
 [N25A](NATIVE_OBJECT_IDENTITY.md). N25C1 adds a staged common-envelope read API
 over those immutable snapshots. Neither activates object admission in the
-running opacity application. N25C2 host/MCP binding and N25D fill/history remain
-separate admission and acceptance gates. P03 object consumers remain pending.
+running opacity application. N25D2 adds the typed staged fill/history owner below.
+Active host/MCP binding and P03 object consumers remain separate pending gates.
 
 ## Persisted format and admission
 
@@ -55,10 +55,10 @@ receive borrowed immutable data or detached read-result copies.
 ## Immutable pinned read
 
 `ObjectSnapshot` owns an Arc-backed immutable document, a nonempty instance ID,
-a fresh process-local document incarnation and snapshot ID, and revision zero.
+a fresh process-local document incarnation and snapshot ID, and a selected revision.
 Constructing another snapshot establishes a new incarnation; cloning a snapshot
-retains its original immutable data and identity. This slice has no mutable head,
-revision advance, edit, undo/redo, replacement publication or history authority.
+retains its original immutable data and identity. The N25B constructor starts at
+revision zero; the separately staged N25D2 owner below publishes later revisions.
 
 `query_json(bytes)` accepts a strict version-2-shaped staged read:
 
@@ -83,7 +83,7 @@ revision advance, edit, undo/redo, replacement publication or history authority.
 
 Use the actual constructor-returned document ID, never this illustrative value.
 Success correlates apiVersion, requestId, instanceId, documentId,
-contentRevision (zero), atRevision, documentSnapshotId and the full selected
+contentRevision, atRevision, documentSnapshotId and the full selected
 record. The target must match every scoped component. Duplicate members, unknown
 write fields/operations and invalid request shapes fail as `InvalidRequest`;
 wrong instance/document fail as `WrongInstance`/`WrongDocument`; an unavailable
@@ -101,7 +101,7 @@ process-local identity must not be interpreted as durable identity across restar
 envelope types. It reads the same admitted immutable snapshot without a mutable
 head, request cache, second authority, command/history entry or host installation.
 Only `query.document.object` is supported; `expectedRevision` is forbidden.
-Success returns the complete selected record, exact scoped target, revision zero
+Success returns the complete selected record, exact scoped target, selected revision
 and snapshot ID in a correlated common envelope. Repeated reads and retained
 snapshots survive construction of separate document incarnations unchanged.
 
@@ -134,8 +134,8 @@ and its strict duplicate-member regression controls.
 N25C1 does not register a capability, install an object owner, enable host/MCP/UI
 dispatch, or change active opacity admission. N25C2 must separately prove one-slot
 host installation/release, strict MCP request/result validation, capability
-availability, byte policy and the real common-host round trip. N25D remains the
-native fill/revision/history successor. No browser, installed, visual projection
+availability, byte policy and the real common-host round trip. N25D2's typed native
+fill/revision/history is documented below. No browser, installed, visual projection
 or P03 C04a acceptance follows from this staged library API.
 
 ## N25C2a terminal host cleanup prerequisite
@@ -159,7 +159,7 @@ without repeating cleanup or touching a reentered owner.
 N25C2a's non-desktop test owner proves this host lifecycle prerequisite only. It
 does not install a real object application, activate an object capability, validate
 object MCP requests/results, or enable UI/MCP object reads. Those N25C2 gates and
-the complete-result 4096-byte policy remain separate. N25D fill/history, C04a
+the complete-result 4096-byte policy remain separate. Active fill/history, C04a
 visible selection, browser, installed desktop and full parity remain unavailable
 or pending as recorded below.
 
@@ -192,7 +192,7 @@ The existing 4096-byte reader preserves the complete envelope or rejects it.
 Record schema admission remains separate from transport fit; no geometry, handle,
 identity or fill is truncated to make an overlarge response fit. The existing
 N25C1 source dispatcher retains its bounded typed-unavailable failure policy.
-N25D history, P03 C04a, user save/load, browser, render/export and installed desktop
+Active history, P03 C04a, user save/load, browser, render/export and installed desktop
 acceptance remain separate gates.
 
 ## N25D1 detached solid-fill preparation
@@ -230,13 +230,51 @@ remains unavailable/pending, and active opacity continues denying object command
 No C04a, browser/installed, user save/load/history, animation or render/export
 acceptance follows from this pure preparation API.
 
+## N25D2 staged native fill revisions and history
+
+`history::NativeObjectHistory::new(instance_id, ObjectDocument)` validates through
+the existing snapshot admission and creates a fresh incarnation at revision zero.
+The owner is non-Clone and exposes no snapshot-adoption, replacement, arbitrary
+document commit, transaction or requestId retry-cache port. Its private command
+owner is the only bridge to private revision storage; history does not import the
+read-query layer and revision storage depends only on object document data.
+`object_snapshot::ObjectSnapshot` keeps its existing public API through a re-export
+of the immutable revision representation.
+
+`prepare_fill_json(bytes)` uses the unchanged strict D1 payload parser at the
+current snapshot. `commit_fill(PreparedObjectFill)` consumes the candidate only
+after checking instance, document incarnation, snapshot identity and current
+content revision, including for a semantic no-op. Foreign instance/document or
+stale origins fail without changing content, retained snapshots or either stack.
+A changed fill publishes exactly one new immutable revision and one undo entry,
+then clears redo. Reusing a changed candidate is stale and has no second effect.
+Numeric-equivalent fill preserves exact document bytes, revision, undo and redo.
+The return value is the selected content revision, unchanged for a no-op.
+
+`undo(expected_revision)` and `redo(expected_revision)` require the actual current
+revision and restore the complete retained before/after document as a new
+monotonic revision. They restore content successfully before moving any history
+entry. Stale expectations return `StaleRevision`; empty stacks and safe-integer
+revision exhaustion return `Unavailable`, preserving all state. Revisions never
+exceed 9,007,199,254,740,991. `history_depths()` exposes stack counts and
+`acquire_snapshot(revision)` returns immutable pinned reads for retained revisions.
+Success and failure read envelopes report the selected snapshot revision; a pinned
+snapshot accepts only its own `atRevision`. Old pinned documents, geometry, opaque
+scoped IDs, layers and siblings remain unchanged through edits and history moves.
+
+This is typed staged library ownership only. It does not admit a raw transport
+envelope, install a host owner, activate `native.object`, add UI/MCP round-trip or
+C04a acceptance, or establish browser/installed, user save/load, animation or
+render/export behavior. The common-envelope 4096-byte policy and active opacity
+denial remain unchanged. Later host/raw/runtime gates remain separately admitted.
+
 ## Consumer and acceptance boundaries
 
-| Consumer | N25B evidence or remaining gate |
+| Consumer | Staged source evidence or remaining gate |
 |---|---|
 | Persistence | Native codec round trip and temporary disk reopen preserve records. Active user save/load remains unavailable for this new family. |
 | Read/selection | Immutable exact-target raw and staged common-envelope library reads. Active selection and host/MCP binding require separate acceptance. |
-| Edit/history | Unavailable; N25D must prove native fill commits, pinned old reads and undo/redo. |
+| Edit/history | Staged typed native fill commit and monotonic undo/redo with immutable pinned reads. Active host/UI history remains unavailable pending separate admission. |
 | Animation | Frame-scoped records preserve authored/reference distinctions; no interpolation or cross-frame identity is inferred. |
 | Render/export | Unavailable for this family. Finite coordinates and 2–256 segments establish schema admission, not GPU-safe geometry, nondegeneracy or render/export parity. |
 | Native bridges/browser/Tauri | Staged typed MCP validation and explicitly unavailable object discovery; no capability activation. Active opacity codec and common Rust dispatcher continue rejecting object documents/operations; N25A contract checks also preserve JS rejection. No installed/browser acceptance credit. |
