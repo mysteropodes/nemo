@@ -57,8 +57,11 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   viewport/export authority into Rust, and retain Paper.js only for justified geometry,
   hit-testing or presentation. On the remediation branch, disconnect an obsolete
   JavaScript/Paper writer before its replacement reaches final parity if necessary; an
-  unmigrated feature must report unavailable and cannot fall back to that writer. Full
-  agreed baseline functionality and surface coverage remain required at final promotion.
+  unmigrated feature must report unavailable and cannot fall back to that writer. The
+  current target is a stable, scalable installed desktop app with 100% of agreed
+  desktop baseline functionality and applicable desktop surfaces accepted at promotion.
+  Browser/WASM compatibility is a later Project #2 stage, R24/#1619, not a current
+  desktop completion gate; do not count it accepted or discard its fixtures.
 - R03/R05 and the other broad issues are tracking parents. Only named executable leaf
   dependencies block work; their whole-issue closure is not a global extraction gate.
 - New OpenFX effects, full OCIO/EXR/OTIO implementations, expanded Buzz transport/
@@ -104,7 +107,8 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   are navigation aids.
 - For a persistent field or item type, verify every applicable consumer: save, load,
   undo/redo, selection, animation, render, export, and native bridges.
-- Validate browser and Tauri behavior on their relevant surfaces. Compile success or a
+- Validate Tauri behavior for the current desktop milestone and browser behavior
+  when its separately admitted R24 work begins. Compile success or a
   screenshot does not establish save/reload, timing, export, or packaged desktop behavior.
 - Before giving instructions about a node's settings, read its local documentation and
   implementation.

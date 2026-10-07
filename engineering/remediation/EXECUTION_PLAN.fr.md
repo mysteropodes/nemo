@@ -1,6 +1,6 @@
 # Nemo — liste de contrôle pour l’exécution de la remédiation
 
-Stratégie approuvée : **7 septembre 2026** ; amendement sur le moteur natif approuvé le **20 septembre 2026** ; séparation native approuvée le **22 septembre 2026**. Responsables humains : **Ilya** (`ivg-design`) et **Cyrill** (`mysteropodes`). [Version anglaise](EXECUTION_PLAN.en.md).
+Stratégie approuvée : **7 septembre 2026** ; amendement sur le moteur natif approuvé le **20 septembre 2026** ; séparation native approuvée le **22 septembre 2026** ; objectif de livraison prioritaire pour le bureau approuvé le **7 octobre 2026**. Responsables humains : **Ilya** (`ivg-design`) et **Cyrill** (`mysteropodes`). [Version anglaise](EXECUTION_PLAN.en.md).
 
 ## Avant-propos — Ilya
 
@@ -10,9 +10,49 @@ Aucun de ces efforts n’a été perdu. Les corrections, les tests, les investig
 
 Ce document est le plan opérationnel unique de la remédiation en cours. Il remplace l’ordre d’exécution, les prévisions, les validations globales bloquantes, les hypothèses sur les agents distants et les exigences de compte rendu de l’ancien plan R00–R22 et des guides d’agents locaux. Les documents d’architecture et de code existants restent des références ; en cas de conflit, le présent document régit le périmètre et le fonctionnement. Les issues GitHub consignent les prises en charge et les transmissions en cours ; cette liste définit les résultats attendus. Le [journal horaire partagé de progression #1062](https://github.com/mysteropodes/nemo/issues/1062) est l’unique destination centrale des comptes rendus ; ne créez pas de registres de sprint concurrents ni de PR de compte rendu.
 
-## 0. Séparation native actuellement applicable — 22 septembre 2026
+## Objectif de livraison actuel — application de bureau d’abord, 7 octobre 2026
 
-**Cet amendement est la règle opérationnelle actuelle.** Il remplace tout texte transitoire
+**Cet amendement fixe le périmètre actuel des surfaces et de l’achèvement.**
+Livrer une application de bureau **installée, stable et extensible**, dont le
+moteur Rust natif est l’unique autorité d’écriture pour les documents/révisions,
+l’historique, l’évaluation/ordonnancement, les médias/ressources/GPU, le viewport
+et l’export, avec Tauri et HTML/CSS/JavaScript pour l’interface. Paper.js ne
+reste que pour la géométrie, le hit-test ou la présentation justifiés. UI,
+scripts, SDK et MCP Rust livré utilisent la même API applicative versionnée ;
+aucun ancien writer JavaScript/Paper ni repli silencieux ne peut coexister avec
+le propriétaire natif.
+
+Le jalon bureau exige **100 % des fonctionnalités et parcours de référence
+convenus pour le bureau**, ou des décisions précises sur les défauts préexistants
+caractérisés indépendamment. Préserver l’import des anciens projets sans perte
+silencieuse, l’identité et l’historique, les expressions, les scripts/plugins
+publics, et tous les consommateurs bureau applicables : sauvegarde/chargement,
+annulation/rétablissement, sélection, animation, rendu/export, Tauri,
+UI/API/MCP et clients installés. Un résultat limité au code, une indisponibilité
+temporaire ou un sous-ensemble de développement réussi ne suffisent pas. La
+stabilité, le cycle de vie/la récupération, les frontières d’extensibilité et
+la validation locale normale font partie de l’acceptation.
+[R19 / #921](https://github.com/mysteropodes/nemo/issues/921) conserve les
+références de charge observées et les preuves bornées de non-régression ;
+aucun nouvel objectif général de performance ni campagne d’optimisation
+n’est ajouté silencieusement à la remédiation.
+
+**La compatibilité navigateur/WASM est une étape ultérieure distincte**,
+suivie dans [R24 / #1619](https://github.com/mysteropodes/nemo/issues/1619).
+La parité navigateur et les tests navigateur réels ne bloquent ni ce jalon
+bureau, ni le résultat bureau de P24, ni l’audit final bureau de P33. Préserver
+les fixtures/preuves navigateur et déclarer les différences de capacité ;
+ne pas compter la capacité différée comme acceptée ni restaurer une ancienne
+autorité d’écriture navigateur. Les critères et travaux spécifiques au
+navigateur seront admis plus tard sous R24. Les passages ci-dessous qui font
+du navigateur une validation finale déplacent uniquement cette validation
+vers R24. La séparation de branche, l’autorité unique, le dénominateur
+fonctionnel bureau complet, les propriétaires, la revue indépendante et
+l’intégration protégée restent en vigueur.
+
+## 0. Séparation native — 22 septembre 2026
+
+**Cet amendement reste la règle actuelle d’autorité d’état.** Il remplace tout texte transitoire
 plus bas qui exige une libération du document natif vers legacy, un ancien writer dormant
 et passant, ou une parité complète avant la déconnexion de ce writer. Les implémentations
 et reçus déjà acceptés restent des preuves, pas une obligation de faire fonctionner deux
@@ -38,14 +78,14 @@ une fonctionnalité finale livrée.
   viewport et export. JavaScript reste la couche UI/scripts/présentation ; Paper.js peut
   fournir géométrie, hit-test ou présentation justifiés, jamais un second document
   modifiable ou évaluateur d’autorité. UI, SDK, MCP et scripts applicables utilisent l’API
-  commune de commandes/requêtes/jobs. Les capacités navigateur couvertes emploient
-  l’adaptateur WASM/hôte déclaré, non une ancienne autorité JavaScript indépendante.
+  commune de commandes/requêtes/jobs. Les capacités navigateur couvertes plus tard
+  emploient l’adaptateur WASM/hôte déclaré, non une ancienne autorité JavaScript indépendante.
 - Une opération non migrée peut être visiblement indisponible sur la branche d’intégration
   et doit être refusée avant toute mutation du document ; elle ne peut se replier sur
   l’ancien moteur modifiable. Déconnecter ou retirer le code runtime remplacé à mesure que
   sa responsabilité migre, même avant la parité finale de cette fonctionnalité. Ses
   fixtures et son obligation en attente restent visibles. À la promotion finale,
-  **100 % des fonctionnalités de référence convenues et des surfaces applicables** doivent
+  **100 % des fonctionnalités de référence convenues et des surfaces bureau applicables** doivent
   être acceptées ou disposer d’une décision précise sur un défaut déjà présent dans la
   base. Cela comprend l’import des anciens projets, les expressions et la sémantique
   publique des scripts/plugins ; une indisponibilité temporaire ne ferme jamais une tâche.
@@ -62,7 +102,7 @@ La suite utilise les tâches bornées existantes : **A** préserver `main`, isol
 les données de développement et connecter un premier shell/viewport natif ; **B** achever
 document/édition/historique/persistance natifs ; **C** animation et édition directe ;
 **D** familles de scènes complexes ; **E** médias/sortie et tous les consommateurs
-UI/API/navigateur ; **F** clôture structurelle, parité à dénominateur fixe, acceptation
+UI/API/MCP du bureau ; **F** clôture structurelle, parité à dénominateur fixe, acceptation
 installée/client et promotion finale protégée. Les contrôles du renderer/viewport,
 de sauvegarde/historique et d’export pertinent commencent dès la première fonctionnalité
 utilisable, pas seulement à la fin de la vague E. Paralléliser les propriétaires
@@ -80,8 +120,9 @@ sur le transfert d’autorité supprimé et garder visiblement en attente tout c
 requis temporairement indisponible. Un sous-ensemble de développement réussi n’est pas
 une acceptation complète. Chaque branche de tâche acceptée s’intègre progressivement
 dans la branche protégée avec ses contrôles réels ; la promotion finale exige la matrice
-complète de parité, les preuves à partir d’un clone propre, installé, visuel, navigateur
-et client, ainsi que la revue humaine normale.
+complète de parité bureau, les preuves à partir d’un clone propre, installé, visuel
+et client, ainsi que la revue humaine normale. Les preuves navigateur ultérieures
+appartiennent à R24.
 
 ### Pivot antérieur vers le moteur natif et admission ordonnée — 20 septembre 2026
 
@@ -96,7 +137,7 @@ Le pivot du 20 septembre conservait l’interface Tauri/JavaScript tout en visan
 - [x] **[N03 / #1330](https://github.com/mysteropodes/nemo/issues/1330)** et **[N04 / #1332](https://github.com/mysteropodes/nemo/issues/1332) :** après N02, démontrer indépendamment l’évaluation Rust headless et un viewport Tauri natif sur des jeux d’essai représentatifs. Consigner honnêtement les échecs mesurés et les résultats non pris en charge ; une simple compilation ne vaut pas acceptation de faisabilité.
 - [x] **[N05 / #1333](https://github.com/mysteropodes/nemo/issues/1333) :** seulement après les deux jalons de faisabilité, inscrire la file bornée d’implémentation de production avec fichiers, responsables, SHA prédécesseurs, fixtures de parité, matrices de consommateurs, conditions de retrait et commandes de validation locale exacts.
 
-La migration de production progresse par responsabilités caractérisées via les mêmes commandes, requêtes et jobs applicatifs versionnés qu’utilisent l’interface et le MCP Rust livré. Commencer par la fixture d’opacité acceptée et déplacer derrière les contrats figés la propriété des révisions persistantes, l’évaluation immuable, l’ordonnancement et les ressources natifs, la présentation bureau et l’export à révision fixe. Sur la branche séparée, un ancien writer obsolète peut être déconnecté ou retiré avant la parité finale de son remplacement ; marquer alors la fonctionnalité manquante en attente et refuser son opération sans repli. Les preuves applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur et application bureau installée restent requises pour l’acceptation finale sur des candidats identifiés.
+La migration de production progresse par responsabilités caractérisées via les mêmes commandes, requêtes et jobs applicatifs versionnés qu’utilisent l’interface et le MCP Rust livré. Commencer par la fixture d’opacité acceptée et déplacer derrière les contrats figés la propriété des révisions persistantes, l’évaluation immuable, l’ordonnancement et les ressources natifs, la présentation bureau et l’export à révision fixe. Sur la branche séparée, un ancien writer obsolète peut être déconnecté ou retiré avant la parité finale de son remplacement ; marquer alors la fonctionnalité manquante en attente et refuser son opération sans repli. Les preuves applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif et application bureau installée restent requises pour ce jalon sur des candidats identifiés. Les preuves navigateur restent suivies sous R24.
 
 Cet amendement préserve le travail de remédiation accepté et les responsabilités existantes. En particulier, [P03 / #1005](https://github.com/mysteropodes/nemo/issues/1005), [P16 / #1018](https://github.com/mysteropodes/nemo/issues/1018), [#1316](https://github.com/mysteropodes/nemo/issues/1316) et sa [PR #1323](https://github.com/mysteropodes/nemo/pull/1323) actuelle ne sont ni réassignés ni fermés silencieusement. R23 est un parent de suivi ; seules les tâches exécutables nommées et leurs relations natives de blocage conditionnent le travail.
 
@@ -1030,9 +1071,9 @@ N07–N19A ont fourni les interfaces natives acceptées de sauvegarde/chargement
 
   1. Des cas indépendants couvrent la limite en lecture avant, l’arrêt sans boucle, le bouclage normal, l’inversion ping-pong et une zone de travail d’une seule image.
   2. L’enveloppe préserve la modification de direction et exactement les mêmes appels de boucle audio ; le véritable `startPlay` appelle toujours le noyau extrait.
-  3. Une lecture navigateur à horloge fixe atteint les images attendues ; aucun changement de saut d’images, de pré-calcul automatique ou de stockage du fps, et les limites du domaine ainsi que l’interdiction des globales passent.
+  3. Une lecture à horloge fixe dans l’application de bureau installée atteint les images attendues via le propriétaire natif ; aucun changement de saut d’images, de pré-calcul automatique ou de stockage du fps, et les limites du domaine ainsi que l’interdiction des globales passent. L’ancien cas navigateur est différé sous R24/#1619, sans être présenté comme un test réussi.
 
-  Limite : Périmètre : `timeline.js:29`, `advancePlayFrame(cur)` ; une nouvelle fonction domaine de pas de lecture renvoie image suivante/direction/événement de boucle, l’enveloppe applique l’état et appelle `SMAudio.onLoop`. L’accumulateur rAF et le pré-calcul automatique de `startPlay` restent hors de cette tâche. Ilya D1 suggéré.
+  Limite : Périmètre : `timeline.js:29`, `advancePlayFrame(cur)` ; une nouvelle fonction domaine de pas de lecture renvoie image suivante/direction/événement de boucle, l’enveloppe applique l’état et appelle `SMAudio.onLoop`. L’accumulateur rAF et le pré-calcul automatique de `startPlay` restent hors de cette tâche. Avant de réintégrer la PR brouillon #1473, décider si ce pas JavaScript ne coordonne que l’UI bureau ou doit céder à l’ordonnancement Rust ; aucune seconde autorité sur les images n’est acceptée. Ilya D1 suggéré.
 
 - [ ] **[H03 / #1060](https://github.com/mysteropodes/nemo/issues/1060) — Cartographier un geste de rotation de sélection et sa frontière d’annulation**
 
@@ -1163,18 +1204,23 @@ N07–N19A ont fourni les interfaces natives acceptées de sauvegarde/chargement
 ## 9. Acceptation finale — la ligne d’arrivée
 
 - [x] N00–N05 possèdent des preuves d’acceptation exactes : installation du tableau et du plan, réconciliation de la file sur le main actuel, contrats figés d’autorité et de transition, faisabilité de l’évaluation headless, faisabilité du viewport natif et file bornée d’implémentation de production. Le pourcentage d’un parent de suivi ou un prototype de faisabilité ne vaut pas achèvement de production.
-- [ ] Le moteur Rust natif est l’unique autorité d’écriture pour les chemins convenus de révision du document, commande/historique, évaluation/ordonnancement, médias/ressources/GPU, production du viewport et export. Tauri/JavaScript reste l’interface ; Paper.js et navigateur/WASM sont des adaptateurs de frontière aux capacités déclarées, pas des autorités concurrentes.
-- [ ] Chaque famille de référence requise possède un oracle indépendant de parité à révision fixe et passe ses contrôles applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif, navigateur réel et bureau installé sur le candidat final identifié. Un ancien writer peut avoir été retiré plus tôt sur la branche d’intégration, mais la famille reste en attente jusqu’à ces réussites. L’acceptation du paquet, l’acceptation navigateur et la parité du code source sont consignées séparément aux SHA exacts.
-- [ ] Le dénominateur fixe des workflows de référence atteint 100 % de couverture acceptée sur les surfaces convenues, hormis les décisions précises relatives aux défauts déjà présents. Les anciens formats de projet s’importent sans perte silencieuse de contenu ; expressions et comportement public des scripts/plugins sont pris en compte. Une fonctionnalité requise temporairement indisponible ne peut pas être comptée Done.
+- [ ] Le moteur Rust natif est l’unique autorité d’écriture pour les chemins convenus de révision du document, commande/historique, évaluation/ordonnancement, médias/ressources/GPU, production du viewport et export. Tauri/HTML/CSS/JavaScript reste l’interface bureau ; Paper.js ne sert qu’à la géométrie, au hit-test ou à la présentation justifiés, jamais d’autorité concurrente.
+- [ ] Chaque famille de référence bureau requise possède un oracle indépendant de parité à révision fixe et passe ses contrôles applicables de sauvegarde/chargement, annulation/rétablissement, sélection, animation, rendu, export, pont natif et application de bureau installée sur le candidat final identifié. Un ancien writer peut avoir été retiré plus tôt sur la branche d’intégration, mais la famille reste en attente jusqu’à ces réussites. L’acceptation du paquet bureau et la parité du code source sont consignées séparément aux SHA exacts ; l’acceptation navigateur appartient à R24.
+- [ ] Le dénominateur fixe des workflows de référence atteint 100 % de couverture acceptée sur les surfaces bureau convenues, hormis les décisions précises relatives aux défauts déjà présents. Les anciens formats de projet s’importent sans perte silencieuse de contenu ; expressions et comportement public des scripts/plugins sont pris en compte. Une fonctionnalité bureau requise temporairement indisponible ne peut pas être comptée Done.
 - [ ] Le recensement figé du code et des consommateurs de P03 est complet, y compris les petites tâches inscrites ensuite. Aucun monolithe écrit manuellement ne reste caché derrière une exception héritée ; les fichiers légitimes générés/tiers/de données ont des décisions explicites.
 - [ ] Chaque fonctionnalité possède une API publique cohérente, une seule autorité d’état, les contrats applicables de cycle de vie/ressources et un enregistrement de capacité. Les consommateurs existants interface/API/MCP utilisent la même implémentation ; les anciens propriétaires d’écritures et chemins de contournement sont retirés.
-- [ ] Les contrôles pertinents unitaires, de non-régression, navigateur et natifs protègent le comportement migré. Les rapports de couverture et d’échec sont inspectables au SHA final du code. Les défauts connus sont une dette produit explicite, pas des prérequis de réparation ni des tests présentés à tort comme réussis.
+- [ ] Les contrôles pertinents unitaires, de non-régression, natifs et de bureau installé protègent le comportement migré. Les rapports de couverture et d’échec sont inspectables au SHA final du code. Les résultats navigateur existants restent rapportés honnêtement sans être un jalon bureau ; leurs obligations de compatibilité restent ouvertes sous R24. Les défauts connus sont une dette produit explicite, pas des prérequis de réparation ni des tests présentés à tort comme réussis.
+- [ ] Des charges représentatives de lecture, rendu/export et cycle de vie des ressources sur le bureau installé possèdent des références identifiées et des preuves de non-régression/récupération sur le candidat final sous R19. Aucun nouvel objectif de performance n’est déduit de ce jalon structurel ; des tests limités au code ou à une courte vérification ne valent pas essai d’endurance.
 - [ ] La validation locale normale impose les frontières adoptées, les profils de taille, la fraîcheur des schémas et l’exhaustivité des enregistrements. Chaque vérificateur possède un contrôle négatif pertinent qui échoue.
 - [ ] Un nouvel agent peut ajouter une déclaration de fonctionnalité selon la convention documentée et l’exercer via le MCP Rust livré sans modifier un répartiteur central. Les deux véritables clients disposent de preuves identifiées d’acceptation de l’installation pour la tranche macOS prise en charge.
 - [ ] Le débogage fournit une inspection corrélée bornée et un chemin reproductible de jeu d’essai isolé. Stdout du protocole, propriété des documents et données utilisateur restent intacts.
 - [ ] Ilya et Cyrill acceptent le résultat fonctionnel et structurel complet et ses limites préexistantes explicites de produit/plateforme. Préserver un code/artefact opérationnel récupérable, réconcilier le diff final de l’intégration avec le `main` actuel et ne promouvoir que par PR normalement protégée et revue. Fermer les parents de suivi restants, réconcilier le tableau principal et le compte rendu central final, et libérer les responsabilités terminées de branche/worktree/exécution.
 
 Aucune affirmation ci-dessus n’exige de réparer tous les bugs produit préexistants. Aucune extraction ouverte, aucun propriétaire d’écritures d’état manquant ni aucune preuve architecturale absente ne peut être renommé dette produit uniquement pour déclarer la remédiation terminée.
+
+Après ce jalon bureau, R24 admet et accepte séparément les capacités navigateur/WASM
+couvertes. L’achèvement bureau ne ferme pas R24 et ne présente pas la parité
+navigateur comme livrée.
 
 ## 10. Buzz, rapports horaires et dossiers de démarrage des deux équipes
 
