@@ -1,7 +1,6 @@
 //! Terminal release admission and fail-closed host reconciliation.
 
 use crate::{
-    native_application::DesktopNativeApplication,
     native_application_contract::*,
     native_dispatch::{
         NativeAuthority, NativePhase, NativeState, ReleaseAdmission, ReleaseTombstone,
@@ -97,24 +96,13 @@ where
         application.document_id().to_owned(),
         application.content_revision(),
     );
-    let Some(desktop) = application
-        .as_any_mut()
-        .downcast_mut::<DesktopNativeApplication>()
-    else {
-        drop(application);
-        return Ok(retain_failed_release(
-            &mut authority,
-            generation,
-            retained_request_id,
-            fingerprint,
-            retained_identity,
-            "native desktop host was unavailable during cleanup",
-        ));
-    };
-    let (mut released, core_error) = match catch_unwind_message(|| desktop.release_project()) {
-        Ok(released) => (released, None),
-        Err(message) => {
-            let Some(released) = desktop.release_progress() else {
+    let (mut released, core_error) = match catch_unwind_message(|| application.release_project()) {
+        Ok(Ok(released)) => (released, None),
+        Ok(Err(message)) | Err(message) => {
+            let Some(released) = catch_unwind_message(|| application.release_progress())
+                .ok()
+                .flatten()
+            else {
                 drop(application);
                 return Ok(retain_failed_release(
                     &mut authority,
@@ -135,6 +123,9 @@ where
         if released.application.export_stage == ReconciliationStage::Pending {
             released.application.export_stage = ReconciliationStage::Unknown;
         }
+        if released.preview_stage == ReconciliationStage::Pending {
+            released.preview_stage = ReconciliationStage::Unknown;
+        }
     }
     let viewport = core_error.clone().map_or_else(
         || {
@@ -153,10 +144,30 @@ where
                 .map(|message| host_error("cleanup_failed", message))
         })
         .or_else(|| viewport.as_ref().err().cloned());
+    if cleanup_error.is_none()
+        && (released.application.instance_id != retained_identity.0
+            || released.application.document_id != retained_identity.1
+            || released.application.content_revision != retained_identity.2)
+    {
+        cleanup_error = Some(host_error(
+            "cleanup_failed",
+            "native cleanup identity changed",
+        ));
+    }
     if cleanup_error.is_none() && !released.application.cleanup_complete() {
         cleanup_error = Some(host_error(
             "cleanup_failed",
             "native export cleanup remained indeterminate",
+        ));
+    }
+    if cleanup_error.is_none()
+        && (released.application.transaction_stage != ReconciliationStage::Complete
+            || released.preview_stage != ReconciliationStage::Complete
+            || !released.unresolved_preview.is_empty())
+    {
+        cleanup_error = Some(host_error(
+            "cleanup_failed",
+            "native cleanup stages remained indeterminate",
         ));
     }
     let cleanup_complete = released.application.cleanup_complete()
@@ -170,9 +181,9 @@ where
     let receipt = NativeReleaseReceipt {
         api_version: HOST_API_VERSION,
         request_id: request.request_id.clone(),
-        instance_id: released.application.instance_id,
-        document_id: released.application.document_id,
-        content_revision: released.application.content_revision,
+        instance_id: retained_identity.0,
+        document_id: retained_identity.1,
+        content_revision: retained_identity.2,
         lifecycle_generation: generation,
         status: if cleanup_complete {
             "succeeded"
@@ -252,6 +263,7 @@ mod tests {
         Scratch,
     };
     use super::*;
+    use crate::native_application::DesktopNativeApplication;
     use serde_json::json;
     use std::sync::{
         atomic::{AtomicBool, Ordering},

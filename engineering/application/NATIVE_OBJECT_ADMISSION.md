@@ -138,6 +138,31 @@ availability, byte policy and the real common-host round trip. N25D remains the
 native fill/revision/history successor. No browser, installed, visual projection
 or P03 C04a acceptance follows from this staged library API.
 
+## N25C2a terminal host cleanup prerequisite
+
+The existing single `NativeAuthority` slot releases its installed owner through
+explicit `NativeDispatch::release_project` and `release_progress` ports. The
+shared internal progress result retains transaction, export and preview evidence;
+terminal cleanup no longer requires a `DesktopNativeApplication` downcast. The
+desktop implementation delegates to its existing staged cleanup. The generic
+core application and export-pump test owner explicitly reject unsupported host
+cleanup; the trait has no successful default.
+
+The real host release path retains the admitted instance/document/revision, catches
+cleanup and progress panics, preserves completed stages, and marks unreconciled
+pending stages unknown. Unsupported cleanup, changed cleanup identity, unresolved
+work, incomplete stages and poisoned authority locks produce a failed terminal
+tombstone that denies re-entry. A successful release permits one exclusive newer
+installation generation; identical request replay retrieves the retained receipt
+without repeating cleanup or touching a reentered owner.
+
+N25C2a's non-desktop test owner proves this host lifecycle prerequisite only. It
+does not install a real object application, activate an object capability, validate
+object MCP requests/results, or enable UI/MCP object reads. Those N25C2 gates and
+the complete-result 4096-byte policy remain separate. N25D fill/history, C04a
+visible selection, browser, installed desktop and full parity remain unavailable
+or pending as recorded below.
+
 ## Consumer and acceptance boundaries
 
 | Consumer | N25B evidence or remaining gate |
