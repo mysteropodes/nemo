@@ -323,6 +323,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
     'rust.desktop.native.host.release.tests->rust.desktop.mcp.adapter',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application',
+    'rust.desktop.native.host.release.tests->rust.desktop.native.application.commands',
     'rust.desktop.native.host.release.tests->rust.desktop.native.application.contract',
     'rust.desktop.native.host.release.tests->rust.desktop.native.dispatch',
     'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
@@ -418,7 +419,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.commands': [
       'application::ReproductionFixture', 'application::ReproductionStatus',
       'application::REPRODUCTION_FIXTURE', 'application::replay_reproduction_bundle',
-      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'compositor::Compositor'],
+      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'compositor::Compositor', 'object_codec::decode_project'],
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
     'rust.desktop.native.host.release.tests': [
@@ -498,9 +499,9 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
-  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter']);
+  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
   for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
       'history::NativeObjectHistory', 'object_document::ObjectDocument', 'export_job::ExportReleaseReconciliation']],
@@ -550,4 +551,38 @@ use ${prefix}native_engine::compositor::Compositor;`);
       assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === owner && v.detail.path === item));
     }
   }
+});
+
+test('N25C2e raw bootstrap is registered with exact codec and test-only edges', (t) => {
+  const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
+  const command = 'rust.desktop.native.application.commands', tests = 'rust.desktop.native.host.release.tests';
+  const source = 'src-tauri/src/native_object_bootstrap.rs', controls = 'src-tauri/src/native_object_bootstrap_tests.rs';
+  const owner = profile.modules.find((m) => m.id === command);
+  assert.ok(owner.files.includes(path.basename(source)) && owner.publicApi.includes(path.basename(source)));
+  assert.ok(profile.modules.find((m) => m.id === tests).files.includes(path.basename(controls)));
+  const raw = fs.readFileSync(path.join(ROOT, source), 'utf8'), shell = fs.readFileSync(path.join(ROOT, 'src-tauri/src/lib.rs'), 'utf8');
+  assert.match(shell, /mod native_object_bootstrap;/);
+  assert.match(shell, /native_object_bootstrap::nemo_native_object_bootstrap,/);
+  assert.match(raw, /request_json: String/);
+  assert.match(raw, /require_main\(&window\)\?;\s*bootstrap_raw\(&state, &request_json\)/);
+  assert.equal(profile.sizeProfiles[owner.sizeProfile].hardMax, 500);
+  assert.equal(policy.externalCratePorts.native_engine.moduleItems[command].filter((x) => x === 'object_codec::decode_project').length, 1);
+  const denied = structuredClone(policy);
+  denied.externalCratePorts.native_engine.moduleItems[command] = denied.externalCratePorts.native_engine.moduleItems[command].filter((x) => x !== 'object_codec::decode_project');
+  assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) => v.rule === 'private-port-access' && v.module === command && v.detail.path === 'object_codec::decode_project'));
+  const edgeDenied = structuredClone(policy);
+  edgeDenied.layerRules['host-release-tests'].allowedLayers = edgeDenied.layerRules['host-release-tests'].allowedLayers.filter((x) => x !== 'command-adapter');
+  assert.ok(R.checkRustCrate(profile, edgeDenied, { root: ROOT }).violations.some((v) => v.rule === 'layer-violation' && v.module === tests && v.detail.targetModule === command));
+  for (const file of [source, controls]) {
+    const removed = structuredClone(profile);
+    for (const module of removed.modules) module.files = module.files.filter((x) => x !== path.basename(file));
+    assert.ok(require('./lib/boundaries-coverage.cjs').checkSourceCoverage(removed, { root: ROOT, sourcePaths: [file] }).violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === file));
+  }
+  const root = desktopFixture(t);
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::object_codec::decode_project;');
+  appendSource(root, 'src-tauri/src/application_mcp.rs', 'use crate::native_object_bootstrap::bootstrap_raw;');
+  const violations = R.checkRustCrate(profile, policy, { root }).violations;
+  assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'object_codec::decode_project'));
+  assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === 'rust.desktop.mcp.adapter' && v.detail.targetModule === command));
+  assert.ok(violations.some((v) => v.rule === 'cycle'), 'production back-edge must remain denied');
 });

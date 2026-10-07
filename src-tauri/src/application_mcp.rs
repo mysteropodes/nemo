@@ -119,11 +119,16 @@ impl ApplicationMcp {
         native.install(generation, application)
     }
 
-    /// Typed host prerequisite only; no Tauri route or object capability activation.
-    pub(crate) fn install_native_object(&self, document: ObjectDocument) -> Result<(), String> {
+    /// Return the committed owner's identity without a later mutable status read.
+    pub(crate) fn install_native_object(
+        &self,
+        document: ObjectDocument,
+    ) -> Result<(String, u64), String> {
         let owner = NativeObjectHost::new(self.instance_id.clone(), document)?;
+        let identity = (owner.document_id().to_owned(), owner.content_revision());
         let reservation = self.reserve_native_install()?;
-        self.install_dispatch(reservation.generation(), Box::new(owner))
+        self.install_dispatch(reservation.generation(), Box::new(owner))?;
+        Ok(identity)
     }
 
     pub(crate) fn install_native<P, C, R>(
