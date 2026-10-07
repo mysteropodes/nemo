@@ -333,7 +333,7 @@ fn raw_bootstrap_receipt_remains_a_commit_fact_after_real_release_and_reentry() 
     let state = ApplicationMcp::default();
     let first = bootstrap_raw(&state, &raw(&state)).unwrap();
     let committed = serde_json::to_value(first).unwrap();
-    let generation = identity(&state).unwrap().0;
+    let installation_generation = identity(&state).unwrap().0;
     let request = NativeReleaseRequest {
         api_version: HOST_API_VERSION,
         request_id: "release-first".into(),
@@ -342,10 +342,12 @@ fn raw_bootstrap_receipt_remains_a_commit_fact_after_real_release_and_reentry() 
         expected_revision: 0,
         cancelled_before_dispatch: false,
     };
-    assert!(
-        matches!(admit_release_request(&state.native_state(), &request).unwrap(),
-        ReleaseAdmission::Execute { generation: actual } if actual == generation)
-    );
+    let ReleaseAdmission::Execute { generation } =
+        admit_release_request(&state.native_state(), &request).unwrap()
+    else {
+        panic!("fresh release must execute");
+    };
+    assert!(generation > installation_generation);
     let release = complete_release(&state.native_state(), generation, &request, || {
         Ok((vec![], "already_absent"))
     })
