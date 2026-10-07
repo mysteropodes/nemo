@@ -807,3 +807,18 @@ test('desktop Version Restore with no published native globals denies before eve
   assert.equal(app.elements.get('project-tabs-list').children.length, 0);
   assert.equal(app.toasts.includes('toastVersionRestored'), false);
 });
+
+test('native Version Restore rejected import preserves the existing document, baseline and modal', async () => {
+  const h = versionRestoreHarness();
+  const before = { identity: { ...h.identity }, label: h.app.project.getCurrentLabel(), dirty: h.app.project.isDirty() };
+  h.app.window.NemoNativeOpacityProject.importJSON = async () => false;
+  assert.equal(await h.app.project.restoreVersion('/owned-history/version.json'), false);
+  assert.deepEqual(h.identity, before.identity);
+  assert.equal(h.app.project.getCurrentLabel(), before.label);
+  assert.equal(h.app.project.isDirty(), before.dirty);
+  assert.equal(h.app.mutations, 0);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.app.pendingFrames, 0);
+  assert.equal(h.app.element('history-modal').style.display, 'flex');
+  assert.equal(h.app.toasts.includes('toastVersionRestored'), false);
+});
