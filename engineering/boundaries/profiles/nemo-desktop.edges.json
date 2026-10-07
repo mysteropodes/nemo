@@ -64,8 +64,8 @@
       "meaning": "native_dispatch.rs owns the shared boxed application seam and export pump. It is depended on by owners, but does not reach back into the MCP adapter, application bootstrap or viewport."
     },
     "host-release-tests": {
-      "allowedLayers": ["bootstrap", "host-contract", "host-seam"],
-      "meaning": "N25C2a private terminal lifecycle tests reach only the existing application owner, strict host contract and boxed dispatch seam"
+      "allowedLayers": ["bootstrap", "host-contract", "host-seam", "mcp-adapter"],
+      "meaning": "N25C2a/C2d private host lifecycle tests reach only the existing application owner, strict host contract, boxed dispatch seam and production typed installation adapter"
     },
     "tests": {
       "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
@@ -105,6 +105,7 @@
       "rust.desktop.native.application.ports.tests -> rust.desktop.native.application.ports (native_application_ports_tests.rs: use crate::native_application_ports::*;)",
       "rust.desktop.native.application.viewport -> rust.desktop.native.application.contract (native_application_viewport.rs: use crate::native_application_contract::{...};)",
       "rust.desktop.native.application.viewport -> rust.desktop.native.viewport (native_application_viewport.rs: use crate::native_viewport::NativeViewport;)",
+      "rust.desktop.native.host.release.tests -> rust.desktop.mcp.adapter (native_object_host_tests.rs: production typed installer controls)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application.contract (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.dispatch (native_application_dispatch_release_tests.rs: explicit import)",
@@ -151,6 +152,7 @@
           "application::NativeApplication",
           "commands::OpacityRequest",
           "document::OpacityDocument",
+          "object_document::ObjectDocument",
           "export_job::ExportCompositor",
           "export_job::JobReceipt",
           "export_job::StagedArtifactPort",
@@ -261,9 +263,10 @@
           "export_job::JobStatus"
         ],
         "rust.desktop.native.host.release.tests": [
-        "application::ApplicationReleaseReceipt", "commands::OpacityRequest", "commands::ResponseEnvelope", "document::OpacityDocument", "export_job::ExportReleaseReconciliation", "export_job::JobReceipt", "export_job::PendingFrame", "export_job::ReconciliationStage"
+        "application::ApplicationReleaseReceipt", "commands::OpacityRequest", "commands::ResponseEnvelope", "document::OpacityDocument", "export_job::ExportReleaseReconciliation", "export_job::JobReceipt", "export_job::PendingFrame", "export_job::ReconciliationStage", "object_codec::decode_project", "commands::NativeOpacityApplication", "codec::decode_project"
       ],
       "rust.desktop.native.dispatch": [
+        "history::NativeObjectHistory", "object_document::ObjectDocument", "export_job::ExportReleaseReconciliation",
         "application::ApplicationReleaseReceipt", "export_job::ReconciliationStage", "resource_leases::WorkId",
           "application::ExportResourceResolver",
           "application::NativeApplication",
