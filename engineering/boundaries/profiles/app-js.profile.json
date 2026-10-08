@@ -2291,6 +2291,18 @@
       "publicApi": [
         "project-entry.js"
       ]
+    },
+    {
+      "id": "app.project.history-placement.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "project-history-placement.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "project-history-placement.js"
+      ]
     }
   ],
   "layerRules": {

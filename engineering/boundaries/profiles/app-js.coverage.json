@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "15418facc1d123703d05566949c6cb9ec700accc",
-    "sourceRootTree": "2b0372099d920551695ce7dea8db77960307fef8",
+    "candidateCommit": "1428cde994c58d8ba3c8a8c122a2dafca39b0346",
+    "sourceRootTree": "60a65acd6467994022259c5158300a7d36d8d968",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "f294ec859093f30bfdc3039a6297b5a3686f848e",
-      "lastChangedCommit": "15418facc1d123703d05566949c6cb9ec700accc"
+      "gitTree": "5a54029c85f83593f7deb91c2686bd812074992b",
+      "lastChangedCommit": "1428cde994c58d8ba3c8a8c122a2dafca39b0346"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "c228c8316c1598eb1004ad3f7d17a18098f3d974",
-      "sha256": "aac344dbd0ed63cb24108319df90550ab900d86ed3ed423ddc71ce5ffdd8810c",
-      "lastChangedCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+      "gitBlob": "08eeb843a2d3b51e335ec7d0e3a12b20812ee3c7",
+      "sha256": "c357ff4a2ffa65e0b67618264eb79f9e4f571e2f7cad296065211e07afa87291",
+      "lastChangedCommit": "b580eaf1f647d86b3261a3e6a3752e5bed803ae3"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "2be8bb5773db8e79df6a936e3a45640d5e3a7f4865dfc43c4885d74e2f907d86"
+      "value": "42fcc493e5a1015aee2070cde221ad8f40414706faaaab63a35e1031192b04a8"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "034d59e606df1dd123a042a1a99db6b31d09793d",
-        "sha256": "307072d48f5e7e7f5cdccd44f65b82c1f3e05a1db00aed90f5c929bd582d8f74",
-        "moduleCount": 191,
-        "basedOnCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+        "gitBlob": "7798331193189d94a39a9e7eae325ad33014dbc5",
+        "sha256": "ffb77666f20ebfed9100429bf4e28e9fcc1fecf0927d36ae8d6f4759d62b3b68",
+        "moduleCount": 192,
+        "basedOnCommit": "b580eaf1f647d86b3261a3e6a3752e5bed803ae3"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -3072,6 +3072,18 @@
           "path": "src/index.html",
           "line": 2363,
           "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-history-placement.js",
+      "moduleId": "app.project.history-placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2527,
+          "scriptOrdinal": 180
         }
       ]
     }
