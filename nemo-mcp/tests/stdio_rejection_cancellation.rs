@@ -192,6 +192,25 @@ fn cancelled_receive_must_finish_rejection_waiting_for_write() {
 }
 
 #[test]
+fn uncancelled_rejection_finishes_after_held_write_is_released() {
+    let (mut transport, probe) = harness();
+    probe.lock().unwrap().hold_write = true;
+    feed(&probe, DUPLICATE);
+    let mut receiving = Box::pin(transport.receive());
+    assert!(step(receiving.as_mut()).is_pending());
+    assert_eq!(probe.lock().unwrap().consumed, DUPLICATE.len());
+    assert!(probe.lock().unwrap().write_polls > 0);
+    assert!(lines(&probe).is_empty());
+    change(&probe, |state| state.hold_write = false);
+    assert!(step(receiving.as_mut()).is_pending());
+    assert_eq!(lines(&probe), vec![invalid()]);
+    drop(receiving);
+    change(&probe, |state| state.eof = true);
+    let mut eof = Box::pin(transport.receive());
+    assert!(matches!(step(eof.as_mut()), Poll::Ready(None)));
+}
+
+#[test]
 fn uncancelled_rejection_survives_writer_lock_and_recovers_exactly_once() {
     let (mut transport, probe) = harness();
     probe.lock().unwrap().hold_flush = true;
