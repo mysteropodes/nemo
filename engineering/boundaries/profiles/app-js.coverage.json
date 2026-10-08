@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "b580eaf1f647d86b3261a3e6a3752e5bed803ae3",
-    "sourceRootTree": "1791ed865d930e7ffd5abc804d69cbc556f53b4d",
+    "candidateCommit": "f66c2d5b7367814fddf873899dbcd49d7fe4567a",
+    "sourceRootTree": "463ced345732046cf4d6f99b3543a48a4f898091",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "8882deccdc22af0e1208866b84b53196c77f7163",
-      "lastChangedCommit": "b580eaf1f647d86b3261a3e6a3752e5bed803ae3"
+      "gitTree": "9f0678953eadd3d83bec467e58c0748ac5f483f3",
+      "lastChangedCommit": "f66c2d5b7367814fddf873899dbcd49d7fe4567a"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "3e8eaa586c01e95ee6fda384be430c6e6d9990b2661c3a927230948bf24f7c5b"
+      "value": "6bab374429b8274aa7dd66a0c69338ccbb66c36cac0c04ed54bb424cf0493907"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
         "gitBlob": "7798331193189d94a39a9e7eae325ad33014dbc5",
         "sha256": "ffb77666f20ebfed9100429bf4e28e9fcc1fecf0927d36ae8d6f4759d62b3b68",
-        "moduleCount": 191,
-        "basedOnCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+        "moduleCount": 192,
+        "basedOnCommit": "b580eaf1f647d86b3261a3e6a3752e5bed803ae3"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -878,30 +878,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/project-dirty-baseline.js",
-      "moduleId": "app.project.dirtybaseline.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2461,
-          "scriptOrdinal": 121
-        }
-      ]
-    },
-    {
-      "path": "src/js/adapters/project-history-placement.js",
-      "moduleId": "app.project.history-placement.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2527,
-          "scriptOrdinal": 180
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/project-native-save.js",
       "moduleId": "app.project.nativesave.adapter",
       "executionClass": "document-classic",
@@ -910,6 +886,18 @@
           "path": "src/index.html",
           "line": 2460,
           "scriptOrdinal": 120
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-dirty-baseline.js",
+      "moduleId": "app.project.dirtybaseline.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2461,
+          "scriptOrdinal": 121
         }
       ]
     },
@@ -982,19 +970,6 @@
           "path": "src/index.html",
           "line": 2406,
           "scriptOrdinal": 82
-        }
-      ]
-    },
-    {
-      "path": "src/js/application/diagnostics-capability.js",
-      "moduleId": "app.diagnostics.capability",
-      "executionClass": "classic-without-load-site",
-      "loadSites": [],
-      "sourceEvidence": [
-        {
-          "path": "src/js/application/diagnostics-capability.js",
-          "line": 1,
-          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
         }
       ]
     },
@@ -1876,18 +1851,6 @@
           "path": "src/js/labs/command-palette.js",
           "line": 111,
           "role": "Labs registration if explicitly loaded"
-        }
-      ]
-    },
-    {
-      "path": "src/js/labs/diagnostics-panel.js",
-      "moduleId": "app.labs.diagnostics.panel",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2363,
-          "scriptOrdinal": 48
         }
       ]
     },
@@ -3084,6 +3047,43 @@
           "path": "src/index.html",
           "line": 2495,
           "scriptOrdinal": 151
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/diagnostics-capability.js",
+      "moduleId": "app.diagnostics.capability",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/diagnostics-capability.js",
+          "line": 1,
+          "role": "capability descriptor/registration helper; not wired into a script tag (T08/#1057, bootstrap integration out of scope)"
+        }
+      ]
+    },
+    {
+      "path": "src/js/labs/diagnostics-panel.js",
+      "moduleId": "app.labs.diagnostics.panel",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2363,
+          "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/project-history-placement.js",
+      "moduleId": "app.project.history-placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2527,
+          "scriptOrdinal": 180
         }
       ]
     }
