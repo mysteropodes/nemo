@@ -134,6 +134,18 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "N25C2g/#1638: pinned cargo-llvm-cov 0.9.1 named export at clean source 45f1d27f1d636b514dd629548bc6a75d303453b9 reports no file record or executable regions for this cfg(test) child. Explicitly listed, not excluded. Artifact: reports/20261008T012312Z-45f1d27/coverage-rust/coverage.json."
+    },
+    "nemo-mcp/src/stdio_output.rs": {
+      "lines": 98.18,
+      "regions": 92.25,
+      "functions": 92.85,
+      "note": "N25R1/#1651: clean measured source 765745927ab11307b20d8af22f939c6a7ca1b3b6, pinned cargo-llvm-cov 0.9.1, default instrumented 103 tests passed/0 failed. lines 108/110; regions 143/155; functions 13/14. Report reports/20261008T145043Z-7657459/coverage-rust/coverage.json SHA256 24183386ab5a3a8d9d878d226923d5e6ce02e08cfbffe613485710f9ec079c05. Only this new measured entry added; every prior file/total floor, tool/exclusion/history retained. Protected ed9 comparison confirms inherited 18 coverage failures; registration is not whole coverage acceptance."
+    },
+    "nemo-mcp/src/stdio_transport.rs": {
+      "lines": 91.86,
+      "regions": 91.32,
+      "functions": 100,
+      "note": "N25R1/#1651: clean measured source 765745927ab11307b20d8af22f939c6a7ca1b3b6, pinned cargo-llvm-cov 0.9.1, default instrumented 103 tests passed/0 failed. lines 113/123; regions 179/196; functions 10/10. Report reports/20261008T145043Z-7657459/coverage-rust/coverage.json SHA256 24183386ab5a3a8d9d878d226923d5e6ce02e08cfbffe613485710f9ec079c05. Only this new measured entry added; every prior file/total floor, tool/exclusion/history retained. Protected ed9 comparison confirms inherited 18 coverage failures; registration is not whole coverage acceptance."
     }
   },
   "nativeObjectContractRegistration": {

@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server = nemo_mcp::server::NemoServer::new(nemo_mcp::registry::registry_root()?);
     let (input, output) = rmcp::transport::stdio();
     server
-        .serve((nemo_mcp::wire::guarded_stdio_input(input), output))
+        .serve(nemo_mcp::wire::guarded_stdio_transport(input, output))
         .await?
         .waiting()
         .await?;
