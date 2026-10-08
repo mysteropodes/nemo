@@ -115,6 +115,47 @@ fn reply() -> TxJsonRpcMessage<RoleServer> {
 const PING: &[u8] = b"{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}\n";
 
 #[test]
+fn pinned_sdk_ignored_non_mcp_fixture_and_valid_custom_delivery_are_distinct() {
+    for (value, delivered) in [
+        (
+            json!({"method":"notifications/custom","params":{"data":"custom"}}),
+            false,
+        ),
+        (
+            json!({"jsonrpc":"2.0","method":"foreign/notification"}),
+            true,
+        ),
+    ] {
+        let raw = format!("{value}\n");
+        let mut codec = rmcp::transport::async_rw::JsonRpcMessageCodec::<
+            rmcp::service::RxJsonRpcMessage<RoleServer>,
+        >::new();
+        let mut bytes = tokio_util::bytes::BytesMut::from(raw.as_bytes());
+        let reference = tokio_util::codec::Decoder::decode(&mut codec, &mut bytes).unwrap();
+        assert_eq!(
+            reference.is_some(),
+            delivered,
+            "pinned SDK compatibility policy"
+        );
+        let (mut t, p) = harness();
+        change(&p, |s| {
+            s.bytes.extend(raw.bytes());
+            s.eof = true;
+        });
+        let mut receive = Box::pin(t.receive());
+        let Poll::Ready(message) = step(receive.as_mut()) else {
+            panic!("fixture unexpectedly pending");
+        };
+        assert_eq!(
+            message.is_some(),
+            delivered,
+            "production must match SDK notification policy"
+        );
+        assert!(p.lock().unwrap().output.is_empty());
+    }
+}
+
+#[test]
 fn normal_send_failure_fences_future_receive_send_and_close() {
     for mode in 0..3 {
         let (mut t, p) = harness();

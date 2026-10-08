@@ -274,7 +274,7 @@ fn write_zero_write_error_and_flush_error_are_terminal_without_retry() {
 fn sdk_compatibility_syntax_bom_crlf_unknown_notification_and_final_fragment() {
     for eof in [false, true] {
         let (mut t, p) = harness();
-        let mut bytes = b"\n\r\n{bad}\n{\"jsonrpc\":\"2.0\",\"method\":\"foreign/notification\"}\n\xef\xbb\xbf{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"ping\"}\r\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}".to_vec();
+        let mut bytes = b"\n\r\n{bad}\n{\"method\":\"notifications/custom\",\"params\":{\"data\":\"custom\"}}\n\xef\xbb\xbf{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"ping\"}\r\n{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"ping\"}".to_vec();
         if !eof {
             bytes.push(b'\n');
         }
