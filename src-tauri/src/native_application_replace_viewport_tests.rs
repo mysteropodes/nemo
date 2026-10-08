@@ -341,6 +341,8 @@ fn rebound_b_surface_keeps_deferred_recovery_and_fatal_outcomes_distinct() {
         (FakeOutcome::ValidationFailure, "failed-validation", 0, 0),
         (FakeOutcome::DeviceLost, "failed-device-lost", 0, 0),
     ] {
+        #[cfg(target_os = "macos")]
+        let diagnostics = crate::native_viewport::test_observations();
         let (_scratch, native, old_document, prepared_b) = setup();
         let state = Arc::new(Mutex::new(SurfaceState::default()));
         let (_snapshot_a, compositor) = present_a(&native, &old_document, &state);
@@ -391,6 +393,8 @@ fn rebound_b_surface_keeps_deferred_recovery_and_fatal_outcomes_distinct() {
         )
         .unwrap();
         assert_eq!(presented.status, expected, "{outcome:?}");
+        #[cfg(target_os = "macos")]
+        diagnostics.validate_last(expected);
         let surface = state.lock().unwrap();
         assert_eq!(surface.recreates, recreates, "{outcome:?}");
         assert_eq!(surface.reconfigures, reconfigures, "{outcome:?}");
@@ -410,6 +414,8 @@ fn rebound_b_surface_keeps_deferred_recovery_and_fatal_outcomes_distinct() {
 
 #[test]
 fn rebound_b_close_disposes_its_surface_and_reentry_uses_fresh_host() {
+    #[cfg(target_os = "macos")]
+    let diagnostics = crate::native_viewport::test_observations();
     let (scratch, native, old_document, prepared_b) = setup();
     let state_b = Arc::new(Mutex::new(SurfaceState::default()));
     let (_snapshot_a, _compositor_a) = present_a(&native, &old_document, &state_b);
@@ -492,6 +498,8 @@ fn rebound_b_close_disposes_its_surface_and_reentry_uses_fresh_host() {
     )
     .unwrap();
     assert_eq!(presented.status, "presented");
+    #[cfg(target_os = "macos")]
+    diagnostics.validate_last("presented");
     assert_eq!(
         state_c.lock().unwrap().attached_snapshot.as_deref(),
         Some(snapshot_c.as_str())
