@@ -126,7 +126,7 @@ function domHarness(width, collapsed, windowWidth = 1000) {
   };
   const ui = { context: () => ({ path: 'A.json' }), notice: message => notices.push(message),
     list: async () => [{ ts: 100, path: 'version40.json' }], restore: async () => false, relTime: () => '30s' };
-  return { root, props, elements, notices, controller: bind(root, ui) };
+  return { root, props, elements, notices, ui, controller: bind(root, ui) };
 }
 for (const [width, collapsed, viewport] of [[280, false, 1000], [520, false, 1000], [520, true, 1000], [280, false, 500]]) {
   test(`real DOM binding preserves panel preferences and positive viewport (${width}/${collapsed}/${viewport})`, async () => {
@@ -162,4 +162,18 @@ test('DOM binding refuses lifecycle generation drift even if the document/revisi
   h.root.NemoNativeOpacityCutover.presentPreview = async frame => { const receipt = await real(frame); generation++; return receipt; };
   assert.equal(await h.controller.open(), false);
   assert.equal(h.elements.get('top-area').children.length, 0);
+});
+test('DOM binding refuses same-document lifecycle re-entry while version listing is pending', async () => {
+  const h = domHarness(280, false), rows = deferred(); let generation = 1;
+  h.root.NemoNativeOpacityCutover.getNativeIdentity = () => ({ documentId: 'A', generation });
+  h.ui.list = () => rows.promise;
+  // The production binding captures its injected list at construction.
+  const ui = { ...h.ui, list: () => rows.promise };
+  const controller = bind(h.root, ui), pending = controller.open();
+  await new Promise(done => setImmediate(done)); generation++;
+  rows.resolve([{ ts: 100, path: 'version40.json' }]);
+  assert.equal(await pending, false);
+  assert.equal(h.elements.get('history-list').children.length, 0);
+  assert.equal(h.elements.get('top-area').children.length, 0);
+  assert.equal(h.elements.get('history-modal').style.display, 'none');
 });

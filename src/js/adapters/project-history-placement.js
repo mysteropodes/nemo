@@ -148,7 +148,7 @@
       },
       context: function () {
         var native = root.NemoNativeOpacityCutover;
-        return JSON.stringify([ui.context(), native && native.identity()]);
+        return JSON.stringify([ui.context(), native && native.identity(), native && native.getNativeIdentity()]);
       },
       present: present, list: ui.list, restore: ui.restore, notice: ui.notice,
       render: function (rows) {
