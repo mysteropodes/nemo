@@ -659,7 +659,8 @@
       "files": [
         "boundaries-rust.test.cjs",
         "boundaries-native-object-client.test.cjs",
-        "boundaries-object-frame-packet.test.cjs"
+        "boundaries-object-frame-packet.test.cjs",
+        "boundaries-object-render-scene.test.cjs"
       ],
       "publicApi": [
         "boundaries-rust.test.cjs"
