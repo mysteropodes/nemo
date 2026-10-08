@@ -66,7 +66,7 @@ impl NativeDispatch for NativeObjectHost {
         }
         if let Some(response) = self
             .history
-            .try_dispatch_object_fill(&request)
+            .try_dispatch_object_command(&request)
             .map_err(|_| "native object command correlation is invalid".to_string())?
         {
             return Ok(response);
@@ -134,3 +134,7 @@ mod read_tests;
 #[cfg(test)]
 #[path = "native_object_host_command_tests.rs"]
 mod command_tests;
+
+#[cfg(test)]
+#[path = "native_object_host_history_tests.rs"]
+mod history_tests;

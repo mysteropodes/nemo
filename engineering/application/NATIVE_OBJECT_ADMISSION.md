@@ -521,3 +521,33 @@ writable document, new production graph edge, Cargo/MCP/schema/public descriptor
 change, frozen floor/baseline/exclusion, GPU/resource or viewport is introduced.
 General object common/UI/MCP activation, serialization/replacement/history RPC,
 selection/render/export/C04a and full desktop baseline acceptance remain pending.
+## N25D4 staged actual-owner history dispatch
+
+`NativeObjectHistory::try_dispatch_object_command` handles the distinct staged
+`command.document.object.undo` and `command.document.object.redo` operations as
+well as the accepted fill operation. The existing fill-only method remains a
+compatibility wrapper. The actual host calls the shared dispatcher after its
+release fence, retaining one authority and one request-receipt store.
+
+History payloads are closed objects containing only `command: "object.undo"` or
+`command: "object.redo"`, matching their operation. The existing bounded envelope,
+identity, safe expected-revision and cancellation rules precede effects. Admitted
+identical retries replay their retained revision/result before current-revision
+checks; changed bodies, including another operation under the same request ID,
+cannot overwrite the original receipt. Empty-stack failures are retained too.
+Typed input still requires the unchanged original-byte ingress; it cannot recover
+duplicate members already discarded by a Value parser.
+
+A fresh successful move uses D2's existing atomic history authority to restore the
+complete retained document in a new monotonic revision and move one stack entry.
+Its compact result is `applied: true, historyEntriesAdded: 0`. No-op fill still
+preserves bytes/revision/redo, and a fresh changed fill invalidates redo. Engine
+and actual raw-installed host tests check full content, old immutable pins,
+codec roundtrips, current query readback, retained retries, refused moves,
+release/new-incarnation fencing and public denial.
+
+This is a source producer seam only. Both history operations remain unregistered,
+the object descriptor remains unavailable, and available opacity operation names
+cannot route to this owner. Public UI/MCP, history RPC, save/reopen, rendering,
+export, installed desktop and M1 acceptance remain separate open gates. P37's
+History UI and N20K's viewport/publication paths are unchanged.
