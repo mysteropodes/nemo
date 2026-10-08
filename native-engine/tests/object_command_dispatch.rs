@@ -174,6 +174,18 @@ fn admitted_failures_are_exactly_retained_and_preserve_all_owner_state() {
         "invalid_request"
     );
     assert_eq!(state(&owner), before);
+    let mut missing = request(&owner, "missing-revision", 0);
+    missing.as_object_mut().unwrap().remove("expectedRevision");
+    let first = dispatch(&mut owner, &missing);
+    assert_eq!(first["error"]["code"], "invalid_request");
+    assert_eq!(dispatch(&mut owner, &missing), first);
+    assert_eq!(state(&owner), before);
+    missing["expectedRevision"] = json!(0);
+    assert_eq!(
+        dispatch(&mut owner, &missing)["error"]["code"],
+        "invalid_request"
+    );
+    assert_eq!(state(&owner), before);
 }
 
 #[test]
