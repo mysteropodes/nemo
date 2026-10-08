@@ -74,10 +74,10 @@
   }
 
   function bind(root, ui) {
-    var doc = root.document, modal = doc.getElementById('history-modal');
-    var top = doc.getElementById('top-area'), canvas = doc.getElementById('canvas-area');
-    var props = doc.getElementById('props-panel'), list = doc.getElementById('history-list');
-    var box = modal.querySelector('.modal-box'), closeButton = doc.getElementById('history-close');
+    var document = root.document, modal = document.getElementById('history-modal');
+    var top = document.getElementById('top-area'), canvas = document.getElementById('canvas-area');
+    var props = document.getElementById('props-panel'), list = document.getElementById('history-list');
+    var box = modal.querySelector('.modal-box'), closeButton = document.getElementById('history-close');
     var spacer = null, savedStyle = null, controls = [], observed = false, pending = false, geometry = '';
     function dimensions() {
       var area = canvas.getBoundingClientRect(), right = (spacer || props).getBoundingClientRect();
@@ -118,7 +118,7 @@
           savedStyle = ['left', 'top', 'width', 'max-height'].map(function (key) {
             return [key, box.style.getPropertyValue(key), box.style.getPropertyPriority(key)];
           });
-          spacer = doc.createElement('div'); spacer.id = 'history-column-space';
+          spacer = document.createElement('div'); spacer.id = 'history-column-space';
           spacer.setAttribute('aria-hidden', 'true'); top.appendChild(spacer);
           top.classList.add('history-column-open'); modal.classList.add('history-column');
         }
@@ -155,7 +155,7 @@
         list.textContent = ''; controls = [];
         if (!rows.length) { list.textContent = root.__TAURI__ ? 'Aucun instantané pour l’instant — revenez dans 30s.' : 'Historique disque disponible uniquement dans l’app desktop.'; return; }
         rows.forEach(function (version) {
-          var row = doc.createElement('div'), label = doc.createElement('span'), button = doc.createElement('button');
+          var row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');
           row.className = 'history-version-row';
           label.textContent = ui.relTime(version.ts) + ' (' + new Date(version.ts).toLocaleTimeString(undefined,
             { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ')';
