@@ -657,7 +657,8 @@
       "layer": "tooling-test",
       "dir": "scripts/nemo",
       "files": [
-        "boundaries-rust.test.cjs"
+        "boundaries-rust.test.cjs",
+        "boundaries-native-object-client.test.cjs"
       ],
       "publicApi": [
         "boundaries-rust.test.cjs"

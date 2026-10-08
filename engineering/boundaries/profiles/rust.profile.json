@@ -227,7 +227,9 @@
       "dir": "src-tauri/src",
       "files": [
         "application_mcp.rs",
-        "native_revision_sync.rs"
+        "native_revision_sync.rs",
+        "native_revision_dispatch.rs",
+        "native_object_client.rs"
       ],
       "publicApi": [
         "application_mcp.rs"
@@ -366,7 +368,9 @@
         "native_object_bootstrap_tests.rs",
         "native_object_host_read_tests.rs",
         "native_object_host_command_tests.rs",
-        "native_object_host_history_tests.rs"
+        "native_object_host_history_tests.rs",
+        "native_object_client_tests.rs",
+        "native_object_client_admission_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
