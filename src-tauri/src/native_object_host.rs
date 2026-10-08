@@ -64,6 +64,13 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
+        if let Some(response) = self
+            .history
+            .try_dispatch_object_fill(&request)
+            .map_err(|_| "native object command correlation is invalid".to_string())?
+        {
+            return Ok(response);
+        }
         let snapshot: ObjectSnapshot = self
             .history
             .acquire_snapshot(self.content_revision())
@@ -123,3 +130,7 @@ mod tests;
 #[cfg(test)]
 #[path = "native_object_host_read_tests.rs"]
 mod read_tests;
+
+#[cfg(test)]
+#[path = "native_object_host_command_tests.rs"]
+mod command_tests;

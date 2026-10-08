@@ -488,3 +488,36 @@ existing full-validator behavior and refusal precedence. The source/registration
 RED and original hashes remain separate from unavailable Rust characterization.
 Common UI/MCP/client availability, installed Tauri, mutations/history/viewport,
 C04a and full desktop acceptance remain pending.
+
+## N25D3 actual-owner scoped fill command and compact retry
+
+The actual non-Clone `NativeObjectHistory` offers a distinct staged
+`command.document.object.fill.set` typed-envelope port. The actual installed
+`NativeObjectHost` invokes it under its existing single-authority lock before
+immutable query fallback, with the released-owner fence first. No public caller
+or catalog is activated: the operation stays unregistered, full common
+validation rejects it, and it never borrows the available opacity apply route.
+
+After bounded API/identity/complete4096-byte preflight against the real owner,
+existing compact StageReceipts retain request fingerprints and exact dispositions.
+Identical admitted requests replay the original selected revision/result before
+checking current revision; changed bodies cannot replace that receipt. Fresh
+cancel/stale/invalid payload/absent target failures preserve content/history;
+changed fill delegates D1 preparation and D2 atomic commit, reports one revision
+and one added history entry; no-op keeps exact bytes, revision and redo. Later
+D2 undo/redo or other commands do not turn a retained retry into another effect.
+This typed entry cannot detect duplicate raw members already collapsed into
+Value; the original-byte transport gate remains required before typed admission.
+
+Independent actual-owner controls compare the fixed before/after record and
+complete sibling/geometry/layer/ID preservation, pinned reads, stable retries,
+changed bodies, no-op/redo, cancellation/stale/identity/bounds and terminal
+release/new-incarnation refusal. A real pre-production Rust test compiled and
+executed RED against the actual raw-installed owner before the dispatcher edit.
+Source, compile, host and installed-client evidence remain separate.
+
+Only existing history/command/receipt/revision ownership is used; no second
+writable document, new production graph edge, Cargo/MCP/schema/public descriptor
+change, frozen floor/baseline/exclusion, GPU/resource or viewport is introduced.
+General object common/UI/MCP activation, serialization/replacement/history RPC,
+selection/render/export/C04a and full desktop baseline acceptance remain pending.
