@@ -47,7 +47,7 @@ fn contents(packet: &ObjectFramePacket) -> Value {
     json!({"instanceId":packet.instance_id(),"documentId":packet.document_id(),
         "contentRevision":packet.content_revision(),"documentSnapshotId":packet.document_snapshot_id(),
         "contextId":packet.context_id(),"scopeKind":packet.scope_kind(),"frame":packet.frame(),
-        "layers":packet.source_layers(),"records":packet.records().iter().map(|entry| {
+        "layers":packet.source_layers(),"records":packet.records().map(|entry| {
             json!({"sourceLayerIndex":entry.source_layer_index(),
                 "sourceObjectIndex":entry.source_object_index(),"record":entry.record()})
         }).collect::<Vec<_>>()})
@@ -64,7 +64,7 @@ fn frozen_scopes_keep_complete_relative_geometry_straight_numbers_and_all_pins()
     ] {
         let selected = packet(&snapshot, kind.clone(), frame);
         assert_eq!(selected.records().len(), 1);
-        let entry = &selected.records()[0];
+        let entry = selected.records().next().unwrap();
         assert_eq!(entry.source_layer_index(), index);
         assert_eq!(entry.source_object_index(), index);
         assert_eq!(
@@ -72,6 +72,10 @@ fn frozen_scopes_keep_complete_relative_geometry_straight_numbers_and_all_pins()
             value["objects"][index]
         );
         assert_eq!(entry.record(), &snapshot.document().objects()[index]);
+        assert!(std::ptr::eq(
+            entry.record(),
+            &snapshot.document().objects()[index]
+        ));
         assert_eq!(selected.instance_id(), snapshot.instance_id());
         assert_eq!(selected.document_id(), snapshot.document_id());
         assert_eq!(selected.document_snapshot_id(), snapshot.snapshot_id());
@@ -85,7 +89,7 @@ fn frozen_scopes_keep_complete_relative_geometry_straight_numbers_and_all_pins()
         );
     }
     let authored = packet(&snapshot, FrameScopeKind::Authored, 7);
-    let record = authored.records()[0].record();
+    let record = authored.records().next().unwrap().record();
     assert_eq!(record.fill.r, json!(0.2).as_number().unwrap().clone());
     assert_eq!(record.fill.g, json!(0.4).as_number().unwrap().clone());
     assert_eq!(record.fill.b, json!(0.6).as_number().unwrap().clone());
@@ -124,15 +128,18 @@ fn same_ids_across_scopes_layers_frames_and_multiple_objects_keep_source_provena
     let selected = packet(&snapshot, FrameScopeKind::Authored, 7);
     let positions: Vec<_> = selected
         .records()
-        .iter()
         .map(|entry| (entry.source_layer_index(), entry.source_object_index()))
         .collect();
     assert_eq!(positions, vec![(0, 1), (1, 2), (0, 3)]);
-    for (entry, index) in selected.records().iter().zip([1, 2, 3]) {
+    for (entry, index) in selected.records().zip([1, 2, 3]) {
         assert_eq!(
             serde_json::to_value(entry.record()).unwrap(),
             value["objects"][index]
         );
+        assert!(std::ptr::eq(
+            entry.record(),
+            &snapshot.document().objects()[index]
+        ));
     }
     for (kind, frame, index) in [
         (FrameScopeKind::Authored, 8, 4),
@@ -141,9 +148,12 @@ fn same_ids_across_scopes_layers_frames_and_multiple_objects_keep_source_provena
     ] {
         let selected = packet(&snapshot, kind, frame);
         assert_eq!(selected.records().len(), 1);
-        assert_eq!(selected.records()[0].source_object_index(), index);
         assert_eq!(
-            serde_json::to_value(selected.records()[0].record()).unwrap(),
+            selected.records().next().unwrap().source_object_index(),
+            index
+        );
+        assert_eq!(
+            serde_json::to_value(selected.records().next().unwrap().record()).unwrap(),
             value["objects"][index]
         );
     }
@@ -161,7 +171,7 @@ fn valid_empty_selection_is_distinct_from_invalid_context_or_frame() {
         (FrameScopeKind::Reference, 20),
     ] {
         let selected = packet(&snapshot, kind.clone(), frame);
-        assert!(selected.records().is_empty());
+        assert_eq!(selected.records().len(), 0);
         assert_eq!(selected.frame(), frame);
         assert_eq!(selected.scope_kind(), &kind);
         assert_eq!(selected.source_layers().len(), 2);
@@ -211,10 +221,13 @@ fn each_wrong_pin_refuses_even_an_empty_selection_without_mutating_snapshot() {
         );
         assert_eq!(encode_project(snapshot.document()).unwrap(), before);
     }
-    assert!(prepare_object_frame(&snapshot, &good)
-        .unwrap()
-        .records()
-        .is_empty());
+    assert_eq!(
+        prepare_object_frame(&snapshot, &good)
+            .unwrap()
+            .records()
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -227,7 +240,12 @@ fn precise_numbers_and_codec_admitted_geometry_receive_no_renderer_gate() {
         value["objects"][0]["geometry"]["segments"] = Value::Array(vec![segment.clone(); count]);
         let snapshot = snapshot(&value);
         let selected = packet(&snapshot, FrameScopeKind::Authored, 7);
-        let record = selected.records()[0].record();
+        let record = selected.records().next().unwrap().record();
+        assert!(std::ptr::eq(record, &snapshot.document().objects()[0]));
+        assert!(std::ptr::eq(
+            &record.geometry.segments[0],
+            &snapshot.document().objects()[0].geometry.segments[0]
+        ));
         assert_eq!(serde_json::to_value(record).unwrap(), value["objects"][0]);
         assert_eq!(record.geometry.segments.len(), count);
         assert_eq!(record.fill, snapshot.document().objects()[0].fill);
@@ -287,7 +305,7 @@ fn actual_history_fill_undo_redo_and_reopen_leave_retained_packets_unchanged() {
         assert_eq!(selected.content_revision(), revision);
         assert_eq!(selected.document_snapshot_id(), snapshot.snapshot_id());
         assert_eq!(
-            serde_json::to_value(selected.records()[0].record()).unwrap(),
+            serde_json::to_value(selected.records().next().unwrap().record()).unwrap(),
             expected
         );
         assert_eq!(

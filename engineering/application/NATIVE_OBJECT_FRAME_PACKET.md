@@ -35,12 +35,15 @@ returned. There is no partial-success output.
 `ObjectFramePacket` retains the immutable snapshot and its actual four pins,
 context, scope and frame. `source_layers()` exposes the complete original layer
 table, including layers without matching records. `records()` exposes only exact
-matching scoped records. Each `ObjectFrameRecord` contains its unchanged full
-`ObjectRecord` plus original `source_layer_index` and `source_object_index`.
+matching scoped records through an exact-size iterator of borrowed views. Each
+`ObjectFrameRecord` borrows the unchanged full `ObjectRecord` from the retained
+snapshot and carries original `source_layer_index` and `source_object_index`.
 Packet and record fields are private; accessors return immutable references or
 scalar provenance values. No source owner or mutable document port is stored.
 
-Records are cloned directly from the admitted source, including their complete
+The packet stores only provenance index pairs alongside its immutable snapshot;
+preparation and iteration never deep-copy records or geometry segments. Borrowed
+views cannot outlive the packet. Records expose the admitted source, including their complete
 scoped targets, schema/family, relative cubic anchors and handles, segment order
 and straight fractional RGBA `serde_json::Number` values. No RGB8 quantization,
 f32 cast, premultiplication, color conversion or geometry reconstruction occurs.
@@ -74,7 +77,8 @@ The fixed authored-frame7 and reference-frame12 geometry/color cases provide the
 independent content oracle, including alpha0.75 and relative handles. Additional
 controls cover same IDs across layers/scopes/frames, multiple objects in a layer,
 valid empty frames versus other contexts, four independent wrong pins, adjacent
-fractional channel values, codec-admitted degenerate paths, and actual native
+fractional channel values, codec-admitted degenerate paths, pointer identity of
+borrowed records/segments in the original snapshot, and actual native
 history/reopen retention. Tests are registered in both existing evaluation and
 application harnesses. The history test requires the existing `history` feature;
 normal application enables it. The focused evaluation invocation enables

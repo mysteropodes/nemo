@@ -27,23 +27,29 @@ pub enum ObjectFrameError {
     InvalidSource,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ObjectFrameRecord {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ObjectFrameRecord<'a> {
     source_layer_index: usize,
     source_object_index: usize,
-    record: ObjectRecord,
+    record: &'a ObjectRecord,
 }
 
-impl ObjectFrameRecord {
+impl<'a> ObjectFrameRecord<'a> {
     pub fn source_layer_index(&self) -> usize {
         self.source_layer_index
     }
     pub fn source_object_index(&self) -> usize {
         self.source_object_index
     }
-    pub fn record(&self) -> &ObjectRecord {
-        &self.record
+    pub fn record(&self) -> &'a ObjectRecord {
+        self.record
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ObjectFrameIndices {
+    source_layer_index: usize,
+    source_object_index: usize,
 }
 
 /// No mutable fields, renderer resources, jobs or publication identities.
@@ -53,7 +59,7 @@ pub struct ObjectFramePacket {
     context_id: String,
     scope_kind: FrameScopeKind,
     frame: u32,
-    records: Vec<ObjectFrameRecord>,
+    records: Vec<ObjectFrameIndices>,
 }
 
 impl ObjectFramePacket {
@@ -83,8 +89,13 @@ impl ObjectFramePacket {
         self.snapshot.document().layers()
     }
     /// Source encounter order conveys provenance, never a paint-order promise.
-    pub fn records(&self) -> &[ObjectFrameRecord] {
-        &self.records
+    pub fn records(&self) -> impl ExactSizeIterator<Item = ObjectFrameRecord<'_>> + '_ {
+        self.records.iter().map(|indices| ObjectFrameRecord {
+            source_layer_index: indices.source_layer_index,
+            source_object_index: indices.source_object_index,
+            // Private indices were selected from this same immutable document.
+            record: &self.snapshot.document().objects()[indices.source_object_index],
+        })
     }
 }
 
@@ -128,10 +139,9 @@ pub fn prepare_object_frame(
             let source_layer_index = *layers
                 .get(target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
-            records.push(ObjectFrameRecord {
+            records.push(ObjectFrameIndices {
                 source_layer_index,
                 source_object_index,
-                record: record.clone(),
             });
         }
     }
