@@ -37,6 +37,33 @@
       current.contentRevision === receipt.contentRevision && typeof documentJSON(root) === 'string';
   }
 
+  function afterRevealBoundary(ports) {
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      // WebKit may suspend RAF while an embedded native viewport covers its
+      // content. The timer only starts the final presentation attempt; it
+      // never publishes Open without a strictly presented native receipt.
+      var fallback = setTimeout(finish, 200);
+      function finish() {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallback);
+        resolve();
+      }
+      function fail(error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallback);
+        reject(error);
+      }
+      try {
+        ports.raf(function () {
+          try { ports.raf(finish); } catch (error) { fail(error); }
+        });
+      } catch (error) { fail(error); }
+    });
+  }
+
   function reveal(root, first, ports) {
     // Native presentation below replaces the legacy repaint. The latter
     // schedules a render from the previous document's UI frame during reveal.
@@ -46,9 +73,7 @@
     if (!nativeOpen) return true;
     // The existing repaint crosses two frames after the start screen hides.
     // Present again after that boundary so a resize cannot clear the first frame.
-    return new Promise(function (resolve) {
-      ports.raf(function () { ports.raf(resolve); });
-    }).then(function () {
+    return afterRevealBoundary(ports).then(function () {
       var project = root.NemoNativeOpacityProject;
       if (!project || typeof project.finishOpenAfterReveal !== 'function') {
         throw new Error('Native Open publication is unavailable');

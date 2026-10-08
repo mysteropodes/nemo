@@ -1526,6 +1526,76 @@ test('post-admission viewport deferral does not fence the native document and ne
   }
 });
 
+test('desktop Open retries transient native window occlusion without publishing a deferred receipt', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length < 4 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  let opening = true, sleeps = 0;
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    sleep(ms) { assert.equal(ms, 100); sleeps++; return Promise.resolve(); },
+  }, () => opening, () => false);
+  const first = await viewport.presentPreview(0, true);
+  assert.equal(first.status, 'deferred-occluded');
+  opening = false;
+  const visible = await viewport.presentPreview(0, false, true);
+  assert.equal(visible.status, 'presented');
+  assert.equal(visible.documentSnapshotId, first.documentSnapshotId);
+  assert.equal(sleeps, 2);
+  assert.equal(harness.controller.status(), 'native');
+});
+
+test('desktop Open fails closed after bounded persistent native window occlusion', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: receipt =>
+    ({ ...receipt, status: 'deferred-occluded' }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  let opening = true, sleeps = 0;
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    sleep() { sleeps++; return Promise.resolve(); },
+  }, () => opening, () => false);
+  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
+  opening = false;
+  await assert.rejects(viewport.presentPreview(0, false, true),
+    /native opacity frame was not presented at the admitted revision/);
+  assert.equal(sleeps, 20);
+  assert.equal(harness.state.previews.length, 22);
+  assert.equal(harness.controller.status(), 'indeterminate');
+});
+
+test('desktop Open joins a viewport resize before retrying the occluded frame', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    return state.previews.length < 3 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+  } });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  let opening = true, resizes = 0, viewport;
+  const surface = { defer() { return 1; }, cancel() {}, async resize() { resizes++; } };
+  viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    surface, sleep() { viewport.resizeViewport(); return Promise.resolve(); },
+  }, () => opening, () => false);
+  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
+  opening = false;
+  assert.equal((await viewport.presentPreview(0, false, true)).status, 'presented');
+  assert.equal(resizes, 1);
+  assert.equal(harness.state.previews.length, 3);
+});
+
+test('desktop Open stops occlusion retries before previewing a released document', async () => {
+  const harness = nativeHarness(staticSource(), { previewReceipt: receipt =>
+    ({ ...receipt, status: 'deferred-occluded' }) });
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  let opening = true, sleeps = 0;
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
+    async sleep() { sleeps++; await harness.controller.releaseCurrent('occluded-open-cancelled'); },
+  }, () => opening, () => false);
+  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
+  opening = false;
+  await assert.rejects(viewport.presentPreview(0, false, true),
+    /native opacity Open changed while waiting for a visible viewport/);
+  assert.equal(sleeps, 1);
+  assert.equal(harness.state.previews.length, 2);
+  assert.equal(harness.controller.status(), 'closed');
+});
+
 test('resize after a deferred frame re-presents the last visible frame without a retry loop', async () => {
   let scheduledResize;
   const resized = [];
