@@ -658,7 +658,8 @@
       "dir": "scripts/nemo",
       "files": [
         "boundaries-rust.test.cjs",
-        "boundaries-native-object-client.test.cjs"
+        "boundaries-native-object-client.test.cjs",
+        "boundaries-object-frame-packet.test.cjs"
       ],
       "publicApi": [
         "boundaries-rust.test.cjs"

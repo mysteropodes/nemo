@@ -34,6 +34,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_document.rs',
   'native-engine/src/object_codec.rs',
   'native-engine/src/object_snapshot.rs',
+  'native-engine/src/object_frame_packet.rs',
+  'native-engine/tests/object_frame_packet.rs',
   'native-engine/src/object_fill.rs',
   'native-engine/src/object_fill_owner.rs',
   'native-engine/src/object_revision.rs',
@@ -102,7 +104,7 @@ const PRODUCTION = {
   codec: ['codec', 'document', 'project_structure', 'object_document', 'object_codec'],
   commands: ['commands', 'request_receipts', 'revision', 'object_snapshot'],
   history: ['history', 'transaction'],
-  evaluation: ['evaluation', 'animation_curve'],
+  evaluation: ['evaluation', 'animation_curve', 'object_frame_packet'],
   scheduler: ['resource_leases', 'scheduler'],
   compositor: ['compositor', 'render_scene', 'render_geometry'],
   viewport: ['desktop_viewport'],
@@ -225,13 +227,15 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"',
       'object_fill_tests = "../tests/object_fill.rs"');
     if (name === 'history') expected.push('object_history_tests = "../tests/object_history.rs"');
+    if (name === 'evaluation') expected.push('object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
       'export_geometry_tests = "../tests/render_geometry.rs"',
       'export_job_lifecycle_tests = "../tests/export_job_lifecycle.rs"');
     if (name === 'application') expected.push('application_read_tests = "../tests/application_read.rs"',
       'application_replacement_tests = "../tests/application_replacement.rs"',
-      'object_application_read_tests = "../tests/object_read.rs"');
+      'object_application_read_tests = "../tests/object_read.rs"',
+      'object_frame_packet_application_tests = "../tests/object_frame_packet.rs"');
     assert.deepEqual(testMacros[`test-${name}`], expected);
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });
   }
