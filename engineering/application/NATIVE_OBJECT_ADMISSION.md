@@ -682,3 +682,66 @@ publish a user Save result, install a UI Save/Reopen path, restore cross-reopen
 history, activate public MCP, or accept installed general-document/M1 controls.
 Those consumers and any broader history-persistence policy require their separately
 owned leaves; N25D5/#1648 and M1/#1327 remain open.
+
+## N25E2 private saved-file bootstrap consumer
+
+The existing registered main-window `nemo_native_object_bootstrap` command also
+accepts a strict file-source wrapper:
+
+```json
+{
+  "apiVersion": 2,
+  "requestId": "object-file-open",
+  "instanceId": "<actual-instance-id>",
+  "sourcePath": "/selected/project.json"
+}
+```
+
+`cancelledBeforeDispatch` is the only optional field. File mode forbids
+`documentJson`, `documentId`, `expectedRevision` and all other fields. Its complete
+original UTF-8 wrapper, including whitespace, must fit 4096 bytes. Direct strict
+DTO parsing rejects decoded duplicate members; routing uses neither a Value nor
+an untagged intermediate. Invalid file wrappers cannot become permissive inline
+input: the fallback is the unchanged strict original `bootstrap_raw` parser,
+which rejects file fields. Existing inline `documentJson` inputs retain their
+original complete one-MiB budget and require no file permission or read.
+
+The main-window guard runs before either mode. File mode validates API, actual
+instance, bounded request identity, absolute path and cancellation before resolving
+or opening a file. It canonicalizes once into a resolved path, passes that path to
+the existing installed filesystem configuration scope, and opens the same resolved
+path. `try_fs_scope` returning no scope denies file input; `Scope::is_allowed`
+is an existing configuration check, not a new permission. Scope may internally
+resolve its argument; the consumer never reopens the unresolved input alias.
+A symlink located in an allowed directory does not authorize a resolved target
+outside that scope. No filesystem capability or allowlist is expanded.
+
+Resolved-path metadata must identify a regular file BEFORE the opener is called,
+so an already nonregular FIFO is refused without waiting for a writer. The opened
+descriptor must also remain a regular file. The metadata check and pathname open
+are separate operations: replacement between them remains a race, and this does
+not claim TOCTOU freedom or bounded behavior for adversarial replacement. The
+reader consumes at most one MiB plus
+one refusal byte and rejects over-limit, unreadable, non-UTF-8, corrupt or
+unsupported input without truncation or partial admission. The exact UTF-8 read
+from the file becomes the original byte bootstrap's `documentJson`; no selected
+object reconstruction or geometry/numeric rewrite is performed. That factory
+also enforces its original one-MiB COMPLETE escaped wrapper budget: a file within
+the read limit can still fail the encoded-wrapper limit. All failures preserve
+existing authority, content/history and revision subscription; the consumer never
+closes or releases a live/releasing owner to make room.
+
+Only successful semantic admission and actual single-owner installation produce
+the original correlated bootstrap receipt. A caller must already have a vacant
+authority. Saved full scoped records survive; runtime document identity is fresh,
+revision is zero and undo/redo stacks are empty under the N25E1 persistence policy.
+Tests use actual native fill/undo/redo/serialization bytes, real files and the same
+private router called by the registered command, including nonempty-history and
+subscriber preservation on refused reopening.
+
+This native file consumer does not wire an ordinary picker, publish a tab/frame,
+implement Save, mark a document clean, update recents/autosave, restore persistent
+history or activate public object/MCP/viewport/export capabilities. The private
+object client still declares its five accepted operations and all those public
+availability flags remain false. UI/installed general-document/M1 and first-Open
+presentation acceptance stay separately owned and open.

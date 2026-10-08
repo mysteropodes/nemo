@@ -5,6 +5,10 @@ use crate::native_application_contract::{
 };
 use native_engine::object_codec::decode_project;
 use serde::{Deserialize, Serialize};
+use tauri_plugin_fs::FsExt;
+
+#[path = "native_object_reopen.rs"]
+mod reopen;
 
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
@@ -92,7 +96,11 @@ pub(crate) fn nemo_native_object_bootstrap(
     request_json: String,
 ) -> HostResult<ObjectBootstrapReceipt> {
     require_main(&window)?;
-    bootstrap_raw(&state, &request_json)
+    reopen::bootstrap_request(&state, &request_json, |path| {
+        window
+            .try_fs_scope()
+            .is_some_and(|scope| scope.is_allowed(path))
+    })
 }
 
 #[cfg(test)]
