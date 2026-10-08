@@ -370,6 +370,10 @@ pub(crate) trait NativeDispatch: Send {
     fn instance_id(&self) -> &str;
     fn document_id(&self) -> &str;
     fn content_revision(&self) -> u64;
+    /// Only an active owner implementing the bounded raw object client opts in.
+    fn object_client_available(&self) -> bool {
+        false
+    }
     /// Err refuses dispatch before any mutation or content revision advance.
     /// A committed operation must return its envelope, never a refusal.
     fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String>;

@@ -34,6 +34,19 @@ use tokio::{
     sync::{oneshot, Semaphore},
 };
 
+#[path = "native_object_client.rs"]
+mod object_client;
+#[allow(unused_imports)]
+pub(crate) use object_client::{
+    __cmd__nemo_native_dispatch, __cmd__nemo_native_object_client_status,
+    __cmd__nemo_native_object_dispatch, __cmd__nemo_native_status,
+    __tauri_command_name_nemo_native_dispatch,
+    __tauri_command_name_nemo_native_object_client_status,
+    __tauri_command_name_nemo_native_object_dispatch, __tauri_command_name_nemo_native_status,
+    nemo_native_dispatch, nemo_native_object_client_status, nemo_native_object_dispatch,
+    nemo_native_status,
+};
+
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>;
 
 #[path = "native_revision_sync.rs"]
@@ -290,29 +303,6 @@ pub fn nemo_mcp_reply(
 }
 
 #[tauri::command]
-pub fn nemo_native_status(
-    window: tauri::Window,
-    state: tauri::State<ApplicationMcp>,
-) -> Result<NativeHostStatus, String> {
-    require_main(&window)?;
-    state.native_status(NativeStatusRequest {
-        api_version: NATIVE_API_VERSION,
-        request_id: uuid::Uuid::new_v4().to_string(),
-        instance_id: state.instance_id.clone(),
-    })
-}
-
-#[tauri::command]
-pub fn nemo_native_dispatch(
-    window: tauri::Window,
-    state: tauri::State<ApplicationMcp>,
-    request: NativeApplicationRequest,
-) -> Result<NativeApplicationResponse, String> {
-    require_main(&window)?;
-    state.dispatch_native(request)
-}
-
-#[tauri::command]
 pub fn nemo_native_revision_sync(
     window: tauri::Window,
     state: tauri::State<ApplicationMcp>,
@@ -526,3 +516,11 @@ async fn serve_legacy(
 #[cfg(test)]
 #[path = "application_mcp_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_object_client_tests.rs"]
+mod object_client_tests;
+
+#[cfg(test)]
+#[path = "native_object_client_admission_tests.rs"]
+mod object_client_admission_tests;

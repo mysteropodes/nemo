@@ -4,7 +4,9 @@ N25B implements the persisted records frozen by
 [N25A](NATIVE_OBJECT_IDENTITY.md). N25C1 adds a staged common-envelope read API
 over those immutable snapshots. Neither activates object admission in the
 running opacity application. N25D2 adds the typed staged fill/history owner below.
-Active host/MCP binding and P03 object consumers remain separate pending gates.
+The actual host has staged read/fill/history dispatch. N25D5 adds the bounded
+raw application client below; public capability/MCP binding and P03 object
+consumers remain separate pending gates.
 
 ## Persisted format and admission
 
@@ -551,3 +553,62 @@ the object descriptor remains unavailable, and available opacity operation names
 cannot route to this owner. Public UI/MCP, history RPC, save/reopen, rendering,
 export, installed desktop and M1 acceptance remain separate open gates. P37's
 History UI and N20K's viewport/publication paths are unchanged.
+
+## N25D5 bounded common application client
+
+The registered Tauri command `nemo_native_object_dispatch` takes `requestJson`
+(an original UTF-8 JSON string), not a pre-parsed request. It first enforces the
+4096-byte **original wrapper** bound and recursively rejects duplicate decoded
+keys before any typed or `Value` deserialization. Escaped spellings of the same
+key are duplicates. Trailing JSON/text, unknown envelope fields, positional
+arrays, invalid types, unsafe revision numbers, and unbounded correlation IDs
+fail before owner dispatch. The reusable `wire::decode_json_bounded` utility
+also serves the existing wire parser; it grants no operation availability.
+
+Only these operation names enter this bounded route:
+
+- `query.document.object`: the existing closed selector, `atRevision`, and full
+  scoped stable target; `expectedRevision` is forbidden.
+- `command.document.object.fill.set`: the existing closed `object.fill.set`
+  payload containing `stableTarget` and `fill`.
+- `command.document.object.undo`: exactly `{"command":"object.undo"}`.
+- `command.document.object.redo`: exactly `{"command":"object.redo"}`.
+
+Original-byte admission constructs a private admitted-request token. It enters
+`ApplicationMcp` and the **same** `RevisionSync` dispatch core used by the public
+typed and MCP paths. That core locks the same `NativeAuthority`, checks the actual
+active generation and the owner's explicit bounded-client opt-in, then invokes
+the existing dispatcher. Every other owner defaults to denial. Vacant,
+installing, replacing, releasing and released owners are unavailable. There is
+no direct-host client bypass, additional document authority, writable mirror or
+legacy writer fallback. The private core resides in `native_revision_dispatch.rs`
+to keep transport/control and dispatch responsibilities below normal size caps.
+
+Command payload and revision/cancellation failures are classified and retained
+by the existing actual owner. A command requires current `expectedRevision`;
+exact admitted-body retry returns its retained original revision/result before
+checking a later current revision. Changed-body or cross-operation reuse of that
+request ID cannot overwrite the original receipt or repeat an effect. Missing or
+stale expectation, cancellation, malformed payload, empty history and no-op
+behavior retain their D3/D4 semantics. Wrong-instance/document checks precede
+receipt lookup. Queries retain the host's **current-only** pinned-read policy;
+this route does not expose older retained snapshots. The shared pending-revision
+barrier blocks re-execution, including after disconnect/indeterminate consumer
+synchronization. No new external MCP/TCP transport is activated.
+
+`nemo_native_object_client_status` is a main-window, point-in-time observation of
+that same locked authority. It reports `available`, current document/revision and
+lifecycle generation, and the four operations only when the active object owner
+supports this route. `publicCapabilityAvailable`, `mcpAvailable`, `saveAvailable`,
+`viewportAvailable` and `exportAvailable` remain false. The existing general
+native status/dispatch command names and signatures are preserved. Their thin
+Tauri wrappers share the client module and remain re-exported from ApplicationMcp.
+
+The aggregate `native.object` descriptor stays unavailable, its catalog retains
+only the staged read declaration, and every existing public full validator is
+unchanged. Public typed dispatch and MCP/TCP continue to deny those unavailable
+or unregistered object operations. This bounded source route is not evidence of
+installed UI/client operation, Save/reopen, persisted history, viewport or export.
+The next dependency-ordered slice must admit the general-object serialization and
+persistence/history consumer contract, then connect real UI consumers. Installed
+common-client agreement and the M1 vertical demonstration remain separate gates.
