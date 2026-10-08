@@ -499,7 +499,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
   assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
@@ -564,7 +564,12 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
   assert.match(shell, /mod native_object_bootstrap;/);
   assert.match(shell, /native_object_bootstrap::nemo_native_object_bootstrap,/);
   assert.match(raw, /request_json: String/);
-  assert.match(raw, /require_main\(&window\)\?;\s*bootstrap_raw\(&state, &request_json\)/);
+  assert.match(raw, /require_main\(&window\)\?;\s*reopen::bootstrap_request\(&state, &request_json,/);
+  assert.match(raw, /try_fs_scope\(\)[\s\S]*?scope\.is_allowed\(path\)/);
+  const reopen = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_reopen.rs'), 'utf8');
+  assert.match(reopen, /let resolved = Path::new\(&request\.source_path\)[\s\S]*?\.canonicalize\(\)/);
+  assert.match(reopen, /allowed\(&resolved\)/);
+  assert.match(reopen, /File::open\(&resolved\)/);
   assert.equal(profile.sizeProfiles[owner.sizeProfile].hardMax, 500);
   assert.equal(policy.externalCratePorts.native_engine.moduleItems[command].filter((x) => x === 'object_codec::decode_project').length, 1);
   const denied = structuredClone(policy);
@@ -573,7 +578,7 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
   const edgeDenied = structuredClone(policy);
   edgeDenied.layerRules['host-release-tests'].allowedLayers = edgeDenied.layerRules['host-release-tests'].allowedLayers.filter((x) => x !== 'command-adapter');
   assert.ok(R.checkRustCrate(profile, edgeDenied, { root: ROOT }).violations.some((v) => v.rule === 'layer-violation' && v.module === tests && v.detail.targetModule === command));
-  for (const file of [source, controls]) {
+  for (const file of [source, controls, 'src-tauri/src/native_object_reopen.rs', 'src-tauri/src/native_object_reopen_tests.rs']) {
     const removed = structuredClone(profile);
     for (const module of removed.modules) module.files = module.files.filter((x) => x !== path.basename(file));
     assert.ok(require('./lib/boundaries-coverage.cjs').checkSourceCoverage(removed, { root: ROOT, sourcePaths: [file] }).violations.some((v) => v.rule === 'coverage-unprofiled-source' && v.file === file));
