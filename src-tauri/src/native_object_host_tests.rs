@@ -236,12 +236,12 @@ fn ordinary_dispatch_and_external_invalid_identities_refuse_without_content_chan
     let before = identity(&state);
     let request = json!({"apiVersion":2,"requestId":"ordinary","instanceId":state.instance_id(),
         "documentId":before.1,"operation":"query.document.opacity","payload":{"stableTarget":{"layerUid":"layer"}}});
-    assert_eq!(
-        state
-            .dispatch_native(serde_json::from_value(request.clone()).unwrap())
-            .unwrap_err(),
-        "native object host dispatch is unavailable"
-    );
+    let refusal = state
+        .dispatch_native(serde_json::from_value(request.clone()).unwrap())
+        .unwrap();
+    let refusal = serde_json::to_value(refusal).unwrap();
+    assert_eq!(refusal["ok"], false);
+    assert_eq!(refusal["error"]["code"], "invalid_request");
     for field in ["requestId", "instanceId", "documentId"] {
         let mut invalid = request.clone();
         invalid[field] = json!("bad id");

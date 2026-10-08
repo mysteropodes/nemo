@@ -268,7 +268,7 @@
         "application::ApplicationReleaseReceipt", "commands::OpacityRequest", "commands::ResponseEnvelope", "document::OpacityDocument", "export_job::ExportReleaseReconciliation", "export_job::JobReceipt", "export_job::PendingFrame", "export_job::ReconciliationStage", "object_codec::decode_project", "commands::NativeOpacityApplication", "codec::decode_project"
       ],
       "rust.desktop.native.dispatch": [
-        "history::NativeObjectHistory", "object_document::ObjectDocument", "export_job::ExportReleaseReconciliation",
+        "history::NativeObjectHistory", "object_document::ObjectDocument", "object_snapshot::ObjectSnapshot", "export_job::ExportReleaseReconciliation",
         "application::ApplicationReleaseReceipt", "export_job::ReconciliationStage", "resource_leases::WorkId",
           "application::ExportResourceResolver",
           "application::NativeApplication",
