@@ -129,8 +129,8 @@
           spacer.setAttribute('aria-hidden', 'true'); top.appendChild(spacer);
           top.classList.add('history-column-open'); modal.classList.add('history-column');
         }
-        spacer.style.width = width + 'px'; notifyResize();
-        var valid = position();
+        spacer.style.width = width + 'px';
+        var valid = position(); notifyResize();
         if (!observed && root.ResizeObserver) {
           new root.ResizeObserver(resized).observe(top); observed = true;
         }

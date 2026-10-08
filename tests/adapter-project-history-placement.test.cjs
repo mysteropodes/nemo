@@ -142,6 +142,46 @@ for (const [width, collapsed, viewport] of [[280, false, 1000], [520, false, 100
     assert.equal(box.style.width, '340px'); assert.equal(box.style.left, undefined);
   });
 }
+test('intentional History reserve does not refresh again; external geometry changes coalesce once', async () => {
+  const h = domHarness(520, true), timers = new Map(), scheduled = [], reached = deferred(), frame = deferred();
+  const externalReady = deferred(), real = h.root.NemoNativeOpacityCutover.presentPreview;
+  let timerId = 0, presents = 0, lists = 0, notifications = 0;
+  h.root.setTimeout = (callback, delay) => { const id = ++timerId; timers.set(id, { callback, delay }); scheduled.push(delay); return id; };
+  h.root.clearTimeout = id => timers.delete(id);
+  const dispatch = h.root.dispatchEvent;
+  h.root.dispatchEvent = event => { if (event.type === 'resize') notifications++; dispatch(event); };
+  h.root.NemoNativeOpacityCutover.presentPreview = value => {
+    presents++; reached.resolve(); return presents === 1 ? frame.promise : real(value);
+  };
+  const list = h.elements.get('history-list'), append = list.appendChild;
+  list.appendChild = function (row) {
+    append.call(this, row);
+    const button = row.children[1]; let disabled = button.disabled;
+    Object.defineProperty(button, 'disabled', { get: () => disabled, set(value) {
+      disabled = value; if (!value && lists === 2) externalReady.resolve();
+    } });
+  };
+  const controller = bind(h.root, { ...h.ui, list: async () => { lists++; return [{ ts: 100, path: 'version40.json' }]; } });
+  const pending = controller.open(); await reached.promise;
+  assert.equal(notifications, 2, 'both required native resize notifications remain');
+  assert.equal(scheduled.filter(delay => delay === 0).length, 0, 'reserve cannot schedule a second refresh');
+  assert.equal(timers.size, 0); assert.equal(presents, 1); assert.equal(lists, 0);
+  assert.equal(list.children.length, 0); assert.equal(await controller.restore('version40.json'), false);
+  frame.resolve(await real(10)); assert.equal(await pending, true);
+  assert.equal(presents, 1); assert.equal(lists, 1); assert.equal(list.children[0].children[1].disabled, false);
+  const spacer = h.elements.get('top-area').children.find(node => node.id === 'history-column-space');
+  const rect = spacer.getBoundingClientRect;
+  spacer.getBoundingClientRect = () => { const value = rect.call(spacer); return { ...value, top: value.top + 1 }; };
+  h.root.dispatchEvent(new h.root.Event('resize')); h.root.dispatchEvent(new h.root.Event('resize'));
+  assert.equal(scheduled.filter(delay => delay === 0).length, 1); assert.equal(timers.size, 1);
+  assert.equal(presents, 1); assert.equal(lists, 1);
+  const [id, queued] = [...timers.entries()][0]; assert.equal(queued.delay, 0);
+  timers.delete(id); queued.callback(); await externalReady.promise;
+  assert.equal(presents, 2); assert.equal(lists, 2); assert.equal(timers.size, 0);
+  assert.equal(scheduled.filter(delay => delay === 0).length, 1, 'external refresh cannot recursively schedule another');
+  assert.equal(list.children.length, 1); assert.equal(list.children[0].children[1].disabled, false);
+  assert.deepEqual(h.notices, []); assert.equal(await controller.close(), true);
+});
 for (const patch of [{ status: 'deferred-occluded' }, { documentId: 'B' }, { contentRevision: 3 }, { frame: 0 },
   { owner: undefined }, { owner: 'legacy' }, { lifecycleGeneration: undefined }, { lifecycleGeneration: 2 },
   { viewGeneration: undefined }, { viewGeneration: 0 }, { workId: undefined }, { workId: ' ' }]) {
