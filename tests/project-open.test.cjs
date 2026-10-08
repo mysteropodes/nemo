@@ -281,6 +281,40 @@ test('deferred native first frame remains unpublished until post-reveal presenta
   assert.equal(app.mutations, 0);
 });
 
+test('desktop Open attempts final native presentation when reveal animation frames stall', async () => {
+  const app = harness({ version: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  const opening = app.project.openPath('/tmp/Native.json');
+  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  assert.equal(app.pendingFrames, 1, 'the first RAF remains suspended');
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(native.presentations, 1, 'the bounded fallback reaches final presentation');
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)', 'the timer alone cannot publish Open');
+  native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
+  await opening;
+  assert.match(app.project.getCurrentLabel(), /^Native — \/tmp\/Native\.json$/);
+  assert.equal(app.toasts.at(-1), 'Opened: Native');
+  assert.equal(app.mutations, 0, 'no legacy writer runs on the fallback path');
+});
+
+test('stalled reveal RAF fallback refuses a deferred final native receipt', async () => {
+  const app = harness({ version: '{"supported":true}', deferFrames: true });
+  const native = installNativeOpen(app);
+  const opening = app.project.openPath('/tmp/Native.json');
+  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(native.presentations, 1);
+  native.visible.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  await opening;
+  assert.equal(app.startScreen.classList.contains('hid'), false);
+  assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  assert.equal(app.mutations, 0);
+});
+
 test('stale post-reveal native frame leaves desktop Open unpublished and returns to start screen', async () => {
   const app = harness({ version: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "06819efe9cea4c9f76a3da76cb8be6f355c5f3a6",
-  "describe": "v0.7.0-alpha.4-1047-g06819efe"
+  "head": "236a09ef438a1db13d7fad5eb548d2edda1e133f",
+  "describe": "v0.7.0-alpha.4-1067-g236a09ef"
  },
- "inputsDigest": "b75fb43c71a466bf94a2119a20b51379809a3124c73231a32cbaef45cab0c33e",
+ "inputsDigest": "75a2827888c9d32db450d0711ba6b8f37f188e22083c341949f6efb675c03e59",
  "states": [
   "inventoried",
   "characterized",
@@ -10273,7 +10273,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 66,
+    "functionsVisited": 65,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2896 updateCornersPanel()",
@@ -27041,7 +27041,7 @@
    "source": "src/js/motion.js:9754",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 156
+    "functionsVisited": 158
    },
    "fixtures": [
     "static-props",
@@ -27165,7 +27165,7 @@
    "source": "src/js/motion.js:9799",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 391
+    "functionsVisited": 392
    },
    "fixtures": [
     "static-props",
@@ -28379,7 +28379,7 @@
    "source": "src/js/shapes-panel.js:738",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 82
+    "functionsVisited": 84
    },
    "fixtures": [
     "static-props",
@@ -28531,7 +28531,7 @@
    "source": "src/js/shapes-panel.js:860",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 82
+    "functionsVisited": 84
    },
    "fixtures": [
     "static-props",
@@ -30033,7 +30033,7 @@
    "source": "src/js/timeline.js:5570",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 156
+    "functionsVisited": 158
    },
    "fixtures": [
     "keyed-props",
@@ -30148,7 +30148,7 @@
    "source": "src/js/timeline.js:5601",
    "meta": {
     "i18n": "elementsRename",
-    "functionsVisited": 391
+    "functionsVisited": 392
    },
    "fixtures": [
     "keyed-props",
