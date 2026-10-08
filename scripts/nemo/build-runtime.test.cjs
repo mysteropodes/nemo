@@ -38,9 +38,18 @@ if (releaseFile) {
 const stubbornStub = path.join(scratch, 'stubborn-build-stub');
 fs.writeFileSync(stubbornStub, `#!/usr/bin/env node\n` + String.raw`
 const fs = require('node:fs');
-fs.writeFileSync(process.argv[2], String(process.pid));
 process.on('SIGTERM', () => {});
 setInterval(() => {}, 1000);
+const capture = process.argv[2], release = process.argv[3];
+if (!release) fs.writeFileSync(capture, String(process.pid));
+else {
+  const ready = setInterval(() => {
+    if (fs.existsSync(release)) {
+      fs.writeFileSync(capture, String(process.pid));
+      clearInterval(ready);
+    }
+  }, 20);
+}
 `, { mode: 0o700 });
 
 const orphaningStub = path.join(scratch, 'orphaning-build-stub');
@@ -64,9 +73,10 @@ function exited(child) {
   return new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
 }
 
-function firstLine(child) {
+const FIXTURE_READY_MS = 10_000; // Existing launch budget; one overall fixture deadline.
+function firstLine(child, deadline = Date.now() + FIXTURE_READY_MS) {
   return new Promise((resolve, reject) => {
-    let data = ''; const timer = setTimeout(() => done(new Error('launcher readiness timed out')), 10_000);
+    let data = ''; const timer = setTimeout(() => done(new Error('launcher readiness timed out')), Math.max(0, deadline - Date.now()));
     function done(error, value) { clearTimeout(timer); child.stdout.off('data', read); child.off('exit', early); error ? reject(error) : resolve(value); }
     function read(chunk) { data += chunk; const newline = data.indexOf('\n'); if (newline !== -1) done(null, data.slice(0, newline)); }
     function early(code) { done(new Error(`launcher exited before readiness (${code}): ${data}`)); }
@@ -135,6 +145,56 @@ async function stopOwned(instance) {
   assert.equal(result.code, 0, result.stderr || result.stdout);
   await exited(instance.child);
 }
+
+async function waitForFixtureReady(instance, capture, deadline, ports = {}) {
+  const read = ports.status || (() => runtime.readBuildStatus(instance.info.taskId));
+  const alive = ports.alive || isolation.pidAlive;
+  const exists = ports.exists || (() => fs.existsSync(capture));
+  const pid = ports.pid || (() => Number(fs.readFileSync(capture, 'utf8')));
+  const now = ports.now || Date.now;
+  const wait = ports.wait || (() => new Promise((resolve) => setTimeout(resolve, 20)));
+  let status = null;
+  const failure = (reason) => new Error(`fixture readiness ${reason}; ${JSON.stringify({
+    state: status?.state, childPid: status?.childPid, exitCode: status?.exitCode,
+    signal: status?.signal, launcherAlive: alive(instance.child.pid),
+  })}`);
+  while (now() < deadline) {
+    status = read();
+    if (!alive(instance.child.pid)) throw failure('launcher exited');
+    if (status && ['failed', 'completed', 'stopped', 'reconciliation-required'].includes(status.state)) {
+      throw failure('runtime became terminal before ready');
+    }
+    if (status?.state === 'active' && Number.isSafeInteger(status.childPid) && status.childPid > 0) {
+      if (!alive(status.childPid)) throw failure('child exited before ready');
+      if (exists()) {
+        const readyPid = pid();
+        if (readyPid !== status.childPid) throw failure('marker PID does not match active child');
+        return readyPid;
+      }
+    }
+    await wait();
+  }
+  throw failure('deadline expired without marker');
+}
+
+test('fixture readiness waits beyond OS active and rejects absent, terminal or mismatched readiness', async () => {
+  const instance = { child: { pid: 10 }, info: { taskId: 'controlled-ready' } };
+  let time = 0, marker = false, waits = 0;
+  const ports = { now: () => time, alive: () => true,
+    status: () => ({ state: 'active', childPid: 20 }), exists: () => marker, pid: () => 20,
+    wait: async () => { waits++; time++; marker = true; } };
+  assert.equal(await waitForFixtureReady(instance, null, 10, ports), 20);
+  assert.equal(waits, 1, 'active without fixture marker cannot mean ready');
+  time = 0; marker = false;
+  await assert.rejects(waitForFixtureReady(instance, null, 2, { ...ports,
+    wait: async () => { time++; } }), /deadline expired without marker.*active/);
+  await assert.rejects(waitForFixtureReady(instance, null, 10, { ...ports,
+    status: () => ({ state: 'failed', childPid: 20, exitCode: 7 }) }), /terminal.*exitCode":7/);
+  await assert.rejects(waitForFixtureReady(instance, null, 10, { ...ports,
+    exists: () => true, pid: () => 21 }), /PID does not match/);
+  await assert.rejects(waitForFixtureReady(instance, null, 10, { ...ports,
+    alive: (pid) => pid === 10 }), /child exited/);
+});
 
 test('launch plans isolate mutable build paths and serialize only the same worktree', () => {
   const a = runtime.buildLaunchConfig('build-plan-a', { command: stub, args: [] });
@@ -224,20 +284,25 @@ test('owner stop reaps an active stubborn build group before releasing roots', {
   skip: process.platform === 'win32' ? 'POSIX process-group termination coverage' : false,
 }, async () => {
   const capture = path.join(scratch, 'capture-stubborn.pid');
-  const child = spawn(process.execPath, [cli, 'start', '--task', `build-stubborn-${process.pid}`, '--command', stubbornStub, '--', capture], {
+  const release = path.join(scratch, 'release-stubborn-ready');
+  const deadline = Date.now() + FIXTURE_READY_MS;
+  const child = spawn(process.execPath, [cli, 'start', '--task', `build-stubborn-${process.pid}`, '--command', stubbornStub, '--', capture, release], {
     cwd: repoRoot,
     env: { ...process.env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const instance = { child, info: JSON.parse(await firstLine(child)) };
+  const instance = { child, info: JSON.parse(await firstLine(child, deadline)) };
   try {
-    await waitForState(instance.info.taskId, 'active');
-    for (let i = 0; i < 100 && !fs.existsSync(capture); i++) await new Promise((resolve) => setTimeout(resolve, 10));
-    const buildPid = Number(fs.readFileSync(capture, 'utf8'));
+    await waitForState(instance.info.taskId, 'active', Math.max(0, deadline - Date.now()));
+    assert.equal(fs.existsSync(capture), false, 'OS active cannot bypass the held fixture barrier');
+    const ready = waitForFixtureReady(instance, capture, deadline);
+    fs.writeFileSync(release, 'release initialized fixture');
+    const buildPid = await ready;
     assert.equal(isolation.pidAlive(buildPid), true);
     const stopped = await command(['stop', '--task', instance.info.taskId, '--owner', instance.info.ownerToken]);
     assert.equal(stopped.code, 0, stopped.stderr || stopped.stdout);
     assert.equal(JSON.parse(stopped.stdout).runtime.state, 'stopped');
+    assert.equal(JSON.parse(stopped.stdout).runtime.processTree.forced, true, 'ready fixture must actually ignore SIGTERM');
     await exited(child);
     assert.equal(isolation.pidAlive(buildPid), false);
     assert.equal(fs.existsSync(instance.info.roots.root), false);

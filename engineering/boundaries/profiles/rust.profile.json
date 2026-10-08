@@ -370,7 +370,8 @@
         "native_object_host_command_tests.rs",
         "native_object_host_history_tests.rs",
         "native_object_client_tests.rs",
-        "native_object_client_admission_tests.rs"
+        "native_object_client_admission_tests.rs",
+        "native_object_serialization_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
