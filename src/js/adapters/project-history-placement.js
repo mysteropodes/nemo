@@ -12,6 +12,13 @@
     return { width: Math.min(340, bounds.available - 176) };
   }
 
+  function failureNotice(error) {
+    if (error.code !== 'native_preview_deferred') return error.message;
+    var status = error.status;
+    return 'native opacity frame presentation is deferred' +
+      (status === 'deferred-occluded' || status === 'deferred-timeout' ? ' (' + status + ')' : '');
+  }
+
   function create(ports) {
     var generation = 0, active = false, ready = false, busy = false, context = null;
     function current(token) { return active && token === generation; }
@@ -36,7 +43,7 @@
         if (ports.context() !== context) throw new Error('The document changed while listing History.');
         ports.render(rows); ready = true; ports.enable(true); return true;
       } catch (error) {
-        if (current(token)) { release(); ports.notice(error.message); }
+        if (current(token)) { release(); ports.notice(failureNotice(error)); }
         return false;
       }
     }
@@ -44,7 +51,7 @@
       if (busy) return false;
       if (!active) return true;
       release();
-      try { await ports.present(); } catch (error) { ports.notice(error.message); }
+      try { await ports.present(); } catch (error) { ports.notice(failureNotice(error)); }
       return true;
     }
     async function restore(path) {
@@ -53,7 +60,7 @@
       busy = true; ready = false; ports.enable(false);
       var restored = false;
       try { restored = await ports.restore(path) === true; }
-      catch (error) { ports.notice(error.message); }
+      catch (error) { ports.notice(failureNotice(error)); }
       finally { busy = false; }
       if (restored) await close();
       else if (active) await refresh();

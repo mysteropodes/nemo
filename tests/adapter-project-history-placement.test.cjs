@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { plan, create, bind } = require('../src/js/adapters/project-history-placement.js');
-function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
+function deferred() { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; }
 function harness() {
   const events = []; let available = 900, context = 'document-A/revision-2';
   const ports = {
@@ -126,7 +126,7 @@ function domHarness(width, collapsed, windowWidth = 1000) {
   };
   const ui = { context: () => ({ path: 'A.json' }), notice: message => notices.push(message),
     list: async () => [{ ts: 100, path: 'version40.json' }], restore: async () => false, relTime: () => '30s' };
-  return { root, props, elements, notices, ui, controller: bind(root, ui) };
+  return { root, props, identity, elements, notices, ui, controller: bind(root, ui) };
 }
 for (const [width, collapsed, viewport] of [[280, false, 1000], [520, false, 1000], [520, true, 1000], [280, false, 500]]) {
   test(`real DOM binding preserves panel preferences and positive viewport (${width}/${collapsed}/${viewport})`, async () => {
@@ -177,3 +177,72 @@ test('DOM binding refuses same-document lifecycle re-entry while version listing
   assert.equal(h.elements.get('top-area').children.length, 0);
   assert.equal(h.elements.get('history-modal').style.display, 'none');
 });
+
+for (const status of ['deferred-occluded', 'deferred-timeout']) {
+  test('typed deferred notice preserves rollback without host data or retry: ' + status, async () => {
+    const h = domHarness(520, true), before = JSON.stringify(h.identity); let calls = 0;
+    h.root.NemoNativeOpacityCutover.presentPreview = async () => {
+      calls++; throw Object.assign(Error('PRIVATE HOST DATA'), { code: 'native_preview_deferred', status });
+    };
+    assert.equal(await h.controller.open(), false);
+    assert.deepEqual(h.notices, ['native opacity frame presentation is deferred (' + status + ')']);
+    assert.equal(calls, 1); assert.equal(await h.controller.restore('version40.json'), false);
+    assert.equal(h.elements.get('top-area').children.length, 0);
+    assert.equal(h.elements.get('history-modal').style.display, 'none');
+    assert.equal(h.elements.get('history-list').children.length, 0);
+    assert.equal(h.props.style.width, '520px'); assert.equal(h.props.classList.contains('collapsed'), true);
+    assert.equal(JSON.stringify(h.identity), before);
+  });
+}
+test('unknown typed statuses never expose raw data; an unrelated error cannot borrow a deferred status', async () => {
+  for (const status of ['presented', 'deferred-occluded\nPRIVATE HOST DATA', undefined, { raw: 'PRIVATE HOST DATA' }]) {
+    const h = harness(); h.ports.present = async () => {
+      throw Object.assign(Error('PRIVATE HOST DATA'), { code: 'native_preview_deferred', status });
+    };
+    assert.equal(await h.controller.open(), false);
+    assert.deepEqual(h.events.filter(e => Array.isArray(e) && e[0] === 'notice'),
+      [['notice', 'native opacity frame presentation is deferred']]);
+    assert.equal(await h.controller.restore('version40.json'), false);
+    assert.equal(h.events.some(e => Array.isArray(e) && e[0] === 'enable' && e[1]), false);
+  }
+  const h = harness(); h.ports.present = async () => {
+    throw Object.assign(Error('identity changed'), { code: 'wrong_document', status: 'deferred-occluded' });
+  };
+  assert.equal(await h.controller.open(), false);
+  assert.deepEqual(h.events.filter(e => Array.isArray(e) && e[0] === 'notice'), [['notice', 'identity changed']]);
+});
+test('closing a pending presentation suppresses its late deferred notice and rows', async () => {
+  const h = harness(), frame = deferred(); let calls = 0;
+  h.ports.present = () => ++calls === 1 ? frame.promise : Promise.resolve();
+  const pending = h.controller.open(); await h.controller.close();
+  frame.reject(Object.assign(Error('PRIVATE HOST DATA'), { code: 'native_preview_deferred', status: 'deferred-timeout' }));
+  assert.equal(await pending, false); assert.equal(calls, 2);
+  assert.equal(h.events.some(e => Array.isArray(e) && ['rows', 'notice'].includes(e[0])), false);
+  assert.equal(await h.controller.restore('version40.json'), false);
+  assert.ok(h.events.includes('release'));
+});
+test('a matching frame receipt cannot enable History after revision drift during presentation', async () => {
+  const h = domHarness(280, false), frame = deferred(), real = h.root.NemoNativeOpacityCutover.presentPreview;
+  const admitted = await real(10); h.root.NemoNativeOpacityCutover.presentPreview = () => frame.promise;
+  const pending = h.controller.open(); await new Promise(done => setImmediate(done));
+  h.identity.contentRevision++; frame.resolve(admitted);
+  assert.equal(await pending, false); assert.equal(await h.controller.restore('version40.json'), false);
+  assert.equal(h.elements.get('top-area').children.length, 0);
+  assert.equal(h.elements.get('history-list').children.length, 0);
+  assert.deepEqual(h.notices, ['Could not present the current document after resizing History.']);
+});
+for (const [width, collapsed, viewport] of [[520, true, 1000], [280, false, 500]]) {
+  test('collapsed/narrow controls wait for the final matching presented frame: ' + viewport, async () => {
+    const h = domHarness(width, collapsed, viewport), frame = deferred(), real = h.root.NemoNativeOpacityCutover.presentPreview;
+    h.root.NemoNativeOpacityCutover.presentPreview = () => frame.promise;
+    const pending = h.controller.open(); await new Promise(done => setImmediate(done));
+    assert.equal(h.elements.get('history-list').children.length, 0);
+    assert.equal(await h.controller.restore('version40.json'), false);
+    frame.resolve(await real(10)); assert.equal(await pending, true);
+    const rows = h.elements.get('history-list').children;
+    assert.equal(rows.length, 1); assert.equal(rows[0].children[1].disabled, false);
+    assert.ok(h.elements.get('canvas-area').getBoundingClientRect().width >= 160);
+    assert.deepEqual(h.notices, []); assert.equal(await h.controller.close(), true);
+    assert.equal(h.props.style.width, width + 'px'); assert.equal(h.props.classList.contains('collapsed'), collapsed);
+  });
+}
