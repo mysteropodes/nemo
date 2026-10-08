@@ -67,14 +67,24 @@
       }
     }
 
-    async function presentPreview(frame, allowOccludedAdmission) {
+    async function presentPreview(frame, allowOccludedAdmission, retryOpenOcclusion) {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
       var observed = lifecycle.inspect(), current = lifecycle.identity();
       var retryable = false;
       try {
-        var staleRetries = 0;
+        var staleRetries = 0, openOcclusionRetries = 0;
         for (;;) {
           await settleResize(observed.session);
+          if (openOcclusionRetries > 0) {
+            var beforeRetry = lifecycle.inspect();
+            if (beforeRetry.phase !== 'native' || beforeRetry.session !== observed.session ||
+                beforeRetry.generation !== observed.generation || !beforeRetry.identity ||
+                beforeRetry.identity.instanceId !== current.instanceId ||
+                beforeRetry.identity.documentId !== current.documentId ||
+                beforeRetry.identity.contentRevision !== current.contentRevision) {
+              throw new Error('native opacity Open changed while waiting for a visible viewport');
+            }
+          }
           var work = lifecycle.presentPreview(frame);
           presenting = work;
           var presented;
@@ -114,6 +124,14 @@
           // obtain a fresh, strictly presented receipt at the same identity.
           if (presented.status === 'deferred-occluded' && allowOccludedAdmission && isOpening()) {
             return Object.freeze(Object.assign({ owner: 'native' }, presented));
+          }
+          // A native file picker may briefly leave the NSWindow occluded after
+          // its sheet closes. Retry that still-pending native work for this
+          // Open handoff only; neither a timer nor a deferred receipt publishes.
+          if (presented.status === 'deferred-occluded' && retryOpenOcclusion === true &&
+              openOcclusionRetries++ < 20) {
+            await ports.sleep(100);
+            continue;
           }
           if (presented.status !== 'presented') {
             if (typeof isPublished === 'function' && isPublished(observed.session)) {

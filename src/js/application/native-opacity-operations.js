@@ -93,7 +93,7 @@
       }
       token.finishing = true;
       try {
-        var visible = await viewport.presentPreview(0);
+        var visible = await viewport.presentPreview(0, false, true);
         if (!sameReceipt(token.first, visible) || visible.status !== 'presented' ||
             !currentOpen(token)) throw new Error('Native viewport is not current after reveal');
         var json = lifecycle.persistenceJSON();
