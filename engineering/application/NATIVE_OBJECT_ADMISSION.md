@@ -476,8 +476,13 @@ No descriptor/catalog/schema, owner, transport policy or common route changes.
 
 The helper and private tests are registered in both the general Rust source
 census and actual MCP size overlay under their existing transport owner. No
-native-engine dependency, new graph edge, size ceiling, coverage floor,
-baseline or exclusion is added. Independent fixed selectors, all registered
+native-engine dependency, graph edge or size ceiling is added. Existing file
+and aggregate coverage floors, exclusions and historical snapshot stay intact;
+only the two new files receive pinned measured per-file registrations. The
+production child is measured at 100% lines/regions/functions; the test child
+has no exported executable regions and is explicitly listed, not excluded.
+Whole-crate coverage retains its inherited 18 ratchet failures. These new-file
+registrations are not whole-crate coverage acceptance. Independent fixed selectors, all registered
 examples, closed negative inputs and complete UTF-8 byte boundaries preserve
 existing full-validator behavior and refusal precedence. The source/registration
 RED and original hashes remain separate from unavailable Rust characterization.
