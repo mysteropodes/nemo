@@ -253,7 +253,8 @@
       "dir": "src-tauri/src",
       "files": [
         "native_viewport.rs",
-        "native_viewport_appkit.rs"
+        "native_viewport_appkit.rs",
+        "native_viewport_appkit_occlusion.rs"
       ],
       "publicApi": [
         "native_viewport.rs"
