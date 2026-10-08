@@ -133,10 +133,19 @@ impl ObjectSnapshot {
                 "Object read was cancelled before dispatch.",
             );
         }
-        if request.operation != "query.document.object" || request.expected_revision.is_some() {
+        if request.expected_revision.is_some() {
             return failure(
                 DispatchErrorCode::InvalidRequest,
                 "Only pinned object reads without expectedRevision are supported.",
+            );
+        }
+        if request.operation == "query.document.object.serialize" {
+            return self.serialize_response(&request);
+        }
+        if request.operation != "query.document.object" {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Unsupported object read operation.",
             );
         }
         let read = match self.query_json(&encoded) {
@@ -162,6 +171,70 @@ impl ObjectSnapshot {
             return failure(
                 DispatchErrorCode::Unavailable,
                 "Complete object read exceeds the 4096-byte response limit.",
+            );
+        }
+        Ok(response)
+    }
+
+    fn serialize_response(
+        &self,
+        request: &OpacityRequest,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        let failure = |code, message| Ok(self.read_failure(request, code, message));
+        let revision = request
+            .payload
+            .get("atRevision")
+            .and_then(serde_json::Value::as_u64);
+        if request.payload.as_object().is_none_or(|p| p.len() != 1)
+            || !revision.is_some_and(|r| r <= 9_007_199_254_740_991)
+        {
+            return failure(
+                DispatchErrorCode::InvalidRequest,
+                "Object serialization requires only atRevision.",
+            );
+        }
+        if revision != Some(self.content_revision()) {
+            return failure(
+                DispatchErrorCode::NotFound,
+                "Object serialization revision is unavailable.",
+            );
+        }
+        let bytes = match object_codec::encode_project(self.document()) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return failure(
+                    DispatchErrorCode::Internal,
+                    "Object serialization codec failed.",
+                )
+            }
+        };
+        let document_json = match String::from_utf8(bytes) {
+            Ok(json) => json,
+            Err(_) => {
+                return failure(
+                    DispatchErrorCode::Internal,
+                    "Object serialization UTF-8 is invalid.",
+                )
+            }
+        };
+        let response = ResponseEnvelope {
+            api_version: APPLICATION_API_VERSION,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            error: None,
+            result: Some(serde_json::json!({"atRevision":self.content_revision(),
+                "documentSnapshotId":self.snapshot_id(),"documentJson":document_json})),
+        };
+        if !matches!(
+            serde_json::to_vec(&response).map(|bytes| bytes.len()),
+            Ok(0..=MAX_MESSAGE_BYTES)
+        ) {
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Complete object serialization exceeds the 4096-byte response limit.",
             );
         }
         Ok(response)

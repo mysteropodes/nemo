@@ -8,11 +8,12 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-const OPERATIONS: [&str; 4] = [
+const OPERATIONS: [&str; 5] = [
     "query.document.object",
     "command.document.object.fill.set",
     "command.document.object.undo",
     "command.document.object.redo",
+    "query.document.object.serialize",
 ];
 
 /// Only original-byte admission can construct this token. Public typed dispatch
@@ -55,6 +56,17 @@ pub(super) fn admit_raw(raw: &str) -> Result<AdmittedObjectRequest, String> {
     if request.operation == OPERATIONS[0] {
         // Registered read shape only, never global capability availability.
         request.validate_input().map_err(|e| e.to_string())?;
+    }
+    if request.operation == OPERATIONS[4]
+        && (request.expected_revision.is_some()
+            || request.payload.as_object().is_none_or(|p| p.len() != 1)
+            || !request
+                .payload
+                .get("atRevision")
+                .and_then(Value::as_u64)
+                .is_some_and(|r| r <= MAX_REVISION))
+    {
+        return Err("invalid pinned object serialization request".into());
     }
     // Command payload/expectation/cancellation dispositions remain owned and
     // retained by the real dispatcher, including exact failed-request retries.

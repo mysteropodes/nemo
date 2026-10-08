@@ -196,7 +196,14 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
     let receipt = install(&state);
     let status = client_status(&state).unwrap();
     assert_eq!(status["available"], true);
-    assert_eq!(status["operations"].as_array().unwrap().len(), 4);
+    let operations = json!([
+        "query.document.object",
+        "command.document.object.fill.set",
+        "command.document.object.undo",
+        "command.document.object.redo",
+        "query.document.object.serialize"
+    ]);
+    assert_eq!(status["operations"], operations);
     for flag in [
         "publicCapabilityAvailable",
         "mcpAvailable",
@@ -222,8 +229,10 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
     })
     .unwrap();
     assert_eq!(client_status(&state).unwrap()["available"], false);
+    assert_eq!(client_status(&state).unwrap()["operations"], json!([]));
     assert!(!dispatch_raw(&state, &command.to_string()).unwrap().ok);
     let next = install(&state);
+    assert_eq!(client_status(&state).unwrap()["operations"], operations);
     assert_ne!(next["documentId"], receipt["documentId"]);
     assert_eq!(
         dispatch(&state, &command)["error"]["code"],
