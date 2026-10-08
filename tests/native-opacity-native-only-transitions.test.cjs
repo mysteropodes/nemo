@@ -150,6 +150,7 @@ function nativeHarness(source, options = {}) {
   }
   const controller = OpacityApplication.createNative({
     surface: options.surface,
+    subscribeWindowOcclusion: options.subscribeWindowOcclusion,
     document: ProjectDocument, editor: NativeEditor, selection: NativeSelection,
     createPreview() {
       const value = NativePreview.createNativeOpacityPreviewAdapter();
@@ -252,7 +253,7 @@ function nativeHarness(source, options = {}) {
     replacement: NativeOpacityReplacement, exportWorkflow: NativeOpacityExportWorkflow,
     previewWorkflow: NativeOpacityPreviewWorkflow,
     operations: NativeOpacityOperations, v1: NativeOpacityV1,
-    viewport: NativeOpacityViewport, motionSurface: NativeMotionSurface });
+    viewport: options.viewport || NativeOpacityViewport, motionSurface: NativeMotionSurface });
   async function externalOpacity(value, requestId = `external-${state.identity.contentRevision + 1}`) {
     const fromRevision = state.identity.contentRevision;
     state.document.layers[0].motionStatic.opacity = [value];
@@ -605,16 +606,28 @@ test('first static and keyed native opens await the lifecycle-owned frame-0 pres
   }
 });
 
-test('explicit Open can unocclude the first native frame before publishing success', async () => {
+test('explicit Open keeps the start screen visible through occlusion until the first frame is presented', async () => {
   const source = staticSource();
-  const h = surfaceHarness(source, { previewReceipt(receipt) {
+  let expose, subscribed = false;
+  const h = surfaceHarness(source, {
+    async subscribeWindowOcclusion(callback) { expose = callback; subscribed = true; return () => {}; },
+    previewReceipt(receipt) {
+    assert.equal(subscribed, true, 'exposure listener precedes the first native attempt');
     return { ...receipt, status: h.state.previews.length === 1 ? 'deferred-occluded' : 'presented' };
   } });
-  const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
+  let settled = false;
+  const pending = h.published().project.importJSON(JSON.stringify(source), true, true)
+    .finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(h.ui.state.currentFrame, 10, 'prior UI projection stays in place while occluded');
+  expose({ visible: true });
+  const first = await pending;
   const root = { NemoNativeOpacityProject: h.published().project,
     NemoNativeOpacityCutover: h.published().cutover };
-  assert.equal(first.status, 'deferred-occluded');
-  assert.equal(NativeProjectEntry.ready(root, first), true, 'provisional receipt admits reveal only');
+  assert.equal(first.status, 'presented');
+  assert.equal(NativeProjectEntry.ready(root, first), true);
+  assert.equal(NativeProjectEntry.ready(root, { ...first, status: 'deferred-occluded' }), false);
   assert.equal(h.controller.status(), 'native');
   let hidden = 0, shown = 0;
   assert.equal(await NativeProjectEntry.reveal(root, first, {
@@ -622,43 +635,218 @@ test('explicit Open can unocclude the first native frame before publishing succe
     raf(callback) { callback(); },
   }), true);
   assert.equal(hidden, 1); assert.equal(shown, 0);
-  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0]);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 0]);
   assert.equal(h.controller.blocksLegacy(), true);
 });
 
-test('occlusion on the second native presentation fails closed after reveal', async () => {
+test('Open event subscription failure fences the admitted native owner without publishing UI', async () => {
+  for (const replacing of [false, true]) {
+    let fail = false, blocked = 0;
+    const h = surfaceHarness(staticSource(), { subscribeWindowOcclusion: async () => {
+      if (fail) throw new Error('native window listener failed');
+      return () => {};
+    }, blockPublication() { blocked++; } });
+    if (replacing) {
+      const first = await h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+      await h.published().project.finishOpenAfterReveal(first);
+    }
+    const before = JSON.stringify({ ui: h.ui.state, previews: h.state.previews });
+    fail = true;
+    assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource(60)), true, true), false);
+    assert.equal(JSON.stringify({ ui: h.ui.state, previews: h.state.previews }), before);
+    assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 60, 'native admission precedes listener registration');
+    assert.equal(h.controller.status(), 'indeterminate');
+    assert.equal(h.controller.blocksLegacy(), true);
+    assert.equal(blocked, 1);
+    assert.equal(h.state.imports.length, 0);
+  }
+});
+
+test('release or replacement during delayed exposure registration prevents later first presentation', async () => {
+  for (const replacing of [false, true]) {
+  for (const change of ['release', 'replace']) {
+    const registration = deferred();
+    let expose, disposed = 0, blocked = 0, delay = false;
+    const h = surfaceHarness(staticSource(), {
+      subscribeWindowOcclusion(callback) { expose = callback; return delay ? registration.promise : Promise.resolve(() => {}); },
+      blockPublication() { blocked++; },
+    });
+    if (replacing) {
+      const first = await h.published().project.importJSON(JSON.stringify(staticSource(20)), true, true);
+      await h.published().project.finishOpenAfterReveal(first);
+    }
+    const previousUi = JSON.stringify(h.ui.state), previousPresentations = h.state.previews.length;
+    delay = true;
+    const importing = h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(h.controller.status(), 'native', 'listener setup starts only after native admission');
+    assert.equal(h.state.previews.length, previousPresentations);
+    if (change === 'release') await h.controller.releaseCurrent('cancel-delayed-open');
+    else await h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+    registration.resolve(() => { disposed++; });
+    assert.equal(await importing, false);
+    expose({ visible: true });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(disposed, 1, 'late registered listener is immediately removed');
+    assert.equal(h.state.previews.length, previousPresentations, 'cancelled admission cannot present the old or replacement document');
+    assert.equal(JSON.stringify(h.ui.state), previousUi, 'cancelled admission cannot project a new UI');
+    assert.equal(h.state.imports.length, 0);
+    assert.equal(blocked, 0, 'cancellation cannot fence a clean release or a newer owner');
+    assert.equal(h.controller.status(), change === 'release' ? 'closed' : 'native');
+    if (change === 'replace') assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 60);
+  }
+  }
+});
+
+test('native revision during delayed exposure registration fences the admitted owner before presentation', async () => {
+  for (const mutation of ['local', 'external']) {
+  const registration = deferred();
+  let disposed = 0, blocked = 0;
+  const h = surfaceHarness(staticSource(), {
+    subscribeWindowOcclusion() { return registration.promise; },
+    blockPublication() { blocked++; },
+  });
+  const previousUi = JSON.stringify(h.ui.state);
+  const importing = h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await new Promise(resolve => setImmediate(resolve));
+  const admittedSession = h.state.lifecycle.inspect().session;
+  if (mutation === 'local') await h.controller.setOpacity('r08_curve_layer', 60);
+  else await h.externalOpacity(60, 'revision-during-open-registration');
+  assert.equal(h.state.lifecycle.inspect().session, admittedSession);
+  assert.equal(h.state.identity.contentRevision, 1);
+  registration.resolve(() => { disposed++; });
+  assert.equal(await importing, false);
+  assert.equal(h.controller.status(), 'indeterminate');
+  assert.equal(blocked, 1);
+  assert.equal(disposed, 1);
+  assert.equal(h.state.previews.length, 0);
+  assert.equal(h.state.imports.length, 0);
+  assert.equal(JSON.stringify(h.ui.state), previousUi);
+  assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 60);
+  }
+});
+
+test('native mutation after exposure registration fences before the first presentation', async () => {
+  let blocked = 0;
+  const h = surfaceHarness(staticSource(), {
+    async subscribeWindowOcclusion() { return () => {}; },
+    blockPublication() { blocked++; },
+    viewport: { create(...args) {
+      const viewport = NativeOpacityViewport.create(...args);
+      return { ...viewport, async beginOpen() {
+        await viewport.beginOpen();
+        // Deterministically interleave an actual admitted native mutation
+        // after registration's validation and before import's continuation.
+        await h.controller.setOpacity('r08_curve_layer', 60);
+      } };
+    } },
+  });
+  const previousUi = JSON.stringify(h.ui.state);
+  assert.equal(await h.published().project.importJSON(JSON.stringify(staticSource()), true, true), false);
+  assert.equal(h.state.identity.contentRevision, 1);
+  assert.equal(h.controller.status(), 'indeterminate');
+  assert.equal(blocked, 1);
+  assert.equal(h.state.previews.length, 0);
+  assert.equal(h.state.imports.length, 0);
+  assert.equal(JSON.stringify(h.ui.state), previousUi);
+});
+
+test('release cancels an occluded provisional Open and retires its exposure listener', async () => {
+  let expose, disposed = 0;
+  const h = surfaceHarness(staticSource(), {
+    async subscribeWindowOcclusion(callback) { expose = callback; return () => { disposed++; }; },
+    previewReceipt: receipt => ({ ...receipt, status: 'deferred-occluded' }),
+  });
+  const importing = h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await new Promise(resolve => setImmediate(resolve));
+  await h.controller.releaseCurrent('cancel-occluded-open');
+  assert.equal(await importing, false);
+  assert.equal(disposed, 1);
+  expose({ visible: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.state.previews.length, 1);
+  assert.equal(h.state.imports.length, 0);
+  assert.equal(h.ui.state.currentFrame, 10);
+  assert.equal(h.controller.status(), 'closed');
+});
+
+test('replacement disposes the occluded old Open without presenting or fencing the new session', async () => {
+  let expose, disposed = 0;
+  const h = surfaceHarness(staticSource(), {
+    async subscribeWindowOcclusion(callback) { expose = callback; return () => { disposed++; }; },
+    previewReceipt: receipt => ({ ...receipt, status: 'deferred-occluded' }),
+  });
+  const importing = h.published().project.importJSON(JSON.stringify(staticSource()), true, true);
+  await new Promise(resolve => setImmediate(resolve));
+  const oldDocument = h.state.identity.documentId;
+  await h.state.lifecycle.replace(ProjectDocument.prepareNativeOpacity(staticSource(60)));
+  assert.equal(await importing, false);
+  assert.equal(disposed, 1);
+  expose({ visible: true });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.notEqual(h.state.identity.documentId, oldDocument);
+  assert.equal(h.state.document.layers[0].motionStatic.opacity[0], 60);
+  assert.equal(h.state.previews.length, 1);
+  assert.equal(h.ui.state.currentFrame, 10);
+  assert.equal(h.controller.status(), 'native');
+});
+
+test('fatal native presentation after an occluded reveal restores the start screen without publishing', async () => {
   const source = staticSource();
-  const h = surfaceHarness(source, { previewReceipt(receipt) {
-    return { ...receipt, status: 'deferred-occluded' };
+  let expose;
+  const h = surfaceHarness(source, {
+    async subscribeWindowOcclusion(callback) { expose = callback; return () => {}; },
+    previewReceipt(receipt) {
+    return { ...receipt, status: h.state.previews.length === 1 ? 'presented'
+      : h.state.previews.length === 2 ? 'deferred-occluded' : 'failed-device-lost' };
   } });
   const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
   const root = { NemoNativeOpacityProject: h.published().project,
     NemoNativeOpacityCutover: h.published().cutover };
   let shown = 0;
-  await assert.rejects(NativeProjectEntry.reveal(root, first, {
+  const revealing = NativeProjectEntry.reveal(root, first, {
     hide() {}, show() { shown++; }, repaint() { throw new Error('Paper repaint'); },
     raf(callback) { callback(); },
-  }), /not presented/);
+  });
+  const rejected = assert.rejects(revealing);
+  await new Promise(resolve => setImmediate(resolve));
+  expose({ visible: true });
+  await rejected;
   assert.equal(shown, 1);
   assert.equal(h.controller.status(), 'indeterminate');
   assert.equal(h.controller.blocksLegacy(), true);
   assert.equal(h.state.imports.length, 0);
 });
 
-test('a presented first admission still cannot publish an occluded reveal', async () => {
+test('a presented first admission waits for exposure and a second presented receipt after reveal', async () => {
   const source = staticSource();
-  const h = surfaceHarness(source, { previewReceipt(receipt) {
-    return { ...receipt, status: h.state.previews.length === 1 ? 'presented' : 'deferred-occluded' };
+  let expose, paints = 0;
+  const h = surfaceHarness(source, {
+    async subscribeWindowOcclusion(callback) { expose = callback; return () => {}; },
+    paintUiProjection() { paints++; }, resize: async () => {},
+    previewReceipt(receipt) {
+    return { ...receipt, status: h.state.previews.length === 2 ? 'deferred-occluded' : 'presented' };
   } });
   const first = await h.published().project.importJSON(JSON.stringify(source), true, true);
   assert.equal(first.status, 'presented');
   const root = { NemoNativeOpacityProject: h.published().project,
     NemoNativeOpacityCutover: h.published().cutover };
-  await assert.rejects(NativeProjectEntry.reveal(root, first, {
+  let settled = false;
+  const revealing = NativeProjectEntry.reveal(root, first, {
     hide() {}, show() {}, repaint() { throw new Error('Paper repaint'); },
     raf(callback) { callback(); },
-  }), /not presented/);
-  assert.equal(h.controller.status(), 'indeterminate');
+  }).finally(() => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(paints, 0);
+  h.published().resize();
+  await h.resizeCallback()();
+  assert.equal(h.state.previews.length, 2, 'resize cannot start a competing provisional Open presentation');
+  assert.equal(h.controller.status(), 'native');
+  expose({ visible: true });
+  assert.equal(await revealing, true);
+  assert.equal(paints, 1);
+  assert.equal(h.controller.status(), 'native');
   assert.equal(h.state.imports.length, 0);
 });
 
@@ -1042,12 +1230,13 @@ test('a resize arriving during presentation is applied before the final receipt'
 test('a later successful viewport resize presents the latest native frame again', async () => {
   const source = staticSource();
   const h = surfaceHarness(source, { resize: async () => {} });
-  await h.published().project.importJSON(JSON.stringify(source));
+  const first = await h.published().project.importJSON(JSON.stringify(source));
+  await h.published().project.finishOpenAfterReveal(first);
   h.published().cutover.renderPreview(10);
   await h.controller.flush();
   h.published().resize();
   await h.resizeCallback()();
-  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 10, 10]);
+  assert.deepEqual(h.state.previews.map(request => request.frame), [0, 0, 10, 10]);
   assert.equal(h.controller.status(), 'native');
 });
 

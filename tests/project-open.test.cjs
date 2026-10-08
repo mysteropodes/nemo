@@ -149,13 +149,13 @@ test('browser Resume preserves normalized imported data and the existing repaint
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
 });
 
-test('native Resume permits occluded admission and waits for final visible publication', async () => {
+test('native Resume waits for presented admission and final visible publication', async () => {
   const app = harness({ auto: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   app.elements.get('start-resume').listeners.click();
   assert.equal(native.deferredAllowed, true);
   assert.equal(app.startScreen.classList.contains('hid'), false);
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.startScreen.classList.contains('hid'), true);
   assert.equal(app.toasts.includes('Session resumed'), false);
@@ -172,7 +172,7 @@ test('native Resume permits occluded admission and waits for final visible publi
 });
 
 for (const rejected of [false, { instanceId: 'stale-instance' }, { documentId: 'stale-document' },
-  { contentRevision: 1 }, { status: 'failed' }]) {
+  { contentRevision: 1 }, { status: 'failed' }, { status: 'deferred-occluded' }]) {
   test(`denied or stale native Resume admission leaves the start screen visible (${JSON.stringify(rejected)})`, async () => {
     const app = harness({ auto: '{"supported":true}', deferFrames: true });
     const native = installNativeOpen(app);
@@ -240,6 +240,47 @@ test('browser Open keeps the file name and normalized clean baseline for later S
   assert.equal(app.downloads.at(-1), 'Story.json', 'edited browser Save still retains opened basename');
 });
 
+test('desktop picker requests one awaited window exposure before native Open admission', async () => {
+  const app = harness({ version: '{"supported":true}' });
+  const native = installNativeOpen(app);
+  const focus = deferred();
+  const calls = [];
+  app.window.__TAURI__.dialog = { open: async () => '/tmp/Focused.json' };
+  app.window.__TAURI__.window = { getCurrentWindow() { return { setFocus() { calls.push('focus'); return focus.promise; } }; } };
+  app.window.__TAURI__.fs.readTextFile = async () => { calls.push('read'); return '{"supported":true}'; };
+  const opening = app.project.open();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, ['focus'], 'file admission waits for the one-time focus request');
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  focus.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, ['focus', 'read']);
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false,
+    'window focus cannot substitute for native presentation');
+  native.visible.resolve({ ...native.receipt, workId: 'visible-focus-frame' });
+  await opening;
+  assert.equal(app.toasts.at(-1), 'Opened: Focused');
+});
+
+test('failed window focus never publishes an Open before native presentation', async () => {
+  const app = harness({ version: '{"supported":true}' });
+  const native = installNativeOpen(app);
+  app.window.__TAURI__.dialog = { open: async () => '/tmp/Unfocused.json' };
+  app.window.__TAURI__.window = { getCurrentWindow() { return { async setFocus() { throw new Error('occluded'); } }; } };
+  const opening = app.project.open();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(native.deferredAllowed, true);
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  native.visible.resolve({ ...native.receipt, workId: 'visible-after-focus-failure' });
+  await opening;
+  assert.equal(app.toasts.at(-1), 'Opened: Unfocused');
+});
+
 test('native browser Open publishes success only after both frame-0 presentation boundaries', async () => {
   const app = harness({ deferFrames: true }), native = installNativeOpen(app);
   select(app, { name: 'Native.json', text: '{"supported":true}' });
@@ -263,21 +304,17 @@ test('native browser Open publishes success only after both frame-0 presentation
   assert.equal(app.mutations, 0, 'Paper writers never run during native Open');
 });
 
-test('deferred native first frame remains unpublished until post-reveal presentation', async () => {
+test('deferred native first frame cannot hide the start screen or publish an Open', async () => {
   const app = harness({ deferFrames: true }), native = installNativeOpen(app);
   const first = { ...native.receipt, status: 'deferred-occluded' };
   select(app, { name: 'Occluded.json', text: '{"supported":true}' });
   native.first.resolve(first);
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.startScreen.classList.contains('hid'), false);
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
-  app.flushFrame(); app.flushFrame();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(native.presentations, 1);
-  native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.project.getCurrentLabel(), 'Occluded (not saved)');
-  assert.equal(app.toasts.at(-1), 'Opened: Occluded');
+  assert.equal(app.pendingFrames, 0);
+  assert.equal(native.presentations, 0);
+  assert.equal(app.toasts.includes('Opened: Occluded'), false);
   assert.equal(app.mutations, 0);
 });
 
@@ -285,7 +322,7 @@ test('desktop Open attempts final native presentation when reveal animation fram
   const app = harness({ version: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   const opening = app.project.openPath('/tmp/Native.json');
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.startScreen.classList.contains('hid'), true);
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
@@ -304,7 +341,7 @@ test('stalled reveal RAF fallback refuses a deferred final native receipt', asyn
   const app = harness({ version: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   const opening = app.project.openPath('/tmp/Native.json');
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setTimeout(resolve, 250));
   assert.equal(native.presentations, 1);
   native.visible.resolve({ ...native.receipt, status: 'deferred-occluded' });

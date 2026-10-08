@@ -1526,74 +1526,198 @@ test('post-admission viewport deferral does not fence the native document and ne
   }
 });
 
-test('desktop Open retries transient native window occlusion without publishing a deferred receipt', async () => {
+function occlusionPorts(surface = {}) {
+  let listener, disposed = 0;
+  const timers = new Map();
+  let sequence = 0;
+  return {
+    surface: { defer(callback) { timers.set(++sequence, callback); return sequence; },
+      cancel(id) { timers.delete(id); }, ...surface },
+    async subscribeWindowOcclusion(callback) {
+      listener = callback;
+      return () => { disposed++; };
+    },
+    hint(value) { listener(value); },
+    tick() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(fn => fn()); },
+    get disposed() { return disposed; }, get timerCount() { return timers.size; },
+  };
+}
+const turn = () => new Promise(resolve => setImmediate(resolve));
+
+test('desktop Open remains pending beyond two seconds of native window occlusion and presents only after exposure', async () => {
+  let exposed = false;
   const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
-    return state.previews.length < 4 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+    return exposed ? receipt : { ...receipt, status: 'deferred-occluded' };
   } });
   assert.equal(await harness.controller.activate(harness.prepared), true);
-  let opening = true, sleeps = 0;
-  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
-    sleep(ms) { assert.equal(ms, 100); sleeps++; return Promise.resolve(); },
-  }, () => opening, () => false);
-  const first = await viewport.presentPreview(0, true);
-  assert.equal(first.status, 'deferred-occluded');
-  opening = false;
-  const visible = await viewport.presentPreview(0, false, true);
-  assert.equal(visible.status, 'presented');
-  assert.equal(visible.documentSnapshotId, first.documentSnapshotId);
-  assert.equal(sleeps, 2);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await viewport.beginOpen();
+  let settled = false;
+  const pending = viewport.presentPreview(0, true).finally(() => { settled = true; });
+  await turn();
+  await new Promise(resolve => setTimeout(resolve, 2100));
+  for (let i = 0; i < 25; i++) ports.tick();
+  assert.equal(settled, false);
+  assert.equal(harness.state.previews.length, 1, 'time passing never retries or publishes deferred work');
+  assert.equal(harness.controller.status(), 'native');
+  exposed = true;
+  ports.hint({ visible: true });
+  assert.equal((await pending).status, 'presented');
+  assert.equal(harness.state.previews.length, 2);
+  viewport.endOpen();
+  assert.equal(ports.disposed, 1);
+  assert.equal(ports.timerCount, 0);
+});
+
+test('desktop Open does not lose exposure delivered during an in-flight deferred presentation', async () => {
+  const ports = occlusionPorts();
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
+    if (state.previews.length === 1) {
+      ports.hint({ visible: true });
+      return { ...receipt, status: 'deferred-occluded' };
+    }
+    return receipt;
+  } });
+  await harness.controller.activate(harness.prepared);
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await viewport.beginOpen();
+  assert.equal((await viewport.presentPreview(0, true)).status, 'presented');
+  assert.equal(harness.state.previews.length, 2);
+  assert.equal(ports.timerCount, 0);
+  viewport.endOpen();
   assert.equal(harness.controller.status(), 'native');
 });
 
-test('desktop Open fails closed after bounded persistent native window occlusion', async () => {
+test('desktop Open coalesces duplicate exposure hints and ignores malformed hints', async () => {
   const harness = nativeHarness(staticSource(), { previewReceipt: receipt =>
     ({ ...receipt, status: 'deferred-occluded' }) });
-  assert.equal(await harness.controller.activate(harness.prepared), true);
-  let opening = true, sleeps = 0;
-  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
-    sleep() { sleeps++; return Promise.resolve(); },
-  }, () => opening, () => false);
-  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
-  opening = false;
-  await assert.rejects(viewport.presentPreview(0, false, true),
-    /native opacity frame was not presented at the admitted revision/);
-  assert.equal(sleeps, 20);
-  assert.equal(harness.state.previews.length, 22);
-  assert.equal(harness.controller.status(), 'indeterminate');
+  await harness.controller.activate(harness.prepared);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await viewport.beginOpen();
+  const pending = viewport.presentPreview(0, true);
+  const rejected = assert.rejects(pending, /Open changed/);
+  await turn();
+  for (const hint of [null, {}, { visible: 'true' }, { visible: true, documentId: 'wrong' }, { visible: false }]) ports.hint(hint);
+  await turn();
+  assert.equal(harness.state.previews.length, 1);
+  for (let i = 0; i < 12; i++) ports.hint({ visible: true });
+  await turn();
+  assert.equal(harness.state.previews.length, 2, 'one exposure edge retries once');
+  ports.hint({ visible: true });
+  await turn();
+  assert.equal(harness.state.previews.length, 2, 'repeated exposure never starts a retry loop');
+  viewport.endOpen();
+  await rejected;
+  assert.equal(ports.timerCount, 0);
 });
 
 test('desktop Open joins a viewport resize before retrying the occluded frame', async () => {
   const harness = nativeHarness(staticSource(), { previewReceipt(receipt, _request, state) {
-    return state.previews.length < 3 ? { ...receipt, status: 'deferred-occluded' } : receipt;
+    return state.previews.length === 1 ? { ...receipt, status: 'deferred-occluded' } : receipt;
   } });
   assert.equal(await harness.controller.activate(harness.prepared), true);
-  let opening = true, resizes = 0, viewport;
+  let resizes = 0, viewport;
   const surface = { defer() { return 1; }, cancel() {}, async resize() { resizes++; } };
-  viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
-    surface, sleep() { viewport.resizeViewport(); return Promise.resolve(); },
-  }, () => opening, () => false);
-  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
-  opening = false;
-  assert.equal((await viewport.presentPreview(0, false, true)).status, 'presented');
+  const ports = occlusionPorts(surface);
+  viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await viewport.beginOpen();
+  const pending = viewport.presentPreview(0, true);
+  await turn();
+  viewport.resizeViewport();
+  ports.hint({ visible: true });
+  assert.equal((await pending).status, 'presented');
   assert.equal(resizes, 1);
-  assert.equal(harness.state.previews.length, 3);
+  assert.equal(harness.state.previews.length, 2);
+  viewport.endOpen();
 });
 
 test('desktop Open stops occlusion retries before previewing a released document', async () => {
   const harness = nativeHarness(staticSource(), { previewReceipt: receipt =>
     ({ ...receipt, status: 'deferred-occluded' }) });
   assert.equal(await harness.controller.activate(harness.prepared), true);
-  let opening = true, sleeps = 0;
-  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, {
-    async sleep() { sleeps++; await harness.controller.releaseCurrent('occluded-open-cancelled'); },
-  }, () => opening, () => false);
-  assert.equal((await viewport.presentPreview(0, true)).status, 'deferred-occluded');
-  opening = false;
-  await assert.rejects(viewport.presentPreview(0, false, true),
-    /native opacity Open changed while waiting for a visible viewport/);
-  assert.equal(sleeps, 1);
-  assert.equal(harness.state.previews.length, 2);
+  const ports = occlusionPorts();
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await viewport.beginOpen();
+  const pending = viewport.presentPreview(0, true);
+  const rejected = assert.rejects(pending, /Open changed while waiting/);
+  await turn();
+  await harness.controller.releaseCurrent('occluded-open-cancelled');
+  ports.tick();
+  await rejected;
+  ports.hint({ visible: true });
+  assert.equal(harness.state.previews.length, 1);
   assert.equal(harness.controller.status(), 'closed');
+  viewport.endOpen();
+});
+
+test('occluded Open rejects a changed revision or fatal lifecycle before another presentation', async () => {
+  for (const change of ['revision', 'fence']) {
+    const harness = nativeHarness(staticSource(), { previewReceipt: receipt =>
+      ({ ...receipt, status: 'deferred-occluded' }) });
+    await harness.controller.activate(harness.prepared);
+    const ports = occlusionPorts();
+    const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+    await viewport.beginOpen();
+    const pending = viewport.presentPreview(0, true);
+    const rejected = assert.rejects(pending, /Open changed while waiting/);
+    await turn();
+    if (change === 'revision') await harness.externalOpacity(60);
+    if (change === 'fence') harness.state.lifecycle.fence(new Error('native viewport device lost'));
+    ports.tick();
+    await rejected;
+    ports.hint({ visible: true });
+    assert.equal(harness.state.previews.length, 1, change);
+    viewport.endOpen();
+    assert.equal(ports.timerCount, 0);
+  }
+});
+
+test('a disposed Open exposure callback cannot wake another session', async () => {
+  let callbacks = [], secondExposed = false;
+  const harness = nativeHarness(staticSource(), { previewReceipt(receipt) {
+    return secondExposed ? receipt : { ...receipt, status: 'deferred-occluded' };
+  } });
+  const ports = occlusionPorts();
+  ports.subscribeWindowOcclusion = async callback => { callbacks.push(callback); return () => {}; };
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, ports, () => true, () => false);
+  await harness.controller.activate(harness.prepared);
+  await viewport.beginOpen();
+  const first = viewport.presentPreview(0, true);
+  const rejected = assert.rejects(first, /Open changed/);
+  await turn();
+  await harness.controller.releaseCurrent('cancel-first-open');
+  viewport.disposeSession(harness.state.lifecycle.inspect().session);
+  viewport.endOpen();
+  await rejected;
+  await harness.controller.activate(harness.prepared);
+  await viewport.beginOpen();
+  const second = viewport.presentPreview(0, true);
+  await turn();
+  callbacks[0]({ visible: true });
+  await turn();
+  assert.equal(harness.state.previews.length, 2, 'old callback never presents the replacement session');
+  secondExposed = true;
+  callbacks[1]({ visible: true });
+  assert.equal((await second).status, 'presented');
+  viewport.endOpen();
+});
+
+test('desktop window occlusion port unwraps only the native event payload and preserves teardown', async () => {
+  let eventName, callback, disposed = 0;
+  const root = { __TAURI__: { core: { invoke() {} }, event: {
+    async listen(name, listener) { eventName = name; callback = listener; return () => { disposed++; }; },
+  } }, SM: { importJSON() {} } };
+  const hints = [];
+  const unlisten = await NativeLegacySurface.desktopPorts(root, {}).subscribeWindowOcclusion(hint => hints.push(hint));
+  assert.equal(eventName, 'nemo-native-window-occlusion');
+  callback({ payload: { visible: true }, event: eventName });
+  assert.deepEqual(hints, [{ visible: true }]);
+  unlisten();
+  assert.equal(disposed, 1);
+  delete root.__TAURI__.event;
+  await assert.rejects(NativeLegacySurface.desktopPorts(root, {}).subscribeWindowOcclusion(() => {}), /event port is unavailable/);
 });
 
 test('resize after a deferred frame re-presents the last visible frame without a retry loop', async () => {
@@ -1616,6 +1740,57 @@ test('resize after a deferred frame re-presents the last visible frame without a
   assert.equal(resized.length, 1);
   assert.deepEqual(resized[0], harness.controller.identity());
   assert.equal(harness.controller.status(), 'native');
+});
+
+test('ordinary preview cannot supersede a provisional native Open before reveal', async () => {
+  const session = {}, identity = { instanceId: 'instance-a', documentId: 'open-document', contentRevision: 0 };
+  const ordinaryFrames = [], awaitedFrames = [];
+  let phase = 'legacy', published, projections = 0, expose;
+  const prepared = { opacityMode: 'keyed', layerUid: 'r08_curve_layer', shell: {} };
+  const lifecycle = {
+    inspect() { return { phase, busy: false, session, generation: 1, identity }; },
+    isActive() { return phase === 'native'; },
+    identity() { return identity; },
+    async activate() { phase = 'native'; return true; },
+    persistenceJSON() { return '{"native":true}'; },
+    async presentPreview(frame) {
+      awaitedFrames.push(frame);
+      return { frame, lifecycleGeneration: 1, instanceId: identity.instanceId,
+        documentId: identity.documentId, contentRevision: identity.contentRevision,
+        documentSnapshotId: 'native-opacity:open-document:0',
+        status: awaitedFrames.length === 1 ? 'deferred-occluded'
+          : ordinaryFrames.length ? 'stale-discarded' : 'presented' };
+    },
+    renderPreview(frame) { ordinaryFrames.push(frame); return true; },
+    fence(error) { throw error; },
+  };
+  const surface = {
+    installGuard() {}, wrap() { return () => {}; },
+    publish(_admission, cutover, project) { published = { cutover, project }; return () => {}; },
+    extensionOpen() { return false; },
+    snapshotUiProjection() { return {}; },
+    installUiProjection() { projections++; }, paintUiProjection() {},
+  };
+  const operations = NativeOpacityOperations.create(lifecycle, {
+    surface, document: { prepareNativeOpacity() { return prepared; } },
+    async subscribeWindowOcclusion(callback) { expose = callback; return () => {}; },
+  }, {}, NativeOpacityViewport, { create() { return { handle() {}, disposeSession() {} }; } });
+  operations.install();
+  const importing = published.project.importJSON('fixture', true, true);
+  await turn();
+  assert.equal(published.cutover.renderPreview(10), true);
+  assert.deepEqual(ordinaryFrames, [], 'occluded Open must not send the prior frame to Rust');
+  expose({ visible: true });
+  const first = await importing;
+  assert.equal(first.status, 'presented');
+  assert.equal(published.cutover.renderPreview(10), true,
+    'an ordinary render request may arrive from the prior UI during reveal');
+  assert.deepEqual(ordinaryFrames, [], 'the pending Open must not send the prior frame to Rust');
+  assert.equal((await published.project.finishOpenAfterReveal(first)).status, 'presented');
+  assert.deepEqual(awaitedFrames, [0, 0, 0]);
+  assert.equal(projections, 1);
+  assert.equal(published.cutover.renderPreview(20), true);
+  assert.deepEqual(ordinaryFrames, [20], 'normal rendering resumes after publication');
 });
 
 test('revisiting deferred native work after a newer frame requires fresh presented work', async () => {

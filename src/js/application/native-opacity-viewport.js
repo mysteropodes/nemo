@@ -8,8 +8,91 @@
 
   function create(lifecycle, ports, isOpening, isPublished) {
     var resize = null, resizing = null, presenting = null, lastPresentedFrame = null;
+    var open = null;
+
+    function endOpen() {
+      var token = open;
+      if (!token) return;
+      open = null;
+      token.active = false;
+      if (token.wake) token.wake();
+      if (token.unsubscribe) token.unsubscribe();
+    }
+
+    async function beginOpen() {
+      endOpen();
+      var observed = lifecycle.inspect(), current = lifecycle.identity();
+      var token = open = { active: true, session: observed.session, epoch: 0, visible: null,
+        wake: null, unsubscribe: null };
+      try {
+        if (typeof ports.subscribeWindowOcclusion === 'function') {
+          var unsubscribe = await ports.subscribeWindowOcclusion(function (hint) {
+            if (open !== token || !token.active || !hint ||
+                typeof hint.visible !== 'boolean' || Object.keys(hint).length !== 1) return;
+            if (hint.visible === token.visible) return;
+            token.visible = hint.visible;
+            if (hint.visible) { token.epoch++; if (token.wake) token.wake(); }
+          });
+          if (typeof unsubscribe !== 'function') throw new Error('native window occlusion subscription is unavailable');
+          if (!token.active) unsubscribe();
+          else token.unsubscribe = unsubscribe;
+        }
+        // Registration may finish after release/replacement disposed this
+        // session. Remove a late listener and never present a later owner.
+        if (!sameOpen(observed, current, token)) {
+          var latest = lifecycle.inspect();
+          var retired = open !== token || !token.active ||
+            !['native', 'indeterminate'].includes(latest.phase) ||
+            latest.session !== observed.session || latest.generation !== observed.generation;
+          if (open === token) endOpen();
+          var error = new Error('native opacity Open changed during exposure registration');
+          // Revision/cache drift in this still-owned session is fail-closed;
+          // only an actually retired session is a benign cancellation.
+          if (retired) error.code = 'native_open_cancelled';
+          throw error;
+        }
+        return true;
+      } catch (error) { if (open === token) endOpen(); throw error; }
+    }
+
+    function sameOpen(observed, current, token) {
+      var latest = lifecycle.inspect();
+      return open === token && token.active && latest.phase === 'native' && !latest.busy &&
+        latest.session === observed.session && latest.generation === observed.generation && latest.identity &&
+        latest.identity.instanceId === current.instanceId && latest.identity.documentId === current.documentId &&
+        latest.identity.contentRevision === current.contentRevision;
+    }
+
+    function waitForExposure(token, epoch, observed, current) {
+      return new Promise(function (resolve, reject) {
+        var timer = null, settled = false;
+        function check() {
+          if (settled) return;
+          var valid = sameOpen(observed, current, token);
+          if (!valid || token.epoch !== epoch) {
+            settled = true;
+            if (timer !== null) ports.surface.cancel(timer);
+            token.wake = null;
+            if (valid) resolve();
+            else reject(new Error('native opacity Open changed while waiting for a visible viewport'));
+          }
+        }
+        function observe() {
+          timer = null;
+          check();
+          if (!settled) timer = ports.surface.defer(observe, 100);
+        }
+        // Install before checking the epoch: a hint during presentation cannot
+        // be lost between its deferred receipt and this waiter.
+        token.wake = check;
+        check();
+        // Timers only observe cancellation/fences; only exposure hints retry.
+        if (!settled && ports.surface && ports.surface.defer) timer = ports.surface.defer(observe, 100);
+      });
+    }
 
     function disposeSession(session) {
+      if (open && open.session === session) endOpen();
       if (resize && resize.session === session) {
         if (resize.timer !== null) ports.surface.cancel(resize.timer);
         resize = null;
@@ -67,24 +150,20 @@
       }
     }
 
-    async function presentPreview(frame, allowOccludedAdmission, retryOpenOcclusion) {
+    async function presentPreview(frame, waitOpenOcclusion) {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
       var observed = lifecycle.inspect(), current = lifecycle.identity();
+      var token = waitOpenOcclusion === true ? open : null;
+      if (token) token.session = observed.session;
       var retryable = false;
       try {
-        var staleRetries = 0, openOcclusionRetries = 0;
+        var staleRetries = 0;
         for (;;) {
           await settleResize(observed.session);
-          if (openOcclusionRetries > 0) {
-            var beforeRetry = lifecycle.inspect();
-            if (beforeRetry.phase !== 'native' || beforeRetry.session !== observed.session ||
-                beforeRetry.generation !== observed.generation || !beforeRetry.identity ||
-                beforeRetry.identity.instanceId !== current.instanceId ||
-                beforeRetry.identity.documentId !== current.documentId ||
-                beforeRetry.identity.contentRevision !== current.contentRevision) {
-              throw new Error('native opacity Open changed while waiting for a visible viewport');
-            }
+          if (token && !sameOpen(observed, current, token)) {
+            throw new Error('native opacity Open changed while waiting for a visible viewport');
           }
+          var epoch = token && token.epoch;
           var work = lifecycle.presentPreview(frame);
           presenting = work;
           var presented;
@@ -119,18 +198,10 @@
           if (presented.status === 'presented' &&
               ((resize && resize.session === observed.session) ||
                (resizing && resizing.session === observed.session))) continue;
-          // The start screen can occlude the native layer before reveal. This
-          // receipt admits only the handoff, never an Open success; reveal must
-          // obtain a fresh, strictly presented receipt at the same identity.
-          if (presented.status === 'deferred-occluded' && allowOccludedAdmission && isOpening()) {
-            return Object.freeze(Object.assign({ owner: 'native' }, presented));
-          }
-          // A native file picker may briefly leave the NSWindow occluded after
-          // its sheet closes. Retry that still-pending native work for this
-          // Open handoff only; neither a timer nor a deferred receipt publishes.
-          if (presented.status === 'deferred-occluded' && retryOpenOcclusion === true &&
-              openOcclusionRetries++ < 20) {
-            await ports.sleep(100);
+          // Native window visibility is a retry hint, never a presentation
+          // receipt. A provisional Open remains cancellable for any duration.
+          if (presented.status === 'deferred-occluded' && token && token.unsubscribe) {
+            await waitForExposure(token, epoch, observed, current);
             continue;
           }
           if (presented.status !== 'presented') {
@@ -165,7 +236,7 @@
         if (resize !== job || lifecycle.inspect().session !== job.session) return;
         try {
           if (await applyResize(job) && !job.joined &&
-              lifecycle.inspect().session === job.session && lastPresentedFrame !== null) {
+              !isOpening() && lifecycle.inspect().session === job.session && lastPresentedFrame !== null) {
             await presentPreview(lastPresentedFrame);
           }
         } catch (_) { /* The current session was fenced by the failing operation. */ }
@@ -181,7 +252,7 @@
       return handled;
     }
 
-    return Object.freeze({ disposeSession: disposeSession,
+    return Object.freeze({ disposeSession: disposeSession, beginOpen: beginOpen, endOpen: endOpen,
       reset: function () { lastPresentedFrame = null; },
       presentPreview: presentPreview, resizeViewport: resizeViewport,
       renderPreview: renderPreview });

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "236a09ef438a1db13d7fad5eb548d2edda1e133f",
-  "describe": "v0.7.0-alpha.4-1067-g236a09ef"
+  "head": "15418facc1d123703d05566949c6cb9ec700accc",
+  "describe": "v0.7.0-alpha.4-1084-g15418fac-dirty"
  },
- "inputsDigest": "75a2827888c9d32db450d0711ba6b8f37f188e22083c341949f6efb675c03e59",
+ "inputsDigest": "f394710c33296b092380e1fe2ac914645b4a1fc070ac7204a0f8b15e5236b016",
  "states": [
   "inventoried",
   "characterized",
@@ -3461,7 +3461,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 79,
+    "functionsVisited": 81,
     "via": "chain",
     "references": []
    },
@@ -10273,7 +10273,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 65,
+    "functionsVisited": 67,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2896 updateCornersPanel()",
@@ -15828,7 +15828,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 79,
+    "functionsVisited": 81,
     "via": "chain",
     "references": []
    },
@@ -15867,7 +15867,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 60,
+    "functionsVisited": 62,
     "via": "chain",
     "references": [
      "src/js/project.js:662 initStartScreen()"

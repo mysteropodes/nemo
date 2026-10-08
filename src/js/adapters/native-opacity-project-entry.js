@@ -24,7 +24,7 @@
   function ready(root, receipt, first) {
     if (!root.NemoNativeOpacityProject) return receipt === true;
     if (!receipt || receipt.owner !== 'native' || receipt.frame !== 0 ||
-        !(receipt.status === 'presented' || !first && receipt.status === 'deferred-occluded')) return false;
+        receipt.status !== 'presented') return false;
     var native = root.NemoNativeOpacityCutover;
     if (!native || typeof native.isActive !== 'function' || !native.isActive() ||
         typeof native.identity !== 'function') return false;

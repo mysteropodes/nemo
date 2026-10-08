@@ -18,7 +18,9 @@
     var extensionExposed = false, installation = null, opening = false;
     var pendingOpen = null, publishedSession = null, admissionStarted = false;
     var viewport = viewportModule.create(lifecycle, ports,
-      function () { return opening; },
+      // A provisional Open owns frame zero through reveal and UI publication.
+      // Ordinary renders from the prior UI must not supersede that native work.
+      function () { return opening || !!pendingOpen; },
       function (session) { return publishedSession === session; });
     var v1 = v1Module.create(lifecycle, ports, contract);
 
@@ -93,7 +95,7 @@
       }
       token.finishing = true;
       try {
-        var visible = await viewport.presentPreview(0, false, true);
+        var visible = await viewport.presentPreview(0, true);
         if (!sameReceipt(token.first, visible) || visible.status !== 'presented' ||
             !currentOpen(token)) throw new Error('Native viewport is not current after reveal');
         var json = lifecycle.persistenceJSON();
@@ -123,6 +125,8 @@
           ports.surface.blockPublication();
         }
         throw error;
+      } finally {
+        viewport.endOpen();
       }
     }
     function allowLegacy(kind) {
@@ -146,11 +150,35 @@
       try {
         var admitted = wasNative ? await lifecycle.replace(candidate) : await lifecycle.activate(candidate);
         if (!admitted) return false;
+        // Activation/replacement does not present. Register against its owned
+        // session before the first frame so release can cancel listener setup.
+        var admission = lifecycle.inspect();
+        try { await viewport.beginOpen(); }
+        catch (error) {
+          var failed = lifecycle.inspect();
+          if ((!error || error.code !== 'native_open_cancelled') && failed.phase === 'native' &&
+              failed.session === admission.session) lifecycle.fence(error);
+          throw error;
+        }
+        var registered = lifecycle.inspect();
+        if (registered.phase === 'indeterminate' && registered.session === admission.session) {
+          throw new Error('native opacity owner failed before first presentation');
+        }
+        if (registered.phase !== 'native' || registered.session !== admission.session ||
+            registered.generation !== admission.generation) return false;
+        if (registered.busy || !registered.identity ||
+            registered.identity.instanceId !== admission.identity.instanceId ||
+            registered.identity.documentId !== admission.identity.documentId ||
+            registered.identity.contentRevision !== admission.identity.contentRevision) {
+          var changed = new Error('native opacity Open changed before first presentation');
+          lifecycle.fence(changed);
+          throw changed;
+        }
         viewport.reset();
         var first = await viewport.presentPreview(0, allowOccludedAdmission === true);
         var current = lifecycle.inspect();
         if (!first || first.owner !== 'native' || !current.session ||
-            !['presented', 'deferred-occluded'].includes(first.status)) {
+            first.status !== 'presented') {
           if (wasNative) {
             lifecycle.fence(new Error('replacement first frame was not presented'));
             ports.surface.blockPublication();
@@ -165,6 +193,7 @@
         return false;
       } finally {
         opening = false;
+        if (!pendingOpen) viewport.endOpen();
       }
     }
     function install() {
