@@ -1,11 +1,7 @@
-//! N25R1 diagnostic: cancel the real SDK receive at an observed writer boundary.
-//! Production and the original compiled stdio assertions remain unchanged.
+//! Frozen N25R1 oracles through the actual production stdio factory.
+//! Original SDK RED receipts and compiled stdio assertions remain unchanged.
 use nemo_mcp::wire;
-use rmcp::{
-    service::TxJsonRpcMessage,
-    transport::{async_rw::AsyncRwTransport, Transport},
-    RoleServer,
-};
+use rmcp::{service::TxJsonRpcMessage, transport::Transport, RoleServer};
 use serde_json::{json, Value};
 use std::{
     collections::VecDeque,
@@ -89,9 +85,8 @@ impl AsyncWrite for Output {
 
 fn harness() -> (impl Transport<RoleServer, Error = io::Error>, Probe) {
     let probe = Probe::default();
-    let input = wire::guarded_stdio_input(Input(Arc::clone(&probe)));
     (
-        AsyncRwTransport::new_server(input, Output(Arc::clone(&probe))),
+        wire::guarded_stdio_transport(Input(Arc::clone(&probe)), Output(Arc::clone(&probe))),
         probe,
     )
 }

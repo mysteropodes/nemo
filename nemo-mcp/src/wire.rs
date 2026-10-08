@@ -1,6 +1,8 @@
 //! Bounded local IPC; no shell, eval, document mirror, or public network listener.
 #[path = "raw_envelope.rs"]
 mod raw_envelope;
+#[path = "stdio_transport.rs"]
+mod stdio_transport;
 use crate::{
     contract::{
         bounded_identifier, ApplicationRequest, ApplicationResponse, NativeApplicationRequest,
@@ -75,6 +77,18 @@ pub fn guarded_stdio_input<R: AsyncRead + Unpin + Send + 'static>(
     reader: R,
 ) -> impl AsyncRead + Unpin + Send + 'static {
     raw_envelope::GuardedInput::new(reader, MAX_MESSAGE_BYTES - 2)
+}
+
+/// Production stdio path: SDK codec and one cancellation-safe output owner.
+pub fn guarded_stdio_transport<R, W>(
+    reader: R,
+    writer: W,
+) -> impl rmcp::transport::Transport<rmcp::RoleServer, Error = io::Error>
+where
+    R: AsyncRead + Unpin + Send + 'static,
+    W: AsyncWrite + Unpin + Send + 'static,
+{
+    stdio_transport::new(reader, writer)
 }
 
 async fn read_json_bounded<T: serde::de::DeserializeOwned>(

@@ -6,7 +6,7 @@
       "dir": "nemo-mcp",
       "files": ["build.rs", "src/capabilities.rs", "src/capability_contract.rs", "src/contract.rs", "src/contract_tests.rs",
       "src/native_request_input.rs",
-      "src/native_request_input_tests.rs", "src/lib.rs", "src/main.rs", "src/native_contract.rs", "src/native_object_contract.rs", "src/native_object_contract_tests.rs", "src/native_reproduction_contract.rs", "src/raw_envelope.rs", "src/raw_envelope_tests.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs"],
+      "src/native_request_input_tests.rs", "src/lib.rs", "src/main.rs", "src/native_contract.rs", "src/native_object_contract.rs", "src/native_object_contract_tests.rs", "src/native_reproduction_contract.rs", "src/raw_envelope.rs", "src/stdio_transport.rs", "src/stdio_output.rs", "src/raw_envelope_tests.rs", "src/registry.rs", "src/schema.rs", "src/server.rs", "src/wire.rs"],
       "publicApi": ["src/capabilities.rs", "src/lib.rs", "src/contract.rs", "src/native_request_input.rs", "src/registry.rs", "src/wire.rs"],
       "sizeProfile": "Rust production module"
     },
