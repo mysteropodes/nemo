@@ -606,3 +606,27 @@ test('N25C2f immutable snapshot port belongs only to the actual host seam', (t) 
       && v.module === 'rust.desktop.native.application.commands' && v.detail.path === item));
   }
 });
+
+
+test('N25C2g input child registration keeps full validation at every production caller', () => {
+  const sources = ['src/native_request_input.rs', 'src/native_request_input_tests.rs'];
+  for (const [profile, id] of [[read('rust.profile.json'), 'rust.mcp.transport'], [read('mcp-rust.profile.json'), 'mcp.transport']]) {
+    const module = profile.modules.find(m => m.id === id);
+    for (const source of sources) assert.ok(module.files.includes(source));
+    assert.ok(module.publicApi.includes(sources[0]));
+    assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
+    const missing = structuredClone(profile);
+    missing.modules.find(m => m.id === id).files = module.files.filter(f => !sources.includes(f));
+    const result = require('./lib/boundaries-coverage.cjs').checkSourceCoverage(missing, { root: ROOT, sourcePaths: sources.map(f => `nemo-mcp/${f}`) });
+    assert.equal(result.ok, false);
+  }
+  const contract = fs.readFileSync(path.join(ROOT, 'nemo-mcp/src/contract.rs'), 'utf8');
+  assert.match(contract, /self\.validate_input\(\)\?/);
+  assert.match(contract, /capabilities::validate_native_operation\(&self\.operation\)/);
+  for (const file of ['nemo-mcp/src/server.rs', 'nemo-mcp/src/wire.rs', 'src-tauri/src/native_revision_sync.rs']) {
+    const caller = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    assert.match(caller, /request\.validate\(\)/);
+    assert.equal(caller.includes('validate_input('), false);
+  }
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8')).availability.state, 'unavailable');
+});
