@@ -612,3 +612,73 @@ installed UI/client operation, Save/reopen, persisted history, viewport or expor
 The next dependency-ordered slice must admit the general-object serialization and
 persistence/history consumer contract, then connect real UI consumers. Installed
 common-client agreement and the M1 vertical demonstration remain separate gates.
+
+
+## N25E1 private current-owner serialization and persistence consumer contract
+
+The existing raw `nemo_native_object_dispatch` entry also admits
+`query.document.object.serialize` for the active object owner. The complete
+original request, including whitespace and escaped UTF-8, must fit 4096 bytes;
+raw duplicate members are rejected before typed/Value conversion. It uses the
+same ApplicationMcp, RevisionSync and NativeAuthority as object read/fill/history.
+The unchanged host acquires its current immutable snapshot; the snapshot's
+existing dispatcher performs correlation, cancellation and serialization.
+There is no separate writable document or response-construction port.
+
+The exact query payload is `{"atRevision": 0}`, using the actual current safe
+integer revision. `expectedRevision`, missing or extra selector fields, negative,
+fractional and unsafe revisions are invalid. The serializer follows the existing
+object read identity/cancellation dispositions. An earlier or future revision
+returns `not_found`; a stale document incarnation returns `wrong_document`.
+A vacant, reserved, releasing, released or different-kind owner cannot dispatch.
+Neither successful nor rejected serialization advances content or changes history.
+
+Success correlates apiVersion/requestId/instanceId/documentId/contentRevision and
+has exactly these result fields:
+
+```json
+{
+  "atRevision": 0,
+  "documentSnapshotId": "native-object:<actual-document-id>:0",
+  "documentJson": "<exact UTF-8 emitted by object_codec::encode_project>"
+}
+```
+
+`documentJson` is the complete admitted native object document, not a reconstruction
+from selected-object queries. The existing codec revalidates it before encoding.
+The COMPLETE encoded success envelope, including identity and escaped document
+string, must fit 4096 bytes. Larger results return bounded `unavailable` without
+partial JSON, truncated records or simplified geometry. Codec admission supports
+larger records/documents than this bounded private delivery route can return.
+`ObjectSnapshot::query_json` remains the separate strict selected-object byte
+reader; the new serialization operation belongs to common-envelope dispatch.
+
+Private client status declares exactly five operations when an actual object
+owner is active: `query.document.object`, `command.document.object.fill.set`,
+`command.document.object.undo`, `command.document.object.redo`, and
+`query.document.object.serialize`. Otherwise its operations list is empty.
+Public capability, bundled MCP, production Save, viewport and export flags stay
+false. The public typed/discovery paths still reject this unregistered operation;
+the opacity `query.document.serialize` schema and implementation are unchanged.
+
+The consumer oracle serializes full revision0 content, applies actual fill at
+revision1, undoes at revision2 and redoes at revision3. Undo restores the original
+codec bytes; redo restores the edited bytes, including every untouched scoped
+record, layer, opaque target ID, geometry/handle and numeric value. Repeated
+queries do not add undo entries or consume redo entries.
+
+For this source-level persistence contract, the consumer writes EXACT returned
+codec UTF-8 to a disposable file and reads the identical bytes. It releases the
+actual owner to vacant and feeds those bytes to the existing strict raw bootstrap.
+Reopen preserves all persisted scoped object identities and full document content.
+The runtime instance stays the same for an in-process reopen, but the document
+incarnation and snapshot IDs are fresh, contentRevision is zero, and undo/redo
+stacks are empty. Runtime revisions, command receipts and history stacks are not
+part of this object codec's persisted format. Earlier runtime document IDs cannot
+be used against the reopened owner.
+
+This is native producer and filesystem-consumer contract evidence. It does not
+publish a user Save result, install a UI Save/Reopen path, restore cross-reopen
+history, activate public MCP, or accept installed general-document/M1 controls.
+Those consumers and any broader history-persistence policy require their separately
+owned leaves; N25D5/#1648 and M1/#1327 remain open.
