@@ -1,0 +1,170 @@
+//! Staged actual-owner fill dispatch. Public capability admission stays closed.
+use crate::history::NativeObjectHistory;
+use crate::request_receipts::{
+    DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
+    APPLICATION_API_VERSION,
+};
+use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedDisposition};
+
+const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
+const MAX_MESSAGE_BYTES: usize = 4096;
+const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+
+fn identifier(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !bytes.is_empty()
+        && bytes.len() <= 128
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:/-".contains(byte))
+}
+
+impl NativeObjectHistory {
+    /// Dispatch only the distinct staged fill operation in this actual owner.
+    /// `None` leaves other operations to their existing host route. This typed
+    /// entry needs original-byte ingress before deserialization; it cannot
+    /// detect duplicate raw members already discarded into a Value.
+    pub fn try_dispatch_object_fill(
+        &mut self,
+        request: &OpacityRequest,
+    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
+        if request.operation != OP_OBJECT_FILL {
+            return Ok(None);
+        }
+        if [
+            request.request_id.as_str(),
+            request.instance_id.as_str(),
+            request.document_id.as_str(),
+            self.instance_id(),
+            self.document_id(),
+        ]
+        .iter()
+        .any(|id| !identifier(id))
+        {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let reject = |owner: &Self, code, message| {
+            owner.object_reply(request, &owner.object_failure(code, message))
+        };
+        if request.api_version != APPLICATION_API_VERSION
+            || !request.payload.is_object()
+            || !matches!(
+                serde_json::to_vec(request).map(|bytes| bytes.len()),
+                Ok(0..=MAX_MESSAGE_BYTES)
+            )
+            || request
+                .expected_revision
+                .is_some_and(|revision| revision > MAX_SAFE_REVISION)
+        {
+            return reject(
+                self,
+                DispatchErrorCode::InvalidRequest,
+                "Invalid bounded object fill request.",
+            )
+            .map(Some);
+        }
+        if request.instance_id != self.instance_id() {
+            return reject(
+                self,
+                DispatchErrorCode::WrongInstance,
+                "Object fill targets a different instance.",
+            )
+            .map(Some);
+        }
+        if request.document_id != self.document_id() {
+            return reject(
+                self,
+                DispatchErrorCode::WrongDocument,
+                "Object fill targets a replaced document.",
+            )
+            .map(Some);
+        }
+        let fingerprint =
+            RequestFingerprint::new(request).ok_or(DispatchErrorCode::InvalidRequest)?;
+        match self.receipts.lookup(&request.request_id, &fingerprint) {
+            ReceiptLookup::Retained(disposition) => {
+                return self.object_reply(request, disposition).map(Some)
+            }
+            ReceiptLookup::ChangedBody => {
+                return reject(
+                    self,
+                    DispatchErrorCode::InvalidRequest,
+                    "Object fill requestId was reused with a changed body.",
+                )
+                .map(Some)
+            }
+            ReceiptLookup::Missing => {}
+        }
+        let outcome = if request.cancelled_before_dispatch {
+            Err((
+                DispatchErrorCode::CancelledBeforeDispatch,
+                "Object fill was cancelled before dispatch.",
+            ))
+        } else if request.expected_revision.is_none() {
+            Err((
+                DispatchErrorCode::InvalidRequest,
+                "Object fill requires expectedRevision.",
+            ))
+        } else if request.expected_revision != Some(self.content_revision()) {
+            Err((
+                DispatchErrorCode::StaleRevision,
+                "Object fill expected revision is stale.",
+            ))
+        } else {
+            let payload = serde_json::to_vec(&request.payload)
+                .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+            match self.prepare_fill_json(&payload) {
+                Ok(candidate) => {
+                    let before = self.content_revision();
+                    self.commit_fill(candidate)
+                        .map(|revision| CompactResult::Command {
+                            applied: revision != before,
+                            history_entries_added: u64::from(revision != before),
+                        })
+                        .map_err(|code| (code, "Object fill could not commit."))
+                }
+                Err(code) => Err((code, "Object fill payload is invalid or target is absent.")),
+            }
+        };
+        let disposition = RetainedDisposition::Exact {
+            content_revision: self.content_revision(),
+            outcome: outcome.map_err(|(code, message)| CompactFailure {
+                code,
+                message: message.into(),
+                details: None,
+            }),
+        };
+        self.receipts
+            .retain(request.request_id.clone(), fingerprint, disposition.clone());
+        self.object_reply(request, &disposition).map(Some)
+    }
+
+    fn object_failure(&self, code: DispatchErrorCode, message: &str) -> RetainedDisposition {
+        RetainedDisposition::Exact {
+            content_revision: self.content_revision(),
+            outcome: Err(CompactFailure {
+                code,
+                message: message.into(),
+                details: None,
+            }),
+        }
+    }
+
+    fn object_reply(
+        &self,
+        request: &OpacityRequest,
+        disposition: &RetainedDisposition,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        let response = disposition
+            .response(request, self.instance_id(), self.document_id())
+            .ok_or(DispatchErrorCode::Internal)?;
+        if !matches!(
+            serde_json::to_vec(&response).map(|bytes| bytes.len()),
+            Ok(0..=MAX_MESSAGE_BYTES)
+        ) {
+            return Err(DispatchErrorCode::Internal);
+        }
+        Ok(response)
+    }
+}

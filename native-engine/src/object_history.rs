@@ -3,6 +3,10 @@ use crate::commands::{ObjectFillOwner, PreparedObjectFill};
 use crate::object_document::ObjectDocument;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
+use crate::transaction::StageReceipts;
+
+#[path = "object_command_dispatch.rs"]
+mod object_command_dispatch;
 
 #[derive(Debug, Clone)]
 struct ObjectHistoryEntry {
@@ -16,6 +20,7 @@ pub struct NativeObjectHistory {
     owner: ObjectFillOwner,
     undo: Vec<ObjectHistoryEntry>,
     redo: Vec<ObjectHistoryEntry>,
+    receipts: StageReceipts,
 }
 
 impl NativeObjectHistory {
@@ -27,6 +32,7 @@ impl NativeObjectHistory {
             owner: ObjectFillOwner::new(instance_id, document)?,
             undo: vec![],
             redo: vec![],
+            receipts: StageReceipts::default(),
         })
     }
     pub fn instance_id(&self) -> &str {

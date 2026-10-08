@@ -341,3 +341,5 @@ fn selected_revision_metadata_is_used_for_success_and_failure_envelopes() {
         cases()["command"]["afterRecord"]
     );
 }
+#[path = "object_command_dispatch.rs"]
+mod command_dispatch;
