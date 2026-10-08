@@ -97,9 +97,15 @@
       var native = root.NemoNativeOpacityCutover;
       if (!root.NemoNativeOpacityProject) return;
       if (!native || !native.isActive()) throw new Error('The native document is unavailable.');
-      var pin = native.identity(), frame = root.state.currentFrame;
-      var receipt = await native.presentPreview(frame), latest = native.identity();
-      if (!pin || !latest || !receipt || receipt.status !== 'presented' || receipt.frame !== frame ||
+      var pin = native.identity(), view = native.getNativeIdentity(), frame = root.state.currentFrame;
+      var receipt = await native.presentPreview(frame), latest = native.identity(), latestView = native.getNativeIdentity();
+      if (!pin || !latest || !view || !latestView || !receipt || receipt.owner !== 'native' ||
+          receipt.status !== 'presented' || receipt.frame !== frame ||
+          !Number.isSafeInteger(receipt.lifecycleGeneration) || receipt.lifecycleGeneration < 1 ||
+          receipt.lifecycleGeneration !== view.generation || latestView.generation !== view.generation ||
+          view.documentId !== pin.documentId || latestView.documentId !== pin.documentId ||
+          !Number.isSafeInteger(receipt.viewGeneration) || receipt.viewGeneration < 1 ||
+          typeof receipt.workId !== 'string' || !receipt.workId.trim() ||
           receipt.instanceId !== pin.instanceId || receipt.documentId !== pin.documentId ||
           receipt.contentRevision !== pin.contentRevision || latest.instanceId !== pin.instanceId ||
           latest.documentId !== pin.documentId || latest.contentRevision !== pin.contentRevision ||

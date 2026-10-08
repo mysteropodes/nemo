@@ -117,7 +117,9 @@ function domHarness(width, collapsed, windowWidth = 1000) {
   const root = { innerWidth: windowWidth, document: { getElementById: id => elements.get(id), createElement: () => element('new') },
     __TAURI__: {}, state: { currentFrame: 10 }, NemoNativeOpacityProject: {},
     NemoNativeOpacityCutover: { isActive: () => true, identity: () => identity,
-      presentPreview: async frame => ({ ...identity, status: 'presented', frame }) },
+      getNativeIdentity: () => ({ documentId: 'A', generation: 1 }),
+      presentPreview: async frame => ({ ...identity, owner: 'native', lifecycleGeneration: 1,
+        viewGeneration: 1, workId: 'present-1', status: 'presented', frame }) },
     Event: class { constructor(type) { this.type = type; } },
     addEventListener(type, handler) { listeners.set(type, handler); }, dispatchEvent(event) { listeners.get(event.type)?.(); },
     setTimeout, clearTimeout, requestAnimationFrame: f => f(), confirm: () => true,
@@ -140,10 +142,13 @@ for (const [width, collapsed, viewport] of [[280, false, 1000], [520, false, 100
     assert.equal(box.style.width, '340px'); assert.equal(box.style.left, undefined);
   });
 }
-for (const patch of [{ status: 'deferred-occluded' }, { documentId: 'B' }, { contentRevision: 3 }, { frame: 0 }]) {
+for (const patch of [{ status: 'deferred-occluded' }, { documentId: 'B' }, { contentRevision: 3 }, { frame: 0 },
+  { owner: undefined }, { owner: 'legacy' }, { lifecycleGeneration: undefined }, { lifecycleGeneration: 2 },
+  { viewGeneration: undefined }, { viewGeneration: 0 }, { workId: undefined }, { workId: ' ' }]) {
   test('DOM binding rolls layout back on an unpresented or mismatched native receipt ' + JSON.stringify(patch), async () => {
     const h = domHarness(280, false);
-    h.root.NemoNativeOpacityCutover.presentPreview = async frame => ({ ...h.root.NemoNativeOpacityCutover.identity(), status: 'presented', frame, ...patch });
+    const real = h.root.NemoNativeOpacityCutover.presentPreview;
+    h.root.NemoNativeOpacityCutover.presentPreview = async frame => ({ ...await real(frame), ...patch });
     assert.equal(await h.controller.open(), false);
     assert.equal(h.elements.get('top-area').children.length, 0);
     assert.equal(h.elements.get('history-modal').style.display, 'none');
@@ -151,3 +156,10 @@ for (const patch of [{ status: 'deferred-occluded' }, { documentId: 'B' }, { con
     assert.ok(h.notices.length);
   });
 }
+test('DOM binding refuses lifecycle generation drift even if the document/revision stays the same', async () => {
+  const h = domHarness(280, false), real = h.root.NemoNativeOpacityCutover.presentPreview; let generation = 1;
+  h.root.NemoNativeOpacityCutover.getNativeIdentity = () => ({ documentId: 'A', generation });
+  h.root.NemoNativeOpacityCutover.presentPreview = async frame => { const receipt = await real(frame); generation++; return receipt; };
+  assert.equal(await h.controller.open(), false);
+  assert.equal(h.elements.get('top-area').children.length, 0);
+});
