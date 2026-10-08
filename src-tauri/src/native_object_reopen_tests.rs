@@ -78,10 +78,13 @@ fn owner(
     revision: Option<u64>,
     payload: Value,
 ) -> Value {
-    let request = serde_json::from_value(json!({"apiVersion":2,"requestId":operation,
+    let mut value = json!({"apiVersion":2,"requestId":operation,
         "instanceId":pins["instanceId"],"documentId":pins["documentId"],
-        "operation":operation,"expectedRevision":revision,"payload":payload}))
-    .unwrap();
+        "operation":operation,"payload":payload});
+    if let Some(revision) = revision {
+        value["expectedRevision"] = json!(revision);
+    }
+    let request = serde_json::from_value(value).unwrap();
     let native = state.native_state();
     let mut authority = native.lock().unwrap();
     let generation = authority.active_generation().unwrap();
