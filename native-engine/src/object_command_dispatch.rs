@@ -1,4 +1,4 @@
-//! Staged actual-owner fill dispatch. Public capability admission stays closed.
+//! Staged actual-owner command dispatch. Public capability admission stays closed.
 use crate::history::NativeObjectHistory;
 use crate::request_receipts::{
     DispatchErrorCode, OpacityRequest, RequestFingerprint, ResponseEnvelope,
@@ -7,6 +7,8 @@ use crate::request_receipts::{
 use crate::transaction::{CompactFailure, CompactResult, ReceiptLookup, RetainedDisposition};
 
 const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
+const OP_OBJECT_UNDO: &str = "command.document.object.undo";
+const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const MAX_MESSAGE_BYTES: usize = 4096;
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
@@ -30,6 +32,21 @@ impl NativeObjectHistory {
         request: &OpacityRequest,
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if request.operation != OP_OBJECT_FILL {
+            return Ok(None);
+        }
+        self.try_dispatch_object_command(request)
+    }
+
+    /// Dispatch staged fill and closed undo/redo commands through one owner and
+    /// receipt store. Typed input still requires the unchanged raw ingress gate.
+    pub fn try_dispatch_object_command(
+        &mut self,
+        request: &OpacityRequest,
+    ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
+        if !matches!(
+            request.operation.as_str(),
+            OP_OBJECT_FILL | OP_OBJECT_UNDO | OP_OBJECT_REDO
+        ) {
             return Ok(None);
         }
         if [
@@ -60,7 +77,7 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::InvalidRequest,
-                "Invalid bounded object fill request.",
+                "Invalid bounded object command request.",
             )
             .map(Some);
         }
@@ -68,7 +85,7 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::WrongInstance,
-                "Object fill targets a different instance.",
+                "Object command targets a different instance.",
             )
             .map(Some);
         }
@@ -76,7 +93,7 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::WrongDocument,
-                "Object fill targets a replaced document.",
+                "Object command targets a replaced document.",
             )
             .map(Some);
         }
@@ -90,7 +107,7 @@ impl NativeObjectHistory {
                 return reject(
                     self,
                     DispatchErrorCode::InvalidRequest,
-                    "Object fill requestId was reused with a changed body.",
+                    "Object command requestId was reused with a changed body.",
                 )
                 .map(Some)
             }
@@ -99,32 +116,58 @@ impl NativeObjectHistory {
         let outcome = if request.cancelled_before_dispatch {
             Err((
                 DispatchErrorCode::CancelledBeforeDispatch,
-                "Object fill was cancelled before dispatch.",
+                "Object command was cancelled before dispatch.",
             ))
         } else if request.expected_revision.is_none() {
             Err((
                 DispatchErrorCode::InvalidRequest,
-                "Object fill requires expectedRevision.",
+                "Object command requires expectedRevision.",
             ))
         } else if request.expected_revision != Some(self.content_revision()) {
             Err((
                 DispatchErrorCode::StaleRevision,
-                "Object fill expected revision is stale.",
+                "Object command expected revision is stale.",
             ))
         } else {
-            let payload = serde_json::to_vec(&request.payload)
-                .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-            match self.prepare_fill_json(&payload) {
-                Ok(candidate) => {
-                    let before = self.content_revision();
-                    self.commit_fill(candidate)
-                        .map(|revision| CompactResult::Command {
-                            applied: revision != before,
-                            history_entries_added: u64::from(revision != before),
-                        })
-                        .map_err(|code| (code, "Object fill could not commit."))
+            if request.operation == OP_OBJECT_FILL {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_fill_json(&payload) {
+                    Ok(candidate) => {
+                        let before = self.content_revision();
+                        self.commit_fill(candidate)
+                            .map(|revision| CompactResult::Command {
+                                applied: revision != before,
+                                history_entries_added: u64::from(revision != before),
+                            })
+                            .map_err(|code| (code, "Object fill could not commit."))
+                    }
+                    Err(code) => Err((code, "Object fill payload is invalid or target is absent.")),
                 }
-                Err(code) => Err((code, "Object fill payload is invalid or target is absent.")),
+            } else {
+                let undo = request.operation == OP_OBJECT_UNDO;
+                let command = if undo { "object.undo" } else { "object.redo" };
+                if request.payload != serde_json::json!({"command":command}) {
+                    Err((
+                        DispatchErrorCode::InvalidRequest,
+                        "Object history payload is invalid.",
+                    ))
+                } else {
+                    let revision = request
+                        .expected_revision
+                        .ok_or(DispatchErrorCode::InvalidRequest)?;
+                    let moved = if undo {
+                        self.undo(revision)
+                    } else {
+                        self.redo(revision)
+                    };
+                    moved
+                        .map(|_| CompactResult::Command {
+                            applied: true,
+                            history_entries_added: 0,
+                        })
+                        .map_err(|code| (code, "Object history could not move."))
+                }
             }
         };
         let disposition = RetainedDisposition::Exact {

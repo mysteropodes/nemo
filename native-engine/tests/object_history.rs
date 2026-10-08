@@ -343,3 +343,5 @@ fn selected_revision_metadata_is_used_for_success_and_failure_envelopes() {
 }
 #[path = "object_command_dispatch.rs"]
 mod command_dispatch;
+#[path = "object_history_dispatch.rs"]
+mod history_dispatch;
