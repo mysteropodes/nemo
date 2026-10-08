@@ -207,7 +207,7 @@
   async function openDialog(){
     if(!tauriOk()){document.getElementById('file-input').click();return;}
     var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
-    if(!path)return;
+    if(!path)return;try{await window.__TAURI__.window.getCurrentWindow().setFocus();}catch(_){/* Native presentation still gates Open. */}
     await openPath(Array.isArray(path)?path[0]:path);
   }
 

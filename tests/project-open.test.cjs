@@ -240,6 +240,47 @@ test('browser Open keeps the file name and normalized clean baseline for later S
   assert.equal(app.downloads.at(-1), 'Story.json', 'edited browser Save still retains opened basename');
 });
 
+test('desktop picker requests one awaited window exposure before native Open admission', async () => {
+  const app = harness({ version: '{"supported":true}' });
+  const native = installNativeOpen(app);
+  const focus = deferred();
+  const calls = [];
+  app.window.__TAURI__.dialog = { open: async () => '/tmp/Focused.json' };
+  app.window.__TAURI__.window = { getCurrentWindow() { return { setFocus() { calls.push('focus'); return focus.promise; } }; } };
+  app.window.__TAURI__.fs.readTextFile = async () => { calls.push('read'); return '{"supported":true}'; };
+  const opening = app.project.open();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, ['focus'], 'file admission waits for the one-time focus request');
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  focus.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, ['focus', 'read']);
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false,
+    'window focus cannot substitute for native presentation');
+  native.visible.resolve({ ...native.receipt, workId: 'visible-focus-frame' });
+  await opening;
+  assert.equal(app.toasts.at(-1), 'Opened: Focused');
+});
+
+test('failed window focus never publishes an Open before native presentation', async () => {
+  const app = harness({ version: '{"supported":true}' });
+  const native = installNativeOpen(app);
+  app.window.__TAURI__.dialog = { open: async () => '/tmp/Unfocused.json' };
+  app.window.__TAURI__.window = { getCurrentWindow() { return { async setFocus() { throw new Error('occluded'); } }; } };
+  const opening = app.project.open();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(native.deferredAllowed, true);
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  native.first.resolve(native.receipt);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(app.toasts.some(toast => toast.startsWith('Opened:')), false);
+  native.visible.resolve({ ...native.receipt, workId: 'visible-after-focus-failure' });
+  await opening;
+  assert.equal(app.toasts.at(-1), 'Opened: Unfocused');
+});
+
 test('native browser Open publishes success only after both frame-0 presentation boundaries', async () => {
   const app = harness({ deferFrames: true }), native = installNativeOpen(app);
   select(app, { name: 'Native.json', text: '{"supported":true}' });
