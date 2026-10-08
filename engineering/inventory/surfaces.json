@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9e988b5e7aa5caca1a8b97d28f04e985d6c74a98",
-  "describe": "v0.7.0-alpha.4-1096-g9e988b5e-dirty"
+  "head": "d4cb128b70faa30b72217d80d2de97e31d6e1c27",
+  "describe": "v0.7.0-alpha.4-1098-gd4cb128b-dirty"
  },
- "inputsDigest": "a97e28826b43cbabf322ea8f5fdeac5ce1eb5bbc4c0f7974912af1d95bb40d14",
+ "inputsDigest": "5e7b524a8ff663fed2e866cda5891710a3b1cbd9369179255f255d6c0b6858fa",
  "states": [
   "inventoried",
   "characterized",
@@ -508,7 +508,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 74,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -553,7 +553,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 73,
+    "functionsVisited": 74,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -14065,7 +14065,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 85,
+    "functionsVisited": 86,
     "via": "variable copyBtn",
     "references": []
    },
@@ -23883,7 +23883,7 @@
    "source": "src/js/markers.js:210",
    "meta": {
     "i18n": null,
-    "functionsVisited": 65
+    "functionsVisited": 66
    },
    "fixtures": [
     "static-props",
@@ -32630,7 +32630,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 397
+    "functionsVisited": 398
    },
    "fixtures": [
     "media",
