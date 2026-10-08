@@ -162,7 +162,7 @@ impl Drop for PreviewObservation {
 
 pub(super) fn acquire(
     surface: &wgpu::Surface<'_>,
-    view: &super::OwnedView,
+    view: &crate::native_viewport::platform::OwnedView,
     mapping: ViewportMapping,
 ) -> wgpu::CurrentSurfaceTexture {
     OBSERVATIONS.with(|state| {
@@ -176,9 +176,9 @@ pub(super) fn acquire(
         unsafe {
             let window: *mut Object = msg_send![raw, window];
             let parent: *mut Object = msg_send![raw, superview];
-            let frame: super::NSRect = msg_send![raw, frame];
+            let frame: crate::native_viewport::platform::NSRect = msg_send![raw, frame];
             let bounds: Option<[f64; 4]> = (!parent.is_null()).then(|| {
-                let b: super::NSRect = msg_send![parent, bounds];
+                let b: crate::native_viewport::platform::NSRect = msg_send![parent, bounds];
                 [b.origin.x, b.origin.y, b.size.width, b.size.height]
             });
             let window_state = window_fields(window);

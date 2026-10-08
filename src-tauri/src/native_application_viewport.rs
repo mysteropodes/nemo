@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 pub(crate) use crate::native_viewport::replacement_test_support::{
-    FakeOutcome, FakeViewport, SurfaceState,
+    test_observations, FakeOutcome, FakeViewport, SurfaceState,
 };
 #[cfg(test)]
 pub(crate) type TestCompositionResult = CompositionResult;

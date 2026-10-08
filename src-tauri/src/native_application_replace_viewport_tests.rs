@@ -342,7 +342,7 @@ fn rebound_b_surface_keeps_deferred_recovery_and_fatal_outcomes_distinct() {
         (FakeOutcome::DeviceLost, "failed-device-lost", 0, 0),
     ] {
         #[cfg(target_os = "macos")]
-        let diagnostics = crate::native_viewport::test_observations();
+        let diagnostics = viewport_host::test_observations();
         let (_scratch, native, old_document, prepared_b) = setup();
         let state = Arc::new(Mutex::new(SurfaceState::default()));
         let (_snapshot_a, compositor) = present_a(&native, &old_document, &state);
@@ -415,7 +415,7 @@ fn rebound_b_surface_keeps_deferred_recovery_and_fatal_outcomes_distinct() {
 #[test]
 fn rebound_b_close_disposes_its_surface_and_reentry_uses_fresh_host() {
     #[cfg(target_os = "macos")]
-    let diagnostics = crate::native_viewport::test_observations();
+    let diagnostics = viewport_host::test_observations();
     let (scratch, native, old_document, prepared_b) = setup();
     let state_b = Arc::new(Mutex::new(SurfaceState::default()));
     let (_snapshot_a, _compositor_a) = present_a(&native, &old_document, &state_b);
