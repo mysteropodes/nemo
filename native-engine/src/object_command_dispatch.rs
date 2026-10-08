@@ -61,6 +61,13 @@ impl NativeObjectHistory {
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
+        let message = |fill, history| {
+            if request.operation == OP_OBJECT_FILL {
+                fill
+            } else {
+                history
+            }
+        };
         let reject = |owner: &Self, code, message| {
             owner.object_reply(request, &owner.object_failure(code, message))
         };
@@ -77,7 +84,10 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::InvalidRequest,
-                "Invalid bounded object command request.",
+                message(
+                    "Invalid bounded object fill request.",
+                    "Invalid bounded object history request.",
+                ),
             )
             .map(Some);
         }
@@ -85,7 +95,10 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::WrongInstance,
-                "Object command targets a different instance.",
+                message(
+                    "Object fill targets a different instance.",
+                    "Object history targets a different instance.",
+                ),
             )
             .map(Some);
         }
@@ -93,7 +106,10 @@ impl NativeObjectHistory {
             return reject(
                 self,
                 DispatchErrorCode::WrongDocument,
-                "Object command targets a replaced document.",
+                message(
+                    "Object fill targets a replaced document.",
+                    "Object history targets a replaced document.",
+                ),
             )
             .map(Some);
         }
@@ -107,7 +123,10 @@ impl NativeObjectHistory {
                 return reject(
                     self,
                     DispatchErrorCode::InvalidRequest,
-                    "Object command requestId was reused with a changed body.",
+                    message(
+                        "Object fill requestId was reused with a changed body.",
+                        "Object history requestId was reused with a changed body.",
+                    ),
                 )
                 .map(Some)
             }
@@ -116,17 +135,26 @@ impl NativeObjectHistory {
         let outcome = if request.cancelled_before_dispatch {
             Err((
                 DispatchErrorCode::CancelledBeforeDispatch,
-                "Object command was cancelled before dispatch.",
+                message(
+                    "Object fill was cancelled before dispatch.",
+                    "Object history was cancelled before dispatch.",
+                ),
             ))
         } else if request.expected_revision.is_none() {
             Err((
                 DispatchErrorCode::InvalidRequest,
-                "Object command requires expectedRevision.",
+                message(
+                    "Object fill requires expectedRevision.",
+                    "Object history requires expectedRevision.",
+                ),
             ))
         } else if request.expected_revision != Some(self.content_revision()) {
             Err((
                 DispatchErrorCode::StaleRevision,
-                "Object command expected revision is stale.",
+                message(
+                    "Object fill expected revision is stale.",
+                    "Object history expected revision is stale.",
+                ),
             ))
         } else {
             if request.operation == OP_OBJECT_FILL {

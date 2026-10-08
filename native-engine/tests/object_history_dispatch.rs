@@ -268,6 +268,13 @@ fn preflight_identity_bounds_and_unregistered_aliases_cannot_move_history() {
         assert_eq!(dispatch(&mut owner, &r)["error"]["code"], code);
         assert_eq!(state(&owner), before);
     }
+    let mut invalid_fill = request(&owner, "fill-message", 1, "fill.set");
+    invalid_fill["apiVersion"] = json!(3);
+    assert_eq!(
+        dispatch(&mut owner, &invalid_fill)["error"]["message"],
+        "Invalid bounded object fill request."
+    );
+    assert_eq!(state(&owner), before);
     for operation in [
         "command.document.undo",
         "command.document.redo",
