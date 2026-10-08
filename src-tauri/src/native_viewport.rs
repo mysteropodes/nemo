@@ -59,6 +59,25 @@ mod platform {
 
 pub(crate) use platform::NativeViewport;
 
+#[cfg(target_os = "macos")]
+pub(crate) use platform::occlusion::observe_preview;
+#[cfg(all(test, target_os = "macos"))]
+pub(crate) use platform::occlusion::test_observations;
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) struct PreviewObservation;
+#[cfg(not(target_os = "macos"))]
+impl PreviewObservation {
+    pub(crate) fn finish(&self, _status: &'static str) {}
+}
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn observe_preview(
+    _instance: &str,
+    _result: &native_engine::compositor::CompositionResult,
+) -> PreviewObservation {
+    PreviewObservation
+}
+
 #[cfg(all(test, target_os = "macos"))]
 mod appkit_detach_tests {
     use crate::native_viewport::platform::OwnedView;
@@ -114,6 +133,10 @@ mod appkit_detach_tests {
 
 #[cfg(test)]
 pub(crate) mod replacement_test_support {
+    #[cfg(target_os = "macos")]
+    pub(crate) use super::test_observations;
+    #[cfg(not(target_os = "macos"))]
+    pub(crate) fn test_observations() {}
     use native_engine::compositor::{CompositionResult, Compositor};
     use native_engine::desktop_viewport::{
         AcquiredSurfaceFrame, DesktopViewportHost, PresentationReceipt, SettledSurfaceFrame,
