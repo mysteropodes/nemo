@@ -123,6 +123,17 @@
       "noRegions": true,
       "reason": "no executable regions in the coverage report",
       "note": "N25C2c/#1621: pinned cargo-llvm-cov 0.9.1 measured clean source ba150cd28b92fb5a203702262f1cf78692c3b416. The named export reports no file record or executable regions for this cfg(test) child; it is explicitly listed, not excluded. Artifact: reports/20261007T210343Z-ba150cd/coverage-rust/coverage.json."
+    },
+    "nemo-mcp/src/native_request_input.rs": {
+      "lines": 100,
+      "regions": 100,
+      "functions": 100,
+      "note": "N25C2g/#1638: pinned cargo-llvm-cov 0.9.1 measured clean source 45f1d27f1d636b514dd629548bc6a75d303453b9 via named test:coverage-rust with 84 tests passing, none failing. 56/56 lines, 51/51 regions, 3/3 functions. Artifact: reports/20261008T012312Z-45f1d27/coverage-rust/coverage.json. Existing file and aggregate floors unchanged."
+    },
+    "nemo-mcp/src/native_request_input_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "N25C2g/#1638: pinned cargo-llvm-cov 0.9.1 named export at clean source 45f1d27f1d636b514dd629548bc6a75d303453b9 reports no file record or executable regions for this cfg(test) child. Explicitly listed, not excluded. Artifact: reports/20261008T012312Z-45f1d27/coverage-rust/coverage.json."
     }
   },
   "nativeObjectContractRegistration": {
@@ -151,5 +162,20 @@
       "failed": 0
     },
     "scope": "Only two new per-file entries; every pre-existing entry, aggregate floor, recorded provenance, tool pin, test metadata and exclusion remains unchanged. The named job retains 18 inherited ratchet violations after registration. Whole-crate coverage remains red; this registration is not a coverage pass."
+  },
+  "nativeRegisteredInputValidationRegistration": {
+    "issue": "N25C2g/#1638",
+    "sourceSha": "45f1d27f1d636b514dd629548bc6a75d303453b9",
+    "treeDirty": false,
+    "crateDirty": false,
+    "report": "reports/20261008T012312Z-45f1d27/coverage-rust/coverage.json",
+    "reportSha256": "86d8fa8ccc442122d1b87158b8da9de45c4b3884501069a0c6a8b320cbe6cbfa",
+    "receipt": "reports/20261008T012312Z-45f1d27/receipt.json",
+    "tool": "cargo-llvm-cov 0.9.1",
+    "tests": {
+      "passed": 84,
+      "failed": 0
+    },
+    "scope": "Only two new measured per-file entries and this provenance; every prior file/aggregate floor, exclusion, initial recorded snapshot and tool pin preserved. Whole-crate ratchet remains RED18; source registration is not whole coverage acceptance."
   }
 }
