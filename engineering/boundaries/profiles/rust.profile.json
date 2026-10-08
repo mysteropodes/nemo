@@ -212,7 +212,7 @@
         "stdio_cancellation.rs",
         "stdio_contract.rs",
         "stdio_reconnect.rs",
-        "stdio_raw_envelope.rs", "stdio_rejection_cancellation.rs", "stdio_transport_delivery.rs",
+        "stdio_raw_envelope.rs", "stdio_rejection_cancellation.rs", "stdio_transport_delivery.rs", "stdio_transport_lifecycle.rs",
         "stdio_rejection.rs",
         "stdio_roundtrip.rs",
         "stdio_tracing.rs",

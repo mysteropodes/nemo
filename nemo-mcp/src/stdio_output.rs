@@ -3,7 +3,7 @@ use std::{
     io,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex as StatusMutex,
     },
 };
 use tokio::{
@@ -31,35 +31,61 @@ struct Frame {
 pub(super) struct Writer<W> {
     output: W,
     frame: Option<Frame>,
+    status: Arc<StatusMutex<Status>>,
+}
+#[derive(Default)]
+struct Status {
     failed: Option<io::ErrorKind>,
     closing: bool,
     closed: bool,
 }
-pub(super) type Shared<W> = Arc<Mutex<Writer<W>>>;
+pub(super) struct Shared<W> {
+    writer: Arc<Mutex<Writer<W>>>,
+    status: Arc<StatusMutex<Status>>,
+}
+impl<W> Clone for Shared<W> {
+    fn clone(&self) -> Self {
+        Self {
+            writer: Arc::clone(&self.writer),
+            status: Arc::clone(&self.status),
+        }
+    }
+}
 pub(super) fn shared<W>(output: W) -> Shared<W> {
-    Arc::new(Mutex::new(Writer {
-        output,
-        frame: None,
-        failed: None,
-        closing: false,
-        closed: false,
-    }))
+    let status = Arc::new(StatusMutex::new(Status::default()));
+    Shared {
+        writer: Arc::new(Mutex::new(Writer {
+            output,
+            frame: None,
+            status: Arc::clone(&status),
+        })),
+        status,
+    }
+}
+pub(super) fn accepting<W>(shared: &Shared<W>) -> bool {
+    let state = shared.status.lock().unwrap();
+    state.failed.is_none() && !state.closing && !state.closed
+}
+pub(super) fn fail<W>(shared: &Shared<W>, kind: io::ErrorKind) {
+    shared.status.lock().unwrap().failed.get_or_insert(kind);
 }
 impl<W: AsyncWrite + Unpin> Writer<W> {
     fn failure(&mut self, kind: io::ErrorKind) -> io::Error {
-        self.failed = Some(kind);
+        self.status.lock().unwrap().failed.get_or_insert(kind);
         self.frame = None;
         io::Error::new(kind, "stdio output failed")
     }
     fn healthy(&self) -> io::Result<()> {
-        match self.failed {
+        match self.status.lock().unwrap().failed {
             Some(kind) => Err(io::Error::new(kind, "stdio output failed")),
             None => Ok(()),
         }
     }
     async fn drain(&mut self) -> io::Result<()> {
         self.healthy()?;
-        while let Some(frame) = self.frame.as_mut() {
+        while self.frame.is_some() {
+            self.healthy()?;
+            let frame = self.frame.as_mut().unwrap();
             if frame.offset < frame.bytes.len() {
                 match self.output.write(&frame.bytes[frame.offset..]).await {
                     Ok(0) => return Err(self.failure(io::ErrorKind::WriteZero)),
@@ -71,6 +97,8 @@ impl<W: AsyncWrite + Unpin> Writer<W> {
             if let Err(error) = self.output.flush().await {
                 return Err(self.failure(error.kind()));
             }
+            self.healthy()?;
+            let frame = self.frame.as_mut().unwrap();
             frame.complete.store(true, Ordering::Release);
             self.frame = None;
         }
@@ -81,9 +109,9 @@ pub(super) async fn deliver<W: AsyncWrite + Unpin>(
     shared: &Shared<W>,
     ticket: &mut Ticket,
 ) -> io::Result<()> {
-    let mut writer = shared.lock().await;
+    let mut writer = shared.writer.lock().await;
     writer.healthy()?;
-    if writer.closing || writer.closed {
+    if !accepting(shared) {
         return Err(io::Error::new(
             io::ErrorKind::NotConnected,
             "stdio output closed",
@@ -110,16 +138,17 @@ pub(super) async fn deliver<W: AsyncWrite + Unpin>(
     writer.drain().await
 }
 pub(super) async fn close<W: AsyncWrite + Unpin>(shared: &Shared<W>) -> io::Result<()> {
-    let mut writer = shared.lock().await;
+    let mut writer = shared.writer.lock().await;
     writer.healthy()?;
-    if writer.closed {
+    if shared.status.lock().unwrap().closed {
         return Ok(());
     }
-    writer.closing = true;
+    shared.status.lock().unwrap().closing = true;
     writer.drain().await?;
     if let Err(error) = writer.output.shutdown().await {
         return Err(writer.failure(error.kind()));
     }
-    writer.closed = true;
+    writer.healthy()?;
+    shared.status.lock().unwrap().closed = true;
     Ok(())
 }
