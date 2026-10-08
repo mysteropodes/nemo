@@ -60,6 +60,9 @@ impl NativeDispatch for NativeObjectHost {
     fn content_revision(&self) -> u64 {
         self.history.content_revision()
     }
+    fn object_client_available(&self) -> bool {
+        self.released.is_none()
+    }
     fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String> {
         if self.released.is_some() {
             return Err("native object host was released".into());

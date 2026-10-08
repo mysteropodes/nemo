@@ -90,13 +90,25 @@ async fn read_json_bounded<T: serde::de::DeserializeOwned>(
     if bytes.last() != Some(&b'\n') || bytes.len() > limit {
         return Err(io::Error::other("incomplete or oversized message"));
     }
-    raw_envelope::check_unique(&bytes).map_err(|error| match error {
+    decode_json_bounded(&bytes, limit)
+}
+
+/// Decode complete original bytes with a caller's bound and recursive duplicate
+/// rejection before typed/Value deserialization. This grants no availability.
+pub fn decode_json_bounded<T: serde::de::DeserializeOwned>(
+    bytes: &[u8],
+    max_bytes: usize,
+) -> io::Result<T> {
+    if bytes.len() > max_bytes {
+        return Err(io::Error::other("message exceeds size limit"));
+    }
+    raw_envelope::check_unique(bytes).map_err(|error| match error {
         raw_envelope::RawEnvelopeError::Duplicate => {
             io::Error::new(io::ErrorKind::InvalidData, "duplicate JSON member")
         }
         raw_envelope::RawEnvelopeError::Malformed(error) => io::Error::from(error),
     })?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(serde_json::from_slice(bytes)?)
 }
 
 pub async fn call(
