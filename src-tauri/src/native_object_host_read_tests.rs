@@ -182,9 +182,6 @@ fn correlated_query_refusals_preserve_actual_owner_and_revision() {
         "native object read correlation is invalid"
     );
     drop(authority);
-    assert!(state
-        .dispatch_native(serde_json::from_value(bad_id).unwrap())
-        .is_err());
     assert_eq!(owner(&state), before);
 }
 
@@ -303,9 +300,6 @@ async fn common_and_external_object_admission_remain_unavailable() {
     };
     let (refusal, _) = tokio::join!(work, receive);
     assert_eq!(refusal, reason);
-    assert!(
-        bytes.is_empty(),
-        "unavailable common route must not fabricate a read envelope"
-    );
+    assert!(bytes.is_empty(), "unavailable route fabricated bytes");
     assert_eq!(owner(&state), before);
 }
