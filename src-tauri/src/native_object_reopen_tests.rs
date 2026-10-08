@@ -1,6 +1,6 @@
 //! Independent production-router/file/actual-owner persistence and refusal controls.
 use crate::native_object_bootstrap::bootstrap_raw;
-use crate::native_object_bootstrap::reopen::{bootstrap_request, MAX_FILE_BYTES};
+use crate::native_object_bootstrap::reopen::{bootstrap_request, open_regular, MAX_FILE_BYTES};
 use crate::{
     application_mcp::ApplicationMcp,
     native_application::{admit_release_request, complete_release},
@@ -363,6 +363,21 @@ fn unreadable_regular_file_returns_io_failure_without_owner_effect() {
         "unavailable",
     );
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn fifo_is_rejected_before_the_production_opener_can_block() {
+    let scratch = Scratch::new();
+    let fifo = scratch.0.join("input.fifo");
+    assert!(std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .unwrap()
+        .success());
+    let resolved = fifo.canonicalize().unwrap();
+    let error = open_regular(&resolved, |_| panic!("FIFO must not reach open")).unwrap_err();
+    assert_eq!(error.code, "invalid_request");
 }
 
 #[test]

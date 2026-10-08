@@ -569,7 +569,7 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
   const reopen = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_reopen.rs'), 'utf8');
   assert.match(reopen, /let resolved = Path::new\(&request\.source_path\)[\s\S]*?\.canonicalize\(\)/);
   assert.match(reopen, /allowed\(&resolved\)/);
-  assert.match(reopen, /File::open\(&resolved\)/);
+  assert.match(reopen, /open_regular\(&resolved, \|path\| File::open\(path\)\)/);
   assert.equal(profile.sizeProfiles[owner.sizeProfile].hardMax, 500);
   assert.equal(policy.externalCratePorts.native_engine.moduleItems[command].filter((x) => x === 'object_codec::decode_project').length, 1);
   const denied = structuredClone(policy);

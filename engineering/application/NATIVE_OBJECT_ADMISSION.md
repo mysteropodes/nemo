@@ -716,7 +716,12 @@ resolve its argument; the consumer never reopens the unresolved input alias.
 A symlink located in an allowed directory does not authorize a resolved target
 outside that scope. No filesystem capability or allowlist is expanded.
 
-The opened input must be a regular file. The reader consumes at most one MiB plus
+Resolved-path metadata must identify a regular file BEFORE the opener is called,
+so an already nonregular FIFO is refused without waiting for a writer. The opened
+descriptor must also remain a regular file. The metadata check and pathname open
+are separate operations: replacement between them remains a race, and this does
+not claim TOCTOU freedom or bounded behavior for adversarial replacement. The
+reader consumes at most one MiB plus
 one refusal byte and rejects over-limit, unreadable, non-UTF-8, corrupt or
 unsupported input without truncation or partial admission. The exact UTF-8 read
 from the file becomes the original byte bootstrap's `documentJson`; no selected

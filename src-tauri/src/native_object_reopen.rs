@@ -21,6 +21,32 @@ struct FileRequest {
     cancelled_before_dispatch: bool,
 }
 
+fn open_regular(
+    resolved: &Path,
+    open: impl FnOnce(&Path) -> std::io::Result<File>,
+) -> HostResult<File> {
+    let metadata = resolved
+        .metadata()
+        .map_err(|_| host_error("unavailable", "object project file is unavailable"))?;
+    if !metadata.is_file() {
+        return Err(host_error(
+            "invalid_request",
+            "object project input must be a regular file",
+        ));
+    }
+    // Refuse existing FIFOs before open can block. Path replacement between
+    // this check and open remains a race; retain the descriptor guard too.
+    let file = open(resolved)
+        .map_err(|_| host_error("unavailable", "object project file cannot be opened"))?;
+    if !file.metadata().is_ok_and(|m| m.is_file()) {
+        return Err(host_error(
+            "invalid_request",
+            "object project input must be a regular file",
+        ));
+    }
+    Ok(file)
+}
+
 pub(super) fn bootstrap_request(
     state: &ApplicationMcp,
     raw: &str,
@@ -57,14 +83,7 @@ pub(super) fn bootstrap_request(
                 ));
             }
             // Both scope and open consume the same resolved path, never the raw alias.
-            let file = File::open(&resolved)
-                .map_err(|_| host_error("unavailable", "object project file cannot be opened"))?;
-            if !file.metadata().is_ok_and(|m| m.is_file()) {
-                return Err(host_error(
-                    "invalid_request",
-                    "object project input must be a regular file",
-                ));
-            }
+            let file = open_regular(&resolved, |path| File::open(path))?;
             let mut bytes = Vec::new();
             file.take(MAX_FILE_BYTES + 1)
                 .read_to_end(&mut bytes)
