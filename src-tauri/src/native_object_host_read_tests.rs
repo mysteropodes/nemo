@@ -281,22 +281,28 @@ async fn common_and_external_object_admission_remain_unavailable() {
         .await
         .unwrap();
     let (mut server, _) = listener.accept().await.unwrap();
-    let host = state.clone();
+    let host = &state;
     let query = serde_json::from_value(req.clone()).unwrap();
-    let work = tokio::spawn(async move {
-        host.serve_external_for_test(&mut server, query, |_| panic!("unavailable read notified"))
+    let work = async move {
+        let refusal = host
+            .serve_external_for_test(&mut server, query, |_| panic!("unavailable read notified"))
             .await
-            .unwrap_err()
-    });
+            .unwrap_err();
+        drop(server);
+        refusal
+    };
     let mut bytes = Vec::new();
-    tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        client.read_to_end(&mut bytes),
-    )
-    .await
-    .unwrap()
-    .unwrap();
-    assert_eq!(work.await.unwrap(), reason);
+    let receive = async {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            client.read_to_end(&mut bytes),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    };
+    let (refusal, _) = tokio::join!(work, receive);
+    assert_eq!(refusal, reason);
     assert!(
         bytes.is_empty(),
         "unavailable common route must not fabricate a read envelope"
