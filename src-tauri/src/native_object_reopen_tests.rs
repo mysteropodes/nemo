@@ -1,6 +1,6 @@
 //! Independent production-router/file/actual-owner persistence and refusal controls.
-use super::super::bootstrap_raw;
-use super::{bootstrap_request, MAX_FILE_BYTES};
+use crate::native_object_bootstrap::bootstrap_raw;
+use crate::native_object_bootstrap::reopen::{bootstrap_request, MAX_FILE_BYTES};
 use crate::{
     application_mcp::ApplicationMcp,
     native_application::{admit_release_request, complete_release},

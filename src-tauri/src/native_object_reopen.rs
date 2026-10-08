@@ -1,9 +1,9 @@
 //! Private file consumer for the existing main-window object bootstrap command.
-use super::{bootstrap_raw, ObjectBootstrapReceipt};
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, HostResult,
 };
+use crate::native_object_bootstrap::{bootstrap_raw, ObjectBootstrapReceipt};
 use serde::Deserialize;
 use std::{fs::File, io::Read, path::Path};
 
