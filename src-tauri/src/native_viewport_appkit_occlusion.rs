@@ -2,14 +2,274 @@
 
 use crate::native_viewport::NativeViewportError;
 use block::ConcreteBlock;
+use native_engine::{compositor::CompositionResult, desktop_viewport::ViewportMapping};
 use objc::runtime::Object;
 use objc::{class, msg_send, sel, sel_impl};
+use serde_json::{json, Value};
 use std::ptr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::{
+    cell::{Cell, RefCell},
+    io::Write,
+    marker::PhantomData,
+    rc::Rc,
+    time::Instant,
+};
 use tauri::{Emitter, Manager};
+
+const RECORD_LIMIT: u16 = 256;
+const RECORD_BYTES: usize = 2048;
+
+struct Observations {
+    enabled: bool,
+    records: u16,
+    epoch: u64,
+    started: Instant,
+    active: Option<Value>,
+    #[cfg(test)]
+    capture: Option<Vec<Value>>,
+}
+
+impl Observations {
+    fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            records: 0,
+            epoch: 0,
+            started: Instant::now(),
+            active: None,
+            #[cfg(test)]
+            capture: None,
+        }
+    }
+
+    fn emit(&mut self, event: &'static str, fields: Value) {
+        if !self.enabled || self.records >= RECORD_LIMIT {
+            return;
+        }
+        self.records += 1;
+        let truncated = self.records == RECORD_LIMIT;
+        let record = json!({"diagnostic":"native-occlusion-mapping/v1",
+            "sequence":self.records,"elapsedMs":self.started.elapsed().as_millis(),
+            "exposureEpoch":self.epoch,"preview":self.active,
+            "event":if truncated { "truncated" } else { event },
+            "fields":if truncated { Value::Null } else { fields }});
+        let Ok(mut line) = serde_json::to_vec(&record) else {
+            return;
+        };
+        if line.len() > RECORD_BYTES {
+            return;
+        }
+        #[cfg(test)]
+        if let Some(capture) = self.capture.as_mut() {
+            capture.push(record);
+            return;
+        }
+        line.push(b'\n');
+        let _ = std::io::stderr().lock().write_all(&line);
+    }
+}
+
+thread_local! {
+    static OBSERVATIONS: RefCell<Observations> = RefCell::new(Observations::new(
+        std::env::var_os("NEMO_NATIVE_OCCLUSION_DIAGNOSTICS").as_deref() == Some(std::ffi::OsStr::new("1"))));
+}
+
+fn identifier(value: &str) -> Value {
+    if !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    {
+        json!(value)
+    } else {
+        json!("MISSING")
+    }
+}
+
+/// Only bounded scalar data lives across this synchronous preview; no AppKit
+/// pointer, native authority, callback or resource is retained by this guard.
+pub(crate) struct PreviewObservation {
+    active: bool,
+    finished: Cell<bool>,
+    previous: Option<Value>,
+    _main_thread: PhantomData<Rc<()>>,
+}
+
+pub(crate) fn observe_preview(instance: &str, result: &CompositionResult) -> PreviewObservation {
+    let mut observation = PreviewObservation {
+        active: false,
+        finished: Cell::new(false),
+        previous: None,
+        _main_thread: PhantomData,
+    };
+    OBSERVATIONS.with(|state| {
+        let Ok(mut state) = state.try_borrow_mut() else {
+            return;
+        };
+        if !state.enabled || state.records >= RECORD_LIMIT {
+            return;
+        }
+        let identity = result.scheduled_identity();
+        observation.previous = state.active.take();
+        state.active = Some(json!({"instanceId":identifier(instance),
+            "documentId":identifier(result.document_id()),"revision":result.content_revision(),
+            "frame":identity.evaluation_key().frame(),"workId":identity.work_id().value(),
+            "viewGeneration":identity.view_generation().value(),"jsLifecycleGeneration":"MISSING",
+            "correlation":state.records + 1}));
+        observation.active = true;
+        state.emit("preview-begin", Value::Null);
+    });
+    observation
+}
+
+impl PreviewObservation {
+    pub(crate) fn finish(&self, status: &'static str) {
+        if !self.active || self.finished.replace(true) {
+            return;
+        }
+        OBSERVATIONS.with(|state| {
+            if let Ok(mut state) = state.try_borrow_mut() {
+                state.emit("preview-end", json!({"status":status}));
+            }
+        });
+    }
+}
+
+impl Drop for PreviewObservation {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        OBSERVATIONS.with(|state| {
+            if let Ok(mut state) = state.try_borrow_mut() {
+                if !self.finished.get() {
+                    state.emit(
+                        "preview-no-receipt",
+                        json!({"status":"MISSING",
+                        "unwinding":std::thread::panicking()}),
+                    );
+                }
+                state.active = self.previous.take();
+            }
+        });
+    }
+}
+
+pub(super) fn acquire(
+    surface: &wgpu::Surface<'_>,
+    view: &crate::native_viewport::platform::OwnedView,
+    mapping: ViewportMapping,
+) -> wgpu::CurrentSurfaceTexture {
+    OBSERVATIONS.with(|state| {
+        let Ok(mut state) = state.try_borrow_mut() else { return; };
+        if !state.enabled || state.records >= RECORD_LIMIT { return; }
+        let raw = view.raw;
+        if raw.is_null() || !is_main_thread() {
+            state.emit("mapping", json!({"mapping":"MISSING"}));
+            return;
+        }
+        unsafe {
+            let window: *mut Object = msg_send![raw, window];
+            let parent: *mut Object = msg_send![raw, superview];
+            let frame: crate::native_viewport::platform::NSRect = msg_send![raw, frame];
+            let bounds: Option<[f64; 4]> = (!parent.is_null()).then(|| {
+                let b: crate::native_viewport::platform::NSRect = msg_send![parent, bounds];
+                [b.origin.x, b.origin.y, b.size.width, b.size.height]
+            });
+            let window_state = window_fields(window);
+            let css = mapping.css_bounds();
+            let physical = mapping.physical_extent();
+            state.emit("mapping", json!({"window":window_state,"attached":view.attached,
+                "superviewPresent":!parent.is_null(),"frame":[frame.origin.x,frame.origin.y,frame.size.width,frame.size.height],
+                "superviewBounds":bounds,"cssBounds":[css.x,css.y,css.width,css.height],
+                "physicalExtent":[physical.width,physical.height],"reportedDpr":mapping.reported_dpr()}));
+        }
+    });
+    // This is the original acquisition, exactly once, also when diagnostics are OFF.
+    let outcome = surface.get_current_texture();
+    OBSERVATIONS.with(|state| {
+        if let Ok(mut state) = state.try_borrow_mut() {
+            if !state.enabled || state.records >= RECORD_LIMIT {
+                return;
+            }
+            let label = match &outcome {
+                wgpu::CurrentSurfaceTexture::Success(_) => "success",
+                wgpu::CurrentSurfaceTexture::Suboptimal(_) => "suboptimal",
+                wgpu::CurrentSurfaceTexture::Lost => "lost",
+                wgpu::CurrentSurfaceTexture::Outdated => "outdated",
+                wgpu::CurrentSurfaceTexture::Timeout => "timeout",
+                wgpu::CurrentSurfaceTexture::Occluded => "occluded",
+                wgpu::CurrentSurfaceTexture::Validation => "validation",
+            };
+            state.emit("surface-acquisition", json!({"outcome":label}));
+        }
+    });
+    outcome
+}
+
+unsafe fn window_fields(window: *mut Object) -> Value {
+    if window.is_null() {
+        return json!("MISSING");
+    }
+    let occlusion: usize = msg_send![window, occlusionState];
+    let key: bool = msg_send![window, isKeyWindow];
+    let minimized: bool = msg_send![window, isMiniaturized];
+    let visible: bool = msg_send![window, isVisible];
+    let number: isize = msg_send![window, windowNumber];
+    json!({"windowNumber":number,"occlusionVisible":WindowOcclusionHint::from_state(occlusion).visible,
+        "isVisible":visible,"key":key,"minimized":minimized})
+}
+
+fn observe_exposure(window: *mut Object) {
+    OBSERVATIONS.with(|state| {
+        let Ok(mut state) = state.try_borrow_mut() else {
+            return;
+        };
+        if !state.enabled || state.records >= RECORD_LIMIT {
+            return;
+        }
+        state.epoch = state.epoch.saturating_add(1);
+        state.emit("exposure", unsafe { window_fields(window) });
+    });
+}
+
+#[cfg(test)]
+pub(crate) struct TestObservations(Option<Observations>);
+#[cfg(test)]
+pub(crate) fn test_observations() -> TestObservations {
+    OBSERVATIONS.with(|state| {
+        let mut observed = Observations::new(true);
+        observed.capture = Some(Vec::new());
+        TestObservations(Some(state.replace(observed)))
+    })
+}
+#[cfg(test)]
+impl TestObservations {
+    pub(crate) fn validate_last(&self, expected: &str) {
+        OBSERVATIONS.with(|state| {
+            let state = state.borrow();
+            let records = state.capture.as_ref().unwrap();
+            assert_eq!(records.last().unwrap()["fields"]["status"], expected);
+            assert!(
+                state.active.is_none(),
+                "preview scope must not survive return"
+            );
+        });
+    }
+}
+#[cfg(test)]
+impl Drop for TestObservations {
+    fn drop(&mut self) {
+        if let Some(previous) = self.0.take() {
+            OBSERVATIONS.with(|state| state.replace(previous));
+        }
+    }
+}
 
 #[link(name = "AppKit", kind = "framework")]
 extern "C" {
@@ -77,6 +337,7 @@ impl WindowOcclusionObserver {
                     return;
                 }
                 let state: usize = msg_send![source, occlusionState];
+                observe_exposure(source);
                 let _ = app.emit_to(
                     label.as_str(),
                     "nemo-native-window-occlusion",
@@ -181,6 +442,28 @@ impl Drop for NotificationRegistration {
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn diagnostic_identifiers_and_budget_reject_private_text_and_stop() {
+        for invalid in ["", "/private", "\n", "../key", &"a".repeat(65)] {
+            assert_eq!(identifier(invalid), json!("MISSING"));
+        }
+        assert_eq!(identifier("document-1_A"), json!("document-1_A"));
+        let mut state = Observations::new(false);
+        state.capture = Some(Vec::new());
+        state.emit("preview-begin", Value::Null);
+        assert_eq!(state.records, 0);
+        assert!(state.capture.as_ref().unwrap().is_empty());
+        state.enabled = true;
+        for _ in 0..RECORD_LIMIT + 10 {
+            state.emit("preview-begin", Value::Null);
+        }
+        let records = state.capture.as_ref().unwrap();
+        assert_eq!(records.len(), usize::from(RECORD_LIMIT));
+        assert_eq!(records.last().unwrap()["event"], "truncated");
+        assert!(records.iter().all(|r| r.to_string().len() <= RECORD_BYTES));
+        assert_eq!(records[0].as_object().unwrap().len(), 7);
+    }
 
     #[test]
     fn visibility_uses_only_the_documented_occlusion_bit() {

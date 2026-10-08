@@ -16,9 +16,9 @@ engine_modules! {
     "codec" => codec, document, project_structure, object_document, object_codec;
     "commands" => commands, request_receipts, revision, object_snapshot;
     "history" => history, transaction;
-    "evaluation" => evaluation, animation_curve;
+    "evaluation" => evaluation, animation_curve, object_frame_packet;
     "scheduler" => resource_leases, scheduler;
-    "compositor" => compositor, render_scene, render_geometry;
+    "compositor" => compositor, render_scene, render_geometry, object_render_scene;
     "viewport" => desktop_viewport;
     "export_job" => export_job, export_job_lifecycle, png_output;
     "application" => application, protocol, read_queries;
@@ -45,9 +45,11 @@ test_modules! {
     "test-history" => history_tests = "../tests/history.rs";
     "test-history" => object_history_tests = "../tests/object_history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
+    "test-evaluation" => object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
+    "test-compositor" => object_render_scene_compositor_tests = "../tests/object_render_scene.rs";
     "test-viewport" => viewport_tests = "../tests/desktop_viewport.rs";
     "test-export_job" => export_job_tests = "../tests/export_job.rs";
     "test-export_job" => authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs";
@@ -57,4 +59,6 @@ test_modules! {
     "test-application" => application_read_tests = "../tests/application_read.rs";
     "test-application" => application_replacement_tests = "../tests/application_replacement.rs";
     "test-application" => object_application_read_tests = "../tests/object_read.rs";
+    "test-application" => object_frame_packet_application_tests = "../tests/object_frame_packet.rs";
+    "test-application" => object_render_scene_application_tests = "../tests/object_render_scene.rs";
 }

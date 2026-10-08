@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 pub(crate) use crate::native_viewport::replacement_test_support::{
-    FakeOutcome, FakeViewport, SurfaceState,
+    test_observations, FakeOutcome, FakeViewport, SurfaceState,
 };
 #[cfg(test)]
 pub(crate) type TestCompositionResult = CompositionResult;
@@ -387,11 +387,12 @@ pub(crate) fn present(
     result: &CompositionResult,
     identity: ScheduledFrameIdentity,
 ) -> HostResult<Presentation> {
+    let diagnostic = crate::native_viewport::observe_preview(instance_id, result);
     #[cfg(test)]
     if let Some(result) = with_test_viewport(instance_id, |viewport| {
         viewport.present(compositor, result, identity.clone())
     }) {
-        return result;
+        return result.inspect(|value| diagnostic.finish(value.status));
     }
     with_viewport(instance_id, |viewport| {
         viewport.register(identity.clone()).map_err(|error| {
@@ -406,6 +407,7 @@ pub(crate) fn present(
             status: status_label(receipt.status()),
         })
     })
+    .inspect(|value| diagnostic.finish(value.status))
 }
 
 pub(crate) fn resize(instance_id: &str, mapping: ViewportMapping) -> HostResult<()> {

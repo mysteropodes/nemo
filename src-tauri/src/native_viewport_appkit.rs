@@ -22,7 +22,7 @@ use std::sync::{
 use tauri::Manager;
 
 #[path = "native_viewport_appkit_occlusion.rs"]
-mod occlusion;
+pub(super) mod occlusion;
 
 #[repr(C)]
     #[derive(Clone, Copy)]
@@ -358,7 +358,7 @@ impl SurfacePort for MacOsSurfacePort {
         let Some(surface) = self.surface.as_ref() else {
             return SurfaceAttempt::Lost;
         };
-        match surface.get_current_texture() {
+        match occlusion::acquire(surface, &self.view, self.mapping) {
             wgpu::CurrentSurfaceTexture::Success(texture)
             | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
                 SurfaceAttempt::Acquired(MacOsFrame::Acquired {
