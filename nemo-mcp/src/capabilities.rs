@@ -244,18 +244,32 @@ pub fn native_catalog() -> &'static NativeCapabilityCatalog {
     })
 }
 
-/// Registration does not imply an installed native owner or active transport.
-pub(crate) fn validate_native_operation(
+/// Registration is a shape prerequisite, not permission to execute.
+fn registered_native_operation(
     operation: &str,
-) -> Result<(), crate::contract::RequestError> {
+) -> Result<&'static Value, crate::contract::RequestError> {
     use crate::contract::RequestError;
-    let descriptor = native_catalog()
+    native_catalog()
         .capability_for_operation(operation)
         .ok_or_else(|| {
             RequestError::InvalidRequest(format!(
                 "operation {operation} is not declared by a registered native capability"
             ))
-        })?;
+        })
+}
+
+pub(crate) fn validate_native_operation_registration(
+    operation: &str,
+) -> Result<(), crate::contract::RequestError> {
+    registered_native_operation(operation).map(|_| ())
+}
+
+/// Registration does not imply an installed native owner or active transport.
+pub(crate) fn validate_native_operation(
+    operation: &str,
+) -> Result<(), crate::contract::RequestError> {
+    use crate::contract::RequestError;
+    let descriptor = registered_native_operation(operation)?;
     if descriptor["availability"]["state"] == "available" {
         Ok(())
     } else {

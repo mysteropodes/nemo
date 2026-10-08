@@ -178,6 +178,8 @@
         "src/capability_contract.rs",
         "src/contract.rs",
         "src/contract_tests.rs",
+        "src/native_request_input.rs",
+        "src/native_request_input_tests.rs",
         "src/lib.rs",
         "src/main.rs",
         "src/native_contract.rs",
@@ -193,7 +195,7 @@
       ],
       "publicApi": [
         "src/capabilities.rs",
-        "src/contract.rs",
+        "src/contract.rs", "src/native_request_input.rs",
         "src/lib.rs",
         "src/registry.rs",
         "src/wire.rs"

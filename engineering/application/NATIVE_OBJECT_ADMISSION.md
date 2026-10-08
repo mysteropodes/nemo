@@ -455,3 +455,36 @@ slot was held; this is not compile/runtime characterization. Focused nonzero
 Rust validation is a later gate. `native.object` remains unavailable; common
 UI/MCP routing, installed Tauri invocation, mutations/history, viewport, C04a
 and full agreed desktop baseline acceptance remain separate pending outcomes.
+
+## N25C2g registered-input validation prerequisite
+
+`NativeApplicationRequest::validate_input()` checks the existing typed shape,
+API/identity/revision/selector/payload constraints, complete 4096-byte UTF-8
+request bound and registration of the operation. Its bounded private contract
+child implements this public request-type method; success does not authorize
+execution, admit a document or prove an owner. Shape-valid unknown object
+targets remain the actual owner's concern. Raw duplicate checks must still run
+before typed/Value parsing; this method cannot recover discarded raw members.
+
+The existing `validate()` composes those input checks with capability
+availability. Desktop RevisionSync, the bundled MCP tool handler and TCP client
+all continue to call full `validate()` at their existing positions. Registered
+object input therefore passes only input validation; common object calls still
+fail with the same unavailable descriptor reason before host dispatch or TCP
+connection. The existing JS adapter still does not admit object operations.
+No descriptor/catalog/schema, owner, transport policy or common route changes.
+
+The helper and private tests are registered in both the general Rust source
+census and actual MCP size overlay under their existing transport owner. No
+native-engine dependency, graph edge or size ceiling is added. Existing file
+and aggregate coverage floors, exclusions and historical snapshot stay intact;
+only the two new files receive pinned measured per-file registrations. The
+production child is measured at 100% lines/regions/functions; the test child
+has no exported executable regions and is explicitly listed, not excluded.
+Whole-crate coverage retains its inherited 18 ratchet failures. These new-file
+registrations are not whole-crate coverage acceptance. Independent fixed selectors, all registered
+examples, closed negative inputs and complete UTF-8 byte boundaries preserve
+existing full-validator behavior and refusal precedence. The source/registration
+RED and original hashes remain separate from unavailable Rust characterization.
+Common UI/MCP/client availability, installed Tauri, mutations/history/viewport,
+C04a and full desktop acceptance remain pending.
