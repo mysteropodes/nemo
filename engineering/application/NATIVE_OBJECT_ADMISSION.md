@@ -421,3 +421,37 @@ allowances, policy changes or size exemptions. N25B acceptance requires focused
 codec/read regressions, the existing N25A oracle, full local checks at a clean
 exact candidate, independent exact-SHA review and ordinary protected integration.
 Source/library acceptance does not close N21 or make any P03 consumer Ready.
+
+## N25C2f actual-host immutable read prerequisite
+
+The actual `NativeObjectHost` installed by C2e now acquires its owner's current
+immutable snapshot and delegates a complete typed `NativeDispatch::dispatch`
+request to the existing `ObjectSnapshot::dispatch`. The admitted host has only
+fresh revision zero: `query.document.object` with `atRevision: 0` returns the
+exact frame-scoped object in the correlated bounded envelope. Missing revisions,
+targets, cancellation, invalid selectors or unsupported operations use the
+snapshot's existing typed refusals; uncorrelatable input and a released owner
+remain fallible errors. No new writable mirror, mutation/history routing,
+retained-revision selection, retry registry, GPU or resource work is introduced.
+
+This supersedes C2d's unconditional host dispatch refusal only at the private
+host seam. `NativeApplicationRequest::validate` still rejects `native.object`
+using its unavailable descriptor before common `ApplicationMcp`/RevisionSync
+routing. Direct common and external host request tests require that refusal;
+no input-validation bypass, fabricated response or descriptor activation is
+added. Successful private-host reads are not common UI/MCP or installed credit.
+
+C2f controls bootstrap actual original fixture bytes into the single Rust owner,
+query the active authority, compare full independent object/identity/revision
+results, preserve content/history/subscriber/lifecycle and exercise complete
+4096-byte request/result limits and real terminal release/re-entry. The exact
+`object_snapshot::ObjectSnapshot` production port belongs only to the existing
+host seam; independent controls stay in the dedicated host-release tests.
+Ordinary Rust/Node budgets, baseline, floors and exclusions remain unchanged.
+
+The preflight source/registration RED is separately retained with original
+source/fixture hashes. Actual Rust RED was unavailable while the shared heavy
+slot was held; this is not compile/runtime characterization. Focused nonzero
+Rust validation is a later gate. `native.object` remains unavailable; common
+UI/MCP routing, installed Tauri invocation, mutations/history, viewport, C04a
+and full agreed desktop baseline acceptance remain separate pending outcomes.

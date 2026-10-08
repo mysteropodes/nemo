@@ -1,4 +1,4 @@
-//! Typed object host admission and resource-free terminal cleanup; dispatch stays closed.
+//! Typed object host with immutable current-revision reads and resource-free cleanup.
 use crate::native_dispatch::{NativeDispatch, NativeReleaseProgress};
 use native_engine::{
     application::ApplicationReleaseReceipt,
@@ -7,6 +7,7 @@ use native_engine::{
     export_job::{ExportReleaseReconciliation, JobReceipt, PendingFrame, ReconciliationStage},
     history::NativeObjectHistory,
     object_document::ObjectDocument,
+    object_snapshot::ObjectSnapshot,
 };
 use std::any::Any;
 
@@ -59,13 +60,17 @@ impl NativeDispatch for NativeObjectHost {
     fn content_revision(&self) -> u64 {
         self.history.content_revision()
     }
-    fn dispatch(&mut self, _: OpacityRequest) -> Result<ResponseEnvelope, String> {
-        Err(if self.released.is_some() {
-            "native object host was released"
-        } else {
-            "native object host dispatch is unavailable"
+    fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String> {
+        if self.released.is_some() {
+            return Err("native object host was released".into());
         }
-        .into())
+        let snapshot: ObjectSnapshot = self
+            .history
+            .acquire_snapshot(self.content_revision())
+            .ok_or("native object snapshot is unavailable")?;
+        snapshot
+            .dispatch(request)
+            .map_err(|_| "native object read correlation is invalid".into())
     }
     fn replace_document(&mut self, _: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
         Err("native object host replacement is unavailable".into())
@@ -114,3 +119,7 @@ impl NativeDispatch for NativeObjectHost {
 #[cfg(test)]
 #[path = "native_object_host_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_object_host_read_tests.rs"]
+mod read_tests;

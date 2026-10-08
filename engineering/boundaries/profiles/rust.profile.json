@@ -360,7 +360,8 @@
       "files": [
         "native_application_dispatch_release_tests.rs",
         "native_object_host_tests.rs",
-        "native_object_bootstrap_tests.rs"
+        "native_object_bootstrap_tests.rs",
+        "native_object_host_read_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

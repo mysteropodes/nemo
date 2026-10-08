@@ -71,7 +71,7 @@ fn raw_bootstrap_commits_actual_owner_and_resource_free_identity_receipt() {
     assert_eq!(revision, 0);
     assert!(actual.starts_with("native-object-document-"));
     assert!(uuid::Uuid::parse_str(state.instance_id()).is_ok());
-    // Installing via this source port does not activate ordinary object dispatch.
+    // Bootstrap does not activate common object admission or serialization.
     let request = json!({"apiVersion":2,"requestId":"unsupported","instanceId":state.instance_id(),
         "documentId":actual,"operation":"query.document.serialize","payload":{}});
     let before = identity(&state);
