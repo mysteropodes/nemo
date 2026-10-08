@@ -216,6 +216,14 @@
         }
         return transport.subscribeRevisions(tauri.event.listen.bind(tauri.event), synchronize);
       },
+      subscribeWindowOcclusion: function (hint) {
+        if (!tauri.event || typeof tauri.event.listen !== 'function') {
+          return Promise.reject(new Error('native window occlusion event port is unavailable'));
+        }
+        return tauri.event.listen('nemo-native-window-occlusion', function (event) {
+          hint(event && event.payload);
+        });
+      },
       disconnect: function () { return transport.disconnect(); },
       application: function () { return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui', transport); },
       release: function (request) { return invoke('nemo_native_release', { request: request }); },

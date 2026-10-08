@@ -21,6 +21,9 @@ use std::sync::{
 };
 use tauri::Manager;
 
+#[path = "native_viewport_appkit_occlusion.rs"]
+mod occlusion;
+
 #[repr(C)]
     #[derive(Clone, Copy)]
     #[rustfmt::skip]
@@ -420,6 +423,7 @@ impl Drop for MacOsSurfacePort {
 
 pub(crate) struct NativeViewport {
     host: Option<DesktopViewportHost<MacOsSurfacePort>>,
+    occlusion: Option<occlusion::WindowOcclusionObserver>,
     window: tauri::WebviewWindow,
     mapping: ViewportMapping,
 }
@@ -442,6 +446,7 @@ impl NativeViewport {
         window: &tauri::WebviewWindow,
         mapping: ViewportMapping,
     ) -> Result<(Self, Compositor), NativeViewportError> {
+        let occlusion = occlusion::WindowOcclusionObserver::new(window)?;
         let content_view = window
             .ns_view()
             .map_err(|error| NativeViewportError::new(format!("resolve AppKit view: {error}")))?
@@ -454,6 +459,7 @@ impl NativeViewport {
         Ok((
             Self {
                 host: Some(DesktopViewportHost::new(port, mapping)),
+                occlusion: Some(occlusion),
                 window: window.clone(),
                 mapping,
             },
@@ -474,6 +480,7 @@ impl NativeViewport {
         if self.host.is_some() {
             return Err(NativeViewportError::new("native viewport was not retired"));
         }
+        let occlusion = occlusion::WindowOcclusionObserver::new(&self.window)?;
         let content_view =
             self.window.ns_view().map_err(|error| {
                 NativeViewportError::new(format!("resolve AppKit view: {error}"))
@@ -482,6 +489,7 @@ impl NativeViewport {
         let surface = create_surface(compositor.instance(), &view)?;
         let port = MacOsSurfacePort::new(surface, view, compositor, self.mapping)?;
         self.host = Some(DesktopViewportHost::new(port, self.mapping));
+        self.occlusion = Some(occlusion);
         Ok(())
     }
 
@@ -516,6 +524,8 @@ impl NativeViewport {
     }
 
     pub(crate) fn dispose(&mut self) -> Vec<WorkId> {
+        // Stop window hints before releasing the host; rebind owns a fresh observer.
+        self.occlusion.take();
         self.host
             .take()
             .map_or_else(Vec::new, |mut host| host.dispose())

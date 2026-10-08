@@ -149,13 +149,13 @@ test('browser Resume preserves normalized imported data and the existing repaint
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
 });
 
-test('native Resume permits occluded admission and waits for final visible publication', async () => {
+test('native Resume waits for presented admission and final visible publication', async () => {
   const app = harness({ auto: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   app.elements.get('start-resume').listeners.click();
   assert.equal(native.deferredAllowed, true);
   assert.equal(app.startScreen.classList.contains('hid'), false);
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.startScreen.classList.contains('hid'), true);
   assert.equal(app.toasts.includes('Session resumed'), false);
@@ -172,7 +172,7 @@ test('native Resume permits occluded admission and waits for final visible publi
 });
 
 for (const rejected of [false, { instanceId: 'stale-instance' }, { documentId: 'stale-document' },
-  { contentRevision: 1 }, { status: 'failed' }]) {
+  { contentRevision: 1 }, { status: 'failed' }, { status: 'deferred-occluded' }]) {
   test(`denied or stale native Resume admission leaves the start screen visible (${JSON.stringify(rejected)})`, async () => {
     const app = harness({ auto: '{"supported":true}', deferFrames: true });
     const native = installNativeOpen(app);
@@ -263,21 +263,17 @@ test('native browser Open publishes success only after both frame-0 presentation
   assert.equal(app.mutations, 0, 'Paper writers never run during native Open');
 });
 
-test('deferred native first frame remains unpublished until post-reveal presentation', async () => {
+test('deferred native first frame cannot hide the start screen or publish an Open', async () => {
   const app = harness({ deferFrames: true }), native = installNativeOpen(app);
   const first = { ...native.receipt, status: 'deferred-occluded' };
   select(app, { name: 'Occluded.json', text: '{"supported":true}' });
   native.first.resolve(first);
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.startScreen.classList.contains('hid'), true);
+  assert.equal(app.startScreen.classList.contains('hid'), false);
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
-  app.flushFrame(); app.flushFrame();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(native.presentations, 1);
-  native.visible.resolve({ ...native.receipt, workId: 'visible-frame' });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(app.project.getCurrentLabel(), 'Occluded (not saved)');
-  assert.equal(app.toasts.at(-1), 'Opened: Occluded');
+  assert.equal(app.pendingFrames, 0);
+  assert.equal(native.presentations, 0);
+  assert.equal(app.toasts.includes('Opened: Occluded'), false);
   assert.equal(app.mutations, 0);
 });
 
@@ -285,7 +281,7 @@ test('desktop Open attempts final native presentation when reveal animation fram
   const app = harness({ version: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   const opening = app.project.openPath('/tmp/Native.json');
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(app.startScreen.classList.contains('hid'), true);
   assert.equal(app.project.getCurrentLabel(), 'Untitled (not saved)');
@@ -304,7 +300,7 @@ test('stalled reveal RAF fallback refuses a deferred final native receipt', asyn
   const app = harness({ version: '{"supported":true}', deferFrames: true });
   const native = installNativeOpen(app);
   const opening = app.project.openPath('/tmp/Native.json');
-  native.first.resolve({ ...native.receipt, status: 'deferred-occluded' });
+  native.first.resolve(native.receipt);
   await new Promise(resolve => setTimeout(resolve, 250));
   assert.equal(native.presentations, 1);
   native.visible.resolve({ ...native.receipt, status: 'deferred-occluded' });
