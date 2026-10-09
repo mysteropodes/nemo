@@ -10,6 +10,18 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_reopen.rs"]
 mod reopen;
 
+#[path = "native_object_save.rs"]
+mod save;
+#[allow(unused_imports)]
+pub(crate) use save::{
+    __cmd__nemo_native_object_save_as, __tauri_command_name_nemo_native_object_save_as,
+    nemo_native_object_save_as,
+};
+
+#[cfg(test)]
+#[path = "native_object_save_tests.rs"]
+mod save_tests;
+
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
 

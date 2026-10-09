@@ -97,6 +97,13 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
 }
 
 impl ApplicationMcp {
+    pub(crate) fn serialize_object_file_snapshot(
+        &self,
+        raw: &str,
+    ) -> Result<NativeApplicationResponse, String> {
+        dispatch_raw(self, raw)
+    }
+
     fn dispatch_object_client(
         &self,
         admitted: AdmittedObjectRequest,
