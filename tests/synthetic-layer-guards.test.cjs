@@ -30,6 +30,19 @@ const sites = [
   ['multiLayerSelectionBox', select, 'function multiLayerSelectionBox('],
 ];
 
+// buildSceneJson (render) skips each synthetic kind with its own early
+// `continue`, one line per kind, rather than one combined condition.
+test('buildSceneJson gives every synthetic layer kind an empty stack slot', () => {
+  const bridge = fs.readFileSync(path.join(root, 'src/js/engine-bridge.js'), 'utf8');
+  const start = bridge.indexOf('function buildSceneJson(');
+  assert.notEqual(start, -1, 'buildSceneJson not found');
+  const body = bridge.slice(start, bridge.indexOf('\n  function ', start + 1));
+  for (const kind of SYNTHETIC_KINDS) {
+    assert.match(body, new RegExp(`if \\(state\\.layers\\[i\\]\\.${kind}\\) \\{[^}]*\\}\\);? *(\\n[^\\n]*)?continue;`),
+      `buildSceneJson has no skip for ${kind}`);
+  }
+});
+
 for (const [name, source, header] of sites) {
   test(`${name} excludes every synthetic layer kind`, () => {
     const line = guardLine(source, header);
