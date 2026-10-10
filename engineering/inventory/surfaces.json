@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "2608db3d1fb03f0883fca4c21c98324279d884c5",
-  "describe": "2608db3-dirty"
+  "head": "178388b5036ba4333ca913b46400b91f1ac0427a",
+  "describe": "178388b5"
  },
- "inputsDigest": "d24e6c675f632b62366a3fa112426035ef5ba7c2945047eb919a5d9f80f47ba2",
+ "inputsDigest": "3a40f278c65963549eddc3dd3b6b8c8cccdfd1d17deba2761a390f0a97ff9620",
  "states": [
   "inventoried",
   "characterized",
@@ -151,7 +151,7 @@
   },
   "SMEngineBridge": {
    "file": "src/js/engine-bridge.js",
-   "line": 4506,
+   "line": 4511,
    "members": 21
   },
   "SMExprPanel": {
@@ -15065,7 +15065,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/engine-bridge.js:3663 buildRigPreviewItems())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/engine-bridge.js:3668 buildRigPreviewItems())",
    "source": "src/index.html:1577",
    "meta": {
     "data": {
@@ -15077,7 +15077,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/engine-bridge.js:3663 buildRigPreviewItems()",
+     "src/js/engine-bridge.js:3668 buildRigPreviewItems()",
      "src/js/rig-bridge.js:192 panelDefaultRadius()",
      "src/js/timeline.js:11497"
     ]
