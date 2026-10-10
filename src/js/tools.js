@@ -2961,7 +2961,7 @@ function _fillRegenerateMulti(layer,f,onlyIds,gapCap){
   }
   found.forEach(function(r){var ip=r.path.interiorPoint;if(ip)seeds.push([ip.x,ip.y]);});
   return{path:acc,seeds:seeds};
-}
+}var FILL_REGEN_CARRY_TAGS=['strokeId','groupId','fillGradient','paintOrder','elemHidden','effects','ownerId','ownerName','ownerColor']; // tags a regenerated fill must INHERIT — see #1672
 function fillRegenerateLinked(layer,touchedPath){
   if(!layer)return;
   var fills=layer.children.filter(function(c){return c instanceof Path&&c.data&&(c.data.fillSeed||(c.data.fillSeeds&&c.data.fillSeeds.length));});
@@ -3011,7 +3011,7 @@ function fillRegenerateLinked(layer,touchedPath){
       }
     }
     var idx=layer.children.indexOf(f);
-    f.remove();
+    var carry=f.data||{};f.remove(); // regeneration makes a BRAND-NEW Path, so anything not re-derived below is dropped (#1672)
     res.path.fillColor=col;res.path.strokeColor=null;res.path.opacity=op;
     if(isMulti){
       // Re-anchor to the union's own sub-region interior points — same
@@ -3036,7 +3036,7 @@ function fillRegenerateLinked(layer,touchedPath){
     // forget strokes that are still part of this fill's boundary.
     if(onlyIds)res.path.data.fillWalls=onlyIds;
     else if(res.wallIds&&res.wallIds.length)res.path.data.fillWalls=res.wallIds;
-    layer.insertChild(Math.min(idx,layer.children.length),res.path);
+    FILL_REGEN_CARRY_TAGS.forEach(function(k){if(carry[k]!==undefined&&res.path.data[k]===undefined)res.path.data[k]=carry[k];});if(res.path.data.elemHidden)res.path.visible=false;layer.insertChild(Math.min(idx,layer.children.length),res.path); // elemHidden drives visible too (desP pairs them)
   });
 }
 
