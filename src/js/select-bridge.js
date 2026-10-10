@@ -341,7 +341,7 @@
     var targets = [], left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
     _layerSel.forEach(function (li) {
       var ld = state.layers[li], layer = userLayers[li];
-      if (!ld || !layer || ld.locked || !ld.visible || ld.symbolId || ld.nativeVideo || ld.isNullLayer || ld.isEffectLayer || ld.isGuideLayer || ld.isWidgetLayer) return;
+      if (!ld || !layer || ld.locked || !ld.visible || ld.symbolId || ld.nativeVideo || ld.isNullLayer || ld.isEffectLayer || ld.isGuideLayer || ld.isWidgetLayer || ld.isEffectorLayer) return;
       var paths = layer.children.filter(function (c) { return (c instanceof Path || c instanceof Raster) && isSelectablePathChild(c); });
       if (!paths.length) return;
       var b = layer.bounds;
