@@ -908,6 +908,11 @@
       // drawn separately as an editor-only overlay (buildRigWidgetOverlayItems,
       // inside the includeEditorOverlays block), so no export ever sees them.
       if (state.layers[i].isWidgetLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
+      // Effector layer (effector-layer.js) — a deformation field for the
+      // target's duplicator, never painted content of its own (#1099). Same
+      // "no content, no paint" shape as Guide/Widget above, keeping its stack
+      // slot for matte/folder indices; its rings are an editor-only overlay.
+      if (state.layers[i].isEffectorLayer) { layers.push(userLayerEntries[i] = { items: [] }); continue; }
       // Effect (adjustment) layer (2026-07, Motion; effects stack rewrite
       // 2026-07) — never paints its own content either (ld.frames/strokes
       // are ignored on purpose, matching AE's "Adjustment Layer" toggle),

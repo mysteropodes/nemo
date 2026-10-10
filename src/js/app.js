@@ -4639,7 +4639,7 @@ function saveActiveLayerFrame(){n20RequireLegacyWrite('save-active-layer-frame')
   // d'effets de tracé, pas le dessin. Les relire ici cuirait la déformation
   // dans le document, et chaque changement de réglage la recuirait par-dessus
   // (mesuré avant ce garde-fou : 4 points → 192 → 1152).
-  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(ld)))return;
+  var ld=state.layers[state.activeLayerIdx];if(ld.symbolId||ld.montageId||ld.isNullLayer||ld.isEffectLayer||ld.isGuideLayer||ld.isWidgetLayer||ld.isEffectorLayer||ld.lfsGroup||(ld.duplicator&&!ld._dupEditSource)||ld._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(ld)))return;
   if(!layerIsEffectivelyVisible(state.activeLayerIdx))return;
   // Same class of bug as the eye/solo guard right above, found live
   // 2026-07-30 (Cyril: "avec plein d'aller retour, scrub, trim de layer
@@ -4675,7 +4675,7 @@ function saveAllLayerFrames(){n20RequireLegacyWrite('save-all-layer-frames');
   // duplicator skip: same reason as saveActiveLayerFrame's guard above.
   // nativeVideo dropped from this list too — see the identical comment on
   // saveActiveLayerFrame's own guard above for why.
-  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(state.layers[i])))continue;
+  for(var i=0;i<state.layers.length;i++){if(state.layers[i].symbolId||state.layers[i].montageId||state.layers[i].isNullLayer||state.layers[i].isEffectLayer||state.layers[i].isGuideLayer||state.layers[i].isWidgetLayer||state.layers[i].isEffectorLayer||state.layers[i].lfsGroup||(state.layers[i].duplicator&&!state.layers[i]._dupEditSource)||state.layers[i]._rigPoseLive||(window.SMPathFx&&SMPathFx.hasAny(state.layers[i])))continue;
   if(!layerIsEffectivelyVisible(i))continue;
   // Trim-range guard — see saveActiveLayerFrame's identical check for the
   // full explanation. Per-layer here (unlike the single active layer
