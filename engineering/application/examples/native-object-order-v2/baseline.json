@@ -1,0 +1,947 @@
+{
+  "oracleVersion": "nemo.native-object-order-baseline/1",
+  "baseline": "ded641bd763379f36d629bf1686fcce8a6137a66",
+  "direction": "back-to-front",
+  "pins": {
+    "src/js/domain/animation/opacity.js": {
+      "blob": "17478ea8cc5c2233f3cdac1284688a0af1144c36",
+      "sha256": "4863f27ccc6396db285c70586d30d1284aff64885fa51ffffcd95aeddfda3841"
+    },
+    "src/js/animation/curve.js": {
+      "blob": "c42f255ee8f204806e6d3b539951864c97a86cfd",
+      "sha256": "d6c70a8848a8475f9d7ec62ce62127748e0938f3058dae40a8154a82389534c7"
+    },
+    "src/js/motion.js": {
+      "blob": "0acdfbae5f183f529fc0c3a3e03d9a9e7f7b53b2",
+      "sha256": "b4f56bd04b19cbca5e2b72aef7bb42f1121b43c460825d42ef8b20e02a99d40d"
+    },
+    "src/js/engine-bridge.js": {
+      "blob": "76bf313230872704017fdde97d6dbdc63dc7de6a",
+      "sha256": "e349df8852f42eb8fad75a5813d336d7427a108d03e5abd75abe964d63647714"
+    },
+    "src/js/export.js": {
+      "blob": "81f8a62d08fd23bd0a3797e175338cfbd393cc31",
+      "sha256": "2317f29dd032e8b7538c7bb26a7779c5268dc172b9534c2f1c060b3e85059a1e"
+    }
+  },
+  "excerpts": {
+    "layers": {
+      "start": "    if (_anyLayerOrder) {",
+      "end": "    // artboard background",
+      "sha256": "dbec4398a16b04a0dde6296e509fa3a9b7478f5a208ef7c48454d7af9ac4c53c"
+    },
+    "elements": {
+      "start": "      if (_anyElemOrder) {",
+      "end": "      // Non-destructive combine groups",
+      "sha256": "b13aa6d5bab844dcd33d38af6b3619d3a71cf72306a7392d2e255427deb54c0e"
+    }
+  },
+  "layerCases": [
+    {
+      "id": "natural",
+      "holders": [
+        {},
+        {},
+        {}
+      ],
+      "expected": [
+        "L0",
+        "L1",
+        "L2"
+      ]
+    },
+    {
+      "id": "displacement",
+      "holders": [
+        {},
+        {},
+        {
+          "motionStatic": {
+            "order": [
+              2
+            ]
+          }
+        }
+      ],
+      "expected": [
+        "L0",
+        "L2",
+        "L1"
+      ]
+    },
+    {
+      "id": "collision",
+      "holders": [
+        {
+          "motionStatic": {
+            "order": [
+              1
+            ]
+          }
+        },
+        {},
+        {
+          "motionStatic": {
+            "order": [
+              1
+            ]
+          }
+        }
+      ],
+      "expected": [
+        "L1",
+        "L0",
+        "L2"
+      ]
+    },
+    {
+      "id": "fraction-round-half",
+      "holders": [
+        {},
+        {},
+        {
+          "motionStatic": {
+            "order": [
+              1.5
+            ]
+          }
+        }
+      ],
+      "expected": [
+        "L0",
+        "L2",
+        "L1"
+      ]
+    },
+    {
+      "id": "clamp-front",
+      "holders": [
+        {
+          "motionStatic": {
+            "order": [
+              -50
+            ]
+          }
+        },
+        {},
+        {}
+      ],
+      "expected": [
+        "L1",
+        "L2",
+        "L0"
+      ]
+    },
+    {
+      "id": "clamp-back",
+      "holders": [
+        {},
+        {},
+        {
+          "motionStatic": {
+            "order": [
+              50
+            ]
+          }
+        }
+      ],
+      "expected": [
+        "L2",
+        "L0",
+        "L1"
+      ]
+    },
+    {
+      "id": "explicit-zero",
+      "holders": [
+        {
+          "motionStatic": {
+            "order": [
+              0
+            ]
+          }
+        },
+        {},
+        {}
+      ],
+      "expected": [
+        "L1",
+        "L2",
+        "L0"
+      ]
+    }
+  ],
+  "elementCases": [
+    {
+      "id": "natural",
+      "holders": {},
+      "expected": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    {
+      "id": "descending",
+      "holders": {
+        "b": {
+          "motionStatic": {
+            "order": [
+              2
+            ]
+          }
+        }
+      },
+      "expected": [
+        "b",
+        "a",
+        "c"
+      ]
+    },
+    {
+      "id": "stable-tie",
+      "holders": {
+        "a": {
+          "motionStatic": {
+            "order": [
+              2
+            ]
+          }
+        },
+        "b": {
+          "motionStatic": {
+            "order": [
+              2
+            ]
+          }
+        }
+      },
+      "expected": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    {
+      "id": "negative",
+      "holders": {
+        "b": {
+          "motionStatic": {
+            "order": [
+              -2
+            ]
+          }
+        }
+      },
+      "expected": [
+        "a",
+        "c",
+        "b"
+      ]
+    }
+  ],
+  "animated": {
+    "extendedFrames": {
+      "keys": [
+        {
+          "frame": -0.5,
+          "value": 1
+        },
+        {
+          "frame": 1.5,
+          "value": 3
+        },
+        {
+          "frame": 40,
+          "value": 5
+        }
+      ],
+      "samples": [
+        {
+          "frame": -0.5,
+          "value": 1
+        },
+        {
+          "frame": 0.5,
+          "value": 2
+        },
+        {
+          "frame": 40,
+          "value": 5
+        }
+      ]
+    },
+    "linearAndHold": {
+      "holders": [
+        {
+          "motionStatic": {
+            "order": [
+              2
+            ]
+          }
+        },
+        {
+          "motion": {
+            "order": {
+              "keys": [
+                {
+                  "frame": 0,
+                  "v": [
+                    1
+                  ],
+                  "hold": true,
+                  "curvePoints": [
+                    {
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "x": 1,
+                      "y": 1
+                    }
+                  ]
+                },
+                {
+                  "frame": 10,
+                  "v": [
+                    3
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "motion": {
+            "order": {
+              "keys": [
+                {
+                  "frame": 0,
+                  "v": [
+                    1
+                  ],
+                  "curvePoints": [
+                    {
+                      "x": 0,
+                      "y": 0
+                    },
+                    {
+                      "x": 1,
+                      "y": 1
+                    }
+                  ]
+                },
+                {
+                  "frame": 10,
+                  "v": [
+                    3
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "samples": [
+        {
+          "frame": 0,
+          "ranks": [
+            2,
+            1,
+            1
+          ],
+          "expected": [
+            "L1",
+            "L0",
+            "L2"
+          ]
+        },
+        {
+          "frame": 5,
+          "ranks": [
+            2,
+            1,
+            2
+          ],
+          "expected": [
+            "L0",
+            "L2",
+            "L1"
+          ]
+        },
+        {
+          "frame": 10,
+          "ranks": [
+            2,
+            3,
+            3
+          ],
+          "expected": [
+            "L2",
+            "L1",
+            "L0"
+          ]
+        },
+        {
+          "frame": 15,
+          "ranks": [
+            2,
+            3,
+            3
+          ],
+          "expected": [
+            "L2",
+            "L1",
+            "L0"
+          ]
+        }
+      ]
+    },
+    "nonlinear": {
+      "holder": {
+        "motion": {
+          "order": {
+            "keys": [
+              {
+                "frame": 0,
+                "v": [
+                  1
+                ],
+                "curvePoints": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "tx": 1,
+                    "ty": 0
+                  },
+                  {
+                    "x": 1,
+                    "y": 1,
+                    "tx": 1,
+                    "ty": 0
+                  }
+                ]
+              },
+              {
+                "frame": 20,
+                "v": [
+                  3
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "samples": [
+        {
+          "frame": -1,
+          "value": 1
+        },
+        {
+          "frame": 0,
+          "value": 1
+        },
+        {
+          "frame": 5,
+          "value": 1.3125
+        },
+        {
+          "frame": 10,
+          "value": 2
+        },
+        {
+          "frame": 20,
+          "value": 3
+        },
+        {
+          "frame": 25,
+          "value": 3
+        }
+      ]
+    },
+    "held": {
+      "holder": {
+        "motion": {
+          "order": {
+            "keys": [
+              {
+                "frame": 0,
+                "v": [
+                  1
+                ],
+                "hold": true,
+                "curvePoints": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 1,
+                    "y": 1
+                  }
+                ]
+              },
+              {
+                "frame": 10,
+                "v": [
+                  3
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "samples": [
+        {
+          "frame": 0,
+          "value": 1
+        },
+        {
+          "frame": 9,
+          "value": 1
+        },
+        {
+          "frame": 10,
+          "value": 3
+        },
+        {
+          "frame": 11,
+          "value": 3
+        }
+      ]
+    },
+    "expression": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "expressions": {
+          "order": {
+            "enabled": true,
+            "code": "value + frame / 5"
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "samples": [
+        {
+          "frame": 0,
+          "value": 2
+        },
+        {
+          "frame": 5,
+          "value": 3
+        },
+        {
+          "frame": 10,
+          "value": 4
+        }
+      ]
+    },
+    "expressionWithoutBase": {
+      "holder": {
+        "expressions": {
+          "order": {
+            "enabled": true,
+            "code": "frame + 9"
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "frame": 5,
+      "layerValue": 1,
+      "elementValue": 14,
+      "layerExplicit": false
+    }
+  },
+  "scopedCases": [
+    {
+      "contextId": "scene-root",
+      "frameScope": {
+        "kind": "authored",
+        "frame": 7
+      },
+      "layerUid": "L0",
+      "strokeId": "a",
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        }
+      },
+      "expectedValue": 2
+    },
+    {
+      "contextId": "scene-root",
+      "frameScope": {
+        "kind": "authored",
+        "frame": 7
+      },
+      "layerUid": "L1",
+      "strokeId": "a",
+      "holder": {
+        "motionStatic": {
+          "order": [
+            -2
+          ]
+        }
+      },
+      "expectedValue": -2
+    },
+    {
+      "contextId": "scene-root",
+      "frameScope": {
+        "kind": "authored",
+        "frame": 8
+      },
+      "layerUid": "L0",
+      "strokeId": "a",
+      "holder": {
+        "motionStatic": {
+          "order": [
+            3
+          ]
+        }
+      },
+      "expectedValue": 3
+    },
+    {
+      "contextId": "symbol-A",
+      "frameScope": {
+        "kind": "authored",
+        "frame": 7
+      },
+      "layerUid": "L0",
+      "strokeId": "a",
+      "holder": {
+        "motionStatic": {
+          "order": [
+            4
+          ]
+        }
+      },
+      "expectedValue": 4
+    },
+    {
+      "contextId": "scene-root",
+      "frameScope": {
+        "kind": "reference",
+        "frame": 7
+      },
+      "layerUid": "L0",
+      "strokeId": "a",
+      "disposition": "unavailable-reference-policy"
+    }
+  ],
+  "storageExample": {
+    "format": "nemo.native-object-order-plan",
+    "formatVersion": 1,
+    "documentFormatVersion": 2,
+    "contexts": [
+      {
+        "contextId": "scene-root",
+        "layers": [
+          {
+            "layerUid": "L0",
+            "naturalPosition": 0,
+            "order": {
+              "static": [
+                2
+              ],
+              "track": {
+                "keys": [
+                  {
+                    "frame": 0,
+                    "v": [
+                      1
+                    ],
+                    "hold": true,
+                    "curvePoints": [
+                      {
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "x": 1,
+                        "y": 1
+                      }
+                    ]
+                  },
+                  {
+                    "frame": 10,
+                    "v": [
+                      3
+                    ]
+                  }
+                ]
+              },
+              "expression": {
+                "enabled": false,
+                "code": "value + frame / 5"
+              }
+            }
+          },
+          {
+            "layerUid": "L1",
+            "naturalPosition": 1,
+            "order": {
+              "track": {
+                "keys": []
+              }
+            }
+          },
+          {
+            "layerUid": "L2",
+            "naturalPosition": 2,
+            "order": {
+              "expression": {
+                "enabled": true,
+                "code": ""
+              }
+            }
+          }
+        ],
+        "scopes": [
+          {
+            "frameScope": {
+              "kind": "authored",
+              "frame": 7
+            },
+            "elements": [
+              {
+                "layerUid": "L0",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {
+                  "static": [
+                    2
+                  ]
+                }
+              },
+              {
+                "layerUid": "L1",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {
+                  "expression": {
+                    "enabled": true,
+                    "code": "value + frame / 5"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "frameScope": {
+              "kind": "authored",
+              "frame": 8
+            },
+            "elements": [
+              {
+                "layerUid": "L0",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {}
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "migration": "explicit-plan-required",
+    "referencePolicy": "unresolved"
+  },
+  "authoringPresence": {
+    "coexisting": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "motion": {
+          "order": {
+            "keys": [
+              {
+                "frame": 0,
+                "v": [
+                  5
+                ],
+                "curvePoints": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 1,
+                    "y": 1
+                  }
+                ]
+              },
+              {
+                "frame": 10,
+                "v": [
+                  7
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "value": 5
+        },
+        {
+          "frame": 10,
+          "value": 7
+        }
+      ],
+      "static": [
+        2
+      ]
+    },
+    "emptyTrack": {
+      "holder": {
+        "motion": {
+          "order": {
+            "keys": []
+          }
+        }
+      },
+      "route": true,
+      "animated": false,
+      "layerExplicit": false,
+      "layerValue": 1,
+      "elementValue": 0
+    },
+    "disabledExpression": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "expressions": {
+          "order": {
+            "enabled": false,
+            "code": "value + 9"
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "frame": 5,
+      "value": 2,
+      "code": "value + 9",
+      "enabled": false
+    },
+    "emptyDraft": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "expressions": {
+          "order": {
+            "enabled": true,
+            "code": ""
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "frame": 5,
+      "value": 2,
+      "code": "",
+      "enabled": true
+    },
+    "toggle": {
+      "initialStatic": [
+        2
+      ],
+      "currentFrame": 0,
+      "nextFrame": 10,
+      "nextValue": [
+        8
+      ],
+      "finalStatic": [
+        8
+      ],
+      "finalKeys": []
+    },
+    "editor": {
+      "initialStatic": [
+        2
+      ],
+      "code": "value + 9",
+      "emptyCode": "",
+      "enabledValue": 11,
+      "disabledValue": 2
+    },
+    "metadata": [
+      {
+        "static": [
+          2
+        ],
+        "track": {
+          "keys": [
+            {
+              "frame": 0,
+              "v": [
+                5
+              ],
+              "curvePoints": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            {
+              "frame": 10,
+              "v": [
+                7
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "track": {
+          "keys": []
+        }
+      },
+      {
+        "static": [
+          2
+        ],
+        "expression": {
+          "enabled": false,
+          "code": "value + 9"
+        }
+      },
+      {
+        "static": [
+          2
+        ],
+        "expression": {
+          "enabled": true,
+          "code": ""
+        }
+      }
+    ]
+  },
+  "storageDeclaredLayers": [
+    "L0",
+    "L1",
+    "L2"
+  ]
+}
