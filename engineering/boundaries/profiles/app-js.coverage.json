@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "15418facc1d123703d05566949c6cb9ec700accc",
-    "sourceRootTree": "2b0372099d920551695ce7dea8db77960307fef8",
+    "candidateCommit": "7a5bfdf3bcbc0b3840f55de8fbbdf968f659c06d",
+    "sourceRootTree": "90a3dd09ac3b2dfc9b08ebf4069e7add59963e13",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "f294ec859093f30bfdc3039a6297b5a3686f848e",
-      "lastChangedCommit": "15418facc1d123703d05566949c6cb9ec700accc"
+      "gitTree": "2cb41d2014088bdbcdf0f50af93ed77ed1c22130",
+      "lastChangedCommit": "7a5bfdf3bcbc0b3840f55de8fbbdf968f659c06d"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "c228c8316c1598eb1004ad3f7d17a18098f3d974",
-      "sha256": "aac344dbd0ed63cb24108319df90550ab900d86ed3ed423ddc71ce5ffdd8810c",
-      "lastChangedCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+      "gitBlob": "ea3adf0d6a3f9f77c612977455161aa9477758b5",
+      "sha256": "35193a3a88c8832dd2e13129166f82ebbc3daf3fab661b5aa5d670ae03159bb4",
+      "lastChangedCommit": "5aaa69a692154fc8bfc33685e10990078571d3bb"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "2be8bb5773db8e79df6a936e3a45640d5e3a7f4865dfc43c4885d74e2f907d86"
+      "value": "fd7328863ebf1f7ea29d583ba7e38a8a6fa19b260d4bc7b7e127c28c799a72bf"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "034d59e606df1dd123a042a1a99db6b31d09793d",
-        "sha256": "307072d48f5e7e7f5cdccd44f65b82c1f3e05a1db00aed90f5c929bd582d8f74",
-        "moduleCount": 191,
-        "basedOnCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+        "gitBlob": "4c34854e3bf9b01570abbc5cca2df62d448ef242",
+        "sha256": "d5413b7a5bedbae3a0be89dc89ce48e6dffe9134dd51e2b050d10590bd0e8786",
+        "moduleCount": 192,
+        "basedOnCommit": "b7d23a1c96930507070cf4b45dcddd9a772f6b91"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -3072,6 +3072,18 @@
           "path": "src/index.html",
           "line": 2363,
           "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/tutorial-native-placement.js",
+      "moduleId": "app.tutorial.native.placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2526,
+          "scriptOrdinal": 180
         }
       ]
     }
