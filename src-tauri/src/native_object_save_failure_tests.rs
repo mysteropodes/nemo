@@ -1,5 +1,49 @@
 //! Failure/atomicity controls split without removing assertions.
+use crate::native_dispatch::{NativeDispatch, NativeReleaseProgress};
 use crate::native_object_bootstrap::save_tests::*;
+use native_engine::{
+    commands::{OpacityRequest, ResponseEnvelope},
+    document::OpacityDocument,
+    export_job::{JobReceipt, PendingFrame},
+};
+use std::sync::{atomic::Ordering, Arc};
+
+struct NonObjectFixture {
+    instance: String,
+    pump: TerminalPump,
+}
+impl NativeDispatch for NonObjectFixture {
+    fn instance_id(&self) -> &str {
+        &self.instance
+    }
+    fn document_id(&self) -> &str {
+        self.pump.document_id()
+    }
+    fn content_revision(&self) -> u64 {
+        self.pump.content_revision()
+    }
+    fn dispatch(&mut self, request: OpacityRequest) -> Result<ResponseEnvelope, String> {
+        self.pump.dispatch(request)
+    }
+    fn replace_document(&mut self, document: OpacityDocument) -> Result<Vec<JobReceipt>, String> {
+        self.pump.replace_document(document)
+    }
+    fn start_next_export_frame(&mut self, job: &str) -> Result<Option<PendingFrame>, String> {
+        self.pump.start_next_export_frame(job)
+    }
+    fn finish_export_frame(&mut self, frame: PendingFrame) -> Result<JobReceipt, String> {
+        self.pump.finish_export_frame(frame)
+    }
+    fn release_project(&mut self) -> Result<NativeReleaseProgress, String> {
+        self.pump.release_project()
+    }
+    fn release_progress(&self) -> Option<NativeReleaseProgress> {
+        self.pump.release_progress()
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
 
 #[test]
 fn cancelled_denied_scope_missing_parent_and_stale_pins_never_stage() {
@@ -57,7 +101,7 @@ fn cancelled_denied_scope_missing_parent_and_stale_pins_never_stage() {
 fn absent_nonobject_released_and_oversized_serialization_have_zero_disk_effect() {
     let scratch = Scratch::new();
     let state = ApplicationMcp::default();
-    let fake = json!({"instanceId":state.instance_id(),"documentId":"other"});
+    let fake = json!({"instanceId":state.instance_id(),"documentId":"document-fixture"});
     let attempt = |state: &ApplicationMcp, pins: &Value| {
         assert!(save_request(
             state,
@@ -69,15 +113,19 @@ fn absent_nonobject_released_and_oversized_serialization_have_zero_disk_effect()
     };
     attempt(&state, &fake);
     let reservation = state.reserve_native_install().unwrap();
+    attempt(&state, &fake);
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     state
         .install_dispatch(
             reservation.generation(),
-            Box::new(TerminalPump(std::sync::Arc::new(
-                std::sync::atomic::AtomicUsize::new(0),
-            ))),
+            Box::new(NonObjectFixture {
+                instance: state.instance_id().to_owned(),
+                pump: TerminalPump(Arc::clone(&calls)),
+            }),
         )
         .unwrap();
     attempt(&state, &fake);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
     let active = ApplicationMcp::default();
     let pins = install(&active, ORIGINAL);
     release(&active, &pins, 0);
