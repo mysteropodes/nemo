@@ -1575,7 +1575,8 @@
     // row must not dead-end there, so spin up a default blank project first.
     var startScreen = document.getElementById('start-screen');
     if (startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
-      await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' });
+      try { await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' }); }
+      catch (error) { if (request === transition) transitioning = false; throw error; }
     }
     hideLauncher(); var released = await finishModule(false);
     if (request !== transition) return;

@@ -121,9 +121,16 @@ function tutorialHarness(mode) {
     console,
     MODULES: [{ id: 'lesson', title: 'Lesson', steps: [] }],
     active: null,
+    transition: 0,
+    transitioning: false,
     document: { getElementById: (id) => id === 'start-screen' ? startScreen : null },
     ensureDom() { continuationCalls.push(['ensureDom']); },
-    closeLauncher() { continuationCalls.push(['closeLauncher']); },
+    hideLauncher() { continuationCalls.push(['hideLauncher']); },
+    finishModule(completed) {
+      continuationCalls.push(['finishModule', completed]);
+      context.active = null;
+      return Promise.resolve(true);
+    },
     renderStep() { continuationCalls.push(['renderStep']); },
   };
   context.window = context;
@@ -219,7 +226,7 @@ test('tutorial startModule preserves immediate undefined legacy replacement succ
   await h.context.startModuleUnderTest('lesson');
 
   assert.equal(h.replacementCalls.length, 1);
-  assert.deepEqual(h.continuationCalls, [['ensureDom'], ['closeLauncher'], ['renderStep']]);
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false], ['ensureDom'], ['renderStep']]);
   assert.equal(h.context.active.module.id, 'lesson');
 });
 
@@ -233,7 +240,7 @@ test('tutorial startModule waits for delayed replacement before lesson setup', a
 
   h.replacement.gate.resolve();
   await pending;
-  assert.deepEqual(h.continuationCalls, [['ensureDom'], ['closeLauncher'], ['renderStep']]);
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false], ['ensureDom'], ['renderStep']]);
   assert.equal(h.context.active.module.id, 'lesson');
 });
 
@@ -246,4 +253,46 @@ test('tutorial startModule rejection propagates with zero lesson setup', async (
   );
   assert.deepEqual(h.continuationCalls, []);
   assert.equal(h.context.active, null);
+  assert.equal(h.context.transitioning, false);
+});
+
+test('tutorial waits for restored prior surface after replacement, before lesson setup', async () => {
+  const h = tutorialHarness('legacy'), release = deferred();
+  h.context.finishModule = completed => { h.continuationCalls.push(['finishModule', completed]); return release.promise; };
+  const pending = h.context.startModuleUnderTest('lesson'); await nextTurn();
+  assert.equal(h.replacementCalls.length, 1);
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false]]);
+  assert.equal(h.context.active, null);
+  release.resolve(true); await pending;
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false], ['ensureDom'], ['renderStep']]);
+  assert.equal(h.context.active.module.id, 'lesson');
+});
+
+test('tutorial surface handoff refusal prevents lesson setup after successful replacement', async () => {
+  const h = tutorialHarness('legacy');
+  h.context.finishModule = completed => { h.continuationCalls.push(['finishModule', completed]); return Promise.resolve(false); };
+  await h.context.startModuleUnderTest('lesson');
+  assert.equal(h.replacementCalls.length, 1);
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false]]);
+  assert.equal(h.context.active, null);
+});
+
+test('tutorial superseded transition cannot publish the replaced lesson', async () => {
+  const h = tutorialHarness('delayed');
+  const pending = h.context.startModuleUnderTest('lesson'); await nextTurn();
+  assert.deepEqual(h.continuationCalls, []);
+  h.context.transition++; h.replacement.gate.resolve(); await pending;
+  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false]]);
+  assert.equal(h.context.active, null);
+});
+
+test('a stale replacement rejection cannot clear a newer pending tutorial transition', async () => {
+  const h = tutorialHarness('legacy'); let reject;
+  h.context.SMProject.newProject = () => new Promise((resolve, fail) => { reject = fail; });
+  const pending = h.context.startModuleUnderTest('lesson'); await nextTurn();
+  h.context.transition++; h.context.transitioning = true;
+  const refusal = assert.rejects(pending, /stale replacement refused/);
+  reject(new Error('stale replacement refused')); await refusal;
+  assert.equal(h.context.transitioning, true);
+  assert.deepEqual(h.continuationCalls, []); assert.equal(h.context.active, null);
 });
