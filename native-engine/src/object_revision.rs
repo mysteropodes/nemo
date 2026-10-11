@@ -130,6 +130,7 @@ mod tests {
                 layer_uid: "limit-layer".into(),
             }],
             objects: vec![],
+            composition_order: Default::default(),
         };
         let snapshot =
             ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();
