@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "474b478f64c32bdb6fc1394bd91fbb2cb6d29201",
-    "sourceRootTree": "e0b2d218ec0bbf47cee1a3db113f8d44442f2bcf",
+    "candidateCommit": "c69be13d04af5b35f6c680f65f1919b117ffa1e5",
+    "sourceRootTree": "5e1dc6063e0f8b816cbfba0f2878a9bbd567d18c",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "47cd3b02739d809189f27ffacf983ccc1009faeb",
-      "lastChangedCommit": "474b478f64c32bdb6fc1394bd91fbb2cb6d29201"
+      "gitTree": "6c22c8ff821c8d67fe6d5317be854a788ce7592a",
+      "lastChangedCommit": "c69be13d04af5b35f6c680f65f1919b117ffa1e5"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "293d70bc69e41ecd00df90f7b1839114a619133c7570098bab1a9f9dd0a6d7b3"
+      "value": "689650dab1e65c351a78433e4a0a16def31c1b6a1a049f912c0574147cf50e20"
     },
     "profiles": [
       {
@@ -3076,18 +3076,6 @@
       ]
     },
     {
-      "path": "src/js/adapters/tutorial-native-placement.js",
-      "moduleId": "app.tutorial.native.placement.adapter",
-      "executionClass": "document-classic",
-      "loadSites": [
-        {
-          "path": "src/index.html",
-          "line": 2526,
-          "scriptOrdinal": 180
-        }
-      ]
-    },
-    {
       "path": "src/js/adapters/project-history-placement.js",
       "moduleId": "app.project.history-placement.adapter",
       "executionClass": "document-classic",
@@ -3096,6 +3084,18 @@
           "path": "src/index.html",
           "line": 2528,
           "scriptOrdinal": 181
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/tutorial-native-placement.js",
+      "moduleId": "app.tutorial.native.placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2526,
+          "scriptOrdinal": 180
         }
       ]
     }
