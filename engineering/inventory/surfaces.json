@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c0fd8f76c6209b735d2a964d17e73113c8cf3303",
-  "describe": "v0.7.0-alpha.4-1135-gc0fd8f76-dirty"
+  "head": "c1ffef1da87a03ab9f35bb231aba6ed16ca034e4",
+  "describe": "v0.7.0-alpha.4-1141-gc1ffef1d-dirty"
  },
- "inputsDigest": "3d23b3453459d11cfee80cd7a5a2dac650a0ef959ffc433e927edda48ded1193",
+ "inputsDigest": "b390c9ce23b0b20107dbf631f2bf4309cb6e173bf5744b8e96ccb444900a52ee",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1865,
+   "line": 1875,
    "members": 0
   },
   "SMWorkspace": {
@@ -465,7 +465,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 95,
+    "functionsVisited": 96,
     "via": "variable btn",
     "references": []
    },
@@ -1705,7 +1705,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 93,
+    "functionsVisited": 94,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -2325,7 +2325,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 146,
+    "functionsVisited": 148,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -3477,7 +3477,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1857"
+    "src/js/tutorial.js:1866"
    ],
    "events": [
     "click"
@@ -3498,7 +3498,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 28,
+    "functionsVisited": 113,
     "via": "callback id",
     "references": []
    },
@@ -4723,7 +4723,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 75,
     "via": "chain",
     "references": []
    },
@@ -5023,7 +5023,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 55,
+    "functionsVisited": 62,
     "via": "variable trigger",
     "references": []
    },
@@ -5236,7 +5236,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 55,
+    "functionsVisited": 57,
     "via": "chain",
     "references": []
    },
@@ -9820,7 +9820,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 62,
+    "functionsVisited": 69,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3334 updatePropsContext()"
@@ -11411,7 +11411,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 62,
+    "functionsVisited": 69,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3340 updatePropsContext()",
@@ -24039,7 +24039,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 106
+    "functionsVisited": 108
    },
    "fixtures": [
     "mesh",
