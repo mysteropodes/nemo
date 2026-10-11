@@ -13,6 +13,7 @@ const fixtureBytes = fs.readFileSync(fixturePath);
 const fixture = JSON.parse(fixtureBytes);
 const clone = value => JSON.parse(JSON.stringify(value));
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+assert.equal(sha(fixtureBytes), '37297da17321c132a488cb170231b68be157a86502a36bcf8dd4ea175260411a');
 const frozen = {};
 for (const [file, pin] of Object.entries(fixture.pins)) {
   const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 4 * 1024 * 1024 });
@@ -128,6 +129,16 @@ test('same stroke ID in other complete scopes cannot alias; Reference identity r
   const identities = fixture.scopedCases.map(({ contextId, frameScope, layerUid, strokeId }) =>
     JSON.stringify([contextId, frameScope.kind, frameScope.frame, layerUid, strokeId]));
   assert.equal(new Set(identities).size, fixture.scopedCases.length);
+  const [first, otherLayer] = fixture.scopedCases;
+  const shared = context([
+    { elementMotion: { a: clone(first.holder) } },
+    { elementMotion: { a: clone(otherLayer.holder) } },
+  ]);
+  assert.equal(shared.SMMotion.elementOrderAt(0, 'a', 7), first.expectedValue);
+  assert.equal(shared.SMMotion.elementOrderAt(1, 'a', 7), otherLayer.expectedValue);
+  mismatch(shared.SMMotion.elementOrderAt(0, 'a', 7), otherLayer.expectedValue);
+  const aliased = new Set(fixture.scopedCases.map(sample => sample.strokeId));
+  mismatch(aliased.size, fixture.scopedCases.length);
   for (const sample of fixture.scopedCases) {
     if (sample.frameScope.kind === 'reference') {
       assert.equal(sample.disposition, 'unavailable-reference-policy');
