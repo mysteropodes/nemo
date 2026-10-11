@@ -28,7 +28,7 @@ function harness() {
     present: async () => { events.push('presented'); }, context: () => context,
     list: async () => [{ path: 'version40.json', ts: 100 }],
     render: rows => events.push(['rows', rows]),
-    restore: async () => false, notice: message => events.push(['notice', message]),
+    confirm: async () => true, restore: async () => false, notice: message => events.push(['notice', message]),
   };
   return { ports, events, controller: create(ports), set available(v) { available = v; }, set context(v) { context = v; } };
 }
@@ -80,6 +80,12 @@ test('document/revision drift refuses stale History before dispatch', async () =
   await h.controller.open(); h.context = 'document-B/revision-0';
   assert.equal(await h.controller.restore('version40.json'), false); assert.equal(calls, 0);
   assert.ok(h.events.includes('release'));
+});
+test('exported controller refuses Restore when its confirmation port is missing', async () => {
+  const h = harness(); delete h.ports.confirm; let calls = 0;
+  h.ports.restore = async () => { calls++; return true; };
+  await h.controller.open(); assert.equal(await h.controller.restore('version40.json'), false);
+  assert.equal(calls, 0); assert.equal(h.events.includes('release'), false);
 });
 test('Restore holds layout and prevents close/double dispatch until publication settles', async () => {
   const h = harness(), restored = deferred(); h.ports.restore = () => restored.promise;
@@ -141,6 +147,89 @@ function domHarness(width, collapsed, windowWidth = 1000) {
   const ui = { context: () => ({ path: 'A.json' }), notice: message => notices.push(message),
     list: async () => [{ ts: 100, path: 'version40.json' }], restore: async () => false, relTime: () => '30s' };
   return { root, props, identity, elements, notices, ui, controller: bind(root, ui) };
+}
+function confirmationHarness() {
+  const h = domHarness(280, false), calls = [];
+  h.root.confirm = () => { throw Error('desktop must not use intercepted plain confirm'); };
+  h.controller = bind(h.root, { ...h.ui, restore: async path => { calls.push(path); return true; } });
+  h.calls = calls;
+  h.clickRestore = () => h.elements.get('history-list').children[0].children[1].listeners.click();
+  return h;
+}
+test('actual Restore button waits for explicit desktop approval and dispatches only once', async () => {
+  const h = confirmationHarness(), decision = deferred(); let confirmations = 0;
+  h.root.__TAURI__.dialog = { confirm: () => { confirmations++; return decision.promise; } };
+  await h.controller.open(); const pending = h.clickRestore();
+  assert.equal(confirmations, 1); assert.deepEqual(h.calls, []);
+  assert.equal(await h.clickRestore(), false); assert.equal(confirmations, 1);
+  assert.equal(await h.controller.close(), false, 'in-flight confirmation retains the History lease');
+  assert.equal(h.elements.get('history-list').children[0].children[1].disabled, true);
+  decision.resolve(true); assert.equal(await pending, true);
+  assert.deepEqual(h.calls, ['version40.json']);
+  assert.equal(h.elements.get('history-modal').style.display, 'none');
+  assert.equal(h.elements.get('top-area').children.length, 0);
+});
+for (const answer of [false, undefined, null, 1, 'true']) {
+  test('desktop confirmation must resolve boolean true: ' + JSON.stringify(answer), async () => {
+    const h = confirmationHarness(), before = JSON.stringify(h.identity);
+    h.root.__TAURI__.dialog = { confirm: async () => answer };
+    await h.controller.open(); assert.equal(await h.clickRestore(), false);
+    assert.deepEqual(h.calls, []); assert.equal(JSON.stringify(h.identity), before);
+    assert.equal(h.elements.get('history-modal').style.display, 'flex');
+    assert.equal(h.elements.get('history-list').children[0].children[1].disabled, false);
+  });
+}
+for (const mode of ['missing', 'reject', 'throw']) {
+  test('unavailable or failed desktop confirmation refuses Restore: ' + mode, async () => {
+    const h = confirmationHarness(), before = JSON.stringify(h.identity);
+    if (mode !== 'missing') h.root.__TAURI__.dialog = { confirm: () => {
+      if (mode === 'throw') throw Error('dialog failed');
+      return Promise.reject(Error('dialog failed'));
+    } };
+    await h.controller.open(); assert.equal(await h.clickRestore(), false);
+    assert.deepEqual(h.calls, []); assert.equal(JSON.stringify(h.identity), before);
+    assert.equal(h.elements.get('history-modal').style.display, 'flex');
+    assert.equal(h.elements.get('history-list').children[0].children[1].disabled, false);
+    assert.equal(h.notices.length, 1);
+  });
+}
+for (const drift of ['document', 'revision', 'lifecycle', 'path']) {
+  test('late desktop approval cannot restore a changed History context: ' + drift, async () => {
+    const h = confirmationHarness(), decision = deferred();
+    h.root.__TAURI__.dialog = { confirm: () => decision.promise };
+    let path = 'A.json', generation = 1;
+    h.root.NemoNativeOpacityCutover.getNativeIdentity = () => ({ documentId: h.identity.documentId, generation });
+    h.root.NemoNativeOpacityCutover.presentPreview = async frame => ({ ...h.identity, owner: 'native',
+      lifecycleGeneration: generation, viewGeneration: 1, workId: 'current-frame', status: 'presented', frame });
+    h.controller = bind(h.root, { ...h.ui, context: () => ({ path }),
+      restore: async value => { h.calls.push(value); return true; } });
+    await h.controller.open(); const pending = h.clickRestore();
+    if (drift === 'document') h.identity.documentId = 'B';
+    if (drift === 'revision') h.identity.contentRevision++;
+    if (drift === 'lifecycle') generation++;
+    if (drift === 'path') path = 'B.json';
+    const changed = JSON.stringify(h.identity); decision.resolve(true);
+    assert.equal(await pending, false); assert.deepEqual(h.calls, []);
+    assert.equal(JSON.stringify(h.identity), changed);
+    assert.deepEqual(h.notices, ['The document changed; reopen History.']);
+  });
+}
+test('denied confirmation releases the busy gate so a later explicit decision can Restore', async () => {
+  const h = confirmationHarness(); let confirmations = 0;
+  h.root.__TAURI__.dialog = { confirm: async () => ++confirmations === 2 };
+  await h.controller.open(); assert.equal(await h.clickRestore(), false);
+  assert.equal(await h.clickRestore(), true); assert.equal(confirmations, 2);
+  assert.deepEqual(h.calls, ['version40.json']);
+});
+for (const mode of ['true', 'false', 'promise-true', 'promise-reject']) {
+  test('browser fallback never treats Promise truthiness as confirmation: ' + mode, async () => {
+    const h = confirmationHarness(); delete h.root.__TAURI__;
+    h.root.confirm = () => mode === 'promise-true' ? Promise.resolve(true) :
+      mode === 'promise-reject' ? Promise.reject(Error('unsupported dialog')) : mode === 'true';
+    await h.controller.open(); assert.equal(await h.clickRestore(), mode === 'true');
+    assert.deepEqual(h.calls, mode === 'true' ? ['version40.json'] : []);
+    await new Promise(done => setImmediate(done));
+  });
 }
 for (const [width, collapsed, viewport] of [[280, false, 1000], [520, false, 1000], [520, true, 1000], [280, false, 500]]) {
   test(`real DOM binding preserves panel preferences and positive viewport (${width}/${collapsed}/${viewport})`, async () => {

@@ -58,8 +58,14 @@
       if (!active || !ready || busy) return false;
       if (ports.context() !== context) { await close(); ports.notice('The document changed; reopen History.'); return false; }
       busy = true; ready = false; ports.enable(false);
-      var restored = false;
-      try { restored = await ports.restore(path) === true; }
+      var restored = false, token = generation;
+      try {
+        var approved = typeof ports.confirm === 'function' && await ports.confirm();
+        if (approved === true) {
+          if (!current(token) || ports.context() !== context) throw new Error('The document changed; reopen History.');
+          restored = await ports.restore(path) === true;
+        }
+      }
       catch (error) { ports.notice(failureNotice(error)); }
       finally { busy = false; }
       if (restored) await close();
@@ -158,6 +164,21 @@
         return JSON.stringify([ui.context(), native && native.identity(), native && native.getNativeIdentity()]);
       },
       present: present, list: ui.list, restore: ui.restore, notice: ui.notice,
+      confirm: async function () {
+        var message = 'Restaurer cette version ? Le document actuel non sauvegardé sera remplacé.';
+        if ('__TAURI__' in root) {
+          var dialog = root.__TAURI__ && root.__TAURI__.dialog;
+          if (!dialog || typeof dialog.confirm !== 'function') throw new Error('Version Restore confirmation is unavailable.');
+          return await dialog.confirm(message, { title: 'Restaurer une version' }) === true;
+        }
+        if (typeof root.confirm !== 'function') return false;
+        var answer = root.confirm(message);
+        if (answer && typeof answer.then === 'function') {
+          Promise.resolve(answer).catch(function () {});
+          return false;
+        }
+        return answer === true;
+      },
       render: function (rows) {
         list.textContent = ''; controls = [];
         if (!rows.length) { list.textContent = root.__TAURI__ ? 'Aucun instantané pour l’instant — revenez dans 30s.' : 'Historique disque disponible uniquement dans l’app desktop.'; return; }
@@ -167,9 +188,7 @@
           label.textContent = ui.relTime(version.ts) + ' (' + new Date(version.ts).toLocaleTimeString(undefined,
             { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ')';
           button.className = 'pbtn'; button.textContent = 'Restaurer'; button.disabled = true;
-          button.addEventListener('click', function () {
-            if (root.confirm('Restaurer cette version ? Le document actuel non sauvegardé sera remplacé.')) controller.restore(version.path);
-          });
+          button.addEventListener('click', function () { return controller.restore(version.path); });
           controls.push(button); row.appendChild(label); row.appendChild(button); list.appendChild(row);
         });
       }
