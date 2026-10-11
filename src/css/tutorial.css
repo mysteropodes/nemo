@@ -66,6 +66,11 @@
 #tut-tooltip .tut-close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;line-height:1;pointer-events:auto;}
 #tut-tooltip .tut-close:hover{color:var(--text);}
 
+/* Uncovered temporary column; preserve the properties panel's preferences. */
+#tutorial-native-space{flex:none;min-width:220px;align-self:stretch;}
+#tut-tooltip.tutorial-native-card{transform:none;overflow:auto;transition:opacity .2s;}
+#tut-tooltip.tutorial-native-pending{visibility:hidden;}
+
 /* ---- Module launcher modal ---- */
 /* Opened from the start screen (#start-screen, z-index:500) via its own
    row, same reason #kitsu-modal overrides the default .modal-overlay

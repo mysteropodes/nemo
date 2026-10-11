@@ -2291,6 +2291,18 @@
       "publicApi": [
         "project-entry.js"
       ]
+    },
+    {
+      "id": "app.tutorial.native.placement.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "tutorial-native-placement.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "tutorial-native-placement.js"
+      ]
     }
   ],
   "layerRules": {
