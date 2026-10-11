@@ -244,6 +244,7 @@ pub fn run() {
             application_mcp::nemo_native_revision_sync,
             native_application_commands::nemo_native_bootstrap,
             native_object_bootstrap::nemo_native_object_bootstrap,
+            native_object_bootstrap::nemo_native_object_save_as,
             native_reproduction_session::nemo_native_reproduction_session,
             native_application_commands::nemo_native_replace,
             native_application_commands::nemo_native_bind_output,

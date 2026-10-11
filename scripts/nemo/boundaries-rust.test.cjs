@@ -499,7 +499,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
   assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
