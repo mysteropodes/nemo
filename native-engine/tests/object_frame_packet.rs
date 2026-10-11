@@ -7,6 +7,9 @@ use crate::object_frame_packet::{
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
+#[path = "object_order_evaluation.rs"]
+mod numeric_order_tests;
+
 fn cases() -> Value {
     serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
