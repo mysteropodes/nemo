@@ -2,8 +2,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const { plan, create, bind } = require('../src/js/adapters/project-history-placement.js');
 function deferred() { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; }
+test('actual History callback retains original seconds, minutes and rounded hours labels', () => {
+  const source = fs.readFileSync('src/js/project.js', 'utf8');
+  const match = source.match(/function relTime\(ts\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(match, 'one named formatter is wired into the History adapter');
+  assert.match(source, /relTime:\s*relTime\b/);
+  const now = 10_000_000;
+  const format = vm.runInNewContext('(' + match[0] + ')', { Date: { now: () => now }, Math });
+  for (const [seconds, expected] of [[-1, 'il y a 0s'], [0, 'il y a 0s'], [59, 'il y a 59s'],
+    [60, 'il y a 1 min'], [3540, 'il y a 59 min'], [3600, 'il y a 1h'],
+    [3660, 'il y a 1h1min'], [5400, 'il y a 2h30min'], [7200, 'il y a 2h']]) {
+    assert.equal(format(now - seconds * 1000), expected);
+  }
+});
 function harness() {
   const events = []; let available = 900, context = 'document-A/revision-2';
   const ports = {

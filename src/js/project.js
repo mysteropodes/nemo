@@ -267,13 +267,21 @@
     return true;
   }
 
+  function relTime(ts){
+    var s=Math.max(0,Math.round((Date.now()-ts)/1000));
+    if(s<60)return 'il y a '+s+'s';
+    var m=Math.round(s/60);
+    if(m<60)return 'il y a '+m+' min';
+    var h=Math.round(m/60);
+    return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');
+  }
   var historyUi=null;
   function openHistoryModal(){
     if(!historyUi)historyUi=window.NemoProjectHistoryPlacement.bind(window,{
       context:function(){return {path:currentPath,name:currentName};},
       list:function(){return tauriOk()?listVersionHistory():Promise.resolve([]);},
       restore:restoreVersion,notice:showToast,
-      relTime:function(ts){var seconds=Math.max(0,Math.round((Date.now()-ts)/1000));return seconds<60?'il y a '+seconds+'s':'il y a '+Math.round(seconds/60)+' min';}
+      relTime:relTime
     });
     return historyUi.open();
   }
