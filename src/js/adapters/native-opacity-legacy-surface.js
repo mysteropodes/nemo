@@ -109,11 +109,39 @@
     function onError(event) {
       if (event && event.error && event.error.name === 'NemoNativeReleaseRequired') event.preventDefault();
     }
+    var active = true, observer = null, lastMapping = null;
+    function ownsPublication() { return active && root.NemoNativeOpacityCutover === cutover; }
+    function geometryKey() {
+      try { return JSON.stringify(mapping(root)); } catch (_) { return null; }
+    }
+    function onWindowResize() {
+      if (!ownsPublication()) return;
+      if (observer) lastMapping = geometryKey();
+      resize();
+    }
     root.addEventListener('error', onError, true);
-    root.addEventListener('resize', resize);
+    root.addEventListener('resize', onWindowResize);
+    var canvas = root.document && root.document.getElementById('drawing-canvas');
+    if (canvas && typeof root.ResizeObserver === 'function') {
+      lastMapping = geometryKey();
+      observer = new root.ResizeObserver(function (entries) {
+        if (!ownsPublication() || !Array.prototype.some.call(entries, function (entry) {
+          return entry.target === canvas;
+        })) return;
+        var next = geometryKey();
+        if (next === null || next === lastMapping) return;
+        lastMapping = next;
+        // The existing viewport queue coalesces and fences this notification,
+        // then reads latest physical bounds at execution; no second scheduler.
+        resize();
+      });
+      observer.observe(canvas);
+    }
     return function () {
+      active = false;
+      if (observer) observer.disconnect();
       root.removeEventListener('error', onError, true);
-      root.removeEventListener('resize', resize);
+      root.removeEventListener('resize', onWindowResize);
       if (root.NemoNativeOpacityLegacyAdmission === admission) root.NemoNativeOpacityLegacyAdmission = original.admission;
       if (root.NemoNativeOpacityCutover === cutover) root.NemoNativeOpacityCutover = original.cutover;
       if (root.NemoNativeOpacityProject === project) root.NemoNativeOpacityProject = original.project;

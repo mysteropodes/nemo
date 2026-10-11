@@ -3407,3 +3407,107 @@ test('N20 bootstrap stays browser-inert and binds only the accepted desktop host
   assert.equal(await desktop.NemoNativeOpacityProject.importJSON('unsupported', true), false);
   assert.deepEqual(imports, []);
 });
+
+function n20vGeometrySurface(harness) {
+  let bounds = { left: 20, top: 30, width: 900, height: 500 }, sequence = 0;
+  const timers = new Map(), listeners = new Map(), observers = [], invocations = [];
+  const canvas = { getBoundingClientRect() { return { ...bounds }; } };
+  const root = {
+    devicePixelRatio: 2,
+    document: { getElementById(id) { return id === 'drawing-canvas' ? canvas : null; } },
+    SM: { importJSON() {} }, state: { currentFrame: 0 },
+    NemoApplication: { handle() {} }, NemoOpacityApplication: { meta() {}, legacy() {} },
+    __TAURI__: { core: { async invoke(command, payload) {
+      assert.equal(command, 'nemo_native_viewport_resize');
+      invocations.push(clone(payload.request)); return { status: 'resized' };
+    } } },
+    addEventListener(name, callback) { listeners.set(name, callback); },
+    removeEventListener(name, callback) { if (listeners.get(name) === callback) listeners.delete(name); },
+    setTimeout(callback) { timers.set(++sequence, callback); return sequence; },
+    clearTimeout(id) { timers.delete(id); },
+    ResizeObserver: class {
+      constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+      observe(target) { assert.strictEqual(target, canvas); this.target = target; }
+      disconnect() { this.disconnected = true; }
+    },
+  };
+  const ports = NativeLegacySurface.desktopPorts(root, {});
+  const viewport = NativeOpacityViewport.create(harness.state.lifecycle, { surface: ports.surface }, () => false, () => false);
+  function install() {
+    const cutover = { blocksLegacy: () => harness.controller.blocksLegacy() };
+    return ports.surface.publish({}, cutover, {}, { handle() { return null; }, meta() {}, legacy() {} }, viewport.resizeViewport);
+  }
+  return {
+    root, canvas, observers, invocations, viewport, install,
+    bounds(value) { bounds = { ...bounds, ...value }; },
+    observe(observer = observers.at(-1), target = canvas) {
+      assert.ok(observer, 'canvas geometry must have a production ResizeObserver');
+      observer.callback([{ target }]);
+    },
+    windowResize() { assert.ok(listeners.has('resize')); listeners.get('resize')(); },
+    async flush() { const pending = [...timers.values()]; timers.clear(); for (const callback of pending) await callback(); },
+    get timerCount() { return timers.size; }, get listenerCount() { return listeners.size; },
+  };
+}
+
+test('N20V inspector geometry without window resize coalesces current CSS and physical bounds', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const bytesBefore = harness.controller.persistenceJSON();
+  const fixture = n20vGeometrySurface(harness), dispose = fixture.install();
+  fixture.observe(); assert.equal(fixture.timerCount, 0, 'initial same geometry is a no-op');
+  fixture.bounds({ width: 1040 }); fixture.observe();
+  fixture.bounds({ left: 35, width: 880, height: 460 }); fixture.observe();
+  assert.equal(fixture.timerCount, 1, 'width drag notifications join the existing viewport queue');
+  fixture.root.devicePixelRatio = 1.5;
+  fixture.bounds({ width: 870 }); // Bounds must be read at execution, not from an earlier observer entry.
+  await fixture.flush();
+  assert.equal(fixture.invocations.length, 1);
+  assert.deepEqual(fixture.invocations[0], { apiVersion: 2, instanceId: 'instance-a', viewport: {
+    cssBounds: { x: 35, y: 30, width: 870, height: 460 }, physicalExtent: { width: 1305, height: 690 },
+    compositionExtent: { width: 320, height: 180 }, reportedDpr: 1.5 } });
+  assert.equal(harness.controller.persistenceJSON(), bytesBefore);
+  assert.equal(harness.state.previews.length, 0, 'geometry notification cannot claim presentation');
+  dispose();
+});
+
+test('N20V duplicate and foreign geometry callbacks are inert and OS resize remains effective', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const fixture = n20vGeometrySurface(harness), dispose = fixture.install();
+  fixture.observe(); fixture.observe(); assert.equal(fixture.timerCount, 0);
+  fixture.bounds({ width: 840 }); fixture.observe(undefined, {}); assert.equal(fixture.timerCount, 0);
+  fixture.observe(); await fixture.flush(); assert.equal(fixture.invocations.length, 1);
+  fixture.observe(); assert.equal(fixture.timerCount, 0);
+  fixture.bounds({ left: 60, width: 720 }); fixture.root.devicePixelRatio = 3;
+  fixture.windowResize(); fixture.observe(); assert.equal(fixture.timerCount, 1);
+  await fixture.flush(); assert.equal(fixture.invocations.length, 2);
+  assert.equal(fixture.invocations[1].viewport.cssBounds.x, 60);
+  assert.equal(fixture.invocations[1].viewport.physicalExtent.width, 2160);
+  dispose();
+});
+
+test('N20V disposal and reinstall disconnect observers and reject already queued old callbacks', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const fixture = n20vGeometrySurface(harness), firstDispose = fixture.install();
+  fixture.observe(); const first = fixture.observers[0]; firstDispose();
+  assert.equal(first.disconnected, true); assert.equal(fixture.listenerCount, 0);
+  fixture.bounds({ width: 780 }); fixture.observe(first); assert.equal(fixture.timerCount, 0);
+  const secondDispose = fixture.install(); fixture.observe();
+  fixture.bounds({ width: 750 }); fixture.observe(first); assert.equal(fixture.timerCount, 0);
+  fixture.observe(); await fixture.flush(); assert.equal(fixture.invocations.length, 1);
+  secondDispose(); assert.equal(fixture.observers[1].disconnected, true);
+  fixture.bounds({ width: 730 }); fixture.observe(); assert.equal(fixture.timerCount, 0);
+});
+
+test('N20V pending geometry cannot resize released identity and reentry uses the current session', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const fixture = n20vGeometrySurface(harness), dispose = fixture.install(); fixture.observe();
+  fixture.bounds({ width: 800 }); fixture.observe(); assert.equal(fixture.timerCount, 1);
+  await harness.controller.releaseCurrent('replacement');
+  assert.equal(await harness.controller.activate(harness.prepared), true);
+  await fixture.flush(); assert.equal(fixture.invocations.length, 0, 'old session job cannot resize the replacement');
+  fixture.bounds({ width: 770 }); fixture.observe(); await fixture.flush();
+  assert.equal(fixture.invocations.length, 1);
+  assert.equal(harness.state.identity.documentId, 'native-document-2');
+  assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1540);
+  assert.equal(harness.controller.status(), 'native'); dispose();
+});
