@@ -1562,7 +1562,7 @@
     // underneath). Launching a lesson straight from the start screen's own
     // row must not dead-end there, so spin up a default blank project first.
     var startScreen = document.getElementById('start-screen');
-    if (startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
+    if (!mod.unavailable && startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
       try { await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' }); }
       catch (error) { if (request === transition) transitioning = false; throw error; }
     }

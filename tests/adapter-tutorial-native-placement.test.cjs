@@ -356,6 +356,29 @@ test('closing the unavailable Reference notice never records completion or a suc
   assert.equal(h.store.has('nemo-tutorial-done'), false);
   assert.deepEqual(notices, []);
 });
+test('ordinary start-screen Reference row opens its notice without creating a project', async () => {
+  const h = tutorialFixture(); let creations = 0;
+  h.nodes.get('start-screen').classList.remove('hid');
+  h.window.SMProject = { newProject: async () => { creations++; } };
+  const original = JSON.stringify(h.window.state);
+  await h.window.SMTutorial.open();
+  const list = h.nodes.get('tut-mod-list');
+  list.children.find(el => el.className === 'tut-cat-hdr' && el.innerHTML.includes('Médias')).listeners.click();
+  list.children.find(el => el.innerHTML.includes('roto')).listeners.click();
+  await new Promise(setImmediate);
+  assert.equal(creations, 0);
+  const card = h.nodes.get('tut-tooltip');
+  assert.equal(card.classList.contains('on'), true);
+  assert.ok(card.innerHTML.includes('Référence de rotoscopie indisponible'));
+  assert.ok(card.innerHTML.includes('>Fermer</button>'));
+  assert.equal(h.nodes.get('start-screen').classList.contains('hid'), false);
+  assert.equal(JSON.stringify(h.window.state), original);
+  const stops = h.stopCount();
+  h.handlers.get('.tut-nextclick')(); await new Promise(setImmediate);
+  assert.equal(h.stopCount(), stops + 1);
+  assert.equal(card.classList.contains('on'), false);
+  assert.equal(h.store.has('nemo-tutorial-done'), false);
+});
 test('historical Reference completion cannot show a done badge or inflate available lesson counts', async () => {
   const h = tutorialFixture(); h.store.set('nemo-tutorial-done', JSON.stringify(['reference', 'media']));
   await h.window.SMTutorial.open();
@@ -395,7 +418,7 @@ test('superseded project creation cannot hide or close a newer ordinary launcher
   const h = tutorialFixture(), project = deferred();
   h.nodes.get('start-screen').classList.remove('hid');
   h.window.SMProject = { newProject: () => project.promise };
-  const old = h.window.SMTutorial.start('reference'); await new Promise(setImmediate);
+  const old = h.window.SMTutorial.start('palette'); await new Promise(setImmediate);
   await h.window.SMTutorial.open();
   assert.equal(h.nodes.get('tut-launcher').style.display, 'flex'); assert.equal(h.places.length, 1);
   project.resolve(); await old;
