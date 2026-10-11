@@ -11,8 +11,9 @@ The oracle is `examples/native-object-order-v2/baseline.json`, version
 `nemo.native-object-order-baseline/1`. It names frozen source
 `ded641bd763379f36d629bf1686fcce8a6137a66`, exact Git blobs/content SHA256 and
 renderer-excerpt SHA256. The test reads those actual Git objects, fails if absent
-or different, loads the complete frozen `curve.js` and `motion.js` in an isolated
-VM and calls their public Order evaluators. It runs the actual layer-insertion
+or different, loads the complete frozen `curve.js`, its required `opacity.js`
+domain and `motion.js` in an isolated VM and calls their public Order evaluators.
+It runs the actual layer-insertion
 and element-sort statements from `engine-bridge.js`; it does not copy them into
 an expected-order implementation. Missing history is a failed prerequisite, not
 a skipped test or permission to substitute current source. The frozen export

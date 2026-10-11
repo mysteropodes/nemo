@@ -3,6 +3,10 @@
   "baseline": "ded641bd763379f36d629bf1686fcce8a6137a66",
   "direction": "back-to-front",
   "pins": {
+    "src/js/domain/animation/opacity.js": {
+      "blob": "17478ea8cc5c2233f3cdac1284688a0af1144c36",
+      "sha256": "4863f27ccc6396db285c70586d30d1284aff64885fa51ffffcd95aeddfda3841"
+    },
     "src/js/animation/curve.js": {
       "blob": "c42f255ee8f204806e6d3b539951864c97a86cfd",
       "sha256": "d6c70a8848a8475f9d7ec62ce62127748e0938f3058dae40a8154a82389534c7"

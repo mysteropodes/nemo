@@ -41,7 +41,7 @@ function context(holders) {
   };
   result.window = result;
   vm.createContext(result);
-  for (const file of ['src/js/animation/curve.js', 'src/js/motion.js']) {
+  for (const file of ['src/js/animation/curve.js', 'src/js/domain/animation/opacity.js', 'src/js/motion.js']) {
     vm.runInContext(frozen[file], result, { filename: `${fixture.baseline}:${file}`, timeout: 1000 });
   }
   assert.equal(typeof result.SMMotion.layerOrderAt, 'function');
