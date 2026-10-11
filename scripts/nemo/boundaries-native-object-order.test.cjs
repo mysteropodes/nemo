@@ -9,7 +9,7 @@ const C = require('./lib/boundaries-coverage.cjs');
 const root = path.resolve(__dirname, '../..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const profile = JSON.parse(read('engineering/boundaries/profiles/rust.profile.json'));
-const policy = JSON.parse(read('engineering/boundaries/profiles/nemo-desktop.edges.json'));
+const policy = JSON.parse(read('engineering/boundaries/profiles/native-engine.edges.json'));
 const paths = ['native-engine/src/object_order_document.rs',
   'native-engine/src/object_order_codec.rs', 'native-engine/tests/object_order_codec.rs'];
 
@@ -39,11 +39,15 @@ test('actual native graph stays unchanged and codec cannot import application au
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 18);
   assert.equal(result.edges.length, 44);
+  assert.deepEqual(result.unsupported, []);
   assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-order-boundary-'));
   try {
     fs.cpSync(path.join(root, 'native-engine/src'), path.join(scratch, 'native-engine/src'), { recursive: true });
     fs.appendFileSync(path.join(scratch, paths[1]), '\nuse crate::application::NativeApplication;\n');
-    assert.equal(R.checkRustCrate(profile, policy, { root: scratch }).ok, false);
+    const refused = R.checkRustCrate(profile, policy, { root: scratch });
+    assert.equal(refused.ok, false);
+    assert.ok(refused.violations.some(v => v.rule === 'layer-violation' && v.file === paths[1]
+      && v.detail.targetModule === 'rust.native.engine.application'));
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 });
