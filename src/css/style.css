@@ -2852,3 +2852,17 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 /* No margin of its own now that the list supplies the 8px on both sides —
    a margin here would have added to that gap instead of replacing it. */
 .ta-sep{height:1px;background:rgba(236,234,231,.10);}
+
+/* History must occupy WebKit space outside the native viewport NSView.
+   This transient layout leaves inspector width/collapse/order preferences intact. */
+#top-area.history-column-open > #props-panel,
+#top-area.history-column-open > #props-panel-resize{display:none!important;}
+#history-column-space{flex:none;min-width:220px;align-self:stretch;pointer-events:none;}
+#history-modal.history-column .modal-box{position:fixed;box-sizing:border-box;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+#history-modal.history-column .modal-hdr{flex:none;}
+#history-modal.history-column .modal-bdy{min-height:0;overflow:auto;}
+#history-modal.history-column #history-list{max-height:none!important;}
+.history-version-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:4px;font-size:11px;}
+.history-version-row:hover{background:var(--panel3);}
+.history-version-row span{min-width:0;overflow-wrap:anywhere;}
+.history-version-row button{flex:none;font-size:10px;}

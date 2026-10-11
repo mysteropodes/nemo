@@ -248,7 +248,7 @@
     modal:function(){return document.getElementById('history-modal');},
     backup:writeVersionSnapshot,
     backupFailed:function(error){console.warn('[history] pre-restore snapshot failed',error);},
-    restored:function(){ensureInitialTab();showToast(SM.t('toastVersionRestored'));},
+    restored:function(){ensureInitialTab();if(historyUi)historyUi.close();showToast(SM.t('toastVersionRestored'));},
     unavailable:function(){showToast('Could not finish restoring this version.');}
   });
   async function restoreVersion(path){
@@ -275,33 +275,15 @@
     var h=Math.round(m/60);
     return 'il y a '+h+'h'+(m%60?Math.round(m%60)+'min':'');
   }
-  async function openHistoryModal(){
-    var modal=document.getElementById('history-modal'),list=document.getElementById('history-list');
-    if(!modal||!list)return;
-    if(!tauriOk()){list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Historique disque disponible uniquement dans l\'app desktop.</div>';modal.style.display='flex';return;}
-    list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Chargement…</div>';
-    modal.style.display='flex';
-    var versions=await listVersionHistory();
-    if(!versions.length){list.innerHTML='<div style="font-size:11px;color:var(--text-dim)">Aucun instantané pour l\'instant — revenez dans 30s.</div>';return;}
-    list.innerHTML='';
-    versions.forEach(function(v){
-      var row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:4px;cursor:pointer;font-size:11px;';
-      row.onmouseenter=function(){row.style.background='var(--panel3)';};
-      row.onmouseleave=function(){row.style.background='';};
-      var d=new Date(v.ts);
-      var abs=d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-      row.innerHTML='<span>'+relTime(v.ts)+' <span style="color:var(--text-dim)">('+abs+')</span></span>';
-      var btn=document.createElement('button');
-      btn.className='pbtn';btn.textContent='Restaurer';btn.style.fontSize='10px';
-      btn.addEventListener('click',function(e){
-        e.stopPropagation();
-        if(!confirm('Restaurer cette version ? Le document actuel non sauvegardé sera remplacé.'))return;
-        restoreVersion(v.path).then(function(restored){if(restored)modal.style.display='none';});
-      });
-      row.appendChild(btn);
-      list.appendChild(row);
+  var historyUi=null;
+  function openHistoryModal(){
+    if(!historyUi)historyUi=window.NemoProjectHistoryPlacement.bind(window,{
+      context:function(){return {path:currentPath,name:currentName};},
+      list:function(){return tauriOk()?listVersionHistory():Promise.resolve([]);},
+      restore:restoreVersion,notice:showToast,
+      relTime:relTime
     });
+    return historyUi.open();
   }
 
   // ---- Team sync (v16, Phase 2) — async, NOT realtime. Reuses the exact
@@ -728,10 +710,6 @@
     // Version history modal (v15)
     var histBtn=document.getElementById('btn-history');
     if(histBtn)histBtn.addEventListener('click',openHistoryModal);
-    var histClose=document.getElementById('history-close');
-    if(histClose)histClose.addEventListener('click',function(){document.getElementById('history-modal').style.display='none';});
-    var histModal=document.getElementById('history-modal');
-    if(histModal)histModal.addEventListener('click',function(e){if(e.target===histModal)histModal.style.display='none';});
     document.getElementById('file-input').addEventListener('change',function(e){
       var f=e.target.files[0];if(!f)return;
       var r=new FileReader();r.onload=function(ev){try{var result=afterMaybe(importProjectJSON(ev.target.result,true,true),function(imported){if(!imported||!nativeOpenReady(imported))throw new Error('Invalid or unpresented project');return afterMaybe(revealOpenedProject(imported),function(){markSaved(projectJSON());currentPath=null;currentName=window.SMProjectDocument.baseName(f.name)||'Untitled';updateCurrentLabel();ensureInitialTab();showToast('Opened: '+currentName);});});if(result&&typeof result.catch==='function')result.catch(function(){showToast('Could not open file — it may be invalid or corrupted');});}catch(err){showToast('Could not open file — it may be invalid or corrupted');}};
