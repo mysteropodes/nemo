@@ -282,7 +282,7 @@ test('tutorial superseded transition cannot publish the replaced lesson', async 
   const pending = h.context.startModuleUnderTest('lesson'); await nextTurn();
   assert.deepEqual(h.continuationCalls, []);
   h.context.transition++; h.replacement.gate.resolve(); await pending;
-  assert.deepEqual(h.continuationCalls, [['hideLauncher'], ['finishModule', false]]);
+  assert.deepEqual(h.continuationCalls, []);
   assert.equal(h.context.active, null);
 });
 

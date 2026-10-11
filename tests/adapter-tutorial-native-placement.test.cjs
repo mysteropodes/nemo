@@ -338,6 +338,17 @@ test('native close refusal is a false handoff result, not a swallowed success', 
   assert.equal(await h.controller.close(), false); assert.equal(h.notices.length, 1);
   assert.equal(h.nodes.has('tutorial-native-space'), false);
 });
+test('superseded project creation cannot hide or close a newer ordinary launcher', async () => {
+  const h = tutorialFixture(), project = deferred();
+  h.nodes.get('start-screen').classList.remove('hid');
+  h.window.SMProject = { newProject: () => project.promise };
+  const old = h.window.SMTutorial.start('reference'); await new Promise(setImmediate);
+  await h.window.SMTutorial.open();
+  assert.equal(h.nodes.get('tut-launcher').style.display, 'flex'); assert.equal(h.places.length, 1);
+  project.resolve(); await old;
+  assert.equal(h.nodes.get('tut-launcher').style.display, 'flex'); assert.equal(h.places.length, 1);
+  assert.equal(h.stopCount(), 0, 'stale creation cannot release the newer surface');
+});
 for (const operation of ['start', 'open']) {
   test('real tutorial ' + operation + ' waits for successful prior-surface release', async () => {
     const h = tutorialFixture(); h.handlers.get('timer')(); await new Promise(setImmediate);

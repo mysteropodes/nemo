@@ -1578,6 +1578,7 @@
       try { await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' }); }
       catch (error) { if (request === transition) transitioning = false; throw error; }
     }
+    if (request !== transition) return;
     hideLauncher(); var released = await finishModule(false);
     if (request !== transition) return;
     transitioning = false; if (released === false) return;
