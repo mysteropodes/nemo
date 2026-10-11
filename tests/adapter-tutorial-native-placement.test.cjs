@@ -26,7 +26,8 @@ function classes(initial = []) {
 function harness({ width = 1400, collapsed = false, native = true } = {}) {
   const nodes = new Map(), events = new Map(), frames = [], notices = [];
   let windowWidth = width, nextFrame, doc = 'A', revision = 2, history = false;
-  const inspectorWidth = collapsed ? 36 : 280;
+  let inspectorWidth = collapsed ? 36 : 280, observerCallback;
+  const observed = new Set();
   function node(id) {
     const n = { id, style: style(), classList: classes(), setAttribute() {}, remove() { nodes.delete(this.id); },
       appendChild(child) { nodes.set(child.id, child); } };
@@ -52,6 +53,11 @@ function harness({ width = 1400, collapsed = false, native = true } = {}) {
     addEventListener: (name, fn) => events.set(name, fn), removeEventListener: (name, fn) => { if (events.get(name) === fn) events.delete(name); },
     dispatchEvent: e => events.get(e.type)?.(), Event: class { constructor(type) { this.type = type; } },
     requestAnimationFrame: fn => queueMicrotask(fn), setTimeout, clearTimeout,
+    ResizeObserver: class {
+      constructor(fn) { observerCallback = fn; }
+      observe(element) { observed.add(element); }
+      disconnect() { observed.clear(); }
+    },
     showToast: message => notices.push(message),
   };
   const identity = () => ({ instanceId: 'instance', documentId: doc, contentRevision: revision });
@@ -64,6 +70,9 @@ function harness({ width = 1400, collapsed = false, native = true } = {}) {
   let failures = 0; const controller = create(root, () => { failures++; });
   return { root, controller, card, props, buttons, frames, notices, nodes, events, identity, view, receipt,
     failures: () => failures, setWidth: n => { windowWidth = n; }, setHistory: () => { history = true; },
+    fireChild: id => { const element = nodes.get(id); assert.ok(observed.has(element), id + ' must be observed'); observerCallback(); },
+    setInspectorWidth: width => { inspectorWidth = width; props.style.width = width + 'px'; },
+    collapseInspector: () => { inspectorWidth = 36; props.style.width = ''; props.classList.add('collapsed'); },
     drift: () => { doc = 'B'; revision++; }, next: promise => { nextFrame = promise; }, nativeBounds: drawing.getBoundingClientRect,
     cardBounds: () => rect(parseFloat(card.style.left), parseFloat(card.style.top), parseFloat(card.style.width), 250) };
 }
@@ -125,6 +134,24 @@ test('layout changing during presentation refuses and preserves inspector prefer
   const h = harness(), d = deferred(); h.next(d.promise);
   const p = h.controller.place(h.card, () => null); await new Promise(setImmediate); h.setWidth(1300); d.resolve(h.receipt());
   assert.equal(await p, 'failed'); assert.equal(h.props.style.width, '280px');
+});
+test('child collapse re-presents before enabling controls and coalesces observer feedback', async () => {
+  const h = harness(); await h.controller.place(h.card, () => h.props.getBoundingClientRect());
+  const d = deferred(); h.next(d.promise); h.collapseInspector(); h.fireChild('props-panel'); h.fireChild('drawing-canvas');
+  assert.equal(h.controller.ready(), false); assert.ok(h.buttons.every(b => b.disabled));
+  await new Promise(setImmediate); assert.equal(h.frames.length, 2, 'one native presentation for the changed layout');
+  assert.equal(h.controller.ready(), false); d.resolve(h.receipt()); await new Promise(setImmediate);
+  assert.equal(h.controller.ready(), true); assert.equal(intersects(h.cardBounds(), h.nativeBounds()), false);
+  h.fireChild('canvas-area'); await new Promise(setImmediate); assert.equal(h.frames.length, 2, 'unchanged geometry cannot form an observer loop');
+  await h.controller.close(); assert.equal(h.props.classList.contains('collapsed'), true); assert.equal(h.props.style.width, '');
+});
+test('in-session inspector width that leaves insufficient native space refuses and unwinds', async () => {
+  const h = harness({ width: 1100 }); await h.controller.place(h.card, () => h.props.getBoundingClientRect());
+  h.setInspectorWidth(700); h.fireChild('props-panel'); await new Promise(setImmediate);
+  assert.equal(h.controller.ready(), false); assert.equal(h.failures(), 1);
+  assert.equal(h.nodes.has('tutorial-native-space'), false); assert.equal(h.card.classList.contains('on'), false);
+  assert.equal(h.props.style.width, '700px', 'the user width change is preserved'); assert.equal(h.props.style.display, '');
+  assert.ok(h.nativeBounds().width >= 160, 'unwind restores a positive viewport');
 });
 test('too-narrow window or occupied History column refuses without hiding inspector', async () => {
   for (const occupied of [false, true]) {

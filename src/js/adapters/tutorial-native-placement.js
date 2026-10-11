@@ -104,7 +104,10 @@
         space.setAttribute('aria-hidden', 'true'); top.appendChild(space);
         top.classList.add('tutorial-native-open'); card.classList.add('tutorial-native-card');
         root.addEventListener('resize', resized);
-        if (root.ResizeObserver) { observer = new root.ResizeObserver(resized); observer.observe(top); }
+        if (root.ResizeObserver) {
+          observer = new root.ResizeObserver(resized);
+          [top, canvas, drawing, props].forEach(function (element) { observer.observe(element); });
+        }
       }
       space.style.width = layout.width + 'px';
       var rect = space.getBoundingClientRect(), native = drawing.getBoundingClientRect();
