@@ -339,7 +339,8 @@
         "native_application_replace_replay.rs",
         "native_application_replace_viewport_tests.rs",
         "native_object_bootstrap.rs",
-        "native_object_reopen.rs"
+        "native_object_reopen.rs",
+        "native_object_save.rs"
       ],
       "publicApi": [
         "native_application_commands.rs",
@@ -373,7 +374,9 @@
         "native_object_client_tests.rs",
         "native_object_client_admission_tests.rs",
         "native_object_serialization_tests.rs",
-        "native_object_reopen_tests.rs"
+        "native_object_reopen_tests.rs",
+        "native_object_save_tests.rs",
+        "native_object_save_failure_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
