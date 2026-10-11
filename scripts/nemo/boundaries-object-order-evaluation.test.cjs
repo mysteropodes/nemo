@@ -55,3 +55,23 @@ test('private numeric producer cannot take writable history or render/applicatio
   assert.ok(refused.violations.some(v => v.rule === 'external-crate-violation'
     && v.file === source && v.detail.crate === 'tauri'));
 });
+
+// The helper's narrow input is the scalability boundary: no document object
+// slice/snapshot is available while resolving each ordered element.
+function indexedLookup(candidate) {
+  assert.equal((candidate.match(/\.objects\(\)/g) || []).length, 1);
+  const helper = candidate.slice(candidate.indexOf('fn elements('), candidate.indexOf('pub(crate) fn prepare('));
+  assert.doesNotMatch(helper, /ObjectSnapshot|ObjectRecord|\.objects\(|\.position\(/);
+  assert.match(helper, /sources:[\s\S]*SourceIndices/);
+  assert.match(helper, /sources[\s\S]*\.get\(/);
+}
+
+test('element lookup cannot regress to a document scan per element', () => {
+  const producer = read(source);
+  indexedLookup(producer);
+  assert.throws(() => indexedLookup(producer.replace('sources: &SourceIndices',
+    'snapshot: &ObjectSnapshot, sources: &SourceIndices')), assert.AssertionError);
+  assert.throws(() => indexedLookup(producer.replace('let index = sources',
+    'let index = snapshot.document().objects().iter().position(|_| true); let index = sources')),
+  assert.AssertionError);
+});

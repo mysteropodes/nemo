@@ -1,6 +1,6 @@
 //! Partial numeric Order producer; no expression interpreter or renderer policy.
 use crate::animation_curve::{evaluate_curve, CurveSample};
-use crate::object_document::{AuthoredOrder, OrderContext, OrderCurvePoint};
+use crate::object_document::{AuthoredOrder, FrameScope, OrderContext, OrderCurvePoint};
 use crate::object_frame_packet::ObjectFrameError;
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
@@ -144,8 +144,10 @@ fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
     }
     Err(ObjectFrameError::InvalidSource)
 }
+type SourceIndices<'a> = HashMap<(&'a str, &'a FrameScope, &'a str, &'a str), usize>;
+
 fn elements(
-    snapshot: &ObjectSnapshot,
+    sources: &SourceIndices<'_>,
     context: &OrderContext,
     frame: u32,
     layer: &str,
@@ -172,16 +174,14 @@ fn elements(
         } else {
             0.0
         };
-        let index = snapshot
-            .document()
-            .objects()
-            .iter()
-            .position(|r| {
-                r.target.context_id == context.context_id
-                    && r.target.frame_scope == scope.frame_scope
-                    && r.target.layer_uid == entry.layer_uid
-                    && r.target.stroke_id == entry.stroke_id
-            })
+        let index = sources
+            .get(&(
+                context.context_id.as_str(),
+                &scope.frame_scope,
+                entry.layer_uid.as_str(),
+                entry.stroke_id.as_str(),
+            ))
+            .copied()
             .ok_or(ObjectFrameError::InvalidSource)?;
         result.push(NumericElementOrder {
             source_object_index: index,
@@ -214,6 +214,21 @@ pub(crate) fn prepare(
         .enumerate()
         .map(|(i, l)| (l.layer_uid(), i))
         .collect();
+    // Snapshot admission already rejects duplicate full scoped targets. Borrow
+    // their immutable identities once; per-element lookup never scans geometry.
+    let mut sources = SourceIndices::new();
+    for (index, record) in doc.objects().iter().enumerate() {
+        let target = &record.target;
+        let key = (
+            target.context_id.as_str(),
+            &target.frame_scope,
+            target.layer_uid.as_str(),
+            target.stroke_id.as_str(),
+        );
+        if sources.insert(key, index).is_some() {
+            return Err(ObjectFrameError::InvalidSource);
+        }
+    }
     let mut entries: Vec<_> = context.layers.iter().collect();
     entries.sort_by_key(|l| l.natural_position);
     let mut layers = Vec::new();
@@ -234,7 +249,7 @@ pub(crate) fn prepare(
             natural_position: layer.natural_position,
             value,
             explicit,
-            elements: elements(snapshot, context, frame, &layer.layer_uid)?,
+            elements: elements(&sources, context, frame, &layer.layer_uid)?,
         });
     }
     let mut front: Vec<_> = layers
