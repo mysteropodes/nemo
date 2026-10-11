@@ -20,7 +20,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 
-const RECORD_LIMIT: u16 = 256;
+const RECORD_LIMIT: u16 = 16_384;
 const RECORD_BYTES: usize = 2048;
 
 struct Observations {
