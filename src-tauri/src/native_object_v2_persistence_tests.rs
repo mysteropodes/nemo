@@ -202,33 +202,45 @@ fn host_v2_actual_fill_undo_redo_save_bytes_and_production_file_reopen() {
 }
 
 #[test]
-fn host_v2_scoped_authored_and_reference_behavior_are_separate() {
+fn host_v2_root_query_scoped_data_persistence_and_reference_behavior_are_separate() {
     let mut doc: Value = serde_json::from_str(ORIGINAL).unwrap();
     let mut other = doc["objects"][0].clone();
     other["target"]["contextId"] = json!("symbol-A");
     doc["objects"].as_array_mut().unwrap().push(other);
     let mut context = doc["compositionOrder"]["contexts"][0].clone();
     context["contextId"] = json!("symbol-A");
+    for layer in context["layers"].as_array_mut().unwrap() {
+        layer["order"] = json!({});
+    }
+    context["scopes"][0]["elements"][0]["order"] = json!({});
     doc["compositionOrder"]["contexts"]
         .as_array_mut()
         .unwrap()
         .push(context);
     let state = ApplicationMcp::default();
     let pins = install(&state, &doc.to_string());
-    for index in [0, 2] {
-        let target = &doc["objects"][index]["target"];
-        let result = call(
-            &state,
-            &pins,
-            "query.document.object",
-            0,
-            json!({"atRevision":0,"stableTarget":target}),
-        );
-        assert_eq!(result["ok"], true, "{result}");
-        assert_eq!(result["result"]["object"]["target"], *target);
-    }
-    let reference = &doc["objects"][1]["target"];
+    let target = &doc["objects"][0]["target"];
+    let result = call(
+        &state,
+        &pins,
+        "query.document.object",
+        0,
+        json!({"atRevision":0,"stableTarget":target}),
+    );
+    assert_eq!(result["ok"], true, "{result}");
+    assert_eq!(result["result"]["object"]["target"], *target);
     let before = identity(&state);
+    let refused = json!({"apiVersion":2,"requestId":"nonroot-refused","instanceId":pins["instanceId"],
+        "documentId":pins["documentId"],"operation":"query.document.object",
+        "payload":{"atRevision":0,"stableTarget":doc["objects"][2]["target"]}});
+    assert_eq!(
+        state
+            .serialize_object_file_snapshot(&refused.to_string())
+            .unwrap_err(),
+        "native object selector does not match its declared contract"
+    );
+    assert_eq!(identity(&state), before);
+    let reference = &doc["objects"][1]["target"];
     let read = call(
         &state,
         &pins,
@@ -249,9 +261,28 @@ fn host_v2_scoped_authored_and_reference_behavior_are_separate() {
     assert_eq!(fill["ok"], false);
     assert_eq!(fill["error"]["code"], "unavailable");
     assert_eq!(identity(&state), before);
-    let native = state.native_state();
-    let authority = native.lock().unwrap();
-    assert_eq!(authority.active().unwrap().1.content_revision(), 0);
+    let acquired = snapshot(&state, &pins, 0);
+    let bytes = acquired["documentJson"]
+        .as_str()
+        .unwrap()
+        .as_bytes()
+        .to_vec();
+    assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), doc);
+    let scratch = Scratch::new();
+    let path = scratch.0.join("scoped-v2.json");
+    let request = save_json(&state, &pins, 0, &path);
+    assert_eq!(saved(&state, &request, &scratch.0)["published"], true);
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    release(&state, &pins, 0);
+    let fresh = reopened(&state, &path, &scratch.0);
+    assert_ne!(fresh["documentId"], pins["documentId"]);
+    assert_eq!(fresh["contentRevision"], 0);
+    let restored = snapshot(&state, &fresh, 0);
+    assert_eq!(restored["documentJson"], acquired["documentJson"]);
+    assert_eq!(
+        serde_json::from_str::<Value>(restored["documentJson"].as_str().unwrap()).unwrap(),
+        doc
+    );
 }
 
 #[cfg(test)]
