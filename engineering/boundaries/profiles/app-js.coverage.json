@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "15418facc1d123703d05566949c6cb9ec700accc",
-    "sourceRootTree": "2b0372099d920551695ce7dea8db77960307fef8",
+    "candidateCommit": "b7d23a1c96930507070cf4b45dcddd9a772f6b91",
+    "sourceRootTree": "41c2f08d14d79fedd492669b6c9b0a1dc167e830",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "f294ec859093f30bfdc3039a6297b5a3686f848e",
-      "lastChangedCommit": "15418facc1d123703d05566949c6cb9ec700accc"
+      "gitTree": "50bea3a6e4286cf1e2acbf225f54b31097be7fe2",
+      "lastChangedCommit": "b7d23a1c96930507070cf4b45dcddd9a772f6b91"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "c228c8316c1598eb1004ad3f7d17a18098f3d974",
-      "sha256": "aac344dbd0ed63cb24108319df90550ab900d86ed3ed423ddc71ce5ffdd8810c",
-      "lastChangedCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+      "gitBlob": "94c8e516c07928c3b6245879f3995125d3c78e64",
+      "sha256": "1f4732ce697708aa64175d7a0d97afef8171973790894adf17173ad8db8c35be",
+      "lastChangedCommit": "b7d23a1c96930507070cf4b45dcddd9a772f6b91"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "2be8bb5773db8e79df6a936e3a45640d5e3a7f4865dfc43c4885d74e2f907d86"
+      "value": "0ba368a86f98dee7a560710ae6b471c433553cd2a5a24c73782fb5b875fd08f0"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "034d59e606df1dd123a042a1a99db6b31d09793d",
-        "sha256": "307072d48f5e7e7f5cdccd44f65b82c1f3e05a1db00aed90f5c929bd582d8f74",
-        "moduleCount": 191,
-        "basedOnCommit": "d0419cd9decd82ff0b7da952fd22aa9512b79804"
+        "gitBlob": "4c34854e3bf9b01570abbc5cca2df62d448ef242",
+        "sha256": "d5413b7a5bedbae3a0be89dc89ce48e6dffe9134dd51e2b050d10590bd0e8786",
+        "moduleCount": 192,
+        "basedOnCommit": "b7d23a1c96930507070cf4b45dcddd9a772f6b91"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -703,8 +703,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2523,
-          "scriptOrdinal": 177
+          "line": 2524,
+          "scriptOrdinal": 178
         }
       ]
     },
@@ -751,8 +751,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2515,
-          "scriptOrdinal": 169
+          "line": 2516,
+          "scriptOrdinal": 170
         }
       ]
     },
@@ -763,8 +763,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2525,
-          "scriptOrdinal": 179
+          "line": 2526,
+          "scriptOrdinal": 180
         }
       ]
     },
@@ -775,8 +775,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2516,
-          "scriptOrdinal": 170
+          "line": 2517,
+          "scriptOrdinal": 171
         }
       ]
     },
@@ -787,8 +787,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2519,
-          "scriptOrdinal": 173
+          "line": 2520,
+          "scriptOrdinal": 174
         }
       ]
     },
@@ -823,8 +823,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2518,
-          "scriptOrdinal": 172
+          "line": 2519,
+          "scriptOrdinal": 173
         }
       ]
     },
@@ -847,8 +847,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2517,
-          "scriptOrdinal": 171
+          "line": 2518,
+          "scriptOrdinal": 172
         }
       ]
     },
@@ -859,8 +859,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2524,
-          "scriptOrdinal": 178
+          "line": 2525,
+          "scriptOrdinal": 179
         }
       ]
     },
@@ -1004,8 +1004,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2520,
-          "scriptOrdinal": 174
+          "line": 2521,
+          "scriptOrdinal": 175
         }
       ]
     },
@@ -1233,8 +1233,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2522,
-          "scriptOrdinal": 176
+          "line": 2523,
+          "scriptOrdinal": 177
         }
       ]
     },
@@ -1245,8 +1245,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2521,
-          "scriptOrdinal": 175
+          "line": 2522,
+          "scriptOrdinal": 176
         }
       ]
     },
@@ -2950,8 +2950,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 168
+          "line": 2513,
+          "scriptOrdinal": 169
         }
       ]
     },
@@ -3072,6 +3072,18 @@
           "path": "src/index.html",
           "line": 2363,
           "scriptOrdinal": 48
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/tutorial-native-placement.js",
+      "moduleId": "app.tutorial.native.placement.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2512,
+          "scriptOrdinal": 168
         }
       ]
     }
