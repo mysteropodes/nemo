@@ -262,11 +262,13 @@ test('a new surface cannot steal an existing native dock without a release', asy
   assert.equal(await h.controller.place({}, () => null, null, 'launcher'), 'failed');
   assert.equal(h.nodes.has('tutorial-native-space'), false); assert.equal(h.controller.ready(), false);
 });
-test('all tutorial module definitions, translations and measurement oracles stay byte-identical', () => {
+test('tutorial definitions outside the admitted Reference notice stay byte-identical', () => {
   const current = fs.readFileSync('src/js/tutorial.js', 'utf8');
-  // Frozen pre-repair definitions/translation/measurement bytes, usable in source archives.
-  const prefix = current.slice(0, current.indexOf('  // ---- Progress persistence'));
-  assert.equal(crypto.createHash('sha256').update(prefix).digest('hex'), 'e8d414b4425f05dec927249990d26bea15f780d007b92cf51e4f5b8051773676');
+  // P37B frozen bytes, excluding exactly the admitted P37C lesson and new translations.
+  const prefix = current.slice(0, current.indexOf('  // ---- Progress persistence'))
+    .replace(/    \/\/ P37C availability translations:start\n[\s\S]*?    \/\/ P37C availability translations:end\n/, '')
+    .replace(/    \{\n      id: 'reference',[\s\S]*?(?=    \{\n      id: 'squash-stretch',)/, '    /* P37C Reference availability notice */\n');
+  assert.equal(crypto.createHash('sha256').update(prefix).digest('hex'), '4d0dc1d9cde02c893f04387870f2a2b522ee263e8e07d0bad0ce4f37206ffd84');
 });
 function tutorialFixture() {
   const handlers = new Map(), store = new Map(), nodes = new Map(); let stopCount = 0;
@@ -293,12 +295,13 @@ function tutorialFixture() {
     close: () => { if (live) stopCount++; live = false; return Promise.resolve(true); } };
   const window = { document, state: { language: 'fr' }, NemoTutorialNativePlacement: { create: () => placement } };
   const context = { window, document, localStorage: { getItem: k => store.get(k), setItem: (k, v) => store.set(k, v) },
+    SM: { t: () => '%s completed' },
     setInterval: fn => { handlers.set('timer', fn); return 1; }, clearInterval() {} };
   vm.runInNewContext(fs.readFileSync('src/js/tutorial.js', 'utf8'), context);
   handlers.get('DOMContentLoaded')();
   return { handlers, store, nodes, window, placement, places, stopCount: () => stopCount };
 }
-test('ordinary category/search/module handlers still lead from launcher to an inspector lesson', async () => {
+test('ordinary category/search/module handlers lead to the explicit Reference availability notice', async () => {
   const h = tutorialFixture(); await h.window.SMTutorial.open();
   assert.equal(h.places[0][3], 'launcher');
   const list = h.nodes.get('tut-mod-list');
@@ -310,7 +313,7 @@ test('ordinary category/search/module handlers still lead from launcher to an in
   assert.ok(reference); reference.listeners.click(); await new Promise(setImmediate);
   assert.equal(h.places.length, 2); assert.equal(h.places[1][3], undefined);
   assert.equal(h.nodes.get('tut-launcher').style.display, 'none');
-  assert.ok(h.nodes.get('tut-tooltip').innerHTML.includes('Dessiner par-dessus une référence'));
+  assert.ok(h.nodes.get('tut-tooltip').innerHTML.includes('Référence de rotoscopie indisponible'));
   assert.equal(h.store.has('nemo-tutorial-done'), false);
 });
 test('real tutorial Escape/Skip/finish retain separate seen and completed flags', async () => {
@@ -326,10 +329,11 @@ test('real tutorial Escape/Skip/finish retain separate seen and completed flags'
   click(); click(); handlers.get('.tut-nextclick')(); click(); handlers.get('.tut-nextclick')();
   assert.equal(h.stopCount(), 3); assert.deepEqual(JSON.parse(store.get('nemo-tutorial-done')), ['overview']);
   assert.equal(store.get('nemo-tut-feedback-shown'), '1'); assert.equal(handlers.has('click'), false);
-  await window.SMTutorial.start('reference'); handlers.get('.tut-nextclick')(); handlers.get('timer')();
+  await window.SMTutorial.start('palette'); handlers.get('.tut-nextclick')();
+  window.state.fillColor = '#123456'; handlers.get('timer')();
   let selector;
   handlers.get('click')({ target: { closest: s => { selector = s; return {}; } } });
-  assert.equal(selector, '#p-ref-menu', 'real tutorial delegation still reaches an inspector control');
+  assert.equal(selector, '#btn-palette-swap', 'real tutorial delegation still reaches a supported inspector control');
   await window.SMTutorial.stop(); assert.equal(h.stopCount(), 4);
 });
 test('native close refusal is a false handoff result, not a swallowed success', async () => {
@@ -338,6 +342,55 @@ test('native close refusal is a false handoff result, not a swallowed success', 
   assert.equal(await h.controller.close(), false); assert.equal(h.notices.length, 1);
   assert.equal(h.nodes.has('tutorial-native-space'), false);
 });
+test('closing the unavailable Reference notice never records completion or a success toast', async () => {
+  const h = tutorialFixture(), notices = [];
+  h.window.showToast = text => notices.push(text);
+  await h.window.SMTutorial.start('reference');
+  const card = h.nodes.get('tut-tooltip');
+  assert.ok(card.innerHTML.includes('>Fermer</button>'));
+  assert.equal(h.handlers.has('click'), false);
+  assert.equal(h.places[0][1](), null, 'no hidden inspector target or state probe');
+  h.handlers.get('.tut-nextclick')(); await new Promise(setImmediate);
+  assert.equal(h.stopCount(), 1);
+  assert.equal(card.classList.contains('on'), false);
+  assert.equal(h.store.has('nemo-tutorial-done'), false);
+  assert.deepEqual(notices, []);
+});
+test('historical Reference completion cannot show a done badge or inflate available lesson counts', async () => {
+  const h = tutorialFixture(); h.store.set('nemo-tutorial-done', JSON.stringify(['reference', 'media']));
+  await h.window.SMTutorial.open();
+  const list = h.nodes.get('tut-mod-list');
+  const media = list.children.find(el => el.className === 'tut-cat-hdr' && el.innerHTML.includes('Médias'));
+  assert.ok(media.innerHTML.includes('1/2'), 'only Media and Export count as available lessons');
+  media.listeners.click();
+  const row = list.children.find(el => el.innerHTML.includes('roto'));
+  assert.equal(row.className, 'tut-mod'); assert.ok(row.innerHTML.includes('Indisponible'));
+  assert.doesNotMatch(row.innerHTML, /✓|1 min/);
+  assert.deepEqual(JSON.parse(h.store.get('nemo-tutorial-done')), ['reference', 'media'], 'preserve old stored progress');
+});
+test('Reference Q&A returns availability copy and opens that same notice', async () => {
+  const h = tutorialFixture(); await h.window.SMTutorial.open();
+  h.nodes.get('tut-ask-input').value = 'Référence rotoscopie';
+  h.handlers.get('tut-ask-btnclick')();
+  const answer = h.nodes.get('tut-ask-answer').innerHTML;
+  assert.ok(answer.includes('pas accessible dans cette version'));
+  assert.doesNotMatch(answer, /p-ref|Ouvre la section|Clique/);
+  h.handlers.get('tut-ask-open-btnclick')(); await new Promise(setImmediate);
+  assert.ok(h.nodes.get('tut-tooltip').innerHTML.includes('Référence de rotoscopie indisponible'));
+});
+for (const [language, title, close] of [
+  ['en', 'Rotoscopy reference unavailable', 'Close'],
+  ['es', 'Referencia de rotoscopia no disponible', 'Cerrar'],
+  ['ja', 'ロトスコープ参照は利用できません', '閉じる'],
+]) {
+  test('Reference availability notice uses existing translation route: ' + language, async () => {
+    const h = tutorialFixture(); h.window.state.language = language;
+    await h.window.SMTutorial.start('reference');
+    const markup = h.nodes.get('tut-tooltip').innerHTML;
+    assert.ok(markup.includes(title)); assert.ok(markup.includes('>' + close + '</button>'));
+    await h.window.SMTutorial.stop(); assert.equal(h.stopCount(), 1);
+  });
+}
 test('superseded project creation cannot hide or close a newer ordinary launcher', async () => {
   const h = tutorialFixture(), project = deferred();
   h.nodes.get('start-screen').classList.remove('hid');

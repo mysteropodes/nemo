@@ -124,6 +124,13 @@
       TUT_TR.en[r[0]] = r[1]; TUT_TR.es[r[0]] = r[2]; TUT_TR.ja[r[0]] = r[3];
     });
   })([
+    // P37C availability translations:start
+    ["Indisponible", "Unavailable", "No disponible", "利用不可"],
+    ["Leçon de rotoscopie indisponible dans cette version", "Rotoscopy lesson unavailable in this version", "Lección de rotoscopia no disponible en esta versión", "このバージョンではロトスコープのレッスンは利用できません"],
+    ["Référence de rotoscopie indisponible", "Rotoscopy reference unavailable", "Referencia de rotoscopia no disponible", "ロトスコープ参照は利用できません"],
+    ["Le parcours pour afficher une vidéo ou une image sous le dessin comme référence de rotoscopie n'est pas accessible dans cette version. Cette leçon est suspendue jusqu'à son retour.", "The workflow for displaying a video or image beneath the drawing as a rotoscopy reference is not accessible in this version. This lesson is suspended until it returns.", "El flujo para mostrar un vídeo o una imagen debajo del dibujo como referencia de rotoscopia no está accesible en esta versión. Esta lección queda suspendida hasta que vuelva.", "動画や画像を描画の下にロトスコープ参照として表示する操作は、このバージョンでは利用できません。利用可能になるまで、このレッスンは休止します。"],
+    ["Fermer", "Close", "Cerrar", "閉じる"],
+    // P37C availability translations:end
     ["Dessiner", "Draw", "Dibujar", "描く"],
     ["Calques et animation", "Layers & Animation", "Capas y animación", "レイヤーとアニメーション"],
     ["Organisation", "Organization", "Organización", "構成"],
@@ -1315,32 +1322,13 @@
       category: 'Médias',
       icon: '23',
       title: 'Référence (roto)',
-      desc: 'Vidéo ou image comme calque de référence',
-      time: '1 min',
-      // Comme le module Audio/médias : un vrai import a besoin d'un vrai
-      // fichier que ce tutoriel sandboxé ne peut pas fournir. On reste au
-      // niveau navigation réelle — ouvrir la section, voir le bouton
-      // d'import, voir les réglages une fois qu'une référence existe —
-      // sans jamais prétendre valider un import qui n'a pas lieu.
-      // La Référence n'a plus sa propre section (feedback 2026-07: "doit
-      // être géré par le panneau calque en fonction de la sélection de
-      // l'élément") — ses contrôles vivent maintenant dans #layer-sec
-      // (Blend/Matte/Flou), visible dès qu'un calque est actif.
+      desc: 'Leçon de rotoscopie indisponible dans cette version',
+      time: 'Indisponible',
+      unavailable: true,
+      // P37C: the ordinary Reference entry was removed with the Layer tab.
+      // Keep a discoverable notice, with no hidden-control targets or completion credit.
       steps: [
-        { type: 'info', title: 'Dessiner par-dessus une référence', body: 'La Référence affiche une vidéo, une séquence d\'images ou une image fixe SOUS ton dessin, pour la rotoscopie — elle suit la frame courante et n\'est jamais exportée.' },
-        {
-          type: 'state', target: '#layer-sec .phdr', title: 'Ouvre la section "Layer"', body: 'Clique l\'en-tête "Layer" dans le panneau de droite pour la déplier, si besoin.',
-          hint: 'En attente…',
-          // Cible le déclencheur replié, pas #btn-ref-import : depuis
-          // 2026-07-27 les contrôles vivent dans un popover et n'ont plus de
-          // hauteur tant qu'il n'est pas ouvert — l'ancien check restait
-          // faux même une fois la section correctement dépliée.
-          check: function (win) { var el = win.document.getElementById('p-ref-menu'); return !!(el && el.getBoundingClientRect().height > 0); }
-        },
-        { type: 'click', target: '#p-ref-menu', title: 'Ouvre les options de Référence', body: 'La ligne "Référence" affiche l\'état courant ; clique-la pour ouvrir ses réglages (import, visibilité, opacité, décalage).' },
-        { type: 'click', target: '#btn-ref-import', title: 'Regarde le bouton "Importer…"', body: 'Clique "Référence…" pour voir le sélecteur de fichier s\'ouvrir (vidéo, séquence d\'images, ou image seule).' },
-        { type: 'click', target: '#p-ref-opacity', title: 'Repère le réglage Opacity', body: 'Ce champ (glisse pour changer, ou clique pour taper une valeur) règle la transparence de la référence une fois importée, pour qu\'elle ne gêne pas ton dessin par-dessus.' },
-        { type: 'info', title: 'Bien joué !', body: '"Offset" décale la frame de départ de la référence par rapport à la timeline — utile si ta vidéo ne commence pas au même instant que ton animation.' }
+        { type: 'info', title: 'Référence de rotoscopie indisponible', body: 'Le parcours pour afficher une vidéo ou une image sous le dessin comme référence de rotoscopie n\'est pas accessible dans cette version. Cette leçon est suspendue jusqu\'à son retour.' }
       ]
     },
     {
@@ -1515,7 +1503,7 @@
       (step.type !== 'info' ? '<div class="tut-hint"><span class="tut-dot"></span>' + T(step.hint || 'À toi de jouer…') + '</div>' : '') +
       '<div class="tut-actions">' +
       '<button class="tut-skip">' + T('Passer ce module') + '</button>' +
-      (step.type === 'info' ? '<button class="tut-next">' + T(isLast ? 'Terminer' : 'Suivant') + '</button>' : '') +
+      (step.type === 'info' ? '<button class="tut-next">' + T(mod.unavailable ? 'Fermer' : isLast ? 'Terminer' : 'Suivant') + '</button>' : '') +
       '</div>';
 
     tt.classList.add('on');
@@ -1555,7 +1543,7 @@
     if (sp) sp.classList.remove('on');
     if (tt) tt.classList.remove('on');
     var released = placement ? placement.close() : Promise.resolve(true);
-    if (mod && completed) {
+    if (mod && completed && !mod.unavailable) {
       markDone(mod.id);
       if (window.showToast) showToast(T(SM.t('toastModuleDoneSuffix')).replace('%s', T(mod.title)));
     }
@@ -1670,13 +1658,14 @@
     list.appendChild(intro);
     g.cats.forEach(function (cat) {
       var mods = g.byCat[cat];
-      var doneCount = mods.filter(function (m) { return done.indexOf(m.id) !== -1; }).length;
+      var available = mods.filter(function (m) { return !m.unavailable; });
+      var doneCount = available.filter(function (m) { return done.indexOf(m.id) !== -1; }).length;
       var btn = document.createElement('button');
       btn.className = 'tut-cat-hdr';
       btn.type = 'button';
       btn.innerHTML =
         '<span class="tut-cat-name">' + T(cat) + '</span>' +
-        '<span class="tut-cat-count">' + doneCount + '/' + mods.length + '</span>' +
+        '<span class="tut-cat-count">' + doneCount + '/' + available.length + '</span>' +
         '<span class="tut-cat-chevron">' + chevronSvg() + '</span>';
       btn.addEventListener('click', function () { renderModuleScreen(cat); });
       list.appendChild(btn);
@@ -1701,7 +1690,7 @@
   // belongs to, since it flattens across all of them.
   function renderModuleRows(list, mods, done, showCategory) {
     mods.forEach(function (m) {
-      var isDone = done.indexOf(m.id) !== -1;
+      var isDone = !m.unavailable && done.indexOf(m.id) !== -1;
       var btn = document.createElement('button');
       btn.className = 'tut-mod' + (isDone ? ' done' : '');
       btn.innerHTML =
