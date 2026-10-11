@@ -5,6 +5,11 @@ use serde_json::Number;
 pub const OBJECT_DOCUMENT_FORMAT: &str = "nemo.native-object-document";
 pub const OBJECT_DOCUMENT_FORMAT_VERSION: u32 = 1;
 
+#[path = "object_order_document.rs"]
+mod order;
+pub use order::OrderedObjectDocument;
+pub(crate) use order::*;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
@@ -108,7 +113,7 @@ pub struct SolidFill {
 // schema objects must enter through visit_map; Fields retains strict duplicate
 // and unknown-member checks while nested DTOs apply the same object-only rule.
 macro_rules! object_deserialize {
-    ($name:ident { $($field:ident: $ty:ty),* $(,)? }) => {
+    ($name:ident { $($(#[$attr:meta])* $field:ident: $ty:ty),* $(,)? }) => {
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 struct ObjectVisitor;
@@ -120,7 +125,7 @@ macro_rules! object_deserialize {
                     fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<$name, A::Error> {
                         #[derive(serde::Deserialize)]
                         #[serde(deny_unknown_fields, rename_all = "camelCase")]
-                        struct Fields { $($field: $ty),* }
+                        struct Fields { $($(#[$attr])* $field: $ty),* }
                         let fields = Fields::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
                         Ok($name { $($field: fields.$field),* })
                     }

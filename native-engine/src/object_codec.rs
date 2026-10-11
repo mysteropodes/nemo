@@ -3,8 +3,13 @@
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{ObjectDocument, ObjectRecord, ObjectTarget};
-use crate::object_document::{OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
+use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
 use std::collections::HashSet;
+
+#[path = "object_order_codec.rs"]
+mod order;
+pub use crate::object_document::OrderedObjectDocument;
+pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectCodecErrorKind {
@@ -43,7 +48,13 @@ impl std::error::Error for ObjectCodecError {}
 /// Deserialize directly into strict structs: a Value intermediate would erase
 /// duplicate JSON member keys before admission could reject them.
 pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
-    let document: ObjectDocument = serde_json::from_slice(bytes).map_err(|error| {
+    let document = parse(bytes)?;
+    validate(&document)?;
+    Ok(document)
+}
+
+pub(crate) fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ObjectCodecError> {
+    serde_json::from_slice(bytes).map_err(|error| {
         let kind = if error.to_string().contains("unknown field") {
             ObjectCodecErrorKind::Unsupported
         } else if error.is_syntax() || error.is_eof() {
@@ -52,9 +63,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
             ObjectCodecErrorKind::Invalid
         };
         ObjectCodecError::new(kind, error.to_string())
-    })?;
-    validate(&document)?;
-    Ok(document)
+    })
 }
 
 pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecError> {
@@ -64,7 +73,7 @@ pub fn encode_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecE
 }
 
 pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
-    use ObjectCodecErrorKind::{DuplicateId, Invalid, Unsupported};
+    use ObjectCodecErrorKind::Unsupported;
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT
         || document.format_version != OBJECT_DOCUMENT_FORMAT_VERSION
@@ -74,14 +83,30 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
             "unsupported object format or formatVersion",
         ));
     }
-    if document.total_frames == 0 || document.layers.is_empty() {
+    validate_content(
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+        false,
+    )
+}
+
+pub(crate) fn validate_content(
+    total_frames: u32,
+    declared_layers: &[ObjectLayer],
+    objects: &[ObjectRecord],
+    complete_contexts: bool,
+) -> Result<(), ObjectCodecError> {
+    use ObjectCodecErrorKind::{DuplicateId, Invalid, Unsupported};
+    let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
+    if total_frames == 0 || declared_layers.is_empty() {
         return Err(reject(
             Invalid,
             "positive totalFrames and identified layers are required",
         ));
     }
     let mut layers = HashSet::new();
-    for layer in &document.layers {
+    for layer in declared_layers {
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }
@@ -90,11 +115,18 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         }
     }
     let mut targets = HashSet::new();
-    for record in &document.objects {
+    for record in objects {
         if record.schema_version != 1 || record.family != "closed-solid-fill-cubic-path" {
             return Err(reject(Unsupported, "unsupported object schema or family"));
         }
-        if !record.target.valid() || record.target.frame_scope.frame >= document.total_frames {
+        let valid_target = if complete_contexts {
+            !record.target.context_id.is_empty()
+                && !record.target.layer_uid.is_empty()
+                && !record.target.stroke_id.is_empty()
+        } else {
+            record.target.valid()
+        };
+        if !valid_target || record.target.frame_scope.frame >= total_frames {
             return Err(reject(Invalid, "invalid scoped object target or frame"));
         }
         if !layers.contains(record.target.layer_uid.as_str()) {

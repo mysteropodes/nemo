@@ -2,6 +2,9 @@
 use crate::object_codec::{decode_project, encode_project, ObjectCodecErrorKind};
 use serde_json::{json, Value};
 
+#[path = "object_order_codec.rs"]
+mod order_tests;
+
 fn fixture() -> Value {
     let cases: Value = serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
