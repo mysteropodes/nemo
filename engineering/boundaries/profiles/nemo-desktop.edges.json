@@ -257,7 +257,7 @@
           "commands::OpacityRequest",
           "commands::ResponseEnvelope",
           "compositor::Compositor",
-          "object_codec::decode_project"
+          "object_codec::decode_storage_project"
         ],
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
