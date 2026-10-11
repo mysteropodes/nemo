@@ -3,7 +3,10 @@
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{ObjectDocument, ObjectRecord, ObjectTarget};
-use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
+use crate::object_document::{
+    ObjectLayer, Presence, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+};
+use serde::Deserialize;
 use std::collections::HashSet;
 
 #[path = "object_order_codec.rs"]
@@ -48,9 +51,60 @@ impl std::error::Error for ObjectCodecError {}
 /// Deserialize directly into strict structs: a Value intermediate would erase
 /// duplicate JSON member keys before admission could reject them.
 pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
-    let document = parse(bytes)?;
+    let wire: LegacyDocument = parse(bytes)?;
+    let document = ObjectDocument {
+        format: wire.format,
+        format_version: wire.format_version,
+        total_frames: wire.total_frames,
+        layers: wire.layers,
+        objects: wire.objects,
+        composition_order: Presence::Missing,
+    };
     validate(&document)?;
     Ok(document)
+}
+
+// Canonical v1 still rejects compositionOrder as an unknown member, even null.
+struct LegacyDocument {
+    format: String,
+    format_version: u32,
+    total_frames: u32,
+    layers: Vec<ObjectLayer>,
+    objects: Vec<ObjectRecord>,
+}
+crate::object_document::object_deserialize!(LegacyDocument {
+    format: String, format_version: u32, total_frames: u32,
+    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>
+});
+
+/// Explicit core storage admission; both attempts read the original raw bytes.
+pub fn decode_storage_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> {
+    match decode_project(bytes) {
+        Ok(document) => Ok(document),
+        Err(legacy_error) => match decode_ordered_project(bytes) {
+            Ok(document) => Ok(document.into_storage()),
+            Err(_) => Err(legacy_error),
+        },
+    }
+}
+
+pub fn encode_storage_project(document: &ObjectDocument) -> Result<Vec<u8>, ObjectCodecError> {
+    validate_storage(document)?;
+    serde_json::to_vec(document)
+        .map_err(|e| ObjectCodecError::new(ObjectCodecErrorKind::Invalid, e.to_string()))
+}
+
+pub(crate) fn validate_storage(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+    if document.format_version == 1 {
+        return validate(document);
+    }
+    let plan = document.composition_order.value().ok_or_else(|| {
+        ObjectCodecError::new(
+            ObjectCodecErrorKind::Unsupported,
+            "v2 requires explicit compositionOrder",
+        )
+    })?;
+    order::validate_storage_order(document, plan)
 }
 
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ObjectCodecError> {
@@ -77,6 +131,7 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
     let reject = |kind, message: &str| ObjectCodecError::new(kind, message);
     if document.format != OBJECT_DOCUMENT_FORMAT
         || document.format_version != OBJECT_DOCUMENT_FORMAT_VERSION
+        || !document.composition_order.missing()
     {
         return Err(reject(
             Unsupported,

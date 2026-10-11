@@ -1,5 +1,7 @@
 //! Strict v2 storage DTOs. They carry no live owner, evaluator or painter state.
-use crate::object_document::{object_deserialize, FrameScope, ObjectLayer, ObjectRecord};
+use crate::object_document::{
+    object_deserialize, FrameScope, ObjectDocument, ObjectLayer, ObjectRecord,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Number;
 
@@ -54,6 +56,16 @@ object_deserialize!(OrderedObjectDocument {
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>, composition_order: OrderPlan
 });
 impl OrderedObjectDocument {
+    pub(crate) fn into_storage(self) -> ObjectDocument {
+        ObjectDocument {
+            format: self.format,
+            format_version: self.format_version,
+            total_frames: self.total_frames,
+            layers: self.layers,
+            objects: self.objects,
+            composition_order: Presence::Present(self.composition_order),
+        }
+    }
     pub fn total_frames(&self) -> u32 {
         self.total_frames
     }

@@ -7,6 +7,9 @@ use crate::request_receipts::{DispatchErrorCode, OpacityRequest};
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
 
+#[path = "object_order_history.rs"]
+mod order_image_tests;
+
 fn cases() -> Value {
     serde_json::from_str(include_str!(
         "../../engineering/application/examples/native-object-v1/cases.json"
