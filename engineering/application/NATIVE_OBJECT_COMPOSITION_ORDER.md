@@ -97,8 +97,11 @@ metadata referring to the sole native document's complete records.
 - `{kind:"natural"}`: absent authored override, natural layer rank / element 0.
 - `{kind:"static",value:f64}`: finite value, including 0 and signed/fractional
   values. Layer presence is explicit even when value is 0.
-- `{kind:"track",keys:[key,...]}`: nonempty, strictly increasing unique integer
-  frames in `0..totalFrames-1`. Each key has exactly `frame`, finite scalar `value`,
+- `{kind:"track",keys:[key,...]}`: nonempty, strictly increasing unique finite
+  f64 frames. Signed/fractional and beyond-timeline keys survive unchanged: the
+  actual frozen key writer accepts them, and they can influence in-range samples.
+  Unlike the source `frameScope.frame`, keys are not u32 or clipped to totalFrames.
+  Each key has exactly `frame`, finite scalar `value`,
   boolean `hold`, and `curvePoints`. `curvePoints` is an array of `{x:f64,y:f64}`
   with optional `tx:f64,ty:f64` together. All numbers are finite. Empty means
   linear; otherwise at least two points, first x=0, last x=1, strictly increasing
@@ -114,6 +117,8 @@ An expression's compiled cache, last error, transient seed/context and evaluated
 rank/sequence are not authored storage fields. Random/seed semantics must receive
 their own admitted persistence/evaluation contract before those expressions can
 be consumed natively; never manufacture a seed to make an unsupported mode work.
+Finite authored data can still yield an unsupported/nonfinite evaluation; C must
+return unavailable rather than publish a fabricated natural/static result.
 
 ## Migration and atomic refusal
 

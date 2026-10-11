@@ -13,7 +13,7 @@ const fixtureBytes = fs.readFileSync(fixturePath);
 const fixture = JSON.parse(fixtureBytes);
 const clone = value => JSON.parse(JSON.stringify(value));
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-assert.equal(sha(fixtureBytes), '37297da17321c132a488cb170231b68be157a86502a36bcf8dd4ea175260411a');
+assert.equal(sha(fixtureBytes), 'e157c3440176a71dc99e0592a32b17097a529e441a1d68d72536e158e9e83ce0');
 const frozen = {};
 for (const [file, pin] of Object.entries(fixture.pins)) {
   const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 4 * 1024 * 1024 });
@@ -147,6 +147,16 @@ test('same stroke ID in other complete scopes cannot alias; Reference identity r
     const c = context([{ elementMotion: { [sample.strokeId]: clone(sample.holder) } }]);
     assert.equal(c.SMMotion.elementOrderAt(0, sample.strokeId, sample.frameScope.frame), sample.expectedValue);
   }
+});
+
+test('actual key writer preserves fractional, signed and beyond-timeline frames', () => {
+  const sample = fixture.animated.extendedFrames, c = context([{}]);
+  c.state.totalFrames = 21;
+  for (const key of sample.keys) {
+    c.SMMotion.setKeyAtFrame(c.state.layers[0], 'order', key.frame, [key.value], [{ x: 0, y: 0 }, { x: 1, y: 1 }]);
+  }
+  assert.deepEqual(Array.from(c.state.layers[0].motion.order.keys, key => key.frame), [-0.5, 1.5, 40]);
+  for (const point of sample.samples) assert.equal(c.SMMotion.layerOrderAt(0, point.frame), point.value);
 });
 
 test('actual wrong layer-sort, direction and unstable-tie mutations fail independent expectations', () => {
