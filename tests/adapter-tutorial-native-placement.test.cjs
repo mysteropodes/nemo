@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const cp = require('node:child_process');
+const crypto = require('node:crypto');
 const { create, plan, matches, positionTooltip } = require('../src/js/adapters/tutorial-native-placement.js');
 
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
@@ -145,8 +145,9 @@ test('browser placement retains prior center/corner behavior without a native do
 });
 test('all tutorial module definitions, translations and measurement oracles stay byte-identical', () => {
   const current = fs.readFileSync('src/js/tutorial.js', 'utf8');
-  const base = cp.execFileSync('git', ['show', '4494497d6826c3266599b61a8ab974f293703cf2:src/js/tutorial.js'], { encoding: 'utf8' });
-  assert.equal(current.slice(0, current.indexOf('  // ---- Progress persistence')), base.slice(0, base.indexOf('  // ---- Progress persistence')));
+  // Frozen pre-repair definitions/translation/measurement bytes, usable in source archives.
+  const prefix = current.slice(0, current.indexOf('  // ---- Progress persistence'));
+  assert.equal(crypto.createHash('sha256').update(prefix).digest('hex'), 'e8d414b4425f05dec927249990d26bea15f780d007b92cf51e4f5b8051773676');
 });
 test('real tutorial Escape/Skip/finish retain separate seen and completed flags', () => {
   const handlers = new Map(), store = new Map(), nodes = new Map(); let stopCount = 0;
