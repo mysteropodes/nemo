@@ -1,5 +1,7 @@
 //! Frozen independent full-document bytes and real private write/reopen controls.
-use super::{bootstrap_raw, reopen::bootstrap_request, save::save_request};
+use crate::native_object_bootstrap::{
+    bootstrap_raw, reopen::bootstrap_request, save::save_request,
+};
 use crate::{
     application_mcp::ApplicationMcp,
     native_application::{admit_release_request, complete_release},

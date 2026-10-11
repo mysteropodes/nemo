@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const R = require('./lib/boundaries-rust.cjs');
-const C = require('./lib/coverage.cjs');
+const C = require('./lib/boundaries-coverage.cjs');
 const root = path.resolve(__dirname, '../..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const profile = JSON.parse(read('engineering/boundaries/profiles/rust.profile.json'));
@@ -49,7 +49,7 @@ test('production command preserves main scope, serializer authority and no-repla
   assert.doesNotMatch(producer, /native_engine::|active_mut|encode_project|fs::rename|truncate\(true\)/);
   assert.match(read(controls), /bootstrap_request\(&state/);
   assert.match(read(controls), /#\[path = "native_object_save_failure_tests.rs"\]/);
-  assert.match(read(failures), /use super::\*;/);
+  assert.match(read(failures), /use crate::native_object_bootstrap::save_tests::\*;/);
   assert.match(read('src-tauri/src/native_object_client.rs'), /"saveAvailable":false/);
 });
 

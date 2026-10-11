@@ -1,5 +1,5 @@
 //! Failure/atomicity controls split without removing assertions.
-use super::*;
+use crate::native_object_bootstrap::save_tests::*;
 
 #[test]
 fn cancelled_denied_scope_missing_parent_and_stale_pins_never_stage() {
