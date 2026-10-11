@@ -13,7 +13,7 @@ const fixtureBytes = fs.readFileSync(fixturePath);
 const fixture = JSON.parse(fixtureBytes);
 const clone = value => JSON.parse(JSON.stringify(value));
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-assert.equal(sha(fixtureBytes), 'e157c3440176a71dc99e0592a32b17097a529e441a1d68d72536e158e9e83ce0');
+assert.equal(sha(fixtureBytes), 'af24c67ce4069f65b51802872f0b6ec8cfd9eb40c76ad421dd9d95c9e082e147');
 const frozen = {};
 for (const [file, pin] of Object.entries(fixture.pins)) {
   const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 4 * 1024 * 1024 });
@@ -32,18 +32,20 @@ function excerpt(name) {
   return result;
 }
 const layerProducer = excerpt('layers'), elementProducer = excerpt('elements');
-function context(holders) {
+function context(holders, motionSource = frozen['src/js/motion.js']) {
   const result = {
     document: { readyState: 'loading', addEventListener() {} },
     localStorage: { getItem() { return null; } },
     state: { layers: clone(holders), fps: 20, currentFrame: 0 },
     SM: { t: key => key }, renderFrame: 0,
+    pushUndo() {}, renderLayerList() {}, renderTimeline() {},
     setTimeout() { throw new Error('unexpected asynchronous oracle effect'); },
   };
   result.window = result;
   vm.createContext(result);
   for (const file of ['src/js/animation/curve.js', 'src/js/domain/animation/opacity.js', 'src/js/motion.js']) {
-    vm.runInContext(frozen[file], result, { filename: `${fixture.baseline}:${file}`, timeout: 1000 });
+    vm.runInContext(file === 'src/js/motion.js' ? motionSource : frozen[file], result,
+      { filename: `${fixture.baseline}:${file}`, timeout: 1000 });
   }
   assert.equal(typeof result.SMMotion.layerOrderAt, 'function');
   assert.equal(typeof result.SMMotion.elementOrderAt, 'function');
@@ -53,15 +55,16 @@ function layerOrder(holders, frame = 0, producer = layerProducer) {
   const c = context(holders);
   c.renderFrame = frame;
   c.layers = holders.map((_, index) => ({ id: `L${index}` }));
-  c._anyLayerOrder = holders.some((_, index) => c.SMMotion.layerHasExplicitOrder(index));
+  c._anyLayerOrder = c.SMMotion.anyLayerHasOrder();
   const ranks = holders.map((_, index) => c.SMMotion.layerOrderAt(index, frame));
   vm.runInContext(producer, c, { timeout: 1000 });
   return { ranks, ids: Array.from(c.layers, item => item.id), context: c };
 }
 function elementOrder(holders, frame = 0, producer = elementProducer) {
   const c = context([{ elementMotion: holders }]);
-  c.items = ['a', 'b', 'c'].map(id => ({ id, __ord: c.SMMotion.elementOrderAt(0, id, frame) }));
-  c._anyElemOrder = true; // The excerpt's admitted sort branch, no geometry loop.
+  c._anyElemOrder = c.SMMotion.layerElementsHaveOrder(c.state.layers[0]);
+  c.items = ['a', 'b', 'c'].map(id => c._anyElemOrder
+    ? { id, __ord: c.SMMotion.elementOrderAt(0, id, frame) } : { id });
   vm.runInContext(producer, c, { timeout: 1000 });
   assert.ok(c.items.every(item => !('__ord' in item) && !('__ordIx' in item)));
   return Array.from(c.items, item => item.id);
@@ -187,19 +190,114 @@ test('frame, hold, nonlinear ease and expression bypass mutations fail value or 
   mismatch(context([expression]).SMMotion.layerOrderAt(0, 5), 3);
 });
 
-test('storage witness is an explicit versioned authored plan, not inferred v1 encounter order', () => {
+function authoredMetadata(holder) {
+  const result = {};
+  if (Object.hasOwn(holder.motionStatic || {}, 'order')) result.static = clone(holder.motionStatic.order);
+  if (Object.hasOwn(holder.motion || {}, 'order')) result.track = clone(holder.motion.order);
+  if (Object.hasOwn(holder.expressions || {}, 'order')) {
+    const expression = holder.expressions.order;
+    result.expression = { enabled: expression.enabled, code: expression.code };
+  }
+  return result;
+}
+
+test('frozen toggle retains static plus keys, then a present empty track after disabling', () => {
+  const sample = fixture.authoringPresence.toggle;
+  const c = context([{ motionStatic: { order: sample.initialStatic } }]), holder = c.state.layers[0];
+  c.state.currentFrame = sample.currentFrame;
+  c.SMMotion.toggleAnimated(holder, 'order');
+  assert.deepEqual(Array.from(holder.motionStatic.order), sample.initialStatic);
+  assert.equal(holder.motion.order.keys.length, 1);
+  assert.deepEqual(Array.from(holder.motion.order.keys[0].v), sample.initialStatic);
+  c.SMMotion.setKeyAtFrame(holder, 'order', sample.nextFrame, sample.nextValue);
+  c.state.currentFrame = sample.nextFrame;
+  c.SMMotion.toggleAnimated(holder, 'order');
+  assert.deepEqual(Array.from(holder.motionStatic.order), sample.finalStatic);
+  assert.deepEqual(Array.from(holder.motion.order.keys), sample.finalKeys);
+  assert.equal(c.SMMotion.isAnimated(holder, 'order'), false);
+  assert.equal(c.SMMotion.anyOrderUsedAnywhere(), true);
+});
+
+test('coexisting/empty-track authored presence survives JSON restoration and drives real guards', () => {
+  const cases = fixture.authoringPresence;
+  for (const [index, name] of ['coexisting', 'emptyTrack', 'disabledExpression', 'emptyDraft'].entries()) {
+    assert.deepEqual(authoredMetadata(clone(cases[name].holder)), cases.metadata[index]);
+  }
+  const c = context([cases.coexisting.holder]);
+  for (const point of cases.coexisting.frames) assert.equal(c.SMMotion.layerOrderAt(0, point.frame), point.value);
+  assert.deepEqual(Array.from(c.state.layers[0].motionStatic.order), cases.coexisting.static);
+  const empty = context([cases.emptyTrack.holder]);
+  assert.equal(empty.SMMotion.anyOrderUsedAnywhere(), cases.emptyTrack.route);
+  assert.equal(empty.SMMotion.isAnimated(empty.state.layers[0], 'order'), cases.emptyTrack.animated);
+  assert.equal(empty.SMMotion.layerHasExplicitOrder(0), cases.emptyTrack.layerExplicit);
+  assert.equal(empty.SMMotion.layerOrderAt(0, 0), cases.emptyTrack.layerValue);
+  const element = context([{ elementMotion: { a: cases.emptyTrack.holder } }]);
+  assert.equal(element.SMMotion.layerElementsHaveOrder(element.state.layers[0]), true);
+  assert.equal(element.SMMotion.elementOrderAt(0, 'a', 0), cases.emptyTrack.elementValue);
+});
+
+test('actual expression editor preserves disabled nonempty code and enabled empty drafts', () => {
+  const sample = fixture.authoringPresence.editor;
+  const c = context([{ layerUid: 'L0', motionStatic: { order: sample.initialStatic } }]);
+  const ref = { uid: 'L0', elem: null }, holder = c.state.layers[0];
+  assert.equal(c.SMMotion.applyExprCode(ref, 'order', sample.code), true);
+  assert.equal(c.SMMotion.setExprEnabled(ref, 'order', true), true);
+  assert.equal(c.SMMotion.layerOrderAt(0, 5), sample.enabledValue);
+  c.SMMotion.setExprEnabled(ref, 'order', false);
+  assert.equal(c.SMMotion.layerOrderAt(0, 5), sample.disabledValue);
+  assert.deepEqual(authoredMetadata(holder).expression, { enabled: false, code: sample.code });
+  c.SMMotion.applyExprCode(ref, 'order', sample.emptyCode);
+  c.SMMotion.setExprEnabled(ref, 'order', true);
+  assert.deepEqual(authoredMetadata(holder).expression, { enabled: true, code: '' });
+  assert.equal(c.SMMotion.layerOrderAt(0, 5), sample.disabledValue);
+  for (const name of ['disabledExpression', 'emptyDraft']) {
+    const point = fixture.authoringPresence[name], fresh = context([point.holder]);
+    assert.equal(fresh.SMMotion.layerOrderAt(0, point.frame), point.value);
+    assert.deepEqual(authoredMetadata(fresh.state.layers[0]).expression, { enabled: point.enabled, code: point.code });
+  }
+});
+
+test('lossy active-mode, empty-track and expression-state mutations fail authored or guard oracles', () => {
+  const cases = fixture.authoringPresence;
+  const lossy = clone(cases.coexisting.holder);
+  delete lossy.motionStatic;
+  lossy.motion.order.keys = [];
+  mismatch(context([lossy]).SMMotion.layerOrderAt(0, 0), 2);
+  mismatch(context([{}]).SMMotion.anyOrderUsedAnywhere(), cases.emptyTrack.route);
+  const source = frozen['src/js/motion.js'];
+  const wrongGuard = source.replace('(ld.motion && ld.motion.order) ||', 'isAnimated(ld, "order") ||');
+  assert.notEqual(wrongGuard, source);
+  mismatch(context([cases.emptyTrack.holder], wrongGuard).SMMotion.anyOrderUsedAnywhere(), true);
+  const wrongEnabled = source.replace('holder.expressions[prop].enabled && ', '');
+  assert.notEqual(wrongEnabled, source);
+  mismatch(context([cases.disabledExpression.holder], wrongEnabled).SMMotion.layerOrderAt(0, 5), 2);
+  for (const name of ['disabledExpression', 'emptyDraft']) {
+    const lost = clone(cases[name].holder);
+    delete lost.expressions;
+    mismatch(authoredMetadata(lost), authoredMetadata(cases[name].holder));
+  }
+});
+
+test('storage witness has one complete declared layer stack per context across authored scopes', () => {
   const plan = fixture.storageExample;
   assert.equal(plan.format, 'nemo.native-object-order-plan');
   assert.equal(plan.formatVersion, 1);
   assert.equal(plan.documentFormatVersion, 2);
   assert.equal(plan.migration, 'explicit-plan-required');
   assert.equal(plan.referencePolicy, 'unresolved');
-  for (const scope of plan.scopes) {
-    assert.equal(scope.frameScope.kind, 'authored');
-    assert.deepEqual(scope.layers.map(layer => layer.naturalPosition), [0, 1]);
-    assert.equal(new Set(scope.layers.map(layer => layer.layerUid)).size, scope.layers.length);
-    assert.equal(new Set(scope.elements.map(element => JSON.stringify([element.layerUid, element.strokeId]))).size, scope.elements.length);
-    assert.ok(scope.elements.every(element => scope.layers.some(layer => layer.layerUid === element.layerUid)));
+  for (const context of plan.contexts) {
+    assert.deepEqual(context.layers.map(layer => layer.layerUid), fixture.storageDeclaredLayers);
+    assert.deepEqual(context.layers.map(layer => layer.naturalPosition), [0, 1, 2]);
+    assert.equal(new Set(context.layers.map(layer => layer.layerUid)).size, context.layers.length);
+    assert.equal(context.scopes.length, 2);
+    for (const scope of context.scopes) {
+      assert.equal(scope.frameScope.kind, 'authored');
+      assert.equal(Object.hasOwn(scope, 'layers'), false);
+      assert.equal(new Set(scope.elements.map(element => JSON.stringify([element.layerUid, element.strokeId]))).size, scope.elements.length);
+      assert.ok(scope.elements.every(element => context.layers.some(layer => layer.layerUid === element.layerUid)));
+    }
+    const omittedEmpty = context.layers.slice(0, 2).map(layer => layer.layerUid);
+    mismatch(omittedEmpty, fixture.storageDeclaredLayers);
   }
   const contract = fs.readFileSync(path.join(root, 'engineering/application/NATIVE_OBJECT_COMPOSITION_ORDER.md'), 'utf8');
   for (const marker of ['compositionOrder', 'naturalPosition', 'frameScope', 'expression', 'v1', 'Reference', 'unavailable']) assert.ok(contract.includes(marker));

@@ -243,14 +243,32 @@
   "animated": {
     "extendedFrames": {
       "keys": [
-        { "frame": -0.5, "value": 1 },
-        { "frame": 1.5, "value": 3 },
-        { "frame": 40, "value": 5 }
+        {
+          "frame": -0.5,
+          "value": 1
+        },
+        {
+          "frame": 1.5,
+          "value": 3
+        },
+        {
+          "frame": 40,
+          "value": 5
+        }
       ],
       "samples": [
-        { "frame": -0.5, "value": 1 },
-        { "frame": 0.5, "value": 2 },
-        { "frame": 40, "value": 5 }
+        {
+          "frame": -0.5,
+          "value": 1
+        },
+        {
+          "frame": 0.5,
+          "value": 2
+        },
+        {
+          "frame": 40,
+          "value": 5
+        }
       ]
     },
     "linearAndHold": {
@@ -622,88 +640,308 @@
     "format": "nemo.native-object-order-plan",
     "formatVersion": 1,
     "documentFormatVersion": 2,
-    "scopes": [
+    "contexts": [
       {
         "contextId": "scene-root",
-        "frameScope": {
-          "kind": "authored",
-          "frame": 7
-        },
         "layers": [
           {
             "layerUid": "L0",
             "naturalPosition": 0,
             "order": {
-              "kind": "static",
-              "value": 2
+              "static": [
+                2
+              ],
+              "track": {
+                "keys": [
+                  {
+                    "frame": 0,
+                    "v": [
+                      1
+                    ],
+                    "hold": true,
+                    "curvePoints": [
+                      {
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "x": 1,
+                        "y": 1
+                      }
+                    ]
+                  },
+                  {
+                    "frame": 10,
+                    "v": [
+                      3
+                    ]
+                  }
+                ]
+              },
+              "expression": {
+                "enabled": false,
+                "code": "value + frame / 5"
+              }
             }
           },
           {
             "layerUid": "L1",
             "naturalPosition": 1,
             "order": {
-              "kind": "natural"
-            }
-          }
-        ],
-        "elements": [
-          {
-            "layerUid": "L0",
-            "strokeId": "a",
-            "naturalPosition": 0,
-            "order": {
-              "kind": "track",
-              "keys": [
-                {
-                  "frame": 0,
-                  "value": 1,
-                  "hold": true,
-                  "curvePoints": [
-                    {
-                      "x": 0,
-                      "y": 0
-                    },
-                    {
-                      "x": 1,
-                      "y": 1
-                    }
-                  ]
-                },
-                {
-                  "frame": 10,
-                  "value": 3,
-                  "hold": false,
-                  "curvePoints": [
-                    {
-                      "x": 0,
-                      "y": 0
-                    },
-                    {
-                      "x": 1,
-                      "y": 1
-                    }
-                  ]
-                }
-              ]
+              "track": {
+                "keys": []
+              }
             }
           },
           {
-            "layerUid": "L1",
-            "strokeId": "a",
-            "naturalPosition": 0,
+            "layerUid": "L2",
+            "naturalPosition": 2,
             "order": {
-              "kind": "expression",
-              "source": "value + frame / 5",
-              "base": {
-                "kind": "static",
-                "value": 2
+              "expression": {
+                "enabled": true,
+                "code": ""
               }
             }
+          }
+        ],
+        "scopes": [
+          {
+            "frameScope": {
+              "kind": "authored",
+              "frame": 7
+            },
+            "elements": [
+              {
+                "layerUid": "L0",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {
+                  "static": [
+                    2
+                  ]
+                }
+              },
+              {
+                "layerUid": "L1",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {
+                  "expression": {
+                    "enabled": true,
+                    "code": "value + frame / 5"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "frameScope": {
+              "kind": "authored",
+              "frame": 8
+            },
+            "elements": [
+              {
+                "layerUid": "L0",
+                "strokeId": "a",
+                "naturalPosition": 0,
+                "order": {}
+              }
+            ]
           }
         ]
       }
     ],
     "migration": "explicit-plan-required",
     "referencePolicy": "unresolved"
-  }
+  },
+  "authoringPresence": {
+    "coexisting": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "motion": {
+          "order": {
+            "keys": [
+              {
+                "frame": 0,
+                "v": [
+                  5
+                ],
+                "curvePoints": [
+                  {
+                    "x": 0,
+                    "y": 0
+                  },
+                  {
+                    "x": 1,
+                    "y": 1
+                  }
+                ]
+              },
+              {
+                "frame": 10,
+                "v": [
+                  7
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "value": 5
+        },
+        {
+          "frame": 10,
+          "value": 7
+        }
+      ],
+      "static": [
+        2
+      ]
+    },
+    "emptyTrack": {
+      "holder": {
+        "motion": {
+          "order": {
+            "keys": []
+          }
+        }
+      },
+      "route": true,
+      "animated": false,
+      "layerExplicit": false,
+      "layerValue": 1,
+      "elementValue": 0
+    },
+    "disabledExpression": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "expressions": {
+          "order": {
+            "enabled": false,
+            "code": "value + 9"
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "frame": 5,
+      "value": 2,
+      "code": "value + 9",
+      "enabled": false
+    },
+    "emptyDraft": {
+      "holder": {
+        "motionStatic": {
+          "order": [
+            2
+          ]
+        },
+        "expressions": {
+          "order": {
+            "enabled": true,
+            "code": ""
+          }
+        },
+        "_exprSeed": 12345
+      },
+      "frame": 5,
+      "value": 2,
+      "code": "",
+      "enabled": true
+    },
+    "toggle": {
+      "initialStatic": [
+        2
+      ],
+      "currentFrame": 0,
+      "nextFrame": 10,
+      "nextValue": [
+        8
+      ],
+      "finalStatic": [
+        8
+      ],
+      "finalKeys": []
+    },
+    "editor": {
+      "initialStatic": [
+        2
+      ],
+      "code": "value + 9",
+      "emptyCode": "",
+      "enabledValue": 11,
+      "disabledValue": 2
+    },
+    "metadata": [
+      {
+        "static": [
+          2
+        ],
+        "track": {
+          "keys": [
+            {
+              "frame": 0,
+              "v": [
+                5
+              ],
+              "curvePoints": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 1
+                }
+              ]
+            },
+            {
+              "frame": 10,
+              "v": [
+                7
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "track": {
+          "keys": []
+        }
+      },
+      {
+        "static": [
+          2
+        ],
+        "expression": {
+          "enabled": false,
+          "code": "value + 9"
+        }
+      },
+      {
+        "static": [
+          2
+        ],
+        "expression": {
+          "enabled": true,
+          "code": ""
+        }
+      }
+    ]
+  },
+  "storageDeclaredLayers": [
+    "L0",
+    "L1",
+    "L2"
+  ]
 }
