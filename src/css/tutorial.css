@@ -69,7 +69,8 @@
 /* Uncovered temporary column; preserve the properties panel's preferences. */
 #tutorial-native-space{flex:none;min-width:220px;align-self:stretch;}
 #tut-tooltip.tutorial-native-card{transform:none;overflow:auto;transition:opacity .2s;}
-#tut-tooltip.tutorial-native-pending{visibility:hidden;}
+#tut-tooltip.tutorial-native-pending,#tut-launcher .modal-box.tutorial-native-pending{visibility:hidden;}
+#tut-launcher.modal-overlay .modal-box.tutorial-native-card{position:fixed;transform:none;transition:none;}
 
 /* ---- Module launcher modal ---- */
 /* Opened from the start screen (#start-screen, z-index:500) via its own

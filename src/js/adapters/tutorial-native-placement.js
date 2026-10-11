@@ -54,9 +54,21 @@
   function create(root, onFailure) {
     var doc = root.document, top = doc.getElementById('top-area'), canvas = doc.getElementById('canvas-area');
     var drawing = doc.getElementById('drawing-canvas'), props = doc.getElementById('props-panel');
-    var token = 0, ready = true, pending = false, space = null, card = null, target = null, corner = null;
+    var token = 0, ready = true, pending = false, space = null, card = null, target = null, corner = null, launcher = false;
     var saved = null, observer = null, geometry = '', buttons = [];
-    function nativeMode() { return !!root.NemoNativeOpacityProject; }
+    function nativeMode() {
+      var native = root.NemoNativeOpacityCutover;
+      if (!native && !root.NemoNativeOpacityProject) return false;
+      if (!native) return true;
+      try {
+        if (native.isActive()) return true;
+        // The lifecycle's released/initial state exposes null identities and
+        // blocksLegacy=false. Inactive, disconnected or indeterminate owners
+        // cannot silently put a centered launcher over an attached native view.
+        return !(native.identity() === null && native.getNativeIdentity() === null &&
+          typeof native.blocksLegacy === 'function' && native.blocksLegacy() === false);
+      } catch (_) { return true; }
+    }
     function notice(error) { if (root.showToast) root.showToast(error.message); }
     function enable(value) {
       buttons.forEach(function (item) { item.button.disabled = value ? item.disabled : true; });
@@ -121,16 +133,27 @@
     }
     function controlsFit() {
       var area = space.getBoundingClientRect();
-      return buttons.every(function (item) {
-        var r = item.button.getBoundingClientRect();
+      // Clipped scrolling rows and the optional hidden Back button are not
+      // fixed launcher controls. They remain disabled with the whole card
+      // while pending, then are reached through the ordinary scrolling list.
+      var controls = launcher ? ['#tut-launcher-close', '#tut-launcher-search', '#tut-ask-input', '#tut-ask-btn', '.modal-bdy']
+        .map(function (selector) { return card.querySelector(selector); }) : buttons.map(function (item) { return item.button; });
+      return controls.every(function (control) {
+        if (!control) return false;
+        var r = control.getBoundingClientRect();
         return r.width > 0 && r.height > 0 && r.left >= area.left && r.right <= area.right &&
-          r.top >= area.top && r.bottom <= area.bottom && r.bottom <= root.innerHeight;
+          r.top >= area.top && r.bottom <= area.bottom && r.bottom <= root.innerHeight &&
+          (!launcher || control !== card.querySelector('.modal-bdy') || r.height >= 24);
       });
     }
-    async function place(nextCard, nextTarget, pinCorner) {
+    async function place(nextCard, nextTarget, pinCorner, kind) {
+      if (space && card !== nextCard) {
+        await close(); notice(new Error('Close the current tutorial surface before opening another.'));
+        if (onFailure) onFailure(); return 'failed';
+      }
       var current = ++token; ready = false; pending = true;
-      card = nextCard; target = nextTarget; corner = pinCorner;
-      buttons = Array.from(card.querySelectorAll('button')).map(function (button) { return { button: button, disabled: button.disabled }; });
+      card = nextCard; target = nextTarget; corner = pinCorner; launcher = kind === 'launcher';
+      buttons = Array.from(card.querySelectorAll('button,input')).map(function (button) { return { button: button, disabled: button.disabled }; });
       try {
         if (nativeMode()) {
           enable(false); reserve(); await present();
@@ -145,19 +168,20 @@
         ready = true; return 'ready';
       } catch (error) {
         if (current !== token) return 'stale';
-        releaseLayout(); card.classList.remove('on'); notice(error);
+        if (!releaseLayout()) enable(true);
+        card.classList.remove('on'); notice(error);
         if (onFailure) onFailure();
         return 'failed';
       } finally { if (current === token) pending = false; }
     }
     function resized() {
       if (!space || pending || stamp() === geometry) return;
-      place(card, target, corner);
+      place(card, target, corner, launcher ? 'launcher' : undefined);
     }
     function close() {
       ++token; ready = false; pending = false;
-      if (releaseLayout() && nativeMode()) return present().catch(notice);
-      return Promise.resolve();
+      if (releaseLayout() && nativeMode()) return present().then(function () { return true; }).catch(function (error) { notice(error); return false; });
+      return Promise.resolve(true);
     }
     return Object.freeze({ place: place, close: close, ready: function () { return ready; } });
   }

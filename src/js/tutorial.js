@@ -1444,7 +1444,7 @@
 
   // ---- Runtime state ----------------------------------------------------
   var active = null; // {module, stepIdx, pollTimer, clickHandler}
-  var placement = null;
+  var placement = null, transition = 0, transitioning = false;
 
   function $(sel) { return document.querySelector(sel); }
 
@@ -1554,18 +1554,20 @@
     var sp = $('#tut-spotlight'), tt = $('#tut-tooltip');
     if (sp) sp.classList.remove('on');
     if (tt) tt.classList.remove('on');
-    if (placement) placement.close();
+    var released = placement ? placement.close() : Promise.resolve(true);
     if (mod && completed) {
       markDone(mod.id);
       if (window.showToast) showToast(T(SM.t('toastModuleDoneSuffix')).replace('%s', T(mod.title)));
     }
+    return released;
   }
 
-  function stopTutorial() { finishModule(false); }
+  function stopTutorial() { ++transition; transitioning = false; hideLauncher(); return finishModule(false); }
 
   async function startModule(id) {
     var mod = MODULES.filter(function (m) { return m.id === id; })[0];
     if (!mod) return;
+    var request = ++transition; transitioning = true;
     // The lessons target real toolbar/canvas elements — those are only
     // reachable once a project is open (the start screen sits on top and
     // intercepts clicks, even though the editor DOM already exists
@@ -1575,8 +1577,10 @@
     if (startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
       await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' });
     }
+    hideLauncher(); var released = await finishModule(false);
+    if (request !== transition) return;
+    transitioning = false; if (released === false) return;
     ensureDom();
-    closeLauncher();
     active = { module: mod, stepIdx: 0 };
     renderStep();
   }
@@ -1820,15 +1824,20 @@
     return '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
 
-  function openLauncher() {
-    ensureLauncher();
+  async function openLauncher() {
+    var request = ++transition; transitioning = true; hideLauncher(); var released = await finishModule(false);
+    if (request !== transition) return;
+    transitioning = false; if (released === false) return;
+    ensureDom(); ensureLauncher();
     var si = $('#tut-launcher-search'); if (si) si.value = '';
     var ai = $('#tut-ask-input'); if (ai) ai.value = '';
     var aa = $('#tut-ask-answer'); if (aa) { aa.style.display = 'none'; aa.innerHTML = ''; }
     renderCategoryScreen();
-    $('#tut-launcher').style.display = 'flex';
+    var modal = $('#tut-launcher'); modal.style.display = 'flex';
+    return placement.place(modal.querySelector('.modal-box'), function () { return null; }, null, 'launcher');
   }
-  function closeLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
+  function hideLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
+  function closeLauncher() { return stopTutorial(); }
 
   // ---- First-launch auto-start (feedback-welcome, once ever) -----------
   // Polls for the start screen closing (a project becoming active) rather
@@ -1857,7 +1866,8 @@
       if (btn) btn.addEventListener('click', openLauncher);
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && active) stopTutorial();
+      var launcher = $('#tut-launcher');
+      if (e.key === 'Escape' && (active || transitioning || launcher && launcher.style.display === 'flex')) stopTutorial();
     });
     maybeAutoStartWelcome();
   });
