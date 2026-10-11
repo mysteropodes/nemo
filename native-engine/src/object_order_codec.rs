@@ -3,8 +3,8 @@ use crate::object_codec::{
     parse, validate, validate_content, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, OrderContext, OrderCurvePoint, OrderPlan, OrderedObjectDocument,
-    OBJECT_DOCUMENT_FORMAT,
+    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, OrderContext, OrderCurvePoint,
+    OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
@@ -107,8 +107,12 @@ fn layer_stack(context: &OrderContext, declared: &HashSet<&str>) -> Result<(), O
     Ok(())
 }
 
-fn validate_order(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
-    let plan = &document.composition_order;
+fn validate_order(
+    plan: &OrderPlan,
+    total_frames: u32,
+    layers: &[ObjectLayer],
+    objects: &[ObjectRecord],
+) -> Result<(), ObjectCodecError> {
     if plan.format != "nemo.native-object-order-plan"
         || plan.format_version != 1
         || plan.document_format_version != 2
@@ -117,13 +121,8 @@ fn validate_order(document: &OrderedObjectDocument) -> Result<(), ObjectCodecErr
     {
         return Err(unsupported("unsupported order plan version or policy"));
     }
-    let declared: HashSet<_> = document
-        .layers
-        .iter()
-        .map(|l| l.layer_uid.as_str())
-        .collect();
-    let expected: HashSet<_> = document
-        .objects
+    let declared: HashSet<_> = layers.iter().map(|l| l.layer_uid.as_str()).collect();
+    let expected: HashSet<_> = objects
         .iter()
         .filter(|r| r.target.frame_scope.kind == FrameScopeKind::Authored)
         .map(|r| {
@@ -150,7 +149,7 @@ fn validate_order(document: &OrderedObjectDocument) -> Result<(), ObjectCodecErr
             if scope.frame_scope.kind != FrameScopeKind::Authored {
                 return Err(unsupported("Reference order is unavailable"));
             }
-            if scope.frame_scope.frame >= document.total_frames {
+            if scope.frame_scope.frame >= total_frames {
                 return Err(invalid("invalid authored order source frame"));
             }
             if !scopes.insert(scope.frame_scope.frame) {
@@ -201,7 +200,33 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         &document.objects,
         true,
     )?;
-    validate_order(document)
+    validate_order(
+        &document.composition_order,
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+    )
+}
+
+pub(crate) fn validate_storage_order(
+    document: &ObjectDocument,
+    plan: &OrderPlan,
+) -> Result<(), ObjectCodecError> {
+    if document.format != OBJECT_DOCUMENT_FORMAT || document.format_version != 2 {
+        return Err(unsupported("unsupported ordered object format or version"));
+    }
+    validate_content(
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+        true,
+    )?;
+    validate_order(
+        plan,
+        document.total_frames,
+        &document.layers,
+        &document.objects,
+    )
 }
 
 pub fn decode_ordered_project(bytes: &[u8]) -> Result<OrderedObjectDocument, ObjectCodecError> {

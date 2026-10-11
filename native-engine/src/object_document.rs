@@ -18,6 +18,8 @@ pub struct ObjectDocument {
     pub(crate) total_frames: u32,
     pub(crate) layers: Vec<ObjectLayer>,
     pub(crate) objects: Vec<ObjectRecord>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) composition_order: Presence<OrderPlan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -138,7 +140,8 @@ macro_rules! object_deserialize {
 pub(crate) use object_deserialize;
 
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
-    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord> });
+    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
+    #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String });
 object_deserialize!(ObjectTarget {
     context_id: String,
@@ -177,6 +180,22 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    pub fn format_version(&self) -> u32 {
+        self.format_version
+    }
+    pub(crate) fn valid_target(&self, target: &ObjectTarget) -> bool {
+        if self.format_version == 2 {
+            !target.context_id.is_empty()
+                && !target.layer_uid.is_empty()
+                && !target.stroke_id.is_empty()
+        } else {
+            target.valid()
+        }
+    }
+    /// Storage accepts Reference records; v2 behavior is not designed yet.
+    pub(crate) fn reference_unavailable(&self, target: &ObjectTarget) -> bool {
+        self.format_version == 2 && target.frame_scope.kind == FrameScopeKind::Reference
+    }
     pub fn total_frames(&self) -> u32 {
         self.total_frames
     }
