@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c69be13d04af5b35f6c680f65f1919b117ffa1e5",
-  "describe": "v0.7.0-alpha.4-1194-gc69be13d"
+  "head": "6a66dbf5f5811923c49a75be95142788591a2d13",
+  "describe": "v0.7.0-alpha.4-1200-g6a66dbf5"
  },
- "inputsDigest": "bf3b8257f45cae3b28faf42ac55b79970176d8de29b893965287b7ee8bf5d687",
+ "inputsDigest": "2b6d515f868420ac4f1778be2a1207d088a31528e8f98d6c79be24ce50e4674a",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1877,
+   "line": 1866,
    "members": 0
   },
   "SMWorkspace": {
@@ -3476,7 +3476,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1868"
+    "src/js/tutorial.js:1857"
    ],
    "events": [
     "click"
@@ -5866,7 +5866,7 @@
      "src/js/timeline.js:7848 openCommentPopover()",
      "src/js/timeline.js:7907 initCommentPopover()",
      "src/js/timeline.js:7930 initCommentPopover()",
-     "src/js/tutorial.js:1114 measure()"
+     "src/js/tutorial.js:1121 measure()"
     ]
    },
    "fixtures": [
@@ -7250,7 +7250,7 @@
     "functionsVisited": 2,
     "via": "variable fmtSel",
     "references": [
-     "src/js/tutorial.js:1150 measure()"
+     "src/js/tutorial.js:1157 measure()"
     ]
    },
    "fixtures": [
@@ -9636,7 +9636,7 @@
     "functionsVisited": 53,
     "via": "variable addBtn",
     "references": [
-     "src/js/tutorial.js:1303 check()"
+     "src/js/tutorial.js:1310 check()"
     ]
    },
    "fixtures": [
@@ -10906,7 +10906,7 @@
      "src/js/gradient-bridge.js:63 renderGradientPanel()",
      "src/js/timeline.js:8908 initFillGradientButton()",
      "src/js/timeline.js:8930 syncFillGradientButton()",
-     "src/js/tutorial.js:1262 check()"
+     "src/js/tutorial.js:1269 check()"
     ]
    },
    "fixtures": [
@@ -12335,8 +12335,7 @@
     "via": "variable trig",
     "references": [
      "src/js/reference-bridge.js:354 syncUI()",
-     "src/js/reference-bridge.js:422 openOptions()",
-     "src/js/tutorial.js:1338 check()"
+     "src/js/reference-bridge.js:422 openOptions()"
     ]
    },
    "fixtures": [
@@ -14580,7 +14579,7 @@
     "via": "variable nameEl",
     "references": [
      "src/js/timeline.js:9003 syncProfileFields()",
-     "src/js/tutorial.js:1088 measure()"
+     "src/js/tutorial.js:1095 measure()"
     ]
    },
    "fixtures": []
@@ -15410,7 +15409,7 @@
     "via": "variable sel",
     "references": [
      "src/js/i18n.js:4198 applyI18n()",
-     "src/js/tutorial.js:1023 measure()"
+     "src/js/tutorial.js:1030 measure()"
     ]
    },
    "fixtures": []
