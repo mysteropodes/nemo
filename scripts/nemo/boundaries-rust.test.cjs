@@ -571,10 +571,10 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
   assert.match(reopen, /allowed\(&resolved\)/);
   assert.match(reopen, /open_regular\(&resolved, \|path\| File::open\(path\)\)/);
   assert.equal(profile.sizeProfiles[owner.sizeProfile].hardMax, 500);
-  assert.equal(policy.externalCratePorts.native_engine.moduleItems[command].filter((x) => x === 'object_codec::decode_project').length, 1);
+  assert.equal(policy.externalCratePorts.native_engine.moduleItems[command].filter((x) => x === 'object_codec::decode_storage_project').length, 1);
   const denied = structuredClone(policy);
-  denied.externalCratePorts.native_engine.moduleItems[command] = denied.externalCratePorts.native_engine.moduleItems[command].filter((x) => x !== 'object_codec::decode_project');
-  assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) => v.rule === 'private-port-access' && v.module === command && v.detail.path === 'object_codec::decode_project'));
+  denied.externalCratePorts.native_engine.moduleItems[command] = denied.externalCratePorts.native_engine.moduleItems[command].filter((x) => x !== 'object_codec::decode_storage_project');
+  assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) => v.rule === 'private-port-access' && v.module === command && v.detail.path === 'object_codec::decode_storage_project'));
   const edgeDenied = structuredClone(policy);
   edgeDenied.layerRules['host-release-tests'].allowedLayers = edgeDenied.layerRules['host-release-tests'].allowedLayers.filter((x) => x !== 'command-adapter');
   assert.ok(R.checkRustCrate(profile, edgeDenied, { root: ROOT }).violations.some((v) => v.rule === 'layer-violation' && v.module === tests && v.detail.targetModule === command));
