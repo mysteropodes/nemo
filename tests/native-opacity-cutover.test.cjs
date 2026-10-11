@@ -3511,3 +3511,31 @@ test('N20V pending geometry cannot resize released identity and reentry uses the
   assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1540);
   assert.equal(harness.controller.status(), 'native'); dispose();
 });
+
+test('N20V partial document preserves publication and OS resize without a canvas observer', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const fixture = n20vGeometrySurface(harness), browserDocument = fixture.root.document;
+  fixture.root.document = {}; // Existing headless diagnostics shape: no getElementById port.
+  const dispose = fixture.install();
+  assert.equal(fixture.observers.length, 0);
+  assert.ok(fixture.root.NemoNativeOpacityCutover);
+  fixture.root.document = browserDocument;
+  fixture.bounds({ width: 690 }); fixture.windowResize(); await fixture.flush();
+  assert.equal(fixture.invocations.length, 1);
+  assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1380);
+  dispose(); assert.equal(fixture.listenerCount, 0);
+});
+
+test('N20V absent ResizeObserver does not touch optional DOM lookup and keeps OS resize', async () => {
+  const harness = nativeHarness(staticSource()); await harness.controller.activate(harness.prepared);
+  const fixture = n20vGeometrySurface(harness), browserDocument = fixture.root.document;
+  fixture.root.ResizeObserver = undefined;
+  fixture.root.document = { getElementById() { throw new Error('no observer must not require a DOM lookup'); } };
+  const dispose = fixture.install();
+  assert.equal(fixture.observers.length, 0);
+  fixture.root.document = browserDocument;
+  fixture.bounds({ width: 680 }); fixture.windowResize(); await fixture.flush();
+  assert.equal(fixture.invocations.length, 1);
+  assert.equal(fixture.invocations[0].viewport.physicalExtent.width, 1360);
+  dispose(); assert.equal(fixture.listenerCount, 0);
+});

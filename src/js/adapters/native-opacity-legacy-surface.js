@@ -121,8 +121,9 @@
     }
     root.addEventListener('error', onError, true);
     root.addEventListener('resize', onWindowResize);
-    var canvas = root.document && root.document.getElementById('drawing-canvas');
-    if (canvas && typeof root.ResizeObserver === 'function') {
+    var canvas = typeof root.ResizeObserver === 'function' && root.document &&
+      typeof root.document.getElementById === 'function' ? root.document.getElementById('drawing-canvas') : null;
+    if (canvas) {
       lastMapping = geometryKey();
       observer = new root.ResizeObserver(function (entries) {
         if (!ownsPublication() || !Array.prototype.some.call(entries, function (entry) {
