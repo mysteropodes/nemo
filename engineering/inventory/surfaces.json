@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "c1ffef1da87a03ab9f35bb231aba6ed16ca034e4",
-  "describe": "v0.7.0-alpha.4-1141-gc1ffef1d-dirty"
+  "head": "7a5bfdf3bcbc0b3840f55de8fbbdf968f659c06d",
+  "describe": "v0.7.0-alpha.4-1147-g7a5bfdf3-dirty"
  },
- "inputsDigest": "b390c9ce23b0b20107dbf631f2bf4309cb6e173bf5744b8e96ccb444900a52ee",
+ "inputsDigest": "3e9a521a9759276c91552b3cd4f7af1890a7d8c71408e432d72c7bc3787401e5",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1875,
+   "line": 1877,
    "members": 0
   },
   "SMWorkspace": {
@@ -3477,7 +3477,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1866"
+    "src/js/tutorial.js:1868"
    ],
    "events": [
     "click"
