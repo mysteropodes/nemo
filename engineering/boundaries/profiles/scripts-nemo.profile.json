@@ -664,6 +664,7 @@
         "boundaries-native-object-save.test.cjs",
         "boundaries-native-object-order.test.cjs",
         "boundaries-object-order-history.test.cjs",
+        "boundaries-object-order-evaluation.test.cjs",
         "boundaries-native-object-v2-persistence.test.cjs"
       ],
       "publicApi": [

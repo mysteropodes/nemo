@@ -4,6 +4,10 @@ use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord};
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
 
+#[path = "object_order_evaluation.rs"]
+mod order;
+pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
+
 /// All pins are mandatory, including the snapshot identity within a revision.
 #[derive(Debug, Clone)]
 pub struct ObjectFrameSelector<'a> {
@@ -61,9 +65,14 @@ pub struct ObjectFramePacket {
     scope_kind: FrameScopeKind,
     frame: u32,
     records: Vec<ObjectFrameIndices>,
+    numeric_order: Option<NumericOrderPlan>,
 }
 
 impl ObjectFramePacket {
+    /// Explicit partial numeric composition; records() remains source provenance.
+    pub fn numeric_order(&self) -> Option<&NumericOrderPlan> {
+        self.numeric_order.as_ref()
+    }
     pub fn instance_id(&self) -> &str {
         self.snapshot.instance_id()
     }
@@ -117,7 +126,10 @@ pub fn prepare_object_frame(
     if selector.document_snapshot_id != snapshot.snapshot_id() {
         return Err(ObjectFrameError::WrongSnapshot);
     }
-    if snapshot.document().format_version() == 2 {
+    let v2 = snapshot.document().format_version() == 2;
+    if v2
+        && (selector.context_id != "scene-root" || selector.scope_kind != FrameScopeKind::Authored)
+    {
         return Err(ObjectFrameError::Unavailable);
     }
     if selector.context_id != "scene-root" {
@@ -127,6 +139,11 @@ pub fn prepare_object_frame(
     if selector.frame >= document.total_frames() {
         return Err(ObjectFrameError::FrameOutOfRange);
     }
+    let numeric_order = if v2 {
+        Some(order::prepare(snapshot, selector.frame)?)
+    } else {
+        None
+    };
     let layers: HashMap<_, _> = document
         .layers()
         .iter()
@@ -155,5 +172,6 @@ pub fn prepare_object_frame(
         scope_kind: selector.scope_kind.clone(),
         frame: selector.frame,
         records,
+        numeric_order,
     })
 }
