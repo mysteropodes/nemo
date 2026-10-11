@@ -3,7 +3,7 @@ use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, require_main, HostResult, HOST_API_VERSION,
 };
-use native_engine::object_codec::decode_project;
+use native_engine::object_codec::decode_storage_project;
 use serde::{Deserialize, Serialize};
 use tauri_plugin_fs::FsExt;
 
@@ -21,6 +21,10 @@ pub(crate) use save::{
 #[cfg(test)]
 #[path = "native_object_save_tests.rs"]
 mod save_tests;
+
+#[cfg(test)]
+#[path = "native_object_v2_persistence_tests.rs"]
+mod v2_tests;
 
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
@@ -85,7 +89,7 @@ pub(crate) fn bootstrap_raw(
             "object bootstrap was cancelled",
         ));
     }
-    let document = decode_project(request.document_json.as_bytes())
+    let document = decode_storage_project(request.document_json.as_bytes())
         .map_err(|_| host_error("invalid_request", "invalid native object document"))?;
     let (document_id, content_revision) = state
         .install_native_object(document)
