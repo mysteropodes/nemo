@@ -1,0 +1,260 @@
+//! Partial numeric Order producer; no expression interpreter or renderer policy.
+use crate::animation_curve::{evaluate_curve, CurveSample};
+use crate::object_document::{AuthoredOrder, OrderContext, OrderCurvePoint};
+use crate::object_frame_packet::ObjectFrameError;
+use crate::revision::ObjectSnapshot;
+use serde_json::Number;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct NumericElementOrder {
+    source_object_index: usize,
+    value: f64,
+}
+impl NumericElementOrder {
+    pub fn source_object_index(&self) -> usize {
+        self.source_object_index
+    }
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+}
+#[derive(Debug, Clone)]
+pub struct NumericLayerOrder {
+    source_layer_index: usize,
+    natural_position: u32,
+    value: f64,
+    explicit: bool,
+    elements: Vec<NumericElementOrder>,
+}
+impl NumericLayerOrder {
+    pub fn source_layer_index(&self) -> usize {
+        self.source_layer_index
+    }
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+    pub fn explicit(&self) -> bool {
+        self.explicit
+    }
+    pub fn elements(&self) -> &[NumericElementOrder] {
+        &self.elements
+    }
+}
+/// Back-to-front sequence pinned by its containing immutable frame packet.
+#[derive(Debug, Clone)]
+pub struct NumericOrderPlan {
+    layers: Vec<NumericLayerOrder>,
+}
+impl NumericOrderPlan {
+    pub fn layers(&self) -> &[NumericLayerOrder] {
+        &self.layers
+    }
+}
+
+fn number(value: &Number) -> Result<f64, ObjectFrameError> {
+    value
+        .as_f64()
+        .filter(|v| v.is_finite())
+        .ok_or(ObjectFrameError::Unavailable)
+}
+fn active_expression(order: &AuthoredOrder) -> bool {
+    order
+        .expression
+        .value()
+        .is_some_and(|e| e.enabled && !e.code.is_empty())
+}
+fn has_keys(order: &AuthoredOrder) -> bool {
+    order
+        .track
+        .value()
+        .is_some_and(|track| !track.keys.is_empty())
+}
+fn routing_presence(order: &AuthoredOrder) -> bool {
+    !order.static_value.missing() || !order.track.missing()
+}
+fn samples(points: &[OrderCurvePoint]) -> Result<Vec<CurveSample>, ObjectFrameError> {
+    points
+        .iter()
+        .map(|p| {
+            Ok(CurveSample {
+                x: number(&p.x)?,
+                y: number(&p.y)?,
+                tx: p.tx.value().map(number).transpose()?,
+                ty: p.ty.value().map(number).transpose()?,
+            })
+        })
+        .collect()
+}
+fn default_curve() -> Vec<CurveSample> {
+    [
+        (0.0, 0.0),
+        (0.25, 0.156),
+        (0.5, 0.5),
+        (0.75, 0.844),
+        (1.0, 1.0),
+    ]
+    .into_iter()
+    .map(|(x, y)| CurveSample {
+        x,
+        y,
+        tx: None,
+        ty: None,
+    })
+    .collect()
+}
+fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
+    let Some(track) = order.track.value().filter(|t| !t.keys.is_empty()) else {
+        return order
+            .static_value
+            .value()
+            .map_or(Ok(0.0), |v| number(&v[0]));
+    };
+    let frame = f64::from(frame);
+    let first = &track.keys[0];
+    let last = &track.keys[track.keys.len() - 1];
+    if frame <= number(&first.frame)? {
+        return number(&first.v[0]);
+    }
+    if frame >= number(&last.frame)? {
+        return number(&last.v[0]);
+    }
+    for pair in track.keys.windows(2) {
+        let a = &pair[0];
+        let b = &pair[1];
+        let start = number(&a.frame)?;
+        let end = number(&b.frame)?;
+        if start <= frame && frame < end {
+            let value = number(&a.v[0])?;
+            if a.hold.value() == Some(&true) {
+                return Ok(value);
+            }
+            let t = (frame - start) / (end - start);
+            let curve = match a.curve_points.value() {
+                Some(Some(points)) => samples(points)?,
+                _ => default_curve(),
+            };
+            let y = evaluate_curve(&curve, t);
+            let result = value + (number(&b.v[0])? - value) * y;
+            if result.is_finite() {
+                return Ok(result);
+            }
+            return Err(ObjectFrameError::Unavailable);
+        }
+    }
+    Err(ObjectFrameError::InvalidSource)
+}
+fn elements(
+    snapshot: &ObjectSnapshot,
+    context: &OrderContext,
+    frame: u32,
+    layer: &str,
+) -> Result<Vec<NumericElementOrder>, ObjectFrameError> {
+    let scope = context
+        .scopes
+        .iter()
+        .find(|scope| scope.frame_scope.frame == frame)
+        .ok_or(ObjectFrameError::Unavailable)?;
+    let mut entries: Vec<_> = scope
+        .elements
+        .iter()
+        .filter(|e| e.layer_uid == layer)
+        .collect();
+    entries.sort_by_key(|e| e.natural_position);
+    let routed = entries.iter().any(|e| routing_presence(&e.order));
+    let mut result = Vec::new();
+    for entry in entries {
+        if routed && active_expression(&entry.order) {
+            return Err(ObjectFrameError::Unavailable);
+        }
+        let value = if routed {
+            numeric(&entry.order, frame)?
+        } else {
+            0.0
+        };
+        let index = snapshot
+            .document()
+            .objects()
+            .iter()
+            .position(|r| {
+                r.target.context_id == context.context_id
+                    && r.target.frame_scope == scope.frame_scope
+                    && r.target.layer_uid == entry.layer_uid
+                    && r.target.stroke_id == entry.stroke_id
+            })
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        result.push(NumericElementOrder {
+            source_object_index: index,
+            value,
+        });
+    }
+    if routed {
+        result.sort_by(|a, b| b.value.partial_cmp(&a.value).unwrap());
+    }
+    Ok(result)
+}
+
+pub(crate) fn prepare(
+    snapshot: &ObjectSnapshot,
+    frame: u32,
+) -> Result<NumericOrderPlan, ObjectFrameError> {
+    let doc = snapshot.document();
+    let plan = doc
+        .composition_order
+        .value()
+        .ok_or(ObjectFrameError::Unavailable)?;
+    let context = plan
+        .contexts
+        .iter()
+        .find(|c| c.context_id == "scene-root")
+        .ok_or(ObjectFrameError::Unavailable)?;
+    let source: HashMap<_, _> = doc
+        .layers()
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (l.layer_uid(), i))
+        .collect();
+    let mut entries: Vec<_> = context.layers.iter().collect();
+    entries.sort_by_key(|l| l.natural_position);
+    let mut layers = Vec::new();
+    for layer in entries {
+        let explicit = has_keys(&layer.order) || !layer.order.static_value.missing();
+        if explicit && active_expression(&layer.order) {
+            return Err(ObjectFrameError::Unavailable);
+        }
+        let value = if explicit {
+            numeric(&layer.order, frame)?
+        } else {
+            (context.layers.len() - layer.natural_position as usize) as f64
+        };
+        layers.push(NumericLayerOrder {
+            source_layer_index: *source
+                .get(layer.layer_uid.as_str())
+                .ok_or(ObjectFrameError::InvalidSource)?,
+            natural_position: layer.natural_position,
+            value,
+            explicit,
+            elements: elements(snapshot, context, frame, &layer.layer_uid)?,
+        });
+    }
+    let mut front: Vec<_> = layers
+        .iter()
+        .filter(|l| !l.explicit)
+        .rev()
+        .cloned()
+        .collect();
+    let mut explicit: Vec<_> = layers.into_iter().filter(|l| l.explicit).collect();
+    explicit.sort_by(|a, b| {
+        a.value
+            .partial_cmp(&b.value)
+            .unwrap()
+            .then(a.natural_position.cmp(&b.natural_position))
+    });
+    for layer in explicit {
+        // Negative ranks all clamp to front. Positive round matches JS Math.round.
+        let pos = (layer.value.round() - 1.0).clamp(0.0, front.len() as f64) as usize;
+        front.insert(pos, layer);
+    }
+    front.reverse();
+    Ok(NumericOrderPlan { layers: front })
+}
