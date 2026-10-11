@@ -5,6 +5,11 @@ use serde_json::Number;
 pub const OBJECT_DOCUMENT_FORMAT: &str = "nemo.native-object-document";
 pub const OBJECT_DOCUMENT_FORMAT_VERSION: u32 = 1;
 
+#[path = "object_order_document.rs"]
+mod order;
+pub use order::OrderedObjectDocument;
+pub(crate) use order::*;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
@@ -13,6 +18,8 @@ pub struct ObjectDocument {
     pub(crate) total_frames: u32,
     pub(crate) layers: Vec<ObjectLayer>,
     pub(crate) objects: Vec<ObjectRecord>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) composition_order: Presence<OrderPlan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -108,7 +115,7 @@ pub struct SolidFill {
 // schema objects must enter through visit_map; Fields retains strict duplicate
 // and unknown-member checks while nested DTOs apply the same object-only rule.
 macro_rules! object_deserialize {
-    ($name:ident { $($field:ident: $ty:ty),* $(,)? }) => {
+    ($name:ident { $($(#[$attr:meta])* $field:ident: $ty:ty),* $(,)? }) => {
         impl<'de> serde::Deserialize<'de> for $name {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 struct ObjectVisitor;
@@ -120,7 +127,7 @@ macro_rules! object_deserialize {
                     fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<$name, A::Error> {
                         #[derive(serde::Deserialize)]
                         #[serde(deny_unknown_fields, rename_all = "camelCase")]
-                        struct Fields { $($field: $ty),* }
+                        struct Fields { $($(#[$attr])* $field: $ty),* }
                         let fields = Fields::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
                         Ok($name { $($field: fields.$field),* })
                     }
@@ -133,7 +140,8 @@ macro_rules! object_deserialize {
 pub(crate) use object_deserialize;
 
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
-    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord> });
+    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
+    #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String });
 object_deserialize!(ObjectTarget {
     context_id: String,
@@ -172,6 +180,22 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    pub fn format_version(&self) -> u32 {
+        self.format_version
+    }
+    pub(crate) fn valid_target(&self, target: &ObjectTarget) -> bool {
+        if self.format_version == 2 {
+            !target.context_id.is_empty()
+                && !target.layer_uid.is_empty()
+                && !target.stroke_id.is_empty()
+        } else {
+            target.valid()
+        }
+    }
+    /// Storage accepts Reference records; v2 behavior is not designed yet.
+    pub(crate) fn reference_unavailable(&self, target: &ObjectTarget) -> bool {
+        self.format_version == 2 && target.frame_scope.kind == FrameScopeKind::Reference
+    }
     pub fn total_frames(&self) -> u32 {
         self.total_frames
     }

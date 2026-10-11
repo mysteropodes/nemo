@@ -25,6 +25,7 @@ pub enum ObjectFrameError {
     InvalidContext,
     FrameOutOfRange,
     InvalidSource,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -115,6 +116,9 @@ pub fn prepare_object_frame(
     }
     if selector.document_snapshot_id != snapshot.snapshot_id() {
         return Err(ObjectFrameError::WrongSnapshot);
+    }
+    if snapshot.document().format_version() == 2 {
+        return Err(ObjectFrameError::Unavailable);
     }
     if selector.context_id != "scene-root" {
         return Err(ObjectFrameError::InvalidContext);

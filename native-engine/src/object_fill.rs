@@ -76,12 +76,18 @@ pub fn prepare_object_fill_json(
     let payload: ObjectFillPayload =
         serde_json::from_slice(payload_bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
     if payload.command != "object.fill.set"
-        || !payload.stable_target.valid()
+        || !snapshot.document().valid_target(&payload.stable_target)
         || payload.stable_target.frame() >= snapshot.document().total_frames()
         || payload.fill.kind != "solid"
         || !payload.fill.valid_channels()
     {
         return Err(DispatchErrorCode::InvalidRequest);
+    }
+    if snapshot
+        .document()
+        .reference_unavailable(&payload.stable_target)
+    {
+        return Err(DispatchErrorCode::Unavailable);
     }
     let index = snapshot
         .document()

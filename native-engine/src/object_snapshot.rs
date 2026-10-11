@@ -74,7 +74,7 @@ impl ObjectSnapshot {
         instance_id: impl Into<String>,
         document: ObjectDocument,
     ) -> Result<Self, ObjectCodecError> {
-        object_codec::validate(&document)?;
+        object_codec::validate_storage(&document)?;
         let instance_id = instance_id.into();
         if instance_id.is_empty() {
             return Err(ObjectCodecError::new(
@@ -199,7 +199,7 @@ impl ObjectSnapshot {
                 "Object serialization revision is unavailable.",
             );
         }
-        let bytes = match object_codec::encode_project(self.document()) {
+        let bytes = match object_codec::encode_storage_project(self.document()) {
             Ok(bytes) => bytes,
             Err(_) => {
                 return failure(
@@ -274,7 +274,7 @@ impl ObjectSnapshot {
             || request.instance_id.is_empty()
             || request.document_id.is_empty()
             || request.payload.at_revision > 9_007_199_254_740_991
-            || !request.payload.stable_target.valid()
+            || !self.document().valid_target(&request.payload.stable_target)
         {
             return Err(DispatchErrorCode::InvalidRequest);
         }
@@ -283,6 +283,12 @@ impl ObjectSnapshot {
         }
         if request.document_id != self.document_id() {
             return Err(DispatchErrorCode::WrongDocument);
+        }
+        if self
+            .document()
+            .reference_unavailable(&request.payload.stable_target)
+        {
+            return Err(DispatchErrorCode::Unavailable);
         }
         if request.payload.at_revision != self.content_revision() {
             return Err(DispatchErrorCode::NotFound);

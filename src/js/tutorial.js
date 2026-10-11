@@ -1444,6 +1444,7 @@
 
   // ---- Runtime state ----------------------------------------------------
   var active = null; // {module, stepIdx, pollTimer, clickHandler}
+  var placement = null, transition = 0, transitioning = false;
 
   function $(sel) { return document.querySelector(sel); }
 
@@ -1451,6 +1452,7 @@
     if ($('#tut-spotlight')) return;
     var sp = document.createElement('div'); sp.id = 'tut-spotlight'; document.body.appendChild(sp);
     var tt = document.createElement('div'); tt.id = 'tut-tooltip'; document.body.appendChild(tt);
+    placement = window.NemoTutorialNativePlacement.create(window, stopTutorial);
   }
 
   function stopStepListeners() {
@@ -1476,68 +1478,28 @@
     return r;
   }
 
-  // Picks a tooltip position that (a) stays fully inside the viewport and
-  // (b) never overlaps the spotlighted rect, trying below/above/right/left
-  // in that order (natural reading order first). The old version only
-  // ever tried above-vs-below and always pinned `left` to the rect's own
-  // left edge — for a WIDE target (most steps spotlight `#drawing-canvas`,
-  // which spans nearly the full width/height of the screen) that meant
-  // the "above" branch could land the tooltip at the very top of the
-  // viewport, still deep inside the same huge rect it was supposed to
-  // avoid — found live from a user report with a screenshot, not
-  // something a quick glance at the code would have caught. This version
-  // explicitly rejects any candidate that intersects the rect; only once
-  // NONE of the four sides has room (a target covering nearly the whole
-  // screen) does it fall back to a fixed corner, same idea as the
-  // existing per-step `pinCorner` opt-in but now automatic for every step
-  // instead of needing to be requested by hand.
-  function positionTooltip(tw, th, rect, pinCorner) {
-    var vw = window.innerWidth, vh = window.innerHeight, pad = 16;
-    if (pinCorner === 'top-right') return { top: pad, left: vw - tw - pad };
-    if (!rect) return { top: vh / 2 - th / 2, left: vw / 2 - tw / 2 };
-
-    function inViewport(top, left) { return left >= pad && top >= pad && left + tw <= vw - pad && top + th <= vh - pad; }
-    function overlaps(top, left) { return left < rect.right && left + tw > rect.left && top < rect.bottom && top + th > rect.top; }
-
-    var candidates = [
-      { top: rect.bottom + pad, left: Math.min(vw - tw - pad, Math.max(pad, rect.left)) }, // below
-      { top: rect.top - th - pad, left: Math.min(vw - tw - pad, Math.max(pad, rect.left)) }, // above
-      { top: Math.min(vh - th - pad, Math.max(pad, rect.top)), left: rect.right + pad }, // right
-      { top: Math.min(vh - th - pad, Math.max(pad, rect.top)), left: rect.left - tw - pad } // left
-    ];
-    for (var i = 0; i < candidates.length; i++) {
-      var c = candidates[i];
-      if (inViewport(c.top, c.left) && !overlaps(c.top, c.left)) return c;
-    }
-    // Nothing fits cleanly — the target covers most of the screen (e.g. the
-    // whole canvas). Pin to whichever corner is farthest from the rect's
-    // own center, which at least minimizes how much of the tooltip sits
-    // over the busiest part of the target.
-    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-    return {
-      top: cy < vh / 2 ? vh - th - pad : pad,
-      left: cx < vw / 2 ? vw - tw - pad : pad
-    };
-  }
-
   function renderStep() {
     stopStepListeners();
     var mod = active.module, step = mod.steps[active.stepIdx];
     if (step.before) { try { step.before(window); } catch (e) {} }
 
     var sp = $('#tut-spotlight'), tt = $('#tut-tooltip');
-    var rect = positionFor(step.target);
+    function targetRect() {
+      var rect = positionFor(step.target);
 
-    if (rect) {
-      sp.classList.remove('no-target');
-      sp.style.top = (rect.top - 6) + 'px';
-      sp.style.left = (rect.left - 6) + 'px';
-      sp.style.width = (rect.width + 12) + 'px';
-      sp.style.height = (rect.height + 12) + 'px';
-    } else {
-      sp.classList.add('no-target');
-      sp.style.top = '40%'; sp.style.left = '50%'; sp.style.width = '0px'; sp.style.height = '0px';
+      if (rect) {
+        sp.classList.remove('no-target');
+        sp.style.top = (rect.top - 6) + 'px';
+        sp.style.left = (rect.left - 6) + 'px';
+        sp.style.width = (rect.width + 12) + 'px';
+        sp.style.height = (rect.height + 12) + 'px';
+      } else {
+        sp.classList.add('no-target');
+        sp.style.top = '40%'; sp.style.left = '50%'; sp.style.width = '0px'; sp.style.height = '0px';
+      }
+      return rect;
     }
+    targetRect();
     sp.classList.add('on');
 
     var isLast = active.stepIdx === mod.steps.length - 1;
@@ -1556,12 +1518,7 @@
       (step.type === 'info' ? '<button class="tut-next">' + T(isLast ? 'Terminer' : 'Suivant') + '</button>' : '') +
       '</div>';
 
-    // Position the tooltip near the spotlight (or centered if none)
     tt.classList.add('on');
-    requestAnimationFrame(function () {
-      var pos = positionTooltip(tt.offsetWidth, tt.offsetHeight, rect, step.pinCorner);
-      tt.style.top = pos.top + 'px'; tt.style.left = pos.left + 'px';
-    });
 
     tt.querySelector('.tut-close').addEventListener('click', stopTutorial);
     tt.querySelector('.tut-skip').addEventListener('click', function () { finishModule(false); });
@@ -1571,14 +1528,15 @@
     if (step.type === 'click') {
       active.clickHandler = function (e) {
         var t = e.target.closest && e.target.closest(step.target);
-        if (t) advance();
+        if (t && placement.ready()) advance();
       };
       document.addEventListener('click', active.clickHandler, true);
     } else if (step.type === 'state') {
       active.pollTimer = setInterval(function () {
-        try { if (step.check(window)) advance(); } catch (e) {}
+        try { if (placement.ready() && step.check(window)) advance(); } catch (e) {}
       }, POLL_MS);
     }
+    placement.place(tt, targetRect, step.pinCorner);
   }
 
   function advance() {
@@ -1596,17 +1554,20 @@
     var sp = $('#tut-spotlight'), tt = $('#tut-tooltip');
     if (sp) sp.classList.remove('on');
     if (tt) tt.classList.remove('on');
+    var released = placement ? placement.close() : Promise.resolve(true);
     if (mod && completed) {
       markDone(mod.id);
       if (window.showToast) showToast(T(SM.t('toastModuleDoneSuffix')).replace('%s', T(mod.title)));
     }
+    return released;
   }
 
-  function stopTutorial() { finishModule(false); }
+  function stopTutorial() { ++transition; transitioning = false; hideLauncher(); return finishModule(false); }
 
   async function startModule(id) {
     var mod = MODULES.filter(function (m) { return m.id === id; })[0];
     if (!mod) return;
+    var request = ++transition; transitioning = true;
     // The lessons target real toolbar/canvas elements — those are only
     // reachable once a project is open (the start screen sits on top and
     // intercepts clicks, even though the editor DOM already exists
@@ -1614,10 +1575,14 @@
     // row must not dead-end there, so spin up a default blank project first.
     var startScreen = document.getElementById('start-screen');
     if (startScreen && !startScreen.classList.contains('hid') && window.SMProject && window.SMProject.newProject) {
-      await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' });
+      try { await window.SMProject.newProject({ w: 1920, h: 1080, fps: 24, name: 'Tutoriel' }); }
+      catch (error) { if (request === transition) transitioning = false; throw error; }
     }
+    if (request !== transition) return;
+    hideLauncher(); var released = await finishModule(false);
+    if (request !== transition) return;
+    transitioning = false; if (released === false) return;
     ensureDom();
-    closeLauncher();
     active = { module: mod, stepIdx: 0 };
     renderStep();
   }
@@ -1861,15 +1826,20 @@
     return '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   }
 
-  function openLauncher() {
-    ensureLauncher();
+  async function openLauncher() {
+    var request = ++transition; transitioning = true; hideLauncher(); var released = await finishModule(false);
+    if (request !== transition) return;
+    transitioning = false; if (released === false) return;
+    ensureDom(); ensureLauncher();
     var si = $('#tut-launcher-search'); if (si) si.value = '';
     var ai = $('#tut-ask-input'); if (ai) ai.value = '';
     var aa = $('#tut-ask-answer'); if (aa) { aa.style.display = 'none'; aa.innerHTML = ''; }
     renderCategoryScreen();
-    $('#tut-launcher').style.display = 'flex';
+    var modal = $('#tut-launcher'); modal.style.display = 'flex';
+    return placement.place(modal.querySelector('.modal-box'), function () { return null; }, null, 'launcher');
   }
-  function closeLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
+  function hideLauncher() { var m = $('#tut-launcher'); if (m) m.style.display = 'none'; }
+  function closeLauncher() { return stopTutorial(); }
 
   // ---- First-launch auto-start (feedback-welcome, once ever) -----------
   // Polls for the start screen closing (a project becoming active) rather
@@ -1898,7 +1868,8 @@
       if (btn) btn.addEventListener('click', openLauncher);
     });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && active) stopTutorial();
+      var launcher = $('#tut-launcher');
+      if (e.key === 'Escape' && (active || transitioning || launcher && launcher.style.display === 'flex')) stopTutorial();
     });
     maybeAutoStartWelcome();
   });

@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "005fdf66228d4aaade87d11816b591adf43c9797",
-  "describe": "v0.7.0-alpha.4-1136-g005fdf66"
+  "head": "c4d4b5195840df5cc38a3eb1dd3344914df5e578",
+  "describe": "v0.7.0-alpha.4-1152-gc4d4b519-dirty"
  },
- "inputsDigest": "661c71b6968370c2faa3aef6104130da0232fcf700a7a0bd27092f7c1ef8271f",
+ "inputsDigest": "3ebeb9c802ca64cb38a7e31722e502d6daf6bdd8e5fb0773700946409d280b1c",
  "states": [
   "inventoried",
   "characterized",
@@ -376,7 +376,7 @@
   },
   "SMTutorial": {
    "file": "src/js/tutorial.js",
-   "line": 1906,
+   "line": 1877,
    "members": 0
   },
   "SMWorkspace": {
@@ -3476,7 +3476,7 @@
    "capability": "Discover Nemo — interactive tutorial",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/tutorial.js:1898"
+    "src/js/tutorial.js:1868"
    ],
    "events": [
     "click"
@@ -3497,7 +3497,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 28,
+    "functionsVisited": 111,
     "via": "callback id",
     "references": []
    },
@@ -5020,7 +5020,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 53,
+    "functionsVisited": 54,
     "via": "variable trigger",
     "references": []
    },
@@ -9816,7 +9816,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 40,
+    "functionsVisited": 41,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3334 updatePropsContext()"
@@ -11401,7 +11401,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 40,
+    "functionsVisited": 41,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3340 updatePropsContext()",
@@ -23883,7 +23883,7 @@
    "source": "src/js/markers.js:210",
    "meta": {
     "i18n": null,
-    "functionsVisited": 67
+    "functionsVisited": 68
    },
    "fixtures": [
     "static-props",
