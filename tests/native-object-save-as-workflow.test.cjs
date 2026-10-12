@@ -46,26 +46,63 @@ function harness() {
     count: name => calls.filter(c => c[0] === name).length };
 }
 function legacyRun(ports) {
-  const source = fs.readFileSync('src/js/project.js', 'utf8');
-  const start = source.indexOf('  async function saveAs(){');
-  const end = source.indexOf('  async function save(){', start);
-  assert.ok(start >= 0 && end > start);
+  // HISTORICAL E4A RED fixture: exact saveAs behavior from protected ec6691e,
+  // before B0C. This is intentionally independent of today's production entry.
+  const source = `async function saveAs(){
+    if(!tauriOk()){saveAsDownload();return;}
+    saveFramesIfLegacy();
+    var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
+    if(!path)return;
+    try{await writeProjectTo(path);}
+    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
+    showToast('Saved: '+window.SMProjectDocument.baseName(path));
+  }`;
   const context = { window: { __TAURI__: { dialog: { save: ports.pickDestination } },
     SMProjectDocument: { baseName: () => 'new-object' } },
     tauriOk: () => true, saveFramesIfLegacy: () => {}, currentName: 'Old',
     writeProjectTo: path => ports.savePinned({ legacy: true, destinationPath: path }),
     showToast() {}, SM: { t: () => 'failure' } };
-  vm.runInNewContext(source.slice(start, end) + '\nresult = saveAs;', context);
+  vm.runInNewContext(source + '\nresult = saveAs;', context);
   return context.result();
 }
 const run = baseline ? legacyRun : (...args) => require('../src/js/application/native-object-save-as-workflow.js').run(...args);
 
-test('current legacy Save As source has no object-session fence after its deferred picker', async () => {
+test('historical ec6691e Save As fixture has no object-session fence after its deferred picker', async () => {
   const h = harness(), picker = deferred(); h.ports.pickDestination = () => picker.promise;
   const pending = legacyRun(h.ports); h.change(s => { s.documentId = 'object-b'; });
   picker.resolve(destination); await pending;
-  assert.equal(h.count('save'), 1, 'retained SOURCE characterization, not installed acceptance');
+  assert.equal(h.count('save'), 1, 'historical SOURCE characterization, not current or installed acceptance');
 });
+for (const kind of ['object', 'unknown', 'broken opacity adapter']) {
+  test(`current complete production Save As refuses ${kind} before picker/Paper/IO`, async () => {
+    const fixture = fs.readFileSync('tests/project-open.test.cjs', 'utf8');
+    const start = fixture.indexOf('function harness('), end = fixture.indexOf('\nfunction select(', start);
+    assert.ok(start >= 0 && end > start);
+    const context = vm.createContext({ assert, vm, require, setTimeout, console,
+      source: fs.readFileSync('src/js/project.js', 'utf8'),
+      documentSource: fs.readFileSync('src/js/project-document.js', 'utf8'),
+      entrySource: fs.readFileSync('src/js/project-entry.js', 'utf8') });
+    vm.runInContext(fixture.slice(start, end) + '\nthis.makeHarness=harness;', context);
+    const effects = [], nativeState = { kind, documentId: 'object-a', revision: 7 };
+    const app = context.makeHarness({ configureWindow(root) {
+      root.SM.exportJSON = () => { effects.push('Paper export'); throw Error('Paper forbidden'); };
+      root.__TAURI__ = { core: { invoke() { effects.push('native invoke'); return nativeState; } },
+        dialog: { save() { effects.push('picker'); return Promise.resolve(destination); } },
+        fs: { writeTextFile() { effects.push('write'); }, rename() { effects.push('rename'); }, remove() { effects.push('remove'); } } };
+      if (kind === 'object') root.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => false };
+      if (kind === 'broken opacity adapter') root.NemoNativeOpacityCutover = {};
+    } });
+    const before = JSON.stringify({ label: app.project.getCurrentLabel(), nativeState, dirty: app.project.isDirty() });
+    await assert.rejects(app.project.saveAs(), error => /Native|Desktop/.test(error.message));
+    await turn();
+    assert.deepEqual(effects, []);
+    assert.equal(app.mutations, 0);
+    assert.equal(app.writes.length, 0);
+    assert.equal(app.downloads.length, 0);
+    assert.equal(JSON.stringify({ label: app.project.getCurrentLabel(), nativeState, dirty: app.project.isDirty() }), before);
+    assert.equal(app.toasts.some(message => /^Saved/.test(message)), false);
+  });
+}
 test('native owner drift during picker refuses before disk dispatch', async () => {
   const h = harness(), picker = deferred();
   h.ports.pickDestination = () => { h.calls.push(['picker']); return picker.promise; };
