@@ -197,7 +197,7 @@
         const observed = receive(received), result = freeze({ ...context, ...observed });
         observe('associateReceipt', diagnostic, result);
         return result;
-      } catch (error) { observe('rejectReceipt', diagnostic); throw error; }
+      } catch (error) { observe('rejectReceipt', diagnostic, error); throw error; }
     }
     return freeze({
       register,

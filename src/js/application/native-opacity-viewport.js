@@ -5,6 +5,11 @@
   else root.NemoNativeOpacityViewport = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
+  function associateFailure(receipt, error) {
+    try { var observer = typeof window === 'object' && window.NemoTestPlayObserver;
+      if (observer && typeof observer.associateFailure === 'function') observer.associateFailure(receipt, error);
+    } catch (_) { /* Only actual receipt-derived failures have attribution. */ }
+  }
 
   function create(lifecycle, ports, isOpening, isPublished) {
     var resize = null, resizing = null, presenting = null, lastPresentedFrame = null;
@@ -182,7 +187,8 @@
               latest.identity.documentId !== current.documentId ||
               latest.identity.contentRevision !== current.contentRevision ||
               typeof lifecycle.persistenceJSON() !== 'string') {
-            throw new Error('native opacity frame was not presented at the admitted revision');
+            var invalid = new Error('native opacity frame was not presented at the admitted revision');
+            associateFailure(presented, invalid); throw invalid;
           }
           // Deferred native work remains keyed by evaluation until terminal.
           // After a newer view presents, revisiting it retires the stale work;
@@ -192,6 +198,7 @@
             if (staleRetries++ === 0) continue;
             var stale = new Error('native opacity frame presentation remains stale');
             stale.code = 'native_preview_superseded';
+            associateFailure(presented, stale);
             throw stale;
           }
           // A resize can arrive while the host presents. Finish it and retry.
@@ -210,9 +217,11 @@
               deferred.code = 'native_preview_deferred';
               deferred.status = presented.status;
               retryable = true;
+              associateFailure(presented, deferred);
               throw deferred;
             }
-            throw new Error('native opacity frame was not presented at the admitted revision');
+            var unavailable = new Error('native opacity frame was not presented at the admitted revision');
+            associateFailure(presented, unavailable); throw unavailable;
           }
           lastPresentedFrame = frame;
           var finalReceipt = Object.freeze(Object.assign({ owner: 'native' }, presented));
