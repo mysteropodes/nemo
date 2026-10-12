@@ -10,7 +10,7 @@ const EDITED_A = '{"project":"A","paint":[25,85],"edited":true}';
 // Runs the complete shipped project entry and its real tab DOM listeners.
 // Native modes are introduced only after disposable browser A/B setup;
 // this is a source fixture, never a production native-tab setup mechanism.
-function fixture({ populated = true } = {}) {
+function fixture({ populated = true, nativePorts = null } = {}) {
   const effects = [], notices = [], elements = new Map();
   let bytes = A;
   function element() {
@@ -49,17 +49,21 @@ function fixture({ populated = true } = {}) {
     renderOS: noop, renderArcs: noop, updateUI: noop, renderSymbolTabs: noop, syncDocFields: noop, exitToScene: noop,
     view: { update: noop }, setTimeout, console,
     FileReader: class { readAsText(file) { this.onload({ target: { result: file.text } }); } } };
+  if(nativePorts)nativePorts(root,sandbox,effects);
   vm.runInNewContext(fs.readFileSync('src/js/project-document.js', 'utf8'), sandbox);
   vm.runInNewContext(fs.readFileSync('src/js/project-entry.js', 'utf8'), sandbox);
   sandbox.SMProjectEntry = root.SMProjectEntry;
   vm.runInNewContext(source, sandbox, { filename: 'project.js' });
   document.ready();
-  root.SMProject.newProject({ name: 'A', w: 320, h: 180, fps: 12 });
   const list = () => document.getElementById('project-tabs-list').children;
-  const a = list()[0].dataset.tab;
-  document.getElementById('project-tab-add').listeners.click();
-  const b = list()[1].dataset.tab;
-  if (populated) {
+  let a,b;
+  if(!nativePorts){
+    root.SMProject.newProject({ name: 'A', w: 320, h: 180, fps: 12 });
+    a=list()[0].dataset.tab;
+    document.getElementById('project-tab-add').listeners.click();
+    b=list()[1].dataset.tab;
+  }
+  if (populated&&!nativePorts) {
     bytes = B; root.SMProject.markSaved();
     row(a).listeners.click();
     bytes = EDITED_A;
@@ -182,4 +186,119 @@ test('ordinary browser new-tab callback retains existing creation behavior', () 
   assert.equal(f.state().rows.find(x => x.active).name, 'Untitled 3');
   assert.equal(f.effects.filter(x => x === 'create layer').length, 1);
   assert.equal(f.effects.filter(x => x === 'browser import').length, 0);
+});
+
+// Source UI fixture: A is admitted through ordinary Open, never browser-seeded tabs.
+async function admittedDesktop(options={}) {
+  const doc=require('../src/js/project-document.js');
+  const original=JSON.parse(fs.readFileSync('tests/animation/fixtures/curve-workflow.json','utf8'));
+  original.layers[0].motionStatic={opacity:[25]};
+  const other=structuredClone(original);other.layers[0].motionStatic.opacity=[60];
+  const files={'/A.json':JSON.stringify(original),'/B.json':JSON.stringify(other),'/bad.json':'invalid'};
+  const token='60753e70-372f-47ad-913e-cfb7faf3ac59';
+  const owner={active:false,instanceId:'native-instance-A',documentId:'native-document-A',revision:4,local:3,host:17,
+    bytes:files['/A.json'],frame:0,undo:['A-saved'],redo:[]};
+  const calls=[];let sequence=0;
+  const f=fixture({nativePorts(root,sandbox,effects){
+    sandbox.state={canvasW:320,canvasH:180,fps:24,totalFrames:21,currentFrame:0};root.crypto={randomUUID:()=>`ui-request-${++sequence}`};
+    root.NemoNativeOpacityCutover={blocksLegacy:()=>owner.active,isActive:()=>owner.active,
+      identity:()=>({instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.revision}),
+      getNativeIdentity:()=>({documentId:owner.documentId,generation:owner.local}),persistenceJSON:()=>owner.bytes};
+    root.NemoNativeOpacityProject={async importJSON(raw){effects.push('native import');doc.prepareNativeOpacity(raw);owner.bytes=raw;owner.active=true;
+      return {owner:'native',status:'presented',frame:0,instanceId:owner.instanceId,documentId:owner.documentId,
+        contentRevision:owner.revision,lifecycleGeneration:owner.local,documentSnapshotId:'snapshot-A'};},
+      finishOpenAfterReveal(){effects.push('initial reveal');},release(){effects.push('native release');throw Error('must not release A');}};
+    root.__TAURI__={fs:{async readTextFile(path){calls.push(['read',path]);if(options.read)return options.read(path,files);if(!(path in files))throw Error('missing');return files[path];}},
+      dialog:{async open(){calls.push(['picker']);return options.picker?options.picker():'/B.json';}},
+      window:{getCurrentWindow:()=>({async setFocus(){effects.push('focus');}})},
+      core:{async invoke(name,args){calls.push([name,structuredClone(args)]);
+        if(options.invoke){const changed=await options.invoke(name,args,owner);if(changed!==undefined)return changed;}
+        if(name==='nemo_native_revision_sync')return {instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.revision,
+          lifecycleGeneration:owner.host,subscriptionId:'existing-binding-observation'};
+        const r=args.request;
+        if(name==='nemo_native_prepare_inactive_project')return {apiVersion:2,requestId:r.requestId,preparationToken:token,state:'inactive-prepared',
+          format:'nemo.native-opacity-document',formatVersion:1,layerCount:1,totalFrames:21,geometryCount:21};
+        if(name==='nemo_native_cancel_inactive_project')return {apiVersion:2,requestId:r.requestId,preparationToken:r.preparationToken,state:'inactive-cancelled'};
+        throw Error('unexpected command '+name);
+      }}};
+  }});
+  await f.root.SMProject.openPath('/A.json');
+  assert.equal(f.state().rows.length,1,'ordinary first Open must admit A and create its real row');
+  assert.match(f.root.SMProject.getCurrentLabel(),/^A — \/A.json$/);
+  assert.equal(f.root.SMProject.isDirty(),false);
+  f.effects.length=0;calls.length=0;
+  return Object.assign(f,{owner,calls,token,files,
+    snapshot(){return JSON.stringify({owner:{...owner,bytes:require('node:crypto').createHash('sha256').update(owner.bytes).digest('hex')},label:f.root.SMProject.getCurrentLabel(),dirty:f.root.SMProject.isDirty(),
+      active:f.state().rows.find(r=>r.active),open:f.root.SMProject.getOpenTabs(),frame:f.sandbox.state.currentFrame});},
+    requests(name){return calls.filter(c=>c[0]===name);},
+    editA(){owner.revision++;const edited=JSON.parse(owner.bytes);edited.layers[0].motionStatic.opacity=[40];owner.bytes=JSON.stringify(edited);owner.undo.push('edit-A');f.root.SMProject.refreshActiveTabDirtyDot(owner.bytes);}});
+}
+async function settleUntil(predicate) {
+  for(let turn=0;turn<20&&!predicate();turn++)await new Promise(r=>setImmediate(r));
+  assert.ok(predicate(),'source UI effect must settle within20 event-loop turns');
+}
+test('ordinary desktop toolbar Open appends opaque inactive B and preserves dirty native A',async()=>{
+  const f=await admittedDesktop();f.editA();const before=f.snapshot();
+  const result=await f.document.getElementById('btn-open').listeners.click();
+  assert.equal(result.status,'prepared');assert.equal(f.snapshot(),before);
+  const rows=f.state().rows;assert.equal(rows.length,2);const b=rows.find(r=>!r.active);assert.equal(b.name,'B');assert.equal(b.dirty,false);
+  assert.equal(f.root.SMProject.getOpenTabs().length,0,'no native B JSON reaches transplant/component consumers');
+  const request=f.requests('nemo_native_prepare_inactive_project')[0][1].request;
+  assert.equal(request.lifecycleGeneration,17);assert.equal(request.expectedRevision,5);assert.equal(request.resources.length,21);
+  assert.deepEqual(request.projection,{format:'nemo.native-opacity-document',formatVersion:1,totalFrames:21,
+    layers:[{layerUid:'r08_curve_layer',motionStatic:{opacity:[60]}}]});
+  assert.equal(f.effects.length,0,'no active import, release, Paper writer, focus or reveal');
+  f.switch(b.id);assert.equal(f.snapshot(),before);assert.equal(f.requests('nemo_native_cancel_inactive_project').length,0);
+  const alert=f.document.getElementById('project-tabs-bar').children.find(e=>e.getAttribute('role')==='alert');assert.match(alert.textContent,/^Switching project tabs is unavailable/i);
+  f.close(rows.find(r=>r.active).id);assert.equal(f.state().rows.length,2);assert.equal(f.snapshot(),before);
+  f.close(b.id);await settleUntil(()=>f.state().rows.length===1);assert.equal(f.snapshot(),before);
+  assert.equal(f.requests('nemo_native_cancel_inactive_project')[0][1].request.preparationToken,f.token);
+});
+test('direct desktop OpenPath uses same inactive controller and duplicate request does not append',async()=>{
+  const f=await admittedDesktop(),before=f.snapshot();assert.equal((await f.root.SMProject.openPath('/B.json')).status,'prepared');
+  assert.equal((await f.root.SMProject.openPath('/B.json')).status,'unavailable');assert.equal(f.state().rows.length,2);
+  assert.equal(f.snapshot(),before);assert.equal(f.requests('nemo_native_prepare_inactive_project').length,1);
+});
+for(const mode of ['cancel','picker-error','unsupported','read-error','native-refused','malformed','release'])test('ordinary native B Open refuses '+mode+' without changing A or tab membership',async()=>{
+  const opts={};if(mode==='cancel')opts.picker=()=>null;if(mode==='picker-error')opts.picker=()=>{throw Error('picker failed');};
+  if(mode==='unsupported')opts.picker=()=>'/bad.json';if(mode==='read-error')opts.picker=()=>'/missing.json';
+  if(mode==='native-refused')opts.invoke=(name)=>{if(name==='nemo_native_prepare_inactive_project')throw {code:'preparation_busy'};};
+  if(mode==='malformed')opts.invoke=(name,args)=>name==='nemo_native_prepare_inactive_project'?{apiVersion:2,requestId:args.request.requestId,preparationToken:'unknown'}:undefined;
+  const f=await admittedDesktop(opts);if(mode==='release')f.owner.active=false;
+  const before=JSON.stringify({owner:f.owner,label:f.root.SMProject.getCurrentLabel(),rows:f.state().rows});
+  if(mode==='release')f.root.NemoNativeOpacityCutover.blocksLegacy=()=>true;
+  const result=await f.root.SMProject.open();assert.notEqual(result.status,'prepared');
+  assert.equal(JSON.stringify({owner:f.owner,label:f.root.SMProject.getCurrentLabel(),rows:f.state().rows}),before);
+  assert.equal(f.effects.length,0);assert.ok(f.document.getElementById('project-tabs-bar').children.some(e=>e.getAttribute('role')==='alert'));
+});
+for(const mode of ['revision','local','frame','path'])test('held ordinary picker rejects stale A/UI '+mode,async()=>{
+  let release;const gate=new Promise(r=>release=r);const f=await admittedDesktop({picker:async()=>{await gate;return '/B.json';}});
+  const pending=f.root.SMProject.open();if(mode==='revision')f.editA();if(mode==='local')f.owner.local++;
+  if(mode==='frame')f.sandbox.state.currentFrame=10;
+  if(mode==='path'){f.root.__TAURI__.dialog.save=async()=>'/changed.json';f.root.__TAURI__.fs.writeTextFile=async()=>{};f.root.__TAURI__.fs.rename=async()=>{};f.root.__TAURI__.fs.remove=async()=>{};
+    await f.root.SMProject.saveAs();}
+  const changed=f.snapshot();release();assert.notEqual((await pending).status,'prepared');assert.equal(f.snapshot(),changed);
+  assert.equal(f.state().rows.length,1);assert.equal(f.requests('nemo_native_prepare_inactive_project').length,0);
+});
+test('native B close waits for cancellation acknowledgement and stale lifetime leaves both rows untouched',async()=>{
+  let release;const gate=new Promise(r=>release=r);const f=await admittedDesktop({invoke:async name=>{if(name==='nemo_native_cancel_inactive_project')await gate;}});
+  await f.root.SMProject.openPath('/B.json');const b=f.state().rows.find(r=>!r.active),before=f.snapshot();
+  f.close(b.id);await settleUntil(()=>f.requests('nemo_native_cancel_inactive_project').length===1);
+  assert.equal(f.state().rows.length,2);f.owner.local++;const changed=f.snapshot();release();
+  await settleUntil(()=>f.document.getElementById('project-tabs-bar').children.some(e=>/indeterminate/.test(e.textContent||'')));
+  assert.equal(f.state().rows.length,2);assert.equal(f.snapshot(),changed);assert.notEqual(before,changed);
+});
+test('retained native token row cannot fall into blank/legacy activation if native globals disappear',async()=>{
+  const f=await admittedDesktop();await f.root.SMProject.openPath('/B.json');
+  const b=f.state().rows.find(r=>!r.active),before=JSON.stringify({rows:f.state().rows,label:f.root.SMProject.getCurrentLabel()});
+  delete f.root.__TAURI__;delete f.root.NemoNativeOpacityCutover;delete f.root.NemoNativeOpacityProject;
+  f.switch(b.id);assert.equal(JSON.stringify({rows:f.state().rows,label:f.root.SMProject.getCurrentLabel()}),before);
+  f.close(f.state().rows.find(r=>r.active).id);assert.equal(JSON.stringify({rows:f.state().rows,label:f.root.SMProject.getCurrentLabel()}),before);
+  assert.equal(f.effects.length,0);assert.equal(f.root.SMProject.getOpenTabs().length,0);
+});
+test('scoped inactive close refusal keeps B visible and leaves A untouched',async()=>{
+  const f=await admittedDesktop({invoke(name){if(name==='nemo_native_cancel_inactive_project')throw {code:'stale_owner'};}});
+  await f.root.SMProject.openPath('/B.json');const before=f.snapshot(),b=f.state().rows.find(r=>!r.active);
+  f.close(b.id);await settleUntil(()=>f.document.getElementById('project-tabs-bar').children.some(e=>/indeterminate/.test(e.textContent||'')));
+  assert.equal(f.state().rows.length,2);assert.equal(f.snapshot(),before);assert.equal(f.effects.length,0);
 });
