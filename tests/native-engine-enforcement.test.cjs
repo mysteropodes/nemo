@@ -23,6 +23,7 @@ const POLICY = 'engineering/boundaries/profiles/native-engine.edges.json';
 const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
+  'native-engine/Cargo.toml',
   'native-engine/src/lib.rs',
   'native-engine/src/commands.rs',
   'native-engine/src/history.rs',
@@ -33,6 +34,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/read_queries.rs',
   'native-engine/src/object_document.rs',
   'native-engine/src/object_codec.rs',
+  'native-engine/src/reference_image_asset.rs',
+  'native-engine/tests/reference_image_asset.rs',
   'native-engine/src/object_snapshot.rs',
   'native-engine/src/object_frame_packet.rs',
   'native-engine/tests/object_frame_packet.rs',
@@ -97,7 +100,8 @@ const EXPECTED_EDGES = [
   'export-job->revision', 'export-job->scheduler', 'history->commands', 'history->document',
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
   'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->scheduler',
-  'resource-leases->revision', 'revision->document', 'scheduler->resource-leases', 'scheduler->revision',
+  'resource-leases->revision', 'revision->document', 'root->codec',
+  'scheduler->resource-leases', 'scheduler->revision',
   'commands->read-queries', 'read-queries->codec', 'read-queries->evaluation',
   'read-queries->request-receipts', 'read-queries->revision',
 ].sort();
@@ -173,6 +177,15 @@ function cargoContract(text) {
   return { features, targets };
 }
 
+function cargoFeatureMembers(text) {
+  const members = {};
+  for (const match of section(text, '[features]').matchAll(/^([A-Za-z0-9_-]+)\s*=\s*\[([^\]\n]*)\]$/gm)) {
+    assert.match(match[2], /^\s*(?:"[^"]+"(?:\s*,\s*"[^"]+")*)?\s*$/, `malformed feature list: ${match[1]}`);
+    members[match[1]] = [...match[2].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
+  }
+  return members;
+}
+
 function snapshot(root, files) {
   return new Map(files.map((relative) => [relative, fs.existsSync(path.join(root, relative))
     ? fs.readFileSync(path.join(root, relative)) : null]));
@@ -206,7 +219,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 44);
+  assert.equal(result.edges.length, 45);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
@@ -218,6 +231,24 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   const rootText = fs.readFileSync(path.join(ROOT, 'native-engine/src/lib.rs'), 'utf8');
   const policy = readJson(ROOT, POLICY), cargo = cargoContract(cargoText);
   assert.deepEqual(cargo.features, policy.features.declared);
+  const members = cargoFeatureMembers(cargoText);
+  assert.deepEqual(Object.keys(members), cargo.features);
+  assert.deepEqual(members.reference_image_asset, ['dep:png']);
+  assert.deepEqual(members['test-codec'], ['codec', 'reference_image_asset']);
+  const reaches = (feature, target, graph = members, seen = new Set()) => {
+    if (feature === target) return true;
+    if (seen.has(feature)) return false;
+    seen.add(feature);
+    return (graph[feature] || []).some((member) => graph[member] && reaches(member, target, graph, seen));
+  };
+  for (const feature of cargo.features.filter((name) => name !== 'reference_image_asset')) {
+    assert.equal(reaches(feature, 'reference_image_asset'), feature === 'test-codec',
+      `${feature} must not activate the private PNG selector`);
+  }
+  assert.equal(reaches('codec', 'reference_image_asset', { ...members,
+    codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');
+  assert.match(rootText, /#\[cfg\(feature = "reference_image_asset"\)\]\s*pub\(crate\) mod reference_image_asset;/);
+  assert.equal((rootText.match(/pub\(crate\) mod reference_image_asset;/g) || []).length, 1);
   assertMacroDefinitions(rootText);
   assert.deepEqual(macroMappings(rootText, 'engine_modules'), PRODUCTION);
   const testMacros = macroMappings(rootText, 'test_modules');
@@ -225,7 +256,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   for (const [name, source] of Object.entries(TEST_TARGETS)) {
     const expected = [`${name}_tests = "${source}"`];
     if (name === 'codec') expected.push('project_structure_tests = "../tests/project_structure.rs"',
-      'object_codec_tests = "../tests/object_codec.rs"');
+      'object_codec_tests = "../tests/object_codec.rs"',
+      'reference_image_asset_tests = "../tests/reference_image_asset.rs"');
     if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"',
       'object_fill_tests = "../tests/object_fill.rs"');
     if (name === 'history') expected.push('object_history_tests = "../tests/object_history.rs"');
