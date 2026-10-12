@@ -71,6 +71,9 @@ pub(crate) struct TestPlayLog {
     pub(crate) accepted: u64,
     pub(crate) rejected: u64,
     pub(crate) sealed: bool,
+    finished: bool,
+    cut_id: Option<String>,
+    cut_counts: [u64; 3],
     late: bool,
 }
 #[cfg(feature = "test-play-publication-observer")]
@@ -93,6 +96,14 @@ enum TestPlayInput {
         generated: u64,
         dropped: u64,
         failed: u64,
+    },
+    Finish {
+        run_id: String,
+        cut_id: String,
+        generated: u64,
+        dropped: u64,
+        failed: u64,
+        pending: u64,
     },
     Late {
         run_id: String,
@@ -229,17 +240,42 @@ impl TestPlayLog {
         dropped: u64,
         failed: u64,
     ) -> serde_json::Value {
-        let complete = run == self.run
-            && !self.sealed
-            && self.accepted > 0
+        if run != self.run || self.sealed {
+            self.rejected = self.rejected.saturating_add(1);
+        }
+        self.sealed = true;
+        self.cut_counts = [generated, dropped, failed];
+        let cut = uuid::Uuid::new_v4().to_string();
+        self.cut_id = Some(cut.clone());
+        serde_json::json!({"kind":"seal", "runId":self.run, "cutId":cut, "status":"provisional",
+            "generated":generated, "accepted":self.accepted, "dropped":dropped, "failed":failed, "rejected":self.rejected})
+    }
+    pub(crate) fn finish(
+        &mut self,
+        run: &str,
+        cut: &str,
+        counts: [u64; 4],
+    ) -> Result<serde_json::Value, &'static str> {
+        if run != self.run || !self.sealed || self.finished || self.cut_id.as_deref() != Some(cut) {
+            return self.refuse("test observer terminal fence refused");
+        }
+        let [generated, dropped, failed, pending] = counts;
+        let complete = self.accepted > 0
             && generated == self.accepted
+            && pending == 0
             && dropped == 0
             && failed == 0
             && self.rejected == 0
-            && !self.late;
-        self.sealed = true;
-        serde_json::json!({"kind":"footer", "runId":self.run, "status":if complete {"complete"} else {"partial"},
-            "generated":generated, "accepted":self.accepted, "dropped":dropped, "failed":failed, "rejected":self.rejected})
+            && !self.late
+            && self.cut_counts[0] == self.accepted
+            && self.cut_counts[1] == 0
+            && self.cut_counts[2] == 0;
+        self.finished = true;
+        Ok(
+            serde_json::json!({"kind":"footer", "runId":self.run, "cutId":cut, "terminalFence":complete,
+            "status":if complete {"complete"} else {"partial"}, "generated":generated, "accepted":self.accepted,
+            "dropped":dropped, "failed":failed, "pending":pending, "rejected":self.rejected}),
+        )
     }
     pub(crate) fn output(value: &serde_json::Value) -> Result<(), &'static str> {
         use std::io::Write;
@@ -269,12 +305,16 @@ impl TestPlayLog {
         let run = match &input {
             TestPlayInput::Record { run_id, .. }
             | TestPlayInput::Seal { run_id, .. }
+            | TestPlayInput::Finish { run_id, .. }
             | TestPlayInput::Late { run_id } => run_id,
         };
         if run != &self.run {
             return self.refuse("test observer envelope refused");
         }
-        if self.sealed || matches!(input, TestPlayInput::Late { .. }) {
+        if self.finished
+            || (self.sealed && !matches!(input, TestPlayInput::Finish { .. }))
+            || matches!(input, TestPlayInput::Late { .. })
+        {
             self.rejected = self.rejected.saturating_add(1);
             if !self.late {
                 self.late = true;
@@ -301,6 +341,20 @@ impl TestPlayLog {
                     return self.refuse("test observer counter refused");
                 }
                 self.seal(&run_id, generated, dropped, failed)
+            }
+            TestPlayInput::Finish {
+                run_id,
+                cut_id,
+                generated,
+                dropped,
+                failed,
+                pending,
+            } => {
+                let counts = [generated, dropped, failed, pending];
+                if counts.iter().any(|n| *n > 9_007_199_254_740_991) {
+                    return self.refuse("test observer counter refused");
+                }
+                self.finish(&run_id, &cut_id, counts)?
             }
             TestPlayInput::Late { .. } => unreachable!(),
         };

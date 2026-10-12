@@ -214,7 +214,15 @@ fn play_collection_seal_refuses_missing_ready_gaps_duplicates_and_overflow() {
     let mut clean = TestPlayLog::new(run);
     assert!(clean.record(run, 1, json!({"event":"ready"})).is_ok());
     assert!(clean.record(run, 2, json!({"event":"play-stop"})).is_ok());
-    assert_eq!(clean.seal(run, 2, 0, 0)["status"], "complete");
+    let cut = clean.seal(run, 2, 0, 0);
+    assert_eq!(cut["status"], "provisional");
+    assert!(cut.get("terminalFence").is_none());
+    assert_eq!(
+        clean
+            .finish(run, cut["cutId"].as_str().unwrap(), [2, 0, 0, 0])
+            .unwrap()["status"],
+        "complete"
+    );
     for mode in [
         "missing-ready",
         "gap",
@@ -238,13 +246,27 @@ fn play_collection_seal_refuses_missing_ready_gaps_duplicates_and_overflow() {
                 .record("other", 2, json!({"event":"play-stop"}))
                 .is_err());
         }
-        let footer = log.seal(
+        let provisional = log.seal(
             run,
             log.accepted,
             u64::from(mode == "drop"),
             u64::from(mode == "transport"),
         );
+        assert_eq!(provisional["status"], "provisional");
+        let footer = log
+            .finish(
+                run,
+                provisional["cutId"].as_str().unwrap(),
+                [
+                    log.accepted,
+                    u64::from(mode == "drop"),
+                    u64::from(mode == "transport"),
+                    0,
+                ],
+            )
+            .unwrap();
         assert_eq!(footer["status"], "partial", "{mode}");
+        assert_eq!(footer["terminalFence"], false);
     }
 }
 
@@ -259,7 +281,12 @@ fn play_record_cap_and_terminal_cut_never_ack_more_records() {
             .unwrap();
     }
     assert!(log.record(run, 4097, json!({"event":"play-step"})).is_err());
-    assert_eq!(log.seal(run, 4097, 0, 0)["status"], "partial");
+    let cut = log.seal(run, 4097, 0, 0);
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [4097, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
     assert!(log.record(run, 4098, json!({"event":"play-stop"})).is_err());
     assert_eq!(log.accepted, 4096);
 }
@@ -296,7 +323,12 @@ fn malformed_typed_play_envelopes_are_counted_before_any_footer() {
         log.record(run, 1, json!({"event":"ready"})).unwrap();
         assert!(log.dispatch(action, payload).is_err());
         assert_eq!(log.rejected, 1);
-        assert_eq!(log.seal(run, 1, 0, 0)["status"], "partial");
+        let cut = log.seal(run, 1, 0, 0);
+        assert_eq!(
+            log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+                .unwrap()["status"],
+            "partial"
+        );
     }
 }
 
@@ -306,10 +338,15 @@ fn a_malformed_envelope_after_seal_is_an_explicit_late_tail() {
     let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
     let mut log = crate::test_play_observer::TestPlayLog::new(run);
     log.record(run, 1, json!({"event":"ready"})).unwrap();
-    assert_eq!(log.seal(run, 1, 0, 0)["status"], "complete");
+    let cut = log.seal(run, 1, 0, 0);
+    assert_eq!(cut["status"], "provisional");
     assert!(log.dispatch("other", json!({"secret":"private"})).is_err());
     assert_eq!(log.rejected, 1);
-    assert_eq!(log.seal(run, 1, 0, 0)["status"], "partial");
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
 }
 
 #[cfg(feature = "test-play-publication-observer")]
@@ -364,4 +401,41 @@ fn only_pinned_main_packaged_root_urls_can_send_play_metadata() {
             &tauri::Url::parse(address).unwrap()
         ));
     }
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn terminal_play_fence_requires_same_cut_zero_pending_and_monotonic_clean_counters() {
+    use crate::test_play_observer::TestPlayLog;
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    for counts in [[2, 1, 1, 0], [1, 0, 0, 1]] {
+        let mut log = TestPlayLog::new(run);
+        log.record(run, 1, json!({"event":"ready"})).unwrap();
+        let provisional = log.seal(run, 1, 0, 0);
+        assert_eq!(provisional["kind"], "seal");
+        let terminal = log
+            .finish(run, provisional["cutId"].as_str().unwrap(), counts)
+            .unwrap();
+        assert_eq!(terminal["status"], "partial");
+        assert_eq!(terminal["terminalFence"], false);
+    }
+    let mut log = TestPlayLog::new(run);
+    assert!(log.finish(run, "unissued", [0, 0, 0, 0]).is_err());
+    log.record(run, 1, json!({"event":"ready"})).unwrap();
+    let cut = log.seal(run, 1, 0, 0);
+    assert!(log.finish(run, "wrong", [1, 0, 0, 0]).is_err());
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["terminalFence"],
+        false
+    );
+    let mut sticky = TestPlayLog::new(run);
+    sticky.record(run, 1, json!({"event":"ready"})).unwrap();
+    let cut = sticky.seal(run, 1, 1, 1);
+    assert_eq!(
+        sticky
+            .finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
 }

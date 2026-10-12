@@ -219,7 +219,7 @@ function disjoint(a, b, message) {
 
 function readPlayCollection(bytes, expected) {
   const records = [], events = [];
-  let header, footer, invalid = false;
+  let header, cut, footer, invalid = false;
   for (const line of bytes.toString('utf8').split('\n')) {
     if (!line.startsWith('NEMO_PLAY_OBSERVER ')) continue;
     try { records.push(JSON.parse(line.slice(19))); } catch { invalid = true; }
@@ -227,21 +227,26 @@ function readPlayCollection(bytes, expected) {
   for (const value of records) {
     if (!value || value.runId !== expected.runId || footer) { invalid = true; continue; }
     if (value.kind === 'header' && !header && !events.length) header = value;
-    else if (value.kind === 'event' && header && events.length < 4096) {
+    else if (value.kind === 'event' && header && !cut && events.length < 4096) {
       if (value.sequence !== events.length + 1 || !value.event || typeof value.event !== 'object' ||
           (events.length === 0) !== (value.event.event === 'ready')) invalid = true;
       events.push(value);
-    } else if (value.kind === 'footer' && header) footer = value;
+    } else if (value.kind === 'seal' && header && !cut && value.status === 'provisional' &&
+        /^[0-9a-f-]{36}$/.test(value.cutId)) cut = value;
+    else if (value.kind === 'footer' && header) footer = value;
     else invalid = true;
   }
   const complete = !invalid && bytes.at(-1) === 10 && header?.schema === 'nemo.play-observer/1' &&
     header.taskId === expected.taskId && header.pid === expected.pid && header.window === 'main' &&
-    footer?.status === 'complete' && events.length > 0 && footer.accepted === events.length &&
+    cut && cut.accepted === events.length && cut.generated === events.length && cut.dropped === 0 && cut.failed === 0 &&
+    cut.rejected === 0 && footer?.cutId === cut.cutId && footer.terminalFence === true && footer.pending === 0 &&
+    footer.status === 'complete' && events.length > 0 && footer.accepted === events.length &&
     footer.generated === events.length && footer.dropped === 0 && footer.failed === 0 && footer.rejected === 0;
   return { status: complete ? 'complete' : 'partial', footer: footer || null, events: events.length };
 }
 
-// Call only after an ordinary final Stop. This seals diagnostics, never playback.
+// Start collection before the commands; request this ONLY after ordinary final
+// Stop and all relevant publication work are quiescent. It never stops playback.
 async function collectPlayObserver(instance, { directory, timeout = 5000 }) {
   const snapshot = instance.snapshot, app = snapshot?.app, observer = app?.playObserver;
   requireCheck(instance.validated === true && snapshot.taskId === instance.task && app.taskId === instance.task &&
@@ -275,6 +280,7 @@ async function collectPlayObserver(instance, { directory, timeout = 5000 }) {
   } while (Date.now() < deadline);
   const copied = path.join(directory, 'native-app.stderr.log');
   const receipt = { schema: 'nemo.play-observer-copy/1', ...expected, ...result, status: 'partial', phase: 'before-owner-stop',
+    interval: 'observer-ready-to-host-terminal-fence',
     source: snapshot.source.startup?.head || null, executableSha256: instance.executableSha256 || null,
     stderrSha256: crypto.createHash('sha256').update(bytes).digest('hex') };
   let identities;

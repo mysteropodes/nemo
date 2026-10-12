@@ -10,6 +10,7 @@ const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const bootstrap = path.join(__dirname, 'play-publication-observer-bootstrap.js');
 const RUN = 'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa';
+const CUT = '3d755db1-cdf7-44f8-8706-cc812e1845ca';
 
 function ports(mode = 'ok') {
   const deliveries = [], waiting = [];
@@ -23,7 +24,10 @@ function ports(mode = 'ok') {
         deliveries.push({ action, payload }); resolve({ sequence: payload.sequence });
       }));
       deliveries.push({ action, payload });
-      return Promise.resolve(action === 'record' ? { sequence: payload.sequence } : { status: 'complete' });
+      if (action === 'record') return Promise.resolve({ sequence: payload.sequence });
+      if (action === 'seal') return Promise.resolve({ ...payload, kind: 'seal', status: 'provisional', cutId: CUT });
+      return Promise.resolve({ ...payload, kind: 'footer', terminalFence: true,
+        status: payload.dropped || payload.failed ? 'partial' : 'complete' });
     },
     async listen(callback) { listener = callback; return () => {}; },
     async seal() { await listener({ payload: { runId: RUN } }); },
@@ -79,11 +83,11 @@ test('literal event sequence and immutable scalar pins reach the sink before foo
   assert.equal(api.record(event), undefined);
   event.frame = 99;
   await p.seal();
-  assert.deepEqual(p.deliveries.map(d => d.action), ['record', 'record', 'seal']);
+  assert.deepEqual(p.deliveries.map(d => d.action), ['record', 'record', 'seal', 'finish']);
   assert.deepEqual(p.deliveries.slice(0, 2).map(d => [d.payload.sequence, d.payload.event.event]), [[1, 'ready'], [2, 'host-receipt']]);
   assert.equal(p.deliveries[1].payload.event.frame, 10);
   assert.equal(p.deliveries[1].payload.event.workId, 'native-work-159');
-  assert.deepEqual(p.deliveries[2].payload, { runId: RUN, generated: 2, dropped: 0, failed: 0 });
+  assert.deepEqual(p.deliveries[3].payload, { runId: RUN, cutId: CUT, generated: 2, dropped: 0, failed: 0, pending: 0 });
 });
 
 test('drain waits outside product flow for an outstanding diagnostic ACK', async () => {
@@ -100,7 +104,7 @@ test('drain waits outside product flow for an outstanding diagnostic ACK', async
   assert.equal(p.deliveries.some(d => d.action === 'seal'), false);
   p.waiting.shift()();
   await finishing;
-  assert.equal(p.deliveries.at(-1).action, 'seal');
+  assert.equal(p.deliveries.at(-1).action, 'finish');
 });
 
 for (const mode of ['throw', 'reject']) {
@@ -149,10 +153,13 @@ test('full and late collectors stay bounded and report incomplete tails', async 
   await p.seal();
   assert.equal(p.deliveries.filter(d => d.action === 'record').length, 3);
   assert.equal(p.deliveries.at(-1).payload.dropped, 28);
+  const closedCounters = api.inspect();
   api.record({ event: 'ui-publication', frame: 20 });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(p.deliveries.at(-1).action, 'late');
-  assert.equal(api.inspect().late, 1);
+  assert.equal(p.deliveries.at(-1).action, 'finish');
+  assert.equal(api.inspect().phase, 'retired');
+  assert.equal(api.inspect().outsideInterval, 1);
+  assert.equal(api.inspect().generated, closedCounters.generated);
 });
 
 function fixture(t) {
@@ -169,7 +176,8 @@ function fixture(t) {
     { kind: 'header', schema: 'nemo.play-observer/1', runId: RUN, taskId: 'task-one', pid: producer.pid, window: 'main' },
     { kind: 'event', runId: RUN, sequence: 1, event: { event: 'ready' } },
     { kind: 'event', runId: RUN, sequence: 2, event: { event: 'play-stop', runGeneration: 1 } },
-    { kind: 'footer', runId: RUN, status: 'complete', generated: 2, accepted: 2, dropped: 0, failed: 0, rejected: 0 },
+    { kind: 'seal', runId: RUN, cutId: CUT, status: 'provisional', generated: 2, accepted: 2, dropped: 0, failed: 0, rejected: 0 },
+    { kind: 'footer', runId: RUN, cutId: CUT, terminalFence: true, pending: 0, status: 'complete', generated: 2, accepted: 2, dropped: 0, failed: 0, rejected: 0 },
   ];
   const log = path.join(reports, 'native-app.stderr.log');
   const write = values => fs.writeFileSync(log, '/private/other-native-trace\n' + values.map(v => 'NEMO_PLAY_OBSERVER ' + JSON.stringify(v)).join('\n') + '\n');
@@ -330,4 +338,75 @@ test('canonical-equivalent platform aliases retain artifacts physically outside 
   await f.stopped();
   assert.equal(finalizePlayObserver(f.instance).status, 'complete');
   assert.equal(fs.existsSync(path.join(f.root, 'safe-retained', 'play-observer.json')), true);
+});
+
+test('seal in flight remains provisional and failed late delivery invalidates the final host fence', async () => {
+  const p = ports(), original = p.invoke;
+  let sealPayload, resolveSeal, rejectLate;
+  p.invoke = (action, payload) => {
+    if (action === 'seal') return new Promise(resolve => { sealPayload = payload; resolveSeal = resolve; });
+    if (action === 'late') return new Promise((_, reject) => { rejectLate = reject; });
+    return original(action, payload);
+  };
+  const { api } = await create(p);
+  const sealing = p.seal();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(sealPayload, { runId: RUN, generated: 1, dropped: 0, failed: 0 });
+  api.record({ event: 'ui-publication', frame: 20 });
+  await new Promise(resolve => setImmediate(resolve));
+  resolveSeal({ ...sealPayload, kind: 'seal', status: 'provisional', cutId: CUT });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(p.deliveries.some(d => d.action === 'finish'), false);
+  rejectLate(new Error('late IPC lost'));
+  await sealing;
+  const terminal = p.deliveries.find(d => d.action === 'finish');
+  assert.ok(terminal, 'an attempted terminal fence must carry the final failure counters');
+  assert.deepEqual(terminal.payload, { runId: RUN, cutId: CUT, generated: 2, dropped: 1, failed: 1, pending: 0 });
+});
+
+for (const absent of ['final-footer', 'terminalFence', 'cutId', 'pending']) {
+  test(`provisional or missing ${absent} never establishes complete collection`, async t => {
+    const { collectPlayObserver, finalizePlayObserver } = require('./native-harness.cjs');
+    const f = fixture(t);
+    if (absent === 'final-footer') f.frames.pop();
+    else delete f.frames.at(-1)[absent];
+    f.write(f.frames);
+    await collectPlayObserver(f.instance, { directory: f.destination, timeout: 50 });
+    await f.stopped();
+    assert.equal(finalizePlayObserver(f.instance).status, 'partial');
+  });
+}
+
+for (const mode of ['old-single-footer', 'wrong-cut', 'pending-tail', 'dirty-first-seal']) {
+  test(`${mode} cannot pass a two-phase terminal proof`, async t => {
+    const { collectPlayObserver, finalizePlayObserver } = require('./native-harness.cjs');
+    const f = fixture(t);
+    if (mode === 'old-single-footer') {
+      f.frames.splice(3, 1);
+      delete f.frames.at(-1).cutId; delete f.frames.at(-1).terminalFence; delete f.frames.at(-1).pending;
+    }
+    if (mode === 'wrong-cut') f.frames.at(-1).cutId = RUN;
+    if (mode === 'pending-tail') f.frames.at(-1).pending = 1;
+    if (mode === 'dirty-first-seal') f.frames[3].failed = 1;
+    f.write(f.frames);
+    await collectPlayObserver(f.instance, { directory: f.destination, timeout: 50 });
+    await f.stopped();
+    assert.equal(finalizePlayObserver(f.instance).status, 'partial');
+  });
+}
+
+test('a missing or mismatched provisional ACK cannot dispatch the final fence', async () => {
+  for (const change of [v => { v.runId = CUT; }, v => { v.cutId = 'unissued'; },
+    v => { v.status = 'complete'; }, v => { v.generated++; }]) {
+    const p = ports(), original = p.invoke;
+    p.invoke = async (action, payload) => {
+      const value = await original(action, payload);
+      if (action === 'seal') change(value);
+      return value;
+    };
+    const { api } = await create(p); await p.seal();
+    assert.equal(p.deliveries.some(d => d.action === 'finish'), false);
+    assert.equal(api.inspect().failed, 1);
+    assert.equal(api.inspect().phase, 'sealed');
+  }
 });

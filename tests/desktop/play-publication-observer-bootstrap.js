@@ -42,17 +42,23 @@
       throw new TypeError('test observer unavailable');
     }
     limit = Number.isInteger(limit) && limit > 0 && limit <= 4096 ? limit : 4096;
-    var generated = 0, queued = 0, dropped = 0, failed = 0, late = 0;
-    var cut = false, listening = false, queue = Promise.resolve();
+    var generated = 0, queued = 0, dropped = 0, failed = 0, late = 0, pendingCount = 0, outsideInterval = 0;
+    var cut = false, retired = false, listening = false, queue = Promise.resolve();
     function record(event) {
       try {
+        // The final fence ends this bounded capture; these attempts are outside it.
+        if (retired) { outsideInterval++; return; }
         if (cut) {
           // Count the unrecorded attempt synchronously, even if IPC is lost.
           generated++; dropped++;
-          if (late++ === 0) queue = queue.then(async function () {
-            try { await ports.invoke('late', { runId: config.runId }); }
-            catch (_) { failed++; }
-          });
+          if (late++ === 0) {
+            pendingCount++;
+            queue = queue.then(async function () {
+              try { await ports.invoke('late', { runId: config.runId }); }
+              catch (_) { failed++; }
+              finally { pendingCount--; }
+            });
+          }
           return;
         }
         generated++;
@@ -60,13 +66,14 @@
         var data = snapshot(event);
         if (!data) { dropped++; return; }
         var sequence = generated;
-        queued++;
+        queued++; pendingCount++;
         // The caller never awaits this chain. It serializes diagnostic deliveries only.
         queue = queue.then(async function () {
           try {
             var ack = await ports.invoke('record', { runId: config.runId, sequence: sequence, event: data });
             if (!ack || ack.sequence !== sequence) failed++;
           } catch (_) { failed++; }
+          finally { pendingCount--; }
         });
       } catch (_) { dropped++; }
     }
@@ -79,10 +86,22 @@
       if (cut || !event || !event.payload || event.payload.runId !== config.runId) return;
       cut = true;
       await drain();
+      var first = { runId: config.runId, generated: generated, dropped: dropped, failed: failed }, acknowledged;
       try {
-        await ports.invoke('seal', { runId: config.runId, generated: generated, dropped: dropped, failed: failed });
-      } catch (_) { failed++; }
+        acknowledged = await ports.invoke('seal', first);
+        if (!acknowledged || acknowledged.kind !== 'seal' || acknowledged.status !== 'provisional' ||
+            acknowledged.runId !== config.runId || !uuid.test(acknowledged.cutId) ||
+            acknowledged.generated !== first.generated || acknowledged.dropped !== first.dropped ||
+            acknowledged.failed !== first.failed) throw new Error('test observer cut acknowledgement refused');
+      } catch (_) { failed++; return; }
       await drain();
+      // Synchronous retirement freezes final counters before sending the host fence.
+      // The driver must have finished all relevant product work before asking to seal.
+      retired = true;
+      try {
+        await ports.invoke('finish', { runId: config.runId, cutId: acknowledged.cutId,
+          generated: generated, dropped: dropped, failed: failed, pending: pendingCount });
+      } catch (_) { failed++; }
     }
     var ready = Promise.resolve().then(function () { return ports.listen(seal); }).then(async function () {
       listening = true;
@@ -90,7 +109,8 @@
       await queue;
     }).catch(function () { failed++; });
     return Object.freeze({ record: record, ready: ready,
-      inspect: function () { return { generated: generated, queued: queued, dropped: dropped, failed: failed, late: late }; } });
+      inspect: function () { return { generated: generated, queued: queued, dropped: dropped, failed: failed, late: late,
+        pending: pendingCount, outsideInterval: outsideInterval, phase: retired ? 'retired' : cut ? 'sealed' : 'collecting' }; } });
   }
   if (typeof module === 'object' && module.exports) module.exports = { createObserver: createObserver };
   if (typeof window === 'undefined') return;
