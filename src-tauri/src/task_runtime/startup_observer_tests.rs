@@ -25,7 +25,11 @@ fn origin() -> tauri::Url {
     tauri::Url::parse("tauri://localhost/index.html").unwrap()
 }
 fn event(log: &mut LoadLog, stage: &str) {
-    log.observe(stage, "main", &origin(), 42, "test-run");
+    if stage == "window-created" {
+        log.confirm_creation("main", 42, "test-run");
+    } else {
+        log.observe(stage, "main", &origin(), 42, "test-run");
+    }
 }
 fn window() -> tauri::utils::config::WindowConfig {
     let mut window = tauri::utils::config::WindowConfig::default();
@@ -98,13 +102,13 @@ fn wrong_identity_unknown_stage_and_out_of_order_never_become_success() {
         let fixture = Fixture::new();
         let mut log = fixture.log();
         match variant {
-            0 => log.observe("window-created", "main", &origin(), 43, "test-run"),
-            1 => log.observe("window-created", "main", &origin(), 42, "foreign-run"),
-            2 => log.observe("window-created", "foreign", &origin(), 42, "test-run"),
+            0 => log.confirm_creation("main", 43, "test-run"),
+            1 => log.confirm_creation("main", 42, "foreign-run"),
+            2 => log.confirm_creation("foreign", 42, "test-run"),
             3 => event(&mut log, "secret-console-payload"),
             4 => event(&mut log, "native-page-finished"),
             _ => log.observe(
-                "window-created",
+                "native-page-started",
                 "main",
                 &tauri::Url::parse("https://private.example/secret").unwrap(),
                 42,
@@ -155,13 +159,45 @@ fn duplicate_and_event_overflow_are_bounded_and_refuse_even_after_finished() {
 fn actual_window_confirmation_during_build_does_not_fabricate_duplicate_creation() {
     let fixture = Fixture::new();
     let mut log = fixture.log();
-    log.confirm_creation("main", &origin(), 42, "test-run");
+    log.confirm_creation("main", 42, "test-run");
     event(&mut log, "native-page-started");
-    log.confirm_creation("main", &origin(), 42, "test-run");
+    log.confirm_creation("main", 42, "test-run");
     event(&mut log, "native-page-finished");
     assert_eq!(log.receipt()["accepted"], 3);
     assert_eq!(log.receipt()["rejected"], 0);
     assert_eq!(log.receipt()["status"], "native-load-observed");
+}
+
+#[test]
+fn owned_creation_without_document_is_partial_and_late_native_load_can_complete() {
+    let fixture = Fixture::new();
+    let mut log = fixture.log();
+    log.confirm_creation("main", 42, "test-run"); // No URL/readiness input exists.
+    log.persist().unwrap();
+    assert_eq!(log.receipt()["status"], "partial");
+    assert_eq!(log.receipt()["accepted"], 1);
+    assert_eq!(log.receipt()["stages"][0]["stage"], "window-created");
+    event(&mut log, "native-page-started");
+    event(&mut log, "native-page-finished");
+    assert_eq!(log.receipt()["status"], "native-load-observed");
+}
+
+#[test]
+fn actual_nonapp_callback_origin_refuses_after_valid_owned_creation() {
+    let fixture = Fixture::new();
+    let mut log = fixture.log();
+    log.confirm_creation("main", 42, "test-run");
+    log.observe(
+        "native-page-started",
+        "main",
+        &tauri::Url::parse("about:blank").unwrap(),
+        42,
+        "test-run",
+    );
+    event(&mut log, "native-page-started");
+    event(&mut log, "native-page-finished");
+    assert_eq!(log.receipt()["status"], "refused");
+    assert_eq!(log.receipt()["accepted"], 1);
 }
 
 #[test]

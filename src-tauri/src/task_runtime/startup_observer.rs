@@ -122,7 +122,7 @@ pub(super) fn attach<'a, R: Runtime, M: Manager<R>>(
             let run = log.run.clone();
             // This callback carries the real native window even if it arrives
             // during build(), before the caller confirms creation.
-            log.confirm_creation(window.label(), payload.url(), std::process::id(), &run);
+            log.confirm_creation(window.label(), std::process::id(), &run);
             log.observe(
                 stage,
                 window.label(),
@@ -141,15 +141,9 @@ pub(super) fn created<R: Runtime>(observer: &Observer, window: &tauri::WebviewWi
     if let Some(observer) = observer {
         if let Ok(mut log) = observer.lock() {
             let run = log.run.clone();
-            match window.url() {
-                Ok(origin) => {
-                    log.confirm_creation(window.label(), &origin, std::process::id(), &run)
-                }
-                Err(_) => {
-                    log.rejected += 1;
-                    log.refused = true;
-                }
-            }
+            // Ownership of the returned native window does not require a
+            // document URL: about:blank/unavailable is the diagnostic case.
+            log.confirm_creation(window.label(), std::process::id(), &run);
             if log.persist().is_err() {
                 log.refused = true;
             }
@@ -187,12 +181,18 @@ impl LoadLog {
             refused: false,
         }
     }
-    fn confirm_creation(&mut self, label: &str, url: &tauri::Url, pid: u32, run: &str) {
-        if self.phase == 0 {
-            self.observe("window-created", label, url, pid, run);
-        } else if pid != self.pid || run != self.run || !allowed_origin(label, url) {
-            self.rejected = self.rejected.saturating_add(1);
+    fn confirm_creation(&mut self, label: &str, pid: u32, run: &str) {
+        if pid != self.pid || run != self.run || label != "main" {
+            if self.attempts < LIMIT {
+                self.attempts += 1;
+                self.rejected += 1;
+            } else {
+                self.dropped = self.dropped.saturating_add(1);
+            }
             self.refused = true;
+        } else if self.phase == 0 && !self.refused {
+            self.attempts += 1;
+            self.push_stage("window-created");
         }
     }
     fn observe(&mut self, stage: &str, label: &str, url: &tauri::Url, pid: u32, run: &str) {
@@ -217,6 +217,9 @@ impl LoadLog {
             self.refused = true;
             return;
         }
+        self.push_stage(stage);
+    }
+    fn push_stage(&mut self, stage: &str) {
         self.phase += 1;
         self.stages
             .push(json!({"sequence":self.phase, "stage":stage,
