@@ -76,6 +76,11 @@ fn literal_rgba_preserves_opaque_half_zero_alpha_hidden_rgb_and_source_bytes() {
     assert_eq!(asset.encoded_png(), bytes(RGBA));
     assert_eq!(asset.rgba8()[4..8], [68, 85, 102, 128]);
     let clone = asset.clone();
+    assert!(std::ptr::eq(asset.rgba8().as_ptr(), clone.rgba8().as_ptr()));
+    assert!(std::ptr::eq(
+        asset.encoded_png().as_ptr(),
+        clone.encoded_png().as_ptr()
+    ));
     drop(asset);
     assert_eq!(clone.rgba8()[8..], [119, 136, 153, 0]);
 }
@@ -278,4 +283,126 @@ fn end_marker_trailing_data_and_late_animation_cannot_be_ignored() {
         decode_png(&huge, limits()).unwrap_err(),
         ImageAssetError::Malformed
     );
+}
+
+// Only a small input row and compressed bytes are held: never a full golden.
+// The encoder builds boundary-size inputs; expected channel bytes are literals.
+fn capacity_source(width: u32, height: u32, color: png::ColorType) -> Vec<u8> {
+    use std::io::Write;
+    let channels = if color == png::ColorType::Rgb { 3 } else { 4 };
+    let mut row = Vec::with_capacity(width as usize * channels);
+    for x in 0..width {
+        let pixel = match x % 3 {
+            0 => [17, 34, 51, 255],
+            1 => [68, 85, 102, 128],
+            _ => [119, 136, 153, 0],
+        };
+        row.extend_from_slice(&pixel[..channels]);
+    }
+    let mut encoded = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut encoded, width, height);
+        encoder.set_color(color);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Balanced);
+        encoder.set_filter(png::Filter::NoFilter);
+        let mut writer = encoder.write_header().unwrap();
+        {
+            let mut stream = writer.stream_writer().unwrap();
+            for _ in 0..height {
+                stream.write_all(&row).unwrap();
+            }
+            stream.finish().unwrap();
+        }
+        writer.finish().unwrap();
+    }
+    assert!(encoded.len() <= 16 * 1024 * 1024);
+    encoded
+}
+
+fn capacity_pixels(color: png::ColorType, width: u32, height: u32) {
+    let mut encoded = capacity_source(width, height, color);
+    let expected_size = width as usize * height as usize * 4;
+    let budget = ImageAssetLimits::new(
+        encoded.len(),
+        expected_size,
+        64 * 1024 * 1024,
+        width,
+        height,
+    )
+    .unwrap();
+    let asset = decode_png(&encoded, budget).unwrap();
+    assert_eq!(asset.dimensions(), (width, height));
+    assert_eq!(asset.row_stride(), width as usize * 4);
+    assert_eq!(asset.rgba8().len(), expected_size);
+    assert_eq!(asset.encoded_png(), encoded);
+    for y in [0, height / 2, height - 1] {
+        for (x, mut pixel) in [
+            (0, [17, 34, 51, 255]),
+            (1, [68, 85, 102, 128]),
+            (2, [119, 136, 153, 0]),
+            (
+                width - 1,
+                if (width - 1) % 3 == 0 {
+                    [17, 34, 51, 255]
+                } else if (width - 1) % 3 == 1 {
+                    [68, 85, 102, 128]
+                } else {
+                    [119, 136, 153, 0]
+                },
+            ),
+        ] {
+            if color == png::ColorType::Rgb {
+                pixel[3] = 255;
+            }
+            let at = (y as usize * width as usize + x as usize) * 4;
+            assert_eq!(&asset.rgba8()[at..at + 4], pixel, "pixel({x},{y})");
+        }
+    }
+    let clone = asset.clone();
+    assert_eq!(asset.rgba8().as_ptr(), clone.rgba8().as_ptr());
+    assert_eq!(asset.encoded_png().as_ptr(), clone.encoded_png().as_ptr());
+    encoded.fill(0);
+    drop(encoded);
+    drop(asset);
+    assert_eq!(clone.rgba8().len(), expected_size);
+    assert_eq!(&clone.rgba8()[..4], [17, 34, 51, 255]);
+}
+
+#[test]
+fn capacity_small_4097_and_8192_dimension_boundaries() {
+    capacity_pixels(png::ColorType::Rgba, 4097, 1);
+    capacity_pixels(png::ColorType::Rgb, 8192, 2);
+    assert!(ImageAssetLimits::new(
+        16 * 1024 * 1024,
+        256 * 1024 * 1024,
+        64 * 1024 * 1024,
+        8192,
+        8192
+    )
+    .is_ok());
+    assert_eq!(
+        ImageAssetLimits::new(1024, 256 * 1024 * 1024 + 1, 1024, 8192, 8192).unwrap_err(),
+        ImageAssetError::InvalidLimits
+    );
+    assert_eq!(
+        ImageAssetLimits::new(1024, 256 * 1024 * 1024, 64 * 1024 * 1024 + 1, 8192, 8192)
+            .unwrap_err(),
+        ImageAssetError::InvalidLimits
+    );
+    assert_eq!(
+        ImageAssetLimits::new(1024, 1024, 1024, 8193, 1).unwrap_err(),
+        ImageAssetError::InvalidLimits
+    );
+}
+
+// Root must allocate one exclusive heavy-cpu slot before these ACTUAL decodes.
+// They stay in normal discovery; tiny preflight uses --skip capacity_large.
+#[test]
+fn capacity_large_rgba8192_returns_exact_256mib_straight_pixels() {
+    capacity_pixels(png::ColorType::Rgba, 8192, 8192);
+}
+#[test]
+fn capacity_large_rgb8192_streams_into_exact_256mib_normalized_pixels() {
+    capacity_pixels(png::ColorType::Rgb, 8192, 8192);
 }
