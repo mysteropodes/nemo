@@ -16,6 +16,16 @@
   // "var tabs=[]" further down would only be hoisted as undefined at that
   // point, not yet assigned array — .find()/.forEach() on it would throw.
   var tabs=[],activeTabId=null;
+  var inactiveEntry=window.NemoNativeOpacityProjectEntry.createInactiveEntry(window,{
+    readUi:function p39bReadUi(){return {activeTabId:activeTabId,name:currentName,path:currentPath,frame:state.currentFrame};},
+    commit:function p39bCommit(meta){tabs.push({id:makeTabId(),name:meta.name,path:meta.path,json:null,nativePreparation:meta});renderTabBar();return true;},
+    remove:function p39bRemove(meta){
+      var index=tabs.findIndex(function(t){return t.nativePreparation===meta;});if(index<0)return false;
+      tabs.splice(index,1);renderTabBar();return true;
+    },
+    notice:tabAddNotice
+  });
+  function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
   function importProjectJSON(json,silent,allowOccludedAdmission){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent,allowOccludedAdmission):window.SM.importJSON(json,silent);}
@@ -182,6 +192,7 @@
     return nativeSavedUI.save(writeProjectTo);
   }
   async function openPath(path){
+    if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
     var json;
     try{json=await window.__TAURI__.fs.readTextFile(path);}
@@ -199,6 +210,7 @@
     }catch(e){showToast('Could not open project — native admission or presentation failed');return false;}
   }
   async function openDialog(){
+    if(p39bUseInactiveEntry())return inactiveEntry.openPicker();
     if(!tauriOk()){document.getElementById('file-input').click();return;}
     var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;try{await window.__TAURI__.window.getCurrentWindow().setFocus();}catch(_){/* Native presentation still gates Open. */}
@@ -515,7 +527,7 @@
   function switchToTab(id){
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
-    if(target.json&&!populatedTabTransitionAllowed())return tabAddNotice('Switching project tabs is unavailable in this build.');
+    if(target.nativePreparation||target.json&&!populatedTabTransitionAllowed())return tabAddNotice('Switching project tabs is unavailable in this build.');
     var blankAdmission=target.json?null:releaseNative('tab-switch');if(blankAdmission===false)return false;
     snapshotActiveIntoTab();
     function entered(){
@@ -553,10 +565,11 @@
   function closeTab(id){
     var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
     if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
+    if(tabs[idx].nativePreparation)return inactiveEntry.close(tabs[idx].nativePreparation);
     var wasActive=id===activeTabId;
     function closed(){tabs.splice(idx,1);renderTabBar();}
     if(!wasActive){closed();return;}
-    if(!populatedTabTransitionAllowed())return tabAddNotice('Closing the active project tab is unavailable in this build.');
+    if(tabs.some(function(t){return !!t.nativePreparation;})||!populatedTabTransitionAllowed())return tabAddNotice('Closing the active project tab is unavailable in this build.');
     var next=tabs[idx>0?idx-1:1];
     function enterBlank(admitted){if(admitted===false)return false;activeTabId=next.id;newProjectNow({w:1920,h:1080,fps:24,name:next.name});
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();}
