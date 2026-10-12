@@ -268,7 +268,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
       'object_fill_tests = "../tests/object_fill.rs"');
     if (name === 'history') expected.push('object_history_tests = "../tests/object_history.rs"');
     if (name === 'evaluation') expected.push('object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs"',
-      'expression_noise_tests = "../tests/expression_noise.rs"');
+      'expression_noise_tests = "../tests/expression_noise.rs"',
+      'expression_random_tests = "../tests/expression_random.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"',
       'object_render_scene_compositor_tests = "../tests/object_render_scene.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
