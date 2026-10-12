@@ -308,7 +308,7 @@
             observe('publicationStage', publication, 'sync-enter'); ports.syncInput(); observe('publicationStage', publication, 'sync-return');
           } finally { observe('endPublication', publication); }
         } catch (error) {
-          observe('associateNavigationError', diagnostic, error);
+          observe('associateNavigationError', diagnostic, error, receipt);
           var sameOwner = false;
           try { sameOwner = ports.controller() === controller &&
             sameIdentity(requestedIdentity, controller.identity()); } catch (_) {}

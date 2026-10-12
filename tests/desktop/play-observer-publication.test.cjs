@@ -318,3 +318,18 @@ test('invalid raw scalar slots never retain private objects in an error context'
   const row = s.r.events().find(e => e.event === 'failure');
   assert.equal(Object.hasOwn(row, 'status'), false);
 });
+
+test('a current UI stage with a missing publication association cannot join a cached older error', async () => {
+  const s = await setup(), meta = await rawMetadata(s, 10), raw = s.h.state.previewConsumers[0];
+  const old = vm.runInContext('new Error("cached paint failure")', s.r.context);
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, meta, () => Promise.reject(old), () => {}), e => e === old);
+  const prior = s.r.api.errorContext(old); assert.equal(prior.hostCallOrdinal, 2);
+  s.r.window.NemoTestPlayObserver = new Proxy(s.r.api, { get(target, key) {
+    return key === 'beginPublication' ? () => undefined : target[key];
+  } });
+  s.r.context.updateUI = () => { throw old; };
+  assert.equal(await s.navigate(10), false); await drain();
+  const failure = s.r.events().find(e => e.event === 'failure');
+  assert.equal(Object.hasOwn(failure, 'hostCallOrdinal'), false, 'identity equality cannot substitute the older call');
+  assert.ok(s.r.api.inspect().dropped > 0);
+});

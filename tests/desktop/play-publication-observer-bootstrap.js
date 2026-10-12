@@ -72,8 +72,17 @@
     function associateFailure(receipt, error) {
       if (!rememberFailure(error, receipts.get(receipt))) dropped++;
     }
-    function associateNavigationError(ticket, error) {
+    function associateNavigationError(ticket, error, receipt) {
       var nav = navigations.get(ticket);
+      if (nav && receipt !== undefined) {
+        var current = receipts.get(receipt);
+        if (!current || ['instanceId','documentId','contentRevision','frame'].some(function (key) { return nav.pins[key] !== current[key]; })) {
+          nav.failureFenced = true; dropped++; return;
+        }
+        nav.currentReceiptContext = current;
+        if (!rememberFailure(error, current)) { nav.failureFenced = true; dropped++; }
+        return;
+      }
       if (nav && nav.pins.hostCallOrdinal && error && typeof error === 'object') {
         if (!rememberFailure(error, nav.pins)) dropped++;
       }
@@ -81,15 +90,16 @@
     function navigationFailure(ticket, error) {
       var nav = navigations.get(ticket); if (!nav || nav.finished) return;
       var captured = error && typeof error === 'object' ? failures.get(error) : null;
-      var matching = nav.pins.hostCallOrdinal ? failurePins.concat(['workId','viewGeneration','status']) : ['instanceId','documentId','contentRevision','frame'];
-      if (captured && matching.every(function (key) { return nav.pins[key] === captured[key]; })) {
+      var basis = nav.currentReceiptContext || nav.pins;
+      var matching = basis.hostCallOrdinal ? failurePins.concat(['workId','viewGeneration','status']) : ['instanceId','documentId','contentRevision','frame'];
+      if (!nav.failureFenced && captured && captured.hostCallOrdinal > nav.afterCallOrdinal && matching.every(function (key) { return basis[key] === captured[key]; })) {
         nav.pins = Object.freeze(Object.assign({}, captured, { intent: nav.pins.intent }));
       } else dropped++;
       record(Object.assign({ event: 'failure', code: 'unknown' }, nav.pins));
     }
     function navigationRequest(intent, frame, identity) {
       var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
-      navigations.set(ticket, { pins: pins, finished: false }); productPendingNavigation++;
+      navigations.set(ticket, { pins: pins, finished: false, afterCallOrdinal: callSequence }); productPendingNavigation++;
       record(Object.assign({ event: 'navigate-request' }, pins)); return ticket;
     }
     function navigationSuperseded(ticket) {
