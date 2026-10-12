@@ -24,6 +24,11 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+# Private observer packages only; normal app builds expose no collector command.
+[features]
+default = []
+test-play-publication-observer = []
+
 [dependencies]
 nemo-mcp = { path = "../nemo-mcp" }
 native-engine = { package = "nemo-native-engine", path = "../native-engine", default-features = false, features = ["application", "viewport"] }

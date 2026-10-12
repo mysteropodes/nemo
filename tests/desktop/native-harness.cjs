@@ -109,14 +109,26 @@ function createController({ root, app, env = process.env, timeout = 30_000, cli 
   }
   async function stop(instance, retain = false) {
     requireCheck(instance.info && instance.info.ownerToken, 'native cleanup lacks a verified launcher token; reconcile owned run');
+    if (instance.snapshot?.app?.playObserver && !instance.playObserverCollection) {
+      try {
+        await collectPlayObserver(instance, { directory: path.join(root, 'reports', 'play-observer-' + instance.task), timeout });
+      } catch {
+        // A failed diagnostic must not strand the owned app or disposable data.
+        instance.playObserverCollection = { status: 'partial', reason: 'collection-refused' };
+      }
+    }
     const args = ['stop', '--task', instance.task, '--owner', instance.info.ownerToken, '--timeout-ms', '10000'];
     if (retain) args.push('--retain-data');
-    const result = await command(args);
-    requireCheck(result.code === 0 && result.value && result.value.stopped === true, 'native owner stop was refused or incomplete; reconcile owned run');
-    await until(() => instance.process.finished, 'native launcher did not exit after stop', 12_000);
-    requireCheck(!alive(instance.info.pid), 'native launcher remains alive after stop');
-    if (instance.snapshot) requireCheck(!alive(instance.snapshot.app.pid) && !alive(instance.snapshot.app.pid, true), 'native app process group remains alive after stop');
-    instance.stopped = true;
+    let result;
+    try {
+      requireCheck(!(retain && instance.snapshot?.app?.playObserver), 'test observer requires normal owner cleanup');
+      result = await command(args);
+      requireCheck(result.code === 0 && result.value && result.value.stopped === true, 'native owner stop was refused or incomplete; reconcile owned run');
+      await until(() => instance.process.finished, 'native launcher did not exit after stop', 12_000);
+      requireCheck(!alive(instance.info.pid), 'native launcher remains alive after stop');
+      if (instance.snapshot) requireCheck(!alive(instance.snapshot.app.pid) && !alive(instance.snapshot.app.pid, true), 'native app process group remains alive after stop');
+      instance.stopped = true;
+    } finally { if (instance.playObserverHandle) finalizePlayObserver(instance); }
     instance.retained = retain;
     if (!retain) for (const previous of instances) if (previous.task === instance.task) previous.retained = false;
     return result.value;
@@ -195,6 +207,8 @@ function validateSnapshot(snapshot, instance, context) {
   const state = runtime.nativeStateTargets(instance.task, manifest, app.bundle);
   requireCheck(state.refused.length === 0 && state.targets.some(target => target.name === 'webkitStore'), 'app directory or WebKit cleanup derivation is invalid');
   instance.snapshot = snapshot;
+  instance.validated = true;
+  instance.executableSha256 = app.executableSha256;
   return state.targets;
 }
 
@@ -203,4 +217,133 @@ function disjoint(a, b, message) {
   requireCheck(b.every(value => !left.has(path.resolve(value))), message);
 }
 
-module.exports = { requireCheck, alive, until, hash, packagedApp, createController, validateSnapshot, disjoint };
+function readPlayCollection(bytes, expected) {
+  const records = [], events = [];
+  let header, footer, invalid = false;
+  for (const line of bytes.toString('utf8').split('\n')) {
+    if (!line.startsWith('NEMO_PLAY_OBSERVER ')) continue;
+    try { records.push(JSON.parse(line.slice(19))); } catch { invalid = true; }
+  }
+  for (const value of records) {
+    if (!value || value.runId !== expected.runId || footer) { invalid = true; continue; }
+    if (value.kind === 'header' && !header && !events.length) header = value;
+    else if (value.kind === 'event' && header && events.length < 4096) {
+      if (value.sequence !== events.length + 1 || !value.event || typeof value.event !== 'object' ||
+          (events.length === 0) !== (value.event.event === 'ready')) invalid = true;
+      events.push(value);
+    } else if (value.kind === 'footer' && header) footer = value;
+    else invalid = true;
+  }
+  const complete = !invalid && bytes.at(-1) === 10 && header?.schema === 'nemo.play-observer/1' &&
+    header.taskId === expected.taskId && header.pid === expected.pid && header.window === 'main' &&
+    footer?.status === 'complete' && events.length > 0 && footer.accepted === events.length &&
+    footer.generated === events.length && footer.dropped === 0 && footer.failed === 0 && footer.rejected === 0;
+  return { status: complete ? 'complete' : 'partial', footer: footer || null, events: events.length };
+}
+
+// Call only after an ordinary final Stop. This seals diagnostics, never playback.
+async function collectPlayObserver(instance, { directory, timeout = 5000 }) {
+  const snapshot = instance.snapshot, app = snapshot?.app, observer = app?.playObserver;
+  requireCheck(instance.validated === true && snapshot.taskId === instance.task && app.taskId === instance.task &&
+    app.isolated === true && app.windows?.length === 1 && app.windows[0] === 'main' && alive(app.pid) &&
+    observer?.schema === 'nemo.play-observer/1' && /^[0-9a-f-]{36}$/.test(observer.runId) &&
+    snapshot.source.matches && snapshot.build.matches, 'test observer lacks validated task identity');
+  requireCheck(typeof directory === 'string' && path.isAbsolute(directory), 'test observer destination refused');
+  const reports = snapshot.runtime.roots.reports, taskRoot = snapshot.runtime.roots.root;
+  const relative = path.relative(taskRoot, directory);
+  requireCheck(relative.startsWith('..' + path.sep) || path.isAbsolute(relative), 'test observer copy must outlive task cleanup');
+  for (const folder of [taskRoot, reports]) {
+    const meta = fs.lstatSync(folder);
+    requireCheck(meta.isDirectory() && !meta.isSymbolicLink(), 'test observer report root refused');
+  }
+  requireCheck(path.dirname(reports) === taskRoot, 'test observer report root differs');
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  requireCheck(!fs.lstatSync(directory).isSymbolicLink(), 'test observer destination refused');
+  const marker = path.join(reports, 'play-observer-seal.json'), log = path.join(reports, 'native-app.stderr.log');
+  try { fs.writeFileSync(marker, JSON.stringify({ runId: observer.runId }), { flag: 'wx', mode: 0o600 }); }
+  catch { throw new Error('test observer seal marker refused'); }
+  const expected = { runId: observer.runId, taskId: instance.task, pid: app.pid };
+  const deadline = Date.now() + Math.min(Math.max(timeout, 1), 10_000);
+  let bytes = Buffer.alloc(0), result = { status: 'partial', footer: null, events: 0 }, fd;
+  do {
+    try {
+      fd ??= fs.openSync(log, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+      bytes = readPlayTail(fd);
+      result = readPlayCollection(bytes, expected);
+      if (result.footer) break;
+    } catch { /* Copy a partial receipt even if no readable log arrived. */ }
+    await new Promise(resolve => setTimeout(resolve, 25));
+  } while (Date.now() < deadline);
+  const copied = path.join(directory, 'native-app.stderr.log');
+  const receipt = { schema: 'nemo.play-observer-copy/1', ...expected, ...result, status: 'partial', phase: 'before-owner-stop',
+    source: snapshot.source.startup?.head || null, executableSha256: instance.executableSha256 || null,
+    stderrSha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+  let identities;
+  const manifestBytes = Buffer.from(JSON.stringify(receipt, null, 2) + '\n');
+  try {
+    identities = [newPlayCopy(copied, bytes), newPlayCopy(path.join(directory, 'play-observer.json'), manifestBytes)];
+  } catch (error) { if (fd !== undefined) fs.closeSync(fd); throw error; }
+  instance.playObserverHandle = { fd, directory, expected, identities,
+    manifestSha256: crypto.createHash('sha256').update(manifestBytes).digest('hex') };
+  instance.playObserverCollection = receipt;
+  return receipt;
+}
+
+function readPlayTail(fd) {
+  const meta = fs.fstatSync(fd);
+  requireCheck(meta.isFile() && meta.size <= 64 * 1024 * 1024, 'test observer log refused');
+  const bytes = Buffer.alloc(meta.size);
+  let offset = 0;
+  while (offset < bytes.length) {
+    const read = fs.readSync(fd, bytes, offset, bytes.length - offset, offset);
+    requireCheck(read > 0, 'test observer log changed while copying');
+    offset += read;
+  }
+  return bytes;
+}
+
+function newPlayCopy(file, bytes) {
+  const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600);
+  try { fs.writeFileSync(fd, bytes); fs.fsyncSync(fd); return fs.fstatSync(fd); }
+  finally { fs.closeSync(fd); }
+}
+
+function replacePlayCopy(file, bytes, identity, expectedHash) {
+  const fd = fs.openSync(file, fs.constants.O_RDWR | fs.constants.O_NOFOLLOW);
+  try {
+    const current = fs.fstatSync(fd);
+    requireCheck(current.isFile() && current.dev === identity.dev && current.ino === identity.ino &&
+      crypto.createHash('sha256').update(readPlayTail(fd)).digest('hex') === expectedHash, 'test observer preserved copy changed');
+    fs.ftruncateSync(fd, 0);
+    fs.writeFileSync(fd, bytes); fs.fsyncSync(fd);
+  } finally { fs.closeSync(fd); }
+}
+
+// Held read descriptor survives normal owner cleanup unlinking the source log.
+// Only the post-exit tail may establish complete collection, never the first footer.
+function finalizePlayObserver(instance) {
+  const handle = instance.playObserverHandle;
+  if (!handle) return instance.playObserverCollection;
+  let receipt = { ...instance.playObserverCollection, status: 'partial', phase: 'owner-stop-incomplete' };
+  try {
+    const stopped = instance.stopped === true && !alive(instance.snapshot.app.pid) &&
+      (!instance.process || (instance.process.finished && !alive(instance.info.pid)));
+    if (handle.fd !== undefined) {
+      const bytes = readPlayTail(handle.fd), result = readPlayCollection(bytes, handle.expected);
+      replacePlayCopy(path.join(handle.directory, 'native-app.stderr.log'), bytes, handle.identities[0], receipt.stderrSha256);
+      receipt = { ...receipt, ...result, status: stopped ? result.status : 'partial', phase: stopped ? 'after-owner-stop' : 'owner-stop-incomplete',
+        stderrSha256: crypto.createHash('sha256').update(bytes).digest('hex') };
+    }
+    replacePlayCopy(path.join(handle.directory, 'play-observer.json'), Buffer.from(JSON.stringify(receipt, null, 2) + '\n'),
+      handle.identities[1], handle.manifestSha256);
+  } catch { receipt = { ...receipt, status: 'partial', phase: 'terminal-copy-refused' }; }
+  finally {
+    if (handle.fd !== undefined) { try { fs.closeSync(handle.fd); } catch { receipt.status = 'partial'; } }
+    delete instance.playObserverHandle;
+  }
+  instance.playObserverCollection = receipt;
+  return receipt;
+}
+
+module.exports = { requireCheck, alive, until, hash, packagedApp, createController, validateSnapshot, disjoint,
+  collectPlayObserver, finalizePlayObserver };
