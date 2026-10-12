@@ -52,6 +52,74 @@
     var cut = false, retired = false, listening = false, queue = Promise.resolve();
     var sessions = new WeakMap(), adapters = new WeakMap(), receipts = new WeakMap(), calls = new WeakMap();
     var sessionSequence = 0, callSequence = 0;
+    var navigations = new WeakMap(), publications = new WeakMap(), steps = new WeakMap(), publication = null;
+    var productPendingNavigation = 0, productPendingPlayback = 0, productPlaying = false;
+    function navigationRequest(intent, frame, identity) {
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
+      navigations.set(ticket, { pins: pins, finished: false }); productPendingNavigation++;
+      record(Object.assign({ event: 'navigate-request' }, pins)); return ticket;
+    }
+    function navigationSuperseded(ticket) {
+      var nav = navigations.get(ticket); if (nav) { nav.superseded = true; record(Object.assign({ event: 'navigate-superseded' }, nav.pins)); }
+    }
+    function navigationReturn(ticket, result) {
+      var nav = navigations.get(ticket); if (!nav || nav.finished) return;
+      nav.finished = true; productPendingNavigation--;
+      if (!nav.superseded && !nav.pins.hostCallOrdinal) dropped++;
+      record(Object.assign({ event: 'navigate-return', result: result === true }, nav.pins));
+    }
+    function beginPublication(ticket, receipt) {
+      var nav = navigations.get(ticket), captured = receipts.get(receipt);
+      if (!nav || !captured) { dropped++; return; }
+      if (['instanceId','documentId','contentRevision','frame'].some(function (key) { return nav.pins[key] !== captured[key]; })) dropped++;
+      nav.pins = Object.freeze(Object.assign({}, captured, { intent: nav.pins.intent }));
+      var next = Object.freeze({}); publications.set(next, { pins: nav.pins, previous: publication, input: null, rollback: false });
+      publication = next; return next;
+    }
+    function beginRollback(ticket) {
+      var nav = navigations.get(ticket); if (!nav) return;
+      var next = Object.freeze({}); publications.set(next, { pins: nav.pins, previous: publication, rollback: true });
+      publication = next; return next;
+    }
+    function endPublication(ticket) {
+      var current = publications.get(ticket); if (current && publication === ticket) publication = current.previous;
+    }
+    function uiPublication(actual, windowFrame) {
+      var current = publications.get(publication); if (!current) return;
+      if (!current.rollback && (actual !== current.pins.frame || windowFrame !== actual)) dropped++;
+      record(Object.assign({}, current.pins, { event: current.rollback ? 'rollback' : 'ui-publication', currentFrame: actual, frame: windowFrame }));
+    }
+    function inputPublication(value, actual, windowFrame) {
+      var current = publications.get(publication); if (!current || current.rollback) return;
+      if (typeof value !== 'number' && typeof value !== 'string') { dropped++; return; }
+      var displayed = Number(value); if (!Number.isSafeInteger(displayed) || displayed < 1) { dropped++; return; }
+      current.input = displayed - 1; current.windowFrame = windowFrame;
+      current.agrees = actual === current.input && windowFrame === current.input;
+      if (current.input !== current.pins.frame || !current.agrees) dropped++;
+    }
+    function publicationStage(ticket, event) {
+      var current = publications.get(ticket); if (!current) return;
+      var observed = Object.assign({ event: event }, current.pins);
+      if (event === 'sync-return') {
+        if (current.input === null) dropped++;
+        else { observed.currentFrame = current.input; observed.frame = current.windowFrame; observed.result = current.agrees; }
+      }
+      record(observed);
+    }
+    function schedulerRequest(run, frame, identity) {
+      var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ runGeneration: run, frame: frame }, identity));
+      steps.set(ticket, { pins: pins, finished: false }); productPendingPlayback++;
+      record(Object.assign({ event: 'play-step' }, pins)); return ticket;
+    }
+    function schedulerReturn(ticket, result) {
+      var step = steps.get(ticket); if (!step || step.finished) return;
+      step.finished = true; productPendingPlayback--; if (typeof result !== 'boolean') dropped++;
+      record(Object.assign({ event: 'play-step', result: result === true }, step.pins));
+    }
+    function schedulerState(event, run, identity) { if (identity) record(Object.assign({ event: event, runGeneration: run }, identity)); }
+    function playState(playing, frame) {
+      productPlaying = playing === true; record({ event: 'play-state', playing: playing, currentFrame: frame });
+    }
     function scalarReceipt(raw) {
       var result = {};
       if (!raw || typeof raw !== 'object') return result;
@@ -141,6 +209,7 @@
     }
     async function seal(event) {
       if (cut || !event || !event.payload || event.payload.runId !== config.runId) return;
+      if (productPlaying || productPendingNavigation || productPendingPlayback) dropped++;
       cut = true;
       await drain();
       var first = { runId: config.runId, generated: generated, dropped: dropped, failed: failed }, acknowledged;
@@ -168,8 +237,14 @@
     return Object.freeze({ record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
       rawReceipt: rawReceipt, associateReceipt: associateReceipt, rejectReceipt: rejectReceipt,
       presentedReturn: presentedReturn, receiptContext: function (receipt) { return receipts.get(receipt); },
+      navigationRequest: navigationRequest, navigationSuperseded: navigationSuperseded, navigationReturn: navigationReturn,
+      beginPublication: beginPublication, beginRollback: beginRollback, endPublication: endPublication,
+      uiPublication: uiPublication, inputPublication: inputPublication, publicationStage: publicationStage,
+      schedulerRequest: schedulerRequest, schedulerReturn: schedulerReturn, schedulerState: schedulerState, playState: playState,
       inspect: function () { return { generated: generated, queued: queued, dropped: dropped, failed: failed, late: late,
-        pending: pendingCount, outsideInterval: outsideInterval, phase: retired ? 'retired' : cut ? 'sealed' : 'collecting' }; } });
+        pending: pendingCount, outsideInterval: outsideInterval, productPendingNavigation: productPendingNavigation,
+        productPendingPlayback: productPendingPlayback, productPlaying: productPlaying,
+        phase: retired ? 'retired' : cut ? 'sealed' : 'collecting' }; } });
   }
   if (typeof module === 'object' && module.exports) module.exports = { createObserver: createObserver };
   if (typeof window === 'undefined') return;

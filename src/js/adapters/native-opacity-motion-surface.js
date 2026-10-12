@@ -5,6 +5,11 @@
   else root.NemoNativeOpacityMotionSurface = api;
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
+  function observe(method) {
+    try { var observer = typeof window === 'object' && window.NemoTestPlayObserver;
+      if (observer && typeof observer[method] === 'function') return observer[method].apply(observer, Array.prototype.slice.call(arguments, 1));
+    } catch (_) { /* Passive test telemetry must not affect controls. */ }
+  }
   var UNHANDLED = Object.freeze({ handled: false });
   // One logical frame step, preserving the original loop, ping-pong and
   // audio boundary behavior. This changes only the UI playback direction;
@@ -279,13 +284,14 @@
         if (!controller || !controller.isActive()) return Promise.resolve(false);
         requestedIdentity = controller.identity();
       } catch (_) { return Promise.resolve(false); }
+      var diagnostic = observe('navigationRequest', request, frame, requestedIdentity);
       var work = queue.catch(function () {}).then(async function () {
         if (request !== intent || ports.controller() !== controller || !controller.isActive() ||
-            !sameIdentity(requestedIdentity, controller.identity())) return false;
+            !sameIdentity(requestedIdentity, controller.identity())) { observe('navigationSuperseded', diagnostic); observe('navigationReturn', diagnostic, false); return false; }
         var prior = ports.frame();
         try {
           var receipt = await controller.presentPreview(frame);
-          if (request !== intent) return false; // The newer intent will re-present its frame.
+          if (request !== intent) { observe('navigationSuperseded', diagnostic); observe('navigationReturn', diagnostic, false); return false; } // Newer intent re-presents.
           if (ports.controller() !== controller || !controller.isActive() ||
               !sameIdentity(requestedIdentity, controller.identity()) ||
               !receipt || receipt.owner !== 'native' || receipt.status !== 'presented' ||
@@ -294,14 +300,18 @@
               !Number.isInteger(receipt.viewGeneration) || !receipt.workId) {
             throw new Error('native frame presentation changed identity');
           }
-          ports.commit(frame);
-          ports.paint();
-          ports.syncInput();
+          var publication = observe('beginPublication', diagnostic, receipt);
+          try {
+            observe('publicationStage', publication, 'commit-enter'); ports.commit(frame); observe('publicationStage', publication, 'commit-return');
+            observe('publicationStage', publication, 'paint-enter'); ports.paint(); observe('publicationStage', publication, 'paint-return');
+            observe('publicationStage', publication, 'sync-enter'); ports.syncInput(); observe('publicationStage', publication, 'sync-return');
+          } finally { observe('endPublication', publication); }
         } catch (error) {
           var sameOwner = false;
           try { sameOwner = ports.controller() === controller &&
             sameIdentity(requestedIdentity, controller.identity()); } catch (_) {}
-          if (sameOwner) ports.commit(prior);
+          if (sameOwner) { var rollback = observe('beginRollback', diagnostic);
+            try { ports.commit(prior); } finally { observe('endPublication', rollback); } }
           ports.syncInput();
           // A failed receipt or UI paint can leave the host on a different
           // frame. Restore the previous one; failed restoration fences native.
@@ -311,11 +321,10 @@
           }
           throw error;
         }
-        return true;
+        observe('navigationReturn', diagnostic, true); return true;
       }).catch(function () {
-        ports.syncInput();
-        try { ports.fail(); } catch (_) {}
-        return false;
+        try { ports.syncInput(); try { ports.fail(); } catch (_) {} return false; }
+        finally { observe('navigationReturn', diagnostic, false); }
       });
       queue = work;
       return work;
@@ -370,12 +379,14 @@
             }
             if (next !== ports.frame()) {
               pending = true;
+              var diagnostic = observe('schedulerRequest', run, next, identity);
               try {
                 Promise.resolve(ports.navigate(next)).then(function (presented) {
                   pending = false;
+                  observe('schedulerReturn', diagnostic, presented);
                   if (current(run) && (!presented || ending)) ports.stop();
-                }, function () { pending = false; if (current(run)) ports.stop(); });
-              } catch (_) { pending = false; ports.stop(); return; }
+                }, function () { pending = false; observe('schedulerReturn', diagnostic, false); if (current(run)) ports.stop(); });
+              } catch (_) { pending = false; observe('schedulerReturn', diagnostic, false); ports.stop(); return; }
             } else if (ending) { ports.stop(); return; }
           }
         }
@@ -383,6 +394,7 @@
       }
       try { raf = ports.request(step); }
       catch (_) { ++generation; controller = null; identity = null; return false; }
+      observe('schedulerState', 'play-start', run, identity);
       return true;
     }
     function stop() {
@@ -391,7 +403,7 @@
         try { restore = ports.controller() === controller && controller.isActive() &&
           sameIdentity(identity, controller.identity()); } catch (_) {}
       }
-      ++generation; controller = null; identity = null;
+      ++generation; observe('schedulerState', 'play-stop', generation, identity); controller = null; identity = null;
       if (raf !== null) { ports.cancel(raf); raf = null; }
       return Object.freeze({ wasNative: wasNative, restore: restore });
     }
