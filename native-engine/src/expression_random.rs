@@ -9,9 +9,9 @@
 //! context, clock or global.
 //!
 //! The lattice hash is shared with `noise()`/`wiggle()` through
-//! [`crate::expression_noise::hash_unit`], never copied.
+//! [`crate::evaluation::expression_noise::hash_unit`], never copied.
 
-use crate::expression_noise::hash_unit;
+use crate::evaluation::expression_noise::hash_unit;
 
 /// Weight of the rounded evaluation frame in the hash coordinate.
 const FRAME_STRIDE: f64 = 1013.13;
