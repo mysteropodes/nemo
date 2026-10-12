@@ -38,6 +38,7 @@ const CANDIDATE_FILES = [
   'native-engine/src/project_media_envelope.rs',
   'native-engine/src/object_codec.rs',
   'native-engine/src/project_media_codec.rs',
+  'native-engine/tests/project_media_codec.rs',
   'native-engine/src/reference_image_asset.rs',
   'native-engine/tests/reference_image_asset.rs',
   'native-engine/src/object_snapshot.rs',
