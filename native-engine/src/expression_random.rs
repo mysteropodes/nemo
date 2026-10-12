@@ -63,8 +63,11 @@ pub fn rand01(seed: f64, counter: f64, frame: f64, timeless: bool, fixed: bool) 
 }
 
 /// Box-Muller transform of two already drawn uniforms (`gaussFromUniforms`),
-/// centred on 0.5.
+/// centred on 0.5. A NaN `u1` stays NaN, like `Math.max(1e-9, NaN)`.
 pub fn gauss_from_uniforms(u1: f64, u2: f64) -> f64 {
+    if u1.is_nan() {
+        return f64::NAN;
+    }
     0.5 + GAUSS_SPREAD
         * (-2.0 * u1.max(GAUSS_MIN_UNIFORM).ln()).sqrt()
         * (2.0 * std::f64::consts::PI * u2).cos()
@@ -147,7 +150,9 @@ impl RandomStream {
     }
 }
 
-/// A `random()` bound: a number, or an array for a per-axis range.
+/// A `random()` bound: a number, or an array for a per-axis range. Callers
+/// convert JavaScript values first: strings, `null`, sparse holes, nested or
+/// typed arrays coerce as `_num`/`Array.isArray` would before reaching here.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RandomBound {
     Scalar(f64),

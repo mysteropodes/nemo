@@ -9,8 +9,8 @@ use crate::expression_random::{
 const HOLDER_SEED: f64 = 12345.0;
 
 /// Exact on macOS, the desktop target, where Rust `sin`/`ln`/`cos` matched
-/// JavaScriptCore on every row. Other hosts' libm may differ by an ulp, which
-/// the hash amplifies to about 1e-11; there the check is bounded, not exact.
+/// JavaScriptCore on every row. Another host's libm may differ by an ulp,
+/// which the hash would amplify to about 1e-11, so there the check is bounded.
 fn assert_desktop_bits(actual: f64, expected_bits: u64, label: &str) {
     let expected = f64::from_bits(expected_bits);
     if cfg!(target_os = "macos") {
@@ -124,6 +124,8 @@ fn gauss_matches_desktop_oracle() {
             &format!("gauss {u1},{u2}"),
         );
     }
+    // NaN propagates as in JavaScript instead of being clamped.
+    assert!(gauss_from_uniforms(f64::NAN, 0.3).is_nan());
     // Below the clamp, the first uniform is read as 1e-9.
     assert_eq!(
         gauss_from_uniforms(0.0, 0.3).to_bits(),
