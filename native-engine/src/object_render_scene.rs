@@ -4,6 +4,18 @@ use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFra
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::sync::Arc;
 
+#[path = "object_paint_plan.rs"]
+mod paint;
+#[cfg(all(test, feature = "history"))]
+pub(crate) use paint::tests::paint_contents;
+#[cfg(test)]
+pub(crate) use paint::tests::{
+    document as paint_test_document, frame_cases, join_cases, order_cases,
+};
+pub use paint::{
+    prepare_object_paint_plan, ObjectPaintCommand, ObjectPaintPlan, ObjectPaintPlanError,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectSceneError {
     WrongInstance,
@@ -53,6 +65,13 @@ impl ObjectRenderScene {
     pub fn packet(&self) -> &ObjectFramePacket {
         &self.packet
     }
+    /// Index is the selected packet's provenance position, never paint order.
+    pub fn entry(&self, index: usize) -> Option<ObjectRenderEntry<'_>> {
+        Some(ObjectRenderEntry {
+            source: self.packet.record_at(index)?,
+            compiled: self.contours.get(index)?,
+        })
+    }
     /// Encounter order remains source provenance, never a paint-order promise.
     pub fn entries(&self) -> impl ExactSizeIterator<Item = ObjectRenderEntry<'_>> + '_ {
         self.packet
@@ -68,6 +87,21 @@ pub fn prepare_object_render_scene(
     packet: &ObjectFramePacket,
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectRenderScene, ObjectSceneError> {
+    validate_pins(packet, expected)?;
+    let contours = packet
+        .records()
+        .map(compile)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ObjectRenderScene {
+        packet: packet.clone(),
+        contours: contours.into(),
+    })
+}
+
+fn validate_pins(
+    packet: &ObjectFramePacket,
+    expected: &ObjectFrameSelector<'_>,
+) -> Result<(), ObjectSceneError> {
     if expected.instance_id != packet.instance_id() {
         return Err(ObjectSceneError::WrongInstance);
     }
@@ -89,14 +123,7 @@ pub fn prepare_object_render_scene(
     if expected.frame != packet.frame() {
         return Err(ObjectSceneError::WrongFrame);
     }
-    let contours = packet
-        .records()
-        .map(compile)
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(ObjectRenderScene {
-        packet: packet.clone(),
-        contours: contours.into(),
-    })
+    Ok(())
 }
 
 fn compile(source: ObjectFrameRecord<'_>) -> Result<CompiledContour, ObjectSceneError> {

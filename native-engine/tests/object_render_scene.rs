@@ -1,9 +1,10 @@
 //! Fixed contour/source oracles for the order-neutral production consumer.
-use crate::object_codec::{decode_project, encode_project};
+use crate::object_codec::{decode_project, decode_storage_project, encode_project};
 use crate::object_document::FrameScopeKind;
 use crate::object_frame_packet::{prepare_object_frame, ObjectFramePacket, ObjectFrameSelector};
 use crate::object_render_scene::{
-    prepare_object_render_scene, ObjectRenderScene, ObjectSceneError,
+    frame_cases, join_cases, order_cases, paint_test_document, prepare_object_paint_plan,
+    prepare_object_render_scene, ObjectPaintPlanError, ObjectRenderScene, ObjectSceneError,
 };
 use crate::revision::ObjectSnapshot;
 use serde_json::{json, Value};
@@ -14,6 +15,138 @@ fn cases() -> Value {
         "../../engineering/application/examples/native-object-v1/cases.json"
     ))
     .unwrap()
+}
+
+fn paint_scene(value: &Value, frame: u32) -> ObjectRenderScene {
+    let snapshot = ObjectSnapshot::new(
+        "paint-test",
+        decode_storage_project(&serde_json::to_vec(value).unwrap()).unwrap(),
+    )
+    .unwrap();
+    scene(&packet(&snapshot, FrameScopeKind::Authored, frame))
+}
+
+#[test]
+fn paint_plan_literal_order_frames_empty_and_atomic_pin_joins() {
+    let v1 = snapshot(&source());
+    let reference = scene(&packet(&v1, FrameScopeKind::Reference, 12));
+    let authored = scene(&packet(&v1, FrameScopeKind::Authored, 7));
+    assert_eq!(
+        prepare_object_paint_plan(&authored, &selector(authored.packet())).unwrap_err(),
+        ObjectPaintPlanError::Unavailable
+    );
+    order_cases(paint_scene);
+    frame_cases(paint_scene);
+    join_cases(paint_scene, &reference);
+}
+
+#[test]
+#[cfg(feature = "history")]
+fn paint_plan_borrows_real_triangle_straight_rgba_and_retains_old_v2_history() {
+    use crate::history::NativeObjectHistory;
+    use crate::object_codec::encode_storage_project;
+    use crate::object_render_scene::paint_contents;
+    let value = paint_test_document(&[7]);
+    let mut owner = NativeObjectHistory::new(
+        "paint-owner",
+        decode_storage_project(&serde_json::to_vec(&value).unwrap()).unwrap(),
+    )
+    .unwrap();
+    let zero = owner.acquire_snapshot(0).unwrap();
+    let original = scene(&packet(&zero, FrameScopeKind::Authored, 7));
+    let retained = prepare_object_paint_plan(&original, &selector(original.packet())).unwrap();
+    let cloned = retained.clone();
+    let before = paint_contents(&retained);
+    {
+        let command = retained.commands().next().unwrap();
+        let source = &zero.document().objects()[command.source().source_object_index()];
+        assert!(std::ptr::eq(command.source().record(), source));
+        let entry = original
+            .entries()
+            .find(|e| e.source().source_object_index() == command.source().source_object_index())
+            .unwrap();
+        assert!(std::ptr::eq(command.contour(), entry.contour()));
+        assert!(std::ptr::eq(command.paint()[3], &source.fill.a));
+        assert_eq!(
+            command.contour().commands(),
+            [
+                PathEl::MoveTo((0., 0.).into()),
+                PathEl::CurveTo((0., 0.).into(), (10., 0.).into(), (10., 0.).into()),
+                PathEl::CurveTo((10., 0.).into(), (0., 10.).into(), (0., 10.).into()),
+                PathEl::CurveTo((0., 10.).into(), (0., 0.).into(), (0., 0.).into()),
+                PathEl::ClosePath
+            ]
+        );
+        assert_eq!(
+            json!(command.paint()),
+            json!([
+                0.20000000000000004,
+                0.4000000000000001,
+                0.6000000000000001,
+                0.7500000000000001
+            ])
+        );
+    }
+    let mut payload = cases()["command"]["request"]["payload"].clone();
+    payload["stableTarget"] = serde_json::to_value(
+        retained
+            .commands()
+            .next()
+            .unwrap()
+            .source()
+            .record()
+            .target(),
+    )
+    .unwrap();
+    let prepared = owner
+        .prepare_fill_json(&serde_json::to_vec(&payload).unwrap())
+        .unwrap();
+    assert_eq!(owner.commit_fill(prepared), Ok(1));
+    let one = owner.acquire_snapshot(1).unwrap();
+    assert_eq!(owner.undo(1), Ok(2));
+    let two = owner.acquire_snapshot(2).unwrap();
+    assert_eq!(owner.redo(2), Ok(3));
+    let three = owner.acquire_snapshot(3).unwrap();
+    for (snapshot, revision, fill) in [
+        (&zero, 0, json!(value["objects"][0]["fill"])),
+        (&one, 1, payload["fill"].clone()),
+        (&two, 2, value["objects"][0]["fill"].clone()),
+        (&three, 3, payload["fill"].clone()),
+    ] {
+        let current = scene(&packet(snapshot, FrameScopeKind::Authored, 7));
+        let plan = prepare_object_paint_plan(&current, &selector(current.packet())).unwrap();
+        assert_eq!(plan.packet().content_revision(), revision);
+        assert_eq!(
+            serde_json::to_value(
+                plan.commands()
+                    .next()
+                    .unwrap()
+                    .source()
+                    .record()
+                    .fill
+                    .clone()
+            )
+            .unwrap(),
+            fill
+        );
+        assert_eq!(paint_contents(&retained), before);
+    }
+    let saved = encode_storage_project(three.document()).unwrap();
+    drop(owner);
+    drop(original);
+    drop(retained);
+    drop(zero);
+    drop(one);
+    drop(two);
+    drop(three);
+    assert_eq!(paint_contents(&cloned), before);
+    let fresh =
+        NativeObjectHistory::new("paint-owner", decode_storage_project(&saved).unwrap()).unwrap();
+    assert_eq!(fresh.history_depths(), (0, 0));
+    assert_eq!(
+        encode_storage_project(fresh.acquire_snapshot(0).unwrap().document()).unwrap(),
+        saved
+    );
 }
 fn source() -> Value {
     json!({"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,

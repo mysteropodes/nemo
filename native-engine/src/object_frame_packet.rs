@@ -98,6 +98,19 @@ impl ObjectFramePacket {
     pub fn source_layers(&self) -> &[ObjectLayer] {
         self.snapshot.document().layers()
     }
+    /// Borrow one selected provenance position in constant time, not paint rank.
+    pub(crate) fn record_at(&self, index: usize) -> Option<ObjectFrameRecord<'_>> {
+        let indices = self.records.get(index)?;
+        Some(ObjectFrameRecord {
+            source_layer_index: indices.source_layer_index,
+            source_object_index: indices.source_object_index,
+            record: self
+                .snapshot
+                .document()
+                .objects()
+                .get(indices.source_object_index)?,
+        })
+    }
     /// Source encounter order conveys provenance, never a paint-order promise.
     pub fn records(&self) -> impl ExactSizeIterator<Item = ObjectFrameRecord<'_>> + '_ {
         self.records.iter().map(|indices| ObjectFrameRecord {
