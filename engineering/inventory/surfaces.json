@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1370c1c069ff88890cca23a8ab33c8ef4a6e18a5",
-  "describe": "v0.7.0-alpha.4-1253-g1370c1c0"
+  "head": "1ca2e7210ae0b06b509c149f9d7bec0bf20eea49",
+  "describe": "v0.7.0-alpha.4-1257-g1ca2e721-dirty"
  },
- "inputsDigest": "67f4c59a3759cfb9fd82c6341ac83d8c7fd8d4b93c663a77f61c600452313991",
+ "inputsDigest": "4b97d8a571d2af00bc46c4cb2bc8b228ab8519851cffd98b0251b57c742c860c",
  "states": [
   "inventoried",
   "characterized",
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 283,
+   "native": 291,
    "export": 5,
    "animation": 463,
    "history": 358,
    "selection": 382,
    "render": 490,
-   "persist": 419
+   "persist": 417
   }
  },
  "fixturesByArea": {
@@ -450,9 +450,10 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "export": 1
+    "export": 1,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:129",
@@ -462,7 +463,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 57,
+    "functionsVisited": 84,
     "via": "variable btn",
     "references": []
    },
@@ -1698,7 +1699,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 95,
+    "functionsVisited": 97,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -2316,7 +2317,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 135,
+    "functionsVisited": 152,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -2495,7 +2496,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 129,
+    "functionsVisited": 164,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9131 action()"
@@ -2589,7 +2590,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 177,
+    "functionsVisited": 205,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9133 action()"
@@ -2676,7 +2677,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 233,
     "via": "chain",
     "references": [
      "src/js/images.js:706",
@@ -3070,7 +3071,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 53,
+    "functionsVisited": 72,
     "via": "variable bImg",
     "references": []
    },
@@ -3113,7 +3114,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 79,
+    "functionsVisited": 97,
     "via": "variable bVid",
     "references": []
    },
@@ -3444,8 +3445,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 1,
-    "persist": 3
+    "native": 1
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -3457,7 +3457,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 59,
     "via": "chain",
     "references": []
    },
@@ -3494,7 +3494,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 111,
+    "functionsVisited": 114,
     "via": "callback id",
     "references": []
    },
@@ -4050,7 +4050,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 57,
     "via": "variable btn",
     "references": []
    },
@@ -5015,7 +5015,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 55,
+    "functionsVisited": 53,
     "via": "variable trigger",
     "references": []
    },
@@ -5218,8 +5218,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1322",
@@ -5229,7 +5231,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 40,
+    "functionsVisited": 71,
     "via": "chain",
     "references": []
    },
@@ -7409,7 +7411,7 @@
     "container": "export-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 98,
     "via": "variable runBtn",
     "references": []
    },
@@ -9628,7 +9630,7 @@
     "container": "effects-stack-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 53,
+    "functionsVisited": 74,
     "via": "variable addBtn",
     "references": [
      "src/js/tutorial.js:1310 check()"
@@ -9798,8 +9800,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:680",
@@ -9811,7 +9815,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 57,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3336 updatePropsContext()"
@@ -9885,8 +9889,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:975",
@@ -9896,7 +9902,7 @@
     "container": "p-brushpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 27,
+    "functionsVisited": 55,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:476 setTool()"
@@ -10262,7 +10268,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 116,
+    "functionsVisited": 120,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2898 updateCornersPanel()",
@@ -11383,8 +11389,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:686",
@@ -11396,7 +11404,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 42,
+    "functionsVisited": 57,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3342 updatePropsContext()",
@@ -14248,9 +14256,10 @@
     "history": 2,
     "selection": 2,
     "render": 2,
-    "animation": 3
+    "animation": 3,
+    "native": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:883",
@@ -14344,8 +14353,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:926",
@@ -14355,7 +14366,7 @@
     "container": "stroke-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 31,
+    "functionsVisited": 59,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:3868 updateFsSelPanel()",
@@ -14481,8 +14492,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1782",
@@ -14492,7 +14505,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 31,
+    "functionsVisited": 59,
     "via": "exported ColorPicker.wireColorSwatches()",
     "references": [
      "src/js/timeline.js:9005 syncProfileFields()",
@@ -15801,8 +15814,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 1,
-    "persist": 3
+    "native": 1
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -15814,7 +15826,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 69,
+    "functionsVisited": 59,
     "via": "chain",
     "references": []
    },
@@ -16025,7 +16037,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 22,
+    "functionsVisited": 42,
     "via": "variable chooseBtn",
     "references": []
    },
@@ -23995,7 +24007,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 92
+    "functionsVisited": 109
    },
    "fixtures": [
     "mesh",
@@ -24031,7 +24043,7 @@
    "source": "src/js/media-library.js:553",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 56
+    "functionsVisited": 76
    },
    "fixtures": [
     "mesh",
