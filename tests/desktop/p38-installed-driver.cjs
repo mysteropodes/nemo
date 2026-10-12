@@ -60,6 +60,8 @@ function atomicJSON(guard, name, value) {
 }
 
 function safeWindowEvidence(result) {
+  check(result && Number.isSafeInteger(result.pid) && result.pid > 0 && result.pid <= 2147483647, 'ax-evidence-refused');
+  verifyWindow(result, result.pid);
   const roles = new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXCheckBox','AXMenu','AXMenuItem','other']);
   const controls = new Set(['Open','Cancel','A','B','Motion','Opacity','R08 rectangle']);
   const alerts = new Set(['switch-unavailable','active-close-unavailable']);
@@ -176,6 +178,7 @@ function defaultServices(config) {
     });
     reportGuard.verify();
     const result = JSON.parse(raw);
+    verifyWindow(result, pid, windowId); // Refuse foreign/malformed identity BEFORE evidence persistence.
     if (mode === 'capture') result.captureSha256 = hash(fs.readFileSync(output));
     if (mode === 'inspect') atomicJSON(reportGuard, 'ax-' + ordinal + '.json', safeWindowEvidence(result));
     return result;

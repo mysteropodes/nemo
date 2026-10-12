@@ -144,6 +144,19 @@ test('JS persistence boundary strips arbitrary helper fields and AX values',()=>
 });
 test('invalid or oversized AX paths cannot enter persisted evidence',()=>{
   const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
-  for(const path of ['/private/path','0.'.repeat(100),'a'])assert.throws(()=>safeWindowEvidence({nodes:[{path}]}));
-  assert.throws(()=>safeWindowEvidence({nodes:Array(4097).fill({path:''})}));
+  const identity={pid:123,windowId:45,matchedAX:true};
+  for(const path of ['/private/path','0.'.repeat(100),'a'])assert.throws(()=>safeWindowEvidence({...identity,nodes:[{path}]}));
+  assert.throws(()=>safeWindowEvidence({...identity,nodes:Array(4097).fill({path:''})}));
+});
+test('malformed helper identity scalars refuse at the JS evidence boundary',()=>{
+  const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
+  const identity={pid:123,windowId:45,matchedAX:true,nodes:[]};
+  for(const field of ['pid','windowId','matchedAX']) for(const value of ['/private/secret',{},[],null]) {
+    assert.throws(()=>safeWindowEvidence({...identity,[field]:value}),error=>
+      ['ax-evidence-refused','owned-window-refused'].includes(error.code) && !error.message.includes('private'));
+  }
+  for(const pid of [0,-1,1.5,2147483648])assert.throws(()=>safeWindowEvidence({...identity,pid}));
+  for(const windowId of [0,-1,1.5,4294967296])assert.throws(()=>safeWindowEvidence({...identity,windowId}));
+  assert.throws(()=>safeWindowEvidence({...identity,matchedAX:false}));
+  assert.deepEqual(safeWindowEvidence(identity),identity);
 });
