@@ -242,8 +242,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(cargo.features, policy.features.declared);
   const members = cargoFeatureMembers(cargoText);
   assert.deepEqual(Object.keys(members), cargo.features);
+  assert.deepEqual(members.default, []);
+  assert.deepEqual(members.codec, ['dep:serde', 'dep:serde_json']);
   assert.deepEqual(members.reference_image_asset, ['dep:png']);
-  assert.deepEqual(members['test-codec'], ['codec', 'reference_image_asset']);
+  assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
+  assert.deepEqual(members['test-codec'], ['project_media_codec']);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
     if (feature === target) return true;
     if (seen.has(feature)) return false;
@@ -251,8 +254,13 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     return (graph[feature] || []).some((member) => graph[member] && reaches(member, target, graph, seen));
   };
   for (const feature of cargo.features.filter((name) => name !== 'reference_image_asset')) {
-    assert.equal(reaches(feature, 'reference_image_asset'), feature === 'test-codec',
+    assert.equal(reaches(feature, 'reference_image_asset'),
+      feature === 'project_media_codec' || feature === 'test-codec',
       `${feature} must not activate the private PNG selector`);
+  }
+  for (const feature of cargo.features.filter((name) => name !== 'project_media_codec')) {
+    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec',
+      `${feature} must not activate the private attached-codec selector`);
   }
   assert.equal(reaches('codec', 'reference_image_asset', { ...members,
     codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');
