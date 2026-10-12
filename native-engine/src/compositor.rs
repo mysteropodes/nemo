@@ -3,6 +3,9 @@
 //! N12 neither presents nor encodes. Preview consumers use the opaque native
 //! texture/view and export consumers cross the explicit RGBA8 readback boundary.
 
+#[path = "object_compositor.rs"]
+mod object_compositor;
+
 use crate::render_geometry::LayerShape;
 use crate::render_scene::{RenderScene, ScheduledFrameIdentity};
 use std::fmt::{Display, Formatter};
@@ -199,20 +202,7 @@ impl Compositor {
             }
             self.scene.pop_layer();
         }
-        self.renderer
-            .render_to_texture(
-                &self.device,
-                &self.queue,
-                &self.scene,
-                &view,
-                &RenderParams {
-                    base_color: Color::WHITE,
-                    width,
-                    height,
-                    antialiasing_method: AaConfig::Area,
-                },
-            )
-            .map_err(|error| CompositorError::new(format!("render Vello scene: {error}")))?;
+        self.render_target(&view, width, height, Color::WHITE)?;
         Ok(CompositionResult {
             texture,
             view,
@@ -224,19 +214,59 @@ impl Compositor {
         })
     }
 
+    fn render_target(
+        &mut self,
+        view: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+        base_color: Color,
+    ) -> Result<(), CompositorError> {
+        self.renderer
+            .render_to_texture(
+                &self.device,
+                &self.queue,
+                &self.scene,
+                view,
+                &RenderParams {
+                    base_color,
+                    width,
+                    height,
+                    antialiasing_method: AaConfig::Area,
+                },
+            )
+            .map_err(|error| CompositorError::new(format!("render Vello scene: {error}")))?;
+        Ok(())
+    }
+
     /// The only CPU readback path. N13 can use `CompositionResult::texture_view` instead.
     pub fn readback_rgba8(
         &self,
         result: &CompositionResult,
     ) -> Result<NativeRgba8Readback, CompositorError> {
-        let unpadded_bytes_per_row = result
-            .width
+        let bytes = self.readback_texture(&result.texture, result.width, result.height)?;
+        Ok(NativeRgba8Readback {
+            width: result.width,
+            height: result.height,
+            bytes,
+            scheduled_identity: result.scheduled_identity.clone(),
+            document_id: result.document_id.clone(),
+            content_revision: result.content_revision,
+        })
+    }
+
+    fn readback_texture(
+        &self,
+        texture: &wgpu::Texture,
+        width: u32,
+        height: u32,
+    ) -> Result<Vec<u8>, CompositorError> {
+        let unpadded_bytes_per_row = width
             .checked_mul(4)
             .ok_or_else(|| CompositorError::new("RGBA8 readback width overflows bytes per row"))?;
         let padded_bytes_per_row =
             align_to(unpadded_bytes_per_row, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
         let size = u64::from(padded_bytes_per_row)
-            .checked_mul(u64::from(result.height))
+            .checked_mul(u64::from(height))
             .ok_or_else(|| CompositorError::new("RGBA8 readback allocation overflows"))?;
         let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("n12-native-rgba8-readback"),
@@ -251,7 +281,7 @@ impl Compositor {
             });
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
-                texture: &result.texture,
+                texture: texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -261,12 +291,12 @@ impl Compositor {
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: Some(result.height),
+                    rows_per_image: Some(height),
                 },
             },
             wgpu::Extent3d {
-                width: result.width,
-                height: result.height,
+                width: width,
+                height: height,
                 depth_or_array_layers: 1,
             },
         );
@@ -284,20 +314,13 @@ impl Compositor {
             .map_err(|error| CompositorError::new(format!("receive RGBA8 readback: {error}")))?
             .map_err(|error| CompositorError::new(format!("map RGBA8 readback: {error}")))?;
         let mapped = slice.get_mapped_range();
-        let mut bytes = Vec::with_capacity((unpadded_bytes_per_row * result.height) as usize);
+        let mut bytes = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
         for row in mapped.chunks_exact(padded_bytes_per_row as usize) {
             bytes.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
         }
         drop(mapped);
         buffer.unmap();
-        Ok(NativeRgba8Readback {
-            width: result.width,
-            height: result.height,
-            bytes,
-            scheduled_identity: result.scheduled_identity.clone(),
-            document_id: result.document_id.clone(),
-            content_revision: result.content_revision,
-        })
+        Ok(bytes)
     }
 
     fn make_target(&self, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {

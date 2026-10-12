@@ -41,6 +41,8 @@ const CANDIDATE_FILES = [
   'native-engine/tests/object_frame_packet.rs',
   'native-engine/src/object_render_scene.rs',
   'native-engine/tests/object_render_scene.rs',
+  'native-engine/src/object_compositor.rs',
+  'native-engine/tests/object_compositor.rs',
   'native-engine/src/object_fill.rs',
   'native-engine/src/object_fill_owner.rs',
   'native-engine/src/object_revision.rs',
@@ -229,6 +231,8 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
 test('Cargo features, targets and declaration macros are one exact contract', () => {
   const cargoText = fs.readFileSync(path.join(ROOT, 'native-engine/Cargo.toml'), 'utf8');
   const rootText = fs.readFileSync(path.join(ROOT, 'native-engine/src/lib.rs'), 'utf8');
+  const compositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/compositor.rs'), 'utf8');
+  const objectCompositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_compositor.rs'), 'utf8');
   const policy = readJson(ROOT, POLICY), cargo = cargoContract(cargoText);
   assert.deepEqual(cargo.features, policy.features.declared);
   const members = cargoFeatureMembers(cargoText);
@@ -249,6 +253,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');
   assert.match(rootText, /#\[cfg\(feature = "reference_image_asset"\)\]\s*pub\(crate\) mod reference_image_asset;/);
   assert.equal((rootText.match(/pub\(crate\) mod reference_image_asset;/g) || []).length, 1);
+  assert.match(compositorText, /#\[path = "object_compositor\.rs"\]\s*mod object_compositor;/);
+  assert.match(objectCompositorText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_compositor\.rs"\]\s*mod tests;/);
   assertMacroDefinitions(rootText);
   assert.deepEqual(macroMappings(rootText, 'engine_modules'), PRODUCTION);
   const testMacros = macroMappings(rootText, 'test_modules');
