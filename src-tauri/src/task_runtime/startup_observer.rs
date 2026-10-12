@@ -109,11 +109,20 @@ pub(super) fn prepare(
 pub(super) fn attach<'a, R: Runtime, M: Manager<R>>(
     builder: WebviewWindowBuilder<'a, R, M>,
     observer: Observer,
-) -> WebviewWindowBuilder<'a, R, M> {
+) -> Result<WebviewWindowBuilder<'a, R, M>, Box<dyn std::error::Error>> {
     let Some(observer) = observer else {
-        return builder;
+        return Ok(builder);
     };
-    builder.on_page_load(move |window, payload| {
+    let script = {
+        let native = observer.lock().map_err(|_| "startup log unavailable")?;
+        injection::build_script(Some(&native), true, !cfg!(debug_assertions))
+            .map_err(|_| "startup script refused")?
+    };
+    let builder = match script {
+        Some(script) => builder.initialization_script(script),
+        None => builder,
+    };
+    Ok(builder.on_page_load(move |window, payload| {
         if let Ok(mut log) = observer.lock() {
             let stage = match payload.event() {
                 PageLoadEvent::Started => "native-page-started",
@@ -134,7 +143,7 @@ pub(super) fn attach<'a, R: Runtime, M: Manager<R>>(
                 log.refused = true;
             }
         }
-    })
+    }))
 }
 
 pub(super) fn created<R: Runtime>(observer: &Observer, window: &tauri::WebviewWindow<R>) {
@@ -148,6 +157,9 @@ pub(super) fn created<R: Runtime>(observer: &Observer, window: &tauri::WebviewWi
                 log.refused = true;
             }
         }
+    }
+    if observer.is_some() {
+        host::watch_destroyed(window);
     }
 }
 
@@ -263,3 +275,6 @@ mod js;
 
 #[path = "startup_injection.rs"]
 mod injection;
+
+#[path = "startup_js_host.rs"]
+pub(crate) mod host;
