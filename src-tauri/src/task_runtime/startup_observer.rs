@@ -257,3 +257,6 @@ impl LoadLog {
 #[cfg(test)]
 #[path = "startup_observer_tests.rs"]
 mod tests;
+
+#[path = "startup_js.rs"]
+mod js;
