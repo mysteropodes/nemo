@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "092967fb101806599af8820b055d2dd3e310ce2a",
-  "describe": "v0.7.0-alpha.4-1231-g092967fb"
+  "head": "5c5e3c2d26cef0654fea253b648d9ff9d7c003de",
+  "describe": "v0.7.0-alpha.4-1242-g5c5e3c2d"
  },
- "inputsDigest": "4719bc19984c3cdbac968c5d82663314351184fdae47c89c36e05c2f1385eea3",
+ "inputsDigest": "864058507882a27f47444d077c247cc8104306767ba0f24cdc86232a53f66515",
  "states": [
   "inventoried",
   "characterized",
@@ -2495,7 +2495,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 128,
+    "functionsVisited": 129,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9129 action()"
@@ -5015,7 +5015,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 54,
+    "functionsVisited": 55,
     "via": "variable trigger",
     "references": []
    },
@@ -9811,7 +9811,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 42,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3334 updatePropsContext()"
@@ -10262,7 +10262,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 115,
+    "functionsVisited": 116,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2896 updateCornersPanel()",
@@ -11396,7 +11396,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 42,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3340 updatePropsContext()",
@@ -16177,7 +16177,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 491,
+    "functionsVisited": 492,
     "via": "variable save",
     "references": []
    },

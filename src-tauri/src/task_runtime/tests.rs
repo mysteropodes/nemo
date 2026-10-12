@@ -293,6 +293,69 @@ fn play_record_cap_and_terminal_cut_never_ack_more_records() {
 
 #[cfg(feature = "test-play-publication-observer")]
 #[test]
+fn play_correlation_schema_matches_bounded_actual_identity_and_failure_values() {
+    use crate::test_play_observer::TestPlayLog;
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    let mut log = TestPlayLog::new(run);
+    log.record(run, 1, json!({"event":"ready"})).unwrap();
+    for (index, status) in [
+        "failed-validation",
+        "failed-device-lost",
+        "failed-retry-lost",
+        "failed-retry-outdated",
+        "failed-recreate",
+        "failed-reconfigure",
+    ]
+    .iter()
+    .enumerate()
+    {
+        log.record(
+            run,
+            index as u64 + 2,
+            json!({"event":"host-receipt","status":status,
+            "documentSnapshotId":"native-opacity:native-document-1:0", "contextId":"scene-root",
+            "hostCallOrdinal":1,"workId":"native-work-18446744073709551615"}),
+        )
+        .unwrap();
+    }
+    for phase in [
+        "installing",
+        "release-requested",
+        "releasing",
+        "replacing",
+        "indeterminate",
+    ] {
+        log.record(
+            run,
+            log.accepted + 1,
+            json!({"event":"play-state","playing":false,"phase":phase}),
+        )
+        .unwrap();
+    }
+    for change in [
+        json!({"documentSnapshotId":""}),
+        json!({"documentSnapshotId":"a\n"}),
+        json!({"contextId":"/private/path"}),
+        json!({"hostCallOrdinal":0}),
+        json!({"hostCallOrdinal":9007199254740992_u64}),
+        json!({"workId":"native-work-18446744073709551616"}),
+        json!({"status":"unknown-private-error"}),
+        json!({"document":{"layers":[]}}),
+        json!({"error":"private exception"}),
+    ] {
+        let mut negative = TestPlayLog::new(run);
+        negative.record(run, 1, json!({"event":"ready"})).unwrap();
+        let mut event = json!({"event":"host-receipt"});
+        event
+            .as_object_mut()
+            .unwrap()
+            .extend(change.as_object().unwrap().clone());
+        assert!(negative.record(run, 2, event).is_err());
+    }
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
 fn malformed_typed_play_envelopes_are_counted_before_any_footer() {
     let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
     for (action, payload) in [

@@ -4,14 +4,17 @@
  */
 (function () {
   'use strict';
-  var events = ['ready', 'play-start', 'play-step', 'play-stop', 'navigate-request',
+  var events = ['ready', 'play-start', 'play-step', 'play-stop', 'play-state', 'navigate-request',
     'navigate-superseded', 'host-request', 'host-receipt', 'receipt-rejected',
     'receipt-deferred', 'receipt-stale', 'receipt-retry', 'presented-return',
     'commit-enter', 'commit-return', 'paint-enter', 'paint-return', 'sync-enter',
     'sync-return', 'navigate-return', 'ui-publication', 'rollback', 'failure'];
   var numbers = ['contentRevision', 'frame', 'lifecycleGeneration', 'viewGeneration',
     'jsLifecycleGeneration', 'hostLifecycleGeneration',
-    'sessionOrdinal', 'intent', 'runGeneration', 'hostGeneration', 'currentFrame', 'priorFrame'];
+    'sessionOrdinal', 'hostCallOrdinal', 'intent', 'runGeneration', 'hostGeneration', 'currentFrame', 'priorFrame'];
+  var statuses = ['presented', 'deferred-occluded', 'deferred-timeout', 'stale-discarded',
+    'failed-validation', 'failed-device-lost', 'failed-retry-lost', 'failed-retry-outdated', 'failed-recreate', 'failed-reconfigure'];
+  var identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   var uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   function snapshot(event) {
     if (!event || typeof event !== 'object' || Array.isArray(event)) return null;
@@ -21,16 +24,19 @@
       if (!Object.hasOwn(descriptor, 'value')) return null;
       var value = descriptor.value, valid = false;
       if (key === 'event') valid = events.includes(value);
-      else if (numbers.includes(key)) valid = Number.isSafeInteger(value) && value >= 0;
-      else if (key === 'result') valid = typeof value === 'boolean';
+      else if (numbers.includes(key)) valid = Number.isSafeInteger(value) && value >= (key === 'hostCallOrdinal' ? 1 : 0);
+      else if (key === 'result' || key === 'playing') valid = typeof value === 'boolean';
+      else if (key === 'documentSnapshotId' || key === 'contextId') valid = typeof value === 'string' && identifier.test(value) && !value.endsWith('\n');
       else if (key === 'instanceId') valid = typeof value === 'string' && uuid.test(value);
       else if (key === 'documentId' || key === 'workId') {
         var prefix = key === 'documentId' ? 'native-document-' : 'native-work-';
         valid = typeof value === 'string' && value.startsWith(prefix) &&
-          /^[1-9][0-9]{0,19}$/.test(value.slice(prefix.length));
-      } else if (key === 'status') valid = ['presented', 'deferred-occluded', 'deferred-timeout', 'stale-discarded'].includes(value);
+          /^[1-9][0-9]{0,19}$/.test(value.slice(prefix.length)) && !value.endsWith('\n') &&
+          BigInt(value.slice(prefix.length)) <= 18446744073709551615n;
+      } else if (key === 'status') valid = statuses.includes(value);
       else if (key === 'owner') valid = value === 'native';
-      else if (key === 'phase') valid = ['native', 'blocked', 'preparing', 'closed', 'legacy'].includes(value);
+      else if (key === 'phase') valid = ['native', 'blocked', 'preparing', 'closed', 'legacy', 'installing',
+        'release-requested', 'releasing', 'replacing', 'indeterminate'].includes(value);
       else if (key === 'code') valid = ['native_preview_deferred', 'native_preview_superseded', 'observer_refused', 'unknown'].includes(value);
       if (!valid) return null;
       data[key] = value;
@@ -44,6 +50,57 @@
     limit = Number.isInteger(limit) && limit > 0 && limit <= 4096 ? limit : 4096;
     var generated = 0, queued = 0, dropped = 0, failed = 0, late = 0, pendingCount = 0, outsideInterval = 0;
     var cut = false, retired = false, listening = false, queue = Promise.resolve();
+    var sessions = new WeakMap(), adapters = new WeakMap(), receipts = new WeakMap(), calls = new WeakMap();
+    var sessionSequence = 0, callSequence = 0;
+    function scalarReceipt(raw) {
+      var result = {};
+      if (!raw || typeof raw !== 'object') return result;
+      ['workId', 'viewGeneration', 'status'].forEach(function (key) {
+        var property = Object.getOwnPropertyDescriptor(raw, key);
+        if (property && Object.hasOwn(property, 'value')) result[key] = property.value;
+      });
+      return result;
+    }
+    function bindPreview(raw, session, hostGeneration) {
+      try {
+        if (!sessions.has(session)) sessions.set(session, ++sessionSequence);
+        adapters.set(raw, { session: session, hostGeneration: hostGeneration });
+      } catch (_) { dropped++; }
+    }
+    function beginHost(raw, context, meta) {
+      try {
+        var binding = adapters.get(raw), host = binding && binding.hostGeneration();
+        var captured = { instanceId: context.instanceId, documentId: meta.documentId,
+          contentRevision: meta.contentRevision, documentSnapshotId: meta.documentSnapshotId,
+          contextId: meta.contextId, frame: meta.frame, jsLifecycleGeneration: context.lifecycleGeneration,
+          hostCallOrdinal: ++callSequence };
+        if (binding && Number.isSafeInteger(host) && host > 0) {
+          captured.sessionOrdinal = sessions.get(binding.session); captured.hostGeneration = host;
+        } else dropped++; // Missing native/session attribution makes the whole interval partial.
+        var ticket = Object.freeze({}); calls.set(ticket, { captured: Object.freeze(captured), raw: null });
+        record(Object.assign({ event: 'host-request' }, captured)); return ticket;
+      } catch (_) { dropped++; }
+    }
+    function rawReceipt(ticket, raw) {
+      try { var call = calls.get(ticket); if (!call) { dropped++; return; }
+        call.raw = Object.freeze(scalarReceipt(raw));
+        record(Object.assign({ event: 'host-receipt' }, call.captured, call.raw));
+      } catch (_) { dropped++; }
+    }
+    function associateReceipt(ticket, receipt) {
+      try { var call = calls.get(ticket); if (call) receipts.set(receipt,
+        Object.freeze(Object.assign({}, call.captured, scalarReceipt(receipt)))); else dropped++;
+      } catch (_) { dropped++; }
+    }
+    function rejectReceipt(ticket) {
+      try { var call = calls.get(ticket); if (call) record(Object.assign({ event: 'receipt-rejected', code: 'unknown' }, call.captured)); else dropped++; }
+      catch (_) { dropped++; }
+    }
+    function presentedReturn(source, result) {
+      try { var captured = receipts.get(source); if (!captured) { dropped++; return; }
+        receipts.set(result, captured); record(Object.assign({ event: 'presented-return' }, captured));
+      } catch (_) { dropped++; }
+    }
     function record(event) {
       try {
         // The final fence ends this bounded capture; these attempts are outside it.
@@ -108,7 +165,9 @@
       record({ event: 'ready' });
       await queue;
     }).catch(function () { failed++; });
-    return Object.freeze({ record: record, ready: ready,
+    return Object.freeze({ record: record, ready: ready, bindPreview: bindPreview, beginHost: beginHost,
+      rawReceipt: rawReceipt, associateReceipt: associateReceipt, rejectReceipt: rejectReceipt,
+      presentedReturn: presentedReturn, receiptContext: function (receipt) { return receipts.get(receipt); },
       inspect: function () { return { generated: generated, queued: queued, dropped: dropped, failed: failed, late: late,
         pending: pendingCount, outsideInterval: outsideInterval, phase: retired ? 'retired' : cut ? 'sealed' : 'collecting' }; } });
   }

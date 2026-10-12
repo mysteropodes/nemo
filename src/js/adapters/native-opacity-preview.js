@@ -13,6 +13,11 @@
     'failed-reconfigure',
   ]);
   const deferred = new Set(['deferred-timeout', 'deferred-occluded']);
+  function observe(method, ...args) {
+    try { const observer = typeof window === 'object' && window.NemoTestPlayObserver;
+      if (observer && typeof observer[method] === 'function') return observer[method](...args);
+    } catch (_) { /* Collector failures never change the product operation. */ }
+  }
 
   const has = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   function plain(value) {
@@ -180,13 +185,19 @@
         lifecycleGeneration: revision(lifecycleGeneration, 'lifecycleGeneration', true) });
       if (typeof host !== 'function') throw new TypeError('native preview host is unavailable');
       if (typeof verify !== 'function') throw new TypeError('native preview lifecycle verifier is unavailable');
-      const received = receipt(await host(freeze({ apiVersion: 2, instanceId: context.instanceId, ...meta })));
-      verify();
-      active();
-      if (receipts.has(received.workId)) throw new Error('terminal preview receipt cannot satisfy a new presentation');
-      register(meta, { workId: received.workId, viewGeneration: received.viewGeneration });
-      const observed = receive(received);
-      return freeze({ ...context, ...observed });
+      const diagnostic = observe('beginHost', this, context, meta);
+      try {
+        const raw = await host(freeze({ apiVersion: 2, instanceId: context.instanceId, ...meta }));
+        observe('rawReceipt', diagnostic, raw);
+        const received = receipt(raw);
+        verify();
+        active();
+        if (receipts.has(received.workId)) throw new Error('terminal preview receipt cannot satisfy a new presentation');
+        register(meta, { workId: received.workId, viewGeneration: received.viewGeneration });
+        const observed = receive(received), result = freeze({ ...context, ...observed });
+        observe('associateReceipt', diagnostic, result);
+        return result;
+      } catch (error) { observe('rejectReceipt', diagnostic); throw error; }
     }
     return freeze({
       register,

@@ -132,6 +132,7 @@ impl TestPlayLog {
             "play-start",
             "play-step",
             "play-stop",
+            "play-state",
             "navigate-request",
             "navigate-superseded",
             "host-request",
@@ -172,7 +173,17 @@ impl TestPlayLog {
             | "hostGeneration"
             | "currentFrame"
             | "priorFrame" => value.as_u64().is_some_and(|v| v <= 9_007_199_254_740_991),
-            "result" => value.is_boolean(),
+            "hostCallOrdinal" => value
+                .as_u64()
+                .is_some_and(|v| v > 0 && v <= 9_007_199_254_740_991),
+            "result" | "playing" => value.is_boolean(),
+            "documentSnapshotId" | "contextId" => value.as_str().is_some_and(|s| {
+                !s.is_empty()
+                    && s.len() <= 128
+                    && s.as_bytes()[0].is_ascii_alphanumeric()
+                    && s.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"._:/-".contains(&b))
+            }),
             "owner" => value == "native",
             "instanceId" => value
                 .as_str()
@@ -194,11 +205,29 @@ impl TestPlayLog {
                     "deferred-occluded",
                     "deferred-timeout",
                     "stale-discarded",
+                    "failed-validation",
+                    "failed-device-lost",
+                    "failed-retry-lost",
+                    "failed-retry-outdated",
+                    "failed-recreate",
+                    "failed-reconfigure",
                 ]
                 .contains(&s)
             }),
             "phase" => value.as_str().is_some_and(|s| {
-                ["native", "blocked", "preparing", "closed", "legacy"].contains(&s)
+                [
+                    "native",
+                    "blocked",
+                    "preparing",
+                    "closed",
+                    "legacy",
+                    "installing",
+                    "release-requested",
+                    "releasing",
+                    "replacing",
+                    "indeterminate",
+                ]
+                .contains(&s)
             }),
             "code" => value.as_str().is_some_and(|s| {
                 [
