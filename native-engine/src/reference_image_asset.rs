@@ -1,10 +1,12 @@
 //! Private CPU PNG admission; no document, file, decoder or GPU authority.
 use png::{BitDepth, ColorType, DecodeOptions, Decoder, DecodingError, Limits};
 use std::io::{BufReader, Cursor};
+use std::sync::Arc;
 
 const MAX_ENCODED: usize = 16 * 1024 * 1024;
-const MAX_DECODED: usize = 64 * 1024 * 1024;
-const MAX_DIMENSION: u32 = 4096;
+const MAX_RGBA: usize = 256 * 1024 * 1024;
+const MAX_DECODER: usize = 64 * 1024 * 1024;
+const MAX_DIMENSION: u32 = 8192;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ImageAssetError {
@@ -38,9 +40,9 @@ impl ImageAssetLimits {
         if encoded_bytes == 0
             || encoded_bytes > MAX_ENCODED
             || rgba_bytes == 0
-            || rgba_bytes > MAX_DECODED
+            || rgba_bytes > MAX_RGBA
             || decoder_bytes == 0
-            || decoder_bytes > MAX_DECODED
+            || decoder_bytes > MAX_DECODER
             || width == 0
             || height == 0
             || width > MAX_DIMENSION
@@ -63,8 +65,8 @@ impl ImageAssetLimits {
 pub(crate) struct ReferenceImageAsset {
     width: u32,
     height: u32,
-    encoded: Box<[u8]>,
-    rgba: Box<[u8]>,
+    encoded: Arc<Vec<u8>>,
+    rgba: Arc<Vec<u8>>,
 }
 impl ReferenceImageAsset {
     pub(crate) fn dimensions(&self) -> (u32, u32) {
@@ -188,33 +190,47 @@ pub(crate) fn decode_png(
     if reader.output_buffer_size() != Some(raw_size) {
         return Err(ImageAssetError::Malformed);
     }
-    let mut raw = buffer(raw_size)?;
-    let frame = reader.next_frame(&mut raw).map_err(decoder_error)?;
-    if frame.width != width
-        || frame.height != height
-        || frame.color_type != color
-        || frame.bit_depth != BitDepth::Eight
-        || frame.buffer_size() != raw_size
+    let row_size = (width as usize)
+        .checked_mul(channels)
+        .ok_or(ImageAssetError::DecodedBudget)?;
+    let stride = (width as usize)
+        .checked_mul(4)
+        .ok_or(ImageAssetError::DecodedBudget)?;
+    let mut rgba = buffer(rgba_size)?;
+    for target in rgba.chunks_exact_mut(stride) {
+        let row = reader
+            .next_row()
+            .map_err(decoder_error)?
+            .ok_or(ImageAssetError::Malformed)?;
+        let data = row.data();
+        if data.len() != row_size {
+            return Err(ImageAssetError::Malformed);
+        }
+        if color == ColorType::Rgb {
+            for (rgb, pixel) in data.chunks_exact(3).zip(target.chunks_exact_mut(4)) {
+                pixel[..3].copy_from_slice(rgb);
+                pixel[3] = 255;
+            }
+        } else {
+            target.copy_from_slice(data);
+        }
+    }
+    if reader.next_row().map_err(decoder_error)?.is_some()
+        || reader.info().width != width
+        || reader.info().height != height
+        || reader.info().color_type != color
+        || reader.info().bit_depth != BitDepth::Eight
     {
         return Err(ImageAssetError::Malformed);
     }
     reader.finish().map_err(decoder_error)?;
-    let rgba = if color == ColorType::Rgb {
-        let mut normalized = buffer(rgba_size)?;
-        for (rgb, rgba) in raw.chunks_exact(3).zip(normalized.chunks_exact_mut(4)) {
-            rgba[..3].copy_from_slice(rgb);
-            rgba[3] = 255;
-        }
-        normalized
-    } else {
-        raw
-    };
     let mut encoded = buffer(source.len())?;
     encoded.copy_from_slice(source);
     Ok(ReferenceImageAsset {
         width,
         height,
-        encoded: encoded.into_boxed_slice(),
-        rgba: rgba.into_boxed_slice(),
+        // Arc<Vec> shares payloads without copying a large Vec into Arc<[u8]>.
+        encoded: Arc::new(encoded),
+        rgba: Arc::new(rgba),
     })
 }
