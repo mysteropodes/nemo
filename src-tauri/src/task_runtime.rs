@@ -46,7 +46,7 @@ use serde_json::{json, Value};
 use tauri::{Manager, Runtime};
 
 #[cfg(feature = "test-play-publication-observer")]
-mod startup_observer;
+pub(crate) mod startup_observer;
 
 /// Manifest schema written into the task's `tauri-data` root.
 pub const SCHEMA: &str = "nemo.native-runtime/1";
@@ -279,6 +279,8 @@ pub fn start<R: Runtime>(
     let handle = app.handle().clone();
     #[cfg(feature = "test-play-publication-observer")]
     app.manage(TestPlayState(Mutex::new(None)));
+    #[cfg(feature = "test-play-publication-observer")]
+    startup_observer::host::initialize(app)?;
     let Some(runtime) = runtime else {
         app.manage(TaskRuntimeState {
             manifest: Mutex::new(json!({
@@ -303,6 +305,8 @@ pub fn start<R: Runtime>(
     let observer = prepare_play_observer(&handle, &runtime, &windows)?;
     #[cfg(feature = "test-play-publication-observer")]
     let startup = startup_observer::prepare(&runtime, &windows)?;
+    #[cfg(feature = "test-play-publication-observer")]
+    startup_observer::host::bind(&handle, startup.clone())?;
     let mut labels = Vec::with_capacity(windows.len());
     for window in &windows {
         let builder = tauri::WebviewWindowBuilder::from_config(&handle, window)?;
@@ -312,7 +316,7 @@ pub fn start<R: Runtime>(
             _ => builder,
         };
         #[cfg(feature = "test-play-publication-observer")]
-        let builder = startup_observer::attach(builder, startup.clone());
+        let builder = startup_observer::attach(builder, startup.clone())?;
         let native_window = builder.data_store_identifier(store).build()?;
         #[cfg(feature = "test-play-publication-observer")]
         startup_observer::created(&startup, &native_window);
@@ -359,6 +363,14 @@ pub fn start<R: Runtime>(
                 runtime.data_dir.parent().unwrap().join("reports"),
                 run,
             );
+        }
+        value
+    };
+    #[cfg(feature = "test-play-publication-observer")]
+    let manifest = {
+        let mut value = manifest;
+        if let Some(identity) = startup_observer::host::identity(&handle)? {
+            value["startupObserver"] = identity;
         }
         value
     };

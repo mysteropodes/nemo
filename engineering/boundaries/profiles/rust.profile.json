@@ -436,7 +436,8 @@
         "task_runtime.rs",
         "task_runtime/startup_observer.rs",
         "task_runtime/startup_js.rs",
-        "task_runtime/startup_injection.rs"
+        "task_runtime/startup_injection.rs",
+        "task_runtime/startup_js_host.rs"
       ],
       "publicApi": [
         "task_runtime.rs"
@@ -459,7 +460,8 @@
         "tests.rs",
         "startup_observer_tests.rs",
         "startup_js_tests.rs",
-        "startup_injection_tests.rs"
+        "startup_injection_tests.rs",
+        "startup_js_host_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
