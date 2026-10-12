@@ -1705,6 +1705,18 @@
       ]
     },
     {
+      "id": "app.native.object.save.as.workflow",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-object-save-as-workflow.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-save-as-workflow.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.contract",
       "layer": "domain",
       "dir": "src/js/application",

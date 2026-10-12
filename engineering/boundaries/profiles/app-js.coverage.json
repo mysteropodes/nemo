@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registers a private object Save As coordination helper without a production loader or current object presenter.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "6a66dbf5f5811923c49a75be95142788591a2d13",
-    "sourceRootTree": "03f55cbbae63e92a44714da9a029b670dce8836d",
+    "candidateCommit": "90dd30af13a69152de126bd071291fbdfeb6e898",
+    "sourceRootTree": "fc518b02ebdf3eb35a940fa9afb25be595df1375",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "2547829e1f427763da3cc77e336a0b9161969ef2",
-      "lastChangedCommit": "6a66dbf5f5811923c49a75be95142788591a2d13"
+      "gitTree": "1c7feface486afbb3c9f70ab958a58589705d5c6",
+      "lastChangedCommit": "90dd30af13a69152de126bd071291fbdfeb6e898"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "21e0058c4f46c1c48bb38fe30ba2cedecaef9183242746496b8e9c912c369fcc"
+      "value": "ac3c00ed8873366b962cf1505e96889181f9f2e0534db62e1fb8fe54816b8078"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "91f35e8423494f56e61b9240fb510903d24c239e",
-        "sha256": "1768c535ef8199ab525a23c71a2ad62ee4b04d8c00e1eb06ace8d281e6b79c14",
-        "moduleCount": 193,
-        "basedOnCommit": "f90821559532413ebc7fc6e352efb249285533ef"
+        "gitBlob": "2b71a226224e854bf45dfd884c3292fe8b03ebd4",
+        "sha256": "070a6f099303114460451e23d680edfd560379a9996e7c7c50ac96a0d2b7149a",
+        "moduleCount": 194,
+        "basedOnCommit": "90dd30af13a69152de126bd071291fbdfeb6e898"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -1006,6 +1006,19 @@
           "path": "src/index.html",
           "line": 2520,
           "scriptOrdinal": 174
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-object-save-as-workflow.js",
+      "moduleId": "app.native.object.save.as.workflow",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/native-object-save-as-workflow.js",
+          "line": 1,
+          "role": "N25E4A private explicit-port Save As coordinator; no committed production loader or ordinary object presenter, so no current execution or UI Save As availability claimed"
         }
       ]
     },
