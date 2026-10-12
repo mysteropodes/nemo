@@ -244,6 +244,19 @@ fn fixed_error_categories_and_unknown_control_cannot_become_ready_or_raw_data() 
 fn event_byte_bounds_and_rejection_counters_are_bounded() {
     let f = Fixture::new();
     let mut stream = f.stream();
+    let deep = format!(
+        "{{\"schema\":{}\"private-deep\"{}}}",
+        "[".repeat(130),
+        "]".repeat(130)
+    );
+    for bytes in [vec![0xff], deep.into_bytes()] {
+        assert_eq!(
+            stream.accept_json("main", &origin(), std::process::id(), &bytes),
+            Err(Refusal::Payload)
+        );
+        assert_eq!(retained(&stream), json!([]));
+        assert!(!stream.projection().to_string().contains("private-deep"));
+    }
     for bytes in [
         vec![],
         vec![b'x'; MAX_BYTES + 1],
