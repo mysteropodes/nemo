@@ -104,6 +104,177 @@
       current.contentRevision === receipt.contentRevision && typeof documentJSON(root) === 'string';
   }
 
+  // Private bridge only. The caller owns synchronous atomic UI metadata ports.
+  function createInactiveEntry(root, ports) {
+    if (!ports || ['readUi', 'commit', 'remove', 'notice'].some(function (key) {
+      return typeof ports[key] !== 'function';
+    })) throw new TypeError('Inactive entry ports are unavailable');
+    var busy = false, held = null, uncertain = false, cancelled = 0, lastToken = null, lastId = null;
+    var identifier = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+    var uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    function inactiveEntryInteger(value, positive) { return Number.isSafeInteger(value) && value >= (positive ? 1 : 0); }
+    function inactiveEntryExact(value, keys) {
+      return value && typeof value === 'object' && !Array.isArray(value) &&
+        Object.keys(value).length === keys.length && keys.every(function (key) {
+          var descriptor = Object.getOwnPropertyDescriptor(value, key);
+          return descriptor && Object.hasOwn(descriptor, 'value');
+        });
+    }
+    function inactiveEntryId() {
+      var value = root.crypto.randomUUID();
+      if (typeof value !== 'string' || !identifier.test(value) || value === lastId) throw new Error('Request identity unavailable');
+      lastId = value; return value;
+    }
+    function inactiveEntryResult(status) {
+      try { ports.notice(status === 'prepared' ? 'Project prepared; switching remains unavailable.' :
+        status === 'cancelled' ? 'Inactive project cancelled.' : 'Inactive project admission ' + status + '.'); } catch (_) {}
+      return Object.freeze({ status: status });
+    }
+    function inactiveEntryOwner() {
+      var api = surface(root), native = root.NemoNativeOpacityCutover;
+      if (!api || !native || typeof native.getNativeIdentity !== 'function') throw new Error('Native A unavailable');
+      var bytes = desktopJSON(root, native, api), current = identity(native), local = native.getNativeIdentity();
+      if (!inactiveEntryExact(local, ['documentId', 'generation']) || local.documentId !== current.documentId ||
+          !inactiveEntryInteger(local.generation, true)) throw new Error('Local native lifetime unavailable');
+      return { api: api, native: native, current: current, local: local, bytes: bytes,
+        invoke: api.core.invoke, document: root.SMProjectDocument };
+    }
+    function inactiveEntryUi() {
+      var value = ports.readUi();
+      if (!inactiveEntryExact(value, ['activeTabId', 'name', 'path', 'frame']) ||
+          typeof value.activeTabId !== 'string' || !value.activeTabId ||
+          typeof value.name !== 'string' || !value.name ||
+          value.path !== null && typeof value.path !== 'string' || !inactiveEntryInteger(value.frame, false)) {
+        throw new Error('Active UI lifetime unavailable');
+      }
+      return Object.freeze({ activeTabId: value.activeTabId, name: value.name, path: value.path, frame: value.frame });
+    }
+    function inactiveEntrySameOwner(a, b, content) {
+      return a.api === b.api && a.invoke === b.invoke && a.native === b.native && a.document === b.document &&
+        a.current.instanceId === b.current.instanceId && a.current.documentId === b.current.documentId &&
+        a.local.generation === b.local.generation && (!content ||
+          a.current.contentRevision === b.current.contentRevision && a.bytes === b.bytes);
+    }
+    function inactiveEntryCurrent(attempt) {
+      var latest = inactiveEntryOwner(), display = inactiveEntryUi();
+      if (attempt.cancel !== cancelled || !inactiveEntrySameOwner(attempt.owner, latest, true) ||
+          Object.keys(display).some(function (key) { return display[key] !== attempt.ui[key]; })) {
+        throw new Error('Inactive admission became stale');
+      }
+    }
+    async function inactiveEntryBinding(context) {
+      var value = await context.api.core.invoke('nemo_native_revision_sync', { request: { action: 'binding' } });
+      if (!inactiveEntryExact(value, ['instanceId', 'documentId', 'contentRevision', 'lifecycleGeneration', 'subscriptionId']) ||
+          value.instanceId !== context.current.instanceId || value.documentId !== context.current.documentId ||
+          value.contentRevision !== context.current.contentRevision || !inactiveEntryInteger(value.lifecycleGeneration, true) ||
+          typeof value.subscriptionId !== 'string' || !identifier.test(value.subscriptionId)) {
+        throw new Error('Native binding is stale or malformed');
+      }
+      return value;
+    }
+    function inactiveEntryRequest(context, generation) {
+      return { apiVersion: 2, requestId: inactiveEntryId(), instanceId: context.current.instanceId,
+        documentId: context.current.documentId, expectedRevision: context.current.contentRevision,
+        lifecycleGeneration: generation };
+    }
+    async function inactiveEntryDiscard(record) {
+      try {
+        var latest = inactiveEntryOwner();
+        if (!inactiveEntrySameOwner(record.owner, latest, false)) return false;
+        var active = await inactiveEntryBinding(latest);
+        if (active.lifecycleGeneration !== record.hostGeneration || !inactiveEntrySameOwner(latest, inactiveEntryOwner(), true)) return false;
+        var call = inactiveEntryRequest(latest, active.lifecycleGeneration); call.preparationToken = record.token;
+        var receipt = await latest.api.core.invoke('nemo_native_cancel_inactive_project', { request: call });
+        return inactiveEntryExact(receipt, ['apiVersion', 'requestId', 'preparationToken', 'state']) && receipt.apiVersion === 2 &&
+          receipt.requestId === call.requestId && receipt.preparationToken === record.token && receipt.state === 'inactive-cancelled';
+      } catch (_) { return false; }
+    }
+    async function inactiveEntryOpen(path, picker) {
+      if (busy || held || uncertain) return inactiveEntryResult('unavailable');
+      busy = true;
+      var attempt, record = null, sent = false;
+      try {
+        attempt = { owner: inactiveEntryOwner(), ui: inactiveEntryUi(), cancel: cancelled };
+        if (picker) {
+          path = await attempt.owner.api.dialog.open({ title: 'Open Project', multiple: false,
+            filters: [{ name: 'Nemo Project', extensions: ['json'] }] });
+          inactiveEntryCurrent(attempt);
+          if (!path) return inactiveEntryResult('cancelled');
+          if (Array.isArray(path)) { if (path.length !== 1) throw new Error('One project required'); path = path[0]; }
+        }
+        if (typeof path !== 'string' || !path || path.length > 4096 || path === attempt.ui.path) throw new Error('Invalid inactive path');
+        var bytes = await attempt.owner.api.fs.readTextFile(path); inactiveEntryCurrent(attempt);
+        if (typeof bytes !== 'string' || new TextEncoder().encode(bytes).length > 4 * 1048576) throw new Error('Project exceeds admission limit');
+        var prepared = attempt.owner.document.prepareNativeOpacity(bytes);
+        var active = await inactiveEntryBinding(attempt.owner); inactiveEntryCurrent(attempt);
+        var call = inactiveEntryRequest(attempt.owner, active.lifecycleGeneration);
+        call.projection = prepared.projection; call.resources = prepared.resources;
+        sent = true;
+        var receipt;
+        try { receipt = await attempt.owner.api.core.invoke('nemo_native_prepare_inactive_project', { request: call }); }
+        catch (error) {
+          if (error && ['invalid_request', 'wrong_instance', 'stale_owner', 'unavailable',
+              'preparation_busy', 'request_conflict', 'preparation_cancelled'].includes(error.code)) sent = false;
+          throw error;
+        }
+        // Only a correlated token may ever be cancelled; never guess one from partial data.
+        if (receipt && ['apiVersion', 'requestId', 'preparationToken'].every(function (key) {
+          var d = Object.getOwnPropertyDescriptor(receipt, key); return d && Object.hasOwn(d, 'value');
+        }) && receipt.apiVersion === 2 && receipt.requestId === call.requestId &&
+            typeof receipt.preparationToken === 'string' && uuid.test(receipt.preparationToken)) {
+          record = { owner: attempt.owner, hostGeneration: active.lifecycleGeneration, token: receipt.preparationToken }; sent = false;
+        }
+        if (record && record.token === lastToken) { record = null; sent = true; throw new Error('Retired token replayed'); }
+        if (!record || !inactiveEntryExact(receipt, ['apiVersion', 'requestId', 'preparationToken', 'state', 'format',
+            'formatVersion', 'layerCount', 'totalFrames', 'geometryCount']) || receipt.state !== 'inactive-prepared' ||
+            receipt.format !== 'nemo.native-opacity-document' || receipt.formatVersion !== 1 ||
+            receipt.layerCount !== prepared.projection.layers.length || receipt.totalFrames !== prepared.projection.totalFrames ||
+            receipt.geometryCount !== prepared.resources.length || record.token === lastToken) throw new Error('Inactive receipt refused');
+        inactiveEntryCurrent(attempt);
+        var finalBinding = await inactiveEntryBinding(attempt.owner); inactiveEntryCurrent(attempt);
+        if (finalBinding.lifecycleGeneration !== record.hostGeneration) throw new Error('Host lifetime changed');
+        var meta = Object.freeze({ kind: 'native-inactive', path: path, name: attempt.owner.document.baseName(path),
+          preparationToken: record.token, layerCount: receipt.layerCount, totalFrames: receipt.totalFrames,
+          geometryCount: receipt.geometryCount });
+        // A throw/unknown return can mean an applied metadata effect. Do not retry or undo it.
+        uncertain = true; held = record; record.meta = meta;
+        var committed = ports.commit(meta);
+        inactiveEntryCurrent(attempt);
+        if (committed !== true && committed !== false) return inactiveEntryResult('indeterminate');
+        uncertain = false;
+        if (!committed) { held = null; if (!await inactiveEntryDiscard(record)) { uncertain = true; return inactiveEntryResult('indeterminate'); } return inactiveEntryResult('refused'); }
+        lastToken = record.token;
+        return inactiveEntryResult('prepared');
+      } catch (_) {
+        if (uncertain || sent) { uncertain = true; return inactiveEntryResult('indeterminate'); }
+        if (record && !await inactiveEntryDiscard(record)) { uncertain = true; held = record; return inactiveEntryResult('indeterminate'); }
+        return inactiveEntryResult(attempt && attempt.cancel !== cancelled ? 'cancelled' : 'refused');
+      } finally { busy = false; }
+    }
+    async function inactiveEntryClose(meta) {
+      if (busy || uncertain || !held || held.meta !== meta) return inactiveEntryResult('unavailable');
+      busy = true;
+      try {
+        var original = inactiveEntryOwner(), display = inactiveEntryUi();
+        if (!await inactiveEntryDiscard(held)) { uncertain = true; return inactiveEntryResult('indeterminate'); }
+        if (!inactiveEntrySameOwner(original, inactiveEntryOwner(), true) || JSON.stringify(display) !== JSON.stringify(inactiveEntryUi())) {
+          uncertain = true; return inactiveEntryResult('indeterminate');
+        }
+        uncertain = true;
+        var removed = ports.remove(meta);
+        if (removed !== true) return inactiveEntryResult('indeterminate');
+        held = null; uncertain = false; return inactiveEntryResult('cancelled');
+      } catch (_) { uncertain = true; return inactiveEntryResult('indeterminate'); }
+      finally { busy = false; }
+    }
+    function inactiveEntryOpenPath(path) { return inactiveEntryOpen(path, false); }
+    function inactiveEntryOpenPicker() { return inactiveEntryOpen(null, true); }
+    function inactiveEntryCancelPending() { if (busy) cancelled++; }
+    function inactiveEntryInspect() { return Object.freeze({ busy: busy, retained: !!held, indeterminate: uncertain }); }
+    return Object.freeze({ openPath: inactiveEntryOpenPath, openPicker: inactiveEntryOpenPicker,
+      close: inactiveEntryClose, cancelPending: inactiveEntryCancelPending, inspect: inactiveEntryInspect });
+  }
+
   function afterRevealBoundary(ports) {
     return new Promise(function (resolve, reject) {
       var settled = false;
@@ -153,6 +324,6 @@
     }).catch(function (error) { ports.show(); throw error; });
   }
 
-  return Object.freeze({ documentJSON: documentJSON, saveFramesIfLegacy: saveFramesIfLegacy,
+  return Object.freeze({ createInactiveEntry: createInactiveEntry, documentJSON: documentJSON, saveFramesIfLegacy: saveFramesIfLegacy,
     admitAutosaveBytes: admitAutosaveBytes, ready: ready, reveal: reveal });
 }));
