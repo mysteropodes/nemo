@@ -10,6 +10,12 @@ mod order;
 pub use order::OrderedObjectDocument;
 pub(crate) use order::*;
 
+#[path = "project_media_envelope.rs"]
+mod project;
+pub(crate) use project::{
+    ProjectEnvelope, ProjectMetadata, ProjectMetadataError, ProjectReferenceState,
+};
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
