@@ -186,8 +186,9 @@ fn octave_count_follows_javascript_loop_bounds() {
     assert_eq!(at(2.5).to_bits(), at(3.0).to_bits());
     // Settled amplitude long before overflow, as in JavaScript.
     assert_eq!(at(60.0).to_bits(), at(1000.0).to_bits());
-    // The lattice coordinate overflows near octave 1019 here; JavaScript
-    // returns NaN from then on, and the cap keeps +Infinity from looping.
+    // At t = 1.25 and freq 2 the lattice coordinate overflows near octave
+    // 1019; JavaScript returns NaN from then on for any input, and the cap
+    // keeps +Infinity from looping.
     assert!(at(1024.0).is_nan() && at(1025.0).is_nan() && at(f64::INFINITY).is_nan());
 }
 
@@ -201,4 +202,9 @@ fn negative_controls_offsets_are_load_bearing() {
     let same_seed_y = (value_noise_1d(SEED, 0.5 * 2.0) - 0.5) * 2.0 * 10.0;
     assert_eq!(same_seed_y.to_bits(), x.to_bits());
     assert!((y - same_seed_y).abs() > 1e-3);
+    // Without the o*977 offset, octave 1 would replay octave 0's stream.
+    let two_octaves = scalar(wiggle(SEED, 0.5, 2.0, 10.0, 2.0, WiggleDim::One));
+    let shared_seed = |x: f64| (value_noise_1d(SEED, x) - 0.5) * 2.0;
+    let no_octave_offset = (shared_seed(1.0) + shared_seed(2.0) * 0.5) / 1.5 * 10.0;
+    assert!((two_octaves - no_octave_offset).abs() > 1e-3);
 }
