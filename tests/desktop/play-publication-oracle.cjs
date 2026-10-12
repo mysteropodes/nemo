@@ -103,7 +103,10 @@ function semantics(events) {
       n.failed=true; n.failure=e; failures++;
       if(n.restore)requireEvidence(same(n.restore.cause,e,workPins),'restore-failure-join');
     } else if (e.event==='navigate-superseded') {
-      const n=navs.get(navKey(e)); requireEvidence(n && !n.done, 'superseded-context'); n.superseded=true;
+      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && !n.failed && !n.rollback &&
+        latest.get(e.instanceId)>e.intent && same(n.request,e,['instanceId','documentId','contentRevision','frame','intent']) &&
+        pins.concat(['workId','viewGeneration','status']).filter(k=>!['instanceId','documentId','contentRevision','frame'].includes(k))
+          .every(k=>e[k]===undefined), 'superseded-context'); n.superseded=true;
     } else if (e.event==='navigate-return') {
       const n=navs.get(navKey(e)); requireEvidence(n && !n.done && typeof e.result==='boolean', 'terminal-navigation'); n.done=true;n.result=e.result;
       if (e.result) { requireEvidence(!n.rollback && !n.failed && !n.superseded && n.stage===stages.length &&
@@ -111,7 +114,10 @@ function semantics(events) {
       else if(n.failed){
         requireEvidence(n.restore && n.restored && same(n.failure,e,workPins) &&
           same(n.restore.cause,e,workPins),'failed-terminal-context');
-      }else requireEvidence(n.superseded,'unattributed-failure');
+      }else requireEvidence(n.superseded && latest.get(e.instanceId)>e.intent &&
+        same(n.request,e,['instanceId','documentId','contentRevision','frame','intent']) &&
+        pins.concat(['workId','viewGeneration','status']).filter(k=>!['instanceId','documentId','contentRevision','frame'].includes(k))
+          .every(k=>e[k]===undefined),'unattributed-failure');
       requireEvidence(!n.rollback || n.restored,'rollback-needs-independent-review');
       if(n.stopRestore){requireEvidence(e.result===true,'stop-restore-failed');stopGate=null;}
     } else if (e.event==='play-state') {

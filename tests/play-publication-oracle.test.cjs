@@ -137,12 +137,13 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
     if(action==='record'){records.push(payload.event);return{sequence:payload.sequence};}
     if(action==='seal')return{...payload,kind:'seal',status:'provisional',cutId:CUT};return{};}});await api.ready;
   const oldWindow=global.window;global.window={NemoTestPlayObserver:api};t.after(()=>{if(oldWindow===undefined)delete global.window;else global.window=oldWindow;});
-  const raw=Preview.createNativeOpacityPreviewAdapter();api.bindPreview(raw,Object.freeze({}),()=>7);let call=0;
+  const raw=Preview.createNativeOpacityPreviewAdapter();api.bindPreview(raw,Object.freeze({}),()=>7);let call=0,hostGate=null;
   const controller={isActive:()=>true,identity:()=>identity,async presentPreview(value){
     const meta={documentSnapshotId:'native-opacity:native-document-1:0',documentId:identity.documentId,contentRevision:0,contextId:'scene-root',frame:value,
       quality:'final',outputSpec:{kind:'frame',format:'rgba8',width:320,height:180,colorInterpretation:'srgb',alphaMode:'straight'},
       geometryHandle:{resourceId:'geometry-1',resourceVersion:'v1'}};
-    const receipt=await raw.present(RUN,1,meta,async()=>{call++;return{workId:'native-work-'+call,viewGeneration:call,status:call===1?'deferred-occluded':'presented'};},()=>{});
+    const receipt=await raw.present(RUN,1,meta,async()=>{const ordinal=++call;if(hostGate)await hostGate;
+      return{workId:'native-work-'+ordinal,viewGeneration:ordinal,status:ordinal===1?'deferred-occluded':'presented'};},()=>{});
     if(receipt.status!=='presented'){const error=new Error('model deferred');api.associateFailure(receipt,error);throw error;}
     const final=Object.freeze({owner:'native',...receipt});api.presentedReturn(receipt,final);return final;
   }};
@@ -155,6 +156,10 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
   assert.equal(scheduler.start(controller),true);playing=true;api.playState(true,frame);now+=100;step(now);await drain();
   assert.equal(playing,false);assert.equal(api.inspect().productPendingNavigation,0);
   runFrame=20;assert.equal(scheduler.start(controller),true);playing=true;api.playState(true,frame);now+=100;step(now);await drain();stop();await drain();
+  assert.deepEqual(await Promise.all([nav.navigate(controller,10),nav.navigate(controller,20)]),[false,true]);
+  let release;hostGate=new Promise(resolve=>{release=resolve;});
+  const held=nav.navigate(controller,10);await drain();const newer=nav.navigate(controller,20);
+  hostGate=null;release();assert.deepEqual(await Promise.all([held,newer]),[false,true]);
   for(const value of[0,10,20])assert.equal(await nav.navigate(controller,value),true);await drain();await seal();
   const e=model();e.events=records;e.native=[];
   let restored=false;const emit=(event,fields,preview=null)=>e.native.push({diagnostic:'native-occlusion-mapping/v1',
@@ -173,7 +178,8 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
   assert.equal(ack.intent,1);assert.equal(ack.frame,0);assert.equal(ack.hostCallOrdinal,2);
   for(const mode of['omit-request','omit-presented','omit-ack','omit-chain','foreign-intent','foreign-work','foreign-call',
     'foreign-revision','foreign-generation','foreign-session','foreign-prior','missing-work','missing-view','false-ack','early-ack','newer-intent',
-    'terminal-revision','terminal-frame','terminal-call','terminal-work','terminal-view','terminal-all']){
+    'terminal-revision','terminal-frame','terminal-call','terminal-work','terminal-view','terminal-all','relabel-superseded','relabel-clean',
+    'superseded-terminal-frame','superseded-terminal-revision','superseded-terminal-work']){
     const altered={...e,events:structuredClone(records)},rows=altered.events;
     const request=rows.find(row=>row.event==='receipt-retry'&&row.result===false),presented=rows.find(row=>row.event==='receipt-retry'&&row.result===true);
     const ack=rows.find(row=>row.event==='rollback'&&row.result===true);
@@ -182,6 +188,18 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
     if(mode==='omit-presented')rows.splice(rows.indexOf(presented),1);
     if(mode==='omit-ack')rows.splice(rows.indexOf(ack),1);
     if(mode==='omit-chain')altered.events=rows.filter(row=>!['rollback','receipt-retry'].includes(row.event));
+    if(mode==='relabel-superseded'||mode==='relabel-clean'){
+      altered.events=rows.filter(row=>!['rollback','receipt-retry'].includes(row.event));
+      const fake=altered.events.find(row=>row.event==='failure');fake.event='navigate-superseded';
+      if(mode==='relabel-clean')for(const row of[fake,terminal])for(const key of Object.keys(row))
+        if(!['event','instanceId','documentId','contentRevision','frame','intent','result'].includes(key))delete row[key];
+    }
+    if(mode.startsWith('superseded-terminal-')){
+      const superseded=rows.find(row=>row.event==='navigate-superseded'),end=rows.find(row=>row.event==='navigate-return'&&row.intent===superseded.intent);
+      if(mode==='superseded-terminal-frame')end.frame=19;
+      if(mode==='superseded-terminal-revision')end.contentRevision=99;
+      if(mode==='superseded-terminal-work')end.workId='native-work-99';
+    }
     if(mode==='foreign-intent')ack.intent=99;
     if(mode==='foreign-work')ack.workId='native-work-99';
     if(mode==='foreign-call')ack.hostCallOrdinal=1;
