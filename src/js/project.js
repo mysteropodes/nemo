@@ -32,6 +32,8 @@
   // with embedded media doesn't silently lose its autosave the moment it
   // outgrows localStorage — see project-nemo-web-public-beta memory.
   function autosaveWrite(json){
+    var admission=window.NemoNativeOpacityProjectEntry;
+    if(!admission||typeof admission.admitAutosaveBytes!=='function'||admission.admitAutosaveBytes(window,json)!==true)return {status:'unavailable'};
     var quotaHit=false;
     try{localStorage.setItem('nemo-auto',json);}catch(e){quotaHit=true;}
     if(window.SMIdb)window.SMIdb.set('nemo-auto',json).catch(function(){});
