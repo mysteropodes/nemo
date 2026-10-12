@@ -20,6 +20,8 @@ mod vectorize;
 // Per-task isolation of the app's native mutable state (R06, #902).
 mod task_runtime;
 
+#[cfg(feature = "test-play-publication-observer")]
+mod test_play_observer;
 #[tauri::command]
 async fn run_ffmpeg(
     app: tauri::AppHandle,
@@ -263,7 +265,9 @@ pub fn run() {
             video_decode::create_optimized_media,
             vectorize::vectorize_image,
             task_runtime::nemo_task_runtime,
-            task_runtime::nemo_task_runtime_release
+            task_runtime::nemo_task_runtime_release,
+            #[cfg(feature = "test-play-publication-observer")]
+            task_runtime::nemo_test_play_observer
         ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already

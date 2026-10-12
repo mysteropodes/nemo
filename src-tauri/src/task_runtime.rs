@@ -40,6 +40,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(feature = "test-play-publication-observer")]
+use crate::test_play_observer::{TestPlayLog, TestPlayState};
 use serde_json::{json, Value};
 use tauri::{Manager, Runtime};
 
@@ -272,6 +274,8 @@ pub fn start<R: Runtime>(
     runtime: Option<TaskRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
+    #[cfg(feature = "test-play-publication-observer")]
+    app.manage(TestPlayState(Mutex::new(None)));
     let Some(runtime) = runtime else {
         app.manage(TaskRuntimeState {
             manifest: Mutex::new(json!({
@@ -292,11 +296,17 @@ pub fn start<R: Runtime>(
     let identifier = handle.config().identifier.clone();
     let store = runtime.data_store_identifier();
     let windows = handle.config().app.windows.clone();
+    #[cfg(feature = "test-play-publication-observer")]
+    let observer = prepare_play_observer(&handle, &runtime, &windows)?;
     let mut labels = Vec::with_capacity(windows.len());
     for window in &windows {
-        tauri::WebviewWindowBuilder::from_config(&handle, window)?
-            .data_store_identifier(store)
-            .build()?;
+        let builder = tauri::WebviewWindowBuilder::from_config(&handle, window)?;
+        #[cfg(feature = "test-play-publication-observer")]
+        let builder = match &observer {
+            Some((_, script)) if window.label == "main" => builder.initialization_script(script),
+            _ => builder,
+        };
+        builder.data_store_identifier(store).build()?;
         labels.push(window.label.clone());
     }
 
@@ -330,6 +340,19 @@ pub fn start<R: Runtime>(
             "NEMO_REPORT_DIR": std::env::var("NEMO_REPORT_DIR").ok(),
         },
     });
+    #[cfg(feature = "test-play-publication-observer")]
+    let manifest = {
+        let mut value = manifest;
+        if let Some((run, _)) = observer {
+            value["playObserver"] = json!({"schema":"nemo.play-observer/1", "runId":run});
+            crate::test_play_observer::watch_play_seal(
+                handle.clone(),
+                runtime.data_dir.parent().unwrap().join("reports"),
+                run,
+            );
+        }
+        value
+    };
     write_manifest(&manifest_file, &manifest)?;
     // One machine-readable line for a launcher that captured stdout, matching
     // the existing browser/build launchers' "first line is JSON" convention.
@@ -342,6 +365,75 @@ pub fn start<R: Runtime>(
         manifest_file: Some(manifest_file),
     });
     Ok(())
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+fn prepare_play_observer<R: Runtime>(
+    handle: &tauri::AppHandle<R>,
+    runtime: &TaskRuntime,
+    windows: &[tauri::utils::config::WindowConfig],
+) -> Result<Option<(String, String)>, Box<dyn std::error::Error>> {
+    if std::env::var("NEMO_TEST_PLAY_OBSERVER").ok().as_deref() != Some("1") {
+        return Ok(None);
+    }
+    if cfg!(debug_assertions)
+        || windows.len() != 1
+        || windows[0].label != "main"
+        || windows[0].url != tauri::WebviewUrl::App(PathBuf::from("index.html"))
+        || runtime.owner_token.is_none()
+    {
+        return Err("test observer requires an owned packaged main window".into());
+    }
+    let reports = runtime
+        .data_dir
+        .parent()
+        .ok_or("test observer report root refused")?
+        .join("reports");
+    let actual = PathBuf::from(std::env::var("NEMO_REPORT_DIR")?);
+    let meta = std::fs::symlink_metadata(&actual)?;
+    if actual != reports || !meta.is_dir() || meta.file_type().is_symlink() {
+        return Err("test observer report root refused".into());
+    }
+    let run = uuid::Uuid::new_v4().to_string();
+    let header = json!({"kind":"header", "schema":"nemo.play-observer/1", "runId":run,
+        "taskId":runtime.task_id, "pid":std::process::id(), "window":"main"});
+    let mut log = TestPlayLog::new(&run);
+    if TestPlayLog::output(&header).is_err() {
+        log.rejected += 1;
+    }
+    *handle
+        .state::<TestPlayState>()
+        .0
+        .lock()
+        .map_err(|_| "test observer lock refused")? = Some(log);
+    let script = format!(
+        "window.__NEMO_PLAY_OBSERVER_CONFIG__ = {};\n{}",
+        json!({"runId":run}),
+        include_str!("../../tests/desktop/play-publication-observer-bootstrap.js")
+    );
+    Ok(Some((run, script)))
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[tauri::command]
+pub fn nemo_test_play_observer<R: Runtime>(
+    window: tauri::WebviewWindow<R>,
+    state: tauri::State<'_, TestPlayState>,
+    action: String,
+    payload: Value,
+) -> Result<Value, String> {
+    let url = window.url().map_err(|_| "test observer origin refused")?;
+    if !TestPlayLog::allowed_origin(window.label(), &url) {
+        return Err("test observer origin refused".into());
+    }
+    state
+        .0
+        .lock()
+        .map_err(|_| "test observer lock refused")?
+        .as_mut()
+        .ok_or("test observer disabled")?
+        .dispatch(&action, payload)
+        .map_err(str::to_string)
 }
 
 // ---- commands -------------------------------------------------------------

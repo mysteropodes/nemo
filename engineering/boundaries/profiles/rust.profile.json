@@ -438,6 +438,14 @@
       "sizeProfile": "Rust production module"
     },
     {
+      "id": "rust.desktop.play-observer",
+      "layer": "desktop-shell",
+      "dir": "src-tauri/src",
+      "files": ["test_play_observer.rs"],
+      "publicApi": [],
+      "sizeProfile": "Rust production module"
+    },
+    {
       "id": "rust.desktop.tasks.tests",
       "layer": "tests",
       "dir": "src-tauri/src/task_runtime",

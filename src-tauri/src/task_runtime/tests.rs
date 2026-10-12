@@ -184,3 +184,258 @@ fn manifest_file_lives_inside_the_task_data_root() {
         PathBuf::from("/tmp/nemo-runtime/tasks/abc/tauri-data/native-runtime.json")
     );
 }
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn play_metadata_has_no_free_text_payload_or_coerced_identity() {
+    use crate::test_play_observer::TestPlayLog;
+    for bad in [
+        json!({"event":"play-stop", "path":"/private/secret"}),
+        json!({"event":"host-receipt", "workId":159}),
+        json!({"event":"host-receipt", "documentId":"/private/file"}),
+        json!({"event":"host-receipt", "contentRevision":"2"}),
+        json!({"event":"commit-return", "frame":-1}),
+        json!({"event":"host-receipt", "status":"secret"}),
+        json!({"event":"host-receipt", "owner":"paper"}),
+        json!({"event":"play-stop", "result":{}}),
+    ] {
+        assert!(!TestPlayLog::valid_event(&bad));
+    }
+    let event = json!({"event":"host-receipt", "documentId":"native-document-3",
+        "workId":"native-work-159", "frame":10, "contentRevision":2, "status":"presented"});
+    assert!(TestPlayLog::valid_event(&event));
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn play_collection_seal_refuses_missing_ready_gaps_duplicates_and_overflow() {
+    use crate::test_play_observer::TestPlayLog;
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    let mut clean = TestPlayLog::new(run);
+    assert!(clean.record(run, 1, json!({"event":"ready"})).is_ok());
+    assert!(clean.record(run, 2, json!({"event":"play-stop"})).is_ok());
+    let cut = clean.seal(run, 2, 0, 0);
+    assert_eq!(cut["status"], "provisional");
+    assert!(cut.get("terminalFence").is_none());
+    assert_eq!(
+        clean
+            .finish(run, cut["cutId"].as_str().unwrap(), [2, 0, 0, 0])
+            .unwrap()["status"],
+        "complete"
+    );
+    for mode in [
+        "missing-ready",
+        "gap",
+        "duplicate",
+        "wrong-run",
+        "drop",
+        "transport",
+    ] {
+        let mut log = TestPlayLog::new(run);
+        if mode != "missing-ready" {
+            log.record(run, 1, json!({"event":"ready"})).unwrap();
+        }
+        if mode == "gap" {
+            assert!(log.record(run, 3, json!({"event":"play-stop"})).is_err());
+        }
+        if mode == "duplicate" {
+            assert!(log.record(run, 1, json!({"event":"ready"})).is_err());
+        }
+        if mode == "wrong-run" {
+            assert!(log
+                .record("other", 2, json!({"event":"play-stop"}))
+                .is_err());
+        }
+        let provisional = log.seal(
+            run,
+            log.accepted,
+            u64::from(mode == "drop"),
+            u64::from(mode == "transport"),
+        );
+        assert_eq!(provisional["status"], "provisional");
+        let footer = log
+            .finish(
+                run,
+                provisional["cutId"].as_str().unwrap(),
+                [
+                    log.accepted,
+                    u64::from(mode == "drop"),
+                    u64::from(mode == "transport"),
+                    0,
+                ],
+            )
+            .unwrap();
+        assert_eq!(footer["status"], "partial", "{mode}");
+        assert_eq!(footer["terminalFence"], false);
+    }
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn play_record_cap_and_terminal_cut_never_ack_more_records() {
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    let mut log = crate::test_play_observer::TestPlayLog::new(run);
+    log.record(run, 1, json!({"event":"ready"})).unwrap();
+    for sequence in 2..=4096 {
+        log.record(run, sequence, json!({"event":"play-step"}))
+            .unwrap();
+    }
+    assert!(log.record(run, 4097, json!({"event":"play-step"})).is_err());
+    let cut = log.seal(run, 4097, 0, 0);
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [4097, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
+    assert!(log.record(run, 4098, json!({"event":"play-stop"})).is_err());
+    assert_eq!(log.accepted, 4096);
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn malformed_typed_play_envelopes_are_counted_before_any_footer() {
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    for (action, payload) in [
+        (
+            "record",
+            json!({"runId":run,"sequence":2,"event":{"event":"play-stop"},"secret":"private"}),
+        ),
+        ("record", json!([run, 2, {"event":"play-stop"}])),
+        (
+            "record",
+            json!({"runId":run,"sequence":"2","event":{"event":"play-stop"}}),
+        ),
+        (
+            "record",
+            json!({"runId":run,"sequence":2.0,"event":{"event":"play-stop"}}),
+        ),
+        (
+            "seal",
+            json!({"runId":run,"generated":1,"dropped":0,"failed":0,"extra":true}),
+        ),
+        (
+            "seal",
+            json!({"runId":run,"generated":1,"dropped":0,"failed":9_007_199_254_740_992_u64}),
+        ),
+        ("other", json!({"runId":run})),
+    ] {
+        let mut log = crate::test_play_observer::TestPlayLog::new(run);
+        log.record(run, 1, json!({"event":"ready"})).unwrap();
+        assert!(log.dispatch(action, payload).is_err());
+        assert_eq!(log.rejected, 1);
+        let cut = log.seal(run, 1, 0, 0);
+        assert_eq!(
+            log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+                .unwrap()["status"],
+            "partial"
+        );
+    }
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn a_malformed_envelope_after_seal_is_an_explicit_late_tail() {
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    let mut log = crate::test_play_observer::TestPlayLog::new(run);
+    log.record(run, 1, json!({"event":"ready"})).unwrap();
+    let cut = log.seal(run, 1, 0, 0);
+    assert_eq!(cut["status"], "provisional");
+    assert!(log.dispatch("other", json!({"secret":"private"})).is_err());
+    assert_eq!(log.rejected, 1);
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn seal_marker_is_bounded_exact_run_and_not_a_symlink_or_directory() {
+    use crate::test_play_observer::seal_marker_valid;
+    let root = std::env::temp_dir().join(format!("nemo-play-marker-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let marker = root.join("marker");
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    assert!(!seal_marker_valid(&marker, run));
+    std::fs::write(&marker, json!({"runId":run}).to_string()).unwrap();
+    assert!(seal_marker_valid(&marker, run));
+    assert!(!seal_marker_valid(&marker, "other"));
+    std::fs::write(&marker, "x".repeat(129)).unwrap();
+    assert!(!seal_marker_valid(&marker, run));
+    std::fs::write(&marker, json!({"runId":run,"secret":"private"}).to_string()).unwrap();
+    assert!(!seal_marker_valid(&marker, run));
+    assert!(!seal_marker_valid(&root, run));
+    #[cfg(unix)]
+    {
+        let link = root.join("link");
+        std::os::unix::fs::symlink(&marker, &link).unwrap();
+        assert!(!seal_marker_valid(&link, run));
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn only_pinned_main_packaged_root_urls_can_send_play_metadata() {
+    use crate::test_play_observer::TestPlayLog;
+    for address in [
+        "tauri://localhost",
+        "tauri://localhost/",
+        "tauri://localhost/index.html",
+    ] {
+        let url = tauri::Url::parse(address).unwrap();
+        assert!(TestPlayLog::allowed_origin("main", &url));
+        assert!(!TestPlayLog::allowed_origin("aux", &url));
+    }
+    for address in [
+        "https://localhost/",
+        "http://localhost:1420/",
+        "tauri://other/",
+        "tauri://localhost/other.html",
+        "tauri://user:secret@localhost/",
+        "tauri://localhost:3000/",
+    ] {
+        assert!(!TestPlayLog::allowed_origin(
+            "main",
+            &tauri::Url::parse(address).unwrap()
+        ));
+    }
+}
+
+#[cfg(feature = "test-play-publication-observer")]
+#[test]
+fn terminal_play_fence_requires_same_cut_zero_pending_and_monotonic_clean_counters() {
+    use crate::test_play_observer::TestPlayLog;
+    let run = "da5f47f9-5681-4e71-a0b6-aa7578b6b5fa";
+    for counts in [[2, 1, 1, 0], [1, 0, 0, 1]] {
+        let mut log = TestPlayLog::new(run);
+        log.record(run, 1, json!({"event":"ready"})).unwrap();
+        let provisional = log.seal(run, 1, 0, 0);
+        assert_eq!(provisional["kind"], "seal");
+        let terminal = log
+            .finish(run, provisional["cutId"].as_str().unwrap(), counts)
+            .unwrap();
+        assert_eq!(terminal["status"], "partial");
+        assert_eq!(terminal["terminalFence"], false);
+    }
+    let mut log = TestPlayLog::new(run);
+    assert!(log.finish(run, "unissued", [0, 0, 0, 0]).is_err());
+    log.record(run, 1, json!({"event":"ready"})).unwrap();
+    let cut = log.seal(run, 1, 0, 0);
+    assert!(log.finish(run, "wrong", [1, 0, 0, 0]).is_err());
+    assert_eq!(
+        log.finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["terminalFence"],
+        false
+    );
+    let mut sticky = TestPlayLog::new(run);
+    sticky.record(run, 1, json!({"event":"ready"})).unwrap();
+    let cut = sticky.seal(run, 1, 1, 1);
+    assert_eq!(
+        sticky
+            .finish(run, cut["cutId"].as_str().unwrap(), [1, 0, 0, 0])
+            .unwrap()["status"],
+        "partial"
+    );
+}
