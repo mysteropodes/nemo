@@ -10,6 +10,15 @@ use crate::revision::DocumentSnapshot;
 use serde_json::Number;
 use std::fmt::{Display, Formatter};
 
+// N22C: private expression noise kernel; its consumers arrive in later leaves.
+#[path = "expression_noise.rs"]
+#[allow(dead_code)]
+pub(crate) mod expression_noise;
+// N22D: private random()/randomGauss() kernel over the same lattice hash.
+#[path = "expression_random.rs"]
+#[allow(dead_code)]
+pub(crate) mod expression_random;
+
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
