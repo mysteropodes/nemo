@@ -9,6 +9,9 @@ use crate::object_document::{
 use serde::Deserialize;
 use std::collections::HashSet;
 
+#[path = "project_media_codec.rs"]
+mod project;
+
 #[path = "object_order_codec.rs"]
 mod order;
 pub use crate::object_document::OrderedObjectDocument;
