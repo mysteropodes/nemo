@@ -160,8 +160,31 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
   }
   for(const v of e.visuals){const terminal=e.events.filter(e=>e.event==='navigate-return'&&e.result&&e.frame===v.frame).at(-1);
     for(const key of['instanceId','documentId','contentRevision','hostCallOrdinal','workId','viewGeneration'])v[key]=terminal[key];}
-  const result=verifyEvidence(refresh(e));assert.equal(result.status,'partial');
-  assert.equal(result.code,'rollback-needs-independent-review', 'actual producer rollback has no direct restore-intent link');
+  const result=verifyEvidence(refresh(e));assert.equal(result.status,'consistent',JSON.stringify(result));
+  const ack=records.find(row=>row.event==='rollback'&&row.result===true);assert.ok(ack);
+  assert.equal(ack.intent,1);assert.equal(ack.frame,0);assert.equal(ack.hostCallOrdinal,2);
+  for(const mode of['omit-request','omit-presented','omit-ack','foreign-intent','foreign-work','foreign-call',
+    'foreign-revision','foreign-generation','foreign-session','foreign-prior','missing-work','missing-view','false-ack','early-ack','newer-intent']){
+    const altered={...e,events:structuredClone(records)},rows=altered.events;
+    const request=rows.find(row=>row.event==='receipt-retry'&&row.result===false),presented=rows.find(row=>row.event==='receipt-retry'&&row.result===true);
+    const ack=rows.find(row=>row.event==='rollback'&&row.result===true);
+    if(mode==='omit-request')rows.splice(rows.indexOf(request),1);
+    if(mode==='omit-presented')rows.splice(rows.indexOf(presented),1);
+    if(mode==='omit-ack')rows.splice(rows.indexOf(ack),1);
+    if(mode==='foreign-intent')ack.intent=99;
+    if(mode==='foreign-work')ack.workId='native-work-99';
+    if(mode==='foreign-call')ack.hostCallOrdinal=1;
+    if(mode==='foreign-revision')ack.contentRevision=1;
+    if(mode==='foreign-generation')ack.jsLifecycleGeneration=2;
+    if(mode==='foreign-session')ack.sessionOrdinal=2;
+    if(mode==='foreign-prior')ack.priorFrame=1;
+    if(mode==='missing-work')delete presented.workId;
+    if(mode==='missing-view')delete request.viewGeneration;
+    if(mode==='false-ack')ack.result=false;
+    if(mode==='early-ack'){rows.splice(rows.indexOf(ack),1);rows.splice(rows.indexOf(presented),0,ack);}
+    if(mode==='newer-intent')rows.splice(rows.indexOf(ack),0,{event:'navigate-request',...identity,intent:99,frame:20});
+    assert.equal(verifyEvidence(refresh(altered)).status,'partial',mode);
+  }
 });
 
 for(const kind of['play-start','play-step','play-stop'])test(`removing actual scheduler ${kind} controls refuses`,()=>{

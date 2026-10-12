@@ -42,7 +42,10 @@ function semantics(events) {
   const navKey = e => `${e.instanceId}|${e.documentId}|${e.intent}`;
   const nativeKey = e => `${e.instanceId}|${e.hostCallOrdinal}`;
   const stages = ['commit-enter','ui-publication','commit-return','paint-enter','paint-return','sync-enter','sync-return'];
-  const passive = new Set(['ready','receipt-rejected','receipt-deferred','receipt-stale','receipt-retry']);
+  const passive = new Set(['ready','receipt-rejected','receipt-deferred','receipt-stale']);
+  const workPins = pins.concat(['workId','viewGeneration','status']);
+  const validWork = e => typeof e.workId==='string' && /^native-work-[1-9][0-9]{0,19}$/.test(e.workId) &&
+    BigInt(e.workId.slice(12))<=18446744073709551615n && safe(e.viewGeneration) && e.viewGeneration>0;
   for (const e of events) {
     if (e.event === 'host-request') {
       requireEvidence(pins.every(k=>e[k]!==undefined) && e.hostCallOrdinal>0 && e.sessionOrdinal>0 && e.hostGeneration>0 &&
@@ -68,16 +71,37 @@ function semantics(events) {
       requireEvidence(stages[n.stage]===e.event, 'publication-order'); n.stage++; n.pins=e;
       if (e.event==='ui-publication') requireEvidence(e.currentFrame===e.frame, 'actual-ui-frame');
       if (e.event==='sync-return') requireEvidence(e.currentFrame===e.frame && e.result===true, 'actual-input-frame');
+    } else if (e.event==='receipt-retry') {
+      const n=navs.get(navKey(e)),c=calls.get(nativeKey(e));
+      requireEvidence(n && !n.done && !n.superseded && latest.get(e.instanceId)===e.intent && n.rollback &&
+        typeof e.result==='boolean' && safe(e.priorFrame) && e.priorFrame===n.rollbackFrame && validWork(e), 'restore-intent');
+      if(e.result===false){
+        requireEvidence(!n.restore && c?.receipt && same(c.receipt,e,workPins) &&
+          same(n.request,e,['instanceId','documentId','contentRevision','frame']), 'restore-cause');
+        n.restore={cause:e,afterCall:Math.max(...[...calls.values()].map(c=>c.request.hostCallOrdinal))};
+      }else{
+        requireEvidence(n.restore && !n.restore.presented && c?.presented && e.status==='presented' &&
+          e.frame===n.rollbackFrame && e.hostCallOrdinal>n.restore.afterCall && same(c.receipt,e,workPins) &&
+          same(n.restore.cause,e,pins.filter(k=>k!=='frame'&&k!=='hostCallOrdinal')), 'restore-receipt');
+        n.restore.presented=e;
+      }
     } else if (e.event==='rollback') {
-      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && !n.rollback &&
+      const n=navs.get(navKey(e)); requireEvidence(n && !n.done &&
         same(n.pins||n.request,e,['instanceId','documentId','contentRevision']) &&
-        safe(e.frame) && e.currentFrame===e.frame, 'rollback-context'); n.rollback=true;
+        safe(e.frame) && e.currentFrame===e.frame, 'rollback-context');
+      if(e.result===undefined){requireEvidence(!n.rollback,'duplicate-rollback');n.rollback=true;n.rollbackFrame=e.frame;}
+      else{
+        requireEvidence(e.result===true && !n.restored && n.restore?.presented && !n.superseded &&
+          latest.get(e.instanceId)===e.intent && e.frame===n.rollbackFrame && e.priorFrame===n.rollbackFrame &&
+          same(n.restore.presented,e,workPins), 'restore-acknowledgement');n.restored=true;
+      }
     } else if (e.event==='failure') {
       const n=navs.get(navKey(e)), c=calls.get(nativeKey(e));
       requireEvidence(n && !n.done && c && same(c.request,e) &&
         same(n.request,e,['instanceId','documentId','contentRevision','frame']), 'failure-context');
       if (e.workId!==undefined) requireEvidence(c.receipt && same(c.receipt,e,pins.concat(['workId','viewGeneration','status'])), 'failure-work');
       n.failed=true; failures++;
+      if(n.restore)requireEvidence(same(n.restore.cause,e,workPins),'restore-failure-join');
     } else if (e.event==='navigate-superseded') {
       const n=navs.get(navKey(e)); requireEvidence(n && !n.done, 'superseded-context'); n.superseded=true;
     } else if (e.event==='navigate-return') {
@@ -85,7 +109,7 @@ function semantics(events) {
       if (e.result) { requireEvidence(!n.rollback && !n.failed && !n.superseded && n.stage===stages.length &&
         latest.get(e.instanceId)===e.intent && same(n.pins,e,pins.concat(['workId','viewGeneration'])), 'false-publication'); publications++; }
       else requireEvidence(n.failed || n.superseded, 'unattributed-failure');
-      requireEvidence(!n.rollback,'rollback-needs-independent-review');
+      requireEvidence(!n.rollback || n.restored,'rollback-needs-independent-review');
       if(n.stopRestore){requireEvidence(e.result===true,'stop-restore-failed');stopGate=null;}
     } else if (e.event==='play-state') {
       requireEvidence(typeof e.playing==='boolean'&&safe(e.currentFrame), 'play-state');
