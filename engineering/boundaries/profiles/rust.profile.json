@@ -84,7 +84,7 @@
       "id": "rust.native.engine.render-scene",
       "layer": "native-render-scene",
       "dir": "native-engine/src",
-      "files": ["render_scene.rs", "render_geometry.rs", "object_render_scene.rs"],
+      "files": ["render_scene.rs", "render_geometry.rs", "object_render_scene.rs", "object_paint_plan.rs"],
       "publicApi": ["render_scene.rs", "render_geometry.rs", "object_render_scene.rs"],
       "sizeProfile": "Rust production module"
     },
