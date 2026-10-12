@@ -24,6 +24,9 @@ engine_modules! {
     "application" => application, protocol, read_queries;
 }
 
+#[cfg(feature = "reference_image_asset")]
+pub(crate) mod reference_image_asset;
+
 // Each named Cargo target uses this existing file as a harness. Selecting its
 // test feature resolves the real future test file; absent tests fail compilation.
 // No feature enabled means no test module, not a placeholder passing test.
@@ -39,6 +42,7 @@ test_modules! {
     "test-codec" => codec_tests = "../tests/codec.rs";
     "test-codec" => project_structure_tests = "../tests/project_structure.rs";
     "test-codec" => object_codec_tests = "../tests/object_codec.rs";
+    "test-codec" => reference_image_asset_tests = "../tests/reference_image_asset.rs";
     "test-commands" => commands_tests = "../tests/commands.rs";
     "test-commands" => object_read_tests = "../tests/object_read.rs";
     "test-commands" => object_fill_tests = "../tests/object_fill.rs";
