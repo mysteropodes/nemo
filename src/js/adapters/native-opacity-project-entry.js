@@ -76,6 +76,18 @@
     saveFrames();
   }
 
+  function admitAutosaveBytes(root, bytes) {
+    try {
+      var api=surface(root),native=root.NemoNativeOpacityCutover;
+      if(!api&&!('NemoNativeOpacityProject' in root)) {
+        if(!('NemoNativeOpacityCutover' in root))return true;
+        if(native&&typeof native.blocksLegacy==='function'&&native.blocksLegacy()===false)
+          return root.NemoNativeOpacityCutover===native&&surface(root)===null&&!('NemoNativeOpacityProject' in root);
+      }
+      return typeof bytes==='string'&&bytes.length>0&&desktopJSON(root,native,api)===bytes;
+    }catch(error){return false;}
+  }
+
   function ready(root, receipt, first) {
     if (!root.NemoNativeOpacityProject) return receipt === true;
     if (!receipt || receipt.owner !== 'native' || receipt.frame !== 0 ||
@@ -142,5 +154,5 @@
   }
 
   return Object.freeze({ documentJSON: documentJSON, saveFramesIfLegacy: saveFramesIfLegacy,
-    ready: ready, reveal: reveal });
+    admitAutosaveBytes: admitAutosaveBytes, ready: ready, reveal: reveal });
 }));
