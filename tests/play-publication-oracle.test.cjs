@@ -3,7 +3,6 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {verifyEvidence,runEvidenceFile,plan}=require('./desktop/play-publication-oracle.cjs');
 const {encodeRGBA,canvas,fillRect}=require('./fixtures/lib/png.cjs');
 const crypto=require('node:crypto');
-const {createRequire}=require('node:module');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const RUN='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',CUT='3d755db1-cdf7-44f8-8706-cc812e1845ca';
 // Independent literal MODEL evidence. Never an installed app/window or acceptance receipt.
@@ -12,7 +11,7 @@ function model(){
   const context=(call,frame,status)=>({...identity,documentSnapshotId:'native-opacity:native-document-1:0',contextId:'scene-root',
     frame,jsLifecycleGeneration:1,hostGeneration:7,sessionOrdinal:1,hostCallOrdinal:call,
     workId:'native-work-'+call,viewGeneration:call,status});
-  const events=[{event:'ready'},{event:'play-state',playing:true,currentFrame:0}];
+  const events=[{event:'ready'},{event:'play-start',...identity,runGeneration:1},{event:'play-state',playing:true,currentFrame:0}];
   const request=(intent,call,frame,status)=>{
     const c=context(call,frame,status),base={...c,intent};
     events.push({event:'navigate-request',...identity,intent,frame},{event:'host-request',...c},{event:'host-receipt',...c});
@@ -24,18 +23,22 @@ function model(){
     }else events.push({event:'failure',...base,code:'unknown'});
     events.push({event:'navigate-return',...base,result:status==='presented'});
   };
-  request(1,1,10,'deferred-occluded');events.push({event:'play-state',playing:false,currentFrame:0});
-  events.push({event:'play-state',playing:true,currentFrame:0});request(2,2,20,'presented');
-  events.push({event:'play-state',playing:false,currentFrame:20});request(3,3,20,'presented');
-  request(4,4,0,'presented');request(5,5,10,'presented');request(6,6,20,'presented');
+  events.push({event:'play-step',...identity,runGeneration:1,frame:10});request(1,1,10,'deferred-occluded');
+  events.push({event:'play-step',...identity,runGeneration:1,frame:10,result:false},{event:'play-state',playing:false,currentFrame:0},
+    {event:'play-stop',...identity,runGeneration:2});request(2,2,0,'presented');
+  events.push({event:'play-start',...identity,runGeneration:3},{event:'play-state',playing:true,currentFrame:0},
+    {event:'play-step',...identity,runGeneration:3,frame:20});request(3,3,20,'presented');
+  events.push({event:'play-step',...identity,runGeneration:3,frame:20,result:true},{event:'play-state',playing:false,currentFrame:20},
+    {event:'play-stop',...identity,runGeneration:4});request(4,4,20,'presented');
+  request(5,5,0,'presented');request(6,6,10,'presented');request(7,7,20,'presented');
   const native=[],emit=(event,fields,preview=null,exposureEpoch=1)=>native.push({diagnostic:'native-occlusion-mapping/v1',sequence:native.length+1,event,fields,preview,exposureEpoch});
   const p=(call,frame)=>({instanceId:RUN,documentId:'native-document-1',revision:0,frame,workId:call,viewGeneration:call,jsLifecycleGeneration:'MISSING'});
   emit('exposure',{windowNumber:81,minimized:true,occlusionVisible:false});
   emit('preview-begin',null,p(1,10));emit('preview-end',{status:'deferred-occluded'},p(1,10));
   emit('exposure',{windowNumber:81,minimized:false,occlusionVisible:true},null,2);
-  emit('preview-begin',null,p(2,20),2);emit('preview-end',{status:'presented'},p(2,20),2);
+  emit('preview-begin',null,p(2,0),2);emit('preview-end',{status:'presented'},p(2,0),2);
   emit('preview-begin',null,p(3,20),2);emit('preview-end',{status:'presented'},p(3,20),2);
-  for(const[call,frame]of[[4,0],[5,10],[6,20]]){emit('preview-begin',null,p(call,frame),2);emit('preview-end',{status:'presented'},p(call,frame),2);}
+  for(const[call,frame]of[[4,20],[5,0],[6,10],[7,20]]){emit('preview-begin',null,p(call,frame),2);emit('preview-end',{status:'presented'},p(call,frame),2);}
   const e={schema:'nemo.n20r-evidence/1',sourceCommit:'a'.repeat(40),executableSha256:'b'.repeat(64),fixtureSha256:'c'.repeat(64),
     taskId:'one-run-model',runId:RUN,pid:123,windowId:81,events,native};
   e.package={sourceCommit:e.sourceCommit,executableSha256:e.executableSha256,observerFeature:true,unsigned:true};
@@ -44,7 +47,7 @@ function model(){
   e.visuals=[[0,0,20,204],[10,64,50,128],[20,128,80,51]].map(([frame,x,opacity,color])=>{
     const image=canvas(320,180,[255,255,255,255]);fillRect(image,20+x,60,20,20,[255,color,color,255]);
     const png=encodeRGBA(image.width,image.height,image.rgba);
-    return{...context(frame===0?4:frame===10?5:6,frame,'presented'),frame,positionX:x,opacity,displayedFrame:frame+1,windowOnly:true,reviewed:true,reviewer:'independent-model-review',
+    return{...context(frame===0?5:frame===10?6:7,frame,'presented'),frame,positionX:x,opacity,displayedFrame:frame+1,windowOnly:true,reviewed:true,reviewer:'independent-model-review',
       sourceCommit:e.sourceCommit,executableSha256:e.executableSha256,pid:e.pid,windowId:e.windowId,viewport:{x:0,y:0,width:320,height:180},png,sha256:hash(png)};
   });return refresh(e);
 }
@@ -57,7 +60,7 @@ function refresh(e){
   e.collection.stderrSha256=hash(e.stderr);return e;
 }
 test('literal complete model binds actual-input order, native recovery, visuals and terminal cleanup',()=>{
-  const result=verifyEvidence(model());assert.equal(result.status,'consistent');assert.equal(result.publications,5);assert.equal(result.failures,1);
+  const result=verifyEvidence(model());assert.equal(result.status,'consistent');assert.equal(result.publications,6);assert.equal(result.failures,1);
   assert.match(result.limitations.join(' '),/independent installed review/);
 });
 for(const event of ['host-receipt','presented-return','ui-publication','paint-return','sync-return','navigate-return'])test(`omitted ${event} cannot be accepted`,()=>{
@@ -117,17 +120,35 @@ test('offline file driver is read-only and rejects traversal/symlink/missing evi
   assert.match(plan().join(' '),/no automatic second launch/);
 });
 
-test('oracle consumes actual O1/O2C JS producer records without treating model native/visual evidence as installed',async()=>{
-  const helperFile=path.join(__dirname,'desktop/play-observer-publication.test.cjs'),source=fs.readFileSync(helperFile,'utf8');
-  const end=source.indexOf("test('real navigator");assert.ok(end>0);
-  const {setup,drain}=new Function('require','__dirname',source.slice(0,end)+'\nreturn {setup,drain};')(createRequire(helperFile),path.dirname(helperFile));
-  const s=await setup('on',{collector:true,receipt:r=>require('node:vm').runInContext(
-    '(receipt => ({...receipt,workId:"native-work-"+receipt.viewGeneration,status:occluded?"deferred-occluded":"presented"}))',r.context)});
-  s.r.context.occluded=true;s.start();assert.equal(await s.navigate(10),false);s.stop();await drain();await drain();
-  s.r.context.occluded=false;s.start();assert.equal(await s.navigate(20),true);s.stop();await drain();await drain();
-  for(const frame of[0,10,20])assert.equal(await s.navigate(frame),true);
-  await drain();await s.seal();assert.equal(s.footer().status,'complete');
-  const e=model();e.events=s.r.events();e.native=[];
+test('direct exported O1/preview/navigator/scheduler producers use deterministic ports, never test-source eval',async t=>{
+  const {createObserver}=require('./desktop/play-publication-observer-bootstrap.js');
+  const Preview=require('../src/js/adapters/native-opacity-preview.js');
+  const Motion=require('../src/js/adapters/native-opacity-motion-surface.js');
+  const records=[],identity={instanceId:RUN,documentId:'native-document-1',contentRevision:0};let seal,frame=0,playing=false,runFrame=10,now=0,step;
+  const api=createObserver({runId:RUN},{async listen(fn){seal=()=>fn({payload:{runId:RUN}});},async invoke(action,payload){
+    if(action==='record'){records.push(payload.event);return{sequence:payload.sequence};}
+    if(action==='seal')return{...payload,kind:'seal',status:'provisional',cutId:CUT};return{};}});await api.ready;
+  const oldWindow=global.window;global.window={NemoTestPlayObserver:api};t.after(()=>{if(oldWindow===undefined)delete global.window;else global.window=oldWindow;});
+  const raw=Preview.createNativeOpacityPreviewAdapter();api.bindPreview(raw,Object.freeze({}),()=>7);let call=0;
+  const controller={isActive:()=>true,identity:()=>identity,async presentPreview(value){
+    const meta={documentSnapshotId:'native-opacity:native-document-1:0',documentId:identity.documentId,contentRevision:0,contextId:'scene-root',frame:value,
+      quality:'final',outputSpec:{kind:'frame',format:'rgba8',width:320,height:180,colorInterpretation:'srgb',alphaMode:'straight'},
+      geometryHandle:{resourceId:'geometry-1',resourceVersion:'v1'}};
+    const receipt=await raw.present(RUN,1,meta,async()=>{call++;return{workId:'native-work-'+call,viewGeneration:call,status:call===1?'deferred-occluded':'presented'};},()=>{});
+    if(receipt.status!=='presented'){const error=new Error('model deferred');api.associateFailure(receipt,error);throw error;}
+    const final=Object.freeze({owner:'native',...receipt});api.presentedReturn(receipt,final);return final;
+  }};
+  const nav=Motion.createFrameNavigator({frame:()=>frame,total:()=>21,controller:()=>controller,commit(value){frame=value;api.uiPublication(frame,frame);},
+    paint(){},syncInput(){api.inputPublication(frame+1,frame,frame);},fail(){}});
+  let scheduler;const stop=()=>{if(!playing)return;playing=false;api.playState(false,frame);const state=scheduler.stop();if(state.restore)nav.navigate(controller,frame);};
+  scheduler=Motion.createPlaybackScheduler({frame:()=>frame,fps:()=>10,playing:()=>playing,controller:()=>controller,advance:()=>runFrame,
+    navigate:value=>nav.navigate(controller,value),stop,now:()=>now,request:fn=>{step=fn;return 1;},cancel(){}});
+  const drain=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
+  assert.equal(scheduler.start(controller),true);playing=true;api.playState(true,frame);now+=100;step(now);await drain();
+  assert.equal(playing,false);assert.equal(api.inspect().productPendingNavigation,0);
+  runFrame=20;assert.equal(scheduler.start(controller),true);playing=true;api.playState(true,frame);now+=100;step(now);await drain();stop();await drain();
+  for(const value of[0,10,20])assert.equal(await nav.navigate(controller,value),true);await drain();await seal();
+  const e=model();e.events=records;e.native=[];
   let restored=false;const emit=(event,fields,preview=null)=>e.native.push({diagnostic:'native-occlusion-mapping/v1',
     sequence:e.native.length+1,event,fields,preview,exposureEpoch:restored?2:1});
   emit('exposure',{windowNumber:81,minimized:true,occlusionVisible:false});
@@ -139,6 +160,22 @@ test('oracle consumes actual O1/O2C JS producer records without treating model n
   }
   for(const v of e.visuals){const terminal=e.events.filter(e=>e.event==='navigate-return'&&e.result&&e.frame===v.frame).at(-1);
     for(const key of['instanceId','documentId','contentRevision','hostCallOrdinal','workId','viewGeneration'])v[key]=terminal[key];}
-  const result=verifyEvidence(refresh(e));assert.equal(result.status,'consistent',JSON.stringify(result));
-  assert.match(result.limitations.join(' '),/independent installed review/);
+  const result=verifyEvidence(refresh(e));assert.equal(result.status,'partial');
+  assert.equal(result.code,'rollback-needs-independent-review', 'actual producer rollback has no direct restore-intent link');
+});
+
+for(const kind of['play-start','play-step','play-stop'])test(`removing actual scheduler ${kind} controls refuses`,()=>{
+  const e=model();e.events=e.events.filter(x=>x.event!==kind);assert.equal(verifyEvidence(refresh(e)).status,'partial');
+});
+test('each Stop needs its successful same-frame restoration before restart/end',()=>{
+  for(const intent of[2,4]){const e=model();e.events=e.events.filter(x=>x.intent!==intent&&x.hostCallOrdinal!==intent);
+    assert.equal(verifyEvidence(refresh(e)).status,'partial');}
+});
+test('foreign revision rollback cannot share a pending intent; valid unlinked rollback remains partial',()=>{
+  for(const foreign of[false,true]){
+    const e=model(),index=e.events.findIndex(x=>x.event==='navigate-return'&&x.intent===3);
+    e.events.splice(index,0,{event:'rollback',instanceId:RUN,documentId:'native-document-1',contentRevision:foreign?1:0,intent:3,frame:0,currentFrame:0});
+    const result=verifyEvidence(refresh(e));assert.equal(result.status,'partial');
+    assert.equal(result.code,foreign?'rollback-context':'false-publication');
+  }
 });

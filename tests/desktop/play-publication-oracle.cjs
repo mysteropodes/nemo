@@ -38,11 +38,11 @@ function parse(bytes, expected) {
 }
 function semantics(events) {
   const calls = new Map(), navs = new Map(), latest = new Map(), steps = new Map();
-  let playing = false, sawStart = false, sawStop = false, publications = 0, failures = 0;
+  let playing = false, sawStart = false, sawStop = false, publications = 0, failures = 0, activeRun = null, stopGate = null, playSteps = 0;
   const navKey = e => `${e.instanceId}|${e.documentId}|${e.intent}`;
   const nativeKey = e => `${e.instanceId}|${e.hostCallOrdinal}`;
   const stages = ['commit-enter','ui-publication','commit-return','paint-enter','paint-return','sync-enter','sync-return'];
-  const passive = new Set(['ready','play-start','play-stop','receipt-rejected','receipt-deferred','receipt-stale','receipt-retry']);
+  const passive = new Set(['ready','receipt-rejected','receipt-deferred','receipt-stale','receipt-retry']);
   for (const e of events) {
     if (e.event === 'host-request') {
       requireEvidence(pins.every(k=>e[k]!==undefined) && e.hostCallOrdinal>0 && e.sessionOrdinal>0 && e.hostGeneration>0 &&
@@ -55,7 +55,11 @@ function semantics(events) {
         same(c.receipt,e,pins.concat(['workId','viewGeneration'])), 'presented-context'); c.presented=true;
     } else if (e.event === 'navigate-request') {
       requireEvidence(safe(e.intent) && e.intent>0 && safe(e.frame) && !navs.has(navKey(e)), 'navigation-request');
-      navs.set(navKey(e), { request:e, stage:0, done:false, rollback:false }); latest.set(e.instanceId,e.intent);
+      const n={ request:e, stage:0, done:false, rollback:false };
+      const pending=[...steps.values()].filter(s=>s.pending&&!s.nav&&same(s.request,e,['instanceId','documentId','contentRevision','frame']));
+      requireEvidence(pending.length<=1,'ambiguous-play-step');if(pending.length)n.step=pending[0],pending[0].nav=n;
+      if(stopGate){requireEvidence(stopGate.schedulerStopped&&same(stopGate,e,['instanceId','documentId','contentRevision','frame']), 'stop-restore-context');n.stopRestore=true;}
+      navs.set(navKey(e),n); latest.set(e.instanceId,e.intent);
     } else if (stages.includes(e.event)) {
       const n = navs.get(navKey(e)), c = calls.get(nativeKey(e));
       requireEvidence(n && !n.done && !n.rollback && latest.get(e.instanceId)===e.intent && c?.presented &&
@@ -65,7 +69,9 @@ function semantics(events) {
       if (e.event==='ui-publication') requireEvidence(e.currentFrame===e.frame, 'actual-ui-frame');
       if (e.event==='sync-return') requireEvidence(e.currentFrame===e.frame && e.result===true, 'actual-input-frame');
     } else if (e.event==='rollback') {
-      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && safe(e.frame) && e.currentFrame===e.frame, 'rollback-context'); n.rollback=true;
+      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && !n.rollback &&
+        same(n.pins||n.request,e,['instanceId','documentId','contentRevision']) &&
+        safe(e.frame) && e.currentFrame===e.frame, 'rollback-context'); n.rollback=true;
     } else if (e.event==='failure') {
       const n=navs.get(navKey(e)), c=calls.get(nativeKey(e));
       requireEvidence(n && !n.done && c && same(c.request,e) &&
@@ -75,20 +81,31 @@ function semantics(events) {
     } else if (e.event==='navigate-superseded') {
       const n=navs.get(navKey(e)); requireEvidence(n && !n.done, 'superseded-context'); n.superseded=true;
     } else if (e.event==='navigate-return') {
-      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && typeof e.result==='boolean', 'terminal-navigation'); n.done=true;
+      const n=navs.get(navKey(e)); requireEvidence(n && !n.done && typeof e.result==='boolean', 'terminal-navigation'); n.done=true;n.result=e.result;
       if (e.result) { requireEvidence(!n.rollback && !n.failed && !n.superseded && n.stage===stages.length &&
         latest.get(e.instanceId)===e.intent && same(n.pins,e,pins.concat(['workId','viewGeneration'])), 'false-publication'); publications++; }
       else requireEvidence(n.failed || n.superseded, 'unattributed-failure');
+      requireEvidence(!n.rollback,'rollback-needs-independent-review');
+      if(n.stopRestore){requireEvidence(e.result===true,'stop-restore-failed');stopGate=null;}
     } else if (e.event==='play-state') {
-      requireEvidence(typeof e.playing==='boolean', 'play-state'); playing=e.playing; if(playing)sawStart=true;else sawStop=true;
+      requireEvidence(typeof e.playing==='boolean'&&safe(e.currentFrame), 'play-state');
+      if(e.playing){requireEvidence(activeRun&&!playing&&!stopGate,'play-state-start');sawStart=true;}
+      else{requireEvidence(activeRun&&playing&&!stopGate,'play-state-stop');stopGate={...activeRun,frame:e.currentFrame,schedulerStopped:false};sawStop=true;}
+      playing=e.playing;
+    } else if(e.event==='play-start'){
+      requireEvidence(!activeRun&&!stopGate&&safe(e.runGeneration)&&e.runGeneration>0&&!playing,'scheduler-start');activeRun=e;
+    } else if(e.event==='play-stop'){
+      requireEvidence(activeRun&&stopGate&&!playing&&same(activeRun,e,['instanceId','documentId','contentRevision'])&&
+        e.runGeneration>activeRun.runGeneration,'scheduler-stop');stopGate.schedulerStopped=true;activeRun=null;
     } else if (e.event==='play-step') {
       const key=`${e.instanceId}|${e.runGeneration}|${e.frame}`;
-      if(e.result===undefined) { requireEvidence(!steps.get(key), 'duplicate-play-step'); steps.set(key,true); }
-      else { requireEvidence(steps.get(key) && typeof e.result==='boolean', 'unmatched-play-step'); steps.set(key,false); }
+      if(e.result===undefined) { requireEvidence(activeRun&&playing&&same(activeRun,e,['instanceId','documentId','contentRevision','runGeneration'])&&
+        !steps.get(key)?.pending,'duplicate-play-step');steps.set(key,{request:e,pending:true}); }
+      else { const s=steps.get(key);requireEvidence(s?.pending&&s.nav?.done&&s.nav.result===e.result&&typeof e.result==='boolean','unmatched-play-step');s.pending=false;playSteps++; }
     } else requireEvidence(passive.has(e.event), 'unknown-event');
   }
-  requireEvidence(sawStart && sawStop && !playing && [...navs.values()].every(n=>n.done) &&
-    ![...steps.values()].some(Boolean), 'product-not-quiescent');
+  requireEvidence(sawStart && sawStop && playSteps>0 && !playing && !activeRun&&!stopGate&&[...navs.values()].every(n=>n.done) &&
+    ![...steps.values()].some(s=>s.pending), 'product-not-quiescent');
   requireEvidence(publications>0, 'no-publication'); return { publications, failures };
 }
 function nativeEvidence(native, events, windowId) {
