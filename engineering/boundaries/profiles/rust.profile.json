@@ -12,7 +12,7 @@
       "id": "rust.native.engine.document",
       "layer": "native-document",
       "dir": "native-engine/src",
-      "files": ["document.rs", "object_document.rs", "object_order_document.rs"],
+      "files": ["document.rs", "object_document.rs", "project_media_envelope.rs", "object_order_document.rs"],
       "publicApi": ["document.rs", "object_document.rs"],
       "sizeProfile": "Rust production module"
     },

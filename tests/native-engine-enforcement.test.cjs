@@ -33,6 +33,7 @@ const CANDIDATE_FILES = [
   'native-engine/src/request_receipts.rs',
   'native-engine/src/read_queries.rs',
   'native-engine/src/object_document.rs',
+  'native-engine/src/project_media_envelope.rs',
   'native-engine/src/object_codec.rs',
   'native-engine/src/reference_image_asset.rs',
   'native-engine/tests/reference_image_asset.rs',
