@@ -11,14 +11,16 @@ function fixture(change = {}) {
   const instance={task:cfg.taskId};
   const snapshot={ok:true,taskId:cfg.taskId,source:{matches:true,startup:{head:HEAD}},build:{matches:true},
     runtime:{childPid:123},app:{pid:123,taskId:cfg.taskId,isolated:true,state:'active'}};
-  const actions=[{type:'inspect'},{type:'press',element:'0.1'},{type:'set',element:'0.2',value:'private-path'},
+  const actions=[{type:'inspect'},{type:'press',element:'0.1'},{type:'inspect',element:'0.2'},
     {type:'capture'},{type:'stop'}];
   const controller={async start(){events.push('start');attempts++;if(change.start)return change.start(fire);return instance;},
     async status(){events.push('status');return {value:change.snapshot?change.snapshot(structuredClone(snapshot)):structuredClone(snapshot)};},
     async cleanup(){events.push('cleanup');cleaned++;if(change.cleanup)throw Error('/private/secret');}};
-  const services={async package(){events.push('package');if(change.package)throw Error('/private/pkg');return {executableSha256:HASH,proofHash:HASH};},
+  const services={async transport(){events.push('transport');if(typeof change.transport==='function')return change.transport(fire);
+    if(change.transport)throw Object.assign(Error('transport'),{code:'transport-handshake-refused'});},
+    async package(){events.push('package');if(change.package)throw Error('/private/pkg');return {executableSha256:HASH,proofHash:HASH};},
     async journal(){events.push('journal');if(used)throw Object.assign(Error('duplicate'),{code:'grant-already-attempted'});used=true;},
-    save(r){events.push('save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},
+    save(r){events.push('save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},feedback(){events.push('ephemeral-feedback');},
     controller(){return controller;},validate(){events.push('validate');if(change.validate)throw Error('wrong owner');},
     async window(mode,pid,wid,action){events.push('window-'+mode);if(change.window)return change.window(mode,pid,wid,action,fire);
       return {pid,windowId:45,matchedAX:true,...mode==='capture'?{captureSha256:HASH}:{}};},
@@ -79,9 +81,9 @@ test('package proof refusal does not acquire native/window authority',async()=>{
 });
 test('static owned-window adapter excludes global input and requires exact PID/window/AX actions',()=>{
   const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
-  assert.ok(s.includes('owned.count == 1'));assert.ok(s.includes('AXUIElementGetPid'));assert.ok(s.includes('UInt32(args[2]) == number'));
-  assert.ok(s.includes('"-l" + String(number)'));assert.equal(/CGEvent|SystemWide|osascript/.test(s),false);
-  assert.ok(s.includes('AXPress unsupported; no fallback'));
+  assert.ok(s.includes('initialRows.count == 1'));assert.ok(s.includes('AXUIElementGetPid'));assert.ok(s.includes('CFEqual(parent,main)'));
+  assert.ok(s.includes('"-l"+String(number)'));assert.equal(/CGEvent|SystemWide|osascript/.test(s),false);
+  assert.ok(s.includes('confirm-unsupported'));assert.ok(s.includes('No title/value/children reads from a foreign child'));
 });
 test('flat identity and window validators reject unsafe scalar coercions',()=>{
   const f=fixture();assert.throws(()=>verifyIdentity({app:{pid:'123'}},{task:f.cfg.taskId},f.cfg));
@@ -129,7 +131,7 @@ test('atomic receipt updates do not follow a malicious receipt symlink',()=>{
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 test('static persisted AX evidence is restricted to known control/alert facts',()=>{
-  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('nodes.append(facts)'));
+  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('nodes.append(fact(child,'));
   assert.equal(/facts\["(?:title|value)"\]/.test(s),false);assert.ok(s.includes('switch-unavailable'));
   const d=fs.readFileSync('tests/desktop/p38-installed-driver.cjs','utf8');assert.ok(d.includes('OPERATOR ASSERTION'));
 });
@@ -159,4 +161,136 @@ test('malformed helper identity scalars refuse at the JS evidence boundary',()=>
   for(const windowId of [0,-1,1.5,4294967296])assert.throws(()=>safeWindowEvidence({...identity,windowId}));
   assert.throws(()=>safeWindowEvidence({...identity,matchedAX:false}));
   assert.deepEqual(safeWindowEvidence(identity),identity);
+});
+
+test('transport refusal/EOF/watchdog occurs before package, journal or app start',async()=>{
+  for(const transport of [true, fire=>{fire();return new Promise(()=>{});}]){
+    const f=fixture({transport}),r=await runOperator(f.cfg,f.services);
+    assert.equal(r.status,'partial');assert.equal(f.attempts,0);
+    assert.equal(f.events.includes('package'),false);assert.equal(f.events.includes('journal'),false);
+    assert.equal(f.events.includes('helpers-close'),true);
+  }
+});
+test('nonce handshake admits delayed reply only on explicit PTY, with zero modeled effects',async()=>{
+  const {transportReady}=require('./desktop/p38-installed-driver.cjs'),written=[],nonce='fixed-model-nonce';
+  await transportReady(async()=>{await Promise.resolve();return{transport:'p38-ready',nonce};},r=>written.push(r),true,nonce);
+  assert.deepEqual(written.map(r=>r.status),['waiting','ready']);assert.ok(written.every(r=>r.startAttempts===0&&r.journalWrites===0));
+  let reads=0;await assert.rejects(transportReady(async()=>{reads++;},()=>{},false),e=>e.code==='transport-pty-required');assert.equal(reads,0);
+  for(const reply of [{transport:'p38-ready',nonce:'foreign'},{transport:'N20R',nonce},null]){
+    await assert.rejects(transportReady(async()=>reply,()=>{},true,nonce),e=>e.code==='transport-handshake-refused');
+  }
+  await assert.rejects(transportReady(async()=>{throw Object.assign(Error('EOF'),{code:'operator-input-ended'});},()=>{},true,nonce));
+});
+test('real no-app CLI refuses non-PTY transport probe before any nonce or journal',()=>{
+  const {spawnSync}=require('node:child_process'),p=spawnSync(process.execPath,['tests/desktop/p38-installed-driver.cjs','--transport-probe'],{encoding:'utf8',timeout:5000});
+  assert.equal(p.status,1);assert.equal(p.stdout,'');assert.match(p.stderr,/operator refused/);
+});
+test('positive main/direct-sheet pin/routes/dismissal preserve one main and one start',async()=>{
+  const token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',f=fixture();
+  const actions=[{type:'pin-sheet'},{type:'inspect',target:'sheet',sheetToken:token,element:''},
+    {type:'select',target:'sheet',sheetToken:token,element:'0.1'},{type:'press',target:'sheet',sheetToken:token,element:'0.2'},
+    {type:'sheet-dismissed',sheetToken:token},{type:'inspect'},{type:'stop'}];
+  f.services.next=async()=>actions.shift();f.services.window=async(mode,pid,wid,a={})=>({pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'?{target:'sheet',sheetToken:token}:{}),...(a.target==='sheet'?{target:'sheet',sheetToken:token}:{}),
+    ...(mode==='sheet-dismissed'?{dismissed:true}:{})});
+  const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'operator-complete');assert.equal(r.appPid,123);assert.equal(r.windowId,45);
+  assert.equal(f.attempts,1);assert.equal(f.cleaned,1);assert.equal(r.installedAcceptance,'not-established');
+});
+test('next action learns fresh token from ephemeral output, with no token/private receipt evidence',async()=>{
+  const token=require('node:crypto').randomUUID(),f=fixture(),messages=[];let step=0,learned;
+  f.services.feedback=async reply=>{messages.push(structuredClone(reply));learned=reply.token;};
+  f.services.next=async()=>{
+    if(step++===0)return{type:'pin-sheet'};
+    assert.equal(learned,token);
+    if(step===2)return{type:'inspect',target:'sheet',sheetToken:learned};
+    if(step===3)return{type:'sheet-dismissed',sheetToken:learned};return{type:'stop'};
+  };
+  f.services.window=async(mode,pid,wid,a={})=>({pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'?{target:'sheet',sheetToken:token,ownerToken:'private-owner',value:'private-file-path'}:{}),
+    ...(a.target==='sheet'?{target:'sheet',sheetToken:token}:{}),...(mode==='sheet-dismissed'?{dismissed:true}:{})});
+  const receipt=await runOperator(f.cfg,f.services);assert.equal(receipt.status,'operator-complete');
+  assert.deepEqual(messages,[{target:'sheet',ordinal:1,token}]);
+  for(const value of [receipt,...f.receipts]){
+    const serialized=JSON.stringify(value);assert.equal(serialized.includes(token),false);assert.equal(serialized.includes('private'),false);
+  }
+});
+test('missing token feedback channel refuses instead of continuing with undisclosed routing state',async()=>{
+  const f=fixture();delete f.services.feedback;f.services.next=async()=>({type:'pin-sheet'});
+  f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,...(mode==='pin-sheet'?{target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa'}:{})});
+  const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.reason,'sheet-feedback-required');assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+});
+test('foreign/stale/absent sheet routes and undismissed main/stop refuse before interaction',()=>{
+  const {actionTarget,sheetResult}=require('./desktop/p38-installed-driver.cjs'),token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa';
+  const sheet={token};
+  for(const a of [{type:'press',target:'sheet',sheetToken:'other'},{type:'set',target:'sheet'},
+    {type:'press',target:'main'},{type:'select',target:'foreign'}, {type:'sheet-dismissed',sheetToken:'other'}])assert.throws(()=>actionTarget(a,sheet));
+  for(const r of [{target:'sheet',sheetToken:'bad'},{target:'main',sheetToken:token},
+    {target:'sheet',sheetToken:'3d755db1-cdf7-44f8-8706-cc812e1845ca'}])assert.throws(()=>sheetResult({type:'pin-sheet'},{...sheet},r));
+  assert.throws(()=>sheetResult({type:'sheet-dismissed'},{...sheet},{dismissed:false}));
+  sheetResult({type:'sheet-dismissed'},sheet,{dismissed:true});assert.equal(sheet.token,null);
+  assert.throws(()=>actionTarget({type:'inspect',target:'sheet',sheetToken:token},sheet));
+});
+for(const reason of ['sheet-owner','sheet-parent','sheet-replaced','standalone-window','child-owner','confirm-unsupported','children-unavailable']){
+  test('bounded '+reason+' helper refusal stays partial and always cleans without retry',async()=>{
+    const f=fixture({window(mode,pid){return mode==='discover'?{pid,windowId:45,matchedAX:true}:{status:'refused',code:reason,pid,windowId:45,matchedAX:true};}});
+    const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.reason,reason);assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+  });
+}
+test('blocked local child metadata persists without foreign values or arbitrary reasons',()=>{
+  const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
+  const r=safeWindowEvidence({pid:123,windowId:45,matchedAX:true,nodes:[{path:'0',role:'other',blocked:'child-owner',value:'private',title:'secret'},
+    {path:'1',role:'AXGroup',blocked:'children-unavailable',press:false,confirm:false},{path:'2',role:'other',blocked:'private'}]});
+  assert.equal(r.nodes[0].blocked,'child-owner');assert.equal(r.nodes[1].blocked,'children-unavailable');assert.equal(r.nodes[2].blocked,undefined);
+  assert.equal(JSON.stringify(r).includes('private'),false);assert.equal(JSON.stringify(r).includes('secret'),false);
+});
+test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
+  const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
+  const start=source.indexOf('    case "inspect":'),end=source.indexOf('    case "capture":',start),body=source.slice(start,end);
+  const guard=body.indexOf('if target == "main" { try noSheet() }'),traversal=body.indexOf('try node(base,selectedRoot)');
+  assert.ok(start>=0&&end>start&&guard>=0&&traversal>guard);
+  const noSheet=source.slice(source.indexOf('  func noSheet()'),source.indexOf('  func verify()',source.indexOf('  func noSheet()')));
+  assert.match(noSheet,/sheet == nil/);assert.match(noSheet,/members\(\)\)\.isEmpty/);
+});
+test('A/B fixture proof uses exact same-descriptor bytes and rejects swap/hash/name/symlink',()=>{
+  const {verifyFixtures}=require('./desktop/p38-installed-driver.cjs'),crypto=require('node:crypto'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-fixtures-'));
+  try{
+    const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,JSON.stringify({label}));return{label,path:file,sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')};});
+    verifyFixtures({fixtures});assert.throws(()=>verifyFixtures({fixtures:[fixtures[0]]}));
+    assert.throws(()=>verifyFixtures({fixtures:[{...fixtures[0],sha256:'0'.repeat(64)},fixtures[1]]}),e=>e.code==='fixture-refused');
+    fs.writeFileSync(fixtures[1].path,'changed');assert.throws(()=>verifyFixtures({fixtures}),e=>e.code==='fixture-refused');
+    fs.unlinkSync(fixtures[1].path);fs.symlinkSync(fixtures[0].path,fixtures[1].path);assert.throws(()=>verifyFixtures({fixtures}),e=>e.code==='fixture-refused');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('exact spawned-helper group cleanup escalates only when needed and refuses unreaped group',async()=>{
+  const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
+  for(const endOn of ['already','SIGTERM','SIGKILL','never']){
+    let live=endOn!=='already';const signals=[];
+    const work=cleanupHelper({pid:123},{alive:()=>live,signal:kind=>{signals.push(kind);if(kind===endOn)live=false;},delay:async()=>{}});
+    if(endOn==='never')await assert.rejects(work,e=>e.code==='helper-group-remains');else await work;
+    assert.deepEqual(signals,endOn==='already'?[]:endOn==='SIGTERM'?['SIGTERM']:['SIGTERM','SIGKILL']);
+  }
+  await assert.rejects(cleanupHelper({pid:-1}),e=>e.code==='helper-cleanup-invalid');
+});
+
+for(const mode of ['positive','EOF','malformed','foreign','refused','oversized'])test('real Node-only modeled helper pipe '+mode+' is framed/tracked/cleaned',async()=>{
+  // Disposable Node stub only. Never Nemo, macOS AX, a native window or installed evidence.
+  const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs'),crypto=require('node:crypto');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-node-')),helpers=new Set();
+  try{
+    const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,'{}');return{label,path:file,sha256:crypto.createHash('sha256').update('{}').digest('hex')};});
+    const script=path.join(dir,'modeled-helper');
+    const before=mode==='EOF'?'process.exit(0);':mode==='malformed'?"console.log('not-json');":
+      mode==='oversized'?"console.log('x'.repeat(1048577));":mode==='refused'?"console.log(JSON.stringify({status:'refused',code:'confirm-unsupported'}));":
+      "console.log(JSON.stringify({status:'pinned',pid:"+(mode==='foreign'?124:123)+",windowId:45,matchedAX:true}));";
+    fs.writeFileSync(script,'#!/usr/bin/env node\n'+before+"\nrequire('node:readline').createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);console.log(JSON.stringify({...r,status:'ok',matchedAX:true}));});\n",{mode:0o700});
+    const guard=safeDirectory(dir,['reports']),window=createWindowTransport({windowHelper:script,grant:{id:'model-only'},fixtures},guard.directory,()=>guard,helpers);
+    if(mode==='positive'){
+      assert.equal((await window('discover',123)).windowId,45);
+      assert.equal((await window('check',123,45)).type,'check');assert.equal(helpers.size,1);
+      await assert.rejects(window('check',124,45),e=>e.code==='owned-window-refused');
+    }else await assert.rejects(window('discover',123),e=>['helper-input-ended','helper-malformed','owned-window-refused','confirm-unsupported'].includes(e.code));
+  }finally{
+    for(const child of [...helpers])await cleanupHelper(child);
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
 });

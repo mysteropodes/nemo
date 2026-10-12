@@ -1,123 +1,255 @@
-// P38 owned-window adapter. No global keyboard/mouse events or dialog-window fallback.
+// P38V2 test-only persistent main/sheet control; no global input or rediscovery.
 import Foundation
 import ApplicationServices
 import CoreGraphics
 
-func require(_ value: Bool, _ message: String) throws {
-  if !value { throw NSError(domain: "P38", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+struct Refusal: Error { let code: String }
+let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
+func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
+let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
+func sheetProof(_ members: [Int], _ owners: [Int:Int], _ parents: [Int:Int], _ pid: Int, _ main: Int, _ retained: Int?) throws -> Int {
+  try check(members.count == 1)
+  let candidate = members[0]; try check(owners[candidate] == pid && parents[candidate] == main &&
+    (retained == nil || retained == candidate)); return candidate
 }
-func attr(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+func route(_ raw: String) throws -> [Int] {
+  if raw.isEmpty { return [] }
+  let parts = raw.split(separator: ".", omittingEmptySubsequences: false)
+  try check(parts.count <= 20 && raw.count <= 128)
+  return try parts.map { part in
+    try check(!part.isEmpty && part.allSatisfy { $0.isASCII && $0.isNumber })
+    guard let n = Int(part), n >= 0, n < 4096 else { throw Refusal(code:"adapter-refused") }; return n
+  }
+}
+func attr(_ node: AXUIElement, _ key: String) -> CFTypeRef? {
   var value: CFTypeRef?
-  return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil
+  return AXUIElementCopyAttributeValue(node, key as CFString, &value) == .success ? value : nil
 }
-func children(_ element: AXUIElement) -> [AXUIElement] {
-  return attr(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
+func children(_ node: AXUIElement) -> [AXUIElement] { attr(node, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+func owns(_ node: AXUIElement, _ pid: pid_t) -> Bool {
+  var actual: pid_t = 0; return AXUIElementGetPid(node, &actual) == .success && actual == pid
 }
-func point(_ element: AXUIElement) -> CGPoint? {
-  guard let raw = attr(element, kAXPositionAttribute) else { return nil }
+func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [String:Any]) -> [String:Any] {
+  guard owner == pid else { return ["path":path,"role":"other","blocked":"child-owner"] }
+  return read()
+}
+func xy(_ node: AXUIElement) -> CGPoint? {
+  guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
   return AXValueGetValue(raw as! AXValue, .cgPoint, &value) ? value : nil
 }
-func size(_ element: AXUIElement) -> CGSize? {
-  guard let raw = attr(element, kAXSizeAttribute) else { return nil }
+func wh(_ node: AXUIElement) -> CGSize? {
+  guard let raw = attr(node, kAXSizeAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGSize.zero
   return AXValueGetValue(raw as! AXValue, .cgSize, &value) ? value : nil
 }
 func emit(_ value: [String: Any]) throws {
   let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
-  print(String(data: data, encoding: .utf8)!)
+  print(String(data: data, encoding: .utf8)!); fflush(stdout)
+}
+func selfTest() throws {
+  try check(try route("0.12.3") == [0,12,3])
+  for input in ["-1", "0..1", ".0", "1.", "x", "4096", "999999999999999999999", String(repeating: "1.", count: 21)] {
+    var refused = false; do { _ = try route(input) } catch { refused = true }; try check(refused)
+  }
+  try check(!actions.contains("key") && !actions.contains("focus") && !actions.contains("launch"))
+  try check(try sheetProof([11],[11:123],[11:1],123,1,nil) == 11)
+  try check(try sheetProof([11],[11:123],[11:1],123,1,11) == 11)
+  for (members,owners,parents,retained) in [([], [11:123], [11:1], nil), ([11,12],[11:123,12:123],[11:1,12:1],nil), ([11],[11:124],[11:1],nil),
+    ([12],[11:123,12:123],[11:1,12:1],11), ([],[11:123],[11:1],11), ([11],[11:123],[11:999],nil), ([11],[11:123],[:],11)] as [([Int],[Int:Int],[Int:Int],Int?)] {
+    var refused = false; do { _ = try sheetProof(members,owners,parents,123,1,retained) } catch { refused = true }; try check(refused)
+  }
+  var reads = 0
+  for owner in [124,nil] as [pid_t?] {
+    let fact = localFacts("0",owner,123) { reads += 1; return ["control":"private"] }
+    try check(fact["blocked"] as? String == "child-owner" && reads == 0)
+  }
+  _ = localFacts("0",123,123) { reads += 1; return ["control":"Open"] }; try check(reads == 1)
+  try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
-  try require(ProcessInfo.processInfo.environment["NEMO_P38_GRANT"]?.isEmpty == false, "grant required")
-  try require(args.count >= 3, "owned PID required")
-  guard let pid = Int32(args[1]), pid > 0 else { throw NSError(domain: "P38", code: 2) }
-  try require(AXIsProcessTrusted(), "Accessibility unavailable")
-  let owned = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []).filter {
+  if args == [args[0], "--self-test"] { try selfTest(); return }
+  try check(args.count == 3 && args[1] == "--persistent" && ProcessInfo.processInfo.environment["NEMO_P38_GRANT"]?.isEmpty == false)
+  guard let pid = Int32(args[2]), pid > 0, let report = ProcessInfo.processInfo.environment["NEMO_P38_REPORT_ROOT"] else { throw Refusal(code:"adapter-refused") }
+  let initialRows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []).filter {
     ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
   }
-  let discover = args[2] == "discover"
-  if discover { try require(owned.count == 1, "one initial owned window required") }
-  let selected = discover ? owned : owned.filter { ($0[kCGWindowNumber as String] as? UInt32) == UInt32(args[2]) }
-  try require(selected.count == 1, "owned window identity changed")
-  guard let info = selected.first, let number = info[kCGWindowNumber as String] as? UInt32,
-        let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] else { throw NSError(domain: "P38", code: 3) }
-  if !discover { try require(UInt32(args[2]) == number && args.count >= 4, "window identity changed") }
-  let application = AXUIElementCreateApplication(pid)
-  let axWindows = attr(application, kAXWindowsAttribute) as? [AXUIElement] ?? []
-  try require(axWindows.count == 1, "separate AX dialog/window forbidden")
-  let candidates = axWindows.filter {
-    guard let p = point($0), let s = size($0) else { return false }
-    return abs(p.x - (bounds["X"] ?? -10000)) < 3 && abs(p.y - (bounds["Y"] ?? -10000)) < 3 &&
-      abs(s.width - (bounds["Width"] ?? -10000)) < 3 && abs(s.height - (bounds["Height"] ?? -10000)) < 3
-  }
-  try require(candidates.count == 1, "ambiguous AX/window match")
-  let window = candidates[0]
-  var result: [String: Any] = ["pid": pid, "windowId": number, "matchedAX": true]
-  if discover { try emit(result); return }
-  let action = args[3]
-  func node(_ route: String) throws -> AXUIElement {
-    var current = window
-    let parts = route.split(separator: ".")
-    try require(!parts.isEmpty && parts.count <= 20, "bounded element path required")
-    for part in parts {
-      guard let index = Int(part), children(current).indices.contains(index) else { throw NSError(domain: "P38", code: 4) }
-      current = children(current)[index]
+  try check(initialRows.count == 1)
+  guard let number = initialRows[0][kCGWindowNumber as String] as? UInt32 else { throw Refusal(code:"adapter-refused") }
+  let reportURL = URL(fileURLWithPath: report).standardizedFileURL
+  let physical = reportURL.resolvingSymlinksInPath()
+  try check(physical.path == reportURL.path && FileManager.default.fileExists(atPath: physical.path))
+  let reportIdentity = try FileManager.default.attributesOfItem(atPath: physical.path)
+  try check(reportIdentity[.type] as? FileAttributeType == .typeDirectory)
+  func cg(_ all: Bool) -> [[String:Any]] {
+    let flags: CGWindowListOption = all ? [.optionAll,.excludeDesktopElements] : [.optionOnScreenOnly,.excludeDesktopElements]
+    return (CGWindowListCopyWindowInfo(flags,kCGNullWindowID) as? [[String:Any]] ?? []).filter {
+      ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
     }
-    var actual: pid_t = 0
-    try require(AXUIElementGetPid(current, &actual) == .success && actual == pid, "foreign AX element")
+  }
+  let initial = cg(false); try check(initial.count == 1)
+  guard let row = initial.first, row[kCGWindowNumber as String] as? UInt32 == number,
+        let bounds = row[kCGWindowBounds as String] as? [String:CGFloat] else { throw Refusal(code:"adapter-refused") }
+  try check(AXIsProcessTrusted())
+  let application = AXUIElementCreateApplication(pid)
+  let windows = attr(application,kAXWindowsAttribute) as? [AXUIElement] ?? []
+  let matched = windows.filter {
+    guard owns($0,pid), let p = xy($0), let s = wh($0) else { return false }
+    return abs(p.x-(bounds["X"] ?? -10000)) < 3 && abs(p.y-(bounds["Y"] ?? -10000)) < 3 &&
+      abs(s.width-(bounds["Width"] ?? -10000)) < 3 && abs(s.height-(bounds["Height"] ?? -10000)) < 3
+  }
+  try check(matched.count == 1); let main = matched[0]
+  var ordinal = 0
+  var sheet: AXUIElement? = nil, sheetToken: String? = nil
+  // Public SDK defines AXSheet + AXParent/AXChildren, not an AXSheets constant.
+  // Derive attachment from that documented relationship, never same-PID alone.
+  func members() throws -> [AXUIElement] {
+    guard let childRows = attr(main,kAXChildrenAttribute) as? [AXUIElement],
+          let appRows = attr(application,kAXWindowsAttribute) as? [AXUIElement] else { throw Refusal(code:"adapter-refused") }
+    var attached = [AXUIElement]()
+    for candidate in childRows + appRows {
+      if !owns(candidate,pid) { throw Refusal(code:"sheet-owner") }
+      if attr(candidate,kAXRoleAttribute) as? String != kAXSheetRole { continue }
+      guard let rawParent = attr(candidate,kAXParentAttribute), CFGetTypeID(rawParent) == AXUIElementGetTypeID() else { throw Refusal(code:"sheet-parent") }
+      let parent = rawParent as! AXUIElement
+      if !owns(parent,pid) || !CFEqual(parent,main) { throw Refusal(code:"sheet-parent") }
+      if !attached.contains(where:{ CFEqual($0,candidate) }) { attached.append(candidate) }
+    }
+    return attached
+  }
+  func verifySheet() throws -> AXUIElement {
+    guard let retained = sheet else { throw Refusal(code:"adapter-refused") }
+    let actual = try members()
+    if actual.count != 1 || !owns(actual[0],pid) || !owns(retained,pid) || !CFEqual(actual[0],retained) { throw Refusal(code:"sheet-replaced") }
+    return retained
+  }
+  func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
+  func verify() throws {
+    try check(owns(main,pid) && (attr(application,kAXWindowsAttribute) as? [AXUIElement] ?? []).contains { CFEqual($0,main) })
+    let minimized = attr(main,kAXMinimizedAttribute) as? Bool ?? false
+    let identities = cg(true).filter { $0[kCGWindowNumber as String] as? UInt32 == number }
+    // Retain the exact main AX object across picker presentation; no rediscovery.
+    try check(identities.count == 1 && !minimized)
+  }
+  func node(_ value: String, _ root: AXUIElement) throws -> AXUIElement {
+    var current = root
+    for index in try route(value) {
+      let list = children(current); try check(list.indices.contains(index)); current = list[index]
+      if !owns(current,pid) { throw Refusal(code:"child-owner") }
+      // Routes begin at pinned main; standalone AX windows/panels cannot enter the route.
+      if attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
+    }
     return current
   }
-  switch action {
-  case "check": break
-  case "raise": try require(AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success, "raise refused")
-  case "press":
-    try require(args.count == 5, "element required")
-    let element = try node(args[4]); var actions: CFArray?
-    try require(AXUIElementCopyActionNames(element, &actions) == .success &&
-      (actions as? [String] ?? []).contains(kAXPressAction), "AXPress unsupported; no fallback")
-    try require(AXUIElementPerformAction(element, kAXPressAction as CFString) == .success, "press refused")
-  case "set":
-    try require(args.count == 6, "element/value required")
-    try require(AXUIElementSetAttributeValue(try node(args[4]), kAXValueAttribute as CFString, args[5] as CFString) == .success, "set refused")
-  case "capture":
-    try require(args.count == 5 && args[4].hasPrefix("/"), "capture destination required")
-    guard let reportRoot = ProcessInfo.processInfo.environment["NEMO_P38_REPORT_ROOT"] else { throw NSError(domain: "P38", code: 6) }
-    let parent = URL(fileURLWithPath: args[4]).deletingLastPathComponent().resolvingSymlinksInPath().path
-    try require(parent == reportRoot && URL(fileURLWithPath: reportRoot).resolvingSymlinksInPath().path == reportRoot, "capture containment refused")
-    try require((try? FileManager.default.attributesOfItem(atPath: args[4])) == nil, "capture destination exists")
-    let capture = Process(); capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-    capture.arguments = ["-x", "-o", "-l" + String(number), args[4]]
-    try capture.run(); capture.waitUntilExit(); try require(capture.terminationStatus == 0, "capture failed")
-  case "inspect":
-    var nodes = [[String: Any]]()
-    func visit(_ element: AXUIElement, _ route: String, _ depth: Int) throws {
-      try require(nodes.count < 4096, "AX tree budget")
-      if depth > 15 { return }
-      var actual: pid_t = 0
-      try require(AXUIElementGetPid(element, &actual) == .success && actual == pid, "foreign subtree")
-      let role = attr(element, kAXRoleAttribute) as? String ?? ""
-      let roles = ["AXWindow", "AXSheet", "AXButton", "AXTextField", "AXStaticText", "AXGroup", "AXWebArea", "AXCheckBox", "AXMenu", "AXMenuItem"]
-      var facts: [String: Any] = ["path": route, "role": roles.contains(role) ? role : "other"]
-      let title = attr(element, kAXTitleAttribute) as? String ?? ""
-      let value = attr(element, kAXValueAttribute) as? String ?? ""
-      let labels = ["Open", "Cancel", "A", "B", "Motion", "Opacity", "R08 rectangle"]
-      if labels.contains(title) { facts["control"] = title }
-      let alerts = ["Switching project tabs is unavailable in this build.": "switch-unavailable",
-        "Closing the active project tab is unavailable in this build.": "active-close-unavailable"]
-      if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
-      // No arbitrary AX title/value, file paths, document text or owner token is persisted.
-      nodes.append(facts)
-      for (index, child) in children(element).enumerated() { try visit(child, route.isEmpty ? String(index) : route + "." + String(index), depth + 1) }
+  func supports(_ node: AXUIElement, _ action: String) -> Bool {
+    var list: CFArray?; return AXUIElementCopyActionNames(node,&list) == .success && (list as? [String] ?? []).contains(action)
+  }
+  try emit(["status":"pinned", "pid":pid, "windowId":number, "matchedAX":true])
+  while let line = readLine() {
+    try check(line.utf8.count <= 8192)
+    guard let raw = line.data(using:.utf8), let request = try JSONSerialization.jsonObject(with:raw) as? [String:Any],
+          let action = request["type"] as? String, actions.contains(action), request["pid"] as? Int32 == pid,
+          request["windowId"] as? UInt32 == number else { throw Refusal(code:"adapter-refused") }
+    // The driver's mandatory identity checks do not consume the 64 UI-action budget.
+    if action != "check" { try check(ordinal < 64); ordinal += 1 }
+    if action == "quit" { try verify(); try emit(["status":"quit", "pid":pid,"windowId":number]); return }
+    try verify()
+    var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
+    let target = request["target"] as? String ?? "main"
+    try check(target == "main" || target == "sheet")
+    var selectedRoot = main
+    if target == "sheet" {
+      try check(request["sheetToken"] as? String == sheetToken && sheetToken != nil)
+      selectedRoot = try verifySheet(); result["target"] = "sheet"; result["sheetToken"] = sheetToken
     }
-    try visit(window, "", 0); result["nodes"] = nodes
-  default: throw NSError(domain: "P38", code: 5)
+    switch action {
+    case "pin-sheet":
+      try check(target == "main")
+      let actual = try members(); try check(actual.count == 1 && owns(actual[0],pid))
+      if let retained = sheet { try check(CFEqual(actual[0],retained)); _ = try verifySheet() }
+      else { sheet = actual[0]; sheetToken = UUID().uuidString.lowercased() }
+      result["target"] = "sheet"; result["sheetToken"] = sheetToken
+    case "sheet-dismissed":
+      try check(target == "main" && sheet != nil && sheetToken != nil && request["sheetToken"] as? String == sheetToken)
+      try check(try members().isEmpty); sheet = nil; sheetToken = nil; result["dismissed"] = true
+    case "raise":
+      try check(target == "main"); try noSheet()
+      try check(AXUIElementPerformAction(main,kAXRaiseAction as CFString) == .success)
+    case "press", "set", "select":
+      guard let value = request["element"] as? String, !value.isEmpty else { throw Refusal(code:"adapter-refused") }
+      if target == "main" { try noSheet() }
+      let selected = try node(value,selectedRoot), operation = action == "press" ? kAXPressAction : kAXConfirmAction
+      if action != "select" && !supports(selected,operation) { throw Refusal(code:action == "set" ? "confirm-unsupported" : "adapter-refused") }
+      if action == "set" {
+        try check(target == "sheet")
+        guard let text = request["value"] as? String, text.utf8.count <= 4096 else { throw Refusal(code:"adapter-refused") }
+        try check(attr(selected,kAXRoleAttribute) as? String == kAXTextFieldRole)
+        var focusable = DarwinBoolean(false)
+        try check(AXUIElementIsAttributeSettable(selected,kAXFocusedAttribute as CFString,&focusable) == .success && focusable.boolValue)
+        try check(AXUIElementSetAttributeValue(selected,kAXFocusedAttribute as CFString,kCFBooleanTrue) == .success)
+        guard let focused = attr(application,kAXFocusedUIElementAttribute) else { throw Refusal(code:"adapter-refused") }
+        try check(CFEqual(focused,selected))
+        try check(AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,text as CFString) == .success)
+      }
+      if action == "select" {
+        try check(target == "sheet" && attr(selected,kAXRoleAttribute) as? String == kAXRowRole)
+        var settable = DarwinBoolean(false)
+        try check(AXUIElementIsAttributeSettable(selected,kAXSelectedAttribute as CFString,&settable) == .success && settable.boolValue)
+        try check(AXUIElementSetAttributeValue(selected,kAXSelectedAttribute as CFString,kCFBooleanTrue) == .success)
+      } else { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
+      try verify()
+      if target == "sheet" {
+        if try members().isEmpty { result["dismissalPendingVerification"] = true }
+        else { _ = try verifySheet() }
+      }
+    case "inspect":
+      if target == "main" { try noSheet() }
+      let base = request["element"] as? String ?? ""
+      let selected = try node(base,selectedRoot)
+      let roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
+      let labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+      func fact(_ current: AXUIElement, _ path: String) -> [String:Any] {
+        // No title/value/children reads from a foreign child; expose blocked route only.
+        var owner: pid_t = 0
+        let resolved: pid_t? = AXUIElementGetPid(current,&owner) == .success ? owner : nil
+        return localFacts(path,resolved,pid) {
+        let role = attr(current,kAXRoleAttribute) as? String ?? ""
+        let title = attr(current,kAXTitleAttribute) as? String ?? "", value = attr(current,kAXValueAttribute) as? String ?? ""
+        var facts: [String:Any] = ["path":path,"role":roles.contains(role) ? role : "other","press":supports(current,kAXPressAction),"confirm":supports(current,kAXConfirmAction)]
+        if labels.contains(title) { facts["control"] = title }
+        else if labels.contains(value) { facts["control"] = value }
+        let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
+        if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
+        return facts
+        }
+      }
+      var nodes = [fact(selected,base)]
+      let rawChildren = attr(selected,kAXChildrenAttribute) as? [AXUIElement]
+      let list = rawChildren ?? []; try check(list.count < 4096)
+      if rawChildren == nil { nodes[0]["blocked"] = "children-unavailable" }
+      for (index,child) in list.enumerated() { nodes.append(fact(child,base.isEmpty ? String(index) : base+"."+String(index))) }
+      result["nodes"] = nodes
+      if target == "sheet" { _ = try verifySheet() }
+    case "capture":
+      try check(target == "main")
+      if sheet != nil { _ = try verifySheet() } else { try noSheet() }
+      guard let name = request["capture"] as? String, name.range(of:"^capture-[1-9][0-9]{0,2}\\.png$",options:.regularExpression) != nil else { throw Refusal(code:"adapter-refused") }
+      let now = try FileManager.default.attributesOfItem(atPath:physical.path)
+      try check(now[.systemNumber] as? NSNumber == reportIdentity[.systemNumber] as? NSNumber && now[.systemFileNumber] as? NSNumber == reportIdentity[.systemFileNumber] as? NSNumber)
+      let target = physical.appendingPathComponent(name)
+      try check(!FileManager.default.fileExists(atPath:target.path))
+      let process = Process(); process.executableURL = URL(fileURLWithPath:"/usr/sbin/screencapture")
+      process.arguments = ["-x","-o","-l"+String(number),target.path]
+      try process.run(); process.waitUntilExit()
+      do { try check(process.terminationStatus == 0); try verify() }
+      catch { try? FileManager.default.removeItem(at:target); throw error }
+      result["capture"] = name
+    default: break
+    }
+    try emit(result)
   }
-  let remainsOwned = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []).contains {
-    ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowNumber as String] as? UInt32) == number
-  }
-  if !remainsOwned && action == "capture" { try? FileManager.default.removeItem(atPath: args[4]) }
-  try require(remainsOwned, "owned window disappeared during operation")
-  try emit(result)
 }
-do { try run() } catch { fputs("P38 owned-window operation refused; no fallback.\n", stderr); exit(1) }
+do { try run() }
+catch let error as Refusal { try? emit(["status":"refused","code":allowedReasons.contains(error.code) ? error.code : "adapter-refused"]); exit(1) }
+catch { try? emit(["status":"refused","code":"adapter-refused"]); exit(1) }
