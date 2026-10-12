@@ -23,7 +23,7 @@ fn cpu_output_budget_checks_device_raw_and_aligned_limits_without_allocating() {
 mod actual_owner {
     use super::super::*;
     use crate::history::NativeObjectHistory;
-    use crate::object_codec::decode_project;
+    use crate::object_codec::decode_storage_project;
     use crate::object_document::FrameScopeKind;
     use crate::object_frame_packet::prepare_object_frame;
     use crate::object_render_scene::{
@@ -66,7 +66,7 @@ mod actual_owner {
     fn new_owner(value: &Value) -> NativeObjectHistory {
         NativeObjectHistory::new(
             "d2-real-owner",
-            decode_project(&serde_json::to_vec(value).unwrap()).unwrap(),
+            decode_storage_project(&serde_json::to_vec(value).unwrap()).unwrap(),
         )
         .unwrap()
     }
@@ -355,7 +355,8 @@ mod actual_owner {
         .unwrap();
         let snapshot = app.acquire_snapshot(0).unwrap();
         let id = snapshot.id().to_owned();
-        let spec = OutputSpec::new("frame", "rgba8", 64, 64, "srgb", "straight").unwrap();
+        // Preserve N12's existing 320x180 admission contract; do not widen it.
+        let spec = OutputSpec::new("frame", "rgba8", 320, 180, "srgb", "straight").unwrap();
         let key = EvaluationKey::new(
             &id,
             "scene-root",
@@ -383,7 +384,10 @@ mod actual_owner {
         let mut gpu = headless();
         let result = gpu.compose(&scene).unwrap();
         let pixels = gpu.readback_rgba8(&result).unwrap();
-        assert_pixel(at(pixels.bytes(), 8, 8), [255, 204, 204, 255]);
+        let sample: [u8; 4] = pixels.bytes()[(8 * 320 + 8) * 4..(8 * 320 + 8) * 4 + 4]
+            .try_into()
+            .unwrap();
+        assert_pixel(sample, [255, 204, 204, 255]);
         assert_eq!(pixels.document_snapshot_id(), id);
         assert_eq!(pixels.frame(), 0);
         assert_eq!(pixels.scheduled_identity(), scene.scheduled_identity());

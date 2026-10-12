@@ -101,6 +101,7 @@ impl Compositor {
         let (texture, view) = self.make_target(output.width, output.height);
         self.render_target(&view, output.width, output.height, Color::WHITE)?;
         Ok(ObjectCompositionResult {
+            instance: self.instance.clone(),
             device: self.device.clone(),
             texture,
             view,
@@ -129,7 +130,10 @@ impl Compositor {
         &self,
         result: &ObjectCompositionResult,
     ) -> Result<ObjectRgba8Readback, CompositorError> {
-        if result.device != self.device {
+        // Pinned WGPU CoreDevice equality uses an instance-local ID. Instance
+        // equality also pins the retained Global context's Arc address, so an
+        // equal numeric device ID in another context never reaches this copy.
+        if result.instance != self.instance || result.device != self.device {
             return Err(CompositorError::new(
                 "object pixels belong to a different GPU device",
             ));
@@ -152,6 +156,7 @@ impl Compositor {
 }
 
 pub(crate) struct ObjectCompositionResult {
+    instance: wgpu::Instance,
     device: wgpu::Device,
     texture: wgpu::Texture,
     view: wgpu::TextureView,
