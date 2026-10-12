@@ -311,3 +311,5 @@ test('preview metadata and export frame plan share identity but do not claim end
   assert.equal(Object.hasOwn(session, 'pixelAttestation'), false);
   assert.deepEqual(FIXTURE_FRAMES.map((item) => item.frame), session.request.payload.frames.map((item) => item.sourceFrame));
 });
+
+require('./desktop/play-observer-correlation.test.cjs');

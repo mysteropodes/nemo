@@ -12,6 +12,40 @@ const bootstrap = path.join(__dirname, 'play-publication-observer-bootstrap.js')
 const RUN = 'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa';
 const CUT = '3d755db1-cdf7-44f8-8706-cc812e1845ca';
 
+test('correlation scalar schema accepts real failure phases and rejects incompatible or private fields', async () => {
+  const accepted = ['failed-validation', 'failed-device-lost', 'failed-retry-lost',
+    'failed-retry-outdated', 'failed-recreate', 'failed-reconfigure'];
+  const { api, p } = await create();
+  const base = { event: 'host-receipt', documentSnapshotId: 'native-opacity:native-document-1:0',
+    contextId: 'scene-root', hostCallOrdinal: 1, workId: 'native-work-18446744073709551615' };
+  for (const status of accepted) api.record({ ...base, status });
+  for (const phase of ['installing', 'release-requested', 'releasing', 'replacing', 'indeterminate']) {
+    api.record({ event: 'play-state', playing: false, phase });
+  }
+  const before = api.inspect().dropped;
+  for (const change of [{ documentSnapshotId: '' }, { documentSnapshotId: 'a\n' },
+    { contextId: '/private/path' }, { hostCallOrdinal: 0 }, { hostCallOrdinal: Number.MAX_SAFE_INTEGER + 1 },
+    { workId: 'native-work-18446744073709551616' }, { status: 'unknown-private-error' },
+    { document: { layers: [] } }, { error: 'private exception' }]) api.record({ ...base, ...change });
+  assert.equal(api.inspect().dropped - before, 9);
+  await p.seal();
+  assert.equal(p.deliveries.filter(d => d.action === 'record').length, 12);
+  assert.equal(p.deliveries.at(-1).payload.dropped, 9);
+});
+
+test('missing session attribution forces a partial cut even when scalar delivery succeeds', async () => {
+  const { api, p } = await create();
+  const ticket = api.beginHost({}, { instanceId: RUN, lifecycleGeneration: 1 }, {
+    documentId: 'native-document-1', contentRevision: 0, documentSnapshotId: 'snapshot-1', contextId: 'scene-root', frame: 10 });
+  api.rawReceipt(ticket, { workId: 'native-work-1', viewGeneration: 1, status: 'presented' });
+  await p.seal();
+  assert.equal(p.deliveries.at(-1).payload.dropped, 1);
+  assert.equal(api.inspect().failed, 0);
+  const request = p.deliveries.find(d => d.payload.event?.event === 'host-request').payload.event;
+  assert.equal(Object.hasOwn(request, 'hostGeneration'), false);
+  assert.equal(Object.hasOwn(request, 'sessionOrdinal'), false);
+});
+
 function ports(mode = 'ok') {
   const deliveries = [], waiting = [];
   let listener;
