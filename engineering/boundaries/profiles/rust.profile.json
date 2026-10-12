@@ -20,7 +20,7 @@
       "id": "rust.native.engine.codec",
       "layer": "native-codec",
       "dir": "native-engine/src",
-      "files": ["codec.rs", "project_structure.rs", "object_codec.rs", "object_order_codec.rs", "reference_image_asset.rs"],
+      "files": ["codec.rs", "project_structure.rs", "object_codec.rs", "project_media_codec.rs", "object_order_codec.rs", "reference_image_asset.rs"],
       "publicApi": ["codec.rs", "project_structure.rs", "object_codec.rs"],
       "sizeProfile": "Rust production module"
     },
