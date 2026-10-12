@@ -53,6 +53,7 @@
         r.apiVersion!==2||r.requestId!==ticket.saveRequestId||r.instanceId!==p.instanceId||r.documentId!==p.documentId||
         r.atRevision!==p.contentRevision||r.documentSnapshotId!==p.documentSnapshotId||typeof r.published!=='boolean'||typeof r.cleanupPending!=='boolean'||
         !integer(r.byteCount,1)||r.byteCount>4096)return null;
+    if(r.published&&!['published-current','published-stale','published-cleanup-pending'].includes(w.status))return null;
     if(!fields(s,['apiVersion','requestId','instanceId','documentId','contentRevision','ok','result'])||s.apiVersion!==2||
         s.requestId!==ticket.serializerRequestId||s.instanceId!==p.instanceId||s.documentId!==p.documentId||
         s.contentRevision!==p.contentRevision||s.ok!==true||!fields(s.result,['atRevision','documentSnapshotId','documentJson'])||

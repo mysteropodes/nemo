@@ -244,3 +244,20 @@ test('a copied mutable UI record cannot turn generation drift into equality', as
   const pending = h.helper.acknowledge(h.ticket, input()); original.generation++;
   gate.resolve(present()); await pending; assert.deepEqual(h.effects, []);
 });
+test('actual NUL destination is refused without certifying publication or mutating UI', async () => {
+  const h = fixture(), value = input(); value.written.destinationPath = '/owned/A\0.json';
+  const result = await h.helper.acknowledge(h.ticket, value);
+  assert.equal(result.status, 'refused'); assert.equal(result.written, null);
+  assert.deepEqual(h.effects, []);
+});
+test('literal backslash-zero is distinct from an actual NUL character', async () => {
+  const h = fixture(), value = input(); value.written.destinationPath = '/owned/A\\0.json';
+  assert.equal((await h.helper.acknowledge(h.ticket, value)).status, 'acknowledged');
+  assert.deepEqual(h.effects, [['commit', '/owned/A\\0.json', A]]);
+});
+for (const status of ['refused', 'indeterminate']) test(`${status} cannot certify a contradictory published receipt`, async () => {
+  const h = fixture(), value = input(); value.written.status = status; value.written.eligibleCurrentSave = false;
+  const result = await h.helper.acknowledge(h.ticket, value);
+  assert.equal(result.status, 'refused'); assert.equal(result.written, null);
+  assert.deepEqual(h.effects, []);
+});
