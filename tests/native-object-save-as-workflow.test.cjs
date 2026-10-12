@@ -282,3 +282,61 @@ test('destination and written pin stay bound if caller mutates its selection', a
   const result = await run(h.ports, options);
   assert.equal(result.destinationPath, destination); assert.equal(result.pin.documentSnapshotId, 'snapshot-7');
 });
+for (const [readNumber, label, expected] of [
+  [1, 'first', { pin: 0, picker: 0, save: 0 }],
+  [2, 'second', { pin: 1, picker: 0, save: 0 }],
+  [3, 'pre-dispatch', { pin: 1, picker: 1, save: 0 }],
+]) {
+  for (const interruption of ['abort', 'supersession']) {
+    test('deferred ' + label + ' read ' + interruption + ' prevents subsequent effects', async () => {
+      const h = harness(), reader = deferred(), reached = deferred();
+      const signal = { aborted: false }; let active = true, reads = 0;
+      h.ports.readPresentedObjectSession = () => {
+        if (++reads === readNumber) { reached.resolve(); return reader.promise; }
+        return structuredClone(h.current());
+      };
+      const pending = run(h.ports, { ...options, signal, isCurrent: () => active });
+      await reached.promise;
+      for (const [effect, count] of Object.entries(expected)) assert.equal(h.count(effect), count);
+      if (interruption === 'abort') signal.aborted = true; else active = false;
+      reader.resolve(structuredClone(h.current())); // Same valid native tuple; cancellation alone must fence effects.
+      const result = await pending;
+      assert.equal(result.status, 'cancelled'); assert.equal(result.eligibleCurrentSave, false);
+      for (const [effect, count] of Object.entries(expected)) {
+        assert.equal(h.count(effect), count, label + ' read cannot dispatch ' + effect + ' after ' + interruption);
+      }
+    });
+  }
+}
+for (const interruption of ['abort', 'supersession']) {
+  test('deferred final read ' + interruption + ' keeps published file but denies current acknowledgement', async () => {
+    const h = harness(), reader = deferred(), reached = deferred();
+    const signal = { aborted: false }; let active = true, reads = 0;
+    h.ports.readPresentedObjectSession = () => {
+      if (++reads === 4) { reached.resolve(); return reader.promise; }
+      return structuredClone(h.current());
+    };
+    const pending = run(h.ports, { ...options, signal, isCurrent: () => active });
+    await reached.promise; assert.equal(h.count('save'), 1);
+    if (interruption === 'abort') signal.aborted = true; else active = false;
+    reader.resolve(structuredClone(h.current()));
+    const result = await pending;
+    assert.equal(result.status, 'published-stale'); assert.equal(result.eligibleCurrentSave, false);
+    assert.equal(result.destinationPath, destination); assert.equal(result.pin.contentRevision, 7);
+    assert.equal(h.count('save'), 1); assert.deepEqual(h.writes, [documentJson]);
+  });
+}
+for (const [readNumber, label, pickers] of [[2, 'pre-picker', 0], [3, 'pre-save', 1]]) {
+  test('deferred ' + label + ' native owner drift refuses subsequent effects', async () => {
+    const h = harness(), reader = deferred(), reached = deferred(); let reads = 0;
+    h.ports.readPresentedObjectSession = () => {
+      if (++reads === readNumber) { reached.resolve(); return reader.promise; }
+      return structuredClone(h.current());
+    };
+    const pending = run(h.ports, options); await reached.promise;
+    h.change(s => { s.documentId = s.presentation.documentId = 'object-b'; });
+    reader.resolve(structuredClone(h.current()));
+    assert.equal((await pending).status, 'stale-before-dispatch');
+    assert.equal(h.count('picker'), pickers); assert.equal(h.count('save'), 0);
+  });
+}

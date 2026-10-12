@@ -91,6 +91,7 @@
       savePinned: ports.savePinned.bind(ports) };
     if (cancelled(options)) return result('cancelled', 'cancelled-before-acquisition');
     var pin = await current(ports);
+    if (cancelled(options)) return result('cancelled', 'cancelled-before-acquisition');
     if (!pin) return result('unavailable', 'current-presented-object-session-unavailable');
     var acquire = Object.freeze({ apiVersion: 2, requestId: options.pinRequestId,
       instanceId: pin.instanceId, documentId: pin.documentId,
@@ -101,16 +102,18 @@
       if (!pinResponse(await ports.acquirePin(acquire), acquire, pin)) return result('refused', 'native-pin-refused');
     } catch (_) { return result('refused', 'native-pin-acquisition-failed'); }
     if (cancelled(options)) return result('cancelled', 'cancelled-before-picker');
-    if (!matches(pin, await current(ports))) return result('stale-before-dispatch', 'pin-changed-before-picker');
+    var beforePicker = await current(ports);
+    if (cancelled(options)) return result('cancelled', 'cancelled-before-picker');
+    if (!matches(pin, beforePicker)) return result('stale-before-dispatch', 'pin-changed-before-picker');
     var path;
     try { path = await ports.pickDestination(pin); }
     catch (_) { return result('refused', 'picker-failed'); }
     if (path === null || path === undefined || path === '') return result('cancelled', 'picker-cancelled');
     if (typeof path !== 'string' || path[0] !== '/' || path.indexOf('\0') !== -1) return result('refused', 'invalid-destination');
     if (cancelled(options)) return result('cancelled', 'cancelled-before-dispatch');
-    if (!matches(pin, await current(ports))) return result('stale-before-dispatch', 'pin-changed-during-picker');
-    // A reader may await; recheck caller cancellation after its last boundary.
+    var beforeDispatch = await current(ports);
     if (cancelled(options)) return result('cancelled', 'cancelled-before-dispatch');
+    if (!matches(pin, beforeDispatch)) return result('stale-before-dispatch', 'pin-changed-during-picker');
     var request = Object.freeze({ apiVersion: 2, requestId: options.requestId,
       instanceId: pin.instanceId, documentId: pin.documentId, atRevision: pin.contentRevision,
       documentSnapshotId: pin.documentSnapshotId, destinationPath: path });
