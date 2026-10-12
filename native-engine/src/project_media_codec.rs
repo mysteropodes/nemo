@@ -168,8 +168,8 @@ pub(crate) fn encode_project(
     envelope: &ProjectEnvelope,
     limits: ProjectWireLimits,
 ) -> Result<Vec<u8>, ProjectWireError> {
-    match envelope.reference_state() {
-        ProjectReferenceState::NoMedia => {}
+    if envelope.reference_state() != ProjectReferenceState::NoMedia {
+        return Err(ProjectWireError::Unsupported);
     }
     crate::object_codec::validate_storage(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
     let drawing = bounded_json(envelope.drawing(), limits.drawing_bytes)?;
@@ -193,7 +193,7 @@ pub(crate) fn encode_project(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ProjectReferenceState as State, *};
     use serde_json::{json, Value};
 
     const EMPTY_DRAWING: &str = r#"{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,"layers":[{"layerUid":"0"}],"objects":[]}"#;
@@ -442,20 +442,12 @@ mod tests {
         let bytes = wire(EMPTY_DRAWING);
         let exact = ProjectWireLimits::new(bytes.len(), EMPTY_DRAWING.len()).unwrap();
         let project = decode_project(&bytes, exact).unwrap();
-        assert_eq!(
-            decode_project(
-                &bytes,
-                ProjectWireLimits::new(bytes.len() - 1, MAX_DRAWING).unwrap()
-            ),
-            Err(ProjectWireError::Budget)
-        );
-        assert_eq!(
-            decode_project(
-                &bytes,
-                ProjectWireLimits::new(MAX_ENVELOPE, EMPTY_DRAWING.len() - 1).unwrap()
-            ),
-            Err(ProjectWireError::Budget)
-        );
+        for cap in [
+            ProjectWireLimits::new(bytes.len() - 1, MAX_DRAWING).unwrap(),
+            ProjectWireLimits::new(MAX_ENVELOPE, EMPTY_DRAWING.len() - 1).unwrap(),
+        ] {
+            assert_eq!(decode_project(&bytes, cap), Err(ProjectWireError::Budget));
+        }
         let output = encode_project(&project, limits()).unwrap();
         let drawing_len = super::super::encode_storage_project(project.drawing())
             .unwrap()
@@ -468,20 +460,12 @@ mod tests {
             .unwrap(),
             output
         );
-        assert_eq!(
-            encode_project(
-                &project,
-                ProjectWireLimits::new(output.len() - 1, MAX_DRAWING).unwrap()
-            ),
-            Err(ProjectWireError::Budget)
-        );
-        assert_eq!(
-            encode_project(
-                &project,
-                ProjectWireLimits::new(MAX_ENVELOPE, drawing_len - 1).unwrap()
-            ),
-            Err(ProjectWireError::Budget)
-        );
+        for cap in [
+            ProjectWireLimits::new(output.len() - 1, MAX_DRAWING).unwrap(),
+            ProjectWireLimits::new(MAX_ENVELOPE, drawing_len - 1).unwrap(),
+        ] {
+            assert_eq!(encode_project(&project, cap), Err(ProjectWireError::Budget));
+        }
         // Valid raw drawing whitespace counts against the original-byte cap.
         let prefix = " ".repeat(MAX_DRAWING - EMPTY_DRAWING.len());
         let inclusive = format!("{{{prefix}{}", &EMPTY_DRAWING[1..]);
@@ -513,6 +497,24 @@ mod tests {
         assert_eq!(
             encode_project(&project, limits()),
             Err(ProjectWireError::Budget)
+        );
+    }
+
+    #[test]
+    fn attached_state_refuses_before_drawing_validation_or_serialization() {
+        let encoded = b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x02\x00\x00\x00\x02\x08\x06\x00\x00\x00\x72\xb6\x0d\x24\x00\x00\x00\x1a\x49\x44\x41\x54\x78\x9c\x63\x10\x54\x32\xfe\xef\x12\x9a\xd6\xc0\x50\xde\x31\x93\x61\xd5\xee\x33\xff\x01\x37\x8a\x07\xad\x4f\xf3\x86\x4d\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82".to_vec();
+        let (id, name) = ("media-1".into(), "plate.png".into());
+        let reference = State::admitted_still(id, name, true, 0.5, 0, encoded, 1024).unwrap();
+        let mut drawing =
+            crate::object_codec::decode_storage_project(EMPTY_DRAWING.as_bytes()).unwrap();
+        // Deliberate fault: validation would fail, serialization would exceed1.
+        drawing.format_version = 99;
+        let attached =
+            ProjectEnvelope::no_media(ProjectMetadata::new(320, 180, 24.).unwrap(), drawing)
+                .with_reference(reference);
+        assert_eq!(
+            encode_project(&attached, ProjectWireLimits::new(1, 1).unwrap()),
+            Err(ProjectWireError::Unsupported)
         );
     }
 }
