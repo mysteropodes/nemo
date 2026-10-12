@@ -204,6 +204,7 @@ func run() throws {
         else { _ = try verifySheet() }
       }
     case "inspect":
+      if target == "main" { try noSheet() }
       let base = request["element"] as? String ?? ""
       let selected = try node(base,selectedRoot)
       let roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]

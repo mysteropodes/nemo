@@ -220,6 +220,14 @@ test('blocked local child metadata persists without foreign values or arbitrary 
   assert.equal(r.nodes[0].blocked,'child-owner');assert.equal(r.nodes[1].blocked,'children-unavailable');assert.equal(r.nodes[2].blocked,undefined);
   assert.equal(JSON.stringify(r).includes('private'),false);assert.equal(JSON.stringify(r).includes('secret'),false);
 });
+test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
+  const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
+  const start=source.indexOf('    case "inspect":'),end=source.indexOf('    case "capture":',start),body=source.slice(start,end);
+  const guard=body.indexOf('if target == "main" { try noSheet() }'),traversal=body.indexOf('try node(base,selectedRoot)');
+  assert.ok(start>=0&&end>start&&guard>=0&&traversal>guard);
+  const noSheet=source.slice(source.indexOf('  func noSheet()'),source.indexOf('  func verify()',source.indexOf('  func noSheet()')));
+  assert.match(noSheet,/sheet == nil/);assert.match(noSheet,/members\(\)\)\.isEmpty/);
+});
 test('A/B fixture proof uses exact same-descriptor bytes and rejects swap/hash/name/symlink',()=>{
   const {verifyFixtures}=require('./desktop/p38-installed-driver.cjs'),crypto=require('node:crypto'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-fixtures-'));
   try{
