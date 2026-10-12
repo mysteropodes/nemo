@@ -298,7 +298,8 @@
               receipt.frame !== frame || !sameIdentity(requestedIdentity, receipt) ||
               !Number.isInteger(receipt.lifecycleGeneration) ||
               !Number.isInteger(receipt.viewGeneration) || !receipt.workId) {
-            throw new Error('native frame presentation changed identity');
+            var changed = new Error('native frame presentation changed identity');
+            observe('associateFailure', receipt, changed); throw changed;
           }
           var publication = observe('beginPublication', diagnostic, receipt);
           try {
@@ -307,6 +308,7 @@
             observe('publicationStage', publication, 'sync-enter'); ports.syncInput(); observe('publicationStage', publication, 'sync-return');
           } finally { observe('endPublication', publication); }
         } catch (error) {
+          observe('associateNavigationError', diagnostic, error);
           var sameOwner = false;
           try { sameOwner = ports.controller() === controller &&
             sameIdentity(requestedIdentity, controller.identity()); } catch (_) {}
@@ -322,8 +324,8 @@
           throw error;
         }
         observe('navigationReturn', diagnostic, true); return true;
-      }).catch(function () {
-        try { ports.syncInput(); try { ports.fail(); } catch (_) {} return false; }
+      }).catch(function (error) {
+        try { observe('navigationFailure', diagnostic, error); ports.syncInput(); try { ports.fail(); } catch (_) {} return false; }
         finally { observe('navigationReturn', diagnostic, false); }
       });
       queue = work;

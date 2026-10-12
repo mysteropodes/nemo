@@ -35,7 +35,8 @@ async function setup(mode = 'on', change = {}) {
   if (change.hostGate) options.previewGate = change.hostGate(r);
   if (change.receipt) options.previewReceipt = change.receipt(r);
   const h = r.helpers.nativeHarness(r.helpers.staticSource(), options); await h.controller.activate(h.prepared);
-  const viewport = r.load(path.join(ROOT, 'src/js/application/native-opacity-viewport.js')).create(h.state.lifecycle, {}, () => false, () => true);
+  const viewport = r.load(path.join(ROOT, 'src/js/application/native-opacity-viewport.js')).create(h.state.lifecycle,
+    change.surface ? { surface: change.surface(r) } : {}, () => false, () => true);
   const controller = { blocksLegacy: () => true, isActive: h.state.lifecycle.isActive,
     identity: h.state.lifecycle.identity, presentPreview: frame => viewport.presentPreview(frame) };
   r.window.NemoNativeOpacityCutover = controller; r.window._curFrame = 0;
@@ -57,7 +58,7 @@ async function setup(mode = 'on', change = {}) {
   const timeline = fs.readFileSync(path.join(ROOT, 'src/js/timeline.js'), 'utf8');
   vm.runInContext('var _nativeFrameNavigator=null, nativePlayScheduler=null, playInt=null, playRaf=null;\n' +
     extractFunction(app, 'goToFrame') + ['startNativePlay', 'advancePlayFrame', 'stopPlay'].map(name => extractFunction(timeline, name)).join('\n'), r.context);
-  return { r, h, state, input, paints, audio, rafs, controller, requests, cancels,
+  return { r, h, state, input, paints, audio, rafs, controller, requests, cancels, viewport,
     seal: () => seal(), footer: () => footer,
     navigate: frame => r.context.goToFrame(frame), start: () => r.context.startNativePlay(controller), stop: () => r.context.stopPlay(),
     tick(ms) { now += ms; const fn = rafs.values().next().value; assert.equal(typeof fn, 'function'); rafs.clear(); fn(now); } };
@@ -121,7 +122,7 @@ for (const status of ['deferred-occluded','deferred-timeout','stale-discarded','
     const s = await setup('on', { receipt: r => vm.runInContext(`(receipt => ({...receipt,workId:'native-work-'+receipt.viewGeneration,status:${JSON.stringify(status)}}))`, r.context) });
     assert.equal(await s.navigate(10), false); await drain();
     assert.equal(accepted(s.r.events()), false); assert.equal(s.r.api.inspect().productPendingNavigation, 0);
-    assert.ok(s.r.api.inspect().dropped > 0, 'unreturned host-failure context stays partial');
+    assert.equal(s.r.api.inspect().dropped, 0, 'actual receipt-derived rejection is now attributed');
     assert.equal(s.state.currentFrame, 0);
   });
 }
@@ -182,7 +183,7 @@ test('actual owner release during a held host call prevents any later UI publica
   s.r.context.finishHost(); assert.equal(await old, false); await released; await drain();
   assert.equal(s.h.controller.status(), 'closed'); assert.equal(s.state.currentFrame, 0);
   assert.equal(accepted(s.r.events()), false); assert.equal(s.r.api.inspect().productPendingNavigation, 0);
-  assert.ok(s.r.api.inspect().dropped > 0);
+  assert.equal(s.r.api.inspect().dropped, 0);
 });
 test('actual native revision drift cannot publish the old receipt or invent a current correlation', async () => {
   const s = await setup('on', { hostGate:r => vm.runInContext('new Promise(resolve => { globalThis.finishHost = resolve; })', r.context) });
@@ -190,4 +191,130 @@ test('actual native revision drift cannot publish the old receipt or invent a cu
   s.r.context.finishHost(); assert.equal(await old, false); await revised; await drain();
   assert.equal(s.h.state.identity.contentRevision, 1); assert.equal(s.state.currentFrame, 0);
   assert.equal(accepted(s.r.events()), false); assert.equal(s.r.api.inspect().productPendingNavigation, 0);
+});
+
+test('actual viewport deferred failure joins its own raw call and does not borrow rollback restoration', async () => {
+  const s = await setup('on', { collector:true, receipt:r => vm.runInContext('(receipt => ({...receipt,workId:"native-work-"+receipt.viewGeneration,status:"deferred-occluded"}))', r.context) });
+  assert.equal(await s.navigate(10), false); await drain();
+  const events = s.r.events(), failure = events.find(e => e.event === 'failure'), terminal = events.find(e => e.event === 'navigate-return');
+  assert.ok(failure); assert.equal(failure.hostCallOrdinal, 1); assert.equal(failure.frame, 10);
+  assert.equal(failure.workId, 'native-work-1'); assert.equal(failure.status, 'deferred-occluded');
+  assert.equal(terminal.hostCallOrdinal, 1); assert.equal(terminal.result, false);
+  assert.ok(events.some(e => e.event === 'host-receipt' && e.hostCallOrdinal === 2 && e.frame === 0));
+  assert.equal(accepted(events), false); assert.equal(s.r.api.inspect().dropped, 0);
+  await s.seal(); assert.equal(s.footer().status, 'complete');
+});
+
+async function rawMetadata(s, frame) {
+  await s.controller.presentPreview(frame);
+  const value = s.h.state.previews.at(-1);
+  s.r.context.requestForRaw = value;
+  return vm.runInContext('(() => { var x=JSON.parse(JSON.stringify(requestForRaw));delete x.apiVersion;delete x.instanceId;return x; })()', s.r.context);
+}
+test('raw rejection preserves the ACTUAL object and never decorates, serializes or matches its message', async () => {
+  const s = await setup(); const meta = await rawMetadata(s, 10), raw = s.h.state.previewConsumers[0];
+  const error = vm.runInContext('new Error("private host details")', s.r.context), keys = Reflect.ownKeys(error);
+  const rejected = raw.present(s.h.state.identity.instanceId, 1, meta, () => Promise.reject(error), () => {});
+  await assert.rejects(rejected, actual => actual === error);
+  const context = s.r.api.errorContext(error); assert.ok(Object.isFrozen(context));
+  assert.equal(context.frame, 10); assert.equal(context.sessionOrdinal, 1); assert.equal(context.hostGeneration, 1);
+  assert.equal(context.hostCallOrdinal, 2); assert.equal(Object.hasOwn(context, 'workId'), false);
+  assert.deepEqual(Reflect.ownKeys(error), keys);
+  assert.equal(error.message, 'private host details'); assert.equal(error.name, 'Error');
+  const unrelated = vm.runInContext('new Error("private host details")', s.r.context);
+  assert.equal(s.r.api.errorContext(unrelated), undefined);
+  const ticket = s.r.api.navigationRequest(99, 10, s.h.state.lifecycle.identity());
+  s.r.api.navigationFailure(ticket, unrelated); s.r.api.navigationReturn(ticket, false); await drain();
+  const terminal = s.r.events().find(e => e.event === 'navigate-return' && e.intent === 99);
+  assert.equal(Object.hasOwn(terminal, 'hostCallOrdinal'), false); assert.ok(s.r.api.inspect().dropped > 0);
+  assert.equal(JSON.stringify(s.r.events()).includes('private host details'), false);
+});
+test('distinct overlapping raw rejected objects keep their OWN snapshot/frame/host call', async () => {
+  const s = await setup(), first = await rawMetadata(s, 10), next = await rawMetadata(s, 20), raw = s.h.state.previewConsumers[0];
+  const a = vm.runInContext('new Error("same private text")', s.r.context), b = vm.runInContext('new Error("same private text")', s.r.context);
+  const outputs = await Promise.allSettled([
+    raw.present(s.h.state.identity.instanceId, 1, first, () => Promise.reject(a), () => {}),
+    raw.present(s.h.state.identity.instanceId, 1, next, () => Promise.reject(b), () => {})]);
+  assert.strictEqual(outputs[0].reason, a); assert.strictEqual(outputs[1].reason, b);
+  const ca = s.r.api.errorContext(a), cb = s.r.api.errorContext(b);
+  assert.equal(ca.frame, 10); assert.equal(cb.frame, 20); assert.equal(ca.hostCallOrdinal, 3); assert.equal(cb.hostCallOrdinal, 4);
+  assert.equal(ca.sessionOrdinal, cb.sessionOrdinal); assert.equal(ca.documentSnapshotId, cb.documentSnapshotId);
+});
+test('the SAME rejected object reused across real calls becomes ambiguous, never latest-context attribution', async () => {
+  const s = await setup(), a = await rawMetadata(s, 10), b = await rawMetadata(s, 20), raw = s.h.state.previewConsumers[0];
+  const error = vm.runInContext('new Error("shared rejection")', s.r.context);
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, a, () => Promise.reject(error), () => {}), e => e === error);
+  assert.equal(s.r.api.errorContext(error).frame, 10);
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, b, () => Promise.reject(error), () => {}), e => e === error);
+  assert.equal(s.r.api.errorContext(error), null); assert.ok(s.r.api.inspect().dropped > 0);
+});
+test('primitive and unmapped rejection stays PARTIAL with no private text or invented host/work pins', async () => {
+  const s = await setup(), meta = await rawMetadata(s, 10), raw = s.h.state.previewConsumers[0];
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, meta, () => Promise.reject('private primitive'), () => {}), e => e === 'private primitive');
+  assert.equal(s.r.api.errorContext('private primitive'), undefined); assert.ok(s.r.api.inspect().dropped > 0);
+  await drain(); assert.equal(JSON.stringify(s.r.events()).includes('private primitive'), false);
+});
+test('old actual rejected context stays immutable after release/re-entry and cannot attach to the new owner', async () => {
+  const s = await setup(), meta = await rawMetadata(s, 10), raw = s.h.state.previewConsumers[0];
+  const error = vm.runInContext('new Error("retained old error")', s.r.context);
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, meta, () => Promise.reject(error), () => {}), e => e === error);
+  const old = s.r.api.errorContext(error);
+  await s.h.controller.releaseCurrent('error-reentry'); await s.h.controller.activate(s.h.prepared);
+  assert.strictEqual(s.r.api.errorContext(error), old); assert.equal(old.hostGeneration, 1); assert.equal(old.sessionOrdinal, 1);
+  const ticket = s.r.api.navigationRequest(2, 10, s.h.state.lifecycle.identity());
+  s.r.api.navigationFailure(ticket, error); s.r.api.navigationReturn(ticket, false); await drain();
+  const row = s.r.events().find(e => e.event === 'navigate-return' && e.intent === 2);
+  assert.equal(row.documentId, 'native-document-2'); assert.equal(Object.hasOwn(row, 'hostCallOrdinal'), false);
+  assert.ok(s.r.api.inspect().dropped > 0);
+});
+test('receipt-derived failure oracle rejects independent call/session/snapshot/work substitutions', async () => {
+  const s = await setup('on', { receipt:r => vm.runInContext('(receipt => ({...receipt,workId:"native-work-"+receipt.viewGeneration,status:"deferred-timeout"}))', r.context) });
+  await s.navigate(10); await drain(); const rows = s.r.events();
+  const joinedFailure = events => {
+    const failed = events.find(e => e.event === 'failure' && e.frame === 10);
+    return !!failed && events.slice(0, events.indexOf(failed)).some(e => e.event === 'host-receipt' &&
+      ['instanceId','documentId','contentRevision','documentSnapshotId','frame','sessionOrdinal','hostGeneration','hostCallOrdinal','workId','viewGeneration','status'].every(k => e[k] === failed[k]));
+  };
+  assert.equal(joinedFailure(rows), true);
+  for (const key of ['hostCallOrdinal','sessionOrdinal','documentSnapshotId','workId']) {
+    const altered = structuredClone(rows), failed = altered.find(e => e.event === 'failure');
+    failed[key] = typeof failed[key] === 'number' ? failed[key] + 9 : 'unrelated'; assert.equal(joinedFailure(altered), false, key);
+  }
+});
+
+test('a real Error already owned by another call cannot replace an associated publication context', async () => {
+  const s = await setup(), meta = await rawMetadata(s, 10), raw = s.h.state.previewConsumers[0];
+  const receipt = await s.controller.presentPreview(10), ticket = s.r.api.navigationRequest(9, 10, s.h.state.lifecycle.identity());
+  const publication = s.r.api.beginPublication(ticket, receipt); s.r.api.endPublication(publication);
+  const expected = s.r.api.receiptContext(receipt), error = vm.runInContext('new Error("another operation")', s.r.context);
+  await assert.rejects(raw.present(s.h.state.identity.instanceId, 1, meta, () => Promise.reject(error), () => {}), e => e === error);
+  assert.notEqual(s.r.api.errorContext(error).hostCallOrdinal, expected.hostCallOrdinal);
+  s.r.api.associateNavigationError(ticket, error); s.r.api.navigationFailure(ticket, error); s.r.api.navigationReturn(ticket, false);
+  assert.equal(s.r.api.errorContext(error), null); assert.ok(s.r.api.inspect().dropped > 0);
+  await drain(); const row = s.r.events().find(e => e.event === 'navigate-return' && e.intent === 9);
+  assert.equal(row.hostCallOrdinal, expected.hostCallOrdinal);
+});
+
+test('a resize rejection in the NEXT viewport iteration never borrows its earlier stale receipt', async () => {
+  let resizeError;
+  const s = await setup('on', {
+    surface:r => { resizeError = vm.runInContext('new Error("private resize details")', r.context);
+      return { defer() { return 1; }, cancel() {}, resize() { return Promise.reject(resizeError); } }; },
+    receipt:r => vm.runInContext('(receipt => { receipt.workId="native-work-"+receipt.viewGeneration; scheduleResize(); return {...receipt,status:"stale-discarded"}; })', r.context)
+  });
+  s.r.context.scheduleResize = () => s.viewport.resizeViewport();
+  assert.equal(await s.navigate(10), false); await drain();
+  assert.equal(s.h.state.previews.length, 1);
+  assert.equal(s.r.api.errorContext(resizeError), undefined); assert.ok(s.r.api.inspect().dropped > 0);
+  const row = s.r.events().find(e => e.event === 'failure');
+  assert.equal(Object.hasOwn(row, 'hostCallOrdinal'), false);
+  assert.equal(JSON.stringify(s.r.events()).includes('private resize details'), false);
+});
+test('invalid raw scalar slots never retain private objects in an error context', async () => {
+  const s = await setup('on', { receipt:r => vm.runInContext('(receipt => ({...receipt,workId:"native-work-1",status:{secret:"private payload"}}))', r.context) });
+  assert.equal(await s.navigate(10), false); await drain();
+  assert.ok(s.r.api.inspect().dropped > 0);
+  assert.equal(JSON.stringify(s.r.events()).includes('private payload'), false);
+  const row = s.r.events().find(e => e.event === 'failure');
+  assert.equal(Object.hasOwn(row, 'status'), false);
 });
