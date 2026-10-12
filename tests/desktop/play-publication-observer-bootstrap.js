@@ -55,6 +55,7 @@
     var navigations = new WeakMap(), publications = new WeakMap(), steps = new WeakMap(), publication = null;
     var productPendingNavigation = 0, productPendingPlayback = 0, productPlaying = false;
     var failures = new WeakMap();
+    var restorations = new WeakMap();
     var failurePins = ['instanceId','documentId','contentRevision','documentSnapshotId','contextId','frame',
       'jsLifecycleGeneration','hostGeneration','sessionOrdinal','hostCallOrdinal'];
     function rememberFailure(error, captured) {
@@ -97,6 +98,47 @@
       } else dropped++;
       record(Object.assign({ event: 'failure', code: 'unknown' }, nav.pins));
     }
+    function restoreRequested(ticket, priorFrame, error, currentOwner) {
+      var nav = navigations.get(ticket), cause = error && typeof error === 'object' ? failures.get(error) : null;
+      var token = Object.freeze({});
+      var valid = nav && !nav.finished && !nav.failureFenced && cause && cause.hostCallOrdinal > nav.afterCallOrdinal &&
+        ['instanceId','documentId','contentRevision','frame'].every(function (key) { return nav.pins[key] === cause[key]; }) &&
+        Number.isSafeInteger(priorFrame) && priorFrame >= 0;
+      if (!valid) dropped++;
+      var pins = Object.freeze(Object.assign({}, valid ? cause : nav && nav.pins, { intent: nav && nav.pins.intent, priorFrame: priorFrame }));
+      restorations.set(token, { nav:nav, cause:valid ? cause : null, pins:pins, prior:priorFrame, currentOwner:currentOwner, valid:!!valid, painted:false, finished:false });
+      record(Object.assign({ event:'receipt-retry', result:false }, pins)); return token;
+    }
+    function restorePresented(token, receipt) {
+      var restore = restorations.get(token); if (!restore || restore.finished) { dropped++; return; }
+      var captured = receipts.get(receipt);
+      var matching = ['instanceId','documentId','contentRevision','documentSnapshotId','contextId','jsLifecycleGeneration','hostGeneration','sessionOrdinal'];
+      if (!restore.valid || !captured || captured.status !== 'presented' || captured.frame !== restore.prior ||
+          captured.hostCallOrdinal <= restore.cause.hostCallOrdinal || !matching.every(function (key) { return captured[key] === restore.cause[key]; }) ||
+          !restoreOwner(restore)) {
+        restore.valid=false; dropped++; return;
+      }
+      restore.pins = Object.freeze(Object.assign({}, captured, { intent:restore.nav.pins.intent, priorFrame:restore.prior }));
+      publications.set(token, { pins:restore.pins, previous:publication, input:null, rollback:true, restoration:true }); publication=token;
+      record(Object.assign({ event:'receipt-retry', result:true }, restore.pins));
+    }
+    function restorePainted(token) {
+      var restore=restorations.get(token); if (!restore || !restore.valid || !publications.has(token)) { dropped++; return; }
+      restore.painted=true;
+    }
+    function restoreCompleted(token) {
+      var restore=restorations.get(token), current=publications.get(token);
+      if (!restore || restore.finished) { dropped++; return; } restore.finished=true;
+      if (!restore.valid || !restore.painted || !current || current.input !== restore.prior || current.agrees !== true ||
+          !restoreOwner(restore)) { dropped++; return; }
+      record(Object.assign({}, restore.pins, { event:'rollback', result:true, currentFrame:current.input, frame:current.windowFrame }));
+    }
+    function restoreRejected(token) {
+      var restore=restorations.get(token); if (!restore || restore.finished) return; restore.finished=true; dropped++;
+      record(Object.assign({}, restore.pins, { event:'rollback', result:false }));
+    }
+    function restoreOwner(restore) { try { return typeof restore.currentOwner === 'function' && restore.currentOwner() === true; }
+      catch (_) { return false; } }
     function navigationRequest(intent, frame, identity) {
       var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
       navigations.set(ticket, { pins: pins, finished: false, afterCallOrdinal: callSequence }); productPendingNavigation++;
@@ -133,7 +175,7 @@
       record(Object.assign({}, current.pins, { event: current.rollback ? 'rollback' : 'ui-publication', currentFrame: actual, frame: windowFrame }));
     }
     function inputPublication(value, actual, windowFrame) {
-      var current = publications.get(publication); if (!current || current.rollback) return;
+      var current = publications.get(publication); if (!current || current.rollback && !current.restoration) return;
       if (typeof value !== 'number' && typeof value !== 'string') { dropped++; return; }
       var displayed = Number(value); if (!Number.isSafeInteger(displayed) || displayed < 1) { dropped++; return; }
       current.input = displayed - 1; current.windowFrame = windowFrame;
@@ -286,6 +328,7 @@
       presentedReturn: presentedReturn, receiptContext: function (receipt) { return receipts.get(receipt); },
       navigationRequest: navigationRequest, navigationSuperseded: navigationSuperseded, navigationReturn: navigationReturn,
       associateFailure: associateFailure, associateNavigationError: associateNavigationError, navigationFailure: navigationFailure,
+      restoreRequested:restoreRequested, restorePresented:restorePresented, restorePainted:restorePainted, restoreCompleted:restoreCompleted, restoreRejected:restoreRejected,
       errorContext: function (error) { return error && typeof error === 'object' ? failures.get(error) : undefined; },
       beginPublication: beginPublication, beginRollback: beginRollback, endPublication: endPublication,
       uiPublication: uiPublication, inputPublication: inputPublication, publicationStage: publicationStage,
