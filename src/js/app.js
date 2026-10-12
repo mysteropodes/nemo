@@ -5095,9 +5095,9 @@ function goToFrame(idx){
   if(nativeOpacity&&nativeOpacity.blocksLegacy()){
     if(!_nativeFrameNavigator)_nativeFrameNavigator=NemoNativeOpacityMotionSurface.createFrameNavigator({
       frame:function(){return state.currentFrame;},total:function(){return state.totalFrames;},
-      commit:function(frame){state.currentFrame=frame;window._curFrame=frame;},
+      commit:function(frame){state.currentFrame=frame;window._curFrame=frame;try{var observer=window.NemoTestPlayObserver;if(observer)observer.uiPublication(state.currentFrame,window._curFrame);}catch(_){}},
       paint:function(){updateUI(true);},
-      syncInput:function(){document.getElementById('tl-cf').value=state.currentFrame+1;},
+      syncInput:function(){var input=document.getElementById('tl-cf');input.value=state.currentFrame+1;try{var observer=window.NemoTestPlayObserver;if(observer)observer.inputPublication(input.value,state.currentFrame,window._curFrame);}catch(_){}},
       fail:function(){showToast('Could not display this frame');},
       controller:function(){return window.NemoNativeOpacityCutover;}
     });

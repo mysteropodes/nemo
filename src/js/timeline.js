@@ -37,6 +37,7 @@ function startNativePlay(controller){
   });
   if(!nativePlayScheduler.start(controller)){showToast('Native playback is unavailable');return;}
   state.playing=true;state.playDir=1;
+  try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   document.getElementById('btn-play').innerHTML='<span class="material-symbols-rounded">\u{e034}</span>';
   document.getElementById('btn-play').classList.add('playing');
   if(window.SMAudio)SMAudio.onPlayStart(state.currentFrame);
@@ -184,6 +185,7 @@ function manualBakeCache(){
   });
 }
 function stopPlay(){if(!state.playing)return;state.playing=false;
+  try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
   clearInterval(playInt);playInt=null;

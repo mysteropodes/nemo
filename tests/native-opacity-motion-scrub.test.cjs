@@ -66,6 +66,8 @@ test('cancelled native static-opacity drag restores the authoritative field with
   assert.equal(h.input.value, '25');
 });
 
+require('./desktop/play-observer-publication.test.cjs');
+
 test('detached native opacity field cannot submit its retained pointer release', () => {
   const h = scrubHarness();
   h.fire('pointerdown');
