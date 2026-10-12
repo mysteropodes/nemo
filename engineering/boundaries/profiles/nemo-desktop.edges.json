@@ -23,13 +23,14 @@
     "rust.desktop.native.dispatch",
     "rust.desktop.media",
     "rust.desktop.tasks",
+    "rust.desktop.play-observer",
     "rust.desktop.tasks.tests"
   ],
-  "profileModulesNote": "The sixteen profile modules under sourceDir. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
+  "profileModulesNote": "The seventeen profile modules under sourceDir include the private, default-off O1 Play observer. rust.desktop.build (src-tauri/build.rs) is outside sourceDir (dir 'src-tauri', not 'src-tauri/src') and is not part of this crate's own module graph; it is named in unanalyzedModules below as a census entry only.",
   "layerRules": {
     "desktop-shell": {
       "allowedLayers": ["desktop-shell", "mcp-adapter", "bootstrap", "command-adapter", "host-seam", "host-contract", "host-ports", "viewport-owner", "viewport-adapter"],
-      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media) and task_runtime.rs (tasks) may depend on each other and declare the dormant host modules, never directly on tests"
+      "meaning": "lib.rs/main.rs (shell), media_probe.rs/vectorize.rs/video_decode.rs (media), task_runtime.rs (tasks) and the default-off test_play_observer.rs may depend on each other and declare the dormant host modules, never directly on tests"
     },
     "mcp-adapter": {
       "allowedLayers": ["host-seam"],
@@ -85,6 +86,7 @@
       "rust.desktop.shell -> rust.desktop.native.dispatch (lib.rs: mod native_dispatch;)",
       "rust.desktop.shell -> rust.desktop.media (lib.rs: mod video_decode; mod media_probe; mod vectorize;)",
       "rust.desktop.shell -> rust.desktop.tasks (lib.rs: mod task_runtime;)",
+      "rust.desktop.shell -> rust.desktop.play-observer (lib.rs: cfg-gated mod test_play_observer;)",
       "rust.desktop.mcp.adapter -> rust.desktop.native.dispatch (application_mcp.rs: use crate::native_dispatch::{...};)",
       "rust.desktop.mcp.adapter.tests -> rust.desktop.mcp.adapter (application_mcp_tests.rs: use crate::application_mcp::*;)",
       "rust.desktop.mcp.adapter.tests -> rust.desktop.native.application (application_mcp_tests.rs: use crate::native_application::{...};)",
@@ -110,6 +112,8 @@
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application.contract (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.dispatch (native_application_dispatch_release_tests.rs: explicit import)",
       "rust.desktop.tasks.tests -> rust.desktop.tasks (task_runtime/tests.rs: use super::*;)",
+      "rust.desktop.tasks.tests -> rust.desktop.play-observer (task_runtime/tests.rs: private cfg-gated observer controls)",
+      "rust.desktop.tasks -> rust.desktop.play-observer (task_runtime.rs: cfg-gated private observer use;)",
       "rust.desktop.native.host.release.tests -> rust.desktop.native.application.commands (native_object_bootstrap_tests.rs: raw production bootstrap controls)"
     ]
   },
@@ -118,8 +122,8 @@
     "items": []
   },
   "features": {
-    "declared": [],
-    "declaredNote": "src-tauri/Cargo.toml has no [features] table; any cfg(feature = \"…\") in the crate would therefore reference an undeclared feature and fail. The crate uses no feature cfgs today, only the four plain predicates below.",
+    "declared": ["test-play-publication-observer"],
+    "declaredNote": "O1/#1708 declares one default-off, private test-package feature in src-tauri/Cargo.toml. Normal desktop builds expose no observer; all other cfg predicates remain the four plain predicates below.",
     "allowedCfgs": [
       "test",
       "unix",

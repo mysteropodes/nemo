@@ -333,8 +333,8 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.shell->rust.desktop.native.application.ports',
     'rust.desktop.shell->rust.desktop.native.application.viewport',
     'rust.desktop.shell->rust.desktop.native.dispatch',
-    'rust.desktop.shell->rust.desktop.native.viewport', 'rust.desktop.shell->rust.desktop.tasks',
-    'rust.desktop.tasks.tests->rust.desktop.tasks']);
+    'rust.desktop.shell->rust.desktop.native.viewport', 'rust.desktop.shell->rust.desktop.play-observer', 'rust.desktop.shell->rust.desktop.tasks', 'rust.desktop.tasks->rust.desktop.play-observer',
+    'rust.desktop.tasks.tests->rust.desktop.play-observer', 'rust.desktop.tasks.tests->rust.desktop.tasks']);
   assert.deepEqual(r.unanalyzedModules.slice().sort(),
     ['rust.desktop.build', 'rust.mcp.transport', 'rust.native.engine']);
 
