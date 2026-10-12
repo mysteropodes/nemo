@@ -11782,27 +11782,8 @@ setInterval(function(){
   if(state.playing)return;
   var json;
   try{
-    var nativePresent='NemoNativeOpacityCutover' in window;
-    var native=nativePresent?window.NemoNativeOpacityCutover:null;
-    var blocked=nativePresent?native.blocksLegacy():false;
-    if(blocked===false){
-      saveAllLayerFrames();
-      json=window.SM.exportJSON();
-    }else{
-      // Every non-legacy lifecycle phase fences Paper. Only a stable,
-      // active native identity with a current persistence pin may save.
-      if(blocked!==true||native.isActive()!==true)throw new Error('Native autosave is not ready');
-      var before=native.identity();
-      if(before)before={instanceId:before.instanceId,documentId:before.documentId,contentRevision:before.contentRevision};
-      json=native.persistenceJSON();
-      var after=native.identity();
-      if(!before||!after||typeof before.instanceId!=='string'||!before.instanceId||
-        typeof before.documentId!=='string'||!before.documentId||
-        !Number.isInteger(before.contentRevision)||before.contentRevision<0||
-        before.instanceId!==after.instanceId||before.documentId!==after.documentId||
-        before.contentRevision!==after.contentRevision||typeof json!=='string'||!json||
-        native.blocksLegacy()!==true||native.isActive()!==true)throw new Error('Native autosave persistence is fenced or stale');
-    }
+    // Project Save and timed autosave share the same fail-closed desktop admission.
+    json=window.NemoNativeOpacityProjectEntry.documentJSON(window,saveAllLayerFrames);
   }catch(error){
     console.warn('Timed autosave unavailable',error);
     return {status:'unavailable',error:error};

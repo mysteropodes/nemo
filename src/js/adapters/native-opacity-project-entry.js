@@ -6,19 +6,74 @@
 }(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
 
-  function documentJSON(root) {
-    var native = root.NemoNativeOpacityCutover;
-    if (native && typeof native.blocksLegacy === 'function' && native.blocksLegacy()) {
-      var json = typeof native.persistenceJSON === 'function' ? native.persistenceJSON() : null;
-      if (typeof json !== 'string') throw new Error('Native document is not ready for persistence');
-      return json;
+  function surface(root) {
+    var marked = '__TAURI__' in root, location = root.location;
+    var packaged = false;
+    if (location !== undefined) {
+      if (!location || typeof location.protocol !== 'string' ||
+          typeof location.hostname !== 'string' || !location.hostname) {
+        throw new Error('Persistence surface is unknown');
+      }
+      packaged = location.protocol === 'tauri:';
+      if (packaged ? location.hostname !== 'localhost' || location.port !== '' :
+          location.protocol !== 'http:' && location.protocol !== 'https:') {
+        throw new Error('Persistence surface is unknown');
+      }
+    } else if (!marked) throw new Error('Persistence surface is unknown');
+    if (!marked && !packaged) return null;
+    var api = root.__TAURI__;
+    if (!api || !api.core || typeof api.core.invoke !== 'function') {
+      throw new Error('Desktop persistence API is unavailable');
     }
+    return api;
+  }
+  function identity(native) {
+    var value = native.identity();
+    if (!value || typeof value.instanceId !== 'string' || !value.instanceId ||
+        typeof value.documentId !== 'string' || !value.documentId ||
+        !Number.isSafeInteger(value.contentRevision) || value.contentRevision < 0) {
+      throw new Error('Native persistence identity is unavailable');
+    }
+    return { instanceId: value.instanceId, documentId: value.documentId,
+      contentRevision: value.contentRevision };
+  }
+  function desktopJSON(root, native, api) {
+    if (!native || typeof native.blocksLegacy !== 'function' ||
+        typeof native.isActive !== 'function' || typeof native.identity !== 'function' ||
+        typeof native.persistenceJSON !== 'function' ||
+        native.blocksLegacy() !== true || native.isActive() !== true) {
+      throw new Error('Native desktop persistence is unavailable');
+    }
+    var before = identity(native), json = native.persistenceJSON(), after = identity(native);
+    if (typeof json !== 'string' || !json || before.instanceId !== after.instanceId ||
+        before.documentId !== after.documentId || before.contentRevision !== after.contentRevision ||
+        root.NemoNativeOpacityCutover !== native || surface(root) !== api ||
+        native.blocksLegacy() !== true || native.isActive() !== true) {
+      throw new Error('Native desktop persistence is fenced or stale');
+    }
+    return json;
+  }
+  function documentJSON(root, saveFrames) {
+    var api = surface(root), native = root.NemoNativeOpacityCutover;
+    if (api) return desktopJSON(root, native, api);
+    if ('NemoNativeOpacityCutover' in root) {
+      var blocked = native && typeof native.blocksLegacy === 'function' ? native.blocksLegacy() : null;
+      if (blocked === true) return desktopJSON(root, native, api);
+      if (blocked !== false) throw new Error('Native persistence ownership is unknown');
+    }
+    if (saveFrames) saveFrames();
     return root.SM.exportJSON();
   }
 
   function saveFramesIfLegacy(root, saveFrames) {
-    var native = root.NemoNativeOpacityCutover;
-    if (!native || typeof native.blocksLegacy !== 'function' || !native.blocksLegacy()) saveFrames();
+    var api = surface(root), native = root.NemoNativeOpacityCutover;
+    if (api) { desktopJSON(root, native, api); return; }
+    if ('NemoNativeOpacityCutover' in root) {
+      var blocked = native && typeof native.blocksLegacy === 'function' ? native.blocksLegacy() : null;
+      if (blocked === true) { desktopJSON(root, native, api); return; }
+      if (blocked !== false) throw new Error('Native persistence ownership is unknown');
+    }
+    saveFrames();
   }
 
   function ready(root, receipt, first) {

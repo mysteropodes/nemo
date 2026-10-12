@@ -51,7 +51,8 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element,
     querySelector(selector) { return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null; } };
   let rejectNextImport = false;
-  const window = { NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
+  const window = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
+    NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
@@ -70,7 +71,7 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
     assert.strictEqual(this, window, 'WebKit requestAnimationFrame requires a Window receiver');
     return context.requestAnimationFrame(fn);
   };
-  if (version !== null) window.__TAURI__ = { fs: { readTextFile: async () => version } };
+  if (version !== null) window.__TAURI__ = { core: { invoke() {} }, fs: { readTextFile: async () => version } };
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });
   context.SMProjectEntry = window.SMProjectEntry;
@@ -369,7 +370,7 @@ test('stale post-reveal native frame leaves desktop Open unpublished and returns
 });
 
 test('rejected project transitions preserve the active document and suppress success signals', async () => {
-  const app = harness({ auto: '{"fail":true}', version: '{"layers":[{"frames":[{"strokes":[]}]}]}' });
+  const app = harness({ auto: '{"fail":true}' });
   const beforeResume = { label: app.project.getCurrentLabel(), json: app.json, dirty: app.project.isDirty() };
   app.elements.get('start-resume').listeners.click();
   assert.deepEqual({ label: app.project.getCurrentLabel(), json: app.json, dirty: app.project.isDirty() }, beforeResume);
@@ -378,11 +379,15 @@ test('rejected project transitions preserve the active document and suppress suc
 
   select(app, { name: 'Keep.json', text: '{"title":"keep"}' });
   app.json = JSON.stringify({ title: 'keep', normalized: true, edited: true });
-  const beforeRestore = { label: app.project.getCurrentLabel(), json: app.json, dirty: app.project.isDirty() };
-  app.rejectNextImport();
-  assert.equal(await app.project.restoreVersion('/history/rejected.json'), false);
-  assert.deepEqual({ label: app.project.getCurrentLabel(), json: app.json, dirty: app.project.isDirty() }, beforeRestore);
-  assert.equal(app.toasts.includes('toastVersionRestored'), false);
+  // Desktop restore uses admitted native ports; the remaining tab assertions
+  // exercise the separate ordinary-browser document, not an fs-only desktop.
+  const restore = versionRestoreHarness(), nativeApp = restore.app;
+  nativeApp.window.NemoNativeOpacityProject.importJSON = async () => false;
+  const beforeRestore = { label: nativeApp.project.getCurrentLabel(), json: nativeApp.json, dirty: nativeApp.project.isDirty() };
+  assert.equal(await nativeApp.project.restoreVersion('/history/rejected.json'), false);
+  assert.deepEqual({ label: nativeApp.project.getCurrentLabel(), json: nativeApp.json, dirty: nativeApp.project.isDirty() }, beforeRestore);
+  assert.equal(nativeApp.toasts.includes('toastVersionRestored'), false);
+  assert.deepEqual(restore.writes, []);
 
   const tabs = app.elements.get('project-tabs-list');
   app.elements.get('project-tab-add').listeners.click();
@@ -746,9 +751,12 @@ test('native save failure preserves dirty baseline and skips all legacy frame wr
   app.project.markSaved();
   const edited = '{"saved":false,"opacity":[20,80]}';
   const writes = [];
-  app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, persistenceJSON: () => edited };
+  app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
+    identity: () => ({ instanceId: 'native-i', documentId: 'native-d', contentRevision: 7 }),
+    persistenceJSON: () => edited };
   app.window.SM.exportJSON = () => { throw Error('legacy exporter forbidden'); };
   app.window.__TAURI__ = {
+    core: { invoke() {} },
     dialog: { save: async () => '/disposable/edited.json' },
     fs: { writeTextFile: async (path, bytes) => { writes.push([path, bytes]); throw Error('disk unavailable'); },
       rename: async () => { throw Error('must not rename'); }, remove: async () => {} },

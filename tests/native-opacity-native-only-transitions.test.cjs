@@ -623,7 +623,7 @@ test('explicit Open keeps the start screen visible through occlusion until the f
   assert.equal(h.ui.state.currentFrame, 10, 'prior UI projection stays in place while occluded');
   expose({ visible: true });
   const first = await pending;
-  const root = { NemoNativeOpacityProject: h.published().project,
+  const root = { __TAURI__: { core: { invoke() {} } }, NemoNativeOpacityProject: h.published().project,
     NemoNativeOpacityCutover: h.published().cutover };
   assert.equal(first.status, 'presented');
   assert.equal(NativeProjectEntry.ready(root, first), true);
