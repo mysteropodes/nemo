@@ -131,6 +131,7 @@
   var nativeSavedUI=window.NemoProjectNativeSave.createSavedUI({
     read:function(){return {native:window.NemoNativeOpacityCutover,api:window.__TAURI__,fs:window.__TAURI__&&window.__TAURI__.fs,ui:window.SMProject,tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
     serialize:projectJSON,
+    prepare:function(){saveFramesIfLegacy();},
     pick:function(pin){return window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:pin.name+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
     publish:function(path,json,pin){var fs=pin.fs;return window.NemoProjectNativeSave.writeProjectFile(path,json,{
       writeTextFile:fs.writeTextFile.bind(fs),rename:fs.rename.bind(fs),remove:fs.remove.bind(fs)});},
@@ -172,12 +173,10 @@
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
-    saveFramesIfLegacy();
     return nativeSavedUI.saveAs(writeProjectTo);
   }
   async function save(){
     if(!tauriOk()){saveAsDownload();return;}
-    saveFramesIfLegacy();
     return nativeSavedUI.save(writeProjectTo);
   }
   async function openPath(path){
@@ -616,7 +615,7 @@
   function refreshActiveTabDirtyDot(liveJson){
     var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(!el)return;
-    el.classList.toggle('dirty',dirtyBaseline.isDirtyBytes(liveJson));
+    el.classList.toggle('dirty',!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 

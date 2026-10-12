@@ -60,6 +60,7 @@ var NemoProjectNativeSave = (function () {
     var publish=ports.publish.bind(ports), commit=ports.commit.bind(ports);
     var invalidate=ports.invalidate.bind(ports), pick=ports.pick.bind(ports);
     var notice=ports.notice.bind(ports), failure=ports.failure.bind(ports);
+    var prepare=typeof ports.prepare==='function'?ports.prepare.bind(ports):function(){};
     var active=null, writing=false, dispatched=new WeakSet(), published=new WeakSet(), consumed=new WeakSet();
     function owner(native) {
       if(!native||typeof native.isActive!=='function'||native.isActive()!==true||
@@ -128,15 +129,19 @@ var NemoProjectNativeSave = (function () {
       } finally { writing=false; }
     }
     async function run(mode,writer) {
-      if(writing)return announce(result('save-in-progress',false),null,mode);
-      var ticket=begin(), path=ticket.pin.path;
-      if(mode==='save-as'||!path){
-        path=await pick(ticket.pin);
-        if(path===null||path===undefined||path===''){consumed.add(ticket);return result('cancelled',false);}
+      try {
+        if(writing)return announce(result('save-in-progress',false),null,mode);
+        prepare();
+        var ticket=begin(), path=ticket.pin.path;
+        if(mode==='save-as'||!path){
+          path=await pick(ticket.pin);
+          if(path===null||path===undefined||path===''){consumed.add(ticket);return result('cancelled',false);}
+        }
+        if(!current(ticket,true))return announce(result('stale-before-write',false),path,mode);
+        return await (writer||write)(path,ticket,mode);
+      } catch(error) {
+        failure(error); throw error;
       }
-      if(!current(ticket,true))return announce(result('stale-before-write',false),path,mode);
-      try { return await (writer||write)(path,ticket,mode); }
-      catch(error) { failure(error); throw error; }
     }
     return Object.freeze({begin:begin,write:write,acknowledge:acknowledge,
       saveAs:function(writer){return run('save-as',writer);},save:function(writer){return run('save',writer);}});

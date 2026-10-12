@@ -15,10 +15,10 @@ assert.ok(fixtureStart >= 0 && fixtureEnd > fixtureStart);
 vm.runInContext(fixtureSource.slice(fixtureStart, fixtureEnd) + '\nthis.makeHarness=harness;', context);
 const A = '{"native":"A","paint":[20,80]}', B = '{"native":"B","paint":[40,60]}';
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
-function setup({ pickGate, writeGate } = {}) {
+function setup({ pickGate, writeGate, dirtyDot = false } = {}) {
   const current = { id: 'native-A', revision: 7, generation: 1, bytes: A };
   const writes = [], removes = [], picks = [], paper = [];
-  const app = context.makeHarness({ configureWindow(root) {
+  const app = context.makeHarness({ dirtyDot, configureWindow(root) {
     root.SM.exportJSON = () => { paper.push('export'); throw Error('Paper is forbidden'); };
     root.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
       identity: () => ({ instanceId: 'native-instance', documentId: current.id, contentRevision: current.revision }),
@@ -151,6 +151,30 @@ function ticketFixture() {
     commit: (...args) => commit(...args), invalidate: () => { ready = false; effects.push('invalidate'); },
     notice: value => effects.push(value.status), failure: () => effects.push('failure') });
   return { controller, fields, effects, ready: () => ready, setCommit: value => { commit = value; } };
+}
+test('actual timed dirty-dot refresh cannot clean a failed baseline UI acknowledgement', async () => {
+  const h = setup({ dirtyDot: true });
+  h.app.element('project-tabs-list').appendChild = () => { throw Error('baseline render failed'); };
+  assert.equal((await h.app.project.saveAs()).status, 'written-indeterminate');
+  assert.equal(h.app.project.isDirty(), true);
+  h.app.project.refreshActiveTabDirtyDot(A);
+  assert.equal(h.app.dot.classList.contains('dirty'), true,
+    'matching saved bytes do not override unavailable saved-UI readiness');
+});
+for (const kind of ['missing owner', 'serialization', 'lifecycle admission', 'picker']) {
+  test(`actual production ${kind} save refusal reports one visible failure with no IO/clean stamp`, async () => {
+    const h = setup(), before = h.state();
+    if (kind === 'missing owner') delete h.app.window.NemoNativeOpacityCutover;
+    if (kind === 'serialization') h.app.window.NemoNativeOpacityCutover.persistenceJSON = () => { throw Error('serialization unavailable'); };
+    if (kind === 'lifecycle admission') h.app.window.NemoNativeOpacityCutover.getNativeIdentity = () => { throw Error('lifecycle unavailable'); };
+    if (kind === 'picker') h.app.window.__TAURI__.dialog.save = async () => { throw Error('picker unavailable'); };
+    await assert.rejects(h.app.project.saveAs());
+    assert.equal(h.state(), before);
+    assert.deepEqual(h.writes, []); assert.deepEqual(h.paper, []);
+    assert.equal(h.app.toasts.filter(message => /^Saved/.test(message)).length, 0);
+    assert.equal(h.app.toasts.length, 1);
+    assert.match(h.app.toasts[0], /^toastSaveFailedSuffix/);
+  });
 }
 test('same ticket duplicate/reentrant acknowledgement publishes and notices once', async () => {
   const h = ticketFixture(), ticket = h.controller.begin();

@@ -5,7 +5,6 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 const entry = require('../src/js/adapters/native-opacity-project-entry.js');
-const { extractFunction } = require('./fixtures/lib/sandbox.cjs');
 const timeline = fs.readFileSync(path.join(__dirname, '../src/js/timeline.js'), 'utf8');
 const timerStart = timeline.indexOf('setInterval(function(){\n  if(state.playing)return;');
 assert.ok(timerStart >= 0);
@@ -111,20 +110,32 @@ test('ordinary browser at the identical dev URL retains existing persistence ord
   f.effects.length = 0; f.tick();
   assert.deepEqual(f.effects, [['Paper frames'], ['Paper export'], ['autosave', 'Paper'], ['history', 'Paper'], ['dirty', 'Paper']]);
 });
-test('known desktop failure does not reach actual Save As picker or writeProjectTo writer', async () => {
-  const f = fixture(r => { delete r.NemoNativeOpacityCutover; });
-  f.root.__TAURI__.dialog = { save() { f.effects.push(['picker']); return '/owned/project.json'; } };
-  f.root.NemoProjectNativeSave = { writeProjectFile() { f.effects.push(['writer']); } };
-  Object.assign(f.sandbox, { currentName: 'project', currentPath: null, tauriOk: () => true,
-    showToast() { f.effects.push(['toast']); } });
-  for (const name of ['projectJSON', 'saveFramesIfLegacy', 'writeProjectTo', 'saveAs']) {
-    const asyncPrefix = ['writeProjectTo', 'saveAs'].includes(name) ? 'async ' : '';
-    vm.runInNewContext(asyncPrefix + extractFunction(project, name), f.sandbox);
-  }
-  await assert.rejects(f.sandbox.saveAs());
-  await assert.rejects(f.sandbox.writeProjectTo('/owned/project.json'));
-  assert.deepEqual(f.effects, []);
-});
+for (const method of ['saveAs', 'save']) {
+  test(`known desktop failure reaches actual production ${method} admission, not a missing binding`, async () => {
+    const fixtureSource = fs.readFileSync(path.join(__dirname, 'project-open.test.cjs'), 'utf8');
+    const start = fixtureSource.indexOf('function harness('), end = fixtureSource.indexOf('\nfunction select(', start);
+    assert.ok(start >= 0 && end > start);
+    const sandbox = vm.createContext({ assert, vm, require, setTimeout, console, source: project,
+      documentSource: fs.readFileSync(path.join(__dirname, '../src/js/project-document.js'), 'utf8'),
+      entrySource: fs.readFileSync(path.join(__dirname, '../src/js/project-entry.js'), 'utf8') });
+    vm.runInContext(fixtureSource.slice(start, end) + '\nthis.makeHarness=harness;', sandbox);
+    const effects = [];
+    const app = sandbox.makeHarness({ configureWindow(root) {
+      root.SM.exportJSON = () => { effects.push('Paper export'); throw Error('Paper forbidden'); };
+      root.__TAURI__ = { core: { invoke() { effects.push('native invoke'); } },
+        dialog: { save() { effects.push('picker'); return Promise.resolve('/owned/project.json'); } },
+        fs: { writeTextFile() { effects.push('writer'); }, rename() { effects.push('rename'); }, remove() { effects.push('remove'); } } };
+    } });
+    const before = app.project.getCurrentLabel();
+    await assert.rejects(app.project[method](), error => error.name !== 'ReferenceError' && /Native/.test(error.message));
+    assert.deepEqual(effects, []);
+    assert.equal(app.mutations, 0); assert.equal(app.writes.length, 0);
+    assert.equal(app.project.getCurrentLabel(), before);
+    assert.equal(app.project.isDirty(), true);
+    assert.equal(app.toasts.length, 1);
+    assert.match(app.toasts[0], /^toastSaveFailedSuffix/);
+  });
+}
 test('playing preserves the existing no-effects timer fast path', () => {
   const f = fixture(r => { delete r.__TAURI__; });
   f.sandbox.state.playing = true;
