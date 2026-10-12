@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registers a private object Save As coordination helper without a production loader or current object presenter. N25E4B1A registers a private saved-UI acknowledgement helper without a production loader, UI sink or current object presenter. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registers a private object Save As coordination helper without a production loader or current object presenter. N25E4B1A registers a private saved-UI acknowledgement helper without a production loader, UI sink or current object presenter. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory. N20R-O2B pins the ordinary Play publication observer hooks in Motion, app and timeline source.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "33a79b749e78ba63a064445f468da9b888736fe1",
-    "sourceRootTree": "7a84f83ecd05fc5a96fe05db702e7daefe82ff1d",
+    "candidateCommit": "28ec6c3d7bd845e50138102c87d743ea4b683853",
+    "sourceRootTree": "eef52d9235bf1ea24af847af036291e021c820d1",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "51d840c448dd862f25b7bd7276b665e9343f3207",
-      "lastChangedCommit": "1470c932d5c7b53c0c4bde655714b362610a6327"
+      "gitTree": "db679a4ec4a35da9f799925ceab43948398f4613",
+      "lastChangedCommit": "7ca01b99bc6a5e096672fd55129dd076adbf1686"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "625d1627af3fc6aa09397ee90f299bdc31d6480c037821800afee8fb0a388cc3"
+      "value": "40e6a560650a9ec221b060a68dbf10d87a97e766ff6fe5b4aaa566bd52bbebff"
     },
     "profiles": [
       {
