@@ -248,6 +248,8 @@ pub fn run() {
             native_object_bootstrap::nemo_native_object_bootstrap,
             native_object_bootstrap::nemo_native_object_save_as,
             native_reproduction_session::nemo_native_reproduction_session,
+            native_dispatch::nemo_native_prepare_inactive_project,
+            native_dispatch::nemo_native_cancel_inactive_project,
             native_application_commands::nemo_native_replace,
             native_application_commands::nemo_native_bind_output,
             native_application_commands::nemo_native_preview,

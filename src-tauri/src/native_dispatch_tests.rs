@@ -88,6 +88,7 @@ fn thread_allocation_failure_runs_the_accepted_job_synchronously() {
     let advances = Arc::new(AtomicUsize::new(0));
     let native: NativeState = Arc::new(Mutex::new(NativeAuthority {
         generation: 1,
+        inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
         phase: NativePhase::Active {
@@ -106,6 +107,7 @@ fn thread_allocation_failure_runs_the_accepted_job_synchronously() {
 fn generation_exhaustion_preserves_active_authority_during_release_admission() {
     let mut authority = NativeAuthority {
         generation: u64::MAX,
+        inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
         phase: NativePhase::Active {
@@ -138,6 +140,7 @@ fn generation_exhaustion_preserves_released_reentry_tombstone() {
     };
     let mut authority = NativeAuthority {
         generation: u64::MAX,
+        inactive_project: None,
         retained_releases: BTreeMap::new(),
         retained_replacements: BTreeMap::new(),
         phase: NativePhase::Released(tombstone),
