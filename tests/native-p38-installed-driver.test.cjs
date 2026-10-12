@@ -20,7 +20,7 @@ function fixture(change = {}) {
     if(change.transport)throw Object.assign(Error('transport'),{code:'transport-handshake-refused'});},
     async package(){events.push('package');if(change.package)throw Error('/private/pkg');return {executableSha256:HASH,proofHash:HASH};},
     async journal(){events.push('journal');if(used)throw Object.assign(Error('duplicate'),{code:'grant-already-attempted'});used=true;},
-    save(r){events.push('save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},
+    save(r){events.push('save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},feedback(){events.push('ephemeral-feedback');},
     controller(){return controller;},validate(){events.push('validate');if(change.validate)throw Error('wrong owner');},
     async window(mode,pid,wid,action){events.push('window-'+mode);if(change.window)return change.window(mode,pid,wid,action,fire);
       return {pid,windowId:45,matchedAX:true,...mode==='capture'?{captureSha256:HASH}:{}};},
@@ -195,6 +195,29 @@ test('positive main/direct-sheet pin/routes/dismissal preserve one main and one 
     ...(mode==='sheet-dismissed'?{dismissed:true}:{})});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'operator-complete');assert.equal(r.appPid,123);assert.equal(r.windowId,45);
   assert.equal(f.attempts,1);assert.equal(f.cleaned,1);assert.equal(r.installedAcceptance,'not-established');
+});
+test('next action learns fresh token from ephemeral output, with no token/private receipt evidence',async()=>{
+  const token=require('node:crypto').randomUUID(),f=fixture(),messages=[];let step=0,learned;
+  f.services.feedback=async reply=>{messages.push(structuredClone(reply));learned=reply.token;};
+  f.services.next=async()=>{
+    if(step++===0)return{type:'pin-sheet'};
+    assert.equal(learned,token);
+    if(step===2)return{type:'inspect',target:'sheet',sheetToken:learned};
+    if(step===3)return{type:'sheet-dismissed',sheetToken:learned};return{type:'stop'};
+  };
+  f.services.window=async(mode,pid,wid,a={})=>({pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'?{target:'sheet',sheetToken:token,ownerToken:'private-owner',value:'private-file-path'}:{}),
+    ...(a.target==='sheet'?{target:'sheet',sheetToken:token}:{}),...(mode==='sheet-dismissed'?{dismissed:true}:{})});
+  const receipt=await runOperator(f.cfg,f.services);assert.equal(receipt.status,'operator-complete');
+  assert.deepEqual(messages,[{target:'sheet',ordinal:1,token}]);
+  for(const value of [receipt,...f.receipts]){
+    const serialized=JSON.stringify(value);assert.equal(serialized.includes(token),false);assert.equal(serialized.includes('private'),false);
+  }
+});
+test('missing token feedback channel refuses instead of continuing with undisclosed routing state',async()=>{
+  const f=fixture();delete f.services.feedback;f.services.next=async()=>({type:'pin-sheet'});
+  f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,...(mode==='pin-sheet'?{target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa'}:{})});
+  const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.reason,'sheet-feedback-required');assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
 });
 test('foreign/stale/absent sheet routes and undismissed main/stop refuse before interaction',()=>{
   const {actionTarget,sheetResult}=require('./desktop/p38-installed-driver.cjs'),token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa';

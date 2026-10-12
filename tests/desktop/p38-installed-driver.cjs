@@ -168,6 +168,10 @@ async function runOperator(config, services) {
       const result = await bounded(services.window(action.type, receipt.appPid, receipt.windowId, action));
       windowResult(result, receipt.appPid, receipt.windowId);
       sheetResult(action, sheet, result);
+      if(action.type==='pin-sheet'){
+        check(typeof services.feedback==='function','sheet-feedback-required');
+        await bounded(services.feedback({target:'sheet',ordinal:receipt.actions.length+1,token:sheet.token}));
+      }
       if (result.captureSha256) check(/^[a-f0-9]{64}$/.test(result.captureSha256), 'capture-proof-refused');
       receipt.actions.push({ type: action.type, ordinal: receipt.actions.length + 1,
         ...(result.captureSha256 ? { captureSha256: result.captureSha256 } : {}) });
@@ -178,7 +182,7 @@ async function runOperator(config, services) {
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
       'source-head-refused','fresh-build-proof-required','window-helper-refused','grant-already-attempted',
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended',
-      'helper-malformed','fixture-refused','sheet-token-refused','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed'; }
+      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed'; }
   finally {
     if (timer !== undefined) services.clearTimer(timer);
     try { if (services.close) await services.close(); receipt.helperCleanup = 'complete'; }
@@ -326,6 +330,7 @@ function defaultServices(config) {
     validate(snapshot, instance, app) { verifyFixtures(config); harness.validateSnapshot(snapshot, instance, { isolation, runtime, source: app.source, build: app.build, app }); },
     window: helper,
     next: inputJSON,
+    feedback(value){process.stdout.write(JSON.stringify(value)+'\n');},
     async close() {
       input.close();
       for (const child of [...helpers]) await cleanupHelper(child);
