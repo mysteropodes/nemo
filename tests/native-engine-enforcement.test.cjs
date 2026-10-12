@@ -32,6 +32,8 @@ const CANDIDATE_FILES = [
   'native-engine/tests/export_job_lifecycle.rs',
   'native-engine/src/request_receipts.rs',
   'native-engine/src/read_queries.rs',
+  'native-engine/src/resource_leases.rs',
+  'native-engine/tests/object_resource_leases.rs',
   'native-engine/src/object_document.rs',
   'native-engine/src/project_media_envelope.rs',
   'native-engine/src/object_codec.rs',
