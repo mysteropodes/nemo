@@ -28,9 +28,10 @@ function realImportJSON() {
   return { calls, importJSON, state };
 }
 
-function harness({ auto = null, version = null, deferFrames = false, dirtyDot = false, nativeGuard = false } = {}) {
+function harness({ auto = null, version = null, deferFrames = false, dirtyDot = false, nativeGuard = false,
+  configureWindow = () => {}, allowBootstrapFailure = false } = {}) {
   const elements = new Map();
-  const downloads = [], toasts = [], frames = [], writes = [];
+  const downloads = [], toasts = [], frames = [], writes = [], windowEvents = {};
   let repaints = 0, mutations = 0;
   let json = JSON.stringify({ title: 'boot' });
   function element() {
@@ -52,7 +53,8 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
     querySelector(selector) { return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null; } };
   let rejectNextImport = false;
   const window = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
-    NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'), addEventListener() {}, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
+    NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
+    addEventListener(type, callback) { windowEvents[type] = callback; }, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
   } } };
@@ -72,15 +74,18 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
     return context.requestAnimationFrame(fn);
   };
   if (version !== null) window.__TAURI__ = { core: { invoke() {} }, fs: { readTextFile: async () => version } };
+  configureWindow(window);
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });
   context.SMProjectEntry = window.SMProjectEntry;
   document.body.appendChild = node => downloads.push(node.download);
-  vm.runInNewContext(source, context, { filename: 'project.js' });
-  document.ready();
+  let bootstrapError;
+  try { vm.runInNewContext(source, context, { filename: 'project.js' }); }
+  catch (error) { if (!allowBootstrapFailure) throw error; bootstrapError = error; }
+  if (!bootstrapError) document.ready();
   return { window, input: document.getElementById('file-input'), startScreen: document.getElementById('start-screen'),
     element(id) { return document.getElementById(id); },
-    downloads, toasts, writes, project: window.SMProject, elements, dot,
+    downloads, toasts, writes, project: window.SMProject, elements, dot, windowEvents, bootstrapError,
     flushFrame() { assert.ok(frames.length, 'an animation frame is queued'); frames.shift()(); },
     get pendingFrames() { return frames.length; },
     rejectNextImport() { rejectNextImport = true; }, get json() { return json; }, set json(value) { json = value; }, get repaints() { return repaints; }, get mutations() { return mutations; } };
@@ -802,7 +807,6 @@ function versionRestoreHarness() {
   const version = JSON.stringify(shell);
   const app = harness({ version, deferFrames: true, nativeGuard: true });
   app.json = previous;
-  app.project.markSaved();
   let current = previous, identity = { instanceId: 'native-instance', documentId: 'A', contentRevision: 2 };
   const writes = [], visible = deferred(), first = { owner: 'native', status: 'presented', frame: 0,
     instanceId: 'native-instance', documentId: 'B', contentRevision: 0,
@@ -810,6 +814,7 @@ function versionRestoreHarness() {
   app.window.NemoNativeOpacityLegacyAdmission = { allow: () => false };
   app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
     identity: () => identity, persistenceJSON: () => current };
+  app.project.markSaved();
   app.window.SM.exportJSON = () => { throw Error('legacy export forbidden'); };
   Object.assign(app.window.__TAURI__, { path: { appDataDir: async () => '/owned-app-data' } });
   Object.assign(app.window.__TAURI__.fs, { mkdir: async () => {},
@@ -883,7 +888,7 @@ test('desktop Version Restore with no published native globals denies before eve
   assert.equal(app.mutations, 0);
   assert.equal(app.writes.length, 0);
   assert.equal(app.json, before);
-  assert.equal(app.elements.get('project-tabs-list').children.length, 0);
+  assert.equal(app.element('project-tabs-list').children.length, 0);
   assert.equal(app.toasts.includes('toastVersionRestored'), false);
 });
 
@@ -900,4 +905,122 @@ test('native Version Restore rejected import preserves the existing document, ba
   assert.equal(h.app.pendingFrames, 0);
   assert.equal(h.app.element('history-modal').style.display, 'flex');
   assert.equal(h.app.toasts.includes('toastVersionRestored'), false);
+});
+
+const BASELINE_BYTES = '{"native":"saved-content"}', EDITED_BYTES = '{"native":"edited-content"}';
+function baselineHarness(change = () => {}, options = {}) {
+  const calls = { paper: 0, baselines: [], destroys: 0, asks: 0 };
+  const current = { bytes: BASELINE_BYTES, revision: 0 };
+  const app = harness({ ...options, configureWindow(root) {
+    root.SM.exportJSON = () => { calls.paper++; return '{"paper":"unrelated"}'; };
+    const original = root.NemoProjectDirtyBaseline;
+    root.NemoProjectDirtyBaseline = { create() {
+      const real = original.create();
+      return { ...real, markSaved(bytes) { calls.baselines.push(bytes); real.markSaved(bytes); } };
+    } };
+    root.__TAURI__ = { core: { invoke() {} }, dialog: { ask: async () => { calls.asks++; return false; } },
+      window: { getCurrentWindow: () => ({ onCloseRequested(callback) { calls.close = callback; },
+        async destroy() { calls.destroys++; } }) } };
+    root.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
+      identity: () => ({ instanceId: 'instance-baseline', documentId: 'document-baseline', contentRevision: current.revision }),
+      persistenceJSON: () => current.bytes };
+    change(root, current, calls);
+  } });
+  return { app, calls, current };
+}
+for (const [name, change, bootstrapFailure] of [
+  ['object/no opacity owner', root => { delete root.NemoNativeOpacityCutover; }],
+  ['malformed API', root => { root.__TAURI__ = {}; }],
+  ['packaged API absent', root => { delete root.__TAURI__; root.location = { protocol: 'tauri:', hostname: 'localhost', port: '' }; }],
+  ['throwing API evidence', root => { Object.defineProperty(root, '__TAURI__', { get() { throw Error('API unavailable'); } }); }, true],
+  ...['closed', 'replacing', 'indeterminate', 'synchronizing'].map(name => [name, root => { root.NemoNativeOpacityCutover.isActive = () => false; }]),
+  ['unreadable persistence', root => { root.NemoNativeOpacityCutover.persistenceJSON = () => { throw Error('native read refused'); }; }],
+  ['unavailable close dialog', (root, current, calls) => {
+    delete root.NemoNativeOpacityCutover;
+    root.__TAURI__.dialog.ask = async () => { calls.asks++; throw Error('dialog unavailable'); };
+  }],
+  ['changed revision', (root, current) => { root.NemoNativeOpacityCutover.persistenceJSON = () => { current.revision++; return current.bytes; }; }],
+]) {
+  test(`actual boot and exposed markSaved refuse ${name} before Paper/baseline effects`, async () => {
+    const h = baselineHarness(change, { allowBootstrapFailure: !!bootstrapFailure });
+    assert.equal(!!h.app.bootstrapError, !!bootstrapFailure, 'bootstrap errors remain explicit');
+    assert.equal(h.calls.paper, 0);
+    assert.deepEqual(h.calls.baselines, []);
+    assert.equal(h.app.project.isDirty(), true, 'uninitialized unavailable baseline cannot be clean');
+    h.app.project.markSaved();
+    assert.equal(h.calls.paper, 0);
+    assert.deepEqual(h.calls.baselines, []);
+    assert.equal(h.app.project.isDirty(), true);
+    if (h.calls.close) {
+      let prevented = 0;
+      await h.calls.close({ preventDefault() { prevented++; } });
+      assert.equal(prevented, 1); assert.equal(h.calls.asks, 1); assert.equal(h.calls.destroys, 0);
+    }
+    assert.deepEqual(h.app.writes, []);
+  });
+}
+test('actual native boot/exposed baseline follows native content through edit/undo/redo', () => {
+  const h = baselineHarness();
+  assert.deepEqual(h.calls.baselines, [BASELINE_BYTES]);
+  assert.equal(h.app.project.isDirty(), false);
+  h.current.bytes = EDITED_BYTES; h.current.revision++;
+  assert.equal(h.app.project.isDirty(), true);
+  h.current.bytes = BASELINE_BYTES; h.current.revision++;
+  assert.equal(h.app.project.isDirty(), false, 'new revision with saved content is clean');
+  h.current.bytes = EDITED_BYTES; h.current.revision++;
+  assert.equal(h.app.project.isDirty(), true);
+  h.app.project.markSaved();
+  assert.equal(h.app.project.isDirty(), false);
+  assert.deepEqual(h.calls.baselines, [BASELINE_BYTES, EDITED_BYTES]);
+  assert.equal(h.calls.paper, 0);
+  h.app.project.enterEditor();
+  const currentTab = h.app.element('project-tabs-list').children[0];
+  const label = h.app.project.getCurrentLabel();
+  h.current.bytes = BASELINE_BYTES; h.current.revision++;
+  h.app.window.NemoNativeOpacityCutover.isActive = () => false;
+  h.app.project.markSaved();
+  assert.deepEqual(h.calls.baselines, [BASELINE_BYTES, EDITED_BYTES], 'refusal preserves the prior saved baseline');
+  assert.equal(h.app.project.getCurrentLabel(), label);
+  assert.equal(h.app.element('project-tabs-list').children[0], currentTab, 'refusal leaves the active tab UI untouched');
+  assert.equal(h.app.project.isDirty(), true);
+  h.app.window.NemoNativeOpacityCutover.isActive = () => true;
+  assert.equal(h.app.project.isDirty(), true, 'old content stays dirty against the last accepted baseline');
+});
+test('actual New reports partial failure without clean stamp/autosave/success when persistence is refused', async () => {
+  const h = baselineHarness(root => {
+    delete root.NemoNativeOpacityCutover;
+    // Controlled admission tests the existing post-creation failure path;
+    // ordinary native New denial remains covered independently above.
+    root.NemoNativeOpacityLegacySurface = { allowProjectTransition: () => true, releaseProjectTransition: () => null };
+    root.n20AllowLegacyWrite = () => true;
+  });
+  const form = newProjectForm(h.app);
+  await h.app.elements.get('np-create').listeners.click();
+  assert.ok(h.app.mutations > 0, 'creation may already have changed the document');
+  assert.equal(h.calls.paper, 0); assert.deepEqual(h.calls.baselines, []);
+  assert.deepEqual(h.app.writes, []);
+  assert.equal(h.app.project.isDirty(), true);
+  assert.equal(h.app.toasts.includes('New project created'), false);
+  assert.match(admissionMessage(form).textContent, /creation failed.*may have changed/i);
+});
+test('ordinary browser New stamps current browser bytes and keeps autosave ordering', async () => {
+  const app = harness();
+  app.json = '{"browser":"new"}';
+  const form = newProjectForm(app);
+  await app.elements.get('np-create').listeners.click();
+  assert.equal(app.project.isDirty(), false);
+  assert.equal(app.toasts.includes('New project created'), true);
+  assert.equal(form.style.display, 'none');
+  assert.deepEqual(app.writes, [['nemo-auto', '{"browser":"new"}']]);
+});
+test('browser post-creation serialization failure cannot retain an old clean baseline', async () => {
+  const app = harness();
+  const form = newProjectForm(app);
+  app.window.SM.exportJSON = () => { throw Error('browser serialization failed'); };
+  await app.elements.get('np-create').listeners.click();
+  assert.ok(app.mutations > 0);
+  assert.equal(app.project.isDirty(), true);
+  assert.deepEqual(app.writes, []);
+  assert.equal(app.toasts.includes('New project created'), false);
+  assert.match(admissionMessage(form).textContent, /creation failed.*may have changed/i);
 });

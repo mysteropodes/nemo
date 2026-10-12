@@ -61,6 +61,7 @@
 
   // ---- New / Open / Save (native fs, real files on disk) ----
   function newProjectNow(cfg){
+    savedBaselineReady=false;
     if(window.SMLabs&&window.SMLabs.resetAll)window.SMLabs.resetAll(); // see labs-core.js's own comment — a Labs prototype must never silently carry into a new project
     if(state.activeSymbolId)exitToScene();
     while(userLayers.length>0)userLayers.pop().remove();state.layers=[];
@@ -106,24 +107,25 @@
     syncDocFields();
     currentPath=null;currentName=cfg.name||'Untitled';updateCurrentLabel();
     if(window.NemoOpacityApplication)window.NemoOpacityApplication.documentChanged();
-    try{var freshJson=window.SM.exportJSON();markSaved(freshJson);autosaveWrite(freshJson);}catch(e){}
+    var freshJson=projectJSON();markSaved(freshJson);autosaveWrite(freshJson);
     showToast('New project created');
   }
   function newProject(cfg,stillCurrent,onCreationFailure){return afterMaybe(releaseNative('new-project'),function(admitted){if(admitted===false||!stillCurrent()||typeof window.n20AllowLegacyWrite==='function'&&window.n20AllowLegacyWrite('create-layer')!==true)return false;try{return newProjectNow(cfg);}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});}
 
   // Last successfully persisted document, for the close-with-unsaved-work
-  // guard below. null = "never saved/loaded anything yet" — a brand-new
-  // empty document counts as clean until it's actually drawn on (newProject
-  // and openPath both stamp it).
+  // guard below. Unavailable boot/creation must stay dirty until a baseline
+  // has actually been admitted; the byte adapter's null sentinel is UI-only.
   var dirtyBaseline=window.NemoProjectDirtyBaseline.create();
+  var savedBaselineReady=false;
   function markSaved(json){
     dirtyBaseline.markSaved(json);
+    savedBaselineReady=true;
     var t=activeTab();
     if(t)t.dirty=false;
     renderTabBar();
   }
   function isDirty(){
-    return dirtyBaseline.isDirty(projectJSON);
+    return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);
   }
 
   async function writeProjectTo(path){
@@ -384,7 +386,7 @@
     // feedback-bridge.js's local + shared feedback storage keys off, so a
     // feedback thread and this project's own history/sync folders always
     // agree on which project they belong to without re-deriving the logic.
-    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(window.SM.exportJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
+    getProjectKey:historyKey,profileDir:profileDir,isDirty:isDirty,markSaved:function(){try{markSaved(projectJSON());}catch(e){}},getCurrentLabel:getCurrentLabel,
     refreshActiveTabDirtyDot:refreshActiveTabDirtyDot,
     // Read-only list of every OTHER open project tab (feedback #109: "voir
     // apparaître les différents projet test1, test2... afin de pouvoir les
@@ -414,7 +416,7 @@
     // markSaved itself). Without this, isDirty() stayed null-baselined
     // (never dirty) until the first explicit save/open/new — leaving an
     // auto-restored session entirely unguarded.
-    try{markSaved(window.SM.exportJSON());}catch(e){}
+    try{markSaved(projectJSON());}catch(e){}
     if(tauriOk()&&window.__TAURI__.window&&window.__TAURI__.window.getCurrentWindow){
       try{
         var appWindow=window.__TAURI__.window.getCurrentWindow();
