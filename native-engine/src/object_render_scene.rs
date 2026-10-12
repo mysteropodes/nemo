@@ -16,6 +16,56 @@ pub use paint::{
     prepare_object_paint_plan, ObjectPaintCommand, ObjectPaintPlan, ObjectPaintPlanError,
 };
 
+/// Render-scene-owned composition admission. Its private retained plan cannot
+/// be constructed from unvalidated caller pins or detached identity strings.
+#[derive(Debug, Clone)]
+pub struct ObjectCompositionWitness {
+    plan: ObjectPaintPlan,
+}
+
+pub fn prepare_object_composition(
+    plan: &ObjectPaintPlan,
+    expected: &ObjectFrameSelector<'_>,
+) -> Result<ObjectCompositionWitness, ObjectSceneError> {
+    validate_pins(plan.packet(), expected)?;
+    Ok(ObjectCompositionWitness { plan: plan.clone() })
+}
+
+impl ObjectCompositionWitness {
+    pub fn plan(&self) -> &ObjectPaintPlan {
+        &self.plan
+    }
+    pub fn instance_id(&self) -> &str {
+        self.plan.packet().instance_id()
+    }
+    pub fn document_id(&self) -> &str {
+        self.plan.packet().document_id()
+    }
+    pub fn content_revision(&self) -> u64 {
+        self.plan.packet().content_revision()
+    }
+    pub fn document_snapshot_id(&self) -> &str {
+        self.plan.packet().document_snapshot_id()
+    }
+    pub fn context_id(&self) -> &str {
+        self.plan.packet().context_id()
+    }
+    pub fn frame(&self) -> u32 {
+        self.plan.packet().frame()
+    }
+    /// Compare all original pins, including scope, without leaking evaluator
+    /// selector/packet types into composition consumers.
+    pub fn same_identity_as(&self, other: &Self) -> bool {
+        self.instance_id() == other.instance_id()
+            && self.document_id() == other.document_id()
+            && self.content_revision() == other.content_revision()
+            && self.document_snapshot_id() == other.document_snapshot_id()
+            && self.context_id() == other.context_id()
+            && self.plan.packet().scope_kind() == other.plan.packet().scope_kind()
+            && self.frame() == other.frame()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectSceneError {
     WrongInstance,
