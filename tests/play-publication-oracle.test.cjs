@@ -20,7 +20,14 @@ function model(){
       for(const event of ['commit-enter','ui-publication','commit-return','paint-enter','paint-return','sync-enter','sync-return']){
         events.push({event,...base,...(event==='ui-publication'?{currentFrame:frame}:{}),...(event==='sync-return'?{currentFrame:frame,result:true}:{})});
       }
-    }else events.push({event:'failure',...base,code:'unknown'});
+    }else{
+      const restored=context(8,0,'presented'),retry={...restored,intent,priorFrame:0};
+      events.push({event:'rollback',...identity,intent,frame:0,currentFrame:0},
+        {event:'receipt-retry',...base,priorFrame:0,result:false},
+        {event:'host-request',...restored},{event:'host-receipt',...restored},{event:'presented-return',...restored},
+        {event:'receipt-retry',...retry,result:true},{event:'rollback',...retry,currentFrame:0,result:true},
+        {event:'failure',...base,code:'unknown'});
+    }
     events.push({event:'navigate-return',...base,result:status==='presented'});
   };
   events.push({event:'play-step',...identity,runGeneration:1,frame:10});request(1,1,10,'deferred-occluded');
@@ -36,6 +43,7 @@ function model(){
   emit('exposure',{windowNumber:81,minimized:true,occlusionVisible:false});
   emit('preview-begin',null,p(1,10));emit('preview-end',{status:'deferred-occluded'},p(1,10));
   emit('exposure',{windowNumber:81,minimized:false,occlusionVisible:true},null,2);
+  emit('preview-begin',null,p(8,0),2);emit('preview-end',{status:'presented'},p(8,0),2);
   emit('preview-begin',null,p(2,0),2);emit('preview-end',{status:'presented'},p(2,0),2);
   emit('preview-begin',null,p(3,20),2);emit('preview-end',{status:'presented'},p(3,20),2);
   for(const[call,frame]of[[4,20],[5,0],[6,10],[7,20]]){emit('preview-begin',null,p(call,frame),2);emit('preview-end',{status:'presented'},p(call,frame),2);}
@@ -163,14 +171,17 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
   const result=verifyEvidence(refresh(e));assert.equal(result.status,'consistent',JSON.stringify(result));
   const ack=records.find(row=>row.event==='rollback'&&row.result===true);assert.ok(ack);
   assert.equal(ack.intent,1);assert.equal(ack.frame,0);assert.equal(ack.hostCallOrdinal,2);
-  for(const mode of['omit-request','omit-presented','omit-ack','foreign-intent','foreign-work','foreign-call',
-    'foreign-revision','foreign-generation','foreign-session','foreign-prior','missing-work','missing-view','false-ack','early-ack','newer-intent']){
+  for(const mode of['omit-request','omit-presented','omit-ack','omit-chain','foreign-intent','foreign-work','foreign-call',
+    'foreign-revision','foreign-generation','foreign-session','foreign-prior','missing-work','missing-view','false-ack','early-ack','newer-intent',
+    'terminal-revision','terminal-frame','terminal-call','terminal-work','terminal-view','terminal-all']){
     const altered={...e,events:structuredClone(records)},rows=altered.events;
     const request=rows.find(row=>row.event==='receipt-retry'&&row.result===false),presented=rows.find(row=>row.event==='receipt-retry'&&row.result===true);
     const ack=rows.find(row=>row.event==='rollback'&&row.result===true);
+    const terminal=rows.find(row=>row.event==='navigate-return'&&row.result===false);
     if(mode==='omit-request')rows.splice(rows.indexOf(request),1);
     if(mode==='omit-presented')rows.splice(rows.indexOf(presented),1);
     if(mode==='omit-ack')rows.splice(rows.indexOf(ack),1);
+    if(mode==='omit-chain')altered.events=rows.filter(row=>!['rollback','receipt-retry'].includes(row.event));
     if(mode==='foreign-intent')ack.intent=99;
     if(mode==='foreign-work')ack.workId='native-work-99';
     if(mode==='foreign-call')ack.hostCallOrdinal=1;
@@ -183,6 +194,10 @@ test('direct exported O1/preview/navigator/scheduler producers use deterministic
     if(mode==='false-ack')ack.result=false;
     if(mode==='early-ack'){rows.splice(rows.indexOf(ack),1);rows.splice(rows.indexOf(presented),0,ack);}
     if(mode==='newer-intent')rows.splice(rows.indexOf(ack),0,{event:'navigate-request',...identity,intent:99,frame:20});
+    const mutations={'terminal-revision':{contentRevision:99},'terminal-frame':{frame:19},'terminal-call':{hostCallOrdinal:99},
+      'terminal-work':{workId:'native-work-99'},'terminal-view':{viewGeneration:99},
+      'terminal-all':{contentRevision:99,frame:19,hostCallOrdinal:99,workId:'native-work-99',viewGeneration:99}};
+    if(mutations[mode])Object.assign(terminal,mutations[mode]);
     assert.equal(verifyEvidence(refresh(altered)).status,'partial',mode);
   }
 });

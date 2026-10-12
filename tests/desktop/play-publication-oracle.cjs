@@ -100,7 +100,7 @@ function semantics(events) {
       requireEvidence(n && !n.done && c && same(c.request,e) &&
         same(n.request,e,['instanceId','documentId','contentRevision','frame']), 'failure-context');
       if (e.workId!==undefined) requireEvidence(c.receipt && same(c.receipt,e,pins.concat(['workId','viewGeneration','status'])), 'failure-work');
-      n.failed=true; failures++;
+      n.failed=true; n.failure=e; failures++;
       if(n.restore)requireEvidence(same(n.restore.cause,e,workPins),'restore-failure-join');
     } else if (e.event==='navigate-superseded') {
       const n=navs.get(navKey(e)); requireEvidence(n && !n.done, 'superseded-context'); n.superseded=true;
@@ -108,7 +108,10 @@ function semantics(events) {
       const n=navs.get(navKey(e)); requireEvidence(n && !n.done && typeof e.result==='boolean', 'terminal-navigation'); n.done=true;n.result=e.result;
       if (e.result) { requireEvidence(!n.rollback && !n.failed && !n.superseded && n.stage===stages.length &&
         latest.get(e.instanceId)===e.intent && same(n.pins,e,pins.concat(['workId','viewGeneration'])), 'false-publication'); publications++; }
-      else requireEvidence(n.failed || n.superseded, 'unattributed-failure');
+      else if(n.failed){
+        requireEvidence(n.restore && n.restored && same(n.failure,e,workPins) &&
+          same(n.restore.cause,e,workPins),'failed-terminal-context');
+      }else requireEvidence(n.superseded,'unattributed-failure');
       requireEvidence(!n.rollback || n.restored,'rollback-needs-independent-review');
       if(n.stopRestore){requireEvidence(e.result===true,'stop-restore-failed');stopGate=null;}
     } else if (e.event==='play-state') {
