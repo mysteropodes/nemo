@@ -75,7 +75,12 @@
       return Object.freeze(consumer);
     }
     function createConsumers(target) {
-      target.preview = scoped(ports.createPreview(), ['register', 'receive', 'present']);
+      var rawPreview = ports.createPreview();
+      try { var observer = typeof window === 'object' && window.NemoTestPlayObserver;
+        if (observer && typeof observer.bindPreview === 'function') observer.bindPreview(rawPreview, target.session,
+          function () { return target === cycle && target.active ? target.hostGeneration : null; });
+      } catch (_) { /* Passive test-only attribution cannot change admission. */ }
+      target.preview = scoped(rawPreview, ['register', 'receive', 'present']);
       target.exporter = scoped(ports.createExporter(), ['begin', 'status', 'cancel', 'observe', 'plan']);
     }
     function disposeConsumers(target) { if (!target) return;

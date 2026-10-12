@@ -215,7 +215,11 @@
             throw new Error('native opacity frame was not presented at the admitted revision');
           }
           lastPresentedFrame = frame;
-          return Object.freeze(Object.assign({ owner: 'native' }, presented));
+          var finalReceipt = Object.freeze(Object.assign({ owner: 'native' }, presented));
+          try { var observer = typeof window === 'object' && window.NemoTestPlayObserver;
+            if (observer && typeof observer.presentedReturn === 'function') observer.presentedReturn(presented, finalReceipt);
+          } catch (_) { /* A diagnostic sink cannot change presentation. */ }
+          return finalReceipt;
         }
       } catch (error) {
         var failed = lifecycle.inspect();
