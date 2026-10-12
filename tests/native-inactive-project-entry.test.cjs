@@ -179,8 +179,12 @@ test('commit port changing active A cannot be reported as a successful prepared 
 test('cancel after held native prepare cleans only its correlated token and never commits', async () => {
   const gate=deferred(),f=fixture({invoke:async name=>{if(name==='nemo_native_prepare_inactive_project')await gate.promise;}});
   const pending=f.controller.openPath('/B.json');
-  while(!named(f,'nemo_native_prepare_inactive_project').length)await new Promise(r=>setImmediate(r));
-  f.controller.cancelPending();gate.resolve();assert.equal((await pending).status,'cancelled');assert.equal(f.rows.length,0);
+  try {
+    for(let turn=0;turn<20&&!named(f,'nemo_native_prepare_inactive_project').length;turn++)await new Promise(r=>setImmediate(r));
+    assert.equal(named(f,'nemo_native_prepare_inactive_project').length,1,'admission must reach exactly one prepare call within 20 event-loop turns');
+    f.controller.cancelPending();
+  } finally { gate.resolve(); }
+  assert.equal((await pending).status,'cancelled');assert.equal(f.rows.length,0);
   assert.equal(named(f,'nemo_native_cancel_inactive_project')[0][1].request.preparationToken,TOKEN);
 });
 test('wire payload excludes shell/frames/legacy JSON and input file is untouched', async () => {
