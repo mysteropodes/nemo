@@ -102,18 +102,20 @@
       var nav = navigations.get(ticket), cause = error && typeof error === 'object' ? failures.get(error) : null;
       var token = Object.freeze({});
       var valid = nav && !nav.finished && !nav.failureFenced && cause && cause.hostCallOrdinal > nav.afterCallOrdinal &&
+        restoreWork(cause) &&
         ['instanceId','documentId','contentRevision','frame'].every(function (key) { return nav.pins[key] === cause[key]; }) &&
         Number.isSafeInteger(priorFrame) && priorFrame >= 0;
       if (!valid) dropped++;
       var pins = Object.freeze(Object.assign({}, valid ? cause : nav && nav.pins, { intent: nav && nav.pins.intent, priorFrame: priorFrame }));
-      restorations.set(token, { nav:nav, cause:valid ? cause : null, pins:pins, prior:priorFrame, currentOwner:currentOwner, valid:!!valid, painted:false, finished:false });
+      restorations.set(token, { nav:nav, cause:valid ? cause : null, pins:pins, prior:priorFrame, afterCallOrdinal:callSequence, currentOwner:currentOwner, valid:!!valid, painted:false, finished:false });
       record(Object.assign({ event:'receipt-retry', result:false }, pins)); return token;
     }
     function restorePresented(token, receipt) {
       var restore = restorations.get(token); if (!restore || restore.finished) { dropped++; return; }
       var captured = receipts.get(receipt);
       var matching = ['instanceId','documentId','contentRevision','documentSnapshotId','contextId','jsLifecycleGeneration','hostGeneration','sessionOrdinal'];
-      if (!restore.valid || !captured || captured.status !== 'presented' || captured.frame !== restore.prior ||
+      if (!restore.valid || !captured || !restoreWork(captured) || captured.status !== 'presented' || captured.frame !== restore.prior ||
+          captured.hostCallOrdinal <= restore.afterCallOrdinal ||
           captured.hostCallOrdinal <= restore.cause.hostCallOrdinal || !matching.every(function (key) { return captured[key] === restore.cause[key]; }) ||
           !restoreOwner(restore)) {
         restore.valid=false; dropped++; return;
@@ -139,6 +141,8 @@
     }
     function restoreOwner(restore) { try { return typeof restore.currentOwner === 'function' && restore.currentOwner() === true; }
       catch (_) { return false; } }
+    function restoreWork(pins) { return typeof pins.workId === 'string' && /^native-work-[1-9][0-9]{0,19}$/.test(pins.workId) &&
+      BigInt(pins.workId.slice(12)) <= 18446744073709551615n && Number.isSafeInteger(pins.viewGeneration) && pins.viewGeneration > 0; }
     function navigationRequest(intent, frame, identity) {
       var ticket = Object.freeze({}), pins = Object.freeze(Object.assign({ intent: intent, frame: frame }, identity));
       navigations.set(ticket, { pins: pins, finished: false, afterCallOrdinal: callSequence }); productPendingNavigation++;

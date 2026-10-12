@@ -319,7 +319,7 @@
           // frame. Restore the previous one; failed restoration fences native.
           if (request === intent && sameOwner && controller.isActive()) {
             var restoration = observe('restoreRequested', diagnostic, prior, error, function () {
-              return ports.controller() === controller && controller.isActive() && sameIdentity(requestedIdentity, controller.identity()); });
+              return request === intent && ports.controller() === controller && controller.isActive() && sameIdentity(requestedIdentity, controller.identity()); });
             try { var restored = await controller.presentPreview(prior);
               observe('restorePresented', restoration, restored);
               try { ports.paint(); observe('restorePainted', restoration); ports.syncInput(); observe('restoreCompleted', restoration); }

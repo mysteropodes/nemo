@@ -347,8 +347,42 @@ test('original failed intent is explicitly bound to completed actual restore pai
   assert.equal(terminal.result,false);assert.equal(terminal.hostCallOrdinal,1);
 });
 
+test('new navigation during awaited restoration cannot acknowledge the superseded intent', async () => {
+  const { createObserver } = require('./play-publication-observer-bootstrap.js');
+  const { createFrameNavigator } = require('../../src/js/adapters/native-opacity-motion-surface.js');
+  const rows = [], runId = 'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa';
+  const api = createObserver({ runId }, { invoke(action, payload) {
+    if (action === 'record') rows.push(payload.event); return Promise.resolve({ sequence:payload.sequence });
+  }, async listen() { return () => {}; } });
+  await api.ready; const previous = global.window; global.window = { NemoTestPlayObserver:api };
+  try {
+    const identity = { instanceId:runId, documentId:'native-document-1', contentRevision:0 }, raw = {}, session = {};
+    api.bindPreview(raw, session, () => 1); let frame = 0, count = 0, release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const controller = { isActive:() => true, identity:() => identity, async presentPreview(selected) {
+      const ordinal = ++count, meta = { ...identity, documentSnapshotId:'snapshot-1', contextId:'scene-root', frame:selected };
+      const call = api.beginHost(raw, { instanceId:runId, lifecycleGeneration:1 }, meta);
+      if (ordinal === 2) await gate;
+      const receipt = Object.freeze({ ...meta, owner:'native', status:'presented', lifecycleGeneration:1,
+        viewGeneration:ordinal, workId:'native-work-'+ordinal });
+      api.rawReceipt(call, receipt); api.associateReceipt(call, receipt); api.presentedReturn(receipt, receipt); return receipt;
+    } };
+    const nav = createFrameNavigator({ frame:() => frame, total:() => 21, controller:() => controller,
+      commit(selected) { frame=selected; api.uiPublication(frame,frame); },
+      paint() { if (frame === 10) throw Error('paint rejected'); },
+      syncInput() { api.inputPublication(frame+1,frame,frame); }, fail() {} });
+    const first = nav.navigate(controller,10); await drain(); assert.equal(count,2);
+    const newer = nav.navigate(controller,20); release();
+    assert.deepEqual(await Promise.all([first,newer]),[false,true]); await drain();
+    assert.equal(count,3); assert.equal(frame,20);
+    assert.ok(rows.some(e => e.event === 'navigate-request' && e.intent === 2));
+    assert.equal(rows.some(e => e.event === 'rollback' && e.result === true && e.intent === 1),false);
+    assert.ok(api.inspect().dropped > 0);
+  } finally { if (previous === undefined) delete global.window; else global.window = previous; }
+});
+
 test('restore acknowledgement refuses foreign pins, failed/stale results and missing/reordered completion', async () => {
-  for(const mode of['valid','owner','revision','snapshot','session','host-generation','js-generation','stale','deferred','missing-paint','missing-input','early-complete','owner-lost','getter-throws']){
+  for(const mode of['valid','owner','revision','snapshot','session','host-generation','js-generation','stale','deferred','missing-work','missing-view','missing-cause-work','missing-cause-view','old-call','unmapped-call','missing-paint','missing-input','early-complete','owner-lost','getter-throws']){
     const s=await setup('on',{paint:true});await s.navigate(10);await drain();
     const rows=s.r.events(),cause=rows.find(e=>e.event==='failure'),returned=rows.find(e=>e.event==='presented-return'&&e.hostCallOrdinal===2);
     const fake={...returned};
@@ -362,7 +396,16 @@ test('restore acknowledgement refuses foreign pins, failed/stale results and mis
     const raw={},session=Object.freeze({});s.r.api.bindPreview(raw,session,()=>7);
     const call=s.r.api.beginHost(raw,{instanceId:cause.instanceId,lifecycleGeneration:cause.jsLifecycleGeneration},
       {documentId:cause.documentId,contentRevision:cause.contentRevision,documentSnapshotId:cause.documentSnapshotId,contextId:cause.contextId,frame:10});
+    s.r.api.rawReceipt(call,{...(mode==='missing-cause-work'?{}:{workId:'native-work-900'}),
+      ...(mode==='missing-cause-view'?{}:{viewGeneration:900}),status:'presented'});
     s.r.api.rejectReceipt(call,error);
+    let older;
+    if(mode==='old-call'){
+      const priorCall=s.r.api.beginHost(raw,{instanceId:fake.instanceId,lifecycleGeneration:fake.jsLifecycleGeneration},
+        {documentId:fake.documentId,contentRevision:fake.contentRevision,documentSnapshotId:fake.documentSnapshotId,contextId:fake.contextId,frame:0});
+      s.r.api.rawReceipt(priorCall,{workId:'native-work-901',viewGeneration:901,status:'presented'});
+      older=Object.freeze({workId:'native-work-901',viewGeneration:901,status:'presented'});s.r.api.associateReceipt(priorCall,older);
+    }
     const restore=s.r.api.restoreRequested(ticket,0,error,()=>mode==='getter-throws'?(()=>{throw Error('owner getter');})():mode!=='owner-lost');
     // A same-realm producer receipt gets its own distinct real call context.
     const restoreRaw=mode==='session'||mode==='host-generation'?{}:raw;
@@ -370,8 +413,9 @@ test('restore acknowledgement refuses foreign pins, failed/stale results and mis
     const restoreCall=s.r.api.beginHost(restoreRaw,{instanceId:fake.instanceId,lifecycleGeneration:fake.jsLifecycleGeneration},
       {documentId:fake.documentId,contentRevision:fake.contentRevision,documentSnapshotId:fake.documentSnapshotId,contextId:fake.contextId,frame:0});
     s.r.api.rawReceipt(restoreCall,{workId:fake.workId,viewGeneration:fake.viewGeneration,status:fake.status});
-    const receipt=Object.freeze({workId:fake.workId,viewGeneration:fake.viewGeneration,status:fake.status});
-    s.r.api.associateReceipt(restoreCall,receipt);s.r.api.restorePresented(restore,receipt);
+    const receipt=Object.freeze({...(mode==='missing-work'?{}:{workId:fake.workId}),
+      ...(mode==='missing-view'?{}:{viewGeneration:fake.viewGeneration}),status:fake.status});
+    s.r.api.associateReceipt(restoreCall,receipt);s.r.api.restorePresented(restore,mode==='old-call'?older:mode==='unmapped-call'?Object.freeze({}):receipt);
     if(mode==='early-complete')s.r.api.restoreCompleted(restore);
     if(mode!=='missing-paint')s.r.api.restorePainted(restore);
     if(mode!=='missing-input')s.r.api.inputPublication(1,0,0);
