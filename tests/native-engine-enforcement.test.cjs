@@ -110,7 +110,7 @@ const PRODUCTION = {
   codec: ['codec', 'document', 'project_structure', 'object_document', 'object_codec'],
   commands: ['commands', 'request_receipts', 'revision', 'object_snapshot'],
   history: ['history', 'transaction'],
-  evaluation: ['evaluation', 'animation_curve', 'object_frame_packet'],
+  evaluation: ['evaluation', 'animation_curve', 'object_frame_packet', 'expression_noise'],
   scheduler: ['resource_leases', 'scheduler'],
   compositor: ['compositor', 'render_scene', 'render_geometry', 'object_render_scene'],
   viewport: ['desktop_viewport'],
@@ -261,7 +261,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     if (name === 'commands') expected.push('object_read_tests = "../tests/object_read.rs"',
       'object_fill_tests = "../tests/object_fill.rs"');
     if (name === 'history') expected.push('object_history_tests = "../tests/object_history.rs"');
-    if (name === 'evaluation') expected.push('object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs"');
+    if (name === 'evaluation') expected.push('object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs"',
+      'expression_noise_tests = "../tests/expression_noise.rs"');
     if (name === 'compositor') expected.push('render_geometry_tests = "../tests/render_geometry.rs"',
       'object_render_scene_compositor_tests = "../tests/object_render_scene.rs"');
     if (name === 'export_job') expected.push('authored_curve_consumers_tests = "../tests/authored_curve_consumers.rs"',
