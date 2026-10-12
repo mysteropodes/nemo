@@ -1,7 +1,6 @@
 //! D2 headless object pixels on the existing compositor; never presentation.
-use super::{align_to, Compositor, CompositorError};
-use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameSelector};
-use crate::object_render_scene::{ObjectPaintCommand, ObjectPaintPlan};
+use crate::compositor::{align_to, Compositor, CompositorError};
+use crate::object_render_scene::{ObjectCompositionWitness, ObjectPaintCommand};
 use vello::kurbo::Affine;
 use vello::peniko::{Color, Fill};
 
@@ -71,22 +70,11 @@ fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
 impl Compositor {
     pub(crate) fn compose_object(
         &mut self,
-        plan: &ObjectPaintPlan,
-        expected: &ObjectFrameSelector<'_>,
+        prepared: &ObjectCompositionWitness,
         output: ObjectOutputSpec,
     ) -> Result<ObjectCompositionResult, CompositorError> {
-        let packet = plan.packet();
-        if expected.instance_id != packet.instance_id()
-            || expected.document_id != packet.document_id()
-            || expected.content_revision != packet.content_revision()
-            || expected.document_snapshot_id != packet.document_snapshot_id()
-            || expected.context_id != "scene-root"
-            || expected.context_id != packet.context_id()
-            || expected.scope_kind != *packet.scope_kind()
-            || expected.frame != packet.frame()
-        {
-            return Err(CompositorError::new("object composition pins mismatch"));
-        }
+        // Only the render-scene boundary can create this validated witness.
+        let plan = prepared.plan();
         output_budget(
             output.width,
             output.height,
@@ -106,7 +94,7 @@ impl Compositor {
             texture,
             view,
             output,
-            plan: plan.clone(),
+            prepared: prepared.clone(),
         })
     }
 
@@ -150,7 +138,7 @@ impl Compositor {
                 result.output.height,
             )?,
             output: result.output,
-            plan: result.plan.clone(),
+            prepared: result.prepared.clone(),
         })
     }
 }
@@ -161,11 +149,11 @@ pub(crate) struct ObjectCompositionResult {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     output: ObjectOutputSpec,
-    plan: ObjectPaintPlan,
+    prepared: ObjectCompositionWitness,
 }
 impl ObjectCompositionResult {
-    pub(crate) fn identity(&self) -> &ObjectFramePacket {
-        self.plan.packet()
+    pub(crate) fn identity(&self) -> &ObjectCompositionWitness {
+        &self.prepared
     }
     pub(crate) fn texture_view(&self) -> &wgpu::TextureView {
         &self.view
@@ -175,11 +163,11 @@ impl ObjectCompositionResult {
 pub(crate) struct ObjectRgba8Readback {
     bytes: Vec<u8>,
     output: ObjectOutputSpec,
-    plan: ObjectPaintPlan,
+    prepared: ObjectCompositionWitness,
 }
 impl ObjectRgba8Readback {
-    pub(crate) fn identity(&self) -> &ObjectFramePacket {
-        self.plan.packet()
+    pub(crate) fn identity(&self) -> &ObjectCompositionWitness {
+        &self.prepared
     }
     pub(crate) fn dimensions(&self) -> (u32, u32) {
         (self.output.width, self.output.height)

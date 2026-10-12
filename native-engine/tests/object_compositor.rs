@@ -25,9 +25,10 @@ mod actual_owner {
     use crate::history::NativeObjectHistory;
     use crate::object_codec::decode_storage_project;
     use crate::object_document::FrameScopeKind;
-    use crate::object_frame_packet::prepare_object_frame;
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
     use crate::object_render_scene::{
-        paint_test_document, prepare_object_paint_plan, prepare_object_render_scene,
+        paint_test_document, prepare_object_composition, prepare_object_paint_plan,
+        prepare_object_render_scene, ObjectPaintPlan, ObjectSceneError,
     };
     use crate::revision::ObjectSnapshot;
     use serde_json::{json, Value};
@@ -89,10 +90,10 @@ mod actual_owner {
     }
     fn pixels(gpu: &mut Compositor, snapshot: &ObjectSnapshot, frame: u32) -> ObjectRgba8Readback {
         let input = plan(snapshot, frame);
+        let prepared = prepare_object_composition(&input, &selector(snapshot, frame)).unwrap();
         let result = gpu
             .compose_object(
-                &input,
-                &selector(snapshot, frame),
+                &prepared,
                 ObjectOutputSpec::new(64, 64, "white-srgb-normal-rgba8-area").unwrap(),
             )
             .unwrap();
@@ -100,6 +101,7 @@ mod actual_owner {
             result.identity().document_snapshot_id(),
             snapshot.snapshot_id()
         );
+        assert!(result.identity().same_identity_as(&prepared));
         let _view = result.texture_view();
         gpu.readback_object_rgba8(&result).unwrap()
     }
@@ -414,17 +416,27 @@ mod actual_owner {
                 5 => expected.frame = 6,
                 _ => expected.scope_kind = FrameScopeKind::Reference,
             }
-            assert!(gpu.compose_object(&input, &expected, output).is_err());
+            let error = prepare_object_composition(&input, &expected).unwrap_err();
+            let wanted = [
+                ObjectSceneError::WrongInstance,
+                ObjectSceneError::WrongDocument,
+                ObjectSceneError::WrongRevision,
+                ObjectSceneError::WrongSnapshot,
+                ObjectSceneError::InvalidContext,
+                ObjectSceneError::WrongFrame,
+                ObjectSceneError::WrongScope,
+            ];
+            assert_eq!(error, wanted[field]);
         }
-        let old = gpu
-            .compose_object(&input, &selector(&snapshot, 7), output)
-            .unwrap();
+        let witness = prepare_object_composition(&input, &selector(&snapshot, 7)).unwrap();
+        let old = gpu.compose_object(&witness, output).unwrap();
         let prepared=owner.prepare_fill_json(&serde_json::to_vec(&json!({"command":"object.fill.set",
             "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":7},"layerUid":"L2","strokeId":"a"},
             "fill":{"kind":"solid","r":1,"g":1,"b":0,"a":1}})).unwrap()).unwrap();
         assert_eq!(owner.commit_fill(prepared), Ok(1));
         assert_eq!(owner.undo(1), Ok(2));
         let retained = gpu.readback_object_rgba8(&old).unwrap();
+        assert!(retained.identity().same_identity_as(&witness));
         assert_pixel(at(retained.bytes(), 8, 8), [64, 96, 159, 255]);
         assert_eq!(
             retained.identity().document_snapshot_id(),
