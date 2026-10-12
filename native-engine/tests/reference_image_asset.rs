@@ -257,6 +257,14 @@ fn end_marker_trailing_data_and_late_animation_cannot_be_ignored() {
         ImageAssetError::Unsupported
     );
     let end_crc = inserted(&source, 66, &chunk(b"tEXt", b"end\0checked"));
+    assert!(decode_png(&end_crc, limits()).is_ok());
+    let mut late_crc = end_crc.clone();
+    let late_end = 66 + chunk(b"tEXt", b"end\0checked").len() - 1;
+    late_crc[late_end] ^= 1;
+    assert_eq!(
+        decode_png(&late_crc, limits()).unwrap_err(),
+        ImageAssetError::Malformed
+    );
     let mut bad = end_crc.clone();
     let end = bad.len() - 1;
     bad[end] ^= 1;
