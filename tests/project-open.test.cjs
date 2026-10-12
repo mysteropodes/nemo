@@ -40,17 +40,22 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
       add(name) { classes.add(name); }, remove(name) { classes.delete(name); },
       toggle(name, force) { if (force === false || force === undefined && classes.has(name)) classes.delete(name); else classes.add(name); },
       contains(name) { return classes.has(name); } },
-      addEventListener(type, fn) { this.listeners ||= {}; this.listeners[type] = fn; }, appendChild(child) { this.children.push(child); },
+      addEventListener(type, fn) { this.listeners ||= {}; this.listeners[type] = fn; }, appendChild(child) { this.children.push(child); child.parent = this; },
       setAttribute(name, value) { this.attributes ||= {}; this.attributes[name] = value; },
       getAttribute(name) { return this.attributes && this.attributes[name]; },
-      removeChild() {}, click() { this.clicked = true; } };
+      removeChild() {}, focus() {}, select() {}, replaceWith(next) { next.parent = this.parent; this.parent.children[this.parent.children.indexOf(this)] = next; },
+      click() { this.clicked = true; } };
     Object.defineProperty(el, 'innerHTML', { get() { return ''; }, set() { this.children = []; } });
     return el;
   }
   const dot = element();
   const document = { readyState: 'loading', body: element(), addEventListener(type, fn) { if (type === 'DOMContentLoaded') this.ready = fn; },
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element,
-    querySelector(selector) { return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null; } };
+    querySelector(selector) {
+      const name = selector.match(/^\.project-tab\[data-tab="([^"]+)"\] \.pt-name$/);
+      if (name) return elements.get('project-tabs-list')?.children.find(row => row.dataset.tab === name[1])?.children[2];
+      return dirtyDot && selector.startsWith('.project-tab[data-tab=') ? dot : null;
+    } };
   let rejectNextImport = false;
   const window = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
@@ -758,6 +763,7 @@ test('native save failure preserves dirty baseline and skips all legacy frame wr
   const writes = [];
   app.window.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
     identity: () => ({ instanceId: 'native-i', documentId: 'native-d', contentRevision: 7 }),
+    getNativeIdentity: () => ({ documentId: 'native-d', generation: 1 }),
     persistenceJSON: () => edited };
   app.window.SM.exportJSON = () => { throw Error('legacy exporter forbidden'); };
   app.window.__TAURI__ = {

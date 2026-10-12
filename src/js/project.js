@@ -38,11 +38,11 @@
     if(quotaHit)try{localStorage.removeItem('nemo-auto');}catch(e2){} // stale/truncated slot would win over IDB on next boot otherwise
   }
   function getRecents(){try{return JSON.parse(localStorage.getItem(RECENTS_KEY)||'[]');}catch(e){return[];}}
-  function setRecents(list){try{localStorage.setItem(RECENTS_KEY,JSON.stringify(list));}catch(e){}}
-  function touchRecent(path,name,meta){
+  function setRecents(list,strict){try{localStorage.setItem(RECENTS_KEY,JSON.stringify(list));}catch(e){if(strict)throw e;}}
+  function touchRecent(path,name,meta,strict){
     var list=getRecents().filter(function(r){return r.path!==path;});
     list.unshift({path:path,name:name,canvasW:meta&&meta.canvasW,canvasH:meta&&meta.canvasH,fps:meta&&meta.fps,lastOpened:Date.now()});
-    setRecents(list.slice(0,MAX_RECENTS));
+    setRecents(list.slice(0,MAX_RECENTS),strict);
   }
   function removeRecent(path){setRecents(getRecents().filter(function(r){return r.path!==path;}));}
 
@@ -128,20 +128,23 @@
     return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);
   }
 
-  async function writeProjectTo(path){
-    var json=projectJSON();
-    // Atomic save lives in the adapter; markSaved records those exact bytes.
-    await window.NemoProjectNativeSave.writeProjectFile(path,json,{
-      writeTextFile:function(p,text){return window.__TAURI__.fs.writeTextFile(p,text);},
-      rename:function(from,to){return window.__TAURI__.fs.rename(from,to);},
-      remove:function(p){return window.__TAURI__.fs.remove(p);},
-    });
-    currentPath=path;currentName=window.SMProjectDocument.baseName(path);updateCurrentLabel();
-    touchRecent(path,currentName,{canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps});
-    renderRecents();
-    markSaved(json);
-    try{localStorage.setItem('nemo-auto',json);}catch(e){}
-  }
+  var nativeSavedUI=window.NemoProjectNativeSave.createSavedUI({
+    read:function(){return {native:window.NemoNativeOpacityCutover,api:window.__TAURI__,fs:window.__TAURI__&&window.__TAURI__.fs,ui:window.SMProject,tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
+    serialize:projectJSON,
+    prepare:function(){saveFramesIfLegacy();},
+    pick:function(pin){return window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:pin.name+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
+    publish:function(path,json,pin){var fs=pin.fs;return window.NemoProjectNativeSave.writeProjectFile(path,json,{
+      writeTextFile:fs.writeTextFile.bind(fs),rename:fs.rename.bind(fs),remove:fs.remove.bind(fs)});},
+    commit:function(path,json,pin){
+      var name=window.SMProjectDocument.baseName(path);currentPath=path;currentName=name;updateCurrentLabel();
+      var tab=activeTab();if(tab){tab.path=path;tab.name=name;}
+      touchRecent(path,currentName,{canvasW:pin.canvasW,canvasH:pin.canvasH,fps:pin.fps},true);renderRecents();markSaved(json);
+      try{localStorage.setItem('nemo-auto',json);}catch(e){}return true;},
+    invalidate:function(){savedBaselineReady=false;try{renderTabBar();}catch(e){}},
+    notice:function(result,path,mode){showToast(result.status==='saved-current'?(mode==='save'?'Saved':'Saved: '+window.SMProjectDocument.baseName(path)):(result.status==='save-in-progress'?'A save is already in progress.':result.written?'The file was written, but its saved status could not be applied to the current project.':'Save cancelled: the current project changed.'));},
+    failure:function(error){showToast(SM.t('toastSaveFailedSuffix')+(error&&error.message||error));}
+  });
+  async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
   // projet en mode web aussi") — no Tauri fs/dialog to write a real path
   // to, so Save/Save As both trigger a browser file download of the exact
@@ -170,24 +173,11 @@
   }
   async function saveAs(){
     if(!tauriOk()){saveAsDownload();return;}
-    saveFramesIfLegacy();
-    var path=await window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});
-    if(!path)return;
-    // A failed write MUST be loud — without this catch there was no error
-    // toast at all: the user saw no "Saved" but nothing else either, easy
-    // to miss, and quitting right after meant silent data loss (disk full,
-    // permissions, network volume gone...).
-    try{await writeProjectTo(path);}
-    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
-    showToast('Saved: '+window.SMProjectDocument.baseName(path));
+    return nativeSavedUI.saveAs(writeProjectTo);
   }
   async function save(){
     if(!tauriOk()){saveAsDownload();return;}
-    if(!currentPath){await saveAs();return;}
-    saveFramesIfLegacy();
-    try{await writeProjectTo(currentPath);}
-    catch(e){showToast(SM.t('toastSaveFailedSuffix')+(e&&e.message||e));throw e;}
-    showToast('Saved');
+    return nativeSavedUI.save(writeProjectTo);
   }
   async function openPath(path){
     if(!tauriOk())return;
@@ -625,7 +615,7 @@
   function refreshActiveTabDirtyDot(liveJson){
     var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(!el)return;
-    el.classList.toggle('dirty',dirtyBaseline.isDirtyBytes(liveJson));
+    el.classList.toggle('dirty',!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 

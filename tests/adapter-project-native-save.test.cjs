@@ -203,7 +203,7 @@ function slice(source, startMarker, endMarker, label) {
   return source.slice(start, end);
 }
 
-const WRITE_PROJECT_TO = ['async function writeProjectTo(path){', '\n  // ---- Browser-mode save'];
+const WRITE_PROJECT_TO = ['async function writeProjectTo(path,ticket,mode){', '\n  // ---- Browser-mode save'];
 
 // Evaluate the real adapter and the real production function together in one
 // context whose only legacy globals are the ones the binding reaches for.
@@ -216,6 +216,8 @@ function productionContext(f) {
     state: { canvasW: 1920, canvasH: 1080, fps: 24 },
     currentPath: null,
     currentName: null,
+    activeTabId: 'ui-native', savedBaselineReady: false,
+    activeTab() { return null; },
     updateCurrentLabel() { calls.updateCurrentLabel++; },
     touchRecent(p, name, meta) { calls.touchRecent.push([p, name, meta]); },
     renderRecents() { calls.renderRecents++; },
@@ -223,17 +225,21 @@ function productionContext(f) {
     localStorage: { setItem(key, value) { calls.autosave.push([key, value]); } },
   };
   context.window = context;
+  context.SMProject = {};
   context.SM = { exportJSON: () => { throw Error('desktop Paper serialization is forbidden'); } };
   context.SMProjectDocument = { baseName: (p) => p.split('/').pop() };
   context.__TAURI__ = { core: { invoke() {} }, fs: f.ports };
   context.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
     identity: () => ({ instanceId: 'native-i', documentId: 'native-d', contentRevision: 7 }),
+    getNativeIdentity: () => ({ documentId: 'native-d', generation: 1 }),
     persistenceJSON: () => JSON_BYTES };
   vm.createContext(context);
   vm.runInContext(adapterSource, context, { filename: 'project-native-save.js' });
   vm.runInContext(nativeEntrySource, context, { filename: 'native-opacity-project-entry.js' });
   const projectJSON = slice(projectSource, 'function projectJSON(){', '\n  function nativeOpenReady', 'projectJSON');
   vm.runInContext(`${projectJSON}\nthis.projectJSON = projectJSON;`, context, { filename: 'project-projectJSON.js' });
+  const binding = slice(projectSource, 'var nativeSavedUI=', '\n  async function writeProjectTo', 'native saved UI binding');
+  vm.runInContext(binding, context, { filename: 'project-native-saved-ui-binding.js' });
   const fn = slice(projectSource, WRITE_PROJECT_TO[0], WRITE_PROJECT_TO[1], 'writeProjectTo');
   const writeProjectTo = vm.runInContext(`(${fn})`, context, { filename: 'project-writeProjectTo.js' });
   return { writeProjectTo, calls, context };
@@ -292,24 +298,25 @@ test('a failed save marks nothing: no recents entry, no clean flag, no autosave'
 // ---- routing guard ---------------------------------------------------------
 
 test('the inline filesystem block did not come back into project.js', () => {
-  const fn = slice(projectSource, WRITE_PROJECT_TO[0], WRITE_PROJECT_TO[1], 'writeProjectTo');
+  const fn = slice(projectSource, 'var nativeSavedUI=', WRITE_PROJECT_TO[1], 'real project write binding');
   // window-qualified on purpose: project.js reaches every other cross-module
   // dependency that way (76 window.* references, the closest precedent being
   // window.NemoOpacityApplication in this same file), so an unqualified global
   // here would be the odd one out. Pinned so it does not drift back.
   assert.match(fn, /window\.NemoProjectNativeSave\.writeProjectFile\(path,json,\{/);
+  assert.match(fn, /nativeSavedUI\.write\(path,ticket,mode\)/);
   assert.doesNotMatch(fn, /\.saving/, 'the temp suffix is owned by the adapter now');
   // The fs names still appear — as the three one-line port delegations, which
   // is the binding and is meant to be here. What must NOT come back is the
   // SEQUENCING: the inline block called writeTextFile twice (temp, then the
   // fallback direct write). Exactly one occurrence means the fallback is gone.
   const occurrences = (re) => (fn.match(re) || []).length;
-  assert.equal(occurrences(/fs\.writeTextFile\(/g), 1,
+  assert.equal(occurrences(/fs\.writeTextFile\.bind\(fs\)/g), 1,
     'two writeTextFile calls here would mean the fallback was re-inlined');
-  assert.equal(occurrences(/fs\.rename\(/g), 1);
-  assert.equal(occurrences(/fs\.remove\(/g), 1);
-  assert.match(fn, /writeTextFile:function\(p,text\)\{return window\.__TAURI__\.fs\.writeTextFile\(p,text\);\}/,
-    'the fs references that remain are port delegations, nothing more');
+  assert.equal(occurrences(/fs\.rename\.bind\(fs\)/g), 1);
+  assert.equal(occurrences(/fs\.remove\.bind\(fs\)/g), 1);
+  assert.match(fn, /writeTextFile:fs\.writeTextFile\.bind\(fs\)/,
+    'the admitted filesystem receiver is bound before the first IO await');
   // One '.saving' anywhere in project.js would mean a second inline copy of
   // the temp-file convention; there must be none.
   assert.equal(projectSource.split("'.saving'").length, 1);
