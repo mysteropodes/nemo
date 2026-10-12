@@ -434,7 +434,8 @@
       "dir": "src-tauri/src",
       "files": [
         "task_runtime.rs",
-        "task_runtime/startup_observer.rs"
+        "task_runtime/startup_observer.rs",
+        "task_runtime/startup_js.rs"
       ],
       "publicApi": [
         "task_runtime.rs"
@@ -455,7 +456,8 @@
       "dir": "src-tauri/src/task_runtime",
       "files": [
         "tests.rs",
-        "startup_observer_tests.rs"
+        "startup_observer_tests.rs",
+        "startup_js_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
