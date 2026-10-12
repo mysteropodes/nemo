@@ -260,3 +260,6 @@ mod tests;
 
 #[path = "startup_js.rs"]
 mod js;
+
+#[path = "startup_injection.rs"]
+mod injection;
