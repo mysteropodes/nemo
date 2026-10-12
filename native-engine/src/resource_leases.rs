@@ -4,7 +4,7 @@
 //! submits GPU work; later leaves provide those effects while using these
 //! handles to keep their inputs pinned through their own completion boundary.
 
-use crate::revision::DocumentSnapshot;
+use crate::revision::{DocumentSnapshot, ObjectSnapshot};
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 
@@ -163,9 +163,9 @@ impl ScheduleReceipt {
 }
 
 #[derive(Debug)]
-struct SnapshotLease {
+struct SnapshotLease<S> {
     id: LeaseId,
-    snapshot: DocumentSnapshot,
+    snapshot: S,
 }
 
 #[derive(Debug)]
@@ -178,13 +178,13 @@ struct ResourceLease {
 /// The snapshot is intentionally stored, rather than its ID alone, so a later
 /// document revision cannot turn this into a mutable re-read.
 #[derive(Debug)]
-pub struct LeaseBundle {
-    snapshot: SnapshotLease,
+pub struct LeaseBundle<S = DocumentSnapshot> {
+    snapshot: SnapshotLease<S>,
     resources: Vec<ResourceLease>,
 }
 
-impl LeaseBundle {
-    pub fn snapshot(&self) -> &DocumentSnapshot {
+impl<S> LeaseBundle<S> {
+    pub fn snapshot(&self) -> &S {
         &self.snapshot.snapshot
     }
 
@@ -258,6 +258,24 @@ impl ResourceLeaseManager {
         snapshot: DocumentSnapshot,
         resource_ids: impl IntoIterator<Item = String>,
     ) -> Result<LeaseBundle, LeaseError> {
+        self.acquire_snapshot(snapshot, resource_ids)
+    }
+
+    /// Retain the real object revision through the same counted lease owner.
+    /// The result's static type prevents access through the opacity API.
+    pub(crate) fn acquire_object(
+        &mut self,
+        snapshot: ObjectSnapshot,
+        resource_ids: impl IntoIterator<Item = String>,
+    ) -> Result<LeaseBundle<ObjectSnapshot>, LeaseError> {
+        self.acquire_snapshot(snapshot, resource_ids)
+    }
+
+    fn acquire_snapshot<S>(
+        &mut self,
+        snapshot: S,
+        resource_ids: impl IntoIterator<Item = String>,
+    ) -> Result<LeaseBundle<S>, LeaseError> {
         let snapshot_lease = self.grant()?;
         let mut resources = Vec::new();
         for resource_id in resource_ids {
@@ -282,7 +300,7 @@ impl ResourceLeaseManager {
         })
     }
 
-    pub(crate) fn release(&mut self, bundle: LeaseBundle) -> Result<(), LeaseError> {
+    pub(crate) fn release<S>(&mut self, bundle: LeaseBundle<S>) -> Result<(), LeaseError> {
         bundle.release(self)
     }
 
@@ -337,3 +355,7 @@ impl ResourceLeaseManager {
             .expect("freshly acquired snapshot lease is live during unwind");
     }
 }
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_resource_leases.rs"]
+mod object_tests;
