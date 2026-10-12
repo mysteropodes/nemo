@@ -1,10 +1,22 @@
 //! Shared actual-owner fixtures for inactive preparation controls; no product code.
-use super::*;
 use crate::native_application_ports::{DesktopArtifactPort, SharedCompositor};
 use crate::native_application_viewport as viewport;
+use crate::{
+    application_mcp::ApplicationMcp,
+    native_application::DesktopNativeApplication,
+    native_application_contract::{
+        admit_project, GeometryResourceInput, HostResult, HOST_API_VERSION,
+    },
+    native_dispatch::{
+        inactive_project::{
+            cancel, prepare_with, CancelRequest, CancellationReceipt, PreparationReceipt,
+        },
+        NativeState,
+    },
+};
 
 use native_engine::{commands::OpacityRequest, compositor::Compositor};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     fs,
     path::PathBuf,

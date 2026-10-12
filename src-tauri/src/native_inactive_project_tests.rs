@@ -1,7 +1,13 @@
 //! Actual desktop owner and ordinary legacy-opacity preparation, independent oracles.
-use super::*;
 use crate::native_application_viewport as viewport;
 use crate::native_dispatch::NativePhase;
+use crate::{
+    application_mcp::ApplicationMcp,
+    native_application_contract::{admit_project, GeometryResourceInput, HOST_API_VERSION},
+    native_dispatch::inactive_project::{
+        cancel, prepare_with, PrepareRequest, MAX_REQUEST_BYTES, MAX_SAFE_INTEGER,
+    },
+};
 use native_engine::commands::OpacityRequest;
 use serde_json::json;
 use std::sync::{

@@ -1,5 +1,4 @@
 //! Same-authority inactive CPU project preparation. Never installs a second app.
-use super::{NativeAuthority, NativeState};
 use crate::{
     application_mcp::ApplicationMcp,
     native_application::DesktopNativeApplication,
@@ -7,6 +6,7 @@ use crate::{
         admit_project, bounded_id, host_error, require_api_instance, require_main, AdmittedProject,
         GeometryResourceInput, HostResult, HOST_API_VERSION,
     },
+    native_dispatch::{NativeAuthority, NativeState},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
