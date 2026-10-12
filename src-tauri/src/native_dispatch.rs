@@ -50,8 +50,19 @@ pub(crate) use replacement::{
     ReplacementStage,
 };
 
+#[path = "native_inactive_project.rs"]
+mod inactive_project;
+#[allow(unused_imports)]
+pub(crate) use inactive_project::{
+    __cmd__nemo_native_cancel_inactive_project, __cmd__nemo_native_prepare_inactive_project,
+    __tauri_command_name_nemo_native_cancel_inactive_project,
+    __tauri_command_name_nemo_native_prepare_inactive_project, nemo_native_cancel_inactive_project,
+    nemo_native_prepare_inactive_project,
+};
+
 pub(crate) struct NativeAuthority {
     generation: u64,
+    inactive_project: Option<inactive_project::InactiveProject>,
     retained_releases: BTreeMap<String, ReleaseTombstone>,
     retained_replacements: BTreeMap<String, replacement::ReplacementRecord>,
     pub(crate) phase: NativePhase,
@@ -110,6 +121,7 @@ impl Default for NativeAuthority {
     fn default() -> Self {
         Self {
             generation: 0,
+            inactive_project: None,
             retained_releases: BTreeMap::new(),
             retained_replacements: BTreeMap::new(),
             phase: NativePhase::Vacant,
