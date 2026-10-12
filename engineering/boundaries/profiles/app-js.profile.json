@@ -1717,6 +1717,18 @@
       ]
     },
     {
+      "id": "app.native.object.saved.acknowledgement",
+      "layer": "application",
+      "dir": "src/js/application",
+      "files": [
+        "native-object-saved-acknowledgement.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-saved-acknowledgement.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.contract",
       "layer": "domain",
       "dir": "src/js/application",

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registers a private object Save As coordination helper without a production loader or current object presenter.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registers a private object Save As coordination helper without a production loader or current object presenter. N25E4B1A registers a private saved-UI acknowledgement helper without a production loader, UI sink or current object presenter.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "4322aa92f482587ab9baef988fcb6bfc2d2612ce",
-    "sourceRootTree": "0ed75b296ca1160235e44f79482619214cd6be5d",
+    "candidateCommit": "d0b1afca45401eaec270152ae8836805e0fe161b",
+    "sourceRootTree": "735e1fd51c2a416719391f319f1eeda1db53eb31",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "cfcd76e77a53b789b7438689dd482b969da11688",
-      "lastChangedCommit": "4322aa92f482587ab9baef988fcb6bfc2d2612ce"
+      "gitTree": "a9eb47b444895a0b3a24e0c2472ba307e38567c1",
+      "lastChangedCommit": "d0b1afca45401eaec270152ae8836805e0fe161b"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,15 +35,15 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "193fce5f2442214ed35fdd0fb6b1462058cae681f8d59c4979b31b9daa377259"
+      "value": "d317141894f93941afee6d9638014c36a75ee9e3f65694fc40bbf8ed2ef072b1"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "2b71a226224e854bf45dfd884c3292fe8b03ebd4",
-        "sha256": "070a6f099303114460451e23d680edfd560379a9996e7c7c50ac96a0d2b7149a",
-        "moduleCount": 194,
-        "basedOnCommit": "90dd30af13a69152de126bd071291fbdfeb6e898"
+        "gitBlob": "6fd2e3da3b0d9a4ed2814798e64a6ba6c803e69d",
+        "sha256": "0bf4b07b5bd172ae220a62e824d3f559f2275ebc88ed8921f8eab90877dcdb68",
+        "moduleCount": 195,
+        "basedOnCommit": "d0b1afca45401eaec270152ae8836805e0fe161b"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -1019,6 +1019,19 @@
           "path": "src/js/application/native-object-save-as-workflow.js",
           "line": 1,
           "role": "N25E4A private explicit-port Save As coordinator; no committed production loader or ordinary object presenter, so no current execution or UI Save As availability claimed"
+        }
+      ]
+    },
+    {
+      "path": "src/js/application/native-object-saved-acknowledgement.js",
+      "moduleId": "app.native.object.saved.acknowledgement",
+      "executionClass": "classic-without-load-site",
+      "loadSites": [],
+      "sourceEvidence": [
+        {
+          "path": "src/js/application/native-object-saved-acknowledgement.js",
+          "line": 1,
+          "role": "N25E4B1A private explicit-port saved-UI acknowledgement; no committed production loader, UI sink or ordinary object presenter, so no current execution or UI Save As availability claimed"
         }
       ]
     },
