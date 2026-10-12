@@ -12,7 +12,7 @@ pub(crate) enum ProjectWireError {
     Budget,
     Invalid,
     Unsupported,
-    Drawing(super::ObjectCodecError),
+    Drawing(crate::object_codec::ObjectCodecError),
 }
 
 /// Explicit caller limits cannot exceed the staged file ceilings.
@@ -97,7 +97,7 @@ pub(crate) fn decode_project(
         wire.project.fps,
     )
     .map_err(|_| ProjectWireError::Invalid)?;
-    let drawing = super::decode_storage_project(wire.drawing.get().as_bytes())
+    let drawing = crate::object_codec::decode_storage_project(wire.drawing.get().as_bytes())
         .map_err(ProjectWireError::Drawing)?;
     Ok(ProjectEnvelope::no_media(metadata, drawing))
 }
@@ -171,7 +171,7 @@ pub(crate) fn encode_project(
     match envelope.reference_state() {
         ProjectReferenceState::NoMedia => {}
     }
-    super::validate_storage(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
+    crate::object_codec::validate_storage(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
     let drawing = bounded_json(envelope.drawing(), limits.drawing_bytes)?;
     let raw =
         serde_json::from_slice::<&RawValue>(&drawing).map_err(|_| ProjectWireError::Invalid)?;
