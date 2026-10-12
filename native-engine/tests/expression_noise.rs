@@ -1,4 +1,4 @@
-use crate::expression_noise::{
+use crate::evaluation::expression_noise::{
     hash_unit, noise_1d, noise_2d, value_noise_1d, wiggle, wiggle_octave_count, Wiggle, WiggleDim,
 };
 

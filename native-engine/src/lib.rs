@@ -16,7 +16,7 @@ engine_modules! {
     "codec" => codec, document, project_structure, object_document, object_codec;
     "commands" => commands, request_receipts, revision, object_snapshot;
     "history" => history, transaction;
-    "evaluation" => evaluation, animation_curve, object_frame_packet, expression_noise;
+    "evaluation" => evaluation, animation_curve, object_frame_packet;
     "scheduler" => resource_leases, scheduler;
     "compositor" => compositor, render_scene, render_geometry, object_render_scene;
     "viewport" => desktop_viewport;
