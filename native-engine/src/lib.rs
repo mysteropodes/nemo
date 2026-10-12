@@ -50,6 +50,7 @@ test_modules! {
     "test-history" => object_history_tests = "../tests/object_history.rs";
     "test-evaluation" => evaluation_tests = "../tests/evaluation.rs";
     "test-evaluation" => object_frame_packet_evaluation_tests = "../tests/object_frame_packet.rs";
+    "test-evaluation" => expression_noise_tests = "../tests/expression_noise.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
