@@ -19,6 +19,8 @@ function harness(options = {}) {
   const state = { playing: !!options.playing };
   let tick, delay;
   const window = {
+    location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
+    NemoNativeOpacityProjectEntry: require('../src/js/adapters/native-opacity-project-entry.js'),
     SM: { exportJSON() { effects.push(['legacy-json']); return 'legacy-json'; } },
     SMProject: {
       autosaveWrite(json) { effects.push(['autosave', json]); },

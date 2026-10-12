@@ -223,9 +223,12 @@ function productionContext(f) {
     localStorage: { setItem(key, value) { calls.autosave.push([key, value]); } },
   };
   context.window = context;
-  context.SM = { exportJSON: () => JSON_BYTES };
+  context.SM = { exportJSON: () => { throw Error('desktop Paper serialization is forbidden'); } };
   context.SMProjectDocument = { baseName: (p) => p.split('/').pop() };
-  context.__TAURI__ = { fs: f.ports };
+  context.__TAURI__ = { core: { invoke() {} }, fs: f.ports };
+  context.NemoNativeOpacityCutover = { blocksLegacy: () => true, isActive: () => true,
+    identity: () => ({ instanceId: 'native-i', documentId: 'native-d', contentRevision: 7 }),
+    persistenceJSON: () => JSON_BYTES };
   vm.createContext(context);
   vm.runInContext(adapterSource, context, { filename: 'project-native-save.js' });
   vm.runInContext(nativeEntrySource, context, { filename: 'native-opacity-project-entry.js' });
