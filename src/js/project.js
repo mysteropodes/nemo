@@ -507,9 +507,23 @@
     }
     renderTabBar();
   }
+  function populatedTabTransitionAllowed(){
+    try{
+      if('__TAURI__' in window||'NemoNativeOpacityProject' in window)return false;
+      var location=window.location;
+      if(!location||!['http:','https:'].includes(location.protocol)||
+        typeof location.hostname!=='string'||!location.hostname)return false;
+      if('NemoNativeOpacityCutover' in window){
+        var native=window.NemoNativeOpacityCutover;
+        return !!native&&typeof native.blocksLegacy==='function'&&native.blocksLegacy()===false;
+      }
+      return true;
+    }catch(error){return false;}
+  }
   function switchToTab(id){
     if(id===activeTabId)return;
     var target=tabs.find(function(t){return t.id===id;});if(!target)return;
+    if(target.json&&!populatedTabTransitionAllowed())return tabAddNotice('Switching project tabs is unavailable in this build.');
     var blankAdmission=target.json?null:releaseNative('tab-switch');if(blankAdmission===false)return false;
     snapshotActiveIntoTab();
     function entered(){
@@ -550,6 +564,7 @@
     var wasActive=id===activeTabId;
     function closed(){tabs.splice(idx,1);renderTabBar();}
     if(!wasActive){closed();return;}
+    if(!populatedTabTransitionAllowed())return tabAddNotice('Closing the active project tab is unavailable in this build.');
     var next=tabs[idx>0?idx-1:1];
     function enterBlank(admitted){if(admitted===false)return false;activeTabId=next.id;newProjectNow({w:1920,h:1080,fps:24,name:next.name});
       currentPath=next.path||null;currentName=next.name;updateCurrentLabel();closed();}
