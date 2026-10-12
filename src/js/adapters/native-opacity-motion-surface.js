@@ -318,8 +318,13 @@
           // A failed receipt or UI paint can leave the host on a different
           // frame. Restore the previous one; failed restoration fences native.
           if (request === intent && sameOwner && controller.isActive()) {
-            try { await controller.presentPreview(prior); ports.paint(); ports.syncInput(); }
-            catch (_) {}
+            var restoration = observe('restoreRequested', diagnostic, prior, error, function () {
+              return request === intent && ports.controller() === controller && controller.isActive() && sameIdentity(requestedIdentity, controller.identity()); });
+            try { var restored = await controller.presentPreview(prior);
+              observe('restorePresented', restoration, restored);
+              try { ports.paint(); observe('restorePainted', restoration); ports.syncInput(); observe('restoreCompleted', restoration); }
+              finally { observe('endPublication', restoration); }
+            } catch (_) { observe('restoreRejected', restoration); }
           }
           throw error;
         }
