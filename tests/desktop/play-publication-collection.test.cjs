@@ -156,7 +156,7 @@ test('full and late collectors stay bounded and report incomplete tails', async 
 });
 
 function fixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-play-collection-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-play-collection-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const reports = path.join(root, 'task', 'reports'); fs.mkdirSync(reports, { recursive: true });
   const destination = path.join(root, 'retained');
@@ -287,4 +287,47 @@ test('a refused owner-stop closes the held diagnostic fd and persists a partial 
   assert.equal(owned.playObserverHandle, undefined);
   assert.equal(owned.playObserverCollection.status, 'partial');
   assert.equal(JSON.parse(fs.readFileSync(path.join(f.destination, 'play-observer.json'))).status, 'partial');
+});
+
+test('post-cut late IPC must settle and be counted before a terminal seal is sent', async () => {
+  const p = ports(), original = p.invoke;
+  let rejectLate;
+  p.invoke = (action, payload) => action === 'late'
+    ? new Promise((_, reject) => { rejectLate = reject; }) : original(action, payload);
+  const { api } = await create(p);
+  const sealing = p.seal();
+  api.record({ event: 'ui-publication', frame: 20 });
+  await new Promise(resolve => setImmediate(resolve));
+  // Independent effect oracle: no Native footer while a late delivery is unacknowledged.
+  assert.equal(p.deliveries.some(d => d.action === 'seal'), false);
+  rejectLate(new Error('lost diagnostic tail'));
+  await sealing;
+  const footer = p.deliveries.at(-1).payload;
+  assert.equal(footer.generated, 2);
+  assert.equal(footer.dropped, 1);
+  assert.equal(footer.failed, 1);
+  assert.equal(api.inspect().late, 1);
+});
+
+test('retention rejects a symlink ancestor into task storage before creating artifacts', async t => {
+  const { collectPlayObserver } = require('./native-harness.cjs');
+  const f = fixture(t); f.write(f.frames);
+  const alias = path.join(f.root, 'outside-alias');
+  fs.symlinkSync(path.join(f.root, 'task'), alias);
+  await assert.rejects(collectPlayObserver(f.instance,
+    { directory: path.join(alias, 'retained'), timeout: 100 }), /observer/);
+  assert.equal(fs.existsSync(path.join(f.root, 'task', 'retained')), false);
+});
+
+test('canonical-equivalent platform aliases retain artifacts physically outside task storage', async t => {
+  const { collectPlayObserver, finalizePlayObserver } = require('./native-harness.cjs');
+  const f = fixture(t); f.write(f.frames);
+  // On macOS this uses /var while fixture.root is its /private/var equivalent.
+  const aliasDirectory = path.join(os.tmpdir(), path.basename(f.root), 'safe-retained');
+  await collectPlayObserver(f.instance, { directory: aliasDirectory, timeout: 100 });
+  assert.equal(f.instance.playObserverHandle.directory, path.join(f.root, 'safe-retained'));
+  fs.rmSync(path.join(f.root, 'task'), { recursive: true });
+  await f.stopped();
+  assert.equal(finalizePlayObserver(f.instance).status, 'complete');
+  assert.equal(fs.existsSync(path.join(f.root, 'safe-retained', 'play-observer.json')), true);
 });

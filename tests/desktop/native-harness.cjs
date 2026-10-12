@@ -257,8 +257,7 @@ async function collectPlayObserver(instance, { directory, timeout = 5000 }) {
     requireCheck(meta.isDirectory() && !meta.isSymbolicLink(), 'test observer report root refused');
   }
   requireCheck(path.dirname(reports) === taskRoot, 'test observer report root differs');
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  requireCheck(!fs.lstatSync(directory).isSymbolicLink(), 'test observer destination refused');
+  directory = retentionDirectory(directory, taskRoot);
   const marker = path.join(reports, 'play-observer-seal.json'), log = path.join(reports, 'native-app.stderr.log');
   try { fs.writeFileSync(marker, JSON.stringify({ runId: observer.runId }), { flag: 'wx', mode: 0o600 }); }
   catch { throw new Error('test observer seal marker refused'); }
@@ -284,6 +283,7 @@ async function collectPlayObserver(instance, { directory, timeout = 5000 }) {
     identities = [newPlayCopy(copied, bytes), newPlayCopy(path.join(directory, 'play-observer.json'), manifestBytes)];
   } catch (error) { if (fd !== undefined) fs.closeSync(fd); throw error; }
   instance.playObserverHandle = { fd, directory, expected, identities,
+    realTaskRoot: fs.realpathSync(taskRoot),
     manifestSha256: crypto.createHash('sha256').update(manifestBytes).digest('hex') };
   instance.playObserverCollection = receipt;
   return receipt;
@@ -300,6 +300,33 @@ function readPlayTail(fd) {
     offset += read;
   }
   return bytes;
+}
+
+function retentionDirectory(directory, taskRoot, retainedRealTask, create = true) {
+  const requested = path.resolve(directory), realTask = retainedRealTask || fs.realpathSync(taskRoot);
+  let existing = requested;
+  for (;;) {
+    try { fs.lstatSync(existing); break; }
+    catch (error) {
+      requireCheck(error.code === 'ENOENT' && path.dirname(existing) !== existing, 'test observer destination refused');
+      existing = path.dirname(existing);
+    }
+  }
+  // Resolve the existing ancestry once and operate on the physical path below.
+  // This permits macOS /var aliases but cannot hide a destination inside task storage.
+  const meta = fs.lstatSync(existing);
+  requireCheck(!(existing === requested && meta.isSymbolicLink()) &&
+    fs.statSync(existing).isDirectory(), 'test observer destination ancestor refused');
+  const resolved = path.resolve(fs.realpathSync(existing), path.relative(existing, requested));
+  const outside = target => {
+    const relative = path.relative(realTask, target);
+    return relative.startsWith('..' + path.sep) || path.isAbsolute(relative);
+  };
+  requireCheck(outside(resolved), 'test observer copy must outlive resolved task cleanup');
+  if (create) fs.mkdirSync(resolved, { recursive: true, mode: 0o700 });
+  const actual = fs.realpathSync(resolved);
+  requireCheck(actual === resolved && outside(actual), 'test observer resolved destination differs');
+  return actual;
 }
 
 function newPlayCopy(file, bytes) {
@@ -326,6 +353,7 @@ function finalizePlayObserver(instance) {
   if (!handle) return instance.playObserverCollection;
   let receipt = { ...instance.playObserverCollection, status: 'partial', phase: 'owner-stop-incomplete' };
   try {
+    retentionDirectory(handle.directory, instance.snapshot.runtime.roots.root, handle.realTaskRoot, false);
     const stopped = instance.stopped === true && !alive(instance.snapshot.app.pid) &&
       (!instance.process || (instance.process.finished && !alive(instance.info.pid)));
     if (handle.fd !== undefined) {

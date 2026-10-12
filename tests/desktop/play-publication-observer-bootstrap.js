@@ -47,9 +47,12 @@
     function record(event) {
       try {
         if (cut) {
-          if (late++ === 0) Promise.resolve().then(function () {
-            return ports.invoke('late', { runId: config.runId });
-          }).catch(function () { failed++; });
+          // Count the unrecorded attempt synchronously, even if IPC is lost.
+          generated++; dropped++;
+          if (late++ === 0) queue = queue.then(async function () {
+            try { await ports.invoke('late', { runId: config.runId }); }
+            catch (_) { failed++; }
+          });
           return;
         }
         generated++;
@@ -67,13 +70,19 @@
         });
       } catch (_) { dropped++; }
     }
+    async function drain() {
+      // Post-cut diagnostics can extend the chain while an earlier ACK is pending.
+      var pending;
+      do { pending = queue; await pending; } while (pending !== queue);
+    }
     async function seal(event) {
       if (cut || !event || !event.payload || event.payload.runId !== config.runId) return;
       cut = true;
-      await queue;
+      await drain();
       try {
         await ports.invoke('seal', { runId: config.runId, generated: generated, dropped: dropped, failed: failed });
       } catch (_) { failed++; }
+      await drain();
     }
     var ready = Promise.resolve().then(function () { return ports.listen(seal); }).then(async function () {
       listening = true;
