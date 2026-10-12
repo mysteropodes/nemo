@@ -113,6 +113,57 @@ struct Output<'a> {
     assets: [(); 0],
 }
 
+// Check each write BEFORE reserving/copying it. Growth is capped too, so
+// neither serialized length nor Vec capacity can exceed the caller limit.
+struct CappedWriter {
+    bytes: Vec<u8>,
+    cap: usize,
+    refused: bool,
+}
+impl std::io::Write for CappedWriter {
+    fn write(&mut self, chunk: &[u8]) -> std::io::Result<usize> {
+        let needed = self.bytes.len().checked_add(chunk.len());
+        if needed.is_none_or(|n| n > self.cap) {
+            self.refused = true;
+            return Err(std::io::Error::other("project wire byte budget"));
+        }
+        let needed = needed.unwrap();
+        if needed > self.bytes.capacity() {
+            let capacity = needed
+                .max(self.bytes.capacity().saturating_mul(2))
+                .min(self.cap);
+            if self
+                .bytes
+                .try_reserve_exact(capacity - self.bytes.len())
+                .is_err()
+            {
+                self.refused = true;
+                return Err(std::io::Error::other("project wire reservation"));
+            }
+        }
+        self.bytes.extend_from_slice(chunk);
+        Ok(chunk.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+fn bounded_json(value: &impl Serialize, cap: usize) -> Result<Vec<u8>, ProjectWireError> {
+    let mut writer = CappedWriter {
+        bytes: Vec::new(),
+        cap,
+        refused: false,
+    };
+    serde_json::to_writer(&mut writer, value).map_err(|_| {
+        if writer.refused {
+            ProjectWireError::Budget
+        } else {
+            ProjectWireError::Invalid
+        }
+    })?;
+    Ok(writer.bytes)
+}
+
 pub(crate) fn encode_project(
     envelope: &ProjectEnvelope,
     limits: ProjectWireLimits,
@@ -120,11 +171,8 @@ pub(crate) fn encode_project(
     match envelope.reference_state() {
         ProjectReferenceState::NoMedia => {}
     }
-    let drawing =
-        super::encode_storage_project(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
-    if drawing.len() > limits.drawing_bytes {
-        return Err(ProjectWireError::Budget);
-    }
+    super::validate_storage(envelope.drawing()).map_err(ProjectWireError::Drawing)?;
+    let drawing = bounded_json(envelope.drawing(), limits.drawing_bytes)?;
     let raw =
         serde_json::from_slice::<&RawValue>(&drawing).map_err(|_| ProjectWireError::Invalid)?;
     let (canvas_w, canvas_h) = envelope.project().canvas_dimensions();
@@ -140,11 +188,7 @@ pub(crate) fn encode_project(
         viewport_reference: (),
         assets: [],
     };
-    let bytes = serde_json::to_vec(&wire).map_err(|_| ProjectWireError::Invalid)?;
-    if bytes.len() > limits.envelope_bytes {
-        return Err(ProjectWireError::Budget);
-    }
-    Ok(bytes)
+    bounded_json(&wire, limits.envelope_bytes)
 }
 
 #[cfg(test)]
@@ -439,12 +483,8 @@ mod tests {
             Err(ProjectWireError::Budget)
         );
         // Valid raw drawing whitespace counts against the original-byte cap.
-        let prefix = " ".repeat(MAX_DRAWING - EMPTY_DRAWING.len() - 2);
-        let at_limit = format!("{{{prefix}{}", &EMPTY_DRAWING[1..]);
-        assert_eq!(at_limit.len(), MAX_DRAWING - 2);
-        let inclusive = format!("{at_limit}  ");
-        // RawValue excludes surrounding whitespace; put it INSIDE the object.
-        let inclusive = inclusive.trim_end().strip_suffix('}').unwrap().to_owned() + "  }";
+        let prefix = " ".repeat(MAX_DRAWING - EMPTY_DRAWING.len());
+        let inclusive = format!("{{{prefix}{}", &EMPTY_DRAWING[1..]);
         assert_eq!(inclusive.len(), MAX_DRAWING);
         assert!(decode(&wire(&inclusive)).is_ok());
         let too_large = inclusive.strip_suffix('}').unwrap().to_owned() + " }";
@@ -454,5 +494,25 @@ mod tests {
         assert!(decode(&padded).is_ok());
         padded.push(b' ');
         assert_eq!(decode(&padded), Err(ProjectWireError::Budget));
+    }
+
+    #[test]
+    fn valid_oversized_drawing_refuses_without_serializing_an_over_limit_buffer() {
+        let mut drawing = super::super::decode_storage_project(EMPTY_DRAWING.as_bytes()).unwrap();
+        drawing.layers[0].layer_uid = "L".repeat(MAX_DRAWING + 1);
+        super::super::validate_storage(&drawing).unwrap();
+        let mut writer = CappedWriter {
+            bytes: Vec::new(),
+            cap: 1024,
+            refused: false,
+        };
+        assert!(serde_json::to_writer(&mut writer, &drawing).is_err());
+        assert!(writer.refused && writer.bytes.len() <= 1024 && writer.bytes.capacity() <= 1024);
+        let project =
+            ProjectEnvelope::no_media(ProjectMetadata::new(320, 180, 24.).unwrap(), drawing);
+        assert_eq!(
+            encode_project(&project, limits()),
+            Err(ProjectWireError::Budget)
+        );
     }
 }
