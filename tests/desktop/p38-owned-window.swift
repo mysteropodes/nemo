@@ -40,7 +40,7 @@ func locationPredicate(_ ok: Bool, _ reason: String, _ facts: [String:Any] = [:]
 // Production AX and static fault controls use this same complete walk. An
 // unreadable owner is not absence; no role/parent/children read follows it.
 func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
-  equal: (Node,Node)->Bool, owner: (Node)->(Int,Bool), isWindow: (Node)->Bool,
+  equal: (Node,Node)->Bool, owner: (Node)->(Int,Bool,Int), foreignChild: (String,Int)->Void = { _,_ in }, isWindow: (Node)->Bool,
   timeout: (Node)->Int, children: (Node)->(Int,[Node]?), parent: (Node)->(Int,Node?)) throws -> [Node] {
   var found = [Node]()
   func walk(_ current: Node, _ route: String, _ depth: Int) throws {
@@ -50,7 +50,7 @@ func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
       try locationPredicate(ok,reason,observed.merging(extra) { _,new in new })
     }
     func owned(_ node: Node, _ kind: String) throws {
-      let (error,matches) = owner(node)
+      let (error,matches,_) = owner(node)
       try require(error == 0,kind+"-owner-query",["gotoQueryError":error,"ownerMatches":false])
       try require(matches,kind+"-owner-mismatch",["gotoQueryError":error,"ownerMatches":matches])
     }
@@ -75,13 +75,14 @@ func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
       func edgeRequire(_ ok: Bool, _ reason: String, _ extra: [String:Any] = [:]) throws {
         try locationPredicate(ok,reason,edge.merging(extra) { _,new in new })
       }
-      let (childError,childOwned) = owner(child)
+      let (childError,childOwned,childPid) = owner(child)
       try edgeRequire(childError == 0,"child-owner-query",["gotoQueryError":childError,"ownerMatches":false])
+      if !childOwned { foreignChild(childRoute,childPid) }
       try edgeRequire(childOwned,"child-owner-mismatch",["gotoQueryError":childError,"ownerMatches":childOwned])
       let (parentError,ancestor) = parent(child)
       try edgeRequire(parentError == 0,"parent-query",["gotoQueryError":parentError])
       try edgeRequire(ancestor != nil,"parent-shape",["gotoQueryError":parentError])
-      let (ownerError,parentOwned) = owner(ancestor!)
+      let (ownerError,parentOwned,_) = owner(ancestor!)
       try edgeRequire(ownerError == 0,"parent-owner-query",["gotoQueryError":ownerError,"ownerMatches":false])
       try edgeRequire(parentOwned,"parent-owner-mismatch",["gotoQueryError":ownerError,"ownerMatches":parentOwned])
       try edgeRequire(equal(ancestor!,current),"parent-edge",["parentMatches":false])
@@ -205,6 +206,44 @@ func owns(_ node: AXUIElement, _ pid: pid_t) -> Bool {
 func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [String:Any]) -> [String:Any] {
   guard owner == pid else { return ["path":path,"role":"other","blocked":"child-owner"] }
   return read()
+}
+// A path is diagnostic provenance, never authority to traverse a foreign AX node.
+func foreignOwnerPathClass(_ path: String?) -> String {
+  guard let path, !path.isEmpty else { return "process-path-unreadable" }
+  if path.hasPrefix("/System/Library/") && path.contains("/com.apple.appkit.xpc.openAndSavePanelService.xpc/") {
+    return "appkit-open-save-panel-path"
+  }
+  if path.hasPrefix("/System/Library/") || path.hasPrefix("/usr/libexec/") { return "system-path" }
+  return "other-path"
+}
+// One private, mode-0600 local artifact under the already pinned report directory.
+// It is not emitted through the helper's public JSON protocol or copied into receipts.
+func recordForeignOwner(_ observed: Int, route: String, report: URL, identity: [FileAttributeKey:Any]) {
+  guard route.utf8.count <= 128 else { return }
+  var path: String? = nil
+  if observed > 0 && observed <= Int(Int32.max) {
+    var buffer = [CChar](repeating:0,count:4096)
+    let length = buffer.withUnsafeMutableBufferPointer { proc_pidpath(pid_t(observed),$0.baseAddress,UInt32($0.count)) }
+    if length > 0 && Int(length) < buffer.count { path = String(cString:buffer) }
+  }
+  let facts: [String:Any] = ["schema":"nemo.ax-owner-provenance.private/1", "route":route,
+    "observedPid":observed, "pathClass":foreignOwnerPathClass(path),
+    "executableName":path.map { URL(fileURLWithPath:$0).lastPathComponent } ?? "unreadable"]
+  guard let data = try? JSONSerialization.data(withJSONObject:facts,options:[.sortedKeys]) else { return }
+  let directory = Darwin.open(report.path,O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+  guard directory >= 0 else { return }
+  defer { _ = Darwin.close(directory) }
+  var pinned = stat()
+  guard fstat(directory,&pinned) == 0,
+    UInt64(pinned.st_dev) == (identity[.systemNumber] as? NSNumber)?.uint64Value,
+    UInt64(pinned.st_ino) == (identity[.systemFileNumber] as? NSNumber)?.uint64Value else { return }
+  let name = "ax-owner-provenance.private.json"
+  let file = name.withCString { Darwin.openat(directory,$0,O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW,mode_t(0o600)) }
+  guard file >= 0 else { return }
+  var complete = false
+  defer { _ = Darwin.close(file); if !complete { _ = name.withCString { Darwin.unlinkat(directory,$0,0) } } }
+  let count = data.withUnsafeBytes { Darwin.write(file,$0.baseAddress,data.count) }
+  complete = count == data.count && fsync(file) == 0
 }
 func projectionLimit(_ depth: Int, _ nodes: Int) throws { try check(depth >= 1 && depth <= 5 && nodes >= 1 && nodes <= 128) }
 func identityFailureStage(_ ownerQuery: Int, _ ownerMatches: Bool, _ windowsQuery: Int,
@@ -390,8 +429,8 @@ func selfTest() throws {
         equal:==,owner:{ node in
           ownerReads[node,default:0] += 1
           let target = node == 0 && ownerReads[node] == 1 ? "node" : node == 0 && ownerReads[node] == 2 ? "parent" : "child"
-          if fault == target+"-owner-query" { return (-25204,false) }
-          return (0,fault != target+"-owner-mismatch")
+          if fault == target+"-owner-query" { return (-25204,false,0) }
+          return (0,fault != target+"-owner-mismatch",node == 0 ? 123 : 456)
         },isWindow:{ node in attributeReads.append(node); return fault == "standalone-window" && node == 1 },
         timeout:{ node in attributeReads.append(node); return fault == "timeout-config" ? -25204 : 0 },children:{ node in
           attributeReads.append(node)
@@ -426,7 +465,7 @@ func selfTest() throws {
   for posted in [false,true] {
     let trace = LocationTrace(); var events = [String](), refused = false
     func failingWalk() throws {
-      let ownership: (Int)->(Int,Bool) = { (0,$0 == 0) }
+      let ownership: (Int)->(Int,Bool,Int) = { (0,$0 == 0,$0 == 0 ? 123 : 456) }
       let descendants: (Int)->(Int,[Int]?) = { (0,$0 == 0 ? [1] : []) }
       let ancestor: (Int)->(Int,Int?) = { _ in (0,0) }
       let _: [Int] = try locationWalk(0,deadline:10,now:{ 0 },equal:{ $0 == $1 },owner:ownership,
@@ -443,6 +482,45 @@ func selfTest() throws {
     }
     try check(refused && events == (posted ? ["down","up"] : []))
   }
+  // The old walk had no private owner observation at all: this oracle is RED
+  // there, while preserving the same public refusal and zero foreign AX reads.
+  for control in ["foreign-child","unknown-child","owner-query-error","owned-child","foreign-modal"] {
+    var provenance = [(String,Int)](), foreignReads = 0, diagnostic: [String:Any]?
+    let trace = LocationTrace(); trace.phase = "pre-tree"
+    do { try trace.observe {
+      let _: [Int] = try locationWalk(0,deadline:10,now:{ 0 },equal:==,owner:{ node in
+        if node == 0 { return (0,true,123) }
+        if control == "owner-query-error" { return (-25204,false,0) }
+        if control == "owned-child" { return (0,true,123) }
+        return (0,false,control == "unknown-child" ? 0 : 456)
+      },foreignChild:{ provenance.append(($0,$1)) },isWindow:{ node in
+        if node == 1 { foreignReads += 1 }; return node == 1 && control == "foreign-modal"
+      },timeout:{ _ in 0 },children:{ ($0 == 0 ? (0,[1]) : (0,[])) },parent:{ _ in (0,0) })
+    } } catch let error as ActionRefusal { diagnostic = error.diagnostics }
+    if control == "owned-child" { try check(diagnostic == nil && provenance.isEmpty && foreignReads == 1) }
+    else {
+      let queried = control != "owner-query-error"
+      try check(diagnostic?["gotoReason"] as? String == (queried ? "child-owner-mismatch" : "child-owner-query"))
+      try check(diagnostic?["gotoRoute"] as? String == "0" && diagnostic?["ownerMatches"] as? Bool == false &&
+        diagnostic?["commandPosted"] as? Bool == false && foreignReads == 0)
+      try check(provenance.count == (queried ? 1 : 0))
+      if queried { try check(provenance[0].0 == "0" && provenance[0].1 == (control == "unknown-child" ? 0 : 456)) }
+    }
+  }
+  try check(foreignOwnerPathClass(nil) == "process-path-unreadable")
+  try check(foreignOwnerPathClass("/System/Library/Frameworks/AppKit.framework/XPCServices/com.apple.appkit.xpc.openAndSavePanelService.xpc/Contents/MacOS/service") == "appkit-open-save-panel-path")
+  try check(foreignOwnerPathClass("/usr/libexec/example") == "system-path")
+  try check(foreignOwnerPathClass("/private/other") == "other-path")
+  let privateRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  try FileManager.default.createDirectory(at:privateRoot,withIntermediateDirectories:false,attributes:[.posixPermissions:0o700])
+  defer { try? FileManager.default.removeItem(at:privateRoot) }
+  let privateIdentity = try FileManager.default.attributesOfItem(atPath:privateRoot.path)
+  recordForeignOwner(0,route:"0.1",report:privateRoot,identity:privateIdentity)
+  let privateFile = privateRoot.appendingPathComponent("ax-owner-provenance.private.json")
+  let privateFacts = try JSONSerialization.jsonObject(with:Data(contentsOf:privateFile)) as? [String:Any]
+  let privateMode = try FileManager.default.attributesOfItem(atPath:privateFile.path)[.posixPermissions] as? NSNumber
+  try check(privateFacts?["route"] as? String == "0.1" && privateFacts?["observedPid"] as? Int == 0 &&
+    privateFacts?["pathClass"] as? String == "process-path-unreadable" && privateMode?.intValue == 0o600)
   try check(locationCandidateValid(true,true,true,true,1,"plain",true,true,true))
   for index in 0..<9 {
     try check(!locationCandidateValid(index != 0,index != 1,index != 2,index != 3,index == 4 ? 2 : 1,
@@ -578,7 +656,8 @@ func selfTest() throws {
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
-    "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
+    "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,
+    "privateOwnerCases":5,"privatePathClassCases":4,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -855,11 +934,12 @@ func run() throws {
   }
   // Bounded, complete ownership walk. An unreadable/truncated topology is not
   // absence. Every edge must be attested by both AXChildren and AXParent.
-  func locationTree(_ root: AXUIElement, _ deadline: UInt64 = DispatchTime.now().uptimeNanoseconds + 1_000_000_000) throws -> [AXUIElement] {
+  func locationTree(_ root: AXUIElement, _ deadline: UInt64 = DispatchTime.now().uptimeNanoseconds + 1_000_000_000,
+    foreignChild: (String,Int)->Void = { _,_ in }) throws -> [AXUIElement] {
     try locationWalk(root,deadline:deadline,now:{ DispatchTime.now().uptimeNanoseconds },equal:{ CFEqual($0,$1) },owner:{ node in
       var actual: pid_t = 0; let error = AXUIElementGetPid(node,&actual)
-      return (Int(error.rawValue),error == .success && actual == pid)
-    },isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },
+      return (Int(error.rawValue),error == .success && actual == pid,Int(actual))
+    },foreignChild:foreignChild,isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },
       timeout:{ Int(AXUIElementSetMessagingTimeout($0,0.03).rawValue) },children:{ node in
       var raw: CFTypeRef?; let error = AXUIElementCopyAttributeValue(node,kAXChildrenAttribute as CFString,&raw)
       return (Int(error.rawValue),raw as? [AXUIElement])
@@ -940,7 +1020,9 @@ func run() throws {
         try locationCheck(Set(request.keys).isSubset(of:["type","target","pid","windowId","sheetToken"]) &&
           AXUIElementSetMessagingTimeout(application,0.03) == .success && AXUIElementSetMessagingTimeout(main,0.03) == .success,"goto-state")
         trace.phase = "pre-tree"
-        let before = try locationTree(selectedRoot)
+        let before = try locationTree(selectedRoot,foreignChild:{ route, observed in
+          recordForeignOwner(observed,route:route,report:physical,identity:reportIdentity)
+        })
         let priorModals = before.filter { !CFEqual($0,selectedRoot) && modal($0) }
         try locationPredicate(priorModals.isEmpty,"preexisting-modal",["gotoCandidateCount":priorModals.count])
         try locationCheck(before.contains { attr($0,kAXRoleAttribute) as? String == kAXButtonRole &&
