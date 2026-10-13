@@ -2,7 +2,7 @@
 
 use crate::{
     native_application_contract::{host_error, HostResult},
-    native_viewport::{NativeViewport, NativeViewportConsumer},
+    native_viewport::NativeViewport,
 };
 use native_engine::{
     compositor::{CompositionResult, Compositor},
@@ -41,8 +41,16 @@ pub(crate) struct ViewportRelease {
     pub(crate) status: &'static str,
 }
 
+#[path = "native_object_viewport.rs"]
+mod object_viewport;
+pub(crate) use crate::native_viewport::NativeViewportConsumer;
+pub(crate) use object_viewport::with_object_target;
+use object_viewport::MainViewport;
+#[cfg(test)]
+pub(crate) use object_viewport::TestObjectSlot;
+
 thread_local! {
-    static MAIN_VIEWPORT: RefCell<Option<RetainedViewport>> = const { RefCell::new(None) };
+    static MAIN_VIEWPORT: RefCell<Option<RetainedViewport<MainViewport>>> = const { RefCell::new(None) };
 }
 
 #[cfg(test)]
@@ -131,7 +139,7 @@ pub(crate) fn create(
         }
         *slot = Some(RetainedViewport {
             instance_id,
-            viewport,
+            viewport: MainViewport::External(viewport),
         });
         Ok(compositor)
     })
@@ -257,17 +265,7 @@ pub(crate) fn dispose(instance_id: &str) -> HostResult<Vec<WorkId>> {
 }
 
 pub(crate) fn release(instance_id: &str) -> HostResult<ViewportRelease> {
-    let retained = MAIN_VIEWPORT.with(|slot| {
-        let mut slot = slot.borrow_mut();
-        match slot.as_ref() {
-            Some(value) if value.instance_id == instance_id => Ok(slot.take()),
-            Some(_) => Err(host_error(
-                "wrong_instance",
-                "native viewport instance mismatch",
-            )),
-            None => Ok(None),
-        }
-    })?;
+    let retained = MAIN_VIEWPORT.with(|slot| object_viewport::take_slot(slot, instance_id))?;
     match retained {
         Some(mut retained) => Ok(ViewportRelease {
             work_ids: retained.viewport.dispose(),
@@ -296,7 +294,7 @@ fn with_viewport<T>(
     instance_id: &str,
     operation: impl FnOnce(&mut NativeViewport) -> HostResult<T>,
 ) -> HostResult<T> {
-    MAIN_VIEWPORT.with(|slot| with_retained_target(slot, instance_id, operation))
+    MAIN_VIEWPORT.with(|slot| with_retained_target(slot, instance_id, |value| operation(value)))
 }
 
 fn with_retained_target<V, T>(

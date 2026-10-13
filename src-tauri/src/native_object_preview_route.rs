@@ -20,6 +20,19 @@ impl ApplicationMcp {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<PresentationReceipt, String> {
+        self.with_object_preview_owner(lifecycle_generation, expected, |owner| {
+            owner.present_object_preview(expected, output, compositor, viewport)
+        })
+    }
+
+    /// Admission and the callback share the original native/revision guards.
+    /// A main-thread adapter may obtain its original target only inside here.
+    pub(crate) fn with_object_preview_owner<T>(
+        &self,
+        lifecycle_generation: u64,
+        expected: &ObjectFrameSelector<'_>,
+        operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
+    ) -> Result<T, String> {
         if expected.instance_id != self.instance_id() {
             return Err("object preview application instance is stale".into());
         }
@@ -56,10 +69,52 @@ impl ApplicationMcp {
         // B2B checkpoints pending work before calling SurfacePort. Catch only
         // this consumer unwind so its debt remains releasable without poisoning
         // either shared application lock. No success receipt is synthesized.
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            owner.present_object_preview(expected, output, compositor, viewport)
-        }))
-        .map_err(|_| "native object preview panicked; owner cleanup is required".to_string())?
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(owner)))
+            .map_err(|_| "native object preview panicked; owner cleanup is required".to_string())?
+    }
+    #[cfg(test)]
+    pub(crate) fn preview_locks_held_for_test(&self) -> bool {
+        matches!(
+            self.native.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        ) && matches!(
+            self.revisions.0.try_lock(),
+            Err(std::sync::TryLockError::WouldBlock)
+        )
+    }
+    #[cfg(test)]
+    pub(crate) fn external_object_preview_for_test(
+        &self,
+        raw: &str,
+    ) -> Result<
+        (
+            nemo_mcp::contract::NativeApplicationResponse,
+            Option<(serde_json::Value, tokio::sync::oneshot::Receiver<()>)>,
+        ),
+        String,
+    > {
+        let delivery = self.revisions.dispatch_object(
+            self.instance_id(),
+            &self.native,
+            crate::application_mcp::object_client::admit_raw(raw)?,
+            true,
+        )?;
+        let notification = delivery.notification.map(|(event, receiver)| {
+            (
+                serde_json::to_value(event).expect("revision event is serializable"),
+                receiver,
+            )
+        });
+        Ok((delivery.response, notification))
+    }
+    #[cfg(test)]
+    pub(crate) fn settle_object_preview_for_test(
+        &self,
+        event: serde_json::Value,
+        acknowledged: bool,
+    ) -> bool {
+        let event = serde_json::from_value(event).expect("actual emitted revision event");
+        self.revisions.settle(&self.native, &event, acknowledged)
     }
 }
 

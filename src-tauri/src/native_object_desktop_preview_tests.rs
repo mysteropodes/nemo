@@ -1,0 +1,297 @@
+use crate::native_application_contract::host_error;
+use crate::native_application_viewport::TestObjectSlot;
+use crate::native_object_desktop_preview::tests::support::{document, fill, Fixture};
+use native_engine::{
+    compositor::Compositor, desktop_viewport::SurfacePresentation,
+    object_codec::decode_storage_project,
+};
+use serde_json::json;
+#[path = "native_object_desktop_preview_test_support.rs"]
+mod support;
+
+pub(super) fn pixel(source: &SurfacePresentation<'_>, expected: [u8; 4]) {
+    let buffer = source.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("object-desktop-pixel"),
+        size: 1280 * 180,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = source
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture: source.texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(1280),
+                rows_per_image: Some(180),
+            },
+        },
+        wgpu::Extent3d {
+            width: 320,
+            height: 180,
+            depth_or_array_layers: 1,
+        },
+    );
+    source.queue.submit(Some(encoder.finish()));
+    let slice = buffer.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |value| tx.send(value).unwrap());
+    source
+        .device
+        .poll(wgpu::PollType::wait_indefinitely())
+        .unwrap();
+    rx.recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    let bytes = slice.get_mapped_range();
+    assert_eq!(&bytes[8 * 1280 + 8 * 4..8 * 1280 + 8 * 4 + 4], &expected);
+    assert_eq!(
+        &bytes[40 * 1280 + 40 * 4..40 * 1280 + 40 * 4 + 4],
+        &[255; 4]
+    );
+    drop(bytes);
+    buffer.unmap();
+}
+
+#[test]
+fn every_invalid_pin_and_original_byte_shape_refuses_before_first_gpu_factory() {
+    let f = Fixture::new();
+    for field in [
+        "instanceId",
+        "documentId",
+        "documentSnapshotId",
+        "contextId",
+    ] {
+        let mut raw = f.raw.clone();
+        raw[field] = json!("foreign");
+        assert!(f.run(&raw.to_string()).is_err(), "{field}");
+    }
+    for (field, value) in [
+        ("contentRevision", json!(1)),
+        ("lifecycleGeneration", json!(999)),
+        ("scopeKind", json!("reference")),
+        ("frame", json!(1)),
+        ("cancelledBeforeDispatch", json!(true)),
+    ] {
+        let mut raw = f.raw.clone();
+        raw[field] = value;
+        assert!(f.run(&raw.to_string()).is_err(), "{field}");
+    }
+    let mut raw = f.raw.clone();
+    raw["outputSpec"]["width"] = json!(64);
+    assert!(f.run(&raw.to_string()).is_err());
+    let duplicate = f.raw.to_string().replacen('{', "{\"apiVersion\":2,", 1);
+    assert!(f.run(&duplicate).is_err());
+    assert!(f.run(&" ".repeat(8193)).is_err());
+    assert_eq!(f.creations.get(), 0);
+    assert_eq!(f.trace.borrow().acquisitions, 0);
+}
+
+#[test]
+fn gpu_one_original_target_retries_and_shared_edits_history_update_literal_pixels() {
+    let mut f = Fixture::new();
+    f.trace.borrow_mut().mode = 1;
+    let first = f.run(&f.raw.to_string()).unwrap();
+    assert_eq!(first.status, "deferred-timeout");
+    f.trace.borrow_mut().mode = 0;
+    let next = f.run(&f.raw.to_string()).unwrap();
+    assert_eq!(next.status, "presented");
+    assert_eq!(first.work_id, next.work_id);
+    for (op, payload, color) in [
+        (
+            "command.document.object.fill.set",
+            fill(1),
+            [255, 0, 0, 255],
+        ),
+        (
+            "command.document.object.undo",
+            json!({"command":"object.undo"}),
+            [0, 0, 255, 255],
+        ),
+        (
+            "command.document.object.redo",
+            json!({"command":"object.redo"}),
+            [255, 0, 0, 255],
+        ),
+    ] {
+        let response = f
+            .state
+            .serialize_object_file_snapshot(&f.request(op, payload))
+            .unwrap();
+        assert!(response.ok);
+        assert!(f.run(&f.raw.to_string()).is_err());
+        f.refresh();
+        f.trace.borrow_mut().color = color;
+        assert_eq!(f.run(&f.raw.to_string()).unwrap().status, "presented");
+    }
+    assert_eq!(f.creations.get(), 1);
+    let released = f.release();
+    assert!(released.reentry_available);
+    assert_eq!(f.trace.borrow().dispositions, 1);
+    assert!(f.run(&f.raw.to_string()).is_err());
+    f.state
+        .install_native_object(
+            decode_storage_project(&serde_json::to_vec(&document()).unwrap()).unwrap(),
+        )
+        .unwrap();
+    let old = f.raw.clone();
+    f.refresh();
+    assert!(f.run(&old.to_string()).is_err());
+    f.trace.borrow_mut().color = [0, 0, 255, 255];
+    f.run(&f.raw.to_string()).unwrap();
+    assert_eq!(f.creations.get(), 2);
+    f.release();
+    assert_eq!(f.trace.borrow().dispositions, 2);
+}
+
+#[test]
+fn gpu_callback_unwind_retains_owner_debt_and_target_until_common_release() {
+    let f = Fixture::new();
+    f.trace.borrow_mut().mode = 2;
+    assert!(f.run(&f.raw.to_string()).is_err());
+    assert_eq!(f.creations.get(), 1);
+    assert!(f.state.native_state().lock().is_ok());
+    assert!(f.run(&f.raw.to_string()).is_err());
+    assert_eq!(f.trace.borrow().acquisitions, 1);
+    let receipt = f.release();
+    assert!(receipt.reentry_available);
+    assert_eq!(receipt.cancelled_preview_work_ids.len(), 1);
+    assert_eq!(receipt.disposed_viewport_work_ids.len(), 1);
+    assert_eq!(f.trace.borrow().dispositions, 1);
+}
+
+#[test]
+fn gpu_actual_pending_ack_unsettled_and_failed_revision_barriers_never_allocate() {
+    let mut f = Fixture::new();
+    let binding = f
+        .state
+        .control_revision_for_test(json!({"action":"binding"}))
+        .unwrap();
+    f.state
+        .control_revision_for_test(json!({"action":"subscribe","binding":binding}))
+        .unwrap();
+    let (response, notification) = f
+        .state
+        .external_object_preview_for_test(&f.request("command.document.object.fill.set", fill(1)))
+        .unwrap();
+    assert!(response.ok);
+    let (event, mut receiver) = notification.unwrap();
+    f.refresh();
+    assert!(f.run(&f.raw.to_string()).is_err());
+    assert_eq!(f.creations.get(), 0);
+    f.state.control_revision_for_test(json!({"action":"acknowledge","subscriptionId":binding["subscriptionId"],"event":event})).unwrap();
+    assert_eq!(receiver.try_recv(), Ok(()));
+    assert!(f.run(&f.raw.to_string()).is_err());
+    assert_eq!(f.creations.get(), 0);
+    assert!(f.state.settle_object_preview_for_test(event, true));
+    f.trace.borrow_mut().color = [255, 0, 0, 255];
+    f.run(&f.raw.to_string()).unwrap();
+    let (response, notification) = f
+        .state
+        .external_object_preview_for_test(&f.request("command.document.object.fill.set", fill(0)))
+        .unwrap();
+    assert!(response.ok);
+    assert!(notification.is_some());
+    f.refresh();
+    f.state
+        .control_revision_for_test(
+            json!({"action":"disconnect","subscriptionId":binding["subscriptionId"]}),
+        )
+        .unwrap();
+    assert!(f.run(&f.raw.to_string()).is_err());
+    assert_eq!(f.creations.get(), 1);
+    assert_eq!(f.trace.borrow().acquisitions, 1);
+    f.release();
+}
+
+#[test]
+fn gpu_existing_other_owner_wrong_instance_and_stale_slot_never_run_factory() {
+    let slot = TestObjectSlot::external("main".into(), ());
+    for (instance, generation) in [("main", 1), ("foreign", 1)] {
+        assert!(slot
+            .with_target(
+                instance,
+                generation,
+                || panic!("existing target must not allocate"),
+                |_, _| Ok(())
+            )
+            .is_err());
+    }
+    let slot = TestObjectSlot::new();
+    slot.with_target(
+        "main",
+        1,
+        || Ok(((), Compositor::new().unwrap())),
+        |_, _| Ok(()),
+    )
+    .unwrap();
+    assert!(slot
+        .with_target::<()>(
+            "main",
+            2,
+            || panic!("stale must not allocate"),
+            |_, _| panic!("stale must not consume")
+        )
+        .is_err());
+    assert!(slot
+        .with_target::<()>(
+            "foreign",
+            1,
+            || panic!("foreign must not allocate"),
+            |_, _| panic!("foreign must not consume")
+        )
+        .is_err());
+    slot.release("main", |_| vec![]).unwrap();
+    assert!(slot
+        .with_target::<()>(
+            "main",
+            2,
+            || Err(host_error("unavailable", "factory failed")),
+            |_, _| Ok(())
+        )
+        .is_err());
+}
+
+#[test]
+fn failed_or_panicking_factory_callback_clears_cpu_preparation_without_gpu_or_lock_poison() {
+    let f = Fixture::new();
+    let request = crate::native_object_desktop_preview::admit_request(
+        &f.raw.to_string(),
+        f.state.instance_id(),
+    )
+    .unwrap();
+    for _ in 0..2 {
+        let failure =
+            crate::native_object_desktop_preview::preview_with_target(&f.state, &request, |_| {
+                Err(host_error("unavailable", "factory declined"))
+            })
+            .unwrap_err();
+        assert_eq!(failure.message, "factory declined");
+    }
+    assert!(crate::native_object_desktop_preview::preview_with_target(
+        &f.state,
+        &request,
+        |_| panic!("factory callback dropped")
+    )
+    .is_err());
+    assert!(f.state.native_state().lock().is_ok());
+    let called = std::cell::Cell::new(false);
+    let failure =
+        crate::native_object_desktop_preview::preview_with_target(&f.state, &request, |_| {
+            called.set(true);
+            Err(host_error("unavailable", "after unwind"))
+        })
+        .unwrap_err();
+    assert!(called.get());
+    assert_eq!(failure.message, "after unwind");
+    assert_eq!(f.creations.get(), 0);
+    assert_eq!(f.trace.borrow().acquisitions, 0);
+}
