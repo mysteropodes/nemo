@@ -1,4 +1,4 @@
-use crate::reference_image_asset::{decode_png, ImageAssetError, ImageAssetLimits};
+use crate::reference_image_asset::{decode_png, validate_png, ImageAssetError, ImageAssetLimits};
 
 // Frozen minimal PNG containers: literal IHDR, zlib scanlines and CRCs.
 // Accepted-pixel expectations below are manual, not decoder/encoder goldens.
@@ -58,6 +58,108 @@ fn inserted(png: &[u8], after: usize, chunk: &[u8]) -> Vec<u8> {
     out.extend_from_slice(chunk);
     out.extend_from_slice(&png[after..]);
     out
+}
+
+fn parity(source: &[u8], budget: ImageAssetLimits) -> Result<(u32, u32), ImageAssetError> {
+    let validation = validate_png(source, budget);
+    assert_eq!(
+        validation,
+        decode_png(source, budget).map(|asset| asset.dimensions())
+    );
+    validation
+}
+#[test]
+fn borrowed_validation_has_literal_dimensions_and_current_decoder_path_parity() {
+    for (fixture, dimensions) in [(RGBA, (3, 1)), (RGB, (2, 2))] {
+        let source = bytes(fixture);
+        let before = source.clone();
+        assert_eq!(parity(&source, limits()), Ok(dimensions));
+        assert_eq!(source, before);
+        for len in 0..source.len() {
+            assert!(parity(&source[..len], limits()).is_err());
+        }
+        let mut trailing = source.clone();
+        trailing.push(0);
+        assert_eq!(parity(&trailing, limits()), Err(ImageAssetError::Malformed));
+    }
+    // Known OLD decoder gap: corrected width2 ignores excess inflated pixels.
+    assert_eq!(
+        parity(&header(bytes(RGBA), 2, 1, 8, 6, 0), limits()),
+        Ok((2, 1))
+    );
+    for (w, h) in [(3, 2), (3, 3)] {
+        // Correct IHDR CRC: insufficient declared rows must still refuse.
+        assert!(parity(&header(bytes(RGBA), w, h, 8, 6, 0), limits()).is_err());
+    }
+    for (depth, color, interlace) in [(16, 6, 0), (8, 3, 0), (8, 0, 0), (8, 4, 0), (8, 6, 1)] {
+        assert_eq!(
+            parity(
+                &header(bytes(RGBA), 3, 1, depth, color, interlace),
+                limits()
+            ),
+            Err(ImageAssetError::Unsupported)
+        );
+    }
+    for kind in [b"acTL", b"fcTL", b"fdAT"] {
+        assert_eq!(
+            parity(&inserted(&bytes(RGBA), 33, &chunk(kind, &[0; 8])), limits()),
+            Err(ImageAssetError::Unsupported)
+        );
+    }
+    assert_eq!(
+        parity(&bytes(RGB_TRNS), limits()),
+        Err(ImageAssetError::Unsupported)
+    );
+}
+#[test]
+fn borrowed_validation_checks_late_checksums_and_all_caller_budgets() {
+    let source = bytes(RGBA);
+    for index in [29, 62, 77] {
+        let mut bad = source.clone();
+        bad[index] ^= 1;
+        assert_eq!(parity(&bad, limits()), Err(ImageAssetError::Malformed));
+    }
+    let text = chunk(b"tEXt", b"key\0value");
+    let valid = inserted(&source, 33, &text);
+    assert_eq!(parity(&valid, limits()), Ok((3, 1)));
+    let mut corrupt = text;
+    *corrupt.last_mut().unwrap() ^= 1;
+    assert_eq!(
+        parity(&inserted(&source, 33, &corrupt), limits()),
+        Err(ImageAssetError::Malformed)
+    );
+    let mut adler = source.clone();
+    adler[61] ^= 1;
+    let crc = crc(&adler[37..62]);
+    adler[62..66].copy_from_slice(&crc);
+    assert_eq!(parity(&adler, limits()), Err(ImageAssetError::Malformed));
+    for (cap, error) in [
+        (
+            ImageAssetLimits::new(source.len() - 1, 12, 1024 * 1024, 3, 1).unwrap(),
+            ImageAssetError::EncodedBudget,
+        ),
+        (
+            ImageAssetLimits::new(source.len(), 11, 1024 * 1024, 3, 1).unwrap(),
+            ImageAssetError::DecodedBudget,
+        ),
+        (
+            ImageAssetLimits::new(source.len(), 12, 1, 3, 1).unwrap(),
+            ImageAssetError::DecoderBudget,
+        ),
+        (
+            ImageAssetLimits::new(source.len(), 12, 1024 * 1024, 2, 1).unwrap(),
+            ImageAssetError::DimensionBudget,
+        ),
+    ] {
+        assert_eq!(parity(&source, cap), Err(error));
+    }
+    assert_eq!(
+        parity(
+            &source,
+            ImageAssetLimits::new(source.len(), 12, 1024 * 1024, 3, 1).unwrap()
+        ),
+        Ok((3, 1))
+    );
 }
 
 #[test]

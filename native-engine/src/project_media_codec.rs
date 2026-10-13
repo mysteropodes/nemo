@@ -278,10 +278,8 @@ fn decode_reference(
     if std::io::Read::read(&mut reader, &mut [0]).map_err(|_| ProjectWireError::Invalid)? != 0 {
         return Err(ProjectWireError::Invalid);
     }
-    // The decoded RGBA and helper's encoded copy NEVER enter the document.
-    let admitted =
-        crate::reference_image_asset::decode_png(&encoded, png).map_err(ProjectWireError::Png)?;
-    drop(admitted);
+    // Admission reuses decoder checks, not a pixel/encoded-copy result.
+    crate::reference_image_asset::validate_png(&encoded, png).map_err(ProjectWireError::Png)?;
     ProjectReferenceState::admitted_still(
         id,
         name,
