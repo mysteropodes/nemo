@@ -72,6 +72,25 @@ func shouldProbeRetainedMainChildren(_ stage: String, _ facts: [String:Any]) -> 
     facts["minimizedReadable"] as? Bool == true && facts["minimized"] as? Bool == false &&
     facts["pinnedCGWindowListReadable"] as? Bool == true && facts["pinnedCGWindowCount"] as? Int == 1
 }
+func transitionObservationStatus(_ samples: [[String:Any]], _ deadlineExceeded: Bool = false) -> String {
+  if deadlineExceeded { return "deadline" }
+  guard samples.count == 2 else { return "inconclusive" }
+  for sample in samples {
+    guard sample["axPidMatches"] as? Bool == true,
+      sample["applicationWindowsQueryError"] as? Int == 0,
+      sample["applicationWindowsReadable"] as? Bool == true,
+      sample["minimizedQueryError"] as? Int == 0,
+      sample["minimizedReadable"] as? Bool == true,
+      sample["minimized"] as? Bool == false,
+      sample["pinnedCGWindowListReadable"] as? Bool == true,
+      sample["pinnedCGWindowCount"] as? Int == 1,
+      sample["retainedMainChildrenQueryError"] as? Int == 0,
+      sample["retainedMainChildrenReadable"] as? Bool == true else { return "inconclusive" }
+  }
+  if samples.contains(where: { $0["pinnedAXWindowMember"] as? Bool == true }) { return "membership-returned" }
+  if samples.allSatisfy({ $0["pinnedAXWindowMember"] as? Bool == false }) { return "persistent-omission" }
+  return "inconclusive"
+}
 func xy(_ node: AXUIElement) -> CGPoint? {
   guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
@@ -126,6 +145,21 @@ func selfTest() throws {
     "applicationWindowsQueryError":0,"applicationWindowsReadable":true,"pinnedAXWindowMember":false,
     "minimizedQueryError":0,"minimizedReadable":true,"minimized":false,"pinnedCGWindowListReadable":true,"pinnedCGWindowCount":0]))
   try check(!shouldProbeRetainedMainChildren("minimized",membershipFacts))
+  let stableTransitionSample: [String:Any] = ["axPidMatches":true,"applicationWindowsQueryError":0,
+    "applicationWindowsReadable":true,"pinnedAXWindowMember":false,"minimizedQueryError":0,
+    "minimizedReadable":true,"minimized":false,"pinnedCGWindowListReadable":true,"pinnedCGWindowCount":1,
+    "retainedMainChildrenQueryError":0,"retainedMainChildrenReadable":true]
+  try check(transitionObservationStatus([stableTransitionSample]) == "inconclusive")
+  try check(transitionObservationStatus([stableTransitionSample,stableTransitionSample]) == "persistent-omission")
+  var restoredTransitionSample = stableTransitionSample; restoredTransitionSample["pinnedAXWindowMember"] = true
+  try check(transitionObservationStatus([stableTransitionSample,restoredTransitionSample]) == "membership-returned")
+  var driftTransitionSample = stableTransitionSample; driftTransitionSample["axPidMatches"] = false
+  try check(transitionObservationStatus([stableTransitionSample,driftTransitionSample]) == "inconclusive")
+  var errorTransitionSample = stableTransitionSample; errorTransitionSample["applicationWindowsQueryError"] = -25205
+  try check(transitionObservationStatus([stableTransitionSample,errorTransitionSample]) == "inconclusive")
+  try check(transitionObservationStatus([stableTransitionSample,stableTransitionSample,stableTransitionSample]) == "inconclusive")
+  var returnedAfterBudget = stableTransitionSample; returnedAfterBudget["pinnedAXWindowMember"] = true
+  try check(transitionObservationStatus([stableTransitionSample,returnedAfterBudget],true) == "deadline")
   try check(try sheetProof([11],[11:123],[11:1],123,1,nil) == 11)
   try check(try sheetProof([11],[11:123],[11:1],123,1,11) == 11)
   for (members,owners,parents,retained) in [([], [11:123], [11:1], nil), ([11,12],[11:123,12:123],[11:1,12:1],nil), ([11],[11:124],[11:1],nil),
@@ -142,7 +176,7 @@ func selfTest() throws {
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
-    "retainedMainProbeCases":15,"foreignReads":0, "runtimeAX":false])
+    "retainedMainProbeCases":15,"transitionObservationCases":6,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -205,6 +239,7 @@ func run() throws {
   }
   func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
   func retainedMainChildrenDiagnostic() -> [String:Any] {
+    // Separate, count-bounded detail phase outside the transition-sample budget.
     let limit = 64
     var rawChildren: CFTypeRef?
     let query = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
@@ -227,6 +262,9 @@ func run() throws {
     for index in 0..<bounded {
       let child = values[index]
       var facts: [String:Any] = ["index":index]
+      let childTimeout = AXUIElementSetMessagingTimeout(child,0.03)
+      facts["candidateTimeoutConfigError"] = Int(childTimeout.rawValue)
+      guard childTimeout == .success else { incomplete = true; candidates.append(facts); continue }
       var candidatePID: pid_t = 0
       let pidQuery = AXUIElementGetPid(child,&candidatePID)
       facts["candidatePidQueryError"] = Int(pidQuery.rawValue)
@@ -258,6 +296,9 @@ func run() throws {
         facts["candidateParentReadable"] = false; incomplete = true; candidates.append(facts); continue
       }
       facts["candidateParentReadable"] = true
+      let parentTimeout = AXUIElementSetMessagingTimeout(parent,0.03)
+      facts["candidateParentTimeoutConfigError"] = Int(parentTimeout.rawValue)
+      guard parentTimeout == .success else { incomplete = true; candidates.append(facts); continue }
       var parentPID: pid_t = 0
       let parentPIDQuery = AXUIElementGetPid(parent,&parentPID)
       facts["candidateParentPidQueryError"] = Int(parentPIDQuery.rawValue)
@@ -276,6 +317,101 @@ func run() throws {
     evidence["retainedMainChildFacts"] = candidates
     evidence["retainedMainSheetProbe"] = retainedChildrenProbeClass(0,true,truncated,incomplete,attachedSheets)
     return evidence
+  }
+  func transitionObservationDiagnostic() -> [String:Any] {
+    let started = DispatchTime.now().uptimeNanoseconds
+    let deadline = started + 750_000_000
+    let timeout: Float = 0.03
+    var timeoutsConfigured = false
+    func elapsedMs() -> Int { Int((DispatchTime.now().uptimeNanoseconds-started)/1_000_000) }
+    func expired() -> Bool { DispatchTime.now().uptimeNanoseconds >= deadline }
+    func result(_ suggestedStatus: String, _ samples: [[String:Any]]) -> [String:Any] {
+      let completed = DispatchTime.now().uptimeNanoseconds
+      let overrun = completed >= deadline
+      return ["status":overrun ? "deadline" : suggestedStatus,"budgetMs":750,
+        "budgetKind":"best-effort","budgetScope":"transition-samples-only",
+        "axTimeoutsConfigured":timeoutsConfigured,"elapsedMs":Int((completed-started)/1_000_000),"samples":samples]
+    }
+    // AX message timeouts precede every data query in either post-refusal probe.
+    if expired() { return result("deadline",[]) }
+    let appTimeout = AXUIElementSetMessagingTimeout(application,timeout)
+    if expired() { return result("deadline",[]) }
+    guard appTimeout == .success else { return result("timeout-config-refused",[]) }
+    let mainTimeout = AXUIElementSetMessagingTimeout(main,timeout)
+    timeoutsConfigured = mainTimeout == .success
+    if expired() { return result("deadline",[]) }
+    guard timeoutsConfigured else { return result("timeout-config-refused",[]) }
+    // AX calls have per-element timeouts. The transition-sample budget is best-effort
+    // because synchronous CoreGraphics calls cannot be interrupted; each return is checked.
+    func sample(_ index: Int) -> ([String:Any],Bool) {
+      var facts: [String:Any] = ["sampleIndex":index,"elapsedMs":elapsedMs()]
+      func reachedDeadline() -> Bool {
+        facts["elapsedMs"] = elapsedMs()
+        if expired() { facts["sampleDeadlineReached"] = true; return true }
+        return false
+      }
+      if reachedDeadline() { return (facts,true) }
+      var actualPID: pid_t = 0
+      let ownerError = AXUIElementGetPid(main,&actualPID)
+      facts["axPidQueryError"] = Int(ownerError.rawValue)
+      facts["axPidMatches"] = ownerError == .success && actualPID == pid
+      if reachedDeadline() { return (facts,true) }
+
+      var rawWindows: CFTypeRef?
+      let windowsError = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
+      let windows = windowsError == .success ? rawWindows as? [AXUIElement] : nil
+      facts["applicationWindowsQueryError"] = Int(windowsError.rawValue)
+      facts["applicationWindowsReadable"] = windows != nil
+      facts["pinnedAXWindowMember"] = windows?.contains { CFEqual($0,main) } ?? false
+      if reachedDeadline() { return (facts,true) }
+
+      var rawMinimized: CFTypeRef?
+      let minimizedError = AXUIElementCopyAttributeValue(main,kAXMinimizedAttribute as CFString,&rawMinimized)
+      let minimizedValue = minimizedError == .success ? (rawMinimized as? Bool) : nil
+      facts["minimizedQueryError"] = Int(minimizedError.rawValue)
+      facts["minimizedReadable"] = minimizedValue != nil
+      if let minimizedValue { facts["minimized"] = minimizedValue }
+      if reachedDeadline() { return (facts,true) }
+
+      let cgRows = CGWindowListCopyWindowInfo([.optionAll,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]]
+      facts["pinnedCGWindowListReadable"] = cgRows != nil
+      if reachedDeadline() { return (facts,true) }
+      let identities = cgRows?.filter {
+        $0[kCGWindowNumber as String] as? UInt32 == number &&
+          ($0[kCGWindowOwnerPID as String] as? Int32) == pid &&
+          ($0[kCGWindowLayer as String] as? Int) == 0
+      } ?? []
+      if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
+
+      if reachedDeadline() { return (facts,true) }
+      var rawChildren: CFTypeRef?
+      let childrenError = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
+      let childRows = childrenError == .success ? rawChildren as? [AXUIElement] : nil
+      facts["retainedMainChildrenQueryError"] = Int(childrenError.rawValue)
+      facts["retainedMainChildrenReadable"] = childRows != nil
+      if reachedDeadline() { return (facts,true) }
+      if let childRows {
+        facts["retainedMainChildrenCount"] = min(childRows.count,4096)
+        facts["retainedMainChildrenCountCapped"] = childRows.count > 4096
+      }
+      return (facts,false)
+    }
+    var samples = [[String:Any]]()
+    for index in 0..<2 {
+      if index > 0 {
+        let now = DispatchTime.now().uptimeNanoseconds
+        let remaining = deadline > now ? deadline-now : 0
+        if remaining == 0 { break }
+        Thread.sleep(forTimeInterval:min(0.15,Double(remaining)/1_000_000_000))
+      }
+      if expired() { break }
+      let (facts,overrun) = sample(index)
+      samples.append(facts)
+      if overrun { break }
+    }
+    let overrun = expired() || samples.contains { $0["sampleDeadlineReached"] as? Bool == true }
+    let status = transitionObservationStatus(samples,overrun)
+    return result(status,samples)
   }
   func verify() throws {
     var actualPID: pid_t = 0
@@ -467,7 +603,13 @@ func run() throws {
         if action == "press" {
           var facts = error.facts
           if shouldProbeRetainedMainChildren(error.stage,error.facts) {
-            facts.merge(retainedMainChildrenDiagnostic()) { _, new in new }
+            let observation = transitionObservationDiagnostic()
+            facts["transitionObservation"] = observation
+            let status = observation["status"] as? String
+            let configured = observation["axTimeoutsConfigured"] as? Bool == true
+            if configured && status != "deadline" && status != "timeout-config-refused" {
+              facts.merge(retainedMainChildrenDiagnostic()) { _, new in new }
+            }
           }
           throw pressFailure("post-action-"+error.stage,facts)
         }
