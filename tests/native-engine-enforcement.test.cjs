@@ -327,7 +327,7 @@ test('native-engine validation is required in normal graphs and staged adapters 
   }
 });
 
-test('P37C1C4A retained-reference CPU payload children have exact private source coverage', () => {
+test('P37C1C4 retained-reference CPU and PNG children have exact private source coverage', () => {
   const profile = readJson(ROOT, PROFILE);
   const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
   const children = [
@@ -335,8 +335,11 @@ test('P37C1C4A retained-reference CPU payload children have exact private source
     ['rust.native.engine.read-queries', 'native-engine/src/reference_image_resources.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/image_resource_budget.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/reference_image_resources.rs'],
+    ['rust.native.engine.codec', 'native-engine/src/reference_png_scanlines.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/reference_png_scanlines.rs'],
   ];
   assert.match(coverage.provenance.nativeReferenceCpuPayloadBudgetRegistration, /P37C1C4A\/#1843/);
+  assert.match(coverage.provenance.nativeReferencePngScanlineStrictnessRegistration, /P37C1C4B\/#1848/);
   for (const [id, file] of children) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
