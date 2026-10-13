@@ -1,9 +1,27 @@
 //! Private bridge from codec admission and sealed fill origins to revision storage.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
-use crate::object_document::{ObjectDocument, ProjectEnvelope};
+use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
+
+#[derive(Debug, Clone)]
+pub(crate) enum ReferenceEdit {
+    Settings {
+        name: String,
+        visible: bool,
+        opacity: f64,
+        offset_frames: i64,
+    },
+    Remove,
+}
+/// Sealed inside this owner module: callers cannot forge origin or after-state.
+#[derive(Debug, Clone)]
+pub(crate) struct PreparedReferenceEdit {
+    origin: ObjectSnapshot,
+    reference: ProjectReferenceState,
+    changed: bool,
+}
 
 #[derive(Debug)]
 pub(crate) struct ObjectFillOwner {
@@ -11,6 +29,61 @@ pub(crate) struct ObjectFillOwner {
 }
 
 impl ObjectFillOwner {
+    pub(crate) fn prepare_reference_edit(
+        &self,
+        edit: ReferenceEdit,
+    ) -> Result<PreparedReferenceEdit, DispatchErrorCode> {
+        let origin = self.current_snapshot();
+        let before = origin
+            .project()
+            .ok_or(DispatchErrorCode::Unavailable)?
+            .reference_state();
+        let reference = match edit {
+            ReferenceEdit::Remove => ProjectReferenceState::NoMedia,
+            ReferenceEdit::Settings {
+                name,
+                visible,
+                opacity,
+                offset_frames,
+            } => {
+                if before == ProjectReferenceState::NoMedia {
+                    return Err(DispatchErrorCode::Unavailable);
+                }
+                before
+                    .with_settings(name, visible, opacity, offset_frames)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?
+            }
+        };
+        let changed = reference != before;
+        Ok(PreparedReferenceEdit {
+            origin,
+            reference,
+            changed,
+        })
+    }
+    pub(crate) fn commit_reference_edit(
+        &mut self,
+        candidate: PreparedReferenceEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let current = self.current_snapshot();
+        if candidate.origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if candidate.origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if candidate.origin.snapshot_id() != current.snapshot_id()
+            || candidate.origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        if !candidate.changed {
+            return Ok(self.content_revision());
+        }
+        self.revisions
+            .publish_reference(candidate.reference)
+            .map_err(|_| DispatchErrorCode::Unavailable)
+    }
     /// Private typed entry, not an import/host/resource route. PNG was admitted
     /// upstream; even a fabricated ProjectEnvelope drawing is revalidated here.
     pub(crate) fn from_admitted_project(
@@ -87,5 +160,58 @@ impl ObjectFillOwner {
     fn current_snapshot(&self) -> ObjectSnapshot {
         self.acquire_snapshot(self.content_revision())
             .expect("current object revision has a retained immutable snapshot")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn sealed_candidate_pins_existing_bytes_after_owner_drop_without_binary_copy() {
+        let document: ObjectDocument = serde_json::from_value(serde_json::json!({
+            "format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,
+            "layers":[{"layerUid":"L"}],"objects":[]}))
+        .unwrap();
+        let project = ProjectEnvelope::no_media(
+            crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),
+            document,
+        );
+        // Opaque already-admitted buffer for retention only, not PNG validation.
+        let encoded = vec![1, 2, 3];
+        let pointer = encoded.as_ptr();
+        let state = ProjectReferenceState::admitted_still(
+            "media-1".into(),
+            "before.png".into(),
+            true,
+            1.,
+            0,
+            encoded,
+            3,
+        )
+        .unwrap();
+        let owner =
+            ObjectFillOwner::from_admitted_project("candidate", project.with_reference(state))
+                .unwrap();
+        let candidate = owner
+            .prepare_reference_edit(ReferenceEdit::Settings {
+                name: "after.png".into(),
+                visible: false,
+                opacity: 0.5,
+                offset_frames: 2,
+            })
+            .unwrap();
+        drop(owner);
+        let ProjectReferenceState::StillImage(before) =
+            candidate.origin.project().unwrap().reference_state()
+        else {
+            panic!()
+        };
+        let ProjectReferenceState::StillImage(after) = candidate.reference else {
+            panic!()
+        };
+        assert_eq!((before.name(), after.name()), ("before.png", "after.png"));
+        assert_eq!(before.encoded_png(), after.encoded_png());
+        assert_eq!(before.encoded_png().as_ptr(), pointer);
+        assert_eq!(after.encoded_png().as_ptr(), pointer);
     }
 }

@@ -1,5 +1,5 @@
 //! Immutable object revision storage. Admission and command policy live above it.
-use crate::object_document::{ObjectDocument, ProjectEnvelope};
+use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "history")]
 use std::collections::BTreeMap;
 use std::sync::{
@@ -134,6 +134,30 @@ impl ObjectRevisionOwner {
         };
         self.advance(Arc::new(value))
     }
+    /// Existing allocation only. No caller can attach/replace through this seam.
+    pub(crate) fn publish_reference(
+        &mut self,
+        reference: ProjectReferenceState,
+    ) -> Result<u64, &'static str> {
+        let current = self
+            .snapshots
+            .get(&self.content_revision)
+            .ok_or("current revision absent")?;
+        let ProjectRevisionValue::Project(project) = current.as_ref() else {
+            return Err("bare reference unavailable");
+        };
+        if let ProjectReferenceState::StillImage(after) = &reference {
+            let ProjectReferenceState::StillImage(before) = project.reference_state() else {
+                return Err("attach resource admission unavailable");
+            };
+            if after.id() != before.id() || !std::ptr::eq(after.encoded_png(), before.encoded_png())
+            {
+                return Err("replacement resource admission unavailable");
+            }
+        }
+        let next = project.with_reference(reference);
+        self.advance(Arc::new(ProjectRevisionValue::Project(next)))
+    }
     pub(crate) fn restore(&mut self, revision: u64) -> Result<u64, &'static str> {
         let document = self
             .snapshots
@@ -196,5 +220,73 @@ mod tests {
             );
             assert!(owner.acquire(MAX_CONTENT_REVISION + 1).is_none());
         }
+    }
+    #[test]
+    fn reference_storage_refuses_new_allocations_ids_and_attach_before_publication() {
+        let document: ObjectDocument = serde_json::from_value(serde_json::json!({
+            "format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,
+            "layers":[{"layerUid":"L"}],"objects":[]}))
+        .unwrap();
+        ObjectSnapshot::validate_drawing(&document).unwrap();
+        let project = ProjectEnvelope::no_media(
+            crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),
+            document.clone(),
+        );
+        // Already-admitted bytes; this test checks allocation/identity barriers,
+        // not PNG validity or resource-manager admission.
+        let encoded=b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x02\0\0\0\x02\x08\x06\0\0\0\x72\xb6\x0d\x24\0\0\0\x1aIDAT\x78\x9c\x63\x10\x54\x32\xfe\xef\x12\x9a\xd6\xc0\x50\xde\x31\x93\x61\xd5\xee\x33\xff\x01\x37\x8a\x07\xad\x4f\xf3\x86\x4d\0\0\0\0IEND\xae\x42\x60\x82";
+        let state = ProjectReferenceState::admitted_still(
+            "media-1".into(),
+            "plate.png".into(),
+            true,
+            0.5,
+            0,
+            encoded.to_vec(),
+            1024,
+        )
+        .unwrap();
+        let mut owner = ObjectRevisionOwner::from_admitted(
+            ObjectSnapshot::from_admitted_project(
+                "guard".into(),
+                project.with_reference(state.clone()),
+            )
+            .unwrap(),
+        );
+        let before = owner.snapshots.clone();
+        for id in ["media-1", "foreign"] {
+            let other = ProjectReferenceState::admitted_still(
+                id.into(),
+                "plate.png".into(),
+                true,
+                0.5,
+                0,
+                encoded.to_vec(),
+                1024,
+            )
+            .unwrap();
+            assert!(owner.publish_reference(other).is_err());
+            assert_eq!(owner.content_revision(), 0);
+            assert_eq!(owner.snapshots, before);
+        }
+        assert_eq!(
+            owner.publish_reference(ProjectReferenceState::NoMedia),
+            Ok(1)
+        );
+        assert!(owner.publish_reference(state.clone()).is_err());
+        assert_eq!(owner.content_revision(), 1);
+        let bare = ObjectSnapshot::from_admitted("bare".into(), document).unwrap();
+        assert!(ObjectRevisionOwner::from_admitted(bare)
+            .publish_reference(state.clone())
+            .is_err());
+        let full = Arc::clone(owner.snapshots.get(&0).unwrap());
+        owner.snapshots.insert(MAX_CONTENT_REVISION, full);
+        owner.content_revision = MAX_CONTENT_REVISION;
+        let before = owner.snapshots.clone();
+        let same_blob = state
+            .with_settings("changed.png".into(), false, 0.25, 7)
+            .unwrap();
+        assert!(owner.publish_reference(same_blob).is_err());
+        assert_eq!(owner.snapshots, before);
+        assert_eq!(owner.content_revision(), MAX_CONTENT_REVISION);
     }
 }
