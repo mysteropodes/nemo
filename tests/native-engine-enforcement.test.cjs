@@ -37,6 +37,7 @@ const CANDIDATE_FILES = [
   'native-engine/src/read_queries.rs',
   'native-engine/src/reference_image_resources.rs',
   'native-engine/tests/reference_image_resources.rs',
+  'native-engine/tests/reference_png_rows.rs',
   'native-engine/src/resource_leases.rs',
   'native-engine/tests/object_resource_leases.rs',
   'native-engine/src/object_document.rs',
@@ -337,6 +338,7 @@ test('P37C1C4 retained-reference CPU, PNG, and managed-wire children have exact 
     ['rust.native.engine.read-queries', 'native-engine/src/reference_image_resources.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/image_resource_budget.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/reference_image_resources.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/reference_png_rows.rs'],
     ['rust.native.engine.codec', 'native-engine/src/reference_png_scanlines.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/reference_png_scanlines.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_project_admission.rs'],
@@ -345,6 +347,7 @@ test('P37C1C4 retained-reference CPU, PNG, and managed-wire children have exact 
   assert.match(coverage.provenance.nativeReferencePngScanlineStrictnessRegistration, /P37C1C4B\/#1848/);
   assert.match(coverage.provenance.nativeReferenceInflateWorkspaceRegistration, /P37C1C4C\/#1851/);
   assert.match(coverage.provenance.nativeManagedProjectWireWorkspaceRegistration, /P37C1C4D\/#1856/);
+  assert.match(coverage.provenance.nativeReferencePngRowOutputRegistration, /P37C1C4E\/#1860/);
   for (const [id, file] of children) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
