@@ -235,6 +235,60 @@ async function closeOwnedHelpers(closeInput, children, cleanup) {
   return {cleanupDiagnostics:diagnostics};
 }
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
+const STARTUP_DIAGNOSTIC_LIMIT = 16 * 1024;
+function safeStartupDiagnostics(value) {
+  const classes = ['rust-panic','tauri-startup-abort','p38-startup-refusal','unclassified-startup-abort','stderr-unavailable','diagnostic-capture-failed'];
+  const states = ['starting','active','stopped','exited','failed','reconciliation-required'];
+  const signals = ['SIGABRT','SIGSEGV','SIGILL','SIGBUS','SIGTRAP','SIGKILL','SIGTERM','SIGINT'];
+  if (!value || typeof value !== 'object') return undefined;
+  const safe = { classification: classes.includes(value.classification) ? value.classification : 'diagnostic-capture-failed' };
+  if (states.includes(value.runtimeState)) safe.runtimeState = value.runtimeState;
+  if (signals.includes(value.signal)) safe.signal = value.signal;
+  if (Number.isSafeInteger(value.stderrBytes) && value.stderrBytes >= 0 && value.stderrBytes <= STARTUP_DIAGNOSTIC_LIMIT) safe.stderrBytes = value.stderrBytes;
+  if (typeof value.stderrSha256 === 'string' && /^[a-f0-9]{64}$/.test(value.stderrSha256)) safe.stderrSha256 = value.stderrSha256;
+  if (typeof value.truncated === 'boolean') safe.truncated = value.truncated;
+  return safe;
+}
+function classifyStartupStderr(bytes) {
+  const text = bytes.toString('utf8');
+  if (/thread ['\"]main['\"] panicked at|panicked at /.test(text)) return 'rust-panic';
+  if (text.includes('error while running tauri application')) return 'tauri-startup-abort';
+  if (/P38 (?:fixture|probe|runtime|owner|checkpoint) [a-z -]+/.test(text)) return 'p38-startup-refusal';
+  return bytes.length ? 'unclassified-startup-abort' : 'stderr-unavailable';
+}
+async function captureStartupDiagnostics(task, isolation, runtime) {
+  const deadline = Date.now() + 1200;
+  let status = null;
+  do {
+    try { status = runtime.readNativeStatus(task); } catch { status = null; }
+    if (status && ['stopped','exited','failed','reconciliation-required'].includes(status.state)) break;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  } while (Date.now() < deadline);
+  let bytes = Buffer.alloc(0), truncated = false;
+  try {
+    const roots = isolation.taskRoots(task), root = roots.root, reports = roots.reports;
+    const canonicalRoot = fs.realpathSync(root);
+    for (const folder of [root, reports]) {
+      const meta = fs.lstatSync(folder);
+      check(meta.isDirectory() && !meta.isSymbolicLink(), 'startup-log-root-refused');
+    }
+    check(path.dirname(reports) === root && fs.realpathSync(reports) === path.join(canonicalRoot, 'reports'), 'startup-log-root-refused');
+    const fd = fs.openSync(path.join(reports, 'native-app.stderr.log'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    try {
+      const meta = fs.fstatSync(fd); check(meta.isFile(), 'startup-log-refused');
+      const length = Math.min(meta.size, STARTUP_DIAGNOSTIC_LIMIT); truncated = meta.size > length;
+      bytes = Buffer.alloc(length);
+      let offset = 0;
+      while (offset < length) {
+        const count = fs.readSync(fd, bytes, offset, length - offset, meta.size - length + offset);
+        check(count > 0, 'startup-log-changed'); offset += count;
+      }
+    } finally { fs.closeSync(fd); }
+  } catch { /* Unsafe or missing logs stay unavailable and never block cleanup. */ }
+  return safeStartupDiagnostics({ classification: classifyStartupStderr(bytes),
+    ...(status && ['starting','active','stopped','exited','failed','reconciliation-required'].includes(status.state) ? { runtimeState: status.state } : {}),
+    ...(status && typeof status.signal === 'string' ? { signal: status.signal } : {}), stderrBytes: bytes.length, stderrSha256: hash(bytes), truncated });
+}
 function actionTarget(action, sheet) {
   const target = action.target || 'main'; check(['main','sheet'].includes(target), 'target-refused');
   if (target === 'sheet') check(sheet.token && action.sheetToken === sheet.token &&
@@ -302,6 +356,7 @@ async function runOperator(config, services) {
     save();
     controller = services.controller(app, config);
     receipt.startAttempts = 1; save();
+    receipt.stage = 'launch'; save();
     instance = await bounded(controller.start(config.taskId, ['desktop-input', 'gpu-reference']));
     receipt.stage = 'identity';
     const first = await bounded(controller.status(instance));
@@ -359,6 +414,7 @@ async function runOperator(config, services) {
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended','inspect-budget-refused',
       'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
+      ...(safeStartupDiagnostics(error.startupDiagnostics) ? { startupDiagnostics: safeStartupDiagnostics(error.startupDiagnostics) } : {}),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
       ...(error.actionDiagnostics ? { actionDiagnostics:safeActionDiagnostics(error.actionDiagnostics) } : {}),
       ...(actionStartedAt !== null ? { action:{...receipt.inFlightAction,durationMs:Math.max(0,Math.round(performance.now()-actionStartedAt))} } : {}) });
@@ -539,7 +595,8 @@ function defaultServices(config) {
       finally { fs.closeSync(fd); }
     },
     save(receipt) { if (ready) atomicJSON(reportGuard, 'receipt.json', receipt); },
-    controller(app) { return harness.createController({ root: ROOT, app: app.bundle }); },
+    controller(app) { return harness.createController({ root: ROOT, app: app.bundle,
+      startupDiagnostics: task => captureStartupDiagnostics(task, isolation, runtime) }); },
     validate(snapshot, instance, app) { verifyFixtures(config); harness.validateSnapshot(snapshot, instance, { isolation, runtime, source: app.source, build: app.build, app }); },
     window: helper,
     next: inputJSON,
@@ -564,4 +621,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };

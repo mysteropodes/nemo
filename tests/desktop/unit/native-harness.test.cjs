@@ -83,6 +83,21 @@ test('missing bundle and unsupported platform fail rather than skip', () => {
   });
 });
 
+test('startup diagnostics callback runs on failed manifest before caller cleanup', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-harness-startup-'));
+  const cli = path.join(root, 'fixture.cjs'); fs.writeFileSync(cli, fixture);
+  const events = [];
+  const controller = createController({ root, cli, app: 'unused', timeout: 250,
+    env: { ...process.env, FIXTURE_ROOT: root, FIXTURE_MODE: 'invalid-manifest' },
+    async startupDiagnostics(task) { events.push('diagnostics-' + task); return { classification: 'rust-panic' }; } });
+  t.after(async () => { await controller.cleanup(); fs.rmSync(root, { recursive: true, force: true }); });
+  await assert.rejects(controller.start('startup-task'), /valid runtime manifest/);
+  assert.deepEqual(events, ['diagnostics-startup-task']);
+  assert.equal(controller.instances.length, 1);
+  await controller.cleanup();
+  assert.equal(controller.instances[0].stopped, true);
+});
+
 test('packaged gate rejects executable scripts disguised as an app binary', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-not-a-native-app-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
