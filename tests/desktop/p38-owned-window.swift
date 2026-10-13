@@ -77,7 +77,7 @@ func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
       }
       let (childError,childOwned,childPid) = owner(child)
       try edgeRequire(childError == 0,"child-owner-query",["gotoQueryError":childError,"ownerMatches":false])
-      _ = childPid // Test-only RED: successful foreign ownership has no private observation yet.
+      if !childOwned { foreignChild(childRoute,childPid) }
       try edgeRequire(childOwned,"child-owner-mismatch",["gotoQueryError":childError,"ownerMatches":childOwned])
       let (parentError,ancestor) = parent(child)
       try edgeRequire(parentError == 0,"parent-query",["gotoQueryError":parentError])
