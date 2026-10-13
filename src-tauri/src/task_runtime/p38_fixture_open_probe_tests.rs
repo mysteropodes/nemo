@@ -76,6 +76,7 @@ fn fixture_session() -> (TempProbeRoot, Session) {
     use std::os::unix::fs::MetadataExt;
     let root = std::env::temp_dir().join(format!("p38-fixture-test-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir(&root).unwrap();
+    let root = std::fs::canonicalize(root).unwrap();
     let files = [root.join("A.json"), root.join("B.json")];
     write_new(&files[0], FIXTURE_A).unwrap();
     write_new(&files[1], FIXTURE_B).unwrap();
