@@ -75,16 +75,9 @@ impl Fixture {
         std::fs::rename(temp, self.task.join("reports/startup-cut-request.json")).unwrap();
     }
     fn input(&self) -> request::Input {
-        let root = self
-            .state
-            .0
-            .lock()
-            .unwrap()
-            .owner
-            .as_ref()
-            .unwrap()
-            .root
-            .clone();
+        let slot = self.state.0.lock().unwrap();
+        let root = slot.owner.as_ref().unwrap().root.clone();
+        drop(slot);
         root.read().unwrap().unwrap()
     }
     fn advance(&self) {
@@ -104,15 +97,8 @@ impl Fixture {
         self.store.publish(version, &projection).unwrap();
     }
     fn state(&self) -> owner::State {
-        self.state
-            .0
-            .lock()
-            .unwrap()
-            .owner
-            .as_ref()
-            .unwrap()
-            .session
-            .state()
+        let slot = self.state.0.lock().unwrap();
+        slot.owner.as_ref().unwrap().session.state()
     }
     fn native(&self) -> Arc<Mutex<LoadLog>> {
         self.state
@@ -247,28 +233,10 @@ fn metadata_input_changes_refuse_and_point_health_does_not_claim_finality() {
             match fault {
                 "version" => f.advance(),
                 "adapter" => {
-                    f.state
-                        .0
-                        .lock()
-                        .unwrap()
-                        .bridge
-                        .as_mut()
-                        .unwrap()
-                        .adapter_refused = true
+                    let mut slot = f.state.0.lock().unwrap();
+                    slot.bridge.as_mut().unwrap().adapter_refused = true;
                 }
-                "native" => {
-                    f.state
-                        .0
-                        .lock()
-                        .unwrap()
-                        .bridge
-                        .as_ref()
-                        .unwrap()
-                        .native
-                        .lock()
-                        .unwrap()
-                        .refused = true
-                }
+                "native" => f.native().lock().unwrap().refused = true,
                 "holder" => *f.state.1.lock().unwrap() = None,
                 "input" => {
                     std::fs::write(f.task.join("reports/startup-cut-request.json"), b"foreign")
@@ -291,6 +259,44 @@ fn metadata_input_changes_refuse_and_point_health_does_not_claim_finality() {
         retire(&f.state.0);
         assert_eq!(f.state(), owner::State::Refused);
     }
+}
+#[test]
+fn final_original_native_lock_crossing_deadline_cannot_create_requested_cut() {
+    let f = Fixture::new();
+    f.publish(&serde_json::to_vec(&f.request()).unwrap());
+    let mut input = f.input();
+    let native = f.native();
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let (health_send, health_recv) = std::sync::mpsc::channel();
+    let (held_send, held_recv) = std::sync::mpsc::channel();
+    let (wait_send, wait_recv) = std::sync::mpsc::channel();
+    std::thread::scope(|scope| {
+        let slot = &f.state.0;
+        let worker = scope.spawn(move || {
+            attempt_with_wait(
+                slot,
+                &mut input,
+                deadline,
+                || {
+                    health_send.send(()).unwrap();
+                    held_recv.recv().unwrap();
+                },
+                || wait_send.send(()).unwrap(),
+            )
+        });
+        health_recv.recv_timeout(Duration::from_secs(2)).unwrap();
+        let held = native.lock().unwrap(); // REAL original Arc; receipt stays unchanged.
+        held_send.send(()).unwrap();
+        wait_recv.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(Instant::now() < deadline); // Passed the pre-lock deadline check.
+        std::thread::sleep(deadline.saturating_duration_since(Instant::now()));
+        assert!(Instant::now() >= deadline);
+        drop(held);
+        assert!(worker.join().unwrap().is_err());
+    });
+    assert_eq!(f.state(), owner::State::Checking); // No confirm/pending Cut.
+    retire(&f.state.0);
+    assert_eq!(f.state(), owner::State::Refused);
 }
 #[test]
 fn waiting_missing_input_cancellation_deadline_and_actual_worker_exit_are_bounded() {

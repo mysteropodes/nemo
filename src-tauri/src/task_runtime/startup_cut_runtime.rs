@@ -212,6 +212,15 @@ fn attempt_after(
     deadline: Instant,
     after_health: impl FnOnce(),
 ) -> Result<(), &'static str> {
+    attempt_with_wait(slot, input, deadline, after_health, || {})
+}
+fn attempt_with_wait(
+    slot: &Arc<Mutex<Slot>>,
+    input: &mut request::Input,
+    deadline: Instant,
+    after_health: impl FnOnce(),
+    before_native: impl FnOnce(),
+) -> Result<(), &'static str> {
     if Instant::now() >= deadline {
         return Err(ERROR);
     }
@@ -252,7 +261,11 @@ fn attempt_after(
         return Err(ERROR);
     }
     let bridge = bridge.as_ref().ok_or(ERROR)?;
+    before_native(); // Production is empty; deterministic lock-contention test seam.
     let native = bridge.native.lock().map_err(|_| ERROR)?;
+    if Instant::now() >= deadline {
+        return Err(ERROR);
+    }
     owner
         .as_mut()
         .ok_or(ERROR)?
