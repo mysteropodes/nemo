@@ -48,8 +48,10 @@ const CANDIDATE_FILES = [
   'native-engine/tests/object_project_admission.rs',
   'native-engine/src/object_project_admission.rs',
   'native-engine/src/object_project_history.rs',
+  'native-engine/src/object_reference_dispatch.rs',
   'native-engine/tests/object_project_history.rs',
   'native-engine/tests/project_media_workflow.rs',
+  'native-engine/tests/object_reference_dispatch.rs',
   'native-engine/src/reference_image_asset.rs',
   'native-engine/src/reference_png_scanlines.rs',
   'native-engine/tests/reference_image_asset.rs',
@@ -92,6 +94,10 @@ const CANDIDATE_FILES = [
   'native-engine/tests/reproduction_decode.rs',
   'native-engine/tests/reproduction_replay.rs',
   'native-engine/tests/reproduction_catalog.rs',
+  'src-tauri/src/native_object_reference.rs',
+  'src-tauri/src/native_object_project_route.rs',
+  'src-tauri/src/native_object_project_tests.rs',
+  'src-tauri/src/native_object_reference_tests.rs',
   'tests/native-engine-enforcement.test.cjs',
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
@@ -103,6 +109,7 @@ const CANDIDATE_FILES = [
   'engineering/inventory/surfaces.csv',
   'engineering/inventory/SURFACES.md',
   'engineering/boundaries/profiles/app-js.coverage.json',
+  'engineering/boundaries/profiles/app-js.profile.json',
   'engineering/remediation/EXECUTION_PLAN.en.md',
   'engineering/remediation/EXECUTION_PLAN.fr.md',
 ];
@@ -410,6 +417,29 @@ test('P37C1-DESKTOP project history children are private and fail closed without
     ['rust.native.engine.history', 'native-engine/src/object_project_history.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_project_history.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/project_media_workflow.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('P37C1-DESKTOP host and reference dispatch children remain private and registered', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativeStillReferenceDesktopRouteRegistration, /P37C1-DESKTOP\/#1864/);
+  for (const [id, file] of [
+    ['rust.native.engine.history', 'native-engine/src/object_reference_dispatch.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_reference_dispatch.rs'],
+    ['rust.desktop.native.application.commands', 'src-tauri/src/native_object_reference.rs'],
+    ['rust.desktop.native.application.commands', 'src-tauri/src/native_object_project_route.rs'],
+    ['rust.desktop.native.host.release.tests', 'src-tauri/src/native_object_project_tests.rs'],
+    ['rust.desktop.native.host.release.tests', 'src-tauri/src/native_object_reference_tests.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
