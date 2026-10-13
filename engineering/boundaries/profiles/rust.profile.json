@@ -441,7 +441,9 @@
         "task_runtime/startup_retention.rs",
         "task_runtime/startup_retention_health.rs",
         "task_runtime/startup_cut.rs",
-        "task_runtime/startup_cut_owner.rs"
+        "task_runtime/startup_cut_owner.rs",
+        "task_runtime/startup_cut_request.rs",
+        "task_runtime/startup_cut_runtime.rs"
       ],
       "publicApi": [
         "task_runtime.rs"
@@ -470,7 +472,9 @@
         "startup_retention_health_tests.rs",
         "startup_cut_tests.rs",
         "startup_cut_provisional_tests.rs",
-        "startup_cut_owner_tests.rs"
+        "startup_cut_owner_tests.rs",
+        "startup_cut_request_tests.rs",
+        "startup_cut_runtime_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

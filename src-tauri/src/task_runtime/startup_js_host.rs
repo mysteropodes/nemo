@@ -19,6 +19,11 @@ mod cut;
 #[path = "startup_cut_owner.rs"]
 mod owner;
 
+#[path = "startup_cut_request.rs"]
+mod request;
+#[path = "startup_cut_runtime.rs"]
+pub(super) mod runtime;
+
 struct Bridge {
     native: Arc<Mutex<LoadLog>>,
     stream: JsStream,
@@ -74,6 +79,7 @@ impl Bridge {
 
 #[derive(Default)]
 struct Slot {
+    owner: Option<runtime::Binding>,
     bound: bool,
     bridge: Option<Bridge>,
     version: u64,
@@ -104,6 +110,9 @@ impl Slot {
             .admit(label, url, pid, body)
     }
     fn close(&mut self) {
+        if let Some(owner) = self.owner.as_mut() {
+            owner.retire();
+        }
         if let Some(bridge) = self.bridge.as_mut() {
             bridge.stream.fence(Fence::Closed);
         }
@@ -159,7 +168,8 @@ pub(in crate::task_runtime) fn bind<R: Runtime>(
         *state
             .1
             .lock()
-            .map_err(|_| "startup retention unavailable")? = Some(store);
+            .map_err(|_| "startup retention unavailable")? = Some(store.clone());
+        runtime::install(&state, runtime, store)?;
     }
     Ok(())
 }

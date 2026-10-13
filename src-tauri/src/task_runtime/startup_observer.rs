@@ -160,6 +160,7 @@ pub(super) fn created<R: Runtime>(observer: &Observer, window: &tauri::WebviewWi
     }
     if observer.is_some() {
         host::watch_destroyed(window);
+        host::runtime::arm(observer, window);
     }
 }
 
