@@ -1,6 +1,6 @@
 //! Private bridge from codec admission and sealed fill origins to revision storage.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
@@ -11,6 +11,23 @@ pub(crate) struct ObjectFillOwner {
 }
 
 impl ObjectFillOwner {
+    /// Private typed entry, not an import/host/resource route. PNG was admitted
+    /// upstream; even a fabricated ProjectEnvelope drawing is revalidated here.
+    pub(crate) fn from_admitted_project(
+        instance_id: impl Into<String>,
+        project: ProjectEnvelope,
+    ) -> Result<Self, &'static str> {
+        let instance_id = instance_id.into();
+        if instance_id.is_empty() {
+            return Err("instanceId must be nonempty");
+        }
+        ObjectSnapshot::validate_drawing(project.drawing())
+            .map_err(|_| "project drawing admission failed")?;
+        let snapshot = ObjectSnapshot::from_admitted_project(instance_id, project)?;
+        Ok(Self {
+            revisions: ObjectRevisionOwner::from_admitted(snapshot),
+        })
+    }
     pub(crate) fn new(
         instance_id: impl Into<String>,
         document: ObjectDocument,

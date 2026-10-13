@@ -1,5 +1,5 @@
 //! Immutable object revision storage. Admission and command policy live above it.
-use crate::object_document::ObjectDocument;
+use crate::object_document::{ObjectDocument, ProjectEnvelope};
 #[cfg(feature = "history")]
 use std::collections::BTreeMap;
 use std::sync::{
@@ -11,13 +11,19 @@ static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]
 const MAX_CONTENT_REVISION: u64 = 9_007_199_254_740_991;
 
+#[derive(Debug, PartialEq)]
+enum ProjectRevisionValue {
+    BareDrawing(ObjectDocument),
+    Project(ProjectEnvelope),
+}
+
 #[derive(Debug, Clone)]
 pub struct ObjectSnapshot {
     instance_id: String,
     document_id: String,
     snapshot_id: String,
     content_revision: u64,
-    document: Arc<ObjectDocument>,
+    value: Arc<ProjectRevisionValue>,
 }
 
 impl ObjectSnapshot {
@@ -26,6 +32,20 @@ impl ObjectSnapshot {
         instance_id: String,
         document: ObjectDocument,
     ) -> Result<Self, &'static str> {
+        Self::from_value(instance_id, ProjectRevisionValue::BareDrawing(document))
+    }
+    /// Storage seam only: the existing snapshot admission layer checked drawing.
+    #[cfg(feature = "history")]
+    pub(crate) fn from_admitted_project(
+        instance_id: String,
+        project: ProjectEnvelope,
+    ) -> Result<Self, &'static str> {
+        Self::from_value(instance_id, ProjectRevisionValue::Project(project))
+    }
+    fn from_value(instance_id: String, value: ProjectRevisionValue) -> Result<Self, &'static str> {
+        if instance_id.is_empty() {
+            return Err("instanceId must be nonempty");
+        }
         let sequence = NEXT_OBJECT_DOCUMENT
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_add(1))
             .map_err(|_| "object document identity sequence exhausted")?;
@@ -35,7 +55,7 @@ impl ObjectSnapshot {
             snapshot_id: format!("native-object:{document_id}:0"),
             document_id,
             content_revision: 0,
-            document: Arc::new(document),
+            value: Arc::new(value),
         })
     }
     pub fn instance_id(&self) -> &str {
@@ -51,7 +71,16 @@ impl ObjectSnapshot {
         self.content_revision
     }
     pub fn document(&self) -> &ObjectDocument {
-        &self.document
+        match self.value.as_ref() {
+            ProjectRevisionValue::BareDrawing(drawing) => drawing,
+            ProjectRevisionValue::Project(project) => project.drawing(),
+        }
+    }
+    pub(crate) fn project(&self) -> Option<&ProjectEnvelope> {
+        match self.value.as_ref() {
+            ProjectRevisionValue::BareDrawing(_) => None,
+            ProjectRevisionValue::Project(project) => Some(project),
+        }
     }
 }
 
@@ -61,7 +90,7 @@ pub(crate) struct ObjectRevisionOwner {
     instance_id: String,
     document_id: String,
     content_revision: u64,
-    snapshots: BTreeMap<u64, Arc<ObjectDocument>>,
+    snapshots: BTreeMap<u64, Arc<ProjectRevisionValue>>,
 }
 
 #[cfg(feature = "history")]
@@ -71,7 +100,7 @@ impl ObjectRevisionOwner {
             instance_id: snapshot.instance_id,
             document_id: snapshot.document_id,
             content_revision: 0,
-            snapshots: BTreeMap::from([(0, snapshot.document)]),
+            snapshots: BTreeMap::from([(0, snapshot.value)]),
         }
     }
     pub(crate) fn instance_id(&self) -> &str {
@@ -84,18 +113,26 @@ impl ObjectRevisionOwner {
         self.content_revision
     }
     pub(crate) fn acquire(&self, revision: u64) -> Option<ObjectSnapshot> {
-        self.snapshots
-            .get(&revision)
-            .map(|document| ObjectSnapshot {
-                instance_id: self.instance_id.clone(),
-                document_id: self.document_id.clone(),
-                snapshot_id: format!("native-object:{}:{revision}", self.document_id),
-                content_revision: revision,
-                document: Arc::clone(document),
-            })
+        self.snapshots.get(&revision).map(|value| ObjectSnapshot {
+            instance_id: self.instance_id.clone(),
+            document_id: self.document_id.clone(),
+            snapshot_id: format!("native-object:{}:{revision}", self.document_id),
+            content_revision: revision,
+            value: Arc::clone(value),
+        })
     }
     pub(crate) fn publish(&mut self, document: ObjectDocument) -> Result<u64, &'static str> {
-        self.advance(Arc::new(document))
+        let current = self
+            .snapshots
+            .get(&self.content_revision)
+            .ok_or("current revision absent")?;
+        let value = match current.as_ref() {
+            ProjectRevisionValue::BareDrawing(_) => ProjectRevisionValue::BareDrawing(document),
+            ProjectRevisionValue::Project(project) => {
+                ProjectRevisionValue::Project(project.with_drawing(document))
+            }
+        };
+        self.advance(Arc::new(value))
     }
     pub(crate) fn restore(&mut self, revision: u64) -> Result<u64, &'static str> {
         let document = self
@@ -104,13 +141,13 @@ impl ObjectRevisionOwner {
             .ok_or("retained revision absent")?;
         self.advance(Arc::clone(document))
     }
-    fn advance(&mut self, document: Arc<ObjectDocument>) -> Result<u64, &'static str> {
+    fn advance(&mut self, value: Arc<ProjectRevisionValue>) -> Result<u64, &'static str> {
         let next = self
             .content_revision
             .checked_add(1)
             .filter(|next| *next <= MAX_CONTENT_REVISION)
             .ok_or("contentRevision safe-integer limit exhausted")?;
-        self.snapshots.insert(next, document);
+        self.snapshots.insert(next, value);
         self.content_revision = next;
         Ok(next)
     }
@@ -132,21 +169,32 @@ mod tests {
             objects: vec![],
             composition_order: Default::default(),
         };
-        let snapshot =
-            ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();
-        let mut owner = ObjectRevisionOwner::from_admitted(snapshot.clone());
-        owner
-            .snapshots
-            .insert(MAX_CONTENT_REVISION - 1, Arc::new(document.clone()));
-        owner.content_revision = MAX_CONTENT_REVISION - 1;
-        assert_eq!(owner.publish(document.clone()), Ok(MAX_CONTENT_REVISION));
-        let before = owner.snapshots.clone();
-        assert!(owner.publish(document).is_err());
-        assert!(owner.restore(0).is_err());
-        assert!(owner.restore(MAX_CONTENT_REVISION + 1).is_err());
-        assert_eq!(owner.content_revision(), MAX_CONTENT_REVISION);
-        assert_eq!(owner.snapshots, before);
-        assert_eq!(owner.acquire(0).unwrap().document(), snapshot.document());
-        assert!(owner.acquire(MAX_CONTENT_REVISION + 1).is_none());
+        let bare = ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();
+        let project = ProjectEnvelope::no_media(
+            crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),
+            document.clone(),
+        );
+        let composite =
+            ObjectSnapshot::from_admitted_project("project-limit".into(), project).unwrap();
+        for snapshot in [bare, composite] {
+            let mut owner = ObjectRevisionOwner::from_admitted(snapshot.clone());
+            owner
+                .snapshots
+                .insert(MAX_CONTENT_REVISION - 1, Arc::clone(&snapshot.value));
+            owner.content_revision = MAX_CONTENT_REVISION - 1;
+            assert_eq!(owner.publish(document.clone()), Ok(MAX_CONTENT_REVISION));
+            let before = owner.snapshots.clone();
+            assert!(owner.publish(document.clone()).is_err());
+            assert!(owner.restore(0).is_err());
+            assert!(owner.restore(MAX_CONTENT_REVISION + 1).is_err());
+            assert_eq!(owner.content_revision(), MAX_CONTENT_REVISION);
+            assert_eq!(owner.snapshots, before);
+            assert_eq!(owner.acquire(0).unwrap().document(), snapshot.document());
+            assert_eq!(
+                owner.acquire(MAX_CONTENT_REVISION).unwrap().project(),
+                snapshot.project()
+            );
+            assert!(owner.acquire(MAX_CONTENT_REVISION + 1).is_none());
+        }
     }
 }
