@@ -23,6 +23,7 @@ const POLICY = 'engineering/boundaries/profiles/native-engine.edges.json';
 const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
+  'engineering/boundaries/profiles/rust.coverage.json',
   'native-engine/Cargo.toml',
   'native-engine/src/lib.rs',
   'native-engine/src/commands.rs',
@@ -32,7 +33,10 @@ const CANDIDATE_FILES = [
   'native-engine/src/export_job_lifecycle.rs',
   'native-engine/tests/export_job_lifecycle.rs',
   'native-engine/src/request_receipts.rs',
+  'native-engine/src/revision.rs',
   'native-engine/src/read_queries.rs',
+  'native-engine/src/reference_image_resources.rs',
+  'native-engine/tests/reference_image_resources.rs',
   'native-engine/src/resource_leases.rs',
   'native-engine/tests/object_resource_leases.rs',
   'native-engine/src/object_document.rs',
@@ -53,6 +57,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_fill_owner.rs',
   'native-engine/src/object_revision.rs',
   'native-engine/src/encoded_retention_budget.rs',
+  'native-engine/src/image_resource_budget.rs',
+  'native-engine/tests/image_resource_budget.rs',
   'native-engine/src/object_history.rs',
   'native-engine/tests/object_history.rs',
   'native-engine/tests/object_codec.rs',
@@ -318,6 +324,28 @@ test('native-engine validation is required in normal graphs and staged adapters 
   }
 });
 
+test('P37C1C4A retained-reference CPU payload children have exact private source coverage', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  const children = [
+    ['rust.native.engine.revision', 'native-engine/src/image_resource_budget.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/reference_image_resources.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/image_resource_budget.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/reference_image_resources.rs'],
+  ];
+  assert.match(coverage.provenance.nativeReferenceCpuPayloadBudgetRegistration, /P37C1C4A\/#1843/);
+  for (const [id, file] of children) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
@@ -357,6 +385,18 @@ test('isolated negative controls fail closed and restore every touched byte', (t
     assert.ok(edge.violations.some((entry) => entry.rule === 'layer-violation'
       && entry.file === 'native-engine/src/document.rs' && entry.detail.targetModule === 'rust.native.engine.application'));
     restore(clone, new Map([['native-engine/src/document.rs', original.get('native-engine/src/document.rs')]]));
+
+    for (const [file, importPath, target] of [
+      ['native-engine/src/read_queries.rs', 'crate::history::NativeObjectHistory', 'rust.native.engine.history'],
+      ['native-engine/src/revision.rs', 'crate::codec::decode_project', 'rust.native.engine.codec'],
+      ['native-engine/src/object_codec.rs', 'crate::revision::ImageResourceBudget', 'rust.native.engine.revision'],
+    ]) {
+      fs.appendFileSync(path.join(clone, file), `\nuse ${importPath};\n`);
+      const denied = nativeResult(clone);
+      assert.ok(denied.violations.some((entry) => entry.rule === 'layer-violation'
+        && entry.file === file && entry.detail.targetModule === target), `${file} must reject ${importPath}`);
+      restore(clone, new Map([[file, original.get(file)]]));
+    }
 
     const rootPath = path.join(clone, 'native-engine/src/lib.rs');
     fs.appendFileSync(rootPath, '\n#[cfg(feature = "n19-undeclared")] pub mod n19_undeclared {}\n');
