@@ -227,11 +227,23 @@ fn original_store_and_session_identity_are_required_and_retention_tamper_blocks_
     store.publish(1, &p).unwrap();
     work.store = store;
     assert!(f.confirm(&mut s, work.authorize(&body)).is_err());
-    let mut s = f.session();
-    let work = f.capture(&mut s);
-    std::fs::write(f.root.join("startup-js.json"), b"foreign bytes").unwrap();
-    assert!(f.confirm(&mut s, work.authorize(&body)).is_err());
-    assert!(s.pending().is_err());
+    for fault in ["tamper", "missing", "failed"] {
+        let f = Fixture::new();
+        let mut s = f.session();
+        let work = f.capture(&mut s);
+        let body = bytes(&f.request());
+        match fault {
+            "tamper" => std::fs::write(f.root.join("startup-js.json"), b"foreign bytes").unwrap(),
+            "missing" => std::fs::remove_file(f.root.join("startup-js.json")).unwrap(),
+            _ => {
+                let mut bad = f.bridge.lock().unwrap().projection();
+                bad["private"] = json!(true);
+                assert!(f.store.publish(2, &bad).is_err());
+            }
+        }
+        assert!(f.confirm(&mut s, work.authorize(&body)).is_err());
+        assert!(s.pending().is_err());
+    }
 }
 
 #[test]
