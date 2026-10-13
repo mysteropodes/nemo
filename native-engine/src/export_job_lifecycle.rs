@@ -1,6 +1,11 @@
 //! Terminal lifecycle and cleanup reconciliation for native export jobs.
 
-use crate::png_output::{ExportArtifact, StagedArtifactPort};
+use crate::export_job::ObjectExportBegin;
+use crate::history::NativeObjectHistory;
+use crate::png_output::{ExportArtifact, ExportBegin, StagedArtifactPort};
+use crate::revision::ObjectSnapshot;
+use crate::scheduler::FrameScheduler;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReconciliationStage {
@@ -186,7 +191,7 @@ pub(crate) fn retry_failed_cleanup<P: StagedArtifactPort>(port: &mut P, receipt:
     }
 }
 
-fn retain_cleanup_failure(receipt: &mut JobReceipt, message: String) {
+pub(crate) fn retain_cleanup_failure(receipt: &mut JobReceipt, message: String) {
     receipt.status = JobStatus::Failed;
     receipt.cleanup = CleanupReceipt {
         status: CleanupStatus::Failed,
@@ -194,4 +199,87 @@ fn retain_cleanup_failure(receipt: &mut JobReceipt, message: String) {
     };
     receipt.external_effect_disposition = ExternalEffectDisposition::Indeterminate;
     receipt.error = Some(JobError::new("cleanup_failed", message));
+}
+
+pub(crate) fn validate_begin(request: &ExportBegin) -> Result<(), ExportJobError> {
+    if request.request_id.is_empty()
+        || request.context_id.is_empty()
+        || request.quality != "final"
+        || request.target.is_empty()
+        || request.frames.is_empty()
+    {
+        return Err(ExportJobError::new(
+            ExportJobErrorKind::InvalidRequest,
+            "export request identity, target, final quality and frames are required",
+        ));
+    }
+    if request.frames.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+        return Err(ExportJobError::new(
+            ExportJobErrorKind::InvalidRequest,
+            "source frames must be strictly ascending",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn invoke<T>(call: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    catch_unwind(AssertUnwindSafe(call)).unwrap_or_else(|_| Err("export callback panicked".into()))
+}
+
+pub(crate) fn validate_object_begin(
+    history: &NativeObjectHistory,
+    request: &ObjectExportBegin,
+    scheduler: &FrameScheduler,
+) -> Result<ObjectSnapshot, ExportJobError> {
+    let invalid = |message| ExportJobError::new(ExportJobErrorKind::InvalidRequest, message);
+    if scheduler.lease_counters().live() != 0 {
+        return Err(ExportJobError::new(
+            ExportJobErrorKind::Busy,
+            "caller scheduler already owns live work",
+        ));
+    }
+    if request.request_id.is_empty()
+        || request.request_id.len() > 128
+        || request.target.is_empty()
+        || request.target.len() > 4096
+        || request.target.chars().any(char::is_control)
+        || request.maximum_encoded_bytes == 0
+    {
+        return Err(invalid(
+            "bounded request, target and positive PNG budget required",
+        ));
+    }
+    let pins = &request.pins;
+    if pins.instance_id != history.instance_id()
+        || pins.document_id != history.document_id()
+        || pins.content_revision != history.content_revision()
+    {
+        return Err(invalid(
+            "object export must begin on the original current owner",
+        ));
+    }
+    history
+        .acquire_snapshot(pins.content_revision)
+        .ok_or_else(|| invalid("snapshot missing"))
+}
+
+pub(crate) fn replay_object_begin(
+    original: &ObjectExportBegin,
+    requested: &ObjectExportBegin,
+    same_witness: bool,
+    receipt: &JobReceipt,
+) -> Result<JobReceipt, ExportJobError> {
+    if original.request_id != requested.request_id {
+        return Err(ExportJobError::new(
+            ExportJobErrorKind::Busy,
+            "one request is admitted per object export session",
+        ));
+    }
+    if original != requested || !same_witness {
+        return Err(ExportJobError::new(
+            ExportJobErrorKind::ChangedRequestId,
+            "changed object export replay",
+        ));
+    }
+    Ok(receipt.clone())
 }

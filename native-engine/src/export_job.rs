@@ -4,8 +4,10 @@
 //! N12 currently supplies opaque RGBA8 only; transparent-alpha export is not claimed.
 
 use crate::export_job_lifecycle::{
-    cleanup_allows_release, release_snapshot, retry_failed_cleanup, terminalize,
+    cleanup_allows_release, release_snapshot, retry_failed_cleanup, terminalize, validate_begin,
 };
+#[path = "object_export_job.rs"]
+mod object;
 pub use crate::export_job_lifecycle::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, ReconciliationStage,
@@ -21,6 +23,7 @@ use crate::revision::DocumentSnapshot;
 use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, WorkId,
 };
+pub(crate) use object::{ObjectExportBegin, ObjectExportJob, PendingObjectFrame};
 use std::collections::{BTreeMap, BTreeSet};
 
 const WIDTH: u32 = 320;
@@ -502,25 +505,4 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
         terminalize(&mut self.port, &mut job.receipt, status, error);
         self.active_job = None;
     }
-}
-
-fn validate_begin(request: &ExportBegin) -> Result<(), ExportJobError> {
-    if request.request_id.is_empty()
-        || request.context_id.is_empty()
-        || request.quality != "final"
-        || request.target.is_empty()
-        || request.frames.is_empty()
-    {
-        return Err(ExportJobError::new(
-            ExportJobErrorKind::InvalidRequest,
-            "export request identity, target, final quality and frames are required",
-        ));
-    }
-    if request.frames.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
-        return Err(ExportJobError::new(
-            ExportJobErrorKind::InvalidRequest,
-            "source frames must be strictly ascending",
-        ));
-    }
-    Ok(())
 }
