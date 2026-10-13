@@ -209,3 +209,122 @@ fn encode_rgba8_into(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+    use std::io::{self, Cursor};
+
+    #[derive(Default)]
+    struct Sink {
+        bytes: Vec<u8>,
+        largest_write: usize,
+        fail_after: Option<usize>,
+    }
+    impl Write for Sink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.largest_write = self.largest_write.max(bytes.len());
+            if bytes.len() > 4096 {
+                return Err(io::Error::other("whole-image write exceeds 4 KiB"));
+            }
+            if self
+                .fail_after
+                .is_some_and(|limit| self.bytes.len() + bytes.len() > limit)
+            {
+                return Err(io::Error::other("injected PNG sink failure"));
+            }
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn noisy_rgba() -> Vec<u8> {
+        let mut seed = 0x1234_5678u32;
+        let mut pixels = vec![0; 256 * 64 * 4];
+        for pixel in pixels.chunks_exact_mut(4) {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            pixel.copy_from_slice(&seed.to_le_bytes());
+        }
+        // Preserve hidden straight RGB at zero alpha, plus half and full alpha.
+        pixels[..12].copy_from_slice(&[17, 34, 51, 0, 17, 34, 51, 127, 99, 88, 77, 255]);
+        pixels
+    }
+
+    fn assert_pixels(encoded: &[u8], width: u32, height: u32, expected: &[u8]) {
+        let mut reader = png::Decoder::new(Cursor::new(encoded)).read_info().unwrap();
+        assert_eq!((reader.info().width, reader.info().height), (width, height));
+        assert_eq!(reader.info().color_type, ColorType::Rgba);
+        assert_eq!(reader.info().bit_depth, BitDepth::Eight);
+        let mut pixels = vec![0; reader.output_buffer_size().unwrap()];
+        let info = reader.next_frame(&mut pixels).unwrap();
+        assert_eq!(&pixels[..info.buffer_size()], expected);
+        reader.finish().unwrap();
+    }
+
+    #[test]
+    fn cpu_streaming_png_incompressible_output_respects_actual_sink_bound() {
+        let pixels = noisy_rgba();
+        let mut sink = Sink::default();
+        encode_rgba8_into(256, 64, &pixels, &mut sink).unwrap();
+        assert_eq!(sink.largest_write, 4096);
+        assert!(
+            sink.bytes.len() > 4096 * 8,
+            "fixture must exercise many chunks"
+        );
+        assert_pixels(&sink.bytes, 256, 64, &pixels);
+        assert_eq!(encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
+        assert_eq!(encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
+    }
+
+    #[test]
+    fn cpu_streaming_png_tiny_terminal_chunk_preserves_straight_alpha() {
+        let pixels = [17, 34, 51, 0, 17, 34, 51, 127, 99, 88, 77, 255];
+        let mut sink = Sink::default();
+        encode_rgba8_into(3, 1, &pixels, &mut sink).unwrap();
+        assert!(sink.largest_write < 4096);
+        assert_pixels(&sink.bytes, 3, 1, &pixels);
+    }
+
+    #[test]
+    fn cpu_streaming_png_invalid_shapes_refuse_before_any_output() {
+        for (width, height, pixels) in [
+            (0, 1, &[][..]),
+            (1, 0, &[][..]),
+            (1, 1, &[0, 1, 2][..]),
+            (1, 1, &[0, 1, 2, 3, 4][..]),
+            (u32::MAX, u32::MAX, &[][..]),
+        ] {
+            let mut sink = Sink::default();
+            assert!(encode_rgba8_into(width, height, pixels, &mut sink).is_err());
+            assert!(sink.bytes.is_empty());
+            assert_eq!(sink.largest_write, 0);
+        }
+    }
+
+    #[test]
+    fn cpu_streaming_png_propagates_header_write_stream_finish_and_iend_errors() {
+        let noisy = noisy_rgba();
+        let tiny = [17, 34, 51, 0];
+        let complete = encode_rgba8(1, 1, &tiny).unwrap();
+        for (width, height, pixels, limit, stage) in [
+            (1, 1, tiny.as_slice(), 0, "write PNG header:"),
+            (256, 64, noisy.as_slice(), 33, "write PNG image data:"),
+            (1, 1, tiny.as_slice(), 33, "finish PNG stream:"),
+            (1, 1, tiny.as_slice(), complete.len() - 1, "finish PNG:"),
+        ] {
+            let mut sink = Sink {
+                fail_after: Some(limit),
+                ..Sink::default()
+            };
+            let error = encode_rgba8_into(width, height, pixels, &mut sink).unwrap_err();
+            assert!(error.to_string().starts_with(stage), "{error}");
+            assert!(error.to_string().contains("injected PNG sink failure"));
+            assert!(sink.bytes.len() <= limit);
+        }
+    }
+}
