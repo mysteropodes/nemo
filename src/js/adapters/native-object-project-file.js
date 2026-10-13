@@ -55,5 +55,30 @@
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
   }
-  return Object.freeze({create:create,projectView:projectView});
+  function bind(root,ports){
+    var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
+    if(!session)return null;
+    function commit(path,info){
+      var name=root.SMProjectDocument.baseName(path);
+      // Persist recents before changing the visible file identity.
+      ports.touchRecent(path,name,info,true);ports.commit(path,name);ports.renderRecents();return true;
+    }
+    var ui=create(session,{
+      readUI:function(){return {handle:ports.read().tabId||'native-project-opening',generation:1};},
+      reveal:async function(info){
+        projectView(root,info);ports.hide();
+        await new Promise(function(resolve){root.requestAnimationFrame(function(){root.requestAnimationFrame(resolve);});});
+      },
+      opened:function(path,info){commit(path,info);ports.opened();ports.notice('Opened: '+ports.read().name);},
+      commit:commit,repaint:ports.repaint,
+      pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
+      notice:function(result,written,error){
+        ports.notice(result.acknowledged?'Saved: '+ports.read().name:error?'Save failed: '+(error.message||error):
+          written&&written.receipt&&written.receipt.published?'File written; current saved status was not confirmed.':'Save cancelled or unavailable. Choose a new file path.');
+      },
+      failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
+    },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
+    return Object.freeze({isActive:session.blocksLegacy,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath});
+  }
+  return Object.freeze({create:create,projectView:projectView,bind:bind});
 }));

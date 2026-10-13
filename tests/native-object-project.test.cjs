@@ -10,7 +10,7 @@ const Ack=require('../src/js/application/native-object-saved-acknowledgement.js'
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function host(){
-  const calls=[];let installed=false,revision=0,edited=false,undo=false,preview='presented';
+  const calls=[];let installed=false,revision=0,edited=false,undo=false,preview='presented',failure=null;
   let reference=null;const copies=[];
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
     documentSnapshotId:'snapshot-'+revision,contentRevision:revision,canvasW:320,canvasH:180,fps:24,totalFrames:21,
@@ -25,14 +25,20 @@ function host(){
       if(r.sourcePath==='/bad.json')throw {code:'invalid_request'};
       installed=true;return {...info(),requestId:r.requestId};
     }
-    if(command==='nemo_native_object_reference'&&r.action.kind==='inspect')return {...info(),requestId:r.requestId};
+    if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
+      if(failure==='inspection')throw Error('Owner unavailable');
+      return {...info(),requestId:r.requestId};
+    }
     if(command==='nemo_native_object_preview')return {status:preview,workId:'work-'+revision,viewGeneration:1};
     if(command==='nemo_native_object_reference'||command==='nemo_native_object_dispatch'){
       assert.equal(r.expectedRevision,revision);
+      if(failure==='refused')return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,ok:false,error:{code:'invalid_request'}};
+      if(failure==='transport-before'||failure==='inspection')throw Error('Native response lost');
       if(r.operation==='command.document.object.undo'){edited=false;undo=true;reference=null;}
       else if(r.operation==='command.document.object.redo'){edited=true;undo=false;}
       else {edited=true;reference={id:'ref',name:'image.png',opacity:0.5,visible:true,offsetFrames:0};}
       revision++;
+      if(failure==='transport-after')throw Error('Native response lost');
       return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
     }
     if(command==='nemo_native_object_save_as'){
@@ -42,7 +48,7 @@ function host(){
     if(command==='nemo_native_object_export')return {...info(),requestId:r.requestId,published:true,cleanupComplete:true};
     throw Error('Unexpected command: '+command);
   }
-  return {invoke,info,calls,copies,preview(value){preview=value;}};
+  return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;}};
 }
 function session(h){return Project.create({invoke:h.invoke,mapping:()=>({}),frame:()=>0});}
 async function presented(h){const s=session(h);await s.openPath('/project.json');await s.presentPreview(0);return s;}
@@ -65,6 +71,24 @@ test('undo to saved bytes clears dirty even though native content revision incre
   await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});assert.equal(f.ui.isDirty(),true);
   await s.historyFromUi('undo');assert.equal(s.info().contentRevision,2);assert.equal(f.ui.isDirty(),false);
   await s.historyFromUi('redo');assert.equal(f.ui.isDirty(),true);
+});
+for(const failure of ['refused','transport-before','transport-after']){
+  test('reconciled '+failure+' re-presents current native state without retrying mutation',async()=>{
+    const h=host(),s=session(h),f=files(s);await f.ui.openPath('/project.json');h.fail(failure);
+    await assert.rejects(s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'}));
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_reference'&&c.r.action.kind==='attach').length,1);
+    assert.equal(s.isActive(),true);assert.ok(s.readPresentedObjectSession());
+    assert.equal(s.info().contentRevision,failure==='transport-after'?1:0);
+    assert.equal(f.ui.isDirty(),failure==='transport-after');h.fail(null);
+    assert.equal((await f.ui.saveAs()).acknowledged,true);
+  });
+}
+test('failed reconciliation fences authority and does not present or acknowledge Save',async()=>{
+  const h=host(),s=await presented(h),f=files(s),before=h.calls.filter(c=>c.command==='nemo_native_object_preview').length;
+  h.fail('inspection');await assert.rejects(s.reference({kind:'remove'}),/Owner unavailable/);
+  assert.equal(s.isActive(),false);assert.equal(s.blocksLegacy(),true);assert.equal(s.readPresentedObjectSession(),null);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_preview').length,before);
+  assert.equal((await f.ui.saveAs()).acknowledged,false);assert.equal(h.copies.length,0);
 });
 test('Save As refuses an owner advance during picker, and a tab replacement before acknowledgement',async()=>{
   const h=host(),s=await presented(h),picker=deferred(),f=files(s,{pick:()=>picker.promise});

@@ -94,12 +94,16 @@
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
         try{await inspect();changed();}catch(unknown){throw fence(unknown);}
+        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(ports.notice)ports.notice(unpresented.message);}
         throw error;
       }
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==pin.instanceId||
         receipt.documentId!==pin.documentId||!integer(receipt.contentRevision,pin.contentRevision)||typeof receipt.ok!=='boolean')throw fence(new Error('Native mutation response is uncorrelated'));
-      await inspect();changed();
-      if(!receipt.ok)throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
+      try{await inspect();changed();}catch(unknown){throw fence(unknown);}
+      if(!receipt.ok){
+        try{await present(ports.frame?ports.frame():0);}catch(unpresented){if(ports.notice)ports.notice(unpresented.message);}
+        throw new Error('Native command refused: '+(receipt.error&&receipt.error.code||'unavailable'));
+      }
       await present(ports.frame?ports.frame():0);return receipt;
     });}
     function reference(action){return mutation(function(pin){return {apiVersion:2,requestId:requestId('reference'),instanceId:pin.instanceId,

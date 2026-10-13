@@ -28,33 +28,6 @@
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
-  function objectSession(){return window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);}
-  function objectActive(){var session=objectSession();return session&&session.blocksLegacy();}
-  var objectFiles=null;
-  function objectFileUI(){
-    if(objectFiles)return objectFiles;
-    var session=objectSession();if(!session||!window.NemoNativeObjectProjectFile)return null;
-    objectFiles=window.NemoNativeObjectProjectFile.create(session,{
-      readUI:function(){return {handle:activeTabId||'native-project-opening',generation:1};},
-      reveal:async function(info){
-        window.NemoNativeObjectProjectFile.projectView(window,info);hideStartScreen();
-        await new Promise(function(resolve){window.requestAnimationFrame(function(){window.requestAnimationFrame(resolve);});});
-      },
-      opened:function(path,info){objectProjectMetadata(path,info);ensureInitialTab();showToast('Opened: '+currentName);},
-      commit:function(path,info){objectProjectMetadata(path,info);return true;},
-      repaint:renderTabBar,
-      pick:function(){return window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:currentName+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
-      notice:function(result,written,error){showToast(result.acknowledged?'Saved: '+currentName:error?'Save failed: '+(error.message||error):written&&written.receipt&&written.receipt.published?'File written; current saved status was not confirmed.':'Save cancelled or unavailable. Choose a new file path.');},
-      failed:function(error){showStartScreen();showToast('Could not open native project: '+(error.message||error));}
-    },window.NemoNativeObjectSaveAsWorkflow,window.NemoNativeObjectSavedAcknowledgement);
-    return objectFiles;
-  }
-  function objectProjectMetadata(path,info){
-    // Persist recents first: a storage error must not acknowledge a partial UI save.
-    var name=window.SMProjectDocument.baseName(path);touchRecent(path,name,info,true);
-    currentPath=path;currentName=name;var tab=activeTab();if(tab){tab.path=path;tab.name=name;}
-    updateCurrentLabel();renderRecents();
-  }
   function importProjectJSON(json,silent,allowOccludedAdmission){return window.NemoNativeOpacityProject?window.NemoNativeOpacityProject.importJSON(json,silent,allowOccludedAdmission):window.SM.importJSON(json,silent);}
   function projectJSON(){return window.NemoNativeOpacityProjectEntry.documentJSON(window);}
   function nativeOpenReady(receipt,first){return window.NemoNativeOpacityProjectEntry.ready(window,receipt,first);}
@@ -163,26 +136,20 @@
     if(t)t.dirty=false;
     renderTabBar();
   }
-  function isDirty(){
-    if(objectActive())return !objectFiles||objectFiles.isDirty();
-    return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);
-  }
+  function isDirty(){return nativeSavedUI?nativeSavedUI.isDirty():true;}
 
-  var nativeSavedUI=window.NemoProjectNativeSave.createSavedUI({
-    read:function(){return {native:window.NemoNativeOpacityCutover,api:window.__TAURI__,fs:window.__TAURI__&&window.__TAURI__.fs,ui:window.SMProject,tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
-    serialize:projectJSON,
-    prepare:function(){saveFramesIfLegacy();},
-    pick:function(pin){return window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:pin.name+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
-    publish:function(path,json,pin){var fs=pin.fs;return window.NemoProjectNativeSave.writeProjectFile(path,json,{
-      writeTextFile:fs.writeTextFile.bind(fs),rename:fs.rename.bind(fs),remove:fs.remove.bind(fs)});},
-    commit:function(path,json,pin){
-      var name=window.SMProjectDocument.baseName(path);currentPath=path;currentName=name;updateCurrentLabel();
+  var nativeSavedUI=window.NemoProjectNativeSave.bindProjectUI(window,{
+    read:function(){return {tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
+    serialize:projectJSON,prepare:saveFramesIfLegacy,
+    commit:function(path,name){
+      currentPath=path;currentName=name;updateCurrentLabel();
       var tab=activeTab();if(tab){tab.path=path;tab.name=name;}
-      touchRecent(path,currentName,{canvasW:pin.canvasW,canvasH:pin.canvasH,fps:pin.fps},true);renderRecents();markSaved(json);
-      try{localStorage.setItem('nemo-auto',json);}catch(e){}return true;},
+    },
+    touchRecent:touchRecent,renderRecents:renderRecents,markSaved:markSaved,
+    remember:function(json){try{localStorage.setItem('nemo-auto',json);}catch(e){}},
+    isDirty:function(){return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);},
     invalidate:function(){savedBaselineReady=false;try{renderTabBar();}catch(e){}},
-    notice:function(result,path,mode){showToast(result.status==='saved-current'?(mode==='save'?'Saved':'Saved: '+window.SMProjectDocument.baseName(path)):(result.status==='save-in-progress'?'A save is already in progress.':result.written?'The file was written, but its saved status could not be applied to the current project.':'Save cancelled: the current project changed.'));},
-    failure:function(error){showToast(SM.t('toastSaveFailedSuffix')+(error&&error.message||error));}
+    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar
   });
   async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
@@ -212,21 +179,18 @@
     showToast(SM.t('toastDownloadedSuffix')+currentName+'.json');
   }
   async function saveAs(){
-    if(objectActive())return objectFileUI().saveAs();
     if(!tauriOk()){saveAsDownload();return;}
     return nativeSavedUI.saveAs(writeProjectTo);
   }
   async function save(){
-    if(objectActive()){showToast('Save this native project to a new file.');return objectFileUI().saveAs();}
     if(!tauriOk()){saveAsDownload();return;}
     return nativeSavedUI.save(writeProjectTo);
   }
   async function openPath(path){
-    if(objectActive()){showToast('Opening another project requires restarting Nemo until native project switching is available.');return false;}
+    if(!nativeSavedUI.allowOpen())return false;
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
-    var objectUI=objectFileUI();
-    if(objectUI){var nativeOpened=await objectUI.openPath(path);if(nativeOpened!==null)return nativeOpened;}
+    var nativeOpened=await nativeSavedUI.openNative(path);if(nativeOpened!==null)return nativeOpened;
     var json;
     try{json=await window.__TAURI__.fs.readTextFile(path);}
     catch(e){showToast('Could not read file — it may have moved or been deleted');return false;}
@@ -243,7 +207,7 @@
     }catch(e){showToast('Could not open project — native admission or presentation failed');return false;}
   }
   async function openDialog(){
-    if(objectActive()){showToast('Opening another project requires restarting Nemo until native project switching is available.');return false;}
+    if(!nativeSavedUI.allowOpen())return false;
     if(p39bUseInactiveEntry())return inactiveEntry.openPicker();
     if(!tauriOk()){document.getElementById('file-input').click();return;}
     var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
@@ -664,7 +628,7 @@
   function refreshActiveTabDirtyDot(liveJson){
     var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(!el)return;
-    el.classList.toggle('dirty',objectActive()?isDirty():!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
+    el.classList.toggle('dirty',nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive()?isDirty():!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 
