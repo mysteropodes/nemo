@@ -21,6 +21,7 @@ viewport = ["compositor", "dep:raw-window-handle"]
 export_job = ["history", "compositor", "dep:png"]
 application = ["history", "export_job"]
 object_expression_pin = ["history", "evaluation"]
+object_expression_runtime = ["object_expression_pin", "dep:rquickjs"]
 # Test harness selectors are separate from production module availability.
 test-codec = ["project_media_codec"]
 test-commands = ["commands"]
@@ -32,6 +33,7 @@ test-viewport = ["viewport"]
 test-export_job = ["export_job"]
 test-application = ["application"]
 test-object_expression_pin = ["object_expression_pin"]
+test-object_expression_runtime = ["object_expression_runtime"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
@@ -45,6 +47,7 @@ png = { version = "0.18", optional = true }
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"], optional = true }
 miniz_oxide = { version = "=0.9.1", default-features = false, optional = true }
 base64 = { version = "=0.22.1", optional = true }
+rquickjs = { version = "=0.14.0", default-features = false, features = ["std"], optional = true }
 
 [[test]]
 name = "codec"
@@ -95,3 +98,8 @@ required-features = ["test-application"]
 name = "object_expression_pin"
 path = "src/lib.rs"
 required-features = ["test-object_expression_pin"]
+
+[[test]]
+name = "object_expression_runtime"
+path = "src/lib.rs"
+required-features = ["test-object_expression_runtime"]

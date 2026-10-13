@@ -118,7 +118,7 @@ function jobTestNativeEngine(ctx) {
   if (!which('cargo')) return blocked('cargo not found');
   const manifest = path.join(ROOT, 'native-engine', 'Cargo.toml');
   if (!exists(manifest)) return blocked('native-engine/Cargo.toml missing');
-  const targets = ['codec', 'commands', 'history', 'evaluation', 'scheduler', 'compositor', 'viewport', 'export_job', 'application', 'object_expression_pin'];
+  const targets = ['codec', 'commands', 'history', 'evaluation', 'scheduler', 'compositor', 'viewport', 'export_job', 'application', 'object_expression_pin', 'object_expression_runtime'];
   const targetDir = path.join(ctx.reportDir, 'native-engine-target');
   const results = [], logs = [];
   for (const target of targets) {

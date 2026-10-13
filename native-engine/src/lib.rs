@@ -29,6 +29,8 @@ pub(crate) mod reference_image_asset;
 
 #[cfg(feature = "object_expression_pin")]
 pub(crate) mod object_expression_pin;
+#[cfg(feature = "object_expression_runtime")]
+pub(crate) mod object_expression_runtime;
 
 // Each named Cargo target uses this existing file as a harness. Selecting its
 // test feature resolves the real future test file; absent tests fail compilation.
@@ -75,3 +77,7 @@ test_modules! {
 #[cfg(all(test, feature = "test-object_expression_pin"))]
 #[path = "../tests/object_expression_pin.rs"]
 mod object_expression_pin_tests;
+
+#[cfg(all(test, feature = "test-object_expression_runtime"))]
+#[path = "../tests/object_expression_runtime.rs"]
+mod object_expression_runtime_tests;
