@@ -95,6 +95,20 @@ pub(crate) fn decode_project(
     bytes: &[u8],
     limits: ProjectWireLimits,
 ) -> Result<ProjectEnvelope, ProjectWireError> {
+    decode_allocated_project(bytes, limits, |predicted| {
+        let mut encoded = Vec::new();
+        encoded
+            .try_reserve_exact(predicted)
+            .map_err(|_| ProjectWireError::Budget)?;
+        encoded.resize(predicted, 0);
+        Ok(encoded)
+    })
+}
+pub(crate) fn decode_allocated_project(
+    bytes: &[u8],
+    limits: ProjectWireLimits,
+    mut allocate: impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
+) -> Result<ProjectEnvelope, ProjectWireError> {
     if bytes.len() > limits.envelope_bytes {
         return Err(ProjectWireError::Budget);
     }
@@ -140,6 +154,7 @@ pub(crate) fn decode_project(
                 wire.viewport_reference,
                 asset.ok_or(ProjectWireError::Invalid)?,
                 limits,
+                &mut allocate,
             )?
         }
     };
@@ -225,6 +240,7 @@ fn decode_reference(
     reference: &RawValue,
     asset: &RawValue,
     limits: ProjectWireLimits,
+    allocate: &mut impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
 ) -> Result<ProjectReferenceState, ProjectWireError> {
     let (cap, png) = limits.png.ok_or(ProjectWireError::Budget)?;
     let r: Reference<'_> = object(reference)?;
@@ -265,11 +281,10 @@ fn decode_reference(
     if predicted == 0 || predicted > cap {
         return Err(ProjectWireError::Budget);
     }
-    let mut encoded = Vec::new();
-    encoded
-        .try_reserve_exact(predicted)
-        .map_err(|_| ProjectWireError::Budget)?;
-    encoded.resize(predicted, 0);
+    let mut encoded = allocate(predicted)?;
+    if encoded.len() != predicted {
+        return Err(ProjectWireError::Budget);
+    }
     let mut reader = base64::read::DecoderReader::new(
         data.as_bytes(),
         &base64::engine::general_purpose::STANDARD,
