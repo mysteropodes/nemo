@@ -29,6 +29,23 @@ function directory(pathname) {
   requireCheck(stat.isDirectory() && !stat.isSymbolicLink() && fs.realpathSync(pathname) === pathname,
     'evidence directory must be a canonical real directory');
 }
+function ownedReportDirectory(reportRoot, taskRoot) {
+  requireCheck(path.isAbsolute(reportRoot) && path.isAbsolute(taskRoot) &&
+    path.normalize(reportRoot) === reportRoot && path.normalize(taskRoot) === taskRoot,
+  'owned report path refused');
+  for (const pathname of [reportRoot, taskRoot]) {
+    const stat = fs.lstatSync(pathname);
+    requireCheck(stat.isDirectory() && !stat.isSymbolicLink(), 'owned report path symlink refused');
+  }
+  const canonical = fs.realpathSync(reportRoot);
+  const knownMacAlias = reportRoot.startsWith('/var/folders/') &&
+    canonical === '/private' + reportRoot && fs.realpathSync('/var') === '/private/var';
+  requireCheck(canonical === reportRoot || knownMacAlias, 'owned report alias refused');
+  requireCheck(path.basename(canonical) === 'reports' &&
+    path.dirname(canonical) === fs.realpathSync(taskRoot), 'owned report root differs from task');
+  directory(canonical);
+  return canonical;
+}
 function readProbe(reportRoot, source, instance) {
   const file = path.join(reportRoot, 'object-window-probe.json');
   const stat = fs.lstatSync(file);
@@ -125,8 +142,8 @@ async function main() {
     const status = await controller.status(instance);
     requireCheck(status.code === 0, 'owned native status refused');
     validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
-    const reportRoot = instance.snapshot.runtime.roots.reports;
-    directory(reportRoot);
+    const reportRoot = ownedReportDirectory(instance.snapshot.runtime.roots.reports,
+      instance.snapshot.runtime.roots.root);
     requireCheck(instance.info.reservations.join(',') === slots.join(','), 'app/GPU slot reservation missing');
     const ready = await phase(reportRoot, source, instance, 'ready', 0);
     ack(reportRoot, ready, instance.info.ownerToken);
@@ -174,4 +191,4 @@ async function main() {
 if (require.main === module) {
   main().catch(error => { process.stderr.write('installed object export FAIL: ' + error.message + '\n'); process.exitCode = 1; });
 }
-module.exports = { pngPixels, artifactEvidence };
+module.exports = { pngPixels, artifactEvidence, ownedReportDirectory };

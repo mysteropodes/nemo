@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const os = require('node:os');
 const zlib = require('node:zlib');
-const { pngPixels, artifactEvidence } = require('./object-export-installed.cjs');
+const { pngPixels, artifactEvidence, ownedReportDirectory } = require('./object-export-installed.cjs');
 const script = fs.readFileSync(path.join(__dirname, 'object-export-probe-bootstrap.js'), 'utf8');
 const runId = '11111111-1111-4111-8111-111111111111';
 const destinationDirectory = '/private/tmp/nemo-runtime/tasks/owned/reports/object-export-' + runId;
@@ -164,4 +164,34 @@ test('literal installed PNG oracle checks white outside and blue inside the fixe
       fs.writeFileSync(file, makePng(true));
       assert.throws(() => pngPixels(file), /literal pinned PNG pixels differ/);
     } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+  });
+
+test('owned report root admits only the real macOS var/folders alias after task binding',
+  { skip: process.platform !== 'darwin' }, () => {
+    const rawTask = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-export-report-'));
+    const canonicalTask = fs.realpathSync(rawTask);
+    const aliasTask = canonicalTask.replace(/^\/private(?=\/var\/folders\/)/, '');
+    const foreign = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-export-foreign-'));
+    const arbitrary = fs.mkdtempSync('/tmp/nemo-export-other-alias-');
+    try {
+      assert.notEqual(aliasTask, canonicalTask, 'real macOS var/folders alias required');
+      fs.mkdirSync(path.join(aliasTask, 'reports'));
+      fs.mkdirSync(path.join(foreign, 'reports'));
+      fs.mkdirSync(path.join(arbitrary, 'reports'));
+      const canonicalReports = path.join(canonicalTask, 'reports');
+      assert.equal(ownedReportDirectory(path.join(aliasTask, 'reports'), aliasTask), canonicalReports);
+      assert.equal(ownedReportDirectory(canonicalReports, canonicalTask), canonicalReports);
+      assert.throws(() => ownedReportDirectory(path.join(foreign, 'reports'), aliasTask),
+        /owned report root differs from task/);
+      assert.throws(() => ownedReportDirectory(path.join(arbitrary, 'reports'), arbitrary),
+        /owned report alias refused/);
+      fs.rmSync(canonicalReports, { recursive: true });
+      fs.symlinkSync(path.join(foreign, 'reports'), path.join(aliasTask, 'reports'));
+      assert.throws(() => ownedReportDirectory(path.join(aliasTask, 'reports'), aliasTask),
+        /owned report path symlink refused/);
+    } finally {
+      fs.rmSync(rawTask, { recursive: true, force: true });
+      fs.rmSync(foreign, { recursive: true, force: true });
+      fs.rmSync(arbitrary, { recursive: true, force: true });
+    }
   });
