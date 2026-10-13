@@ -235,9 +235,6 @@ impl Store {
                 return Err("startup retention regression refused");
             }
         }
-        if version <= disk.version {
-            return Ok(());
-        } // Newer aggregate covers this prefix.
         let write = (|| {
             let named = std::fs::symlink_metadata(&self.path)
                 .map_err(|_| "startup retention identity unavailable")?;
@@ -265,6 +262,9 @@ impl Store {
             if existing != disk.bytes {
                 return Err("startup retention foreign bytes refused");
             }
+            if version <= disk.version {
+                return Ok(());
+            } // Cover only verified retained bytes.
             disk.file
                 .seek(SeekFrom::Start(0))
                 .and_then(|_| disk.file.write_all(&bytes))

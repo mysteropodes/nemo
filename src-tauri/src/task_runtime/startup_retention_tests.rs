@@ -270,3 +270,27 @@ handle.finalize(()=>({schema:'nemo.startup-stop-proof/1',runId:run,taskKey:pins.
     assert_eq!(receipt["sealed"], false);
     assert!(!task.exists());
 }
+
+#[test]
+fn covered_or_equal_snapshot_cannot_ack_tampered_newest_inode_or_bytes() {
+    for replaced in [false, true] {
+        for equal in [false, true] {
+            let f = Fixture::new();
+            let store = f.store();
+            let mut newest = f.value.clone();
+            newest["adapterRefused"] = json!(true);
+            store.publish(2, &newest).unwrap();
+            if replaced {
+                std::fs::remove_file(f.root.join(FILE)).unwrap();
+            }
+            std::fs::write(f.root.join(FILE), b"foreign-private").unwrap();
+            let (version, snapshot) = if equal { (2, &newest) } else { (1, &f.value) };
+            assert!(store.publish(version, snapshot).is_err());
+            assert!(store.publish(3, &newest).is_err());
+            assert_eq!(
+                std::fs::read(f.root.join(FILE)).unwrap(),
+                b"foreign-private"
+            );
+        }
+    }
+}
