@@ -36,21 +36,25 @@ test('v2 host/file controls have exact census and production still uses same adm
   assert.deepEqual(owner.publicApi, ['boundaries-rust.test.cjs']);
 });
 
-test('policy changes only the exact command decoder item and retains old host-test grant', () => {
+test('storage decoder remains confined to command and actual host-release tests', () => {
   const items = policy.externalCratePorts.native_engine.moduleItems[command];
   assert.equal(items.filter(item => item === 'object_codec::decode_storage_project').length, 1);
   assert.ok(!items.includes('object_codec::decode_project'));
   for (const [owner, allowed] of Object.entries(policy.externalCratePorts.native_engine.moduleItems)) {
-    if (owner !== command) assert.ok(!allowed.includes('object_codec::decode_storage_project'), owner);
+    if (owner !== command && owner !== 'rust.desktop.native.host.release.tests') {
+      assert.ok(!allowed.includes('object_codec::decode_storage_project'), owner);
+    }
   }
   assert.ok(policy.externalCratePorts.native_engine.moduleItems['rust.desktop.native.host.release.tests']
     .includes('object_codec::decode_project'));
+  assert.ok(policy.externalCratePorts.native_engine.moduleItems['rust.desktop.native.host.release.tests']
+    .includes('object_codec::decode_storage_project'));
 });
 
 test('actual desktop graph admits new command port, denies old command and cross-adapter decoders', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 16); assert.equal(result.edges.length, 36);
+  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 39);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-v2-host-port-'));
   try {

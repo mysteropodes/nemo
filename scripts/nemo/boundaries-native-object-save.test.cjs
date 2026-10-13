@@ -56,8 +56,8 @@ test('production command preserves main scope, serializer authority and no-repla
 test('unchanged desktop graph and actual forbidden host/engine import controls', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 16);
-  assert.equal(result.edges.length, 36);
+  assert.equal(result.moduleCount, 17);
+  assert.equal(result.edges.length, 39);
   assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-save-boundary-'));
   try {
