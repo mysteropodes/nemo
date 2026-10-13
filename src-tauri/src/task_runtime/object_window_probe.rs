@@ -22,6 +22,7 @@ struct Packet {
     work_id: Option<String>,
     revision: Option<u64>,
     cleanup_succeeded: Option<bool>,
+    failure_stage: Option<String>,
     export: Option<control::ExportEvidence>,
 }
 struct Session {
@@ -150,6 +151,7 @@ impl Session {
                 || packet.work_id.is_some()
                 || packet.revision.is_some()
                 || packet.export.is_some()
+                || packet.failure_stage.is_some()
             {
                 return Err("probe failure refused");
             }
@@ -167,6 +169,7 @@ impl Session {
         }
         if self.failed
             || packet.cleanup_succeeded.is_some()
+            || packet.failure_stage.is_some()
             || packet.export.is_some()
             || (!(1..5).contains(&self.cursor)
                 && (packet.work_id.is_some() || packet.revision.is_some()))

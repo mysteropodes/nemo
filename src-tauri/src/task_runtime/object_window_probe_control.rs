@@ -39,6 +39,24 @@ pub(super) fn admit_export(session: &mut Session, packet: &Packet) -> Result<boo
             || packet.revision.is_some()
             || packet.export.is_some()
             || packet.cleanup_succeeded.is_none()
+            || !matches!(
+                packet.failure_stage.as_deref(),
+                Some(
+                    "runtime-binding"
+                        | "ready"
+                        | "identity"
+                        | "bootstrap"
+                        | "pins"
+                        | "preview"
+                        | "blue-checkpoint"
+                        | "stale-refusal"
+                        | "refusal-checkpoint"
+                        | "export"
+                        | "export-checkpoint"
+                        | "release"
+                        | "release-checkpoint"
+                )
+            )
             || session
                 .records
                 .last()
@@ -49,12 +67,15 @@ pub(super) fn admit_export(session: &mut Session, packet: &Packet) -> Result<boo
         session.failed = true;
         session.records.push(
             serde_json::json!({"phase":"failed","status":"operation_failed",
-            "cleanupSucceeded":packet.cleanup_succeeded}),
+            "cleanupSucceeded":packet.cleanup_succeeded,"failureStage":packet.failure_stage}),
         );
         session.persist()?;
         return Ok(false);
     }
-    if session.failed || packet.phase != EXPORT_PHASES[session.cursor] {
+    if session.failed
+        || packet.failure_stage.is_some()
+        || packet.phase != EXPORT_PHASES[session.cursor]
+    {
         return Err("export probe checkpoint refused");
     }
     let phase = session.cursor;

@@ -73,9 +73,35 @@ async function phase(reportRoot, source, instance, expected, checkpoint) {
 }
 function ack(reportRoot, receipt, owner, captureSha256 = null) {
   const file = path.join(reportRoot, 'object-window-probe-control.json');
+  const temporary = path.join(reportRoot, `.object-window-probe-control-${crypto.randomUUID()}.tmp`);
   const body = { runId: receipt.runId, sourceSha: receipt.sourceSha,
     checkpoint: receipt.checkpoint, ownerToken: owner, screenshotSha256: captureSha256 };
-  fs.writeFileSync(file, JSON.stringify(body), { mode: 0o600, flag: 'w' });
+  try {
+    fs.writeFileSync(temporary, JSON.stringify(body), { mode: 0o600, flag: 'wx' });
+    fs.renameSync(temporary, file);
+  } finally {
+    if (fs.existsSync(temporary)) fs.unlinkSync(temporary);
+  }
+}
+function sanitizedProbe(receipt) {
+  const phases = new Set(['ready', 'blue', 'refused', 'exported', 'released', 'failed']);
+  const stages = new Set(['runtime-binding', 'ready', 'identity', 'bootstrap', 'pins',
+    'preview', 'blue-checkpoint', 'stale-refusal', 'refusal-checkpoint', 'export',
+    'export-checkpoint', 'release', 'release-checkpoint']);
+  const rows = receipt.records.map(row => {
+    requireCheck(phases.has(row.phase), 'probe diagnostic phase refused');
+    const result = { phase: row.phase };
+    if (row.phase === 'failed') {
+      requireCheck(stages.has(row.failureStage) && typeof row.cleanupSucceeded === 'boolean',
+        'probe diagnostic failure stage refused');
+      result.failureStage = row.failureStage;
+      result.cleanupSucceeded = row.cleanupSucceeded;
+    }
+    return result;
+  });
+  return { schema: 'nemo.object-export-failure-diagnostic/1',
+    checkpoint: receipt.checkpoint, waiting: receipt.waiting === true,
+    failed: receipt.failed === true, complete: receipt.complete === true, phases: rows };
 }
 function stageEmpty(app) {
   const stage = path.join(app.dirs.appCache, 'native-export-staging');
@@ -125,7 +151,9 @@ async function main() {
   directory(args['--evidence-dir']);
   const capture = path.join(args['--evidence-dir'], 'blue-window.png');
   const evidenceFile = path.join(args['--evidence-dir'], 'object-export-installed.json');
-  requireCheck(!fs.existsSync(capture) && !fs.existsSync(evidenceFile), 'fresh evidence paths required');
+  const failureFile = path.join(args['--evidence-dir'], 'object-export-failure.json');
+  requireCheck(!fs.existsSync(capture) && !fs.existsSync(evidenceFile) && !fs.existsSync(failureFile),
+    'fresh evidence paths required');
   const source = identity.sourceIdentity();
   requireCheck(source.head && !source.dirty && source.worktree && fs.realpathSync(source.worktree) === fs.realpathSync(root),
     'exact clean checked-out source required');
@@ -136,13 +164,13 @@ async function main() {
   const env = { ...process.env, NEMO_TEST_OBJECT_EXPORT_PROBE: '1', NEMO_TEST_OBJECT_WINDOW_PROBE: '0',
     NEMO_OBJECT_PROBE_EXPECTED_SOURCE: source.head };
   const controller = createController({ root, app: app.bundle, env, timeout: 120_000 });
-  let instance, packet, stopped = false, error;
+  let instance, reportRoot, packet, stopped = false, error;
   try {
     instance = await controller.start(task, slots);
     const status = await controller.status(instance);
     requireCheck(status.code === 0, 'owned native status refused');
     validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
-    const reportRoot = ownedReportDirectory(instance.snapshot.runtime.roots.reports,
+    reportRoot = ownedReportDirectory(instance.snapshot.runtime.roots.reports,
       instance.snapshot.runtime.roots.root);
     requireCheck(instance.info.reservations.join(',') === slots.join(','), 'app/GPU slot reservation missing');
     const ready = await phase(reportRoot, source, instance, 'ready', 0);
@@ -181,7 +209,16 @@ async function main() {
       captureSha256: captureHash, pngSha256, pixels,
       phases: ['ready', 'blue', 'refused', 'exported', 'released'],
       privateRoute: true, published: true, ownerReleased: true, taskRemoved: true };
-  } catch (cause) { error = cause; }
+  } catch (cause) {
+    error = cause;
+    if (instance && reportRoot) {
+      try {
+        const probe = readProbe(reportRoot, source, instance);
+        fs.writeFileSync(failureFile, JSON.stringify(sanitizedProbe(probe)) + '\n',
+          { flag: 'wx', mode: 0o600 });
+      } catch (_) { /* Preserve the original refusal; never copy raw private probe data. */ }
+    }
+  }
   try { await controller.cleanup(); } catch (cause) { error ||= cause; }
   if (error || !stopped || !packet) throw error || new Error('installed export remained incomplete');
   fs.writeFileSync(evidenceFile, JSON.stringify(packet, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
@@ -191,4 +228,4 @@ async function main() {
 if (require.main === module) {
   main().catch(error => { process.stderr.write('installed object export FAIL: ' + error.message + '\n'); process.exitCode = 1; });
 }
-module.exports = { pngPixels, artifactEvidence, ownedReportDirectory };
+module.exports = { pngPixels, artifactEvidence, ownedReportDirectory, ack, sanitizedProbe };

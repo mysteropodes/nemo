@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const os = require('node:os');
 const zlib = require('node:zlib');
-const { pngPixels, artifactEvidence, ownedReportDirectory } = require('./object-export-installed.cjs');
+const { pngPixels, artifactEvidence, ownedReportDirectory, ack, sanitizedProbe } = require('./object-export-installed.cjs');
 const script = fs.readFileSync(path.join(__dirname, 'object-export-probe-bootstrap.js'), 'utf8');
 const runId = '11111111-1111-4111-8111-111111111111';
 const destinationDirectory = '/private/tmp/nemo-runtime/tasks/owned/reports/object-export-' + runId;
@@ -20,6 +20,7 @@ async function scenario(options = {}) {
     if (name === 'nemo_test_object_window_probe') {
       const packet = JSON.parse(args.payloadJson); phases.push(packet);
       if (packet.phase === options.blockAt) await new Promise(resolve => { resume = resolve; });
+      if (packet.phase === options.failCheckpoint) throw new Error('checkpoint refused');
       return;
     }
     if (name === 'nemo_mcp_identity') return { instanceId: 'owned-instance' };
@@ -52,7 +53,7 @@ async function scenario(options = {}) {
       assert.equal(request.lifecycleGeneration, 7);
       assert.deepEqual(request.outputSpec, { kind: 'frame', format: 'rgba8', width: 320,
         height: 180, colorInterpretation: 'srgb', alphaMode: 'straight' });
-      if (request.documentSnapshotId.endsWith('-wrong')) throw new Error('snapshot refused');
+      if (request.documentSnapshotId.endsWith('-wrong') && !options.staleReturnsSuccess) throw new Error('snapshot refused');
       if (options.failExport) throw new Error('export failed');
       return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
         documentId: request.documentId, contentRevision: 0, documentSnapshotId: 'owned-snapshot',
@@ -102,11 +103,63 @@ test('foreign runtime, arbitrary config and failed export never claim publicatio
   for (const options of [{ failPreview: true }, { failExport: true }, { falsePublish: true }]) {
     const result = await scenario(options);
     assert.equal(result.phases.at(-1).phase, 'failed');
+    assert.equal(result.phases.at(-1).failureStage,
+      options.failPreview ? 'preview' : 'export');
     assert.equal(result.phases.some(p => p.phase === 'exported'), false);
     assert.equal(result.released, true);
   }
+  const staleSuccess = await scenario({ staleReturnsSuccess: true });
+  assert.equal(staleSuccess.phases.at(-1).failureStage, 'stale-refusal');
+  assert.equal(staleSuccess.exports.length, 1);
+  const blueAck = await scenario({ failCheckpoint: 'blue' });
+  assert.equal(blueAck.phases.at(-1).failureStage, 'blue-checkpoint');
   const failedRelease = await scenario({ failExport: true, failRelease: true });
   assert.equal(failedRelease.phases.at(-1).cleanupSucceeded, false);
+});
+
+test('ACK replacement never exposes a truncated control file and never follows a target symlink', () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-object-export-ack-'));
+  const target = path.join(folder, 'object-window-probe-control.json');
+  const foreign = path.join(folder, 'foreign');
+  const receipt = { runId, sourceSha: config.sourceSha, checkpoint: 1 };
+  try {
+    ack(folder, { ...receipt, checkpoint: 0 }, 'private-owner');
+    const before = fs.readFileSync(target, 'utf8');
+    const rename = fs.renameSync;
+    try {
+      fs.renameSync = (temporary, destination) => {
+        assert.equal(destination, target);
+        assert.equal(fs.readFileSync(target, 'utf8'), before);
+        assert.equal(JSON.parse(fs.readFileSync(temporary, 'utf8')).checkpoint, 1);
+        return rename(temporary, destination);
+      };
+      ack(folder, receipt, 'private-owner', 'a'.repeat(64));
+    } finally { fs.renameSync = rename; }
+    assert.equal(JSON.parse(fs.readFileSync(target, 'utf8')).checkpoint, 1);
+    assert.equal(fs.statSync(target).mode & 0o777, 0o600);
+    fs.writeFileSync(foreign, 'preserve');
+    fs.rmSync(target); fs.symlinkSync(foreign, target);
+    ack(folder, receipt, 'private-owner');
+    assert.equal(fs.readFileSync(foreign, 'utf8'), 'preserve');
+    assert.equal(fs.lstatSync(target).isSymbolicLink(), false);
+    assert.deepEqual(fs.readdirSync(folder).sort(), ['foreign', 'object-window-probe-control.json']);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+});
+
+test('failure snapshot keeps only fixed stages and phase names, rejecting private fields', () => {
+  const receipt = { checkpoint: 2, waiting: false, failed: true, complete: false,
+    ownerToken: 'private-owner', records: [
+      { phase: 'ready', request: 'private' },
+      { phase: 'blue', workId: 'private' },
+      { phase: 'failed', failureStage: 'stale-refusal', cleanupSucceeded: true,
+        rawError: 'private' }] };
+  const diagnostic = sanitizedProbe(receipt);
+  assert.deepEqual(diagnostic.phases, [{ phase: 'ready' }, { phase: 'blue' },
+    { phase: 'failed', failureStage: 'stale-refusal', cleanupSucceeded: true }]);
+  assert.equal(JSON.stringify(diagnostic).includes('private'), false);
+  assert.throws(() => sanitizedProbe({ ...receipt, records: [
+    { phase: 'failed', failureStage: 'arbitrary', cleanupSucceeded: true }] }),
+  /failure stage refused/);
 });
 
 test('literal installed PNG oracle checks white outside and blue inside the fixed object',
