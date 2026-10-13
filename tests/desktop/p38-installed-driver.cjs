@@ -60,11 +60,13 @@ function atomicJSON(guard, name, value) {
   guard.verify(); fs.renameSync(temporary, destination); guard.verify();
 }
 
-function safeWindowEvidence(result) {
+function safeWindowEvidence(result, reference = false) {
   check(result && Number.isSafeInteger(result.pid) && result.pid > 0 && result.pid <= 2147483647, 'ax-evidence-refused');
   verifyWindow(result, result.pid);
   const roles = new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXCheckBox','AXMenu','AXMenuItem','AXRow','AXOutline','AXScrollArea','other']);
+  if(reference)roles.add('AXPopUpButton');
   const controls = new Set(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle']);
+  if (reference) for (const label of require('./reference-installed-policy.cjs').labels) controls.add(label);
   const alerts = new Set(['switch-unavailable','active-close-unavailable']);
   check(Array.isArray(result.nodes) && result.nodes.length <= 4096, 'ax-evidence-refused');
   const clean = { pid: result.pid, windowId: result.windowId, matchedAX: result.matchedAX,
@@ -372,10 +374,14 @@ function windowResult(info,pid,expected) {
   check(info?.status===undefined||['ok','pinned'].includes(info.status),'owned-window-refused');
   return verifyWindow(info,pid,expected);
 }
-async function runOperator(config, services) {
+async function runOperator(config, services) { return runScopedOperator(config,services,null); }
+async function runReferenceOperator(config, services) {
+  return runScopedOperator(config,services,require('./reference-installed-policy.cjs'));
+}
+async function runScopedOperator(config, services, reference) {
   // Before this gate there is no package access, journal, process, AX or capture.
-  authorize(config);
-  const receipt = { schema: 'nemo.p38-operator/1', issue: 1645, grant: config.grant.id,
+  (reference ? reference.authorize : authorize)(config);
+  const receipt = { schema: reference ? 'nemo.reference-operator/1' : 'nemo.p38-operator/1', issue: reference ? 1864 : 1645, grant: config.grant.id,
     source: config.sourceHead, task: config.taskId, startAttempts: 0, appPid: null, windowId: null,
     actions: [], status: 'partial', cleanup: 'not-required', helperCleanup: 'not-required', installedAcceptance: 'not-established' };
   let controller, instance, app, timer, expire, failure = null, actionStartedAt = null, operatorWaitStartedAt = null; const sheet = { token:null }, runStarted = performance.now();
@@ -389,6 +395,7 @@ async function runOperator(config, services) {
     app = await services.package(config);
     receipt.stage = 'package';
     receipt.executableSha256 = app.executableSha256; receipt.buildProofSha256 = app.proofHash;
+    if (reference) receipt.driver = app.driverProof;
     await services.journal(config); // Exclusive grant journal survives cleanup and prevents reuse.
     save();
     controller = services.controller(app, config);
@@ -401,14 +408,14 @@ async function runOperator(config, services) {
     receipt.appPid = verifyIdentity(first.value, instance, config); save(); // Persist before window/UI.
     receipt.windowId = windowResult(await bounded(services.window('discover', receipt.appPid)), receipt.appPid); save();
     for (;;) {
-      check(receipt.actions.length < 64, 'action-budget-exhausted');
+      check(receipt.actions.length < (reference ? 128 : 64), 'action-budget-exhausted');
       receipt.stage = 'awaiting-operator-input'; receipt.operatorWaitStartedElapsedMs = Math.round(performance.now() - runStarted); save();
       const waitStarted = performance.now(); operatorWaitStartedAt = waitStarted;
       const action = await bounded(services.next());
       const operatorWaitMs = Math.max(0, Math.round(performance.now() - waitStarted));
       operatorWaitStartedAt = null;
       receipt.operatorWaitMs = (receipt.operatorWaitMs || 0) + operatorWaitMs;
-      check(action && ['inspect', 'press', 'set', 'select', 'raise', 'capture', 'pin-sheet', 'sheet-dismissed', 'stop'].includes(action.type), 'action-refused');
+      check(action && ['inspect', 'press', 'set', 'select', 'raise', 'capture', 'pin-sheet', 'sheet-dismissed', 'stop', ...(reference ? ['artifacts'] : [])].includes(action.type), 'action-refused');
       if (action.type === 'stop') { check(!sheet.token, 'sheet-active'); receipt.stage = 'operator-stop'; break; }
       actionTarget(action, sheet);
       const ordinal = receipt.actions.length + 1, actionStarted = performance.now(); actionStartedAt = actionStarted;
@@ -419,13 +426,21 @@ async function runOperator(config, services) {
         check(action.element === undefined || typeof action.element === 'string' && /^(?:\d+(?:\.\d+)*)?$/.test(action.element) && action.element.length<=128, 'element-refused');
         if (action.depth !== undefined || action.maxNodes !== undefined) check(['main','sheet'].includes(action.target || 'main') && Number.isInteger(action.depth) && action.depth >= 1 && action.depth <= 5 && Number.isInteger(action.maxNodes) && action.maxNodes >= 1 && action.maxNodes <= 128, 'inspect-budget-refused');
       }
-      if (action.type === 'set') check(action.target==='sheet' && typeof action.value === 'string' && action.value.length <= 4096 &&
-        config.fixtures?.some(item=>action.value===item.path), 'fixture-refused');
+      if (action.type === 'set') {
+        if (reference) reference.verifySet(config,action);
+        else check(action.target==='sheet' && typeof action.value === 'string' && action.value.length <= 4096 &&
+          config.fixtures?.some(item=>action.value===item.path), 'fixture-refused');
+      }
       const status = await bounded(controller.status(instance));
       services.validate(status.value, instance, app, config);
       check(verifyIdentity(status.value, instance, config) === receipt.appPid, 'native-pid-changed');
       // A sheet is a separate target under the SAME immutable main, never rediscovery.
       windowResult(await bounded(services.window('check', receipt.appPid, receipt.windowId)), receipt.appPid, receipt.windowId);
+      if (action.type === 'artifacts') {
+        check(!sheet.token, 'sheet-active'); receipt.artifacts=reference.artifacts(config);
+        receipt.actions.push({type:'artifacts',ordinal,durationMs:Math.max(0,Math.round(performance.now()-actionStarted)),operatorWaitMs});
+        delete receipt.inFlightAction; actionStartedAt=null; save(); continue;
+      }
       const result = await bounded(services.window(action.type, receipt.appPid, receipt.windowId, action));
       windowResult(result, receipt.appPid, receipt.windowId);
       sheetResult(action, sheet, result);
@@ -449,7 +464,7 @@ async function runOperator(config, services) {
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
       'source-head-refused','fresh-build-proof-required','window-helper-refused','grant-already-attempted',
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended','inspect-budget-refused',
-      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
+      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS,...(reference ? reference.errors : [])].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
       ...(safeStartupDiagnostics(error.startupDiagnostics) ? { startupDiagnostics: safeStartupDiagnostics(error.startupDiagnostics) } : {}),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
@@ -498,14 +513,20 @@ function verifyFixtures(config) {
   }
 
 function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs=10000) {
+  const reference=config.workflow==='P37_REFERENCE' ? require('./reference-installed-policy.cjs') : null;
+  if(reference)reference.authorize(config);
   check(Number.isInteger(helperTimeoutMs) && helperTimeoutMs >= 1 && helperTimeoutMs <= 10000, 'helper-timeout-refused');
   let channel=null, ordinal=0;
   async function helper(mode, pid, windowId, action = {}) {
     const reportGuard = getGuard(); reportGuard.verify();
     if (!channel) {
       check(mode === 'discover', 'owned-window-refused');
-      const child = spawn(config.windowHelper, ['--persistent', String(pid)], { detached:true, stdio:['pipe','pipe','pipe'],
-        env:{...process.env,NEMO_P38_GRANT:config.grant.id,NEMO_P38_REPORT_ROOT:reportGuard.directory} });
+      const scopedEnv=reference ? {NEMO_REFERENCE_GRANT:config.grant.id,NEMO_REFERENCE_REPORT_ROOT:reportGuard.directory} :
+        {NEMO_P38_GRANT:config.grant.id,NEMO_P38_REPORT_ROOT:reportGuard.directory};
+      const environment={...process.env};
+      for(const key of ['NEMO_P38_GRANT','NEMO_P38_REPORT_ROOT','NEMO_REFERENCE_GRANT','NEMO_REFERENCE_REPORT_ROOT'])delete environment[key];
+      const child = spawn(config.windowHelper, [reference ? '--reference-persistent' : '--persistent', String(pid)], { detached:true, stdio:['pipe','pipe','pipe'],
+        env:{...environment,...scopedEnv} });
       child.p38GroupMayContainDescendants=false;
       helpers.add(child); child.on('error', () => {}); child.stdin.on('error', () => {}); child.stderr.resume();
       child.once('close', () => {
@@ -518,7 +539,7 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       channel.windowId = pinned.windowId; return pinned;
     }
     check(mode !== 'discover' && channel.pid===pid && channel.windowId===windowId, 'owned-window-refused');
-    verifyFixtures(config);
+    (reference ? reference.verifyInputs : verifyFixtures)(config);
     const request = { ...action, type:mode, pid, windowId };
     const name = 'capture-' + ++ordinal + '.png', output = path.join(directory,name);
     // A refused press can run the bounded CoreGraphics sampler in a child.
@@ -526,13 +547,16 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
     // exit still leaves the helper tracked for group cleanup.
     if(mode==='press')channel.child.p38GroupMayContainDescendants=true;
     if(mode==='capture'){request.capture=name;channel.child.p38GroupMayContainDescendants=true;}
-    if(mode==='set' && request.target==='sheet')check(config.fixtures.some(f=>request.value===f.path),'fixture-refused');
+    if(mode==='set' && request.target==='sheet') {
+      if(reference)reference.verifySet(config,request);
+      else check(config.fixtures.some(f=>request.value===f.path),'fixture-refused');
+    }
     channel.child.stdin.write(JSON.stringify(request)+'\n');
     const result = await reply();
     reportGuard.verify(); verifyWindow(result,pid,windowId);
     check(result.type===mode && result.status==='ok','owned-window-refused');
     if(mode==='capture'){check(result.capture===name,'capture-proof-refused');result.captureSha256=hash(fs.readFileSync(output));}
-    if(mode==='inspect')atomicJSON(reportGuard,'ax-'+ordinal+'.json',safeWindowEvidence(result));
+    if(mode==='inspect')atomicJSON(reportGuard,'ax-'+ordinal+'.json',safeWindowEvidence(result,!!reference));
     return result;
   }
   async function reply() {
@@ -662,4 +686,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, runReferenceOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
