@@ -200,9 +200,19 @@ fn encode_rgba8_into(
         let mut writer = encoder
             .write_header()
             .map_err(|error| PngOutputError::new(format!("write PNG header: {error}")))?;
-        writer
-            .write_image_data(rgba)
-            .map_err(|error| PngOutputError::new(format!("write PNG image data: {error}")))?;
+        {
+            // Stream IDAT chunks instead of first retaining the whole compressed
+            // image inside png::Writer. Row/compressor storage remains separate.
+            let mut stream = writer
+                .stream_writer_with_size(4096)
+                .map_err(|error| PngOutputError::new(format!("start PNG stream: {error}")))?;
+            stream
+                .write_all(rgba)
+                .map_err(|error| PngOutputError::new(format!("write PNG image data: {error}")))?;
+            stream
+                .finish()
+                .map_err(|error| PngOutputError::new(format!("finish PNG stream: {error}")))?;
+        }
         writer
             .finish()
             .map_err(|error| PngOutputError::new(format!("finish PNG: {error}")))?;
