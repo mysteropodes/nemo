@@ -10,7 +10,19 @@ use tauri::{Manager, Runtime, WebviewWindow};
 
 const ERROR: &str = "startup native owner unavailable";
 const WAIT: Duration = Duration::from_secs(600);
+#[path = "startup_cut_dispatch.rs"]
+mod dispatch;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "startup_cut_exchange_tests.rs"]
+mod exchange_tests;
+#[path = "startup_cut_footer.rs"]
+pub(crate) mod footer;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "startup_cut_j1_exchange_tests.rs"]
+mod j1_exchange_tests;
 pub(super) struct Binding {
+    native: Weak<Mutex<LoadLog>>,
+    deadline: Option<Instant>,
     runtime: TaskRuntime,
     session: owner::Session,
     store: Arc<Store>,
@@ -98,8 +110,11 @@ pub(super) fn install(
     let bridge = slot.bridge.as_ref().ok_or(ERROR)?;
     let native = bridge.native.lock().map_err(|_| ERROR)?;
     let session = owner::Session::new(runtime, &native, bridge, store.clone())?;
+    let original = Arc::downgrade(&bridge.native);
     drop(native);
     slot.owner = Some(Binding {
+        native: original,
+        deadline: None,
         runtime: runtime.clone(),
         session,
         store,
@@ -112,6 +127,7 @@ pub(super) fn install(
     Ok(())
 }
 struct Work {
+    deadline: Instant,
     slot: Weak<Mutex<Slot>>,
     root: Arc<request::Root>,
     cancel: Arc<AtomicBool>,
@@ -145,7 +161,10 @@ fn prepare(
         return Err(ERROR);
     }
     binding.armed = true;
+    let deadline = Instant::now().checked_add(WAIT).ok_or(ERROR)?;
+    binding.deadline = Some(deadline);
     Ok(Work {
+        deadline,
         slot: Arc::downgrade(slot),
         root: binding.root.clone(),
         cancel: binding.cancel.clone(),
@@ -166,6 +185,8 @@ pub(in super::super) fn arm<R: Runtime>(observer: &Observer, window: &WebviewWin
             .is_err()
         {
             retire(&state.0);
+        } else {
+            dispatch::arm(window);
         }
     }
 }
@@ -183,6 +204,7 @@ fn run(work: Work, timeout: Duration) {
         }
         return;
     };
+    let deadline = deadline.min(work.deadline);
     loop {
         let Some(slot) = work.slot.upgrade() else {
             return;

@@ -445,7 +445,9 @@
         "task_runtime/startup_cut.rs",
         "task_runtime/startup_cut_owner.rs",
         "task_runtime/startup_cut_request.rs",
-        "task_runtime/startup_cut_runtime.rs"
+        "task_runtime/startup_cut_runtime.rs",
+        "task_runtime/startup_cut_footer.rs",
+        "task_runtime/startup_cut_dispatch.rs"
       ],
       "publicApi": [
         "task_runtime.rs"
@@ -476,7 +478,9 @@
         "startup_cut_provisional_tests.rs",
         "startup_cut_owner_tests.rs",
         "startup_cut_request_tests.rs",
-        "startup_cut_runtime_tests.rs"
+        "startup_cut_runtime_tests.rs",
+        "startup_cut_exchange_tests.rs",
+        "startup_cut_j1_exchange_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
