@@ -61,6 +61,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_frame_packet.rs',
   'native-engine/src/object_expression_pin.rs',
   'native-engine/tests/object_expression_pin.rs',
+  'native-engine/src/object_expression_runtime.rs',
+  'native-engine/tests/object_expression_runtime.rs',
   'native-engine/tests/object_frame_packet.rs',
   'native-engine/src/object_render_scene.rs',
   'native-engine/tests/object_render_scene.rs',
@@ -278,6 +280,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
   assert.deepEqual(members.object_expression_pin, ['history', 'evaluation']);
   assert.deepEqual(members['test-object_expression_pin'], ['object_expression_pin']);
+  assert.deepEqual(members.object_expression_runtime, ['object_expression_pin', 'dep:rquickjs']);
+  assert.deepEqual(members['test-object_expression_runtime'], ['object_expression_runtime']);
+  assert.match(cargoText, /^rquickjs = \{ version = "=0\.14\.0", default-features = false, features = \["std"\], optional = true \}$/m);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
     if (feature === target) return true;
     if (seen.has(feature)) return false;
@@ -294,8 +299,13 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
       `${feature} must not activate the private attached-codec selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {
-    assert.equal(reaches(feature, 'object_expression_pin'), feature === 'test-object_expression_pin',
+    assert.equal(reaches(feature, 'object_expression_pin'),
+      ['test-object_expression_pin', 'object_expression_runtime', 'test-object_expression_runtime'].includes(feature),
       `${feature} must not activate the private expression-pin selector`);
+  }
+  for (const feature of cargo.features.filter((name) => name !== 'object_expression_runtime')) {
+    assert.equal(reaches(feature, 'object_expression_runtime'), feature === 'test-object_expression_runtime',
+      `${feature} must not activate the private expression-runtime selector`);
   }
   assert.equal(reaches('codec', 'reference_image_asset', { ...members,
     codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');
@@ -304,6 +314,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(rootText, /#\[cfg\(feature = "object_expression_pin"\)\]\s*pub\(crate\) mod object_expression_pin;/);
   assert.equal((rootText.match(/pub\(crate\) mod object_expression_pin;/g) || []).length, 1);
   assert.match(rootText, /#\[cfg\(all\(test, feature = "test-object_expression_pin"\)\)\]\s*#\[path = "\.\.\/tests\/object_expression_pin\.rs"\]\s*mod object_expression_pin_tests;/);
+  assert.match(rootText, /#\[cfg\(feature = "object_expression_runtime"\)\]\s*pub\(crate\) mod object_expression_runtime;/);
+  assert.equal((rootText.match(/pub\(crate\) mod object_expression_runtime;/g) || []).length, 1);
+  assert.match(rootText, /#\[cfg\(all\(test, feature = "test-object_expression_runtime"\)\)\]\s*#\[path = "\.\.\/tests\/object_expression_runtime\.rs"\]\s*mod object_expression_runtime_tests;/);
   assert.match(compositorText, /#\[path = "object_compositor\.rs"\]\s*mod object_compositor;/);
   assert.match(objectCompositorText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_compositor\.rs"\]\s*mod tests;/);
   assertMacroDefinitions(rootText);
@@ -336,9 +349,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   }
   assert.deepEqual(cargo.targets.object_expression_pin,
     { path: 'src/lib.rs', feature: 'test-object_expression_pin' });
-  assert.deepEqual(Object.keys(cargo.targets), [...Object.keys(TEST_TARGETS), 'object_expression_pin']);
+  assert.deepEqual(cargo.targets.object_expression_runtime,
+    { path: 'src/lib.rs', feature: 'test-object_expression_runtime' });
+  assert.deepEqual(Object.keys(cargo.targets), [...Object.keys(TEST_TARGETS), 'object_expression_pin', 'object_expression_runtime']);
   assert.match(fs.readFileSync(path.join(ROOT, 'scripts/nemo/lib/rust-test-jobs.cjs'), 'utf8'),
-    /const targets = \[[^\n]*'application', 'object_expression_pin'\];/);
+    /const targets = \[[^\n]*'application', 'object_expression_pin', 'object_expression_runtime'\];/);
   const privateModules = rootText.replace('pub mod $module;', 'mod $module;');
   assert.notEqual(privateModules, rootText, 'engine module visibility token was not found');
   assert.throws(() => assertMacroDefinitions(privateModules), /engine_modules definition drift/);
@@ -395,6 +410,25 @@ test('N25F3C2A1P expression pins remain private and fail closed without source r
   for (const [id, file] of [
     ['rust.native.engine.application', 'native-engine/src/object_expression_pin.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_expression_pin.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('N25F3C2A1R expression runtime remains private and fails closed without source registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativeObjectExpressionRuntimeRegistration, /N25F3C2A1R\/#1701/);
+  for (const [id, file] of [
+    ['rust.native.engine.application', 'native-engine/src/object_expression_runtime.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_expression_runtime.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
