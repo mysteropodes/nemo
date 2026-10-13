@@ -51,6 +51,7 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_fill.rs',
   'native-engine/src/object_fill_owner.rs',
   'native-engine/src/object_revision.rs',
+  'native-engine/src/encoded_retention_budget.rs',
   'native-engine/src/object_history.rs',
   'native-engine/tests/object_history.rs',
   'native-engine/tests/object_codec.rs',
