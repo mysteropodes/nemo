@@ -124,15 +124,21 @@ fn accept_packet(session: &Session, packet: &Packet) -> Result<(), &'static str>
         _ => return Err("P38 checkpoint refused"),
     };
     if packet.status == "failed" {
-        let expected_failure = match (
-            session.cursor,
-            packet.fixture_id.as_deref(),
-            packet.failure_code.as_deref(),
-        ) {
-            (1, Some("A"), Some("a-open-threw" | "a-open-false" | "a-open-unaccepted")) => {
+        let expected_failure = match (session.cursor, packet.fixture_id.as_deref()) {
+            (1, Some("A"))
+                if packet
+                    .failure_code
+                    .as_deref()
+                    .is_some_and(allowed_a_failure) =>
+            {
                 Some(HASH_A)
             }
-            (2, Some("B"), Some("b-open-threw" | "b-open-false" | "b-open-unaccepted")) => {
+            (2, Some("B"))
+                if packet
+                    .failure_code
+                    .as_deref()
+                    .is_some_and(allowed_b_failure) =>
+            {
                 Some(HASH_B)
             }
             _ => None,
@@ -153,6 +159,44 @@ fn accept_packet(session: &Session, packet: &Packet) -> Result<(), &'static str>
         return Err("P38 checkpoint payload refused");
     }
     Ok(())
+}
+
+pub(super) fn allowed_a_failure(code: &str) -> bool {
+    matches!(
+        code,
+        "a-open-threw"
+            | "a-open-false"
+            | "a-open-unaccepted"
+            | "a-pre-native-refusal"
+            | "a-native-status-rejected"
+            | "a-native-bootstrap-unsupported-format"
+            | "a-native-bootstrap-rejected"
+            | "a-native-bootstrap-resolved-open-refused"
+            | "a-native-status-empty-no-bootstrap"
+            | "a-native-status-available-no-bootstrap"
+            | "a-native-status-malformed-no-bootstrap"
+            | "a-fs-read-rejected"
+            | "a-fs-read-resolved-open-refused"
+    )
+}
+
+pub(super) fn allowed_b_failure(code: &str) -> bool {
+    matches!(
+        code,
+        "b-open-threw"
+            | "b-open-false"
+            | "b-open-unaccepted"
+            | "b-pre-native-refusal"
+            | "b-native-status-rejected"
+            | "b-native-bootstrap-unsupported-format"
+            | "b-native-bootstrap-rejected"
+            | "b-native-bootstrap-resolved-open-refused"
+            | "b-native-status-empty-no-bootstrap"
+            | "b-native-status-available-no-bootstrap"
+            | "b-native-status-malformed-no-bootstrap"
+            | "b-fs-read-rejected"
+            | "b-fs-read-resolved-open-refused"
+    )
 }
 
 #[tauri::command]
