@@ -51,6 +51,27 @@ func identityFailureStage(_ ownerQuery: Int, _ ownerMatches: Bool, _ windowsQuer
   if minimizedQuery != 0 || !minimizedReadable || minimized { return "minimized" }
   return nil
 }
+func diagnosticSheetMatch(_ candidate: [String:Any]) -> Bool {
+  candidate["candidatePidMatches"] as? Bool == true && candidate["candidateRoleReadable"] as? Bool == true &&
+    candidate["candidateRole"] as? String == "AXSheet" && candidate["candidateParentReadable"] as? Bool == true &&
+    candidate["candidateParentPidMatches"] as? Bool == true && candidate["candidateParentIsRetainedMain"] as? Bool == true
+}
+func retainedChildrenProbeClass(_ queryError: Int, _ readable: Bool, _ truncated: Bool, _ incomplete: Bool, _ matches: Int) -> String {
+  if queryError != 0 { return "children-query-error" }
+  if !readable { return "children-unreadable" }
+  if truncated { return "children-truncated" }
+  if incomplete { return "candidate-probe-incomplete" }
+  if matches == 0 { return "no-attached-sheet" }
+  if matches == 1 { return "one-attached-sheet" }
+  return "multiple-attached-sheets"
+}
+func shouldProbeRetainedMainChildren(_ stage: String, _ facts: [String:Any]) -> Bool {
+  stage == "application-window-membership" && facts["axPidMatches"] as? Bool == true &&
+    facts["applicationWindowsQueryError"] as? Int == 0 && facts["applicationWindowsReadable"] as? Bool == true &&
+    facts["pinnedAXWindowMember"] as? Bool == false && facts["minimizedQueryError"] as? Int == 0 &&
+    facts["minimizedReadable"] as? Bool == true && facts["minimized"] as? Bool == false &&
+    facts["pinnedCGWindowListReadable"] as? Bool == true && facts["pinnedCGWindowCount"] as? Int == 1
+}
 func xy(_ node: AXUIElement) -> CGPoint? {
   guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
@@ -79,6 +100,32 @@ func selfTest() throws {
     (0,true,0,true,true,0,false,false,true,1,"minimized")
   ] { try check(identityFailureStage(ownerError,ownerMatches,windowsError,windowsReadable,member,minimizedError,minimizedReadable,minimized,cgReadable,cgCount) == expected) }
   try check(identityFailureStage(0,true,0,true,true,0,true,false,true,1) == nil)
+  try check(retainedChildrenProbeClass(-25205,false,false,false,0) == "children-query-error")
+  try check(!diagnosticSheetMatch(["candidatePidMatches":false,"candidateRoleReadable":true,"candidateRole":"AXSheet",
+    "candidateParentReadable":true,"candidateParentPidMatches":true,"candidateParentIsRetainedMain":true]))
+  try check(!diagnosticSheetMatch(["candidatePidMatches":true,"candidateRoleReadable":true,"candidateRole":"AXSheet",
+    "candidateParentReadable":true,"candidateParentPidMatches":true,"candidateParentIsRetainedMain":false]))
+  try check(diagnosticSheetMatch(["candidatePidMatches":true,"candidateRoleReadable":true,"candidateRole":"AXSheet",
+    "candidateParentReadable":true,"candidateParentPidMatches":true,"candidateParentIsRetainedMain":true]))
+  try check(retainedChildrenProbeClass(0,true,false,false,0) == "no-attached-sheet")
+  try check(retainedChildrenProbeClass(0,true,false,false,2) == "multiple-attached-sheets")
+  try check(retainedChildrenProbeClass(0,true,false,false,1) == "one-attached-sheet")
+  try check(retainedChildrenProbeClass(0,true,true,false,1) == "children-truncated")
+  try check(retainedChildrenProbeClass(0,true,false,true,1) == "candidate-probe-incomplete")
+  let membershipFacts: [String:Any] = ["axPidMatches":true,"applicationWindowsQueryError":0,
+    "applicationWindowsReadable":true,"pinnedAXWindowMember":false,"minimizedQueryError":0,
+    "minimizedReadable":true,"minimized":false,"pinnedCGWindowListReadable":true,"pinnedCGWindowCount":1]
+  try check(shouldProbeRetainedMainChildren("application-window-membership",membershipFacts))
+  try check(!shouldProbeRetainedMainChildren("application-window-membership",["axPidMatches":true,
+    "applicationWindowsQueryError":-25205,"applicationWindowsReadable":false,"pinnedAXWindowMember":false]))
+  try check(!shouldProbeRetainedMainChildren("application-window-membership",["axPidMatches":false,
+    "applicationWindowsQueryError":0,"applicationWindowsReadable":true,"pinnedAXWindowMember":false]))
+  try check(!shouldProbeRetainedMainChildren("application-window-membership",["axPidMatches":true,
+    "applicationWindowsQueryError":0,"applicationWindowsReadable":true,"pinnedAXWindowMember":true]))
+  try check(!shouldProbeRetainedMainChildren("application-window-membership",["axPidMatches":true,
+    "applicationWindowsQueryError":0,"applicationWindowsReadable":true,"pinnedAXWindowMember":false,
+    "minimizedQueryError":0,"minimizedReadable":true,"minimized":false,"pinnedCGWindowListReadable":true,"pinnedCGWindowCount":0]))
+  try check(!shouldProbeRetainedMainChildren("minimized",membershipFacts))
   try check(try sheetProof([11],[11:123],[11:1],123,1,nil) == 11)
   try check(try sheetProof([11],[11:123],[11:1],123,1,11) == 11)
   for (members,owners,parents,retained) in [([], [11:123], [11:1], nil), ([11,12],[11:123,12:123],[11:1,12:1],nil), ([11],[11:124],[11:1],nil),
@@ -94,7 +141,8 @@ func selfTest() throws {
   try projectionLimit(5,128)
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
-  try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9, "foreignReads":0, "runtimeAX":false])
+  try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
+    "retainedMainProbeCases":15,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -156,6 +204,79 @@ func run() throws {
     return retained
   }
   func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
+  func retainedMainChildrenDiagnostic() -> [String:Any] {
+    let limit = 64
+    var rawChildren: CFTypeRef?
+    let query = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
+    var evidence: [String:Any] = ["retainedMainChildrenQueryError":Int(query.rawValue),
+      "retainedMainChildrenReadable":false,"retainedMainChildFacts":[]]
+    guard query == .success else {
+      evidence["retainedMainSheetProbe"] = retainedChildrenProbeClass(Int(query.rawValue),false,false,false,0)
+      return evidence
+    }
+    guard let values = rawChildren as? [AXUIElement] else {
+      evidence["retainedMainSheetProbe"] = retainedChildrenProbeClass(0,false,false,false,0)
+      return evidence
+    }
+    let total = values.count
+    let truncated = total > limit
+    let bounded = min(total,limit)
+    var candidates = [[String:Any]]()
+    var incomplete = false
+    var attachedSheets = 0
+    for index in 0..<bounded {
+      let child = values[index]
+      var facts: [String:Any] = ["index":index]
+      var candidatePID: pid_t = 0
+      let pidQuery = AXUIElementGetPid(child,&candidatePID)
+      facts["candidatePidQueryError"] = Int(pidQuery.rawValue)
+      guard pidQuery == .success else { incomplete = true; candidates.append(facts); continue }
+      facts["candidatePid"] = Int(candidatePID)
+      guard candidatePID > 0 else { incomplete = true; facts["candidatePidMatches"] = false; candidates.append(facts); continue }
+      let samePID = candidatePID == pid
+      facts["candidatePidMatches"] = samePID
+      guard samePID else { candidates.append(facts); continue }
+
+      var rawRole: CFTypeRef?
+      let roleQuery = AXUIElementCopyAttributeValue(child,kAXRoleAttribute as CFString,&rawRole)
+      facts["candidateRoleQueryError"] = Int(roleQuery.rawValue)
+      guard roleQuery == .success else { incomplete = true; candidates.append(facts); continue }
+      guard let role = rawRole as? String else {
+        facts["candidateRoleReadable"] = false; incomplete = true; candidates.append(facts); continue
+      }
+      facts["candidateRoleReadable"] = true
+      facts["candidateRole"] = role == kAXSheetRole ? "AXSheet" : "other"
+      guard role == kAXSheetRole else { candidates.append(facts); continue }
+
+      var rawParent: CFTypeRef?
+      let parentQuery = AXUIElementCopyAttributeValue(child,kAXParentAttribute as CFString,&rawParent)
+      facts["candidateParentQueryError"] = Int(parentQuery.rawValue)
+      guard parentQuery == .success else {
+        incomplete = true; candidates.append(facts); continue
+      }
+      guard let parent = axElement(rawParent) else {
+        facts["candidateParentReadable"] = false; incomplete = true; candidates.append(facts); continue
+      }
+      facts["candidateParentReadable"] = true
+      var parentPID: pid_t = 0
+      let parentPIDQuery = AXUIElementGetPid(parent,&parentPID)
+      facts["candidateParentPidQueryError"] = Int(parentPIDQuery.rawValue)
+      guard parentPIDQuery == .success else { incomplete = true; candidates.append(facts); continue }
+      let parentPIDMatches = parentPID == pid
+      let retainedParent = parentPIDMatches && CFEqual(parent,main)
+      facts["candidateParentPidMatches"] = parentPIDMatches
+      facts["candidateParentIsRetainedMain"] = retainedParent
+      if diagnosticSheetMatch(facts) { attachedSheets += 1 }
+      candidates.append(facts)
+    }
+    evidence["retainedMainChildrenReadable"] = true
+    evidence["retainedMainChildrenCount"] = min(total,4096)
+    evidence["retainedMainChildrenCountCapped"] = total > 4096
+    evidence["retainedMainChildrenTruncated"] = truncated
+    evidence["retainedMainChildFacts"] = candidates
+    evidence["retainedMainSheetProbe"] = retainedChildrenProbeClass(0,true,truncated,incomplete,attachedSheets)
+    return evidence
+  }
   func verify() throws {
     var actualPID: pid_t = 0
     let ownerError = AXUIElementGetPid(main,&actualPID)
@@ -342,7 +463,16 @@ func run() throws {
         result["selected"] = true
       } else if action != "press" { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
       do { try verify() }
-      catch let error as IdentityRefusal { if action == "press" { throw pressFailure("post-action-"+error.stage,error.facts) }; throw error }
+      catch let error as IdentityRefusal {
+        if action == "press" {
+          var facts = error.facts
+          if shouldProbeRetainedMainChildren(error.stage,error.facts) {
+            facts.merge(retainedMainChildrenDiagnostic()) { _, new in new }
+          }
+          throw pressFailure("post-action-"+error.stage,facts)
+        }
+        throw error
+      }
       catch { if action == "press" { throw pressFailure("post-action-identity") }; throw error }
       if target == "sheet" {
         if try members().isEmpty { result["dismissalPendingVerification"] = true }

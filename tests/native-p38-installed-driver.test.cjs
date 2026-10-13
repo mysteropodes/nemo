@@ -374,6 +374,44 @@ test('post-press identity receipts retain bounded per-predicate facts and reject
   assert.deepEqual(unavailable,{stage:'post-action-pinned-cg-window-list',elementPath:'2',pinnedCGWindowListReadable:false});
   assert.equal(unavailable.pinnedCGWindowCount,undefined);
 });
+test('retained-main sheet probe is bounded, identity-gated, sanitized and never resumes a refused press',async()=>{
+  const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const ownedSheet={index:0,candidatePidQueryError:0,candidatePid:123,candidatePidMatches:true,candidateRoleQueryError:0,
+    candidateRoleReadable:true,candidateRole:'AXSheet',candidateParentQueryError:0,candidateParentReadable:true,
+    candidateParentPidQueryError:0,candidateParentPidMatches:true,candidateParentIsRetainedMain:true,privatePath:'/private/secret'};
+  const scenarios=[
+    {name:'query error',queryError:-25205,readable:false,count:0,facts:[],probe:'children-query-error'},
+    {name:'foreign child',queryError:0,readable:true,count:1,facts:[{index:0,candidatePidQueryError:0,candidatePid:124,candidatePidMatches:false}],probe:'no-attached-sheet'},
+    {name:'multiple sheets',queryError:0,readable:true,count:2,facts:[ownedSheet,{...ownedSheet,index:1}],probe:'multiple-attached-sheets'},
+    {name:'parent mismatch',queryError:0,readable:true,count:1,facts:[{...ownedSheet,candidateParentIsRetainedMain:false}],probe:'no-attached-sheet'},
+    {name:'exact attached sheet',queryError:0,readable:true,count:1,facts:[ownedSheet],probe:'one-attached-sheet'},
+  ];
+  for(const scenario of scenarios){
+    const diagnostic={stage:'post-action-application-window-membership',elementPath:'2',
+      axPidQueryError:0,axPidMatches:true,applicationWindowsQueryError:0,applicationWindowsReadable:true,pinnedAXWindowMember:false,
+      minimizedQueryError:0,minimizedReadable:true,minimized:false,pinnedCGWindowListReadable:true,pinnedCGWindowCount:1,
+      retainedMainChildrenQueryError:scenario.queryError,retainedMainChildrenReadable:scenario.readable,
+      ...(scenario.readable?{retainedMainChildrenCount:scenario.count,retainedMainChildrenCountCapped:false,retainedMainChildrenTruncated:false}:{}),
+      retainedMainChildFacts:scenario.facts,retainedMainSheetProbe:scenario.probe,privatePath:'/private/identity'};
+    const clean=safeActionDiagnostics(diagnostic);
+    assert.equal(clean.retainedMainSheetProbe,scenario.probe,scenario.name);
+    if(scenario.probe==='one-attached-sheet')assert.equal(clean.retainedMainChildFacts[0].candidateParentIsRetainedMain,true);
+    assert.equal(JSON.stringify(clean).includes('/private/'),false,scenario.name);
+    const f=fixture();let requests=0;f.services.next=async()=>{requests++;return{type:'press',element:'2'};};
+    f.services.window=async(mode,pid)=>mode==='discover'?{pid,windowId:45,matchedAX:true}:
+      {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:diagnostic};
+    const result=await runOperator(f.cfg,f.services);
+    assert.equal(result.firstFailure.code,'adapter-refused',scenario.name);
+    assert.equal(result.firstFailure.stage,'window-press-main',scenario.name);
+    assert.equal(result.firstFailure.actionDiagnostics.retainedMainSheetProbe,scenario.probe,scenario.name);
+    assert.equal(result.installedAcceptance,'not-established',scenario.name);
+    assert.equal(requests,1,scenario.name);
+  }
+  assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainSheetProbe:'AXSheet'}));
+  assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainChildFacts:Array(65).fill({index:0})}));
+  assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainChildFacts:[{index:0,candidateRole:'/private'}]}));
+  assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainChildFacts:[{index:0,candidatePid:999999999999}]}));
+});
 test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
   const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
   const cases=[
