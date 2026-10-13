@@ -11,6 +11,14 @@ struct IdentityRefusal: Error { let stage: String; let facts: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
+func operatorScope(_ mode: String, _ environment: [String:String]) throws -> (reference:Bool, report:String) {
+  try check(mode == "--persistent" || mode == "--reference-persistent")
+  let reference = mode == "--reference-persistent"
+  let prefix = reference ? "NEMO_REFERENCE_" : "NEMO_P38_"
+  try check(environment[prefix+"GRANT"]?.isEmpty == false)
+  guard let report = environment[prefix+"REPORT_ROOT"], !report.isEmpty else { throw Refusal(code:"adapter-refused") }
+  return (reference,report)
+}
 func sheetProof(_ members: [Int], _ owners: [Int:Int], _ parents: [Int:Int], _ pid: Int, _ main: Int, _ retained: Int?) throws -> Int {
   try check(members.count == 1)
   let candidate = members[0]; try check(owners[candidate] == pid && parents[candidate] == main &&
@@ -180,6 +188,14 @@ func boundedPinnedCGWindowSample(_ pid:pid_t, _ window:UInt32, _ deadline:UInt64
   }
 }
 func selfTest() throws {
+  for (mode,prefix,reference) in [("--persistent","NEMO_P38_",false),("--reference-persistent","NEMO_REFERENCE_",true)] {
+    let scoped = try operatorScope(mode,[prefix+"GRANT":"scoped-run",prefix+"REPORT_ROOT":"/test-only"])
+    try check(scoped.reference == reference && scoped.report == "/test-only")
+    let wrongPrefix = reference ? "NEMO_P38_" : "NEMO_REFERENCE_"
+    var denied = false
+    do { _ = try operatorScope(mode,[wrongPrefix+"GRANT":"wrong-scope",wrongPrefix+"REPORT_ROOT":"/test-only"]) }
+    catch { denied = true }; try check(denied)
+  }
   try check(try route("0.12.3") == [0,12,3])
   for input in ["-1", "0..1", ".0", "1.", "x", "4096", "999999999999999999999", String(repeating: "1.", count: 21)] {
     var refused = false; do { _ = try route(input) } catch { refused = true }; try check(refused)
@@ -277,8 +293,10 @@ func run() throws {
   let args = CommandLine.arguments
   if args == [args[0], "--self-test"] { try selfTest(); return }
   if args.count == 4 && args[1] == "--p38-cg-sample" { try cgWindowSampleWorker(args); return }
-  try check(args.count == 3 && args[1] == "--persistent" && ProcessInfo.processInfo.environment["NEMO_P38_GRANT"]?.isEmpty == false)
-  guard let pid = Int32(args[2]), pid > 0, let report = ProcessInfo.processInfo.environment["NEMO_P38_REPORT_ROOT"] else { throw Refusal(code:"adapter-refused") }
+  try check(args.count == 3)
+  let scope = try operatorScope(args[1],ProcessInfo.processInfo.environment)
+  let report = scope.report
+  guard let pid = Int32(args[2]), pid > 0 else { throw Refusal(code:"adapter-refused") }
   let initialRows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []).filter {
     ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
   }
@@ -543,7 +561,7 @@ func run() throws {
           let action = request["type"] as? String, actions.contains(action), request["pid"] as? Int32 == pid,
           request["windowId"] as? UInt32 == number else { throw Refusal(code:"adapter-refused") }
     // The driver's mandatory identity checks do not consume the 64 UI-action budget.
-    if action != "check" { try check(ordinal < 64); ordinal += 1 }
+    if action != "check" { try check(ordinal < (scope.reference ? 128 : 64)); ordinal += 1 }
     if action == "quit" { try verify(); try emit(["status":"quit", "pid":pid,"windowId":number]); return }
     let requestedPath = request["element"] as? String
     func pressFailure(_ stage: String, _ extra: [String:Any] = [:]) -> ActionRefusal {
@@ -600,7 +618,8 @@ func run() throws {
         var actionNames: CFArray?
         let query = AXUIElementCopyActionNames(selected,&actionNames)
         let advertised = query == .success && (actionNames as? [String] ?? []).contains(kAXPressAction as String)
-        let roles: Set<String> = [kAXButtonRole,kAXCheckBoxRole,kAXMenuItemRole,kAXRowRole,kAXTextFieldRole]
+        var roles: Set<String> = [kAXButtonRole,kAXCheckBoxRole,kAXMenuItemRole,kAXRowRole,kAXTextFieldRole]
+        if scope.reference { roles.insert(kAXPopUpButtonRole) }
         let rawRole = attr(selected,kAXRoleAttribute) as? String ?? ""
         var facts: [String:Any] = ["axPressQueryError":Int(query.rawValue),"axPressAdvertised":advertised,
           "role":roles.contains(rawRole) ? rawRole : "other"]
@@ -711,8 +730,13 @@ func run() throws {
       if target == "main" { try noSheet() }
       let base = request["element"] as? String ?? ""
       let selected = try node(base,selectedRoot)
-      let roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
-      let labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+      var roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
+      if scope.reference { roles.insert(kAXPopUpButtonRole) }
+      var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+      if scope.reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
+        "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
+        "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
+        "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace"]) }
       func fact(_ current: AXUIElement, _ path: String) -> [String:Any] {
         // No title/value/children reads from a foreign child; expose blocked route only.
         var owner: pid_t = 0
