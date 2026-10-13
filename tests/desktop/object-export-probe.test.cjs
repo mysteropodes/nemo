@@ -54,8 +54,11 @@ async function scenario(options = {}) {
       assert.deepEqual(request.outputSpec, { kind: 'frame', format: 'rgba8', width: 320,
         height: 180, colorInterpretation: 'srgb', alphaMode: 'straight' });
       if (options.scopeDenied) throw { code: 'invalid_request' };
-      if (request.documentSnapshotId.endsWith('-wrong') && !options.staleReturnsSuccess)
+      if (request.documentSnapshotId.endsWith('-wrong') && !options.staleReturnsSuccess) {
+        if (options.staleThrowsString) throw 'private native refusal';
+        if (options.staleErrorNoCode) throw new Error('private native refusal');
         throw { code: options.staleErrorCode || 'unavailable' };
+      }
       if (options.failExport) throw new Error('export failed');
       return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
         documentId: request.documentId, contentRevision: 0, documentSnapshotId: 'owned-snapshot',
@@ -112,13 +115,23 @@ test('foreign runtime, arbitrary config and failed export never claim publicatio
   }
   for (const options of [{ scopeDenied: true }, { staleErrorCode: 'invalid_request' }]) {
     const result = await scenario(options);
-    assert.equal(result.phases.at(-1).failureStage, 'stale-refusal');
+    assert.equal(result.phases.at(-1).failureStage, 'stale-refusal-invalid-request');
     assert.equal(result.phases.some(p => p.phase === 'refused'), false);
     assert.equal(result.exports.length, 1);
     assert.equal(result.released, true);
   }
+  for (const [options, stage] of [
+    [{ staleThrowsString: true }, 'stale-refusal-non-object'],
+    [{ staleErrorNoCode: true }, 'stale-refusal-no-code'],
+    [{ staleErrorCode: 'unsupported' }, 'stale-refusal-other-code'],
+  ]) {
+    const result = await scenario(options);
+    assert.equal(result.phases.at(-1).failureStage, stage);
+    assert.equal(result.phases.some(p => p.phase === 'refused'), false);
+    assert.equal(result.released, true);
+  }
   const staleSuccess = await scenario({ staleReturnsSuccess: true });
-  assert.equal(staleSuccess.phases.at(-1).failureStage, 'stale-refusal');
+  assert.equal(staleSuccess.phases.at(-1).failureStage, 'stale-refusal-no-error');
   assert.equal(staleSuccess.exports.length, 1);
   const blueAck = await scenario({ failCheckpoint: 'blue' });
   assert.equal(blueAck.phases.at(-1).failureStage, 'blue-checkpoint');
@@ -160,11 +173,11 @@ test('failure snapshot keeps only fixed stages and phase names, rejecting privat
     ownerToken: 'private-owner', records: [
       { phase: 'ready', request: 'private' },
       { phase: 'blue', workId: 'private' },
-      { phase: 'failed', failureStage: 'stale-refusal', cleanupSucceeded: true,
+      { phase: 'failed', failureStage: 'stale-refusal-invalid-request', cleanupSucceeded: true,
         rawError: 'private' }] };
   const diagnostic = sanitizedProbe(receipt);
   assert.deepEqual(diagnostic.phases, [{ phase: 'ready' }, { phase: 'blue' },
-    { phase: 'failed', failureStage: 'stale-refusal', cleanupSucceeded: true }]);
+    { phase: 'failed', failureStage: 'stale-refusal-invalid-request', cleanupSucceeded: true }]);
   assert.equal(JSON.stringify(diagnostic).includes('private'), false);
   assert.throws(() => sanitizedProbe({ ...receipt, records: [
     { phase: 'failed', failureStage: 'arbitrary', cleanupSucceeded: true }] }),

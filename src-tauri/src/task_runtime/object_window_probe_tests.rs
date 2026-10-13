@@ -431,3 +431,33 @@ fn export_failure_stage_is_fixed_and_never_accepted_on_success_packets() {
     );
     assert!(!receipt.to_string().contains("private-owner"));
 }
+
+#[test]
+fn export_failure_diagnostic_classes_are_fixed_and_terminal() {
+    for stage in [
+        "stale-refusal-invalid-request",
+        "stale-refusal-non-object",
+        "stale-refusal-no-code",
+        "stale-refusal-other-code",
+        "stale-refusal-no-error",
+    ] {
+        let fixture = Fixture::new();
+        let mut session = fixture.session();
+        session.export = true;
+        let run = session.run.clone();
+        session
+            .admit(&packet(&run, "ready", "ready", None, None))
+            .unwrap();
+        complete(&mut session, &run, 0, Ok(())).unwrap();
+        let mut failed = packet(&run, "failed", "operation_failed", None, None);
+        failed.cleanup_succeeded = Some(true);
+        failed.failure_stage = Some(stage.into());
+        assert_eq!(session.admit(&failed), Ok(false), "{stage}");
+        let receipt: serde_json::Value = serde_json::from_slice(
+            &fs::read(fixture.root.join("object-window-probe.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(receipt["records"][1]["failureStage"], stage);
+        assert_eq!(receipt["complete"], false);
+    }
+}
