@@ -130,8 +130,14 @@ function packageArtifacts(app) {
 
 async function runBuildJob(options = {}) {
   const taskId = options.taskId || `desktop-build-${crypto.randomBytes(16).toString('hex')}`;
-  const root = isolation.taskRoot(taskId);
-  let reportDir;
+  let root; let reportDir;
+  try {
+    // The tasks directory can itself be a symlink; compare physical owner and
+    // destination paths so neither side can hide containment through an alias.
+    root = isolation.canonicalDirectory(isolation.taskRoot(taskId), 'build task root');
+  } catch (error) {
+    return result('blocked', `build task root refused: ${error.message}`);
+  }
   try {
     // RUNTIME_ROOT is physical; resolve report destinations through the same
     // nearest-existing-ancestor rule before the disposable-root containment check.
