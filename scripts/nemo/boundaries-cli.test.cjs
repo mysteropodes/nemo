@@ -217,7 +217,7 @@ test('Rust CLI preserves real layer, cycle, feature, exported-port and unsupport
     ['cycle', 'use crate as root;'],
     ['undeclared-feature', '#[cfg(feature = "unlisted")] fn hidden() {}'],
     ['exported-port', 'pub use model::Thing as Extra;'],
-    ['unsupported', 'use crate::missing::Thing;'],
+    ['unsupported', 'mod outer { mod inner { use super::super::Thing; } }'],
   ]) await t.test(rule, (t) => {
     const f = rustFixture(t), crate = f.crates[2];
     if (rule === 'cycle') {

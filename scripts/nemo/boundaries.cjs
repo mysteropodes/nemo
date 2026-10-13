@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 // Standalone CLI for the R05 module-profile/dependency rule checker
-// (scripts/nemo/lib/boundaries.cjs). Not wired into `npm run check`/`verify`
-// or scripts/nemo/lib/jobs.cjs yet — see engineering/boundaries/README.md for
-// why (R01/R03 need to land first) and the integration contract for when
-// they do.
+// Reuses the JavaScript checker or the normal CI adopted Rust crate policies,
+// according to the declared source paths. See engineering/boundaries/README.md.
 //
 // Usage:
 //   node scripts/nemo/boundaries.cjs <profile.json> [--baseline <prior-profile.json>]
@@ -15,8 +13,30 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { checkProfile } = require('./lib/boundaries.cjs');
+const { checkProfile, validateProfile } = require('./lib/boundaries.cjs');
 const { compareSizeBaseline } = require('./lib/boundaries-ratchet.cjs');
+const { checkSourceSizes } = require('./lib/boundaries-size.cjs');
+const { rustBoundaries } = require('./ci.cjs');
+
+function profileReport(profile, root) {
+  validateProfile(profile);
+  const files = profile.modules.flatMap((m) => m.files);
+  const rustCount = files.filter((file) => /\.rs$/i.test(file)).length;
+  if (!rustCount) return checkProfile(profile, { root });
+  if (rustCount !== files.length) throw new Error('mixed Rust and non-Rust profiles are unsupported; check separate profiles');
+  const size = checkSourceSizes(profile, { root });
+  const rust = rustBoundaries(root, profile);
+  const explicitlyUnanalyzed = new Set(rust.crates.flatMap((crate) => crate.unanalyzedModules));
+  const sizeOnlyModules = profile.modules.filter((m) => explicitlyUnanalyzed.has(m.id)
+    || !rust.crates.some((crate) => m.dir === crate.sourceDir || m.dir.startsWith(`${crate.sourceDir}/`)))
+    .map((m) => m.id).sort();
+  return { ...size, ok: size.ok && rust.ok, language: 'rust', moduleCount: profile.modules.length,
+    violations: size.violations.concat(rust.crates.flatMap((crate) =>
+      crate.violations.map((violation) => ({ ...violation, policy: crate.policy })))),
+    exceptionsApplied: size.exceptionsApplied.concat(rust.crates.flatMap((crate) => crate.exceptionsApplied)),
+    rust, scope: { graphPolicies: rust.crates.map((crate) => crate.policy), sizeOnlyModules,
+      graphComplete: sizeOnlyModules.length === 0 } };
+}
 
 function parseArgs(argv) {
   const out = { profilePath: null, baselinePath: null, root: process.cwd(), json: false };
@@ -60,7 +80,7 @@ function main() {
 
   let report;
   try {
-    report = checkProfile(profile, { root: path.resolve(args.root) });
+    report = profileReport(profile, path.resolve(args.root));
   } catch (err) {
     console.error(`boundaries check could not run: ${err.message}`);
     return 2;
@@ -87,6 +107,10 @@ function main() {
     console.log(JSON.stringify(report, null, 2));
   } else {
     console.log(`boundaries: ${report.moduleCount} module(s), ${report.violations.length} violation(s), ${report.warnings.length} warning(s)`);
+    if (report.language === 'rust') {
+      console.log(`Rust graph scope: ${report.scope.graphPolicies.length} adopted crate policies; size checks cover all ${report.moduleCount} profile modules`);
+      console.log(`size-only modules: ${report.scope.sizeOnlyModules.join(', ') || '(none)'}`);
+    }
     for (const v of report.violations) {
       console.log(`  FAIL  ${v.rule.padEnd(18)} ${v.file || v.module}${v.line ? `:${v.line}` : ''} — ${v.message}`);
     }

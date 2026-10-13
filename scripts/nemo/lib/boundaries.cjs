@@ -319,6 +319,9 @@ function findCycles(edges) {
  */
 function checkProfile(profile, opts = {}) {
   validateProfile(profile);
+  if (profile.modules.some((m) => m.files.some((f) => /\.rs$/i.test(f)))) {
+    throw new Error('checkProfile is a JavaScript checker; use the Rust profile CLI or checkRustCrate for Rust sources');
+  }
   const root = fs.realpathSync(opts.root || process.cwd());
   const now = opts.now || new Date();
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('invalid check clock');

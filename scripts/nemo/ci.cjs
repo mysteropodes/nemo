@@ -144,16 +144,17 @@ function applicationBoundaries(base, scratch, root = ROOT) {
 
 // P12: Rust-aware intra-crate module edges, exported port and feature gates,
 // per adopted crate policy. Rust is never fed to the JavaScript lexer.
-function rustBoundaries(root = ROOT) {
+function rustBoundaries(root = ROOT, suppliedProfile) {
   const profilePath = path.join(root, RUST_PROFILE);
-  if (!fs.existsSync(profilePath)) return null;   // a checkout without the Rust profile has nothing to enforce
-  const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+  if (suppliedProfile === undefined && !fs.existsSync(profilePath)) return null;
+  const profile = suppliedProfile === undefined
+    ? JSON.parse(fs.readFileSync(profilePath, 'utf8')) : suppliedProfile;
   const crates = RUST_CRATE_POLICIES.map((file) => {
     const policyPath = path.join(root, file);
     // Once a crate policy is adopted its absence is a removal, not a skip.
     if (!fs.existsSync(policyPath)) throw new Error(`${file} was removed from the candidate`);
     const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
-    return { policy: file, ...checkRustCrate(profile, policy, { root }) };
+    return { policy: file, sourceDir: policy.sourceDir, ...checkRustCrate(profile, policy, { root }) };
   });
   return { ok: crates.every((c) => c.ok), crates };
 }

@@ -53,6 +53,33 @@ Exit 0 = no violations, 1 = one or more, 2 = bad usage or a profile that could n
 an unknown `sizeProfile` key, malformed exception, missing file, or unsupported lexical syntax).
 Unknown flags, missing option values and extra positional arguments also exit 2.
 
+An all-`.rs` profile uses the existing Rust analyzer and the same adopted crate policies
+as `ci.rustBoundaries`, together with UTF-8 size checks over every supplied profile path.
+The CLI checks the actual supplied profile, even if a different canonical Rust profile
+exists under `--root`. It does not infer a Rust graph from JavaScript tokens. A profile
+mixing Rust and non-Rust paths exits 2; check those profiles separately. Direct use of
+the JavaScript `checkProfile` API on `.rs` files also fails explicitly.
+
+```bash
+node scripts/nemo/boundaries.cjs engineering/boundaries/profiles/rust.profile.json --root . --json
+```
+
+The Rust route requires all three adopted policies listed by the existing CI contract:
+`geometry-wasm.edges.json`, `nemo-desktop.edges.json`, and `native-engine.edges.json`
+under `engineering/boundaries/profiles` in the selected root. A missing or malformed
+policy exits 2, rather than silently reducing enforcement. Existing JavaScript profile
+behavior and the optional size-baseline comparison remain unchanged.
+
+Rust JSON reports include `language: "rust"`, the per-crate `rust` reports, and `scope`.
+`scope.graphPolicies` names the adopted graph checks; `scope.sizeOnlyModules` lists
+profile modules outside those graph scopes or explicitly declared unanalyzed. The text
+report prints the same distinction. `scope.graphComplete` describes only whether all
+supplied profile modules fall within these graph scopes, not complete Rust syntax or
+whole-project architecture acceptance. Exit 0 means the stated adopted checks passed;
+it does not turn size-only modules into graph-checked modules or close R05. Discovery
+coverage, protected baseline provenance, and other crate policies keep their existing
+separate validation contracts.
+
 The second form enables the size-baseline ratchet. `<prior-profile.json>` must be the explicit,
 previously reviewed profile from the commit being compared; the checker does not guess a Git
 revision or silently fall back when that file is missing. The original invocation remains
