@@ -212,6 +212,39 @@ pub(super) fn prepare(
     }
 }
 
+/// The callback owns its failure hook independently of the invoking waiter.
+/// A discarded callback terminalizes the reserved authority even after cancel.
+pub(super) fn submit(
+    native: NativeState,
+    generation: u64,
+    request_id: String,
+    fingerprint: Vec<u8>,
+    prepared: PreparedProjectReplacement,
+    schedule: impl FnOnce(Box<dyn FnOnce() + Send>) -> Result<(), ()>,
+    viewport_release: impl FnOnce() -> HostResult<(Vec<WorkId>, &'static str)> + Send + 'static,
+) -> Result<
+    tokio::sync::oneshot::Receiver<HostResult<ObjectBootstrapReceipt>>,
+    crate::native_application_viewport::ReplacementCallbackFailure,
+> {
+    let callback_native = native.clone();
+    let callback_id = request_id.clone();
+    crate::native_application_viewport::submit_replacement(
+        schedule,
+        move || {
+            complete(
+                &callback_native,
+                generation,
+                &callback_id,
+                prepared,
+                viewport_release,
+            )
+        },
+        move |_| {
+            let _ = reconcile_executor(&native, generation, &request_id, &fingerprint);
+        },
+    )
+}
+
 pub(super) fn complete(
     native: &NativeState,
     generation: u64,
@@ -361,3 +394,97 @@ pub(super) fn reconcile_executor(
 #[cfg(test)]
 #[path = "native_object_project_replace_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod callback_tests {
+    use super::tests::Fixture;
+    use super::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn cpu_callback_owner_settles_without_waiter_and_preserves_committed_success() {
+        // Rejected; queued then discarded; queued then completed after cancel;
+        // completed synchronously despite a scheduler returning an error.
+        for scenario in 0..4 {
+            let f = Fixture::new();
+            let (generation, id, fingerprint, prepared) = f.execute();
+            let cleanup = Arc::new(AtomicUsize::new(0));
+            let callback_cleanup = cleanup.clone();
+            let mut queued = None;
+            let waiter = submit(
+                f.state.native_state(),
+                generation,
+                id.clone(),
+                fingerprint.clone(),
+                prepared,
+                |callback| match scenario {
+                    0 => {
+                        drop(callback);
+                        Err(())
+                    }
+                    3 => {
+                        callback();
+                        Err(())
+                    }
+                    _ => {
+                        queued = Some(callback);
+                        Ok(())
+                    }
+                },
+                move || {
+                    callback_cleanup.fetch_add(1, Ordering::SeqCst);
+                    Ok((Vec::new(), "disposed"))
+                },
+            );
+            assert_eq!(waiter.is_err(), matches!(scenario, 0 | 3));
+            // No receiver remains to run any awaited reconciliation branch.
+            drop(waiter);
+            if scenario == 2 {
+                queued.take().unwrap()();
+            }
+            drop(queued);
+            assert_eq!(cleanup.load(Ordering::SeqCst), usize::from(scenario >= 2));
+            let native = f.state.native_state();
+            let authority = native.lock().unwrap();
+            let retained = authority
+                .lookup_replace_replay(&id, &fingerprint)
+                .unwrap()
+                .unwrap();
+            if scenario < 2 {
+                assert!(
+                    matches!(retained, ReplacementReplay::Fenced(_)),
+                    "callback loss must not remain pending"
+                );
+                assert!(authority.active().is_none());
+            } else {
+                assert!(
+                    matches!(retained, ReplacementReplay::Succeeded(_)),
+                    "committed success must not be overwritten by an executor error"
+                );
+                assert_eq!(authority.active_generation().unwrap(), generation);
+                assert_ne!(
+                    authority.active().unwrap().1.document_id(),
+                    f.request["replace"]["documentId"].as_str().unwrap()
+                );
+            }
+            drop(authority);
+            let settled = reconcile_executor(&native, generation, &id, &fingerprint);
+            if scenario < 2 {
+                assert_eq!(settled.unwrap_err().code, "replacement_indeterminate");
+                assert_eq!(
+                    f.prepare(&f.request).err().unwrap().code,
+                    "replacement_indeterminate"
+                );
+            } else {
+                assert!(settled.is_ok());
+                assert!(matches!(
+                    f.prepare(&f.request).unwrap(),
+                    Admission::Replay(_)
+                ));
+            }
+        }
+    }
+}

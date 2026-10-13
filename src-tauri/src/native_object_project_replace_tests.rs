@@ -9,15 +9,15 @@ use crate::native_object_bootstrap::{
 use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
 
-struct Fixture {
-    state: ApplicationMcp,
+pub(super) struct Fixture {
+    pub(super) state: ApplicationMcp,
     root: PathBuf,
     path: PathBuf,
-    request: Value,
+    pub(super) request: Value,
     before: Value,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let root = std::env::temp_dir().join(format!("nemo-replace-{}", uuid::Uuid::new_v4()));
         fs::create_dir(&root).unwrap();
         let root = root.canonicalize().unwrap();
@@ -56,14 +56,14 @@ impl Fixture {
             before,
         }
     }
-    fn prepare(&self, request: &Value) -> HostResult<Admission> {
+    pub(super) fn prepare(&self, request: &Value) -> HostResult<Admission> {
         replace::prepare(
             &self.state,
             reopen::file_request(&request.to_string()).unwrap(),
             |p| p.starts_with(&self.root),
         )
     }
-    fn execute(
+    pub(super) fn execute(
         &self,
     ) -> (
         u64,

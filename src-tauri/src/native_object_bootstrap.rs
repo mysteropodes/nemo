@@ -179,18 +179,24 @@ pub(crate) async fn nemo_native_object_bootstrap(
         };
         state.invalidate_native_subscriber(&app);
         let native = state.native_state();
-        let scheduled = native.clone();
-        let scheduled_id = request_id.clone();
         let instance = state.instance_id().to_owned();
-        let result =
-            crate::native_application_viewport::on_main_thread_committed(&app, move || {
-                replace::complete(&scheduled, generation, &scheduled_id, prepared, || {
-                    crate::native_application_viewport::release(&instance)
-                        .map(|released| (released.work_ids, released.status))
-                })
-            })
-            .await;
-        return result.or_else(|_| {
+        let waiter = replace::submit(
+            native.clone(),
+            generation,
+            request_id.clone(),
+            fingerprint.clone(),
+            prepared,
+            |callback| app.run_on_main_thread(callback).map_err(|_| ()),
+            move || {
+                crate::native_application_viewport::release(&instance)
+                    .map(|released| (released.work_ids, released.status))
+            },
+        );
+        let result = match waiter {
+            Ok(waiter) => waiter.await.map_err(|_| ()),
+            Err(_) => Err(()),
+        };
+        return result.unwrap_or_else(|_| {
             replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
         });
     }
