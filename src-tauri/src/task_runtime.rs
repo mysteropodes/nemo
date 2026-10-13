@@ -306,7 +306,7 @@ pub fn start<R: Runtime>(
     #[cfg(feature = "test-play-publication-observer")]
     let startup = startup_observer::prepare(&runtime, &windows)?;
     #[cfg(feature = "test-play-publication-observer")]
-    startup_observer::host::bind(&handle, startup.clone())?;
+    startup_observer::host::bind(&handle, startup.clone(), &runtime)?;
     let mut labels = Vec::with_capacity(windows.len());
     for window in &windows {
         let builder = tauri::WebviewWindowBuilder::from_config(&handle, window)?;

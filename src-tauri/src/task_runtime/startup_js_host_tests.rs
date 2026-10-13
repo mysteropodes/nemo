@@ -260,3 +260,61 @@ fn concurrent_native_transition_reconciles_without_gui_or_reverse_locking() {
         Ok(true)
     );
 }
+
+#[test]
+fn actual_producer_snapshots_retain_initial_records_refusals_and_close_outside_guards() {
+    let f = Fixture::new();
+    let state = StartupTransport::default();
+    let (version, initial) = {
+        let mut slot = state.0.lock().unwrap();
+        slot.bind(Some(f.native.clone())).unwrap();
+        slot.snapshot().unwrap().unwrap()
+    };
+    let store = Arc::new(retention::Store::open(&f.root, &f.root, &initial).unwrap());
+    store.publish(version, &initial).unwrap();
+    *state.1.lock().unwrap() = Some(store.clone());
+    assert_eq!(
+        transact(
+            &state,
+            "main",
+            Ok(&origin()),
+            std::process::id(),
+            &f.body(1, "early-script")
+        ),
+        Ok(true)
+    );
+    assert!(transact(
+        &state,
+        "main",
+        Err(()),
+        std::process::id(),
+        &InvokeBody::Raw(vec![])
+    )
+    .is_err());
+    let snapshot = {
+        let mut slot = state.0.lock().unwrap();
+        slot.close();
+        slot.snapshot().unwrap().unwrap()
+    };
+    store.publish(snapshot.0, &snapshot.1).unwrap();
+    let value: Value =
+        serde_json::from_slice(&std::fs::read(f.root.join("startup-js.json")).unwrap()).unwrap();
+    assert_eq!(value["js"]["accepted"], 1);
+    assert_eq!(value["adapterRefused"], true);
+    assert_eq!(value["js"]["fence"], "closed");
+    assert_eq!(value["js"]["sealed"], false);
+    assert!(state.0.try_lock().is_ok());
+    assert!(f.native.try_lock().is_ok());
+    let mut slot = state.0.lock().unwrap();
+    slot.version = u64::MAX;
+    assert!(slot.snapshot().is_err());
+    assert!(slot.retention_failed);
+    assert!(slot
+        .admit(
+            "main",
+            &origin(),
+            std::process::id(),
+            &f.body(2, "dom-ready")
+        )
+        .is_err());
+}
