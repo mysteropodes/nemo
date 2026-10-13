@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "0cbb5cc0633d4f688af5d07cfa5657f59320db72",
-    "sourceRootTree": "61548ff56a194236aa0032ec44859714e736549f",
+    "candidateCommit": "8f502b4adee7cd7032ed249278ff72da1919432f",
+    "sourceRootTree": "e98a900618581825cd244d8fc3b699ca58ec5685",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "d3a7b914a3c7510ba7c27d034e2e3891c5d4c1ae",
-      "lastChangedCommit": "0cbb5cc0633d4f688af5d07cfa5657f59320db72"
+      "gitTree": "8b80c163bb23b7a4baffb0ece26361bd1e553983",
+      "lastChangedCommit": "8485b62d4c83c03c132b28eac6286a243e200ce1"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "961abe30864c1d707c38e5ff769ed1cf47ed68b8",
-      "sha256": "89614cb7fa2646fa2a21ae5168552b6d243fb03e7409132fc8c472dd40334272",
-      "lastChangedCommit": "f90821559532413ebc7fc6e352efb249285533ef"
+      "gitBlob": "a9e0870a1e7a1e413c5fc65f9d32b22dc5124576",
+      "sha256": "057ad190c7fffe7010f72833716f75a4741c850f9100bf4363d330519b39b774",
+      "lastChangedCommit": "9984bf0e82b6495cdf44f925125e4dd69b643147"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "41945c44891c12f329de735940bf59bc8148ce5deada8c9e1ede5cdb57a7014b"
+      "value": "9348b890188db6f77ead022db1ffd0d95e82a7563670f2b4016b4ac1bec21b29"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "6fd2e3da3b0d9a4ed2814798e64a6ba6c803e69d",
-        "sha256": "0bf4b07b5bd172ae220a62e824d3f559f2275ebc88ed8921f8eab90877dcdb68",
-        "moduleCount": 195,
-        "basedOnCommit": "d0b1afca45401eaec270152ae8836805e0fe161b"
+        "gitBlob": "994e5ebf28b9854015358938f452fdbe10896e4d",
+        "sha256": "ae4f853caecaefb2b940c3accbd4bd8ef43780566b78f6e82bc1f9fb2e648fea",
+        "moduleCount": 198,
+        "basedOnCommit": "9984bf0e82b6495cdf44f925125e4dd69b643147"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
