@@ -426,8 +426,11 @@ func selfTest() throws {
   for posted in [false,true] {
     let trace = LocationTrace(); var events = [String](), refused = false
     func failingWalk() throws {
-      _ = try locationWalk(0,deadline:10,now:{ 0 },equal:==,owner:{ (0,$0 == 0) },isWindow:{ _ in false },timeout:{ _ in 0 },
-        children:{ (0,$0 == 0 ? [1] : []) },parent:{ _ in (0,0) })
+      let ownership: (Int)->(Int,Bool) = { (0,$0 == 0) }
+      let descendants: (Int)->(Int,[Int]?) = { (0,$0 == 0 ? [1] : []) }
+      let ancestor: (Int)->(Int,Int?) = { _ in (0,0) }
+      let _: [Int] = try locationWalk(0,deadline:10,now:{ 0 },equal:{ $0 == $1 },owner:ownership,
+        isWindow:{ _ in false },timeout:{ _ in 0 },children:descendants,parent:ancestor)
     }
     do { try trace.observe {
       trace.phase = "pre-tree"
