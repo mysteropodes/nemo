@@ -19,7 +19,9 @@ function execute(openResults, configPatch = {}, runtime = {}) {
     if(name==='nemo_test_p38_fixture_open_probe')return checkpointInvoke(name,args);
     return runtime.invoke ? Reflect.apply(runtime.invoke,this,arguments) : Promise.resolve({available:false});
   };
-  const core = {invoke:(runtime.lateInvoke||runtime.missingInvoke)?null:baseInvoke};
+  const core = {};
+  if(runtime.observerInstallFailure)Object.defineProperty(core,'invoke',{configurable:true,get:()=>baseInvoke,set:()=>{throw new Error('private observer install detail');}});
+  else core.invoke=(runtime.lateInvoke||runtime.missingInvoke)?null:baseInvoke;
   const fs = {readTextFile:function(){return runtime.readTextFile ? Reflect.apply(runtime.readTextFile,this,arguments) : Promise.resolve('{}');}};
   const project = runtime.missingOpenPath ? {} : {openPath:runtime.openPath || async function(path){opened.push(path);return openResults.shift();}};
   const originalOpen=project.openPath, originalInvoke=runtime.missingInvoke?null:baseInvoke, originalRead=fs.readTextFile;
@@ -66,6 +68,12 @@ test('pre-ready openPath absence persists one fixed cursor-zero refusal and open
 test('absent Tauri invoke cannot fabricate a persisted pre-ready checkpoint', async()=>{
   const r=await execute([], {}, {missingInvoke:true,expireImmediately:true});
   assert.equal(r.result,'refused'); assert.deepEqual(r.calls,[]); assert.deepEqual(r.opened,[]);
+});
+
+test('native observer installation failure with valid openPath is not mislabeled openPath-unavailable', async()=>{
+  const r=await execute([], {}, {observerInstallFailure:true,expireImmediately:true});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]); assert.deepEqual(r.calls,[]);
+  assert.equal(r.restored,true);
 });
 
 test('categorical native outcomes preserve invoke receiver, arguments, and Promise identity', async()=>{

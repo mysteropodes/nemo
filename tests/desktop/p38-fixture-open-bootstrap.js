@@ -24,6 +24,12 @@
   let activeOpen = null;
   let restoreNative = null;
   let nativeObserverEarly = false;
+  let nativeObserverInstallFailed = false;
+  const readinessFailure = Object.freeze({
+    openPathUnavailable: Symbol('open-path-unavailable'),
+    invokeUnavailable: Symbol('tauri-invoke-unavailable'),
+    observerInstallFailed: Symbol('native-observer-install-failed'),
+  });
   function observePromise(value, fulfilled, rejected) {
     try {
       if (value && typeof value.then === 'function') value.then(
@@ -68,6 +74,10 @@
     try {
       core.invoke = wrappedInvoke;
       if (originalRead) fs.readTextFile = wrappedRead;
+      if (core.invoke !== wrappedInvoke || (originalRead && fs.readTextFile !== wrappedRead)) {
+        restore();
+        throw new Error('observer-install-refused');
+      }
     } catch (error) {
       restore();
       throw error;
@@ -121,17 +131,22 @@
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
       if (!restoreNative && window.__TAURI__ && window.__TAURI__.core &&
-          typeof window.__TAURI__.core.invoke === 'function') restoreNative = installNativeObserver();
+          typeof window.__TAURI__.core.invoke === 'function') {
+        if (nativeObserverInstallFailed) throw readinessFailure.observerInstallFailed;
+        try { restoreNative = installNativeObserver(); }
+        catch (_) { nativeObserverInstallFailed = true; throw readinessFailure.observerInstallFailed; }
+      }
       if (window.SMProject && typeof window.SMProject.openPath === 'function' &&
           window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    throw new Error(typeof (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) === 'function'
-      ? 'open-path-unavailable' : 'tauri-invoke-unavailable');
+    if (nativeObserverInstallFailed) throw readinessFailure.observerInstallFailed;
+    throw typeof (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) === 'function'
+      ? readinessFailure.openPathUnavailable : readinessFailure.invokeUnavailable;
   }
   if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
     try { restoreNative = installNativeObserver(); nativeObserverEarly = !!restoreNative; }
-    catch (_) { restoreNative = null; }
+    catch (_) { restoreNative = null; nativeObserverInstallFailed = true; }
   }
   async function open(phase, id) {
     const trace = {};
@@ -155,12 +170,12 @@
     let restoreOpenPath = null;
     try {
       try { await waitForOpenPath(); }
-      catch (_) {
+      catch (cause) {
         // Cursor zero is the only place a pre-ready refusal can be recorded.
         // If invoke itself is absent there is no trusted channel to persist it;
         // the external owner reports the prepared-only ready timeout instead.
         const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-        if (typeof invoke === 'function') {
+        if (cause === readinessFailure.openPathUnavailable && typeof invoke === 'function') {
           try { await fail('ready', undefined, 'ready-open-path-unavailable'); } catch (_) {}
         }
         return 'refused';
