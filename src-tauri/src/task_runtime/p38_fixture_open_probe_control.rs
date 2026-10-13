@@ -159,7 +159,10 @@ pub(super) fn valid_failure_packet(
 }
 
 pub(super) fn allowed_ready_failure(code: &str) -> bool {
-    matches!(code, "ready-open-path-unavailable")
+    matches!(
+        code,
+        "ready-open-path-unavailable" | "ready-observer-install-failed"
+    )
 }
 
 pub(super) fn allowed_a_failure(code: &str) -> bool {

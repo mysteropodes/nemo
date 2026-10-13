@@ -70,9 +70,12 @@ test('absent Tauri invoke cannot fabricate a persisted pre-ready checkpoint', as
   assert.equal(r.result,'refused'); assert.deepEqual(r.calls,[]); assert.deepEqual(r.opened,[]);
 });
 
-test('native observer installation failure with valid openPath is not mislabeled openPath-unavailable', async()=>{
+test('native observer installation failure persists one fixed cursor-zero refusal', async()=>{
   const r=await execute([], {}, {observerInstallFailure:true,expireImmediately:true});
-  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]); assert.deepEqual(r.calls,[]);
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.deepEqual(r.calls.map(x=>[x.phase,x.status,x.failureCode,x.fixtureId,x.fixtureSha256]),
+    [['ready','failed','ready-observer-install-failed',undefined,undefined]]);
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|exception|must not leak/);
   assert.equal(r.restored,true);
 });
 
