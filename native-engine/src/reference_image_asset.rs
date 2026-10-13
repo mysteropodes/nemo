@@ -1,6 +1,6 @@
 //! Private CPU PNG admission; no document, file, decoder or GPU authority.
 use png::{BitDepth, ColorType, DecodeOptions, Decoder, DecodingError, Limits};
-use std::io::{BufReader, Cursor};
+use std::io::Cursor;
 use std::sync::Arc;
 
 #[path = "reference_png_scanlines.rs"]
@@ -172,7 +172,8 @@ fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>, R: AsMut<[u8]
     let mut options = DecodeOptions::default();
     options.set_ignore_checksums(false);
     options.set_skip_ancillary_crc_failures(false);
-    let mut decoder = Decoder::new_with_options(BufReader::new(Cursor::new(source)), options);
+    // Cursor already provides buffered reads over the retained, borrowed input.
+    let mut decoder = Decoder::new_with_options(Cursor::new(source), options);
     decoder.set_limits(Limits {
         bytes: budget.decoder_bytes,
     });

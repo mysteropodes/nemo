@@ -1,6 +1,59 @@
 use super::*;
 use crate::object_codec::decode_png_pixels_with_workspace;
 
+fn assert_no_png_input_buffer(retain_pixels: bool) {
+    use crate::reference_image_asset::{measure_allocations, validate_png_with_workspace};
+    use std::io::{BufReader, Cursor};
+
+    let source = tests::workspace_png();
+    // Observe the actual stdlib buffer layout, without fixing its default capacity.
+    let capacity = BufReader::new(Cursor::new(source.as_slice())).capacity();
+    let layout = std::alloc::Layout::array::<u8>(capacity).unwrap();
+    let (_, control) = measure_allocations(Some(layout), || {
+        let reader = BufReader::new(Cursor::new(source.as_slice()));
+        std::hint::black_box(&reader);
+    });
+    assert_eq!(control, [1, 1, 0], "observer must see the old input buffer");
+
+    let workspace_called = std::cell::Cell::new(false);
+    let (result, calls) = measure_allocations(Some(layout), || {
+        let refuse_workspace = || {
+            workspace_called.set(true);
+            Err::<Box<PngWorkspace>, _>(ImageAssetError::Allocation)
+        };
+        // Stop after the real reader/header path, before unrelated decoder, row,
+        // workspace or pixel allocations could share the input buffer's layout.
+        if retain_pixels {
+            decode_png_pixels_with_workspace(&source, tests::limits(), refuse_workspace, |_| {
+                panic!("workspace refusal must precede RGBA allocation")
+            })
+            .map(|_| ())
+        } else {
+            validate_png_with_workspace(&source, tests::limits(), refuse_workspace).map(|_| ())
+        }
+    });
+    assert!(
+        workspace_called.get(),
+        "the valid header must reach workspace admission"
+    );
+    assert_eq!(result, Err(ImageAssetError::Allocation));
+    assert_eq!(
+        calls,
+        [0, 0, 0],
+        "borrowed input needs no extra reader buffer"
+    );
+}
+
+#[test]
+fn borrowed_validation_has_no_png_input_buffer() {
+    assert_no_png_input_buffer(false);
+}
+
+#[test]
+fn retained_pixel_decoder_has_no_png_input_buffer() {
+    assert_no_png_input_buffer(true);
+}
+
 #[test]
 fn actual_charged_row_overlaps_rgba_and_releases_while_pixel_aliases_remain() {
     let snapshot = tests::workspace_fixture();
