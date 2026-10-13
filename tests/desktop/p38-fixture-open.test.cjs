@@ -15,16 +15,18 @@ function execute(openResults, configPatch = {}, runtime = {}) {
     taskKey:'a'.repeat(64), sourceSha:'b'.repeat(40), buildSha:'b'.repeat(40), manifestSha256:'c'.repeat(64),
     pid:42, fixtures:{...fixtures}, ...configPatch };
   const checkpointInvoke = async (_name,args)=>{calls.push(JSON.parse(args.payloadJson));};
-  const core = {invoke:function(name,args){
+  const baseInvoke = function(name,args){
     if(name==='nemo_test_p38_fixture_open_probe')return checkpointInvoke(name,args);
     return runtime.invoke ? Reflect.apply(runtime.invoke,this,arguments) : Promise.resolve({available:false});
-  }};
+  };
+  const core = {invoke:runtime.lateInvoke?null:baseInvoke};
   const fs = {readTextFile:function(){return runtime.readTextFile ? Reflect.apply(runtime.readTextFile,this,arguments) : Promise.resolve('{}');}};
   const project = {openPath:runtime.openPath || async function(path){opened.push(path);return openResults.shift();}};
-  const originalOpen=project.openPath, originalInvoke=core.invoke, originalRead=fs.readTextFile;
+  const originalOpen=project.openPath, originalInvoke=baseInvoke, originalRead=fs.readTextFile;
   const window = { [ '__NEMO_P38_FIXTURE_OPEN__' ]:config, __TAURI__:{core,fs} };
   if(!runtime.lateBind)window.SMProject=project;
   vm.runInNewContext(script, {window, Date, setTimeout, Promise, Object, Number, Error});
+  if(runtime.lateInvoke)core.invoke=baseInvoke;
   if(runtime.bind)runtime.bind({project,core,fs,window});
   if(runtime.lateBind)window.SMProject=project;
   return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,
@@ -105,6 +107,21 @@ test('early native observation precedes and sees the adapter cached invoke bindi
       return Promise.reject({code:'unsupported_format'});
     }});
   assert.equal(result.calls[1].failureCode,'a-native-bootstrap-unsupported-format');
+  assert.equal(result.restored,true);
+});
+
+test('late native observation cannot label an adapter-cached open as pre-native refusal', async()=>{
+  let cachedInvoke;
+  const result=await execute([], {}, {lateInvoke:true,lateBind:true,
+    bind:refs=>{cachedInvoke=refs.core.invoke.bind(refs.core);},
+    openPath:function(){
+      return Reflect.apply(cachedInvoke,this,['nemo_native_object_bootstrap',{requestJson:'opaque'}])
+        .then(()=>false,()=>false);
+    },invoke:function(command){
+      assert.equal(command,'nemo_native_object_bootstrap');
+      return Promise.reject({code:'unsupported_format'});
+    }});
+  assert.equal(result.calls[1].failureCode,'a-observer-late-untrusted');
   assert.equal(result.restored,true);
 });
 

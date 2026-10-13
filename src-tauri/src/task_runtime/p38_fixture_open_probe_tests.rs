@@ -32,6 +32,7 @@ fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
         "a-native-status-empty-no-bootstrap",
         "a-native-status-available-no-bootstrap",
         "a-native-status-malformed-no-bootstrap",
+        "a-observer-late-untrusted",
         "a-fs-read-resolved-open-refused",
     ] {
         assert!(super::control::allowed_a_failure(code), "{code}");
@@ -47,6 +48,7 @@ fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
         "b-native-status-empty-no-bootstrap",
         "b-native-status-available-no-bootstrap",
         "b-native-status-malformed-no-bootstrap",
+        "b-observer-late-untrusted",
         "b-fs-read-resolved-open-refused",
     ] {
         assert!(super::control::allowed_b_failure(code), "{code}");

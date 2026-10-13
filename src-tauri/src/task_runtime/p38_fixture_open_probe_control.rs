@@ -175,6 +175,7 @@ pub(super) fn allowed_a_failure(code: &str) -> bool {
             | "a-native-status-empty-no-bootstrap"
             | "a-native-status-available-no-bootstrap"
             | "a-native-status-malformed-no-bootstrap"
+            | "a-observer-late-untrusted"
             | "a-fs-read-rejected"
             | "a-fs-read-resolved-open-refused"
     )
@@ -194,6 +195,7 @@ pub(super) fn allowed_b_failure(code: &str) -> bool {
             | "b-native-status-empty-no-bootstrap"
             | "b-native-status-available-no-bootstrap"
             | "b-native-status-malformed-no-bootstrap"
+            | "b-observer-late-untrusted"
             | "b-fs-read-rejected"
             | "b-fs-read-resolved-open-refused"
     )

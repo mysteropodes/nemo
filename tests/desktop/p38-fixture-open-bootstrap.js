@@ -23,6 +23,7 @@
   window.__NEMO_P38_FIXTURE_OPEN_STARTED__ = true;
   let activeOpen = null;
   let restoreNative = null;
+  let nativeObserverEarly = false;
   function observePromise(value, fulfilled, rejected) {
     try {
       if (value && typeof value.then === 'function') value.then(
@@ -96,6 +97,7 @@
     if (trace.status === 'empty') return prefix + '-native-status-empty-no-bootstrap';
     if (trace.status === 'available') return prefix + '-native-status-available-no-bootstrap';
     if (trace.status === 'resolved') return prefix + '-native-status-malformed-no-bootstrap';
+    if (!nativeObserverEarly) return prefix + '-observer-late-untrusted';
     if (!trace.status && !trace.bootstrap && !trace.fsRead) return prefix + '-pre-native-refusal';
     return fallback;
   }
@@ -127,7 +129,8 @@
     throw new Error('open-path-unavailable');
   }
   if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
-    try { restoreNative = installNativeObserver(); } catch (_) { restoreNative = null; }
+    try { restoreNative = installNativeObserver(); nativeObserverEarly = !!restoreNative; }
+    catch (_) { restoreNative = null; }
   }
   async function open(phase, id) {
     const trace = {};
