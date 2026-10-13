@@ -23,7 +23,7 @@ function host(){
       assert.equal(r.projectOnly,true);assert.equal(typeof r.sourcePath,'string');assert.equal('documentJson' in r,false);
       if(r.sourcePath==='/opacity.json')throw {code:'unsupported_format'};
       if(r.sourcePath==='/bad.json')throw {code:'invalid_request'};
-      installed=true;return {...info(),requestId:r.requestId};
+      installed=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
     }
     if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
       if(failure==='inspection')throw Error('Owner unavailable');
@@ -195,6 +195,8 @@ function replacementHost(){
       install(r.sourcePath);
       const receipt={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:owner.documentId,
         contentRevision:0,resourceCount:0,viewportAvailable:false};
+      if(r.sourcePath==='/bad-resource.json')receipt.resourceCount=2;
+      if(r.sourcePath==='/bad-viewport.json')receipt.viewportAvailable=true;
       seen.set(r.requestId,{request:r,receipt});return receipt;
     }
     if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
@@ -381,6 +383,15 @@ test('a retained B receipt cannot publish after native owner advances to C',asyn
   assert.deepEqual(f.effects,[['open','/a.json']]);
   assert.equal(h.previews.length,2,'no B frame reached presentation');
 });
+
+for(const path of ['/bad-resource.json','/bad-viewport.json']){
+  test('malformed B bootstrap receipt '+path+' fences before presentation',async()=>{
+    const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+    assert.equal(await f.ui.openPath(path),false);
+    assert.equal(s.isActive(),false);assert.equal(s.readPresentedObjectSession(),null);
+    assert.deepEqual(f.effects,[['open','/a.json']]);assert.equal(h.previews.length,2);
+  });
+}
 
 test('a presented B frame is rejected when the native owner changes before the status gate',async()=>{
   const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');

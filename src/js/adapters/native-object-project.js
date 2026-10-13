@@ -82,7 +82,8 @@
           dispatched=true;inBootstrap=true;
           var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
           if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
-              !id(receipt.documentId)||receipt.contentRevision!==0||previous&&receipt.documentId===previous.documentId)
+              !id(receipt.documentId)||receipt.contentRevision!==0||!integer(receipt.resourceCount,0)||
+              receipt.resourceCount>1||receipt.viewportAvailable!==false||previous&&receipt.documentId===previous.documentId)
             throw new Error('Native project Open could not be reconciled');
           var installed=await status();
           if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
