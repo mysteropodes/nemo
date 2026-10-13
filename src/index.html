@@ -2308,6 +2308,13 @@
 <script src="js/application/native-opacity-v1.js"></script>
 <script src="js/application/native-opacity-lifecycle.js"></script>
 <script src="js/application/native-opacity-viewport.js"></script>
+<!-- The ordinary native project adapters must exist before opacity's legacy
+     guard and the later reference/project UI consumers install. -->
+<script src="js/application/native-object-save-as-workflow.js"></script>
+<script src="js/application/native-object-saved-acknowledgement.js"></script>
+<script src="js/adapters/native-object-project.js"></script>
+<script src="js/adapters/native-object-project-file.js"></script>
+<script src="js/adapters/native-object-reference.js"></script>
 <script src="js/application/native-opacity-operations.js"></script>
 <script src="js/application/opacity-application.js"></script>
 <script src="js/adapters/native-opacity-legacy-surface.js"></script>

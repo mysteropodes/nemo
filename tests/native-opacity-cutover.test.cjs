@@ -485,6 +485,11 @@ test('classic startup loads frozen guard modules before the production first-lay
     'js/application/native-opacity-v1.js',
     'js/application/native-opacity-lifecycle.js',
     'js/application/native-opacity-viewport.js',
+    'js/application/native-object-save-as-workflow.js',
+    'js/application/native-object-saved-acknowledgement.js',
+    'js/adapters/native-object-project.js',
+    'js/adapters/native-object-project-file.js',
+    'js/adapters/native-object-reference.js',
     'js/application/native-opacity-operations.js', 'js/application/opacity-application.js',
     'js/adapters/native-opacity-legacy-surface.js', 'js/adapters/native-opacity-motion-surface.js',
     'js/domain/component/exposed-properties.js'];

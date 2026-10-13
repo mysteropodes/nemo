@@ -51,17 +51,21 @@
         value.instanceId !== pin.instanceId || value.documentId !== pin.documentId ||
         value.contentRevision !== pin.contentRevision || value.ok !== true) return false;
     var r = value.result;
+    if (request.operation === 'query.document.project.info') return fields(r, ['atRevision', 'documentSnapshotId', 'documentDigest', 'byteCount']) &&
+      r.atRevision === pin.contentRevision && r.documentSnapshotId === pin.documentSnapshotId &&
+      typeof r.documentDigest === 'string' && /^[a-f0-9]{64}$/.test(r.documentDigest) &&
+      integer(r.byteCount, 1) && r.byteCount <= 32 * 1024 * 1024;
     return fields(r, ['atRevision', 'documentSnapshotId', 'documentJson']) &&
       r.atRevision === pin.contentRevision && r.documentSnapshotId === pin.documentSnapshotId &&
       typeof r.documentJson === 'string' && r.documentJson.length > 0;
   }
-  function diskReceipt(value, request) {
+  function diskReceipt(value, request, project) {
     if (!fields(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'atRevision',
         'documentSnapshotId', 'byteCount', 'published', 'cleanupPending']) ||
         value.apiVersion !== request.apiVersion || value.requestId !== request.requestId ||
         value.instanceId !== request.instanceId || value.documentId !== request.documentId ||
         value.atRevision !== request.atRevision || value.documentSnapshotId !== request.documentSnapshotId ||
-        !integer(value.byteCount, 1) || value.byteCount > 4096 ||
+        !integer(value.byteCount, 1) || value.byteCount > (project ? 32 * 1024 * 1024 : 4096) ||
         typeof value.published !== 'boolean' || typeof value.cleanupPending !== 'boolean') return null;
     // Detach the receipt from its port; do not retain a mutable native response.
     return Object.freeze({ apiVersion: value.apiVersion, requestId: value.requestId,
@@ -83,7 +87,7 @@
       return result('refused', 'invalid-workflow-input');
     }
     // Keep request identity and the chosen authority ports stable across awaits.
-    options = { requestId: options.requestId, pinRequestId: options.pinRequestId,
+    options = { requestId: options.requestId, pinRequestId: options.pinRequestId, project: options.project === true,
       signal: options.signal, isCurrent: options.isCurrent };
     ports = { readPresentedObjectSession: typeof ports.readPresentedObjectSession === 'function'
         ? ports.readPresentedObjectSession.bind(ports) : function () { return null; },
@@ -95,7 +99,7 @@
     if (!pin) return result('unavailable', 'current-presented-object-session-unavailable');
     var acquire = Object.freeze({ apiVersion: 2, requestId: options.pinRequestId,
       instanceId: pin.instanceId, documentId: pin.documentId,
-      operation: 'query.document.object.serialize', payload: Object.freeze({ atRevision: pin.contentRevision }) });
+      operation: options.project ? 'query.document.project.info' : 'query.document.object.serialize', payload: Object.freeze({ atRevision: pin.contentRevision }) });
     try {
       // Native bytes are inspected only as an opaque successful serializer result.
       // They are never parsed, assembled, retained, or supplied to the file writer.
@@ -118,7 +122,7 @@
       instanceId: pin.instanceId, documentId: pin.documentId, atRevision: pin.contentRevision,
       documentSnapshotId: pin.documentSnapshotId, destinationPath: path });
     var receipt;
-    try { receipt = diskReceipt(await ports.savePinned(request), request); }
+    try { receipt = diskReceipt(await ports.savePinned(request), request, options.project); }
     catch (_) { return result('indeterminate', 'publication-response-unavailable', pin, path); }
     if (!receipt) return result('indeterminate', 'publication-response-uncorrelated', pin, path);
     if (!receipt.published) return result('refused', 'native-publication-refused', pin, path, receipt);

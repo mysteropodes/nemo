@@ -240,10 +240,13 @@ function safeStartupDiagnostics(value) {
   const classes = ['rust-panic','tauri-startup-abort','p38-startup-refusal','unclassified-startup-abort','stderr-unavailable','diagnostic-capture-failed'];
   const states = ['starting','active','stopped','exited','failed','reconciliation-required'];
   const signals = ['SIGABRT','SIGSEGV','SIGILL','SIGBUS','SIGTRAP','SIGKILL','SIGTERM','SIGINT'];
+  const manifestOutcomes = ['status-unavailable','manifest-pending','manifest-not-written','manifest-invalid-schema',
+    'manifest-task-mismatch','manifest-present','manifest-error-other','manifest-unclassified'];
   if (!value || typeof value !== 'object') return undefined;
   const safe = { classification: classes.includes(value.classification) ? value.classification : 'diagnostic-capture-failed' };
   if (states.includes(value.runtimeState)) safe.runtimeState = value.runtimeState;
   if (signals.includes(value.signal)) safe.signal = value.signal;
+  if (value.manifestOutcome !== undefined) safe.manifestOutcome = manifestOutcomes.includes(value.manifestOutcome) ? value.manifestOutcome : 'manifest-unclassified';
   if (Number.isSafeInteger(value.stderrBytes) && value.stderrBytes >= 0 && value.stderrBytes <= STARTUP_DIAGNOSTIC_LIMIT) safe.stderrBytes = value.stderrBytes;
   if (typeof value.stderrSha256 === 'string' && /^[a-f0-9]{64}$/.test(value.stderrSha256)) safe.stderrSha256 = value.stderrSha256;
   if (typeof value.truncated === 'boolean') safe.truncated = value.truncated;
@@ -256,12 +259,25 @@ function classifyStartupStderr(bytes) {
   if (/P38 (?:fixture|probe|runtime|owner|checkpoint) [a-z -]+/.test(text)) return 'p38-startup-refusal';
   return bytes.length ? 'unclassified-startup-abort' : 'stderr-unavailable';
 }
+function classifyManifestOutcome(status) {
+  if (!status) return 'status-unavailable';
+  if (typeof status.appRuntimeError === 'string') {
+    if (status.appRuntimeError === 'app did not write its runtime manifest') return 'manifest-not-written';
+    if (status.appRuntimeError === 'app manifest is not a nemo.native-runtime/1 document') return 'manifest-invalid-schema';
+    if (status.appRuntimeError.startsWith('app manifest belongs to task ')) return 'manifest-task-mismatch';
+    return 'manifest-error-other';
+  }
+  if (status.appRuntime && typeof status.appRuntime === 'object') return 'manifest-present';
+  if (['starting','active'].includes(status.state)) return 'manifest-pending';
+  return 'manifest-unclassified';
+}
 async function captureStartupDiagnostics(task, isolation, runtime) {
   const deadline = Date.now() + 1200;
   let status = null;
   do {
     try { status = runtime.readNativeStatus(task); } catch { status = null; }
-    if (status && ['stopped','exited','failed','reconciliation-required'].includes(status.state)) break;
+    if (status && (['stopped','exited','failed','reconciliation-required'].includes(status.state) ||
+      typeof status.appRuntimeError === 'string')) break;
     await new Promise(resolve => setTimeout(resolve, 25));
   } while (Date.now() < deadline);
   let bytes = Buffer.alloc(0), truncated = false;
@@ -292,6 +308,7 @@ async function captureStartupDiagnostics(task, isolation, runtime) {
     } finally { fs.closeSync(fd); }
   } catch { /* Unsafe or missing logs stay unavailable and never block cleanup. */ }
   return safeStartupDiagnostics({ classification: classifyStartupStderr(bytes),
+    manifestOutcome: classifyManifestOutcome(status),
     ...(status && ['starting','active','stopped','exited','failed','reconciliation-required'].includes(status.state) ? { runtimeState: status.state } : {}),
     ...(status && typeof status.signal === 'string' ? { signal: status.signal } : {}), stderrBytes: bytes.length, stderrSha256: hash(bytes), truncated });
 }
@@ -627,4 +644,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };

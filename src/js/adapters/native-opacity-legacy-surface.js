@@ -227,6 +227,7 @@
   function desktopPorts(root, transport) {
     var tauri = root.__TAURI__, invoke = tauri.core.invoke;
     return Object.freeze({
+      objectProject: function () { return root.NemoNativeObjectProject ? root.NemoNativeObjectProject.desktop(root) : null; },
       document: root.SMProjectDocument, editor: root.NemoNativeOpacityEditorAdapter,
       selection: root.NemoNativeOpacitySelectionAdapter,
       createPreview: function () { return root.NemoNativeOpacityPreviewAdapter.createNativeOpacityPreviewAdapter(); },

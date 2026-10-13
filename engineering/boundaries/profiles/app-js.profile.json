@@ -2065,6 +2065,42 @@
       ]
     },
     {
+      "id": "app.native.object.project.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-project.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-project.js"
+      ]
+    },
+    {
+      "id": "app.native.object.project-file.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-project-file.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-project-file.js"
+      ]
+    },
+    {
+      "id": "app.native.object.reference.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-reference.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-reference.js"
+      ]
+    },
+    {
       "id": "app.native.opacity.legacy-surface.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

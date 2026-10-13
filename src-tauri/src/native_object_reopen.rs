@@ -3,12 +3,12 @@ use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, HostResult,
 };
-use crate::native_object_bootstrap::{bootstrap_raw, ObjectBootstrapReceipt};
+use crate::native_object_bootstrap::{bootstrap_file_bytes, bootstrap_raw, ObjectBootstrapReceipt};
 use serde::Deserialize;
 use std::{fs::File, io::Read, path::Path};
 
 const MAX_FILE_REQUEST_BYTES: usize = 4096;
-const MAX_FILE_BYTES: u64 = 1_048_576;
+const MAX_FILE_BYTES: u64 = 32 * 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -17,6 +17,8 @@ struct FileRequest {
     request_id: String,
     instance_id: String,
     source_path: String,
+    #[serde(default)]
+    project_only: bool,
     #[serde(default)]
     cancelled_before_dispatch: bool,
 }
@@ -94,15 +96,23 @@ pub(super) fn bootstrap_request(
                     "object project file exceeds byte limit",
                 ));
             }
-            let document_json = String::from_utf8(bytes)
-                .map_err(|_| host_error("invalid_request", "object project file is not UTF-8"))?;
-            let wrapper = serde_json::json!({"apiVersion":request.api_version,
-                "requestId":request.request_id,"instanceId":request.instance_id,
-                "documentJson":document_json})
-            .to_string();
-            // Original byte admission also bounds the entire escaped wrapper,
-            // validates all records and owns the single atomic installation.
-            return bootstrap_raw(state, &wrapper);
+            // Original file bytes go straight to the selected strict codec;
+            // embedded media never crosses an escaped JSON/JavaScript wrapper.
+            if request.project_only {
+                #[derive(Deserialize)]
+                struct Format {
+                    format: Option<String>,
+                }
+                let format: Format = serde_json::from_slice(&bytes)
+                    .map_err(|_| host_error("invalid_request", "invalid project file"))?;
+                if format.format.as_deref() != Some("nemo.native-project-document") {
+                    return Err(host_error(
+                        "unsupported_format",
+                        "file is not a native project",
+                    ));
+                }
+            }
+            return bootstrap_file_bytes(state, request.request_id, &bytes);
         }
     }
     bootstrap_raw(state, raw)
