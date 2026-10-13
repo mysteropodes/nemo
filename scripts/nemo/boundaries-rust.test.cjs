@@ -313,6 +313,28 @@ test('P37C1C4A CPU payload children stay private within revision and read-query 
   ]) assert.equal(pairs.has(forbidden), false, `${forbidden} must stay denied`);
 });
 
+test('P37C1C4B PNG scanline children remain private and covered by the native profile', () => {
+  const profile = read('rust.profile.json');
+  for (const [id, file, source] of [
+    ['rust.native.engine.codec', 'reference_png_scanlines.rs', 'native-engine/src/reference_png_scanlines.rs'],
+    ['rust.native.engine.tests', 'reference_png_scanlines.rs', 'native-engine/tests/reference_png_scanlines.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner.files.includes(file));
+    assert.equal(owner.publicApi.includes(file), false);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== file);
+    const coverage = require('./lib/boundaries-coverage.cjs').checkSourceCoverage(missing, {
+      root: ROOT, sourcePaths: [source],
+    });
+    assert.ok(coverage.violations.some((violation) =>
+      violation.rule === 'coverage-unprofiled-source' && violation.file === source));
+  }
+  const result = R.checkRustCrate(profile, read('native-engine.edges.json'), { root: ROOT });
+  assert.equal(result.ok, true, JSON.stringify(result.violations));
+  assert.deepEqual(result.unsupported, []);
+});
+
 
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);

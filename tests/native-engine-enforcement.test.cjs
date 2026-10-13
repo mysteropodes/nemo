@@ -45,7 +45,9 @@ const CANDIDATE_FILES = [
   'native-engine/src/project_media_codec.rs',
   'native-engine/tests/project_media_codec.rs',
   'native-engine/src/reference_image_asset.rs',
+  'native-engine/src/reference_png_scanlines.rs',
   'native-engine/tests/reference_image_asset.rs',
+  'native-engine/tests/reference_png_scanlines.rs',
   'native-engine/src/object_snapshot.rs',
   'native-engine/src/object_frame_packet.rs',
   'native-engine/tests/object_frame_packet.rs',
@@ -252,7 +254,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(members), cargo.features);
   assert.deepEqual(members.default, []);
   assert.deepEqual(members.codec, ['dep:serde', 'dep:serde_json']);
-  assert.deepEqual(members.reference_image_asset, ['dep:png']);
+  assert.deepEqual(members.reference_image_asset, ['dep:png', 'dep:flate2']);
+  assert.match(cargoText, /^flate2 = \{ version = "=1\.1\.10", default-features = false, features = \["rust_backend"\], optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
