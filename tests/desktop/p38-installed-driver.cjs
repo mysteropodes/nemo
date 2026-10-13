@@ -182,14 +182,23 @@ async function runOperator(config, services) {
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
       'source-head-refused','fresh-build-proof-required','window-helper-refused','grant-already-attempted',
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended',
-      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed'; }
+      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
+    receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight' });
+    receipt.status = 'partial'; save(); // Persist the first safe refusal before cleanup can fail.
+  }
   finally {
     if (timer !== undefined) services.clearTimer(timer);
     try { if (services.close) await services.close(); receipt.helperCleanup = 'complete'; }
-    catch (_) { failure = true; receipt.helperCleanup = 'incomplete'; receipt.reason = 'helper-cleanup-incomplete'; }
+    catch (_) { failure = true; receipt.helperCleanup = 'incomplete';
+      if (!receipt.firstFailure) { receipt.reason = 'helper-cleanup-incomplete';
+        receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: 'helper-cleanup' }); }
+    }
     if (controller) {
-      try { await controller.cleanup(); receipt.cleanup = receipt.helperCleanup === 'incomplete' ? 'incomplete' : 'complete'; }
-      catch (_) { receipt.cleanup = 'incomplete'; receipt.status = 'partial'; receipt.reason = 'cleanup-incomplete'; }
+      try { await controller.cleanup(); receipt.cleanup = 'complete'; } // Owner cleanup is independent of helper cleanup.
+      catch (_) { failure = true; receipt.cleanup = 'incomplete';
+        if (!receipt.firstFailure) { receipt.reason = 'cleanup-incomplete';
+          receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: 'owner-cleanup' }); }
+      }
     }
     if (failure) receipt.status = 'partial';
     save();
