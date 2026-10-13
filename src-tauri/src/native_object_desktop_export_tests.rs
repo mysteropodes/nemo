@@ -1,8 +1,12 @@
 //! Original application authority plus real desktop destination controls.
-use super::{admit_request, export_with_target, MAX_PNG_BYTES};
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::host_error;
-use native_engine::{compositor::Compositor, object_codec::decode_storage_project};
+use crate::native_object_desktop_export::{
+    admit_request, export_with_target, port::LazyDesktopArtifactPort, MAX_PNG_BYTES,
+};
+use native_engine::{
+    compositor::Compositor, export_job::StagedArtifactPort, object_codec::decode_storage_project,
+};
 use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
 
@@ -145,6 +149,24 @@ fn original_owner_and_revision_barriers_precede_any_target_callback() {
     assert!(!scratch.stage().exists());
 }
 
+#[test]
+fn lazy_artifact_port_refuses_pre_begin_operations_without_filesystem_effects() {
+    let scratch = Scratch::new();
+    let mut port = LazyDesktopArtifactPort::new(
+        scratch.stage(),
+        "object-output".into(),
+        scratch.destination(),
+    );
+    assert!(port
+        .write_frame("job", "frame_0001.png", b"invalid")
+        .is_err());
+    assert!(port.publish("job", "object-output", &[]).is_err());
+    assert!(port.begin_staging("job", "foreign").is_err());
+    assert!(port.cleanup("job").is_ok());
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+}
+
 #[cfg(target_os = "macos")]
 fn decoded_pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
     use objc::runtime::Object;
@@ -174,8 +196,22 @@ fn decoded_pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
 fn exact_application_owner_publishes_literal_png_through_real_port() {
     let scratch = Scratch::new();
     let (state, raw) = fixture(&scratch);
-    let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
     let mut gpu = Compositor::new().unwrap();
+    let mut stale = raw.clone();
+    stale["documentSnapshotId"] = json!("foreign-snapshot");
+    let stale = admit_request(&stale.to_string(), state.instance_id(), |_| true).unwrap();
+    assert!(
+        export_with_target(&state, &stale, scratch.stage(), |consumer| {
+            consumer
+                .run(&mut gpu)
+                .map_err(|message| host_error("unavailable", message))
+        })
+        .is_err()
+    );
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+
+    let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
     let result = export_with_target(&state, &admitted, scratch.stage(), |consumer| {
         consumer
             .run(&mut gpu)

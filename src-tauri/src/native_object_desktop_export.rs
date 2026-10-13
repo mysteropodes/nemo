@@ -4,7 +4,6 @@ use crate::native_application_contract::{
     bounded_id, host_error, reconcile_export, require_api_instance, require_main, HostResult,
     OutputSpecInput, ViewportInput, HOST_API_VERSION,
 };
-use crate::native_application_ports::DesktopArtifactPort;
 use crate::native_application_viewport::{self as viewport_host, NativeViewportConsumer};
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
@@ -22,6 +21,10 @@ use std::{
 };
 use tauri::Manager;
 use tauri_plugin_fs::FsExt;
+
+#[path = "native_object_desktop_export_port.rs"]
+mod port;
+use port::LazyDesktopArtifactPort;
 
 const MAX_REQUEST_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -219,10 +222,8 @@ struct ObjectExportConsumer<'a> {
 }
 impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
-        let mut port = DesktopArtifactPort::new(
-            self.staging_root,
-            [(OUTPUT_HANDLE.into(), self.destination)],
-        )?;
+        let mut port =
+            LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination);
         self.owner.export_pinned_object_png(
             &self.selector,
             self.request_id,
