@@ -467,12 +467,12 @@ test('main press diagnostics distinguish route, AXPress support and perform outc
   const f=fixture();f.services.next=async()=>({type:'press',element:'2'});
   f.services.window=async(mode,pid)=>mode==='discover'?{pid,windowId:45,matchedAX:true}:
     {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:diagnostic};
-  f.services.close=async()=>{throw Object.assign(Error('/private/group'),{cleanupDiagnostics:[{stage:'group-remains',helperPid:321,capturePossible:true,
+  f.services.close=async()=>{throw Object.assign(Error('/private/group'),{cleanupDiagnostics:[{stage:'group-remains',helperPid:321,descendantPossible:true,
     groupAliveBefore:true,groupAliveAfterTerm:true,groupAliveAfterKill:true,signalAttempts:2}]});};
   const result=await runOperator(f.cfg,f.services);
   assert.equal(result.firstFailure.code,'adapter-refused');assert.equal(result.firstFailure.stage,'window-press-main');
   assert.deepEqual(result.firstFailure.actionDiagnostics,clean);
-  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-remains',helperPid:321,capturePossible:true,
+  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-remains',helperPid:321,descendantPossible:true,
     groupAliveBefore:true,groupAliveAfterTerm:true,groupAliveAfterKill:true,signalAttempts:2}]);
   assert.equal(result.helperCleanup,'incomplete');assert.equal(result.cleanup,'complete');
   for(const receipt of f.receipts)assert.equal(JSON.stringify(receipt).includes('/private/'),false);
@@ -677,23 +677,23 @@ test('helper liveness, signal and wait exceptions produce sanitized incomplete c
 });
 test('non-capture helper cleanup records exact-handle signal and wait exceptions',async()=>{
   const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
-  const child={pid:321,p38CapturePossible:false,exitCode:null,signalCode:null,kill(){throw Error('/private/exact-signal');}};
+  const child={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill(){throw Error('/private/exact-signal');}};
   await assert.rejects(cleanupHelper(child),error=>{
-    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-signal-error',helperPid:321,capturePossible:false,
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-signal-error',helperPid:321,descendantPossible:false,
       signalKind:'SIGTERM',signalAttempts:1,signalError:true}]);return true;
   });
-  const waiting={pid:321,p38CapturePossible:false,exitCode:null,signalCode:null,kill:()=>{}};
+  const waiting={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill:()=>{}};
   await assert.rejects(cleanupHelper(waiting,{delay(){throw Error('/private/exact-wait');}}),error=>{
-    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-wait-error',helperPid:321,capturePossible:false,
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-wait-error',helperPid:321,descendantPossible:false,
       signalKind:'SIGTERM',signalAttempts:1,probePoint:'wait-term'}]);return true;
   });
 });
 test('cleanup loop preserves detailed exception facts or supplies a bounded fallback stage',()=>{
   const {cleanupFailureDiagnostics,safeCleanupDiagnostics,closeOwnedHelpers}=require('./desktop/p38-installed-driver.cjs');
-  const prior=[{stage:'group-absent',helperPid:123,capturePossible:true,groupAliveBefore:false,signalAttempts:0}];
+  const prior=[{stage:'group-absent',helperPid:123,descendantPossible:true,groupAliveBefore:false,signalAttempts:0}];
   const fallback=cleanupFailureDiagnostics(Error('/private/close'),prior,99);
   assert.deepEqual(safeCleanupDiagnostics(fallback),[...prior,{stage:'cleanup-loop-error',helpersRemaining:8}]);
-  const reported=[{stage:'group-probe-error',helperPid:123,capturePossible:true,probePoint:'initial',signalAttempts:0,probeError:true}];
+  const reported=[{stage:'group-probe-error',helperPid:123,descendantPossible:true,probePoint:'initial',signalAttempts:0,probeError:true}];
   assert.deepEqual(cleanupFailureDiagnostics(Error('ignored'),prior,1),[...prior,{stage:'cleanup-loop-error',helpersRemaining:1}]);
   assert.deepEqual(cleanupFailureDiagnostics(Object.assign(Error('private'),{cleanupDiagnostics:reported}),prior,1),[...prior,...reported]);
 });
@@ -701,15 +701,15 @@ test('input-close failure still attempts helper cleanup and retains both observa
   const {closeOwnedHelpers,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
   let cleaned=0;
   await assert.rejects(closeOwnedHelpers(()=>{throw Error('/private/stdin');},[{pid:12},{pid:13}],async child=>{
-    cleaned++; if(child.pid===12)throw Object.assign(Error('/private/helper'),{cleanupDiagnostics:[{stage:'group-signal-error',helperPid:12,capturePossible:true,
+    cleaned++; if(child.pid===12)throw Object.assign(Error('/private/helper'),{cleanupDiagnostics:[{stage:'group-signal-error',helperPid:12,descendantPossible:true,
       groupAliveBefore:true,signalAttempts:1,signalKind:'SIGTERM',signalError:true}]});
-    return [{stage:'group-absent',helperPid:13,capturePossible:true,groupAliveBefore:false,signalAttempts:0}];
+    return [{stage:'group-absent',helperPid:13,descendantPossible:true,groupAliveBefore:false,signalAttempts:0}];
   }),error=>{
     assert.equal(cleaned,2);
     assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[
-      {stage:'group-absent',helperPid:13,capturePossible:true,groupAliveBefore:false,signalAttempts:0},
+      {stage:'group-absent',helperPid:13,descendantPossible:true,groupAliveBefore:false,signalAttempts:0},
       {stage:'input-close-error',helpersRemaining:2},
-      {stage:'group-signal-error',helperPid:12,capturePossible:true,groupAliveBefore:true,signalAttempts:1,signalKind:'SIGTERM',signalError:true},
+      {stage:'group-signal-error',helperPid:12,descendantPossible:true,groupAliveBefore:true,signalAttempts:1,signalKind:'SIGTERM',signalError:true},
     ]);
     assert.equal(JSON.stringify(error.cleanupDiagnostics).includes('/private/'),false);return true;
   });
@@ -727,7 +727,7 @@ test('cleanup exception facts do not replace the saved first refusal',async()=>{
   assert.equal(result.firstFailure.code,'adapter-refused');
   assert.deepEqual(result.firstFailure.actionDiagnostics,safeActionDiagnostics(diagnostic));
   assert.equal(result.helperCleanup,'incomplete');
-  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-probe-error',helperPid:321,capturePossible:true,
+  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-probe-error',helperPid:321,descendantPossible:true,
     probePoint:'initial',signalAttempts:0,probeError:true}]);
   assert.equal(result.cleanup,'complete');assert.equal(JSON.stringify(result).includes('/private/'),false);
 });
@@ -807,6 +807,40 @@ for(const mode of ['positive','EOF','malformed','foreign','refused','oversized',
     }else await assert.rejects(window('discover',123),e=>['helper-input-ended','helper-malformed','owned-window-refused','confirm-unsupported'].includes(e.code));
   }finally{
     for(const child of [...helpers])await cleanupHelper(child);
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+
+test('press helper cleanup retains and kills its process group after helper exit',async()=>{
+  // Disposable Node processes only. This models the Swift sampler outliving its supervisor.
+  const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs');
+  const {once}=require('node:events'),crypto=require('node:crypto'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-worker-group-')),
+    helpers=new Set(),workerPidFile=path.join(dir,'worker.pid');
+  try{
+    const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,'{}');
+      return{label,path:file,sha256:crypto.createHash('sha256').update('{}').digest('hex')};});
+    const script=path.join(dir,'modeled-helper');
+    fs.writeFileSync(script,'#!/usr/bin/env node\nconsole.log(JSON.stringify({status:"pinned",pid:123,windowId:45,matchedAX:true}));\n'+
+      'require("node:readline").createInterface({input:process.stdin}).on("line",()=>{'+
+      'const worker=require("node:child_process").spawn(process.execPath,["-e","setInterval(()=>{},1000)"],{stdio:"ignore"});'+
+      'require("node:fs").writeFileSync('+JSON.stringify(workerPidFile)+',String(worker.pid));setTimeout(()=>process.exit(0),30);});\n',{mode:0o700});
+    const guard=safeDirectory(dir,['reports']),window=createWindowTransport({windowHelper:script,grant:{id:'worker-group-model'},fixtures},
+      guard.directory,()=>guard,helpers,1000);
+    assert.equal((await window('discover',123)).windowId,45);
+    const helper=[...helpers][0],closed=once(helper,'close');
+    assert.equal(helper.p38GroupMayContainDescendants,false);
+    await assert.rejects(window('press',123,45,{element:'2'}),error=>error.code==='helper-input-ended');
+    await closed;
+    assert.equal(helper.p38GroupMayContainDescendants,true);
+    assert.equal(helpers.has(helper),true,'helper remains tracked while its sampler descendant occupies the group');
+    const workerPid=Number(fs.readFileSync(workerPidFile,'utf8'));
+    assert.ok(Number.isSafeInteger(workerPid)&&workerPid>0);
+    assert.doesNotThrow(()=>process.kill(-helper.pid,0),'the modeled sampler descendant must still occupy the helper group');
+    const cleanup=await cleanupHelper(helper);
+    assert.equal(cleanup[0].stage,'group-terminated');
+    assert.equal(helpers.size,1,'the caller owns set removal after cleanup');
+  }finally{
+    for(const child of [...helpers])await cleanupHelper(child).catch(()=>{});
     fs.rmSync(dir,{recursive:true,force:true});
   }
 });

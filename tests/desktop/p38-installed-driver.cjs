@@ -211,7 +211,7 @@ function safeCleanupDiagnostics(values) {
     check(value && typeof value === 'object' && stages.has(value.stage), 'cleanup-evidence-refused');
     const clean = { stage:value.stage };
     if (value.helperPid !== undefined) { check(Number.isSafeInteger(value.helperPid) && value.helperPid > 0 && value.helperPid <= 2147483647, 'cleanup-evidence-refused'); clean.helperPid=value.helperPid; }
-    for (const key of ['capturePossible','groupAliveBefore','groupAliveAfterTerm','groupAliveAfterKill']) {
+    for (const key of ['descendantPossible','groupAliveBefore','groupAliveAfterTerm','groupAliveAfterKill']) {
       if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'cleanup-evidence-refused'); clean[key]=value[key]; }
     }
     if (value.signalAttempts !== undefined) { check(Number.isInteger(value.signalAttempts) && value.signalAttempts >= 0 && value.signalAttempts <= 2, 'cleanup-evidence-refused'); clean.signalAttempts=value.signalAttempts; }
@@ -506,10 +506,10 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       check(mode === 'discover', 'owned-window-refused');
       const child = spawn(config.windowHelper, ['--persistent', String(pid)], { detached:true, stdio:['pipe','pipe','pipe'],
         env:{...process.env,NEMO_P38_GRANT:config.grant.id,NEMO_P38_REPORT_ROOT:reportGuard.directory} });
-      child.p38CapturePossible=false;
+      child.p38GroupMayContainDescendants=false;
       helpers.add(child); child.on('error', () => {}); child.stdin.on('error', () => {}); child.stderr.resume();
       child.once('close', () => {
-        if(!child.p38CapturePossible){helpers.delete(child);return;}
+        if(!child.p38GroupMayContainDescendants){helpers.delete(child);return;}
         try { process.kill(-child.pid,0); } catch(error) { if(error.code==='ESRCH')helpers.delete(child); }
       });
       const lines = readline.createInterface({input:child.stdout,terminal:false})[Symbol.asyncIterator]();
@@ -521,7 +521,11 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
     verifyFixtures(config);
     const request = { ...action, type:mode, pid, windowId };
     const name = 'capture-' + ++ordinal + '.png', output = path.join(directory,name);
-    if(mode==='capture'){request.capture=name;channel.child.p38CapturePossible=true;}
+    // A refused press can run the bounded CoreGraphics sampler in a child.
+    // Mark the process group before writing so operator timeout/early helper
+    // exit still leaves the helper tracked for group cleanup.
+    if(mode==='press')channel.child.p38GroupMayContainDescendants=true;
+    if(mode==='capture'){request.capture=name;channel.child.p38GroupMayContainDescendants=true;}
     if(mode==='set' && request.target==='sheet')check(config.fixtures.some(f=>request.value===f.path),'fixture-refused');
     channel.child.stdin.write(JSON.stringify(request)+'\n');
     const result = await reply();
@@ -549,12 +553,12 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
 }
 async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
-  const observation = { helperPid:child.pid, capturePossible:child.p38CapturePossible !== false };
-  if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,capturePossible:observation.capturePossible}]});
+  const observation = { helperPid:child.pid, descendantPossible:child.p38GroupMayContainDescendants !== false };
+  if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,descendantPossible:observation.descendantPossible}]});
   const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,...facts}]});
-  // This reviewed helper spawns a descendant ONLY for explicit capture. Once
-  // its non-capture process exits, do not signal a recycled process-group ID.
-  if(child.p38CapturePossible===false){
+  // The helper may own a CG sampler after a refused press or an explicit
+  // capture. Once a non-descendant helper exits, do not signal a recycled PGID.
+  if(child.p38GroupMayContainDescendants===false){
     for(const kind of ['SIGTERM','SIGKILL']){
       if(child.exitCode!==null||child.signalCode!==null)return [{...observation,stage:'helper-exited',exitObserved:true}];
       try { child.kill(kind); } catch { throw failed('exact-helper-signal-error',{signalKind:kind,signalAttempts:kind==='SIGTERM'?1:2,signalError:true}); }
