@@ -136,25 +136,20 @@
     if(t)t.dirty=false;
     renderTabBar();
   }
-  function isDirty(){
-    return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);
-  }
+  function isDirty(){return nativeSavedUI?nativeSavedUI.isDirty():true;}
 
-  var nativeSavedUI=window.NemoProjectNativeSave.createSavedUI({
-    read:function(){return {native:window.NemoNativeOpacityCutover,api:window.__TAURI__,fs:window.__TAURI__&&window.__TAURI__.fs,ui:window.SMProject,tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
-    serialize:projectJSON,
-    prepare:function(){saveFramesIfLegacy();},
-    pick:function(pin){return window.__TAURI__.dialog.save({title:'Save Project As',defaultPath:pin.name+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
-    publish:function(path,json,pin){var fs=pin.fs;return window.NemoProjectNativeSave.writeProjectFile(path,json,{
-      writeTextFile:fs.writeTextFile.bind(fs),rename:fs.rename.bind(fs),remove:fs.remove.bind(fs)});},
-    commit:function(path,json,pin){
-      var name=window.SMProjectDocument.baseName(path);currentPath=path;currentName=name;updateCurrentLabel();
+  var nativeSavedUI=window.NemoProjectNativeSave.bindProjectUI(window,{
+    read:function(){return {tabId:activeTabId,path:currentPath,name:currentName,canvasW:state.canvasW,canvasH:state.canvasH,fps:state.fps};},
+    serialize:projectJSON,prepare:saveFramesIfLegacy,
+    commit:function(path,name){
+      currentPath=path;currentName=name;updateCurrentLabel();
       var tab=activeTab();if(tab){tab.path=path;tab.name=name;}
-      touchRecent(path,currentName,{canvasW:pin.canvasW,canvasH:pin.canvasH,fps:pin.fps},true);renderRecents();markSaved(json);
-      try{localStorage.setItem('nemo-auto',json);}catch(e){}return true;},
+    },
+    touchRecent:touchRecent,renderRecents:renderRecents,markSaved:markSaved,
+    remember:function(json){try{localStorage.setItem('nemo-auto',json);}catch(e){}},
+    isDirty:function(){return !savedBaselineReady||dirtyBaseline.isDirty(projectJSON);},
     invalidate:function(){savedBaselineReady=false;try{renderTabBar();}catch(e){}},
-    notice:function(result,path,mode){showToast(result.status==='saved-current'?(mode==='save'?'Saved':'Saved: '+window.SMProjectDocument.baseName(path)):(result.status==='save-in-progress'?'A save is already in progress.':result.written?'The file was written, but its saved status could not be applied to the current project.':'Save cancelled: the current project changed.'));},
-    failure:function(error){showToast(SM.t('toastSaveFailedSuffix')+(error&&error.message||error));}
+    notice:showToast,hide:hideStartScreen,show:showStartScreen,opened:ensureInitialTab,repaint:renderTabBar
   });
   async function writeProjectTo(path,ticket,mode){projectJSON();return nativeSavedUI.write(path,ticket,mode);}
   // ---- Browser-mode save (2026-07, "ajoute la possibilité de save un
@@ -192,8 +187,10 @@
     return nativeSavedUI.save(writeProjectTo);
   }
   async function openPath(path){
+    if(!nativeSavedUI.allowOpen())return false;
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
+    var nativeOpened=await nativeSavedUI.openNative(path);if(nativeOpened!==null)return nativeOpened;
     var json;
     try{json=await window.__TAURI__.fs.readTextFile(path);}
     catch(e){showToast('Could not read file — it may have moved or been deleted');return false;}
@@ -210,6 +207,7 @@
     }catch(e){showToast('Could not open project — native admission or presentation failed');return false;}
   }
   async function openDialog(){
+    if(!nativeSavedUI.allowOpen())return false;
     if(p39bUseInactiveEntry())return inactiveEntry.openPicker();
     if(!tauriOk()){document.getElementById('file-input').click();return;}
     var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
@@ -630,7 +628,7 @@
   function refreshActiveTabDirtyDot(liveJson){
     var el=document.querySelector('.project-tab[data-tab="'+activeTabId+'"]');
     if(!el)return;
-    el.classList.toggle('dirty',!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
+    el.classList.toggle('dirty',nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive()?isDirty():!savedBaselineReady||dirtyBaseline.isDirtyBytes(liveJson));
   }
   document.getElementById('project-tab-add')&&document.getElementById('project-tab-add').addEventListener('click',addTab);
 

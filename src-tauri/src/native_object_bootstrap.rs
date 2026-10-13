@@ -10,8 +10,15 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_reopen.rs"]
 mod reopen;
 
+#[path = "native_object_reference.rs"]
+mod reference;
 #[path = "native_object_save.rs"]
 mod save;
+#[allow(unused_imports)]
+pub(crate) use reference::{
+    __cmd__nemo_native_object_reference, __tauri_command_name_nemo_native_object_reference,
+    nemo_native_object_reference,
+};
 #[allow(unused_imports)]
 pub(crate) use save::{
     __cmd__nemo_native_object_save_as, __tauri_command_name_nemo_native_object_save_as,
@@ -25,6 +32,10 @@ mod save_tests;
 #[cfg(test)]
 #[path = "native_object_v2_persistence_tests.rs"]
 mod v2_tests;
+
+#[cfg(test)]
+#[path = "native_object_project_tests.rs"]
+mod project_tests;
 
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
@@ -89,18 +100,48 @@ pub(crate) fn bootstrap_raw(
             "object bootstrap was cancelled",
         ));
     }
-    let document = decode_storage_project(request.document_json.as_bytes())
-        .map_err(|_| host_error("invalid_request", "invalid native object document"))?;
-    let (document_id, content_revision) = state
-        .install_native_object(document)
-        .map_err(|_| host_error("unavailable", "native object installation unavailable"))?;
+    bootstrap_file_bytes(state, request.request_id, request.document_json.as_bytes())
+}
+
+pub(super) fn bootstrap_file_bytes(
+    state: &ApplicationMcp,
+    request_id: String,
+    bytes: &[u8],
+) -> HostResult<ObjectBootstrapReceipt> {
+    #[derive(Deserialize)]
+    struct Format {
+        format: String,
+    }
+    // This only chooses between two strict native codecs; it never reconstructs
+    // input bytes or accepts the project. The selected codec validates all keys.
+    let format: Format = serde_json::from_slice(bytes)
+        .map_err(|_| host_error("invalid_request", "invalid native project format"))?;
+    let (document_id, content_revision, resource_count) =
+        if format.format == "nemo.native-project-document" {
+            state
+                .install_native_project_file(bytes)
+                .map_err(|_| host_error("unavailable", "native project installation refused"))?
+        } else {
+            if bytes.len() >= MAX_OBJECT_BOOTSTRAP_BYTES {
+                return Err(host_error(
+                    "invalid_request",
+                    "bare object file exceeds byte limit",
+                ));
+            }
+            let document = decode_storage_project(bytes)
+                .map_err(|_| host_error("invalid_request", "invalid native object document"))?;
+            let (document, revision) = state
+                .install_native_object(document)
+                .map_err(|_| host_error("unavailable", "native object installation unavailable"))?;
+            (document, revision, 0)
+        };
     Ok(ObjectBootstrapReceipt {
         api_version: HOST_API_VERSION,
-        request_id: request.request_id,
+        request_id,
         instance_id: state.instance_id().to_owned(),
         document_id,
         content_revision,
-        resource_count: 0,
+        resource_count,
         viewport_available: false,
     })
 }

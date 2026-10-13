@@ -23,6 +23,8 @@
       function () { return opening || !!pendingOpen; },
       function (session) { return publishedSession === session; });
     var v1 = v1Module.create(lifecycle, ports, contract);
+    function objectProject(){var p=ports.objectProject&&ports.objectProject();return p&&p.blocksLegacy()?p:null;}
+    function routed(name,original){return function(){var p=objectProject();return p?p[name].apply(p,arguments):original.apply(null,arguments);};}
 
     function ensureActive() {
       if (!lifecycle.isActive()) throw new Error('native opacity authority is not active');
@@ -45,6 +47,7 @@
       }, mode);
     }
     function legacyIntent(kind, holder, values) {
+      if(objectProject())return false;
       var current = lifecycle.inspect();
       if (current.phase === 'legacy') return null;
       if (current.phase !== 'native') return false;
@@ -53,7 +56,7 @@
       }
       return false;
     }
-    var handleV1 = v1.handle;
+    var handleV1 = function(request){if(objectProject())throw new Error('This application operation is unavailable for native object projects');return v1.handle(request);};
 
     function reenterLegacy() { return false; }
     function disposeSession(session) {
@@ -134,6 +137,7 @@
       catch (_) { return false; }
     }
     async function importJSON(json, silent, allowOccludedAdmission) {
+      if(objectProject())return false;
       var candidate;
       try { candidate = ports.document.prepareNativeOpacity(json); }
       catch (_) { return false; }
@@ -199,7 +203,9 @@
     function install() {
       if (installation) return installation;
       var surface = ports.surface, disposers = [];
-      surface.installGuard(lifecycle);
+      surface.installGuard(ports.objectProject&&ports.objectProject()?{
+        getNativeIdentity:routed('getNativeIdentity',lifecycle.getNativeIdentity),
+        requestRelease:routed('requestRelease',lifecycle.requestRelease)}:lifecycle);
       function wrap(target, names, prefix, admitted) {
         disposers.push(surface.wrap(target, names, prefix, allowLegacy, admitted));
       }
@@ -252,20 +258,21 @@
       wrap('script', ['run', 'openFile', 'api'], 'script-', exposeExtension);
       wrap('plugin', ['openFile', 'loadArchive', 'loadFiles'], 'plugin-', exposeExtension);
       disposers.push(surface.publish(Object.freeze({ allow: allowLegacy }), Object.freeze({
-        blocksLegacy: lifecycle.blocksLegacy, isActive: lifecycle.isActive,
-        getNativeIdentity: lifecycle.getNativeIdentity,
-        prepared: lifecycle.prepared, identity: lifecycle.identity, projectSelection: lifecycle.projectSelection,
-        persistenceJSON: lifecycle.persistenceJSON, renderPreview: viewport.renderPreview,
-        presentPreview: viewport.presentPreview,
-        exportPng: lifecycle.exportPng, releaseCurrent: lifecycle.releaseCurrent,
-        historyFromUi: function (action, requestId) { return history(action, requestId, 'ui'); }
+        blocksLegacy: routed('blocksLegacy',lifecycle.blocksLegacy), isActive: routed('isActive',lifecycle.isActive),
+        getNativeIdentity: routed('getNativeIdentity',lifecycle.getNativeIdentity),
+        prepared: function(){var p=objectProject();return p?p.info():lifecycle.prepared();}, identity: routed('identity',lifecycle.identity),
+        projectSelection: function(){if(objectProject())return [];return lifecycle.projectSelection.apply(null,arguments);},
+        persistenceJSON: routed('persistenceJSON',lifecycle.persistenceJSON), renderPreview: routed('renderPreview',viewport.renderPreview),
+        presentPreview: routed('presentPreview',viewport.presentPreview),
+        exportPng: routed('exportPng',lifecycle.exportPng), releaseCurrent: routed('releaseCurrent',lifecycle.releaseCurrent),
+        historyFromUi: function (action, requestId) { var p=objectProject();return p?p.historyFromUi(action,requestId):history(action, requestId, 'ui'); }
       }), Object.freeze({ importJSON: importJSON, finishOpenAfterReveal: finishOpenAfterReveal,
         release: function (kind) { return lifecycle.releaseCurrent(kind || 'document-replacement'); }
       }), Object.freeze({ handle: handleV1, legacy: legacyIntent, meta: function () {
-        var current = lifecycle.identity();
+        var p=objectProject(),current = p?p.info():lifecycle.identity();
         return current ? { instanceId: current.instanceId, documentId: current.documentId,
           revision: current.contentRevision } : null;
-      } }), viewport.resizeViewport));
+      } }), function(){var p=objectProject();if(p)p.renderPreview(ports.currentFrame());else viewport.resizeViewport();}));
       installation = Object.freeze({ dispose: function () {
         if (lifecycle.blocksLegacy()) throw new Error('native opacity must release before surface disposal');
         disposers.slice().reverse().forEach(function (dispose) { dispose(); });

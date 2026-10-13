@@ -170,9 +170,12 @@ test('the promise resolves only after both filesystem calls have completed', asy
   assert.deepEqual(settled, ['done']);
 });
 
-test('the adapter reads no globals: its only entry points are the ports', () => {
-  const code = adapterSource.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
+test('the pure file writer and saved-UI core read no globals beyond their ports', () => {
+  const pure = adapterSource.slice(0, adapterSource.indexOf('  function bindProjectUI(root,ports){'));
+  const code = pure.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
   assert.doesNotMatch(code, /window\.|__TAURI__|localStorage|document\./);
+  const binding = adapterSource.slice(adapterSource.indexOf('  function bindProjectUI(root,ports){'));
+  assert.doesNotMatch(binding, /\bwindow\./, 'the UI binding consumes its injected root, not a free window global');
 });
 
 // ---- equivalence with the pre-P29 inline block -----------------------------
@@ -223,6 +226,9 @@ function productionContext(f) {
     renderRecents() { calls.renderRecents++; },
     markSaved(json) { calls.markSaved.push(json); },
     localStorage: { setItem(key, value) { calls.autosave.push([key, value]); } },
+    showToast() {}, hideStartScreen() {}, showStartScreen() {}, ensureInitialTab() {}, renderTabBar() {},
+    saveFramesIfLegacy() { throw Error('direct write must not prepare a separate save'); },
+    dirtyBaseline: { isDirty() { return false; } },
   };
   context.window = context;
   context.SMProject = {};
@@ -298,24 +304,21 @@ test('a failed save marks nothing: no recents entry, no clean flag, no autosave'
 // ---- routing guard ---------------------------------------------------------
 
 test('the inline filesystem block did not come back into project.js', () => {
-  const fn = slice(projectSource, 'var nativeSavedUI=', WRITE_PROJECT_TO[1], 'real project write binding');
-  // window-qualified on purpose: project.js reaches every other cross-module
-  // dependency that way (76 window.* references, the closest precedent being
-  // window.NemoOpacityApplication in this same file), so an unqualified global
-  // here would be the odd one out. Pinned so it does not drift back.
-  assert.match(fn, /window\.NemoProjectNativeSave\.writeProjectFile\(path,json,\{/);
-  assert.match(fn, /nativeSavedUI\.write\(path,ticket,mode\)/);
-  assert.doesNotMatch(fn, /\.saving/, 'the temp suffix is owned by the adapter now');
-  // The fs names still appear — as the three one-line port delegations, which
-  // is the binding and is meant to be here. What must NOT come back is the
-  // SEQUENCING: the inline block called writeTextFile twice (temp, then the
-  // fallback direct write). Exactly one occurrence means the fallback is gone.
-  const occurrences = (re) => (fn.match(re) || []).length;
+  const projectBinding = slice(projectSource, 'var nativeSavedUI=', WRITE_PROJECT_TO[1], 'real project write binding');
+  const adapterBinding = slice(adapterSource, '  function bindProjectUI(root,ports){', '\n  return {', 'adapter UI binding');
+  assert.match(projectBinding, /window\.NemoProjectNativeSave\.bindProjectUI\(window,\{/);
+  assert.match(projectBinding, /nativeSavedUI\.write\(path,ticket,mode\)/);
+  assert.doesNotMatch(projectBinding, /\.saving|fs\.writeTextFile|fs\.rename|fs\.remove/,
+    'project.js must not reintroduce native filesystem sequencing');
+  assert.match(adapterBinding, /writeProjectFile\(path,json,\{/);
+  // The three receiver-bound filesystem ports belong in the adapter UI
+  // binding. The pure file writer still owns temp/rename/fallback ordering.
+  const occurrences = (re) => (adapterBinding.match(re) || []).length;
   assert.equal(occurrences(/fs\.writeTextFile\.bind\(fs\)/g), 1,
-    'two writeTextFile calls here would mean the fallback was re-inlined');
+    'the adapter must pass one receiver-bound write port');
   assert.equal(occurrences(/fs\.rename\.bind\(fs\)/g), 1);
   assert.equal(occurrences(/fs\.remove\.bind\(fs\)/g), 1);
-  assert.match(fn, /writeTextFile:fs\.writeTextFile\.bind\(fs\)/,
+  assert.match(adapterBinding, /writeTextFile:fs\.writeTextFile\.bind\(fs\)/,
     'the admitted filesystem receiver is bound before the first IO await');
   // One '.saving' anywhere in project.js would mean a second inline copy of
   // the temp-file convention; there must be none.

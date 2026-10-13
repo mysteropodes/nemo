@@ -36,7 +36,10 @@
 (function () {
   var REF_VIDEO_ID = 'ref:video';
 
-  function ref() { return state.refMedia || null; }
+  function nativeReference(){return window.NemoNativeObjectReference&&window.NemoNativeObjectReference.desktop(window);}
+  function nativeAction(action){var owner=nativeReference();if(!owner)return false;
+    Promise.resolve().then(function(){return action(owner);}).catch(function(error){showToast(error.message||String(error));}).finally(syncUI);return true;}
+  function ref() { var owner=nativeReference();return owner?owner.read():state.refMedia || null; }
   function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
   function extOf(name) { var m = /\.([^.]+)$/.exec(name); return m ? m[1].toLowerCase() : ''; }
   function baseName(path) { var parts = path.split(/[\\/]/); return parts[parts.length - 1]; }
@@ -97,6 +100,7 @@
   // permanent one.
   var SEEK_WATCHDOG_MS = 300;
   function syncToFrame(frame, force) {
+    if(nativeReference())return;
     var r = ref();
     if (!r || !r.visible) return;
     if (r.type === 'video') {
@@ -159,6 +163,7 @@
   // pixels; engine-bridge passes its own cached-registration helper for
   // static ids and the forced re-upload path is only used by the video seek.
   function buildRefItem(registerCachedFn) {
+    if(nativeReference())return null;
     var r = ref();
     if (!r || !r.visible) return null;
     var imageId = null, dims = r._dims;
@@ -204,6 +209,7 @@
 
   // ---- import ----
   function setRef(r) {
+    if(nativeReference())return false;
     state.refMedia = r;
     syncUI();
     if (r) syncToFrame(state.currentFrame, true);
@@ -231,6 +237,7 @@
     });
   }
   function importFiles(files) {
+    if(nativeReference()){showToast('Use Import Reference to choose a PNG file for this native project.');return;}
     if (!files.length) return;
     var f0 = files[0];
     if (f0.type.indexOf('video/') === 0) {
@@ -307,6 +314,7 @@
   // not from a <input type=file> File object). Browser preview keeps using
   // importFiles/ref-file-input above, which has no sidecar to route through.
   async function importViaDialog() {
+    if(nativeAction(function(owner){return owner.importPath();}))return;
     var paths = await window.__TAURI__.dialog.open({
       title: 'Importer une référence',
       multiple: true,
@@ -414,6 +422,7 @@
   }
 
   window.SMReference = {
+    refreshNative: syncUI,
     buildRefItem: buildRefItem,
     onFrameChanged: syncToFrame,
     importFiles: importFiles,
@@ -443,13 +452,13 @@
     // syncUI() on toggle: the collapsed trigger reports visibility now, and
     // this handler is the only place it can change without going through
     // setRef() (which repaints on its own).
-    if (on) on.addEventListener('change', function () { var r = ref(); if (r) { r.visible = on.checked; if (r.visible) syncToFrame(state.currentFrame, true); bumpScene(); syncUI(); } });
+    if (on) on.addEventListener('change', function () { var visible=on.checked;if(nativeAction(function(owner){return owner.settings({visible:visible});}))return;var r = ref(); if (r) { r.visible = on.checked; if (r.visible) syncToFrame(state.currentFrame, true); bumpScene(); syncUI(); } });
     var op = document.getElementById('p-ref-opacity');
-    if (op) op.addEventListener('input', function () { var r = ref(); if (r) { r.opacity = op.value / 100; bumpScene(); } });
+    if (op) op.addEventListener('input', function () { var value=op.value/100;if(nativeAction(function(owner){return owner.settings({opacity:value});}))return;var r = ref(); if (r) { r.opacity = op.value / 100; bumpScene(); } });
     var off = document.getElementById('p-ref-offset');
-    if (off) off.addEventListener('change', function () { var r = ref(); if (r) { r.offsetFrames = parseInt(off.value) || 0; syncToFrame(state.currentFrame, true); bumpScene(); } });
+    if (off) off.addEventListener('change', function () { var value=parseInt(off.value)||0;if(nativeAction(function(owner){return owner.settings({offsetFrames:value});}))return;var r = ref(); if (r) { r.offsetFrames = parseInt(off.value) || 0; syncToFrame(state.currentFrame, true); bumpScene(); } });
     var rm = document.getElementById('btn-ref-remove');
-    if (rm) rm.addEventListener('click', function () { setRef(null); });
+    if (rm) rm.addEventListener('click', function () { if(!nativeAction(function(owner){return owner.remove();}))setRef(null); });
     syncUI();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

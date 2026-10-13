@@ -52,18 +52,22 @@
     if(!p||!fields(r,['apiVersion','requestId','instanceId','documentId','atRevision','documentSnapshotId','byteCount','published','cleanupPending'])||
         r.apiVersion!==2||r.requestId!==ticket.saveRequestId||r.instanceId!==p.instanceId||r.documentId!==p.documentId||
         r.atRevision!==p.contentRevision||r.documentSnapshotId!==p.documentSnapshotId||typeof r.published!=='boolean'||typeof r.cleanupPending!=='boolean'||
-        !integer(r.byteCount,1)||r.byteCount>4096)return null;
+        !integer(r.byteCount,1)||r.byteCount>32*1024*1024)return null;
     if(r.published&&!['published-current','published-stale','published-cleanup-pending'].includes(w.status))return null;
     if(!fields(s,['apiVersion','requestId','instanceId','documentId','contentRevision','ok','result'])||s.apiVersion!==2||
         s.requestId!==ticket.serializerRequestId||s.instanceId!==p.instanceId||s.documentId!==p.documentId||
-        s.contentRevision!==p.contentRevision||s.ok!==true||!fields(s.result,['atRevision','documentSnapshotId','documentJson'])||
-        s.result.atRevision!==p.contentRevision||s.result.documentSnapshotId!==p.documentSnapshotId||
-        typeof s.result.documentJson!=='string'||utf8(s.result.documentJson)!==r.byteCount)return null;
-    var bytes=s.result.documentJson;
+        s.contentRevision!==p.contentRevision||s.ok!==true||!object(s.result)||
+        s.result.atRevision!==p.contentRevision||s.result.documentSnapshotId!==p.documentSnapshotId)return null;
+    var compact=fields(s.result,['atRevision','documentSnapshotId','documentDigest','byteCount']);
+    if(compact){
+      if(typeof s.result.documentDigest!=='string'||!/^[a-f0-9]{64}$/.test(s.result.documentDigest)||s.result.byteCount!==r.byteCount)return null;
+    }else if(!fields(s.result,['atRevision','documentSnapshotId','documentJson'])||r.byteCount>4096||
+      typeof s.result.documentJson!=='string'||utf8(s.result.documentJson)!==r.byteCount)return null;
+    var bytes=compact?null:s.result.documentJson;
     var envelope={apiVersion:2,requestId:ticket.serializerRequestId,instanceId:p.instanceId,documentId:p.documentId,
       contentRevision:p.contentRevision,ok:true,result:{atRevision:p.contentRevision,documentSnapshotId:p.documentSnapshotId,documentJson:bytes}};
-    if(utf8(JSON.stringify(envelope))>4096)return null;
-    return Object.freeze({ui:ticket.ui,pin:p,destinationPath:w.destinationPath,documentJson:bytes,
+    if(!compact&&utf8(JSON.stringify(envelope))>4096)return null;
+    return Object.freeze({ui:ticket.ui,pin:p,destinationPath:w.destinationPath,documentJson:bytes,documentDigest:compact?s.result.documentDigest:null,
       eligibility:w.status==='published-current'&&w.eligibleCurrentSave===true,
       receipt:Object.freeze({apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
         atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,byteCount:r.byteCount,published:r.published,cleanupPending:r.cleanupPending})});

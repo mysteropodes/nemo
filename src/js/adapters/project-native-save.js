@@ -147,11 +147,55 @@ var NemoProjectNativeSave = (function () {
       saveAs:function(writer){return run('save-as',writer);},save:function(writer){return run('save',writer);}});
   }
 
+  // Bind ordinary Project UI ports without moving project/tab state here.
+  // The optional object file adapter owns only its native presentation/digest
+  // workflow; the existing opacity writer and acknowledgement stay unchanged.
+  function bindProjectUI(root,ports){
+    var object=root.NemoNativeObjectProjectFile?root.NemoNativeObjectProjectFile.bind(root,ports):null;
+    function objectActive(){return !!object&&object.isActive();}
+    var saved=createSavedUI({
+      read:function(){
+        var meta=ports.read();
+        return {native:root.NemoNativeOpacityCutover,api:root.__TAURI__,fs:root.__TAURI__&&root.__TAURI__.fs,
+          ui:root.SMProject,tabId:meta.tabId,path:meta.path,name:meta.name,canvasW:meta.canvasW,canvasH:meta.canvasH,fps:meta.fps};
+      },
+      serialize:ports.serialize,prepare:ports.prepare,
+      pick:function(pin){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:pin.name+'.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
+      publish:function(path,json,pin){var fs=pin.fs;return writeProjectFile(path,json,{
+        writeTextFile:fs.writeTextFile.bind(fs),rename:fs.rename.bind(fs),remove:fs.remove.bind(fs)});},
+      commit:function(path,json,pin){
+        var name=root.SMProjectDocument.baseName(path);ports.commit(path,name);
+        ports.touchRecent(path,name,{canvasW:pin.canvasW,canvasH:pin.canvasH,fps:pin.fps},true);
+        ports.renderRecents();ports.markSaved(json);
+        ports.remember(json);return true;
+      },
+      invalidate:ports.invalidate,
+      notice:function(result,path,mode){ports.notice(result.status==='saved-current'?(mode==='save'?'Saved':'Saved: '+root.SMProjectDocument.baseName(path)):
+        result.status==='save-in-progress'?'A save is already in progress.':result.written?'The file was written, but its saved status could not be applied to the current project.':'Save cancelled: the current project changed.');},
+      failure:function(error){ports.notice(root.SM.t('toastSaveFailedSuffix')+(error&&error.message||error));}
+    });
+    return Object.freeze({
+      nativeObject:object,write:saved.write,
+      isDirty:function(){return objectActive()?object.isDirty():ports.isDirty();},
+      saveAs:function(writer){return objectActive()?object.saveAs():saved.saveAs(writer);},
+      save:function(writer){
+        if(objectActive()){ports.notice('Save this native project to a new file.');return object.saveAs();}
+        return saved.save(writer);
+      },
+      openNative:function(path){return object?object.openPath(path):Promise.resolve(null);},
+      allowOpen:function(){
+        if(!objectActive())return true;
+        ports.notice('Opening another project requires restarting Nemo until native project switching is available.');return false;
+      }
+    });
+  }
+
   return {
     TEMP_SUFFIX: TEMP_SUFFIX,
     tempPathFor: tempPathFor,
     writeProjectFile: writeProjectFile,
     createSavedUI: createSavedUI,
+    bindProjectUI: bindProjectUI,
   };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = NemoProjectNativeSave;
