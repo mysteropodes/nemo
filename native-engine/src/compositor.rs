@@ -5,6 +5,12 @@
 
 #[path = "object_compositor.rs"]
 mod object_compositor;
+#[cfg(all(test, feature = "history"))]
+pub(crate) use object_compositor::scheduled_tests::{
+    owner as object_test_owner, plan as object_test_plan, schedule as schedule_test_object,
+    selector as object_test_selector,
+};
+pub(crate) use object_compositor::ScheduledObjectCompositionResult;
 
 use crate::render_geometry::LayerShape;
 use crate::render_scene::{RenderScene, ScheduledFrameIdentity};

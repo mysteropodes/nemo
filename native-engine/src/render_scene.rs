@@ -190,32 +190,35 @@ impl GeometryPaintInput {
 }
 
 /// The complete identity N11 assigned to still-live scheduled work.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ScheduledFrameIdentity {
-    work_id: WorkId,
-    view_generation: ViewGeneration,
-    evaluation_key: EvaluationKey,
+    scheduled: ScheduledFrame,
 }
+
+impl PartialEq for ScheduledFrameIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.scheduled.same_work_as(&other.scheduled)
+    }
+}
+impl Eq for ScheduledFrameIdentity {}
 
 impl ScheduledFrameIdentity {
     pub fn from_scheduled(scheduled: &ScheduledFrame) -> Self {
         Self {
-            work_id: scheduled.work_id(),
-            view_generation: scheduled.view_generation(),
-            evaluation_key: scheduled.key().clone(),
+            scheduled: scheduled.clone(),
         }
     }
 
     pub fn work_id(&self) -> WorkId {
-        self.work_id
+        self.scheduled.work_id()
     }
 
     pub fn view_generation(&self) -> ViewGeneration {
-        self.view_generation
+        self.scheduled.view_generation()
     }
 
     pub fn evaluation_key(&self) -> &EvaluationKey {
-        &self.evaluation_key
+        self.scheduled.key()
     }
 }
 
