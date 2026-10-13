@@ -13,6 +13,9 @@ use tauri::{
 #[path = "startup_retention.rs"]
 mod retention;
 
+#[path = "startup_cut.rs"]
+mod cut;
+
 struct Bridge {
     native: Arc<Mutex<LoadLog>>,
     stream: JsStream,
