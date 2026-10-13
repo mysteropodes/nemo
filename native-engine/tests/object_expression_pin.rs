@@ -360,6 +360,41 @@ fn real_owner_to_retired_runtime_to_final_pin_yields_only_detached_scalar() {
 
 #[cfg(feature = "object_expression_runtime")]
 #[test]
+fn real_owner_early_input_refusal_preserves_history_and_recovers() {
+    use crate::object_expression_runtime::{
+        evaluate_for_owner, ExpressionLimits, ExpressionRefusal,
+    };
+    let mut value = source();
+    value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"][0]["order"]["expression"]
+        ["code"] = json!("value+frame/5");
+    let owner = make_owner(&value);
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let before = (
+        bytes(&owner),
+        owner.content_revision(),
+        owner.history_depths(),
+    );
+    let tiny_input = ExpressionLimits::new(1, 8_388_608, 262_144, 32).unwrap();
+    assert_eq!(
+        evaluate_for_owner(&owner, &snapshot, &select(&snapshot, 5), tiny_input),
+        Err(ExpressionRefusal::InputLimit)
+    );
+    assert_eq!(
+        (
+            bytes(&owner),
+            owner.content_revision(),
+            owner.history_depths()
+        ),
+        before
+    );
+    assert_eq!(
+        evaluate_for_owner(&owner, &snapshot, &select(&snapshot, 5), bounded_runtime()),
+        Ok(7.0)
+    );
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
 fn real_fill_and_undo_between_detached_evaluation_and_finalization_refuse_stale() {
     use crate::object_expression_runtime::{evaluate_detached, ExpressionRefusal};
     let mut value = source();
