@@ -32,6 +32,10 @@ function host(){
     if(command==='nemo_native_object_preview')return {status:preview,workId:'work-'+revision,viewGeneration:1};
     if(command==='nemo_native_object_reference'||command==='nemo_native_object_dispatch'){
       assert.equal(r.expectedRevision,revision);
+      if(command==='nemo_native_object_dispatch'){
+        assert.ok(['command.document.object.undo','command.document.object.redo'].includes(r.operation));
+        assert.deepEqual(r.payload,{command:r.operation==='command.document.object.undo'?'object.undo':'object.redo'});
+      }
       if(failure==='refused')return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',contentRevision:revision,ok:false,error:{code:'invalid_request'}};
       if(failure==='transport-before'||failure==='inspection')throw Error('Native response lost');
       if(r.operation==='command.document.object.undo'){edited=false;undo=true;reference=null;}
@@ -71,6 +75,10 @@ test('undo to saved bytes clears dirty even though native content revision incre
   await s.reference({kind:'attach',id:'ref',sourcePath:'/image.png'});assert.equal(f.ui.isDirty(),true);
   await s.historyFromUi('undo');assert.equal(s.info().contentRevision,2);assert.equal(f.ui.isDirty(),false);
   await s.historyFromUi('redo');assert.equal(f.ui.isDirty(),true);
+  assert.deepEqual(h.calls.filter(c=>c.command==='nemo_native_object_dispatch').map(c=>[c.r.operation,c.r.payload]),[
+    ['command.document.object.undo',{command:'object.undo'}],['command.document.object.redo',{command:'object.redo'}]
+  ]);
+  const count=h.calls.length;await assert.rejects(s.historyFromUi('clear'),/Unsupported history action/);assert.equal(h.calls.length,count);
 });
 for(const failure of ['refused','transport-before','transport-after']){
   test('reconciled '+failure+' re-presents current native state without retrying mutation',async()=>{
