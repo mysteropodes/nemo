@@ -188,6 +188,7 @@
   }
   async function openPath(path){
     if(!nativeSavedUI.allowOpen())return false;
+    if(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())return nativeSavedUI.openNative(path);
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
     var nativeOpened=await nativeSavedUI.openNative(path);if(nativeOpened!==null)return nativeOpened;
@@ -208,7 +209,7 @@
   }
   async function openDialog(){
     if(!nativeSavedUI.allowOpen())return false;
-    if(p39bUseInactiveEntry())return inactiveEntry.openPicker();
+    if(!(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())&&p39bUseInactiveEntry())return inactiveEntry.openPicker();
     if(!tauriOk()){document.getElementById('file-input').click();return;}
     var path=await window.__TAURI__.dialog.open({title:'Open Project',multiple:false,filters:[{name:'Nemo Project',extensions:['json']}]});
     if(!path)return;try{await window.__TAURI__.window.getCurrentWindow().setFocus();}catch(_){/* Native presentation still gates Open. */}

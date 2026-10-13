@@ -184,8 +184,8 @@ var NemoProjectNativeSave = (function () {
       },
       openNative:function(path){return object?object.openPath(path):Promise.resolve(null);},
       allowOpen:function(){
-        if(!objectActive())return true;
-        ports.notice('Opening another project requires restarting Nemo until native project switching is available.');return false;
+        if(!objectActive()||object.canOpen())return true;
+        ports.notice('Native project Open is unavailable while another Open or Save is in progress.');return false;
       }
     });
   }

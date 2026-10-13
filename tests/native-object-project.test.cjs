@@ -54,12 +54,14 @@ function host(){
   }
   return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;}};
 }
-function session(h){return Project.create({invoke:h.invoke,mapping:()=>({}),frame:()=>0});}
+function session(h){return Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
+  physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});}
 async function presented(h){const s=session(h);await s.openPath('/project.json');await s.presentPreview(0);return s;}
 function files(s,overrides={}){
   const effects=[];let handle='tab';
-  const ports={readUI:()=>({handle,generation:1}),reveal:async()=>{},opened:(path)=>effects.push(['open',path]),
-    commit:(path)=>{effects.push(['save',path]);return true;},pick:async()=>'/new.json',repaint:()=>{},failed:()=>{},notice:()=>{},...overrides};
+  const ports={readUI:()=>({handle,generation:1}),reveal:async()=>{},opened:(path)=>{effects.push(['open',path]);return true;},
+    commit:(path)=>{effects.push(['save',path]);return true;},pick:async()=>'/new.json',repaint:()=>{},failed:()=>{},
+    refused:()=>{},confirmReplace:async()=>true,notice:()=>{},...overrides};
   return {ui:Files.create(s,ports,Workflow,Ack),effects,replace(){handle='other';}};
 }
 test('native file Open and Save As carry paths and compact actual metadata, never document bytes',async()=>{
@@ -112,7 +114,7 @@ test('failed/deferred presentation never supplies a presented save session or op
 });
 test('only explicit pre-install unsupported format allows the older file route',async()=>{
   const h=host(),s=session(h);assert.equal(await s.openPath('/opacity.json'),null);assert.equal(s.blocksLegacy(),false);
-  await s.openPath('/project.json');assert.equal(s.blocksLegacy(),true);await assert.rejects(s.openPath('/other.json'),/replacement/);
+  await s.openPath('/project.json');assert.equal(s.blocksLegacy(),true);
   const bad=session(host());await assert.rejects(bad.openPath('/bad.json'));assert.equal(bad.blocksLegacy(),true);assert.throws(bad.getNativeIdentity);
 });
 test('metadata is detached and immutable; malformed or foreign inspection fences admission',async()=>{
@@ -128,7 +130,7 @@ test('single-frame native export uses pinned host route; sequences do not fall b
   assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.maximumEncodedBytes,4*1024*1024);
   assert.equal('reference' in r,false);
 });
-function ordinary(h){
+function ordinary(h,deferFrames=false){
   const fixture=fs.readFileSync('tests/project-open.test.cjs','utf8');
   const start=fixture.indexOf('function harness('),end=fixture.indexOf('\nfunction select(',start);
   const code=fixture.slice(start,end).replace('configureWindow(window);',
@@ -136,7 +138,7 @@ function ordinary(h){
   const context=vm.createContext({assert,vm,require,setTimeout,console,source:fs.readFileSync('src/js/project.js','utf8'),
     documentSource:fs.readFileSync('src/js/project-document.js','utf8'),entrySource:fs.readFileSync('src/js/project-entry.js','utf8')});
   vm.runInContext(code+'\nthis.makeHarness=harness;',context);
-  return context.makeHarness({dirtyDot:true,configureWindow(root){
+  return context.makeHarness({dirtyDot:true,deferFrames,configureWindow(root){
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.__TAURI__={core:{invoke:h.invoke},dialog:{save:async()=>'/ordinary-save.json'},fs:{readTextFile:()=>{throw Error('Project bytes crossed JS');}}};
   }});
@@ -149,5 +151,264 @@ test('complete production Project Open/Save As updates tab, recents and dirty st
   assert.equal((await app.project.saveAs()).acknowledged,true);assert.equal(app.project.getCurrentLabel(),'ordinary-save — /ordinary-save.json');
   assert.equal(app.project.isDirty(),false);assert.equal(app.mutations,0);assert.equal(app.downloads.length,0);
   assert.ok(app.writes.every(([key])=>key==='nemo-recents'),'no byte autosave or alternate document authority');
-  const before=h.calls.length;assert.equal(await app.project.openPath('/another.json'),false);assert.equal(h.calls.length,before);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
+});
+
+function replacementHost(){
+  const calls=[],copies=[],previews=[],seen=new Map();let owner=null,generation=0,viewGeneration=0,failure=null;
+  const size=path=>path==='/b.json'?{canvasW:640,canvasH:360}:{canvasW:320,canvasH:180};
+  const info=()=>({apiVersion:2,instanceId:'instance',documentId:owner.documentId,
+    lifecycleGeneration:owner.generation,documentSnapshotId:'snapshot-'+owner.generation+'-'+owner.revision,
+    contentRevision:owner.revision,documentDigest:(owner.revision?'c':owner.path==='/b.json'?'b':'a').repeat(64),byteCount:10000,
+    ...size(owner.path),fps:24,totalFrames:21,layers:[{layerUid:'drawing'}],reference:null,undoDepth:owner.revision,redoDepth:0});
+  const status=()=>({apiVersion:2,instanceId:'instance',available:!!owner,documentId:owner&&owner.documentId,
+    contentRevision:owner&&owner.revision,lifecycleGeneration:owner&&owner.generation});
+  function install(path){generation++;owner={path,documentId:'document-'+generation,generation,revision:0};}
+  async function invoke(command,args){
+    const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
+    if(command==='nemo_native_object_client_status')return status();
+    if(command==='nemo_native_object_bootstrap'){
+      assert.equal(r.projectOnly,true);assert.equal('documentJson' in r,false);
+      if(seen.has(r.requestId)){
+        const saved=seen.get(r.requestId);if(JSON.stringify(saved.request)!==JSON.stringify(r))throw Error('changed replay');
+        return saved.receipt;
+      }
+      if(owner)assert.deepEqual(r.replace,{documentId:owner.documentId,expectedRevision:owner.revision,
+        documentSnapshotId:info().documentSnapshotId,lifecycleGeneration:owner.generation});
+      else assert.equal('replace' in r,false);
+      if(r.sourcePath==='/bad.json')throw {code:'replacement_refused',message:'Invalid project',
+        details:{disposition:'notDispatched',retryExecution:false,reasonCode:'invalid_request'}};
+      if(r.sourcePath==='/drift.json'){install('/other.json');throw {code:'replacement_refused',message:'Invalid project',
+        details:{disposition:'notDispatched',retryExecution:false,reasonCode:'invalid_request'}};}
+      if(r.sourcePath==='/stale.json'){install(r.sourcePath);return {apiVersion:2,requestId:'wrong',instanceId:'instance',
+        documentId:owner.documentId,contentRevision:0,resourceCount:0,viewportAvailable:false};}
+      if(r.sourcePath==='/replayed.json'){
+        install(r.sourcePath);
+        const retained={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:owner.documentId,
+          contentRevision:0,resourceCount:0,viewportAvailable:false};
+        install('/other.json');return retained;
+      }
+      if(r.sourcePath==='/pending.json')throw {code:'replacement_pending',message:'Pending',
+        details:{disposition:'pending',retryExecution:false}};
+      if(r.sourcePath==='/unknown.json'){install(r.sourcePath);throw {code:'replacement_indeterminate',message:'Unknown',
+        details:{disposition:'indeterminate',retryExecution:false}};}
+      install(r.sourcePath);
+      const receipt={apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:owner.documentId,
+        contentRevision:0,resourceCount:0,viewportAvailable:false};
+      seen.set(r.requestId,{request:r,receipt});return receipt;
+    }
+    if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
+      if(r.documentId!==owner.documentId)throw Error('wrong inspected owner');
+      return {...info(),requestId:r.requestId};
+    }
+    if(command==='nemo_native_object_preview'){
+      previews.push(r);assert.equal(r.documentId,owner.documentId);
+      if(failure&&failure.kind==='preview'&&r.documentId===failure.documentId)return failure.value;
+      if(failure&&failure.kind==='owner-after-preview'&&r.documentId===failure.documentId){
+        install('/other.json');return {status:'presented',workId:'stale-frame',viewGeneration:++viewGeneration};
+      }
+      if(failure&&failure.kind==='gate'&&r.documentId===failure.documentId){
+        const gate=failure.gates.shift();if(gate)return gate.promise;
+      }
+      return {status:'presented',workId:'work-'+(++viewGeneration),viewGeneration};
+    }
+    if(command==='nemo_native_object_reference'||command==='nemo_native_object_dispatch'){
+      assert.equal(r.documentId,owner.documentId);assert.equal(r.expectedRevision,owner.revision);
+      owner.revision++;return {apiVersion:2,requestId:r.requestId,instanceId:'instance',
+        documentId:owner.documentId,contentRevision:owner.revision,ok:true,result:{applied:true}};
+    }
+    if(command==='nemo_native_object_save_as'){
+      copies.push(r);return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
+        atRevision:r.atRevision,documentSnapshotId:r.documentSnapshotId,byteCount:info().byteCount,published:true,cleanupPending:false};
+    }
+    throw Error('Unexpected command: '+command);
+  }
+  return {invoke,calls,copies,previews,info,status,fail(value){failure=value;}};
+}
+
+test('replacement publishes B only after both current frame-0 receipts and post-reveal layout mapping',async()=>{
+  const h=replacementHost(),first=deferred(),final=deferred(),css={width:320,height:180},s=Project.create({invoke:h.invoke,
+    mapping:info=>({cssBounds:{x:0,y:0,width:css.width,height:css.height},
+      physicalExtent:{width:css.width,height:css.height},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  const effects=[],f=files(s,{occlude:()=>effects.push('occlude'),reveal:async info=>{css.width=info.canvasW;css.height=info.canvasH;effects.push('reveal');},
+    opened:path=>{effects.push(path);return true;}});
+  assert.equal(await f.ui.openPath('/a.json'),true);
+  h.fail({kind:'gate',documentId:'document-2',gates:[first,final]});
+  const opening=f.ui.openPath('/b.json');await turn();
+  assert.deepEqual(effects,['occlude','reveal','/a.json','occlude']);assert.equal(h.previews.length,3);
+  assert.equal(h.previews[2].outputSpec.width,640);assert.equal(h.previews[2].viewport.compositionExtent.width,640);
+  assert.equal(h.previews[2].viewport.cssBounds.width,320,'first B receipt precedes B UI layout');
+  first.resolve({status:'presented',workId:'b-first',viewGeneration:2});await turn();
+  assert.deepEqual(effects,['occlude','reveal','/a.json','occlude','reveal']);assert.equal(h.previews.length,4);
+  assert.equal(h.previews[3].viewport.cssBounds.width,640,'final B receipt uses post-reveal layout');
+  assert.equal(f.ui.isDirty(),true,'B is not a clean published file before final presentation');
+  final.resolve({status:'presented',workId:'b-final',viewGeneration:3});
+  assert.equal(await opening,true);assert.deepEqual(effects.at(-1),'/b.json');assert.equal(f.ui.isDirty(),false);
+  assert.equal(s.info().documentId,'document-2');assert.equal(s.readPresentedObjectSession().presentation.workId,'b-final');
+});
+
+test('dirty cancellation sends no native request; typed invalid replacement preserves A',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s,{confirmReplace:async()=>false});
+  assert.equal(await f.ui.openPath('/a.json'),true);await s.reference({kind:'remove'});
+  const count=h.calls.length;assert.equal(await f.ui.openPath('/b.json'),false);assert.equal(h.calls.length,count);
+  assert.equal(s.info().documentId,'document-1');assert.equal(f.ui.isDirty(),true);
+  const previews=h.previews.length,g=files(s);assert.equal(await g.ui.openPath('/bad.json'),false);
+  assert.equal(s.isActive(),true);assert.equal(s.info().documentId,'document-1');
+  assert.equal(h.previews.length,previews,'no B frame is presented on preflight refusal');
+});
+
+test('post-reservation uncertainty fences A and never publishes B path or saved baseline',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);assert.equal(await f.ui.openPath('/a.json'),true);
+  assert.equal(await f.ui.openPath('/unknown.json'),false);
+  assert.equal(s.isActive(),false);assert.equal(s.blocksLegacy(),true);assert.equal(s.readPresentedObjectSession(),null);
+  assert.equal(f.ui.isDirty(),true);assert.deepEqual(f.effects,[['open','/a.json']]);
+  await assert.rejects(s.reference({kind:'remove'}));
+});
+
+test('replacement pending and deferred frame cannot restore A or publish B',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  assert.equal(await f.ui.openPath('/pending.json'),false);assert.equal(s.isActive(),false);
+  const other=replacementHost(),t=session(other),g=files(t);await g.ui.openPath('/a.json');
+  other.fail({kind:'preview',documentId:'document-2',value:{status:'deferred-occluded'}});
+  assert.equal(await g.ui.openPath('/b.json'),false);assert.equal(t.isActive(),false);
+  assert.deepEqual(g.effects,[['open','/a.json']]);
+});
+
+test('production Project Open replaces A in the same tab without Paper or JS project bytes',async()=>{
+  const h=replacementHost(),app=ordinary(h);
+  assert.equal(await app.project.openPath('/a.json'),true);
+  const tab=app.element('project-tabs-list').children[0];
+  assert.equal(await app.project.openPath('/b.json'),true);
+  assert.equal(app.element('project-tabs-list').children.length,1);
+  assert.equal(app.element('project-tabs-list').children[0].dataset.tab,tab.dataset.tab);
+  assert.equal(app.project.getCurrentLabel(),'b — /b.json');assert.equal(app.project.isDirty(),false);
+  assert.equal(h.previews.length,4);assert.equal(h.previews[2].documentId,'document-2');
+  assert.equal(h.previews[3].documentId,'document-2');
+  const s=Project.desktop(app.window);await s.reference({kind:'remove'});assert.equal(app.project.isDirty(),true);
+  assert.equal((await app.project.saveAs()).acknowledged,true);assert.equal(app.project.isDirty(),false);
+  assert.equal(h.copies.at(-1).documentId,'document-2');assert.equal(app.mutations,0);
+  assert.ok(app.writes.every(([key])=>key==='nemo-recents'),'no byte autosave or JS project authority');
+});
+
+test('ordinary replacement waits for both post-reveal animation frames before the final B receipt',async()=>{
+  const h=replacementHost(),app=ordinary(h,true);
+  const first=app.project.openPath('/a.json');await turn();
+  assert.equal(app.pendingFrames,1);app.flushFrame();await turn();
+  assert.equal(app.pendingFrames,1);app.flushFrame();assert.equal(await first,true);
+  const opening=app.project.openPath('/b.json');await turn();
+  assert.equal(h.previews.length,3,'only the pre-reveal B frame has presented');
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.pendingFrames,1);app.flushFrame();await turn();
+  assert.equal(h.previews.length,3,'one layout frame cannot publish B');
+  assert.equal(app.pendingFrames,1);app.flushFrame();assert.equal(await opening,true);
+  assert.equal(h.previews.length,4);assert.equal(app.project.getCurrentLabel(),'b — /b.json');
+});
+
+test('Open is refused throughout Save As picker/ack, then uses the current acknowledged owner',async()=>{
+  const h=replacementHost(),s=session(h),picker=deferred(),f=files(s,{pick:()=>picker.promise});
+  assert.equal(await f.ui.openPath('/a.json'),true);
+  const saving=f.ui.saveAs();await turn();
+  const count=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+  assert.equal(await f.ui.openPath('/b.json'),false);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,count);
+  picker.resolve('/saved-a.json');assert.equal((await saving).acknowledged,true);
+  assert.equal(await f.ui.openPath('/b.json'),true);assert.equal(s.info().documentId,'document-2');
+});
+
+test('actions submitted after Open begins cannot mutate B through a queued A request',async()=>{
+  const h=replacementHost(),first=deferred(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  h.fail({kind:'gate',documentId:'document-2',gates:[first]});
+  const opening=f.ui.openPath('/b.json');await turn();
+  const before=h.calls.length;
+  await assert.rejects(s.reference({kind:'remove'}),/Open is in progress/);
+  assert.equal(await s.renderPreview(10),null);
+  assert.equal(h.calls.length,before);
+  first.resolve({status:'presented',workId:'b-first',viewGeneration:2});
+  assert.equal(await opening,true);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_reference'&&c.r.action.kind==='remove').length,0);
+});
+
+test('ordinary picker and recents replace the active native row without P39B or legacy reads',async()=>{
+  const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
+  const tab=app.element('project-tabs-list').children[0].dataset.tab;
+  app.window.__TAURI__.dialog.open=async()=>'/b.json';
+  app.window.__TAURI__.window={getCurrentWindow:()=>({setFocus:async()=>{}})};
+  await app.project.open();assert.equal(app.project.getCurrentLabel(),'b — /b.json');
+  assert.equal(app.element('project-tabs-list').children.length,1);
+  const rows=app.element('start-recent-list').children;assert.equal(rows.length,2);
+  rows[1].listeners.click();await turn();
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.element('project-tabs-list').children[0].dataset.tab,tab);
+  assert.equal(app.mutations,0);assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,3);
+});
+
+test('ordinary dirty Open cancel preserves A with zero new native calls',async()=>{
+  const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
+  await Project.desktop(app.window).reference({kind:'remove'});
+  app.window.__TAURI__.dialog.ask=async()=>false;
+  const before=h.calls.length;assert.equal(await app.project.openPath('/b.json'),false);
+  assert.equal(h.calls.length,before);assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.project.isDirty(),true);
+  app.window.__TAURI__.dialog.ask=async()=>true;
+  assert.equal(await app.project.openPath('/b.json'),true);assert.equal(app.project.isDirty(),false);
+});
+
+test('preflight refusal with foreign owner drift fences instead of restoring A',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  assert.equal(await f.ui.openPath('/drift.json'),false);
+  assert.equal(s.isActive(),false);assert.equal(s.blocksLegacy(),true);
+  assert.equal(s.readPresentedObjectSession(),null);assert.equal(f.ui.isDirty(),true);
+  assert.deepEqual(f.effects,[['open','/a.json']]);
+});
+
+test('stale bootstrap receipt and zero viewport fence without B publication',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  assert.equal(await f.ui.openPath('/stale.json'),false);assert.equal(s.isActive(),false);
+  assert.deepEqual(f.effects,[['open','/a.json']]);
+  const other=replacementHost();let width=320;
+  const t=Project.create({invoke:other.invoke,mapping:info=>({cssBounds:{x:0,y:0,width,height:180},
+    physicalExtent:{width:Math.max(1,width),height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});
+  const g=files(t);await g.ui.openPath('/a.json');width=0;
+  assert.equal(await g.ui.openPath('/b.json'),false);assert.equal(t.isActive(),false);
+  assert.deepEqual(g.effects,[['open','/a.json']]);
+});
+
+test('a retained B receipt cannot publish after native owner advances to C',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  assert.equal(await f.ui.openPath('/replayed.json'),false);
+  assert.equal(s.isActive(),false);assert.equal(s.blocksLegacy(),true);
+  assert.equal(s.readPresentedObjectSession(),null);assert.equal(f.ui.isDirty(),true);
+  assert.deepEqual(f.effects,[['open','/a.json']]);
+  assert.equal(h.previews.length,2,'no B frame reached presentation');
+});
+
+test('a presented B frame is rejected when the native owner changes before the status gate',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  h.fail({kind:'owner-after-preview',documentId:'document-2'});
+  assert.equal(await f.ui.openPath('/b.json'),false);
+  assert.equal(s.isActive(),false);assert.equal(s.readPresentedObjectSession(),null);
+  assert.deepEqual(f.effects,[['open','/a.json']]);
+  assert.equal(h.previews.length,3,'post-frame status stopped the second B presentation');
+});
+
+test('a deferred final B frame after transient reveal cannot publish B',async()=>{
+  const h=replacementHost(),s=session(h),f=files(s);await f.ui.openPath('/a.json');
+  const final=deferred();h.fail({kind:'gate',documentId:'document-2',gates:[null,final]});
+  const opening=f.ui.openPath('/b.json');await turn();
+  assert.equal(h.previews.length,4);assert.deepEqual(f.effects,[['open','/a.json']]);
+  final.resolve({status:'deferred-occluded'});
+  assert.equal(await opening,false);assert.equal(s.isActive(),false);assert.equal(f.ui.isDirty(),true);
+  assert.deepEqual(f.effects,[['open','/a.json']]);
+});
+
+test('unavailable dirty-confirm dialog preserves A and its visible path',async()=>{
+  const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
+  await Project.desktop(app.window).reference({kind:'remove'});
+  app.window.__TAURI__.dialog.ask=async()=>{throw Error('Dialog unavailable');};
+  const count=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
+  assert.equal(await app.project.openPath('/b.json'),false);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,count);
+  assert.equal(Project.desktop(app.window).isActive(),true);
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.startScreen.classList.contains('hid'),true);
 });

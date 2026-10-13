@@ -26,13 +26,34 @@
     return freeze(result);
   }
   function create(ports){
-    var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null;
+    var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function raw(command,request){return ports.invoke(command,{requestJson:JSON.stringify(request)});}
     function active(){return phase==='native';}
     function requireActive(){if(!active()||!info)throw new Error('Native project is unavailable; reopen Nemo');return info;}
     function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;});}
     function fence(error){phase='indeterminate';presentation=null;if(ports.failed)ports.failed(error);return error;}
+    function epoch(value){return value&&{instanceId:value.instanceId,documentId:value.documentId,lifecycleGeneration:value.lifecycleGeneration};}
+    function sameEpoch(a,b){return !!a&&!!b&&a.instanceId===b.instanceId&&a.documentId===b.documentId&&a.lifecycleGeneration===b.lifecycleGeneration;}
+    function guardEpoch(value){if(!active()||!sameEpoch(value,epoch(info)))throw new Error('Native project owner changed before queued action');}
+    function disposition(error){return error&&error.details&&error.details.disposition;}
+    function localRefusal(message){return {code:'replacement_refused',message:message,details:{disposition:'notDispatched',retryExecution:false}};}
+    async function status(){return ports.invoke('nemo_native_object_client_status');}
+    async function inspectFor(pin){
+      var request={apiVersion:2,requestId:requestId('inspect'),instanceId:pin.instanceId,documentId:pin.documentId,action:{kind:'inspect'}};
+      var next=metadata(await raw('nemo_native_object_reference',request),request);
+      if(next.lifecycleGeneration!==pin.lifecycleGeneration||next.contentRevision!==pin.contentRevision)throw new Error('Native project owner changed');
+      return next;
+    }
+    async function verifyOwner(pin){
+      var value=await status();
+      if(!value||value.apiVersion!==2||value.available!==true||value.instanceId!==pin.instanceId||
+          value.documentId!==pin.documentId||value.contentRevision!==pin.contentRevision||
+          value.lifecycleGeneration!==pin.lifecycleGeneration)throw new Error('Native project owner changed');
+      var next=await inspectFor(pin);
+      if(!same(next,pin))throw new Error('Native project snapshot changed');
+      return next;
+    }
     async function inspect(requestIdValue){
       var current=info;if(!current)throw new Error('Native project identity unavailable');
       var request={apiVersion:2,requestId:requestIdValue||requestId('inspect'),instanceId:current.instanceId,documentId:current.documentId,action:{kind:'inspect'}};
@@ -41,33 +62,71 @@
       if(!same(info,next))presentation=null;
       info=next;return next;
     }
-    async function openPath(path){
-      if(phase!=='idle')throw new Error('Native project replacement is unavailable');
-      phase='opening';
-      try{
-        var status=await ports.invoke('nemo_native_object_client_status');
-        if(!status||status.apiVersion!==2||!id(status.instanceId)||status.available!==false)throw new Error('Native project slot is occupied or unavailable');
-        var rid=requestId('open'),receipt=await raw('nemo_native_object_bootstrap',{apiVersion:2,requestId:rid,instanceId:status.instanceId,sourcePath:path,projectOnly:true});
-        if(!receipt||receipt.requestId!==rid||receipt.instanceId!==status.instanceId||!id(receipt.documentId)||receipt.contentRevision!==0)throw new Error('Native project Open could not be reconciled');
-        var installed=await ports.invoke('nemo_native_object_client_status');
-        if(!installed||installed.available!==true||installed.documentId!==receipt.documentId||installed.instanceId!==status.instanceId||!integer(installed.lifecycleGeneration,1))throw new Error('Native project installation is uncorrelated');
-        info={instanceId:installed.instanceId,documentId:installed.documentId,contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration};
-        await inspect();phase='native';return info;
-      }catch(error){
-        if(!info&&error&&error.code==='unsupported_format'){phase='idle';return null;}
-        throw fence(error);
-      }
+    function openPath(path,transition){
+      if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
+      openingRequested=true;wantedFrame=null;
+      return enqueue(async function(){
+        var previous=info,priorPresentation=presentation,priorPhase=phase,dispatched=false,inBootstrap=false;
+        phase='opening';presentation=null;
+        try{
+          if(transition&&transition.confirm&&await transition.confirm(previous)!==true){phase=priorPhase;presentation=priorPresentation;return false;}
+          if(transition&&transition.occlude)await transition.occlude();
+          var before=await status();
+          if(!before||before.apiVersion!==2||!id(before.instanceId)||
+              (previous?before.available!==true||before.instanceId!==previous.instanceId||before.documentId!==previous.documentId||
+                before.contentRevision!==previous.contentRevision||before.lifecycleGeneration!==previous.lifecycleGeneration:before.available!==false))
+            throw localRefusal('Native project slot changed before Open');
+          var rid=requestId('open'),request={apiVersion:2,requestId:rid,instanceId:before.instanceId,sourcePath:path,projectOnly:true};
+          if(previous)request.replace={documentId:previous.documentId,expectedRevision:previous.contentRevision,
+            documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
+          dispatched=true;inBootstrap=true;
+          var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
+          if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
+              !id(receipt.documentId)||receipt.contentRevision!==0||previous&&receipt.documentId===previous.documentId)
+            throw new Error('Native project Open could not be reconciled');
+          var installed=await status();
+          if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
+              installed.instanceId!==before.instanceId||installed.contentRevision!==0||
+              !integer(installed.lifecycleGeneration,previous?previous.lifecycleGeneration+1:1))
+            throw new Error('Native project installation is uncorrelated');
+          var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
+            contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});
+          info=candidate;
+          await present(0,candidate);await verifyOwner(candidate);
+          if(transition&&transition.reveal){await transition.reveal(candidate);
+            await present(0,candidate);await verifyOwner(candidate);}
+          phase='native';changed();
+          if(transition&&transition.commit)await transition.commit(candidate);
+          return candidate;
+        }catch(error){
+          if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!previous&&error&&error.code==='unsupported_format')){
+            try{
+              if(previous)await verifyOwner(previous);
+              else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
+              info=previous;phase=priorPhase;presentation=priorPresentation;
+              if(transition&&transition.restore)await transition.restore(previous);
+            }catch(unknown){throw fence(unknown);}
+            if(!previous&&error&&error.code==='unsupported_format')return null;
+            throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
+          }
+          throw fence(error);
+        }finally{openingRequested=false;}
+      });
     }
-    function frameRequest(frame){
-      var pin=requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw new Error('Frame is outside the native project');
+    function frameRequest(frame,pin){
+      pin=pin||requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw new Error('Frame is outside the native project');
+      var viewport=ports.mapping(pin);
+      if(!viewport||!viewport.cssBounds||!(viewport.cssBounds.width>0)||!(viewport.cssBounds.height>0)||
+          !viewport.physicalExtent||!integer(viewport.physicalExtent.width,1)||!integer(viewport.physicalExtent.height,1))
+        throw new Error('Native project viewport is unavailable');
       return {apiVersion:2,requestId:requestId('frame'),instanceId:pin.instanceId,documentId:pin.documentId,
         contentRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,
         contextId:'scene-root',scopeKind:'authored',frame:frame,
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
-        viewport:ports.mapping(pin)};
+        viewport:viewport};
     }
-    async function present(frame){
-      var request=frameRequest(frame),receipt=await raw('nemo_native_object_preview',request);
+    async function present(frame,pin){
+      var request=frameRequest(frame,pin),receipt=await raw('nemo_native_object_preview',request);
       if(!same(info,request)||!receipt||receipt.status!=='presented'||!id(receipt.workId)||!integer(receipt.viewGeneration,1)){
         presentation=null;throw new Error('Native project frame was not presented');
       }
@@ -76,9 +135,12 @@
         contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
       return presentation;
     }
-    function presentPreview(frame){return enqueue(function(){return present(frame);});}
+    function presentPreview(frame){
+      if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame);});
+    }
     function renderPreview(frame){
-      if(!active())return Promise.resolve(null);
+      if(!active()||openingRequested)return Promise.resolve(null);
       wantedFrame=frame;
       if(rendering)return rendering;
       rendering=(async function(){var receipt;
@@ -88,8 +150,10 @@
       return rendering;
     }
     function changed(){if(ports.changed)ports.changed(info);}
-    function mutation(makeRequest,command){return enqueue(async function(){
-      var pin=requireActive(),request=makeRequest(pin);presentation=null;
+    function mutation(makeRequest,command){
+      if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      var submitted=epoch(info);return enqueue(async function(){
+      guardEpoch(submitted);var pin=requireActive(),request=makeRequest(pin);presentation=null;
       var receipt;
       try{receipt=await raw(command,request);}catch(error){
         // A transport error cannot establish whether a native command committed.
@@ -120,7 +184,10 @@
     }
     function presentedSession(){return active()&&presentation&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
-    function exportPng(destination,frames,onProgress,signal){return enqueue(async function(){
+    function exportPng(destination,frames,onProgress,signal){
+      if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      var submitted=epoch(info);return enqueue(async function(){
+      guardEpoch(submitted);
       if(!Array.isArray(frames)||frames.length!==1)throw new Error('Native object sequence export is unavailable');
       if(signal&&signal.aborted)return {status:'cancelled'};
       var request=frameRequest(frames[0]);request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
