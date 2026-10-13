@@ -126,7 +126,9 @@ fn wrong_expected_owner_shape_zero_version_and_excess_bytes_cannot_create_health
 
 #[test]
 fn actual_same_inode_bytes_size_or_mode_tamper_stays_failed_after_restoration() {
-    for case in ["bytes", "truncate", "grow", "mode"] {
+    for case in [
+        "bytes", "truncate", "grow", "mode", "setuid", "setgid", "sticky",
+    ] {
         let f = Fixture::new();
         let value = f.publish(1);
         let path = f.path();
@@ -144,7 +146,16 @@ fn actual_same_inode_bytes_size_or_mode_tamper_stays_failed_after_restoration() 
                 bytes.push(b' ');
                 std::fs::write(&path, bytes).unwrap();
             }
-            _ => std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap(),
+            _ => {
+                let mode = match case {
+                    "mode" => 0o644,
+                    "setuid" => 0o4600,
+                    "setgid" => 0o2600,
+                    _ => 0o1600,
+                };
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+                assert_eq!(std::fs::metadata(&path).unwrap().mode() & 0o7777, mode);
+            }
         }
         assert_eq!(std::fs::metadata(&path).unwrap().ino(), inode);
         let foreign = std::fs::read(&path).unwrap();
@@ -186,8 +197,7 @@ fn held_descriptor_cannot_attest_replaced_missing_symlink_or_renamed_owned_path(
                 let saved = f.top.join("held-owner");
                 std::fs::rename(&owner, &saved).unwrap();
                 symlink(saved, owner).unwrap();
-                // Final named file and its immediate parents retain exact inode,
-                // so only canonical ancestor validation catches this alias.
+                // Only canonical ancestry catches this alias: the file and immediate parents retain identity.
                 assert_eq!(std::fs::metadata(&path).unwrap().ino(), f.store.ino);
             }
         }

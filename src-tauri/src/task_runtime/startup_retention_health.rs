@@ -57,7 +57,7 @@ fn owned(store: &Store, m: &Metadata) -> bool {
         && !m.file_type().is_symlink()
         && m.dev() == store.dev
         && m.ino() == store.ino
-        && m.mode() & 0o777 == 0o600
+        && m.mode() & 0o7777 == 0o600
 }
 fn root(store: &Store) -> Result<(), &'static str> {
     let reports = store
