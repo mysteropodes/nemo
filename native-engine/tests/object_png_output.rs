@@ -74,9 +74,21 @@ fn gpu_live_png_is_deterministic_bounded_and_retains_real_edit_undo_drop_pixels(
         let png = encode_scheduled_object_png(&gpu, &result, &live, 64 * 1024).unwrap();
         (result, png)
     };
-    let fill=owner.prepare_fill_json(&serde_json::to_vec(&json!({"command":"object.fill.set",
-        "stableTarget":{"contextId":"scene-root","frameScope":{"kind":"authored","frame":7},"layerUid":"L2","strokeId":"a"},
-        "fill":{"kind":"solid","r":1,"g":1,"b":0,"a":1}})).unwrap()).unwrap();
+    let fill = owner
+        .prepare_fill_json(
+            &serde_json::to_vec(&json!({
+                "command": "object.fill.set",
+                "stableTarget": {
+                    "contextId": "scene-root",
+                    "frameScope": {"kind": "authored", "frame": 7},
+                    "layerUid": "L2",
+                    "strokeId": "a"
+                },
+                "fill": {"kind": "solid", "r": 1, "g": 1, "b": 0, "a": 1}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
     assert_eq!(owner.commit_fill(fill), Ok(1));
     assert_eq!(owner.undo(1), Ok(2));
     drop(owner);
