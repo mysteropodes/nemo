@@ -20,6 +20,51 @@ fn sha256_matches_standard_empty_and_abc_vectors() {
 }
 
 #[test]
+fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
+    for code in [
+        "a-open-false",
+        "a-pre-native-refusal",
+        "a-native-status-rejected",
+        "a-native-bootstrap-unsupported-format",
+        "a-native-bootstrap-rejected",
+        "a-native-bootstrap-resolved-open-refused",
+        "a-fs-read-rejected",
+        "a-native-status-empty-no-bootstrap",
+        "a-native-status-available-no-bootstrap",
+        "a-native-status-malformed-no-bootstrap",
+        "a-observer-late-untrusted",
+        "a-fs-read-resolved-open-refused",
+    ] {
+        assert!(super::control::allowed_a_failure(code), "{code}");
+    }
+    for code in [
+        "b-open-false",
+        "b-pre-native-refusal",
+        "b-native-status-rejected",
+        "b-native-bootstrap-unsupported-format",
+        "b-native-bootstrap-rejected",
+        "b-native-bootstrap-resolved-open-refused",
+        "b-fs-read-rejected",
+        "b-native-status-empty-no-bootstrap",
+        "b-native-status-available-no-bootstrap",
+        "b-native-status-malformed-no-bootstrap",
+        "b-observer-late-untrusted",
+        "b-fs-read-resolved-open-refused",
+    ] {
+        assert!(super::control::allowed_b_failure(code), "{code}");
+    }
+    for code in [
+        "a-native-bootstrap-/Users/private/A.json",
+        "a-native-bootstrap-secret error text",
+        "b-fs-read-/private/path",
+        "unsupported_format",
+    ] {
+        assert!(!super::control::allowed_a_failure(code), "{code}");
+        assert!(!super::control::allowed_b_failure(code), "{code}");
+    }
+}
+
+#[test]
 fn disabled_probe_is_inert_and_enabled_probe_requires_exact_release_identity() {
     assert_eq!(
         gate(false, false, false, false, false, false, "", ""),
