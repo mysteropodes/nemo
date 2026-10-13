@@ -69,7 +69,9 @@ impl Capture {
     /// Caller drops its guards before running this synchronous Store IO.
     pub(super) fn authorize(self, bytes: &[u8]) -> Authorization {
         let checked = (|| {
-            if bytes.is_empty() || bytes.len() > 1024 {
+            if bytes.len() > 1024
+                || bytes.iter().copied().find(|b| !b.is_ascii_whitespace()) != Some(b'{')
+            {
                 return Err("startup owner request refused");
             }
             let r: Request =

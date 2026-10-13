@@ -161,7 +161,18 @@ fn native_configuration_and_typed_request_cannot_be_forged_or_reopened() {
         assert!(s.capture(&f.runtime, &n, &b, f.version).is_err());
     }
     let good = serde_json::to_string(&f.request()).unwrap();
+    let object = f.request();
+    let positional = json!([
+        object["schema"],
+        object["ownerToken"],
+        object["runId"],
+        object["taskKey"],
+        object["pid"],
+        object["window"],
+        object["loadGeneration"]
+    ]);
     for body in [
+        bytes(&positional),
         Vec::new(),
         vec![b' '; 1025],
         vec![0xff],
@@ -170,7 +181,18 @@ fn native_configuration_and_typed_request_cannot_be_forged_or_reopened() {
         let mut s = f.session();
         let work = f.capture(&mut s);
         assert!(f.confirm(&mut s, work.authorize(&body)).is_err());
+        assert_eq!(s.state(), State::Refused);
+        assert!(s.pending().is_err());
+        let b = f.bridge.lock().unwrap();
+        let n = f.native.lock().unwrap();
+        assert!(s.capture(&f.runtime, &n, &b, f.version).is_err());
     }
+    let mut s = f.session();
+    let work = f.capture(&mut s);
+    let spaced_object = format!(" \t\r\n{good}");
+    assert!(f
+        .confirm(&mut s, work.authorize(spaced_object.as_bytes()))
+        .is_ok());
 }
 
 #[test]
