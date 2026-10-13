@@ -29,6 +29,115 @@ impl From<CompositorError> for NativeViewportError {
     fn from(error: CompositorError) -> Self { Self::new(error.to_string()) }
 }
 
+/// The generic method prevents the private platform port or a borrowed frame
+/// from escaping as an associated output. The caller retains its original GPU.
+pub(crate) trait NativeViewportConsumer {
+    type Output;
+    fn consume<P: native_engine::desktop_viewport::SurfacePort>(
+        self,
+        compositor: &mut native_engine::compositor::Compositor,
+        viewport: &mut native_engine::desktop_viewport::DesktopViewportHost<P>,
+    ) -> Result<Self::Output, String>;
+}
+
+pub(crate) struct ViewportGpuBinding {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    thread: std::thread::ThreadId,
+    unwound: bool,
+}
+impl ViewportGpuBinding {
+    pub(crate) fn capture(gpu: &native_engine::compositor::Compositor) -> Self {
+        Self {
+            instance: gpu.instance().clone(),
+            adapter: gpu.adapter().clone(),
+            device: gpu.device().clone(),
+            queue: gpu.queue().clone(),
+            thread: std::thread::current().id(),
+            unwound: false,
+        }
+    }
+    fn require_context(
+        &self,
+        gpu: &native_engine::compositor::Compositor,
+    ) -> Result<(), NativeViewportError> {
+        if self.thread != std::thread::current().id() {
+            return Err(NativeViewportError::new("native viewport thread mismatch"));
+        }
+        if self.instance != *gpu.instance()
+            || self.adapter != *gpu.adapter()
+            || self.device != *gpu.device()
+            || self.queue != *gpu.queue()
+        {
+            return Err(NativeViewportError::new(
+                "native viewport GPU context mismatch",
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn retire<P: native_engine::desktop_viewport::SurfacePort>(
+        &mut self,
+        host: &mut Option<native_engine::desktop_viewport::DesktopViewportHost<P>>,
+    ) -> Vec<native_engine::scheduler::WorkId> {
+        host.take()
+            .map_or_else(Vec::new, |mut value| value.dispose())
+    }
+    pub(crate) fn rebind<P: native_engine::desktop_viewport::SurfacePort>(
+        &mut self,
+        host: &mut Option<native_engine::desktop_viewport::DesktopViewportHost<P>>,
+        compositor: &native_engine::compositor::Compositor,
+        create: impl FnOnce() -> Result<
+            native_engine::desktop_viewport::DesktopViewportHost<P>,
+            NativeViewportError,
+        >,
+    ) -> Result<(), NativeViewportError> {
+        self.require_context(compositor)?;
+        if host.is_some() {
+            return Err(NativeViewportError::new("native viewport was not retired"));
+        }
+        *host = Some(create()?);
+        self.unwound = false;
+        Ok(())
+    }
+    pub(crate) fn consume<
+        P: native_engine::desktop_viewport::SurfacePort,
+        C: NativeViewportConsumer,
+    >(
+        &mut self,
+        host: Option<&mut native_engine::desktop_viewport::DesktopViewportHost<P>>,
+        compositor: &mut native_engine::compositor::Compositor,
+        consumer: C,
+    ) -> Result<C::Output, NativeViewportError> {
+        self.require_context(compositor)?;
+        if self.unwound {
+            return Err(NativeViewportError::new(
+                "native viewport consumer unwound; retire and rebind required",
+            ));
+        }
+        let host =
+            host.ok_or_else(|| NativeViewportError::new("native viewport is retired or absent"))?;
+        // This existing read checks the engine's disposed/fatal latch without
+        // resizing, registering work or acquiring a surface frame.
+        host.pointer_intent(native_engine::desktop_viewport::CssPoint { x: 0., y: 0. })
+            .map_err(|error| {
+                NativeViewportError::new(format!("native viewport is unavailable: {error:?}"))
+            })?;
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            consumer.consume(compositor, host)
+        })) {
+            Ok(result) => result.map_err(NativeViewportError::new),
+            Err(_) => {
+                self.unwound = true;
+                Err(NativeViewportError::new(
+                    "native viewport consumer panicked; cleanup is required",
+                ))
+            }
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 #[path = "native_viewport_appkit.rs"]
 mod platform;
@@ -48,6 +157,7 @@ mod platform {
     #[rustfmt::skip]
     impl NativeViewport {
         pub(crate) fn from_app(_app: &tauri::AppHandle, _window_label: &str, _mapping: ViewportMapping) -> Result<(Self, Compositor), NativeViewportError> { Err(NativeViewportError::new("native viewport unavailable: the staged N16 surface is macOS-only")) }
+        pub(crate) fn with_borrowed_target<C: NativeViewportConsumer>(&mut self, _compositor: &mut Compositor, _consumer: C) -> Result<C::Output, NativeViewportError> { Err(NativeViewportError::new("native viewport unavailable: macOS only")) }
         pub(crate) fn register(&mut self, _identity: ScheduledFrameIdentity) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
         pub(crate) fn resize(&mut self, _mapping: ViewportMapping) -> Result<(), ViewportError> { Err(ViewportError::Disposed) }
         pub(crate) fn present(&mut self, _compositor: &Compositor, _result: &CompositionResult) -> Result<PresentationReceipt, ViewportError> { Err(ViewportError::Disposed) }

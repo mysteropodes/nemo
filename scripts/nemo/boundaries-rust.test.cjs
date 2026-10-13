@@ -296,7 +296,7 @@ test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the thre
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);
   appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfacePort;');
-  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::desktop_viewport::SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::desktop_viewport::CssPoint;');
   appendSource(root, 'src-tauri/src/native_viewport.rs', 'use native_engine::codec::decode_project;');
   const policy = read('nemo-desktop.edges.json');
   const r = R.checkRustCrate(read('rust.profile.json'), policy, { root });
@@ -304,7 +304,7 @@ test('desktop native-engine grants are module-local: host, host tests and viewpo
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
     .map((v) => [v.module, v.detail.path]).sort(), [
     ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
-    ['rust.desktop.native.application.tests', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
     ['rust.desktop.native.viewport', 'codec::decode_project'],
   ]);
 });
@@ -312,7 +312,7 @@ test('desktop native-engine grants are module-local: host, host tests and viewpo
 test('raw identifiers cannot bypass desktop native-engine ports in the host, focused tests or viewport', (t) => {
   const root = desktopFixture(t);
   appendSource(root, 'src-tauri/src/native_application.rs', 'use r#native_engine::r#desktop_viewport::SurfacePort;');
-  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::r#desktop_viewport::r#SurfacePort;');
+  appendSource(root, 'src-tauri/src/native_application_tests.rs', 'use native_engine::r#desktop_viewport::r#CssPoint;');
   appendSource(root, 'src-tauri/src/native_viewport.rs',
     'fn raw_port_probe() { let _ = r#native_engine::r#codec::decode_project; }');
   const r = R.checkRustCrate(read('rust.profile.json'), read('nemo-desktop.edges.json'), { root });
@@ -320,7 +320,7 @@ test('raw identifiers cannot bypass desktop native-engine ports in the host, foc
   assert.deepEqual(r.violations.filter((v) => v.rule === 'private-port-access')
     .map((v) => [v.module, v.detail.path]).sort(), [
     ['rust.desktop.native.application', 'desktop_viewport::SurfacePort'],
-    ['rust.desktop.native.application.tests', 'desktop_viewport::SurfacePort'],
+    ['rust.desktop.native.application.tests', 'desktop_viewport::CssPoint'],
     ['rust.desktop.native.viewport', 'codec::decode_project'],
   ]);
 });
@@ -412,6 +412,28 @@ test('N25F3D3B2C private preview route keeps exact registration and production-o
   assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((violation) =>
     violation.rule === 'private-port-access' && violation.module === 'rust.desktop.mcp.adapter' &&
     violation.detail.path === 'compositor::Compositor'));
+});
+
+test('N25F3D3B2D1 original viewport borrow has exact children and separate production/test ports', (t) => {
+  const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
+  const module = (id) => profile.modules.find((entry) => entry.id === id);
+  assert.ok(module('rust.desktop.native.viewport').files.includes('native_viewport_appkit_binding.rs'));
+  assert.ok(module('rust.desktop.native.application.viewport').files.includes('native_viewport_callbacks.rs'));
+  assert.ok(module('rust.desktop.native.application.tests').files.includes('native_viewport_borrow_tests.rs'));
+  const ports = policy.externalCratePorts.native_engine.moduleItems;
+  assert.ok(ports['rust.desktop.native.viewport'].includes('desktop_viewport::CssPoint'));
+  const testItems = ['AcquiredSurfaceFrame', 'DesktopViewportHost', 'SettledSurfaceFrame',
+    'SurfaceAttempt', 'SurfacePort', 'SurfacePresentation', 'SurfaceRecoveryError', 'ViewportMapping'];
+  for (const item of testItems) assert.ok(ports['rust.desktop.native.application.tests'].includes(`desktop_viewport::${item}`));
+  const denied = structuredClone(policy);
+  denied.externalCratePorts.native_engine.moduleItems['rust.desktop.native.viewport'] =
+    ports['rust.desktop.native.viewport'].filter((item) => item !== 'desktop_viewport::CssPoint');
+  assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) =>
+    v.rule === 'private-port-access' && v.module === 'rust.desktop.native.viewport' && v.detail.path === 'desktop_viewport::CssPoint'));
+  const root = desktopFixture(t);
+  appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfaceAttempt;');
+  assert.ok(R.checkRustCrate(profile, policy, { root }).violations.some((v) =>
+    v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application' && v.detail.path === 'desktop_viewport::SurfaceAttempt'));
 });
 
 test('N25C2e raw bootstrap is registered with exact codec and test-only edges', (t) => {

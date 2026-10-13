@@ -1,14 +1,11 @@
 //! macOS AppKit surface lifetime and same-context native viewport binding.
 
-use crate::native_viewport::NativeViewportError;
-use native_engine::compositor::{CompositionResult, Compositor, CompositorInstance};
+use crate::native_viewport::{NativeViewportError, ViewportGpuBinding};
+use native_engine::compositor::Compositor;
 use native_engine::desktop_viewport::{
-    AcquiredSurfaceFrame, DesktopViewportHost, PresentationReceipt, SettledSurfaceFrame,
-    SurfaceAttempt, SurfacePort, SurfacePresentation, SurfaceRecoveryError, ViewportError,
-    ViewportMapping,
+    AcquiredSurfaceFrame, DesktopViewportHost, SettledSurfaceFrame, SurfaceAttempt, SurfacePort,
+    SurfacePresentation, SurfaceRecoveryError, ViewportMapping,
 };
-use native_engine::render_scene::ScheduledFrameIdentity;
-use native_engine::scheduler::WorkId;
 use objc::declare::ClassDecl;
 use objc::runtime::{Class, Object, Sel};
 use objc::{class, msg_send, sel, sel_impl};
@@ -19,7 +16,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Once,
 };
-use tauri::Manager;
 
 #[path = "native_viewport_appkit_occlusion.rs"]
 pub(super) mod occlusion;
@@ -422,118 +418,12 @@ impl Drop for MacOsSurfacePort {
 }
 
 pub(crate) struct NativeViewport {
+    gpu: ViewportGpuBinding,
     host: Option<DesktopViewportHost<MacOsSurfacePort>>,
     occlusion: Option<occlusion::WindowOcclusionObserver>,
     window: tauri::WebviewWindow,
     mapping: ViewportMapping,
 }
 
-impl NativeViewport {
-    pub(crate) fn from_app(
-        app: &tauri::AppHandle,
-        window_label: &str,
-        mapping: ViewportMapping,
-    ) -> Result<(Self, Compositor), NativeViewportError> {
-        let window = app.get_webview_window(window_label).ok_or_else(|| {
-            NativeViewportError::new(format!(
-                "native viewport unavailable: Tauri webview window '{window_label}' is absent"
-            ))
-        })?;
-        Self::from_window(&window, mapping)
-    }
-
-    fn from_window(
-        window: &tauri::WebviewWindow,
-        mapping: ViewportMapping,
-    ) -> Result<(Self, Compositor), NativeViewportError> {
-        let occlusion = occlusion::WindowOcclusionObserver::new(window)?;
-        let content_view = window
-            .ns_view()
-            .map_err(|error| NativeViewportError::new(format!("resolve AppKit view: {error}")))?
-            as *mut Object;
-        let construction = CompositorInstance::new();
-        let view = OwnedView::new(content_view, mapping)?;
-        let surface = create_surface(construction.instance(), &view)?;
-        let compositor = construction.create_for_surface(&surface)?;
-        let port = MacOsSurfacePort::new(surface, view, &compositor, mapping)?;
-        Ok((
-            Self {
-                host: Some(DesktopViewportHost::new(port, mapping)),
-                occlusion: Some(occlusion),
-                window: window.clone(),
-                mapping,
-            },
-            compositor,
-        ))
-    }
-
-    /// Retire the old surface and its view before any replacement core mutation.
-    pub(crate) fn retire_replacement(&mut self) -> Vec<WorkId> {
-        self.dispose()
-    }
-
-    /// Build an unpresented host from the retained window and the existing GPU context.
-    pub(crate) fn rebind_existing(
-        &mut self,
-        compositor: &Compositor,
-    ) -> Result<(), NativeViewportError> {
-        if self.host.is_some() {
-            return Err(NativeViewportError::new("native viewport was not retired"));
-        }
-        let occlusion = occlusion::WindowOcclusionObserver::new(&self.window)?;
-        let content_view =
-            self.window.ns_view().map_err(|error| {
-                NativeViewportError::new(format!("resolve AppKit view: {error}"))
-            })? as *mut Object;
-        let view = OwnedView::new(content_view, self.mapping)?;
-        let surface = create_surface(compositor.instance(), &view)?;
-        let port = MacOsSurfacePort::new(surface, view, compositor, self.mapping)?;
-        self.host = Some(DesktopViewportHost::new(port, self.mapping));
-        self.occlusion = Some(occlusion);
-        Ok(())
-    }
-
-    pub(crate) fn register(
-        &mut self,
-        identity: ScheduledFrameIdentity,
-    ) -> Result<(), ViewportError> {
-        self.host
-            .as_mut()
-            .ok_or(ViewportError::Disposed)?
-            .register(identity)
-    }
-
-    pub(crate) fn resize(&mut self, mapping: ViewportMapping) -> Result<(), ViewportError> {
-        self.host
-            .as_mut()
-            .ok_or(ViewportError::Disposed)?
-            .resize(mapping)?;
-        self.mapping = mapping;
-        Ok(())
-    }
-
-    pub(crate) fn present(
-        &mut self,
-        compositor: &Compositor,
-        result: &CompositionResult,
-    ) -> Result<PresentationReceipt, ViewportError> {
-        self.host
-            .as_mut()
-            .ok_or(ViewportError::Disposed)?
-            .present_composition(compositor, result)
-    }
-
-    pub(crate) fn dispose(&mut self) -> Vec<WorkId> {
-        // Stop window hints before releasing the host; rebind owns a fresh observer.
-        self.occlusion.take();
-        self.host
-            .take()
-            .map_or_else(Vec::new, |mut host| host.dispose())
-    }
-}
-
-impl Drop for NativeViewport {
-    fn drop(&mut self) {
-        self.dispose();
-    }
-}
+#[path = "native_viewport_appkit_binding.rs"]
+mod binding;
