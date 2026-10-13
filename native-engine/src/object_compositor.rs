@@ -1,6 +1,9 @@
 //! D2 headless object pixels on the existing compositor; never presentation.
 use crate::compositor::{align_to, Compositor, CompositorError};
-use crate::object_render_scene::{ObjectCompositionWitness, ObjectPaintCommand};
+use crate::object_render_scene::{
+    LiveObjectComposition, ObjectCompositionWitness, ObjectPaintCommand, ScheduledObjectComposition,
+};
+use crate::render_scene::ScheduledFrameIdentity;
 use vello::kurbo::Affine;
 use vello::peniko::{Color, Fill};
 
@@ -68,6 +71,32 @@ fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
 }
 
 impl Compositor {
+    pub(crate) fn compose_scheduled_object(
+        &mut self,
+        live: &LiveObjectComposition<'_>,
+    ) -> Result<ScheduledObjectCompositionResult, CompositorError> {
+        let prepared = live.prepared();
+        check_live(live, prepared)?;
+        let (width, height) = prepared.dimensions();
+        let output = ObjectOutputSpec::new(width, height, "white-srgb-normal-rgba8-area")?;
+        Ok(ScheduledObjectCompositionResult {
+            pixels: self.compose_object(prepared.composition(), output)?,
+            prepared: prepared.clone(),
+        })
+    }
+
+    pub(crate) fn readback_scheduled_object_rgba8(
+        &self,
+        result: &ScheduledObjectCompositionResult,
+        live: &LiveObjectComposition<'_>,
+    ) -> Result<ScheduledObjectRgba8Readback, CompositorError> {
+        check_live(live, &result.prepared)?;
+        Ok(ScheduledObjectRgba8Readback {
+            pixels: self.readback_object_rgba8(&result.pixels)?,
+            prepared: result.prepared.clone(),
+        })
+    }
+
     pub(crate) fn compose_object(
         &mut self,
         prepared: &ObjectCompositionWitness,
@@ -143,6 +172,45 @@ impl Compositor {
     }
 }
 
+fn check_live(
+    live: &LiveObjectComposition<'_>,
+    prepared: &ScheduledObjectComposition,
+) -> Result<(), CompositorError> {
+    live.validate_result(prepared)
+        .map_err(|error| CompositorError::new(format!("object work is not consumable: {error:?}")))
+}
+
+/// Raw texture/readback handles remain private; identity is diagnostic only.
+pub(crate) struct ScheduledObjectCompositionResult {
+    pixels: ObjectCompositionResult,
+    prepared: ScheduledObjectComposition,
+}
+impl ScheduledObjectCompositionResult {
+    pub(crate) fn identity(&self) -> &ScheduledFrameIdentity {
+        self.prepared.identity()
+    }
+}
+
+pub(crate) struct ScheduledObjectRgba8Readback {
+    pixels: ObjectRgba8Readback,
+    prepared: ScheduledObjectComposition,
+}
+impl ScheduledObjectRgba8Readback {
+    pub(crate) fn identity(&self) -> &ScheduledFrameIdentity {
+        self.prepared.identity()
+    }
+    pub(crate) fn dimensions(&self) -> (u32, u32) {
+        self.pixels.dimensions()
+    }
+    pub(crate) fn bytes<'a>(
+        &'a self,
+        live: &'a LiveObjectComposition<'_>,
+    ) -> Result<&'a [u8], CompositorError> {
+        check_live(live, &self.prepared)?;
+        Ok(self.pixels.bytes())
+    }
+}
+
 pub(crate) struct ObjectCompositionResult {
     instance: wgpu::Instance,
     device: wgpu::Device,
@@ -180,3 +248,7 @@ impl ObjectRgba8Readback {
 #[cfg(test)]
 #[path = "../tests/object_compositor.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_scheduled_compositor.rs"]
+mod scheduled_tests;

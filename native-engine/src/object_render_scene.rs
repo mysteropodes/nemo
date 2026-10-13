@@ -4,6 +4,13 @@ use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFra
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::sync::Arc;
 
+#[path = "object_scheduled_scene.rs"]
+mod scheduled;
+pub(crate) use scheduled::{
+    prepare_scheduled_object_composition, LiveObjectComposition, ScheduledObjectComposition,
+    ScheduledObjectSceneError,
+};
+
 #[path = "object_paint_plan.rs"]
 mod paint;
 #[cfg(all(test, feature = "history"))]

@@ -185,6 +185,7 @@ impl FrameScheduler {
         }
         if let Some(work_id) = self.active_by_key.get(&key).copied() {
             return Ok(ScheduledFrame {
+                provenance: self.provenance.clone(),
                 work_id,
                 view_generation: self.frames[&work_id].view_generation,
                 key: key.evaluation().clone(),
@@ -230,6 +231,7 @@ impl FrameScheduler {
             },
         );
         Ok(ScheduledFrame {
+            provenance: self.provenance.clone(),
             work_id,
             view_generation,
             key: evaluation,
