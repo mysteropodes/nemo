@@ -239,6 +239,7 @@ func run() throws {
   }
   func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
   func retainedMainChildrenDiagnostic() -> [String:Any] {
+    // Separate, count-bounded detail phase outside the transition-sample budget.
     let limit = 64
     var rawChildren: CFTypeRef?
     let query = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
@@ -321,22 +322,27 @@ func run() throws {
     let started = DispatchTime.now().uptimeNanoseconds
     let deadline = started + 750_000_000
     let timeout: Float = 0.03
+    var timeoutsConfigured = false
     func elapsedMs() -> Int { Int((DispatchTime.now().uptimeNanoseconds-started)/1_000_000) }
     func expired() -> Bool { DispatchTime.now().uptimeNanoseconds >= deadline }
-    func result(_ status: String, _ samples: [[String:Any]]) -> [String:Any] {
-      ["status":status,"budgetMs":750,"budgetKind":"best-effort","elapsedMs":elapsedMs(),"samples":samples]
+    func result(_ suggestedStatus: String, _ samples: [[String:Any]]) -> [String:Any] {
+      let completed = DispatchTime.now().uptimeNanoseconds
+      let overrun = completed >= deadline
+      return ["status":overrun ? "deadline" : suggestedStatus,"budgetMs":750,
+        "budgetKind":"best-effort","budgetScope":"transition-samples-only",
+        "axTimeoutsConfigured":timeoutsConfigured,"elapsedMs":Int((completed-started)/1_000_000),"samples":samples]
     }
     // AX message timeouts precede every data query in either post-refusal probe.
     if expired() { return result("deadline",[]) }
     let appTimeout = AXUIElementSetMessagingTimeout(application,timeout)
     if expired() { return result("deadline",[]) }
+    guard appTimeout == .success else { return result("timeout-config-refused",[]) }
     let mainTimeout = AXUIElementSetMessagingTimeout(main,timeout)
+    timeoutsConfigured = mainTimeout == .success
     if expired() { return result("deadline",[]) }
-    guard appTimeout == .success, mainTimeout == .success else {
-      return result("timeout-config-refused",[])
-    }
-    // AX calls have per-element timeouts. The 750 ms budget is best-effort because
-    // synchronous CoreGraphics calls cannot be interrupted; every return is checked.
+    guard timeoutsConfigured else { return result("timeout-config-refused",[]) }
+    // AX calls have per-element timeouts. The transition-sample budget is best-effort
+    // because synchronous CoreGraphics calls cannot be interrupted; each return is checked.
     func sample(_ index: Int) -> ([String:Any],Bool) {
       var facts: [String:Any] = ["sampleIndex":index,"elapsedMs":elapsedMs()]
       func reachedDeadline() -> Bool {
@@ -377,6 +383,7 @@ func run() throws {
       } ?? []
       if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
 
+      if reachedDeadline() { return (facts,true) }
       var rawChildren: CFTypeRef?
       let childrenError = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
       let childRows = childrenError == .success ? rawChildren as? [AXUIElement] : nil
@@ -596,8 +603,13 @@ func run() throws {
         if action == "press" {
           var facts = error.facts
           if shouldProbeRetainedMainChildren(error.stage,error.facts) {
-            facts["transitionObservation"] = transitionObservationDiagnostic()
-            facts.merge(retainedMainChildrenDiagnostic()) { _, new in new }
+            let observation = transitionObservationDiagnostic()
+            facts["transitionObservation"] = observation
+            let status = observation["status"] as? String
+            let configured = observation["axTimeoutsConfigured"] as? Bool == true
+            if configured && status != "deadline" && status != "timeout-config-refused" {
+              facts.merge(retainedMainChildrenDiagnostic()) { _, new in new }
+            }
           }
           throw pressFailure("post-action-"+error.stage,facts)
         }

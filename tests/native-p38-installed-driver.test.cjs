@@ -424,14 +424,18 @@ test('bounded post-press transition samples are sanitized and never resume a ref
   assert.match(sampler,/AXUIElementSetMessagingTimeout/);
   assert.match(sampler,/kAXChildrenAttribute/);
   assert.match(sampler,/budgetKind":"best-effort/);
+  assert.match(sampler,/budgetScope":"transition-samples-only/);
   assert.match(sampler,/facts\["sampleDeadlineReached"\] = true/);
   assert.match(sampler,/transitionObservationStatus\(samples,overrun\)/);
+  assert.match(sampler,/let completed = DispatchTime\.now\(\)\.uptimeNanoseconds/);
+  assert.match(sampler,/let overrun = completed >= deadline/);
   assert.doesNotMatch(sampler,/AXUIElementPerformAction|AXUIElementPostKeyboardEvent|CGEvent/);
   const refusalPath=helperSource.slice(helperSource.indexOf('if shouldProbeRetainedMainChildren(error.stage,error.facts)'),
     helperSource.indexOf('throw pressFailure("post-action-"',helperSource.indexOf('if shouldProbeRetainedMainChildren(error.stage,error.facts)')));
   assert.ok(refusalPath.indexOf('transitionObservationDiagnostic()')<refusalPath.indexOf('retainedMainChildrenDiagnostic()'));
   assert.match(refusalPath,/transitionObservationDiagnostic\(\)/);
   assert.match(refusalPath,/retainedMainChildrenDiagnostic\(\)/);
+  assert.match(refusalPath,/configured && status != "deadline" && status != "timeout-config-refused"/);
   assert.match(sampler,/AXUIElementSetMessagingTimeout\(application,timeout\)/);
   assert.match(sampler,/AXUIElementSetMessagingTimeout\(main,timeout\)/);
   const stable=(index,extra={})=>({sampleIndex:index,elapsedMs:index?330:0,axPidQueryError:0,axPidMatches:true,
@@ -449,7 +453,8 @@ test('bounded post-press transition samples are sanitized and never resume a ref
   ];
   for(const scenario of scenarios){
     const diagnostic={stage:'post-action-application-window-membership',elementPath:'2',transitionObservation:{
-      status:scenario.status,budgetMs:750,budgetKind:'best-effort',elapsedMs:480,samples:scenario.samples},privatePath:'/private/identity'};
+      status:scenario.status,budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+      axTimeoutsConfigured:true,elapsedMs:480,samples:scenario.samples},privatePath:'/private/identity'};
     const clean=safeActionDiagnostics(diagnostic);
     assert.equal(clean.transitionObservation.status,scenario.status,scenario.name);
     assert.equal(clean.transitionObservation.samples.length,2,scenario.name);
@@ -469,29 +474,39 @@ test('bounded post-press transition samples are sanitized and never resume a ref
     assert.equal(f.events.filter(event=>event==='window-press').length,1,scenario.name);
   }
   const timeout=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',elapsedMs:8,samples:[]}});
-  assert.deepEqual(timeout.transitionObservation,{status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',elapsedMs:8,samples:[]});
+    status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:false,elapsedMs:8,samples:[]}});
+  assert.deepEqual(timeout.transitionObservation,{status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',
+    budgetScope:'transition-samples-only',axTimeoutsConfigured:false,elapsedMs:8,samples:[]});
   const deadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',elapsedMs:740,samples:[stable(0)]}});
+    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:true,elapsedMs:740,samples:[stable(0)]}});
   assert.equal(deadline.transitionObservation.status,'deadline');
   const overrunDeadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',elapsedMs:810,
+    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:true,elapsedMs:810,
     samples:[stable(0),stable(1,{pinnedAXWindowMember:true,sampleDeadlineReached:true})]}});
   assert.equal(overrunDeadline.transitionObservation.elapsedMs,810);
   assert.equal(overrunDeadline.transitionObservation.status,'deadline');
   for(const observation of [
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',elapsedMs:751,samples:[stable(0),stable(1)]},
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',elapsedMs:500,samples:[stable(0),stable(1),stable(2)]},
-    {status:'attached-sheet-observed',budgetMs:750,budgetKind:'best-effort',elapsedMs:500,samples:[stable(0),stable(1)]},
-    {status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',elapsedMs:0,samples:[stable(0)]},
-    {status:'deadline',budgetMs:750,budgetKind:'best-effort',elapsedMs:10001,samples:[stable(0),stable(1)]},
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',elapsedMs:500,samples:[stable(0),stable(1,{pinnedCGWindowCount:0})]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:751,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1),stable(2)]},
+    {status:'attached-sheet-observed',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1)]},
+    {status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,elapsedMs:0,samples:[stable(0)]},
+    {status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:10001,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1,{pinnedCGWindowCount:0})]},
+    {status:'membership-returned',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,
+      samples:[stable(0),stable(1,{pinnedAXWindowMember:true,sampleDeadlineReached:true})]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,
+      elapsedMs:500,samples:[stable(0),stable(1)]},
   ])assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:observation}));
   assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',elapsedMs:750,
+    status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:true,elapsedMs:750,
     samples:[stable(0),stable(1,{pinnedAXWindowMember:true})]}}));
   assert.throws(()=>safeActionDiagnostics({stage:'axpress-perform',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',elapsedMs:0,samples:[]}}));
+    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:false,elapsedMs:0,samples:[]}}));
 });
 test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
   const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');

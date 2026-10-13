@@ -148,13 +148,15 @@ function safeActionDiagnostics(value) {
     const observation=value.transitionObservation;
     const statuses=new Set(['timeout-config-refused','deadline','inconclusive','membership-returned','persistent-omission']);
     check(observation&&typeof observation==='object'&&!Array.isArray(observation)&&statuses.has(observation.status), 'ax-evidence-refused');
-    check(observation.budgetMs===750&&observation.budgetKind==='best-effort', 'ax-evidence-refused');
+    check(observation.budgetMs===750&&observation.budgetKind==='best-effort'&&
+      observation.budgetScope==='transition-samples-only'&&typeof observation.axTimeoutsConfigured==='boolean', 'ax-evidence-refused');
     check(Number.isInteger(observation.elapsedMs)&&observation.elapsedMs>=0&&observation.elapsedMs<=10000, 'ax-evidence-refused');
     if(observation.status!=='deadline')check(observation.elapsedMs<=750,'ax-evidence-refused');
     check(Array.isArray(observation.samples)&&observation.samples.length<=2, 'ax-evidence-refused');
     if(observation.status==='timeout-config-refused')check(observation.samples.length===0, 'ax-evidence-refused');
+    if(observation.status==='timeout-config-refused')check(observation.axTimeoutsConfigured===false, 'ax-evidence-refused');
     if(observation.status==='inconclusive'||observation.status==='membership-returned'||observation.status==='persistent-omission')
-      check(observation.samples.length===2, 'ax-evidence-refused');
+      check(observation.samples.length===2&&observation.axTimeoutsConfigured===true, 'ax-evidence-refused');
     if(observation.status==='deadline')check(observation.samples.length<=2, 'ax-evidence-refused');
     const sampleFacts=observation.samples.map((sample,index)=>{
       check(sample&&typeof sample==='object'&&!Array.isArray(sample)&&sample.sampleIndex===index, 'ax-evidence-refused');
@@ -170,6 +172,8 @@ function safeActionDiagnostics(value) {
       check(sample.retainedMainChildFacts===undefined&&sample.retainedMainSheetProbe===undefined,'ax-evidence-refused');
       return cleanSample;
     });
+    if(observation.status!=='deadline')
+      check(sampleFacts.every(sample=>sample.sampleDeadlineReached!==true), 'ax-evidence-refused');
     if(sampleFacts.length===2&&observation.status!=='deadline'){
       const usable=sampleFacts.every(sample=>sample.axPidMatches===true&&sample.applicationWindowsQueryError===0&&
         sample.applicationWindowsReadable===true&&sample.minimizedQueryError===0&&sample.minimizedReadable===true&&
@@ -180,6 +184,7 @@ function safeActionDiagnostics(value) {
       check(observation.status===derived,'ax-evidence-refused');
     }
     clean.transitionObservation={status:observation.status,budgetMs:750,budgetKind:'best-effort',
+      budgetScope:'transition-samples-only',axTimeoutsConfigured:observation.axTimeoutsConfigured,
       elapsedMs:observation.elapsedMs,samples:sampleFacts};
   }
   return clean;
