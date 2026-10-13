@@ -4,6 +4,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const source = fs.readFileSync(path.join(__dirname, 'desktop/startup-observer-bootstrap.js'), 'utf8');
 const { createStartupProbe } = require('./desktop/startup-observer-bootstrap.js');
 const RUN = '12345678-1234-1234-1234-123456789abc';
+const CUT = 'abcdef12-1234-1234-1234-123456789abc';
 function realm(initial = 'loading', delivery = () => true) {
   function target() {
     const handlers = new Map();
@@ -174,4 +175,102 @@ test('probe changes no document/control values, global descriptors or product ac
   assert.deepEqual(Object.getOwnPropertyDescriptors(r.win), before);
   assert.deepEqual(Object.getOwnPropertyDescriptors(r.node), beforeNode);
   assert.equal(beforeWindow.document.value, r.doc);
+});
+
+test('cut detaches observations but drains every pre-cut queued ACK in order', async () => {
+  const releases = [], r = realm('interactive', () => new Promise(resolve => releases.push(resolve)));
+  const probe = r.start(), escaped = [...r.frames.values()][0];
+  assert.equal(probe.state().pending, 3);
+  await Promise.resolve(); assert.equal(r.messages.length, 1);
+  const result = probe.beginCut(CUT);
+  assert.equal(probe.beginCut(CUT), result);
+  assert.equal(probe.cutState().status, 'draining');
+  assert.equal(probe.cutState().pending, 3);
+  assert.equal(r.frames.size, 0); assert.equal(r.cancelled.length, 1);
+  assert([...r.win.handlers.values(), ...r.doc.handlers.values()].every(set => set.size === 0));
+  r.win.dispatch('error'); r.doc.dispatch('DOMContentLoaded');
+  let settled = false; result.then(() => { settled = true; });
+  for (let i = 0; i < 3; i++) {
+    assert.equal(releases.length, i + 1); releases[i](true);
+    // Each async emit and the serial .then require their own microtask turn.
+    for (let j = 0; j < 6; j++) await Promise.resolve();
+    assert.equal(probe.state().pending, 2 - i);
+  }
+  const footer = await result;
+  assert.equal(settled, true); assert.equal(footer.status, 'drained');
+  assert.equal(footer.generated, 3); assert.equal(footer.sent, 3);
+  assert.equal(footer.pending, 0); assert.equal(footer.failed, 0);
+  assert.equal(footer.dropped, 0); assert.equal(footer.late, 0);
+  assert.equal(footer.runId, RUN); assert.equal(footer.loadGeneration, 7);
+  assert.equal(footer.cutId, CUT); assert(Object.isFrozen(footer));
+  assert.deepEqual(stages(r), ['early-script', 'ready-state-observed', 'startup-control']);
+  assert.equal(probe.cutState().visiblePaint, 'not-observed');
+  // A settled snapshot cannot erase subsequently observed late callbacks.
+  escaped(); assert.equal(probe.cutState().late, 1);
+  assert.equal(probe.cutState().status, 'partial'); assert.equal(footer.late, 0);
+  assert.equal(probe.beginCut(CUT), result); assert.equal(probe.state().generated, 3);
+  probe.dispose();
+});
+
+test('cut retains failed ACKs and real pending until an unsettled transport finishes', async () => {
+  let release;
+  const r = realm('interactive', event => event.sequence === 1
+    ? new Promise(resolve => { release = resolve; }) : Promise.reject(Error('private-failure')));
+  const probe = r.start(); await Promise.resolve();
+  const result = probe.beginCut(CUT);
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(probe.cutState().pending, 3); assert.equal(probe.cutState().status, 'draining');
+  release(false); const footer = await result;
+  assert.equal(footer.pending, 0); assert.equal(footer.failed, 3);
+  assert.equal(footer.sent, 0); assert.equal(footer.status, 'partial');
+  assert(!JSON.stringify(footer).includes('private-failure')); probe.dispose();
+});
+
+test('cut identity is immutable and invalid, different or disposed requests cannot reopen', async () => {
+  const r = realm(), probe = r.start();
+  assert.equal(probe.cutState(), null);
+  for (const value of [null, {}, 3, CUT.toUpperCase(), 'private-cut'])
+    assert.throws(() => probe.beginCut(value), /startup cut unavailable/);
+  const result = probe.beginCut(CUT);
+  r.config.runId = 'private-retarget'; r.config.loadGeneration = 90;
+  assert.throws(() => probe.beginCut(RUN), /startup cut unavailable/);
+  const footer = await result;
+  assert.equal(footer.runId, RUN); assert.equal(footer.loadGeneration, 7);
+  assert.equal(footer.cutId, CUT); assert.equal(footer.status, 'drained');
+  probe.dispose(); assert.throws(() => probe.beginCut(CUT), /startup cut unavailable/);
+  const disposed = realm('interactive'), other = disposed.start(); other.dispose();
+  assert.throws(() => other.beginCut(CUT), /startup cut unavailable/);
+  await other.drained(); assert.equal(other.state().pending, 0);
+  assert.equal(other.state().late, 3); assert.equal(other.state().sent, 0);
+  const deceptive = realm(); let reads = 0;
+  Object.defineProperty(deceptive.config, 'runId', { get() { return reads++ ? 'private-retarget' : RUN; } });
+  const captured = deceptive.start(), pinned = await captured.beginCut(CUT);
+  assert.equal(reads, 1); assert.equal(pinned.runId, RUN); captured.dispose();
+});
+
+test('dispose during a cut preserves retirement semantics and cannot claim a clean drain', async () => {
+  let release;
+  const r = realm('interactive', () => new Promise(resolve => { release = resolve; }));
+  const probe = r.start(); await Promise.resolve();
+  const result = probe.beginCut(CUT); probe.dispose();
+  assert.equal(probe.state().pending, 3); release(true);
+  const footer = await result;
+  assert.equal(footer.sent, 1); assert.equal(footer.late, 2);
+  assert.equal(footer.pending, 0); assert.equal(footer.status, 'partial');
+  assert.throws(() => probe.beginCut(CUT), /startup cut unavailable/);
+});
+
+test('cut refuses false clean results after overflow, late listeners or detach failure', async () => {
+  const r = realm(), probe = r.start(), error = [...r.win.handlers.get('error')][0];
+  for (let i = 0; i < 20; i++) r.win.dispatch('error');
+  const result = probe.beginCut(CUT); error({ isTrusted: true });
+  const footer = await result;
+  assert.equal(footer.generated, 15); assert.equal(footer.sent, 15);
+  assert.equal(footer.dropped, 1); assert.equal(footer.late, 1);
+  assert.equal(footer.pending, 0); assert.equal(footer.status, 'partial'); probe.dispose();
+  const broken = realm('interactive'), active = broken.start();
+  broken.ports.cancelAnimationFrame = () => { throw Error('private-cancel'); };
+  const failed = await active.beginCut(CUT);
+  assert.equal(failed.failed, 1); assert.equal(failed.status, 'partial');
+  assert(!JSON.stringify(failed).includes('private')); active.dispose();
 });

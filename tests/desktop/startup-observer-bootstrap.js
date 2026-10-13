@@ -18,25 +18,30 @@
         || typeof ports.requestAnimationFrame !== 'function' || typeof ports.cancelAnimationFrame !== 'function'
         || typeof ports.getComputedStyle !== 'function') throw Error();
     } catch (_) { throw new TypeError('startup probe unavailable'); }
-    let generated = 0, sent = 0, failed = 0, dropped = 0, late = 0;
+    let generated = 0, sent = 0, failed = 0, dropped = 0, late = 0, pending = 0;
+    let cutId = null, cutPromise = null;
     let refused = false, disposed = false, contentReady = false, domEvent = false, loadEvent = false;
     let sampled = false, rafAcks = 0, queue = Promise.resolve();
     const listeners = [], frames = new Set();
     function state() {
-      return Object.freeze({ generated, sent, failed, dropped, late, refused, disposed,
+      return Object.freeze({ generated, sent, failed, dropped, late, pending, refused, disposed,
         contentReady, domEvent, loadEvent, rafAcks, visiblePaint: 'not-observed' });
     }
     function record(stage, fields) {
-      if (disposed) { late++; return; }
+      if (disposed || cutId !== null) { late++; return; }
       if (generated >= MAX) { dropped++; refused = true; return; }
       const event = Object.freeze(Object.assign({ schema: 'nemo.startup-js/1',
         runId: identity.runId, loadGeneration: identity.loadGeneration,
         sequence: ++generated, stage }, fields));
       if (JSON.stringify(event).length > 1024) { dropped++; refused = true; return; }
+      pending++;
       queue = queue.then(async () => {
-        if (disposed) { late++; return; }
-        try { if (await ports.emit(event) !== true) { failed++; refused = true; }
-          else sent++; } catch (_) { failed++; refused = true; }
+        try {
+          if (disposed) { late++; return; }
+          if (await ports.emit(event) !== true) { failed++; refused = true; }
+          else sent++;
+        } catch (_) { failed++; refused = true; }
+        finally { pending--; }
       });
     }
     function reject(reason) { if (!refused) record('probe-refused', { reason }); refused = true; }
@@ -70,7 +75,7 @@
       let id;
       try {
         id = ports.requestAnimationFrame(() => {
-          if (disposed) { late++; return; }
+          if (disposed || cutId !== null) { late++; return; }
           if (!frames.delete(id)) { reject('stage-order'); return; }
           if (refused) return;
           record('raf-ack', { ordinal: ++rafAcks });
@@ -80,7 +85,7 @@
       } catch (_) { reject('unsupported-port'); }
     }
     function sample() {
-      if (sampled || refused || disposed) return;
+      if (sampled || refused || disposed || cutId !== null) return;
       sampled = true;
       const visibility = control();
       record('startup-control', { control: 'start-open', visibility });
@@ -88,7 +93,7 @@
       else scheduleFrame();
     }
     function trusted(event) {
-      if (disposed) { late++; return false; }
+      if (disposed || cutId !== null) { late++; return false; }
       if (refused) return false;
       try { if (!event || event.isTrusted !== true) { reject('synthetic-event'); return false; } }
       catch (_) { reject('unsupported-document'); return false; }
@@ -122,16 +127,36 @@
     function listen(target, name, handler) {
       target.addEventListener(name, handler); listeners.push([target, name, handler]);
     }
-    function dispose() {
-      if (disposed) return state();
-      disposed = true;
-      for (const [target, name, handler] of listeners) {
+    function detach() {
+      for (const [target, name, handler] of listeners.splice(0)) {
         try { target.removeEventListener(name, handler); } catch (_) { failed++; }
       }
       for (const id of frames) {
         try { ports.cancelAnimationFrame(id); } catch (_) { failed++; }
       }
-      frames.clear(); return state();
+      frames.clear();
+    }
+    function dispose() {
+      if (disposed) return state();
+      disposed = true; detach(); return state();
+    }
+    // This is JS drain evidence only. Native acceptance and sealing are separate.
+    // Read cutState again at final collection: escaped callbacks can increase late.
+    function cutState() {
+      if (cutId === null) return null;
+      const status = pending > 0 ? 'draining' : generated === sent && !refused
+        && failed === 0 && dropped === 0 && late === 0 && !disposed ? 'drained' : 'partial';
+      return Object.freeze({ runId: identity.runId, loadGeneration: identity.loadGeneration,
+        cutId, status, generated, sent, failed, dropped, late, pending,
+        visiblePaint: 'not-observed' });
+    }
+    function beginCut(value) {
+      if (typeof value !== 'string' || !UUID.test(value) || disposed
+        || (cutId !== null && value !== cutId)) throw new TypeError('startup cut unavailable');
+      if (cutPromise !== null) return cutPromise;
+      cutId = value; detach();
+      cutPromise = queue.then(cutState);
+      return cutPromise;
     }
     record('early-script', {});
     try {
@@ -143,7 +168,7 @@
         contentReady = true; record('ready-state-observed', { readyState: initial }); sample();
       }
     } catch (_) { reject('unsupported-document'); }
-    return Object.freeze({ state, dispose, drained: () => queue });
+    return Object.freeze({ state, dispose, beginCut, cutState, drained: () => queue });
   }
   const api = Object.freeze({ createStartupProbe });
   if (typeof module === 'object' && module.exports) module.exports = api;
