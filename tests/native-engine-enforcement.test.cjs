@@ -52,6 +52,8 @@ const CANDIDATE_FILES = [
   'native-engine/tests/reference_png_scanlines.rs',
   'native-engine/src/object_snapshot.rs',
   'native-engine/src/object_frame_packet.rs',
+  'native-engine/src/object_expression_pin.rs',
+  'native-engine/tests/object_expression_pin.rs',
   'native-engine/tests/object_frame_packet.rs',
   'native-engine/src/object_render_scene.rs',
   'native-engine/tests/object_render_scene.rs',
@@ -89,6 +91,7 @@ const CANDIDATE_FILES = [
   'scripts/nemo/ci.cjs',
   'scripts/nemo/ci.test.cjs',
   'scripts/nemo/lib/jobs.cjs',
+  'scripts/nemo/lib/rust-test-jobs.cjs',
   'package.json',
   'engineering/inventory/baseline-manifest.json',
   'engineering/inventory/surfaces.json',
@@ -111,7 +114,7 @@ const EXPECTED_MODULES = [
 
 const EXPECTED_EDGES = [
   'application->codec', 'application->commands', 'application->document', 'application->export-job', 'application->history',
-  'application->protocol', 'application->render-scene', 'application->request-receipts', 'application->revision',
+  'application->evaluation', 'application->protocol', 'application->render-scene', 'application->request-receipts', 'application->revision',
   'codec->document', 'commands->document', 'commands->request-receipts', 'commands->revision',
   'compositor->render-scene', 'desktop-viewport->compositor', 'desktop-viewport->render-scene',
   'desktop-viewport->scheduler', 'evaluation->document', 'evaluation->revision', 'export-job->history',
@@ -119,7 +122,7 @@ const EXPECTED_EDGES = [
   'export-job->revision', 'export-job->scheduler', 'history->commands', 'history->document',
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
   'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->scheduler',
-  'resource-leases->revision', 'revision->document', 'root->codec',
+  'resource-leases->revision', 'revision->document', 'root->application', 'root->codec',
   'scheduler->resource-leases', 'scheduler->revision',
   'commands->read-queries', 'read-queries->codec', 'read-queries->evaluation',
   'read-queries->request-receipts', 'read-queries->revision',
@@ -238,7 +241,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 46);
+  assert.equal(result.edges.length, 48);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
@@ -261,6 +264,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(cargoText, /^miniz_oxide = \{ version = "=0\.9\.1", default-features = false, optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
+  assert.deepEqual(members.object_expression_pin, ['history', 'evaluation']);
+  assert.deepEqual(members['test-object_expression_pin'], ['object_expression_pin']);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
     if (feature === target) return true;
     if (seen.has(feature)) return false;
@@ -276,10 +281,17 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec',
       `${feature} must not activate the private attached-codec selector`);
   }
+  for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {
+    assert.equal(reaches(feature, 'object_expression_pin'), feature === 'test-object_expression_pin',
+      `${feature} must not activate the private expression-pin selector`);
+  }
   assert.equal(reaches('codec', 'reference_image_asset', { ...members,
     codec: [...members.codec, 'reference_image_asset'] }), true, 'feature-isolation mutant must be detected');
   assert.match(rootText, /#\[cfg\(feature = "reference_image_asset"\)\]\s*pub\(crate\) mod reference_image_asset;/);
   assert.equal((rootText.match(/pub\(crate\) mod reference_image_asset;/g) || []).length, 1);
+  assert.match(rootText, /#\[cfg\(feature = "object_expression_pin"\)\]\s*pub\(crate\) mod object_expression_pin;/);
+  assert.equal((rootText.match(/pub\(crate\) mod object_expression_pin;/g) || []).length, 1);
+  assert.match(rootText, /#\[cfg\(all\(test, feature = "test-object_expression_pin"\)\)\]\s*#\[path = "\.\.\/tests\/object_expression_pin\.rs"\]\s*mod object_expression_pin_tests;/);
   assert.match(compositorText, /#\[path = "object_compositor\.rs"\]\s*mod object_compositor;/);
   assert.match(objectCompositorText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/object_compositor\.rs"\]\s*mod tests;/);
   assertMacroDefinitions(rootText);
@@ -310,7 +322,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
     assert.deepEqual(testMacros[`test-${name}`], expected);
     assert.deepEqual(cargo.targets[name], { path: 'src/lib.rs', feature: `test-${name}` });
   }
-  assert.deepEqual(Object.keys(cargo.targets), Object.keys(TEST_TARGETS));
+  assert.deepEqual(cargo.targets.object_expression_pin,
+    { path: 'src/lib.rs', feature: 'test-object_expression_pin' });
+  assert.deepEqual(Object.keys(cargo.targets), [...Object.keys(TEST_TARGETS), 'object_expression_pin']);
+  assert.match(fs.readFileSync(path.join(ROOT, 'scripts/nemo/lib/rust-test-jobs.cjs'), 'utf8'),
+    /const targets = \[[^\n]*'application', 'object_expression_pin'\];/);
   const privateModules = rootText.replace('pub mod $module;', 'mod $module;');
   assert.notEqual(privateModules, rootText, 'engine module visibility token was not found');
   assert.throws(() => assertMacroDefinitions(privateModules), /engine_modules definition drift/);
@@ -349,6 +365,25 @@ test('P37C1C4 retained-reference CPU, PNG, and managed-wire children have exact 
   assert.match(coverage.provenance.nativeManagedProjectWireWorkspaceRegistration, /P37C1C4D\/#1856/);
   assert.match(coverage.provenance.nativeReferencePngRowOutputRegistration, /P37C1C4E\/#1860/);
   for (const [id, file] of children) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('N25F3C2A1P expression pins remain private and fail closed without source registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativeObjectExpressionPinRegistration, /N25F3C2A1P\/#1700/);
+  for (const [id, file] of [
+    ['rust.native.engine.application', 'native-engine/src/object_expression_pin.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_expression_pin.rs'],
+  ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
     assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
