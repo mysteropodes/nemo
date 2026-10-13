@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;
-pub(crate) use scheduled::{
-    prepare_scheduled_object_composition, LiveObjectComposition, ScheduledObjectComposition,
-    ScheduledObjectSceneError,
+pub(crate) use scheduled::ScheduledObjectComposition;
+pub use scheduled::{
+    prepare_scheduled_object_composition, LiveObjectComposition, ScheduledObjectSceneError,
 };
 
 #[path = "object_paint_plan.rs"]
