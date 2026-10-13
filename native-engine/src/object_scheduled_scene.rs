@@ -76,14 +76,33 @@ pub fn prepare_scheduled_object_composition<'a>(
     plan: &ObjectPaintPlan,
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<LiveObjectComposition<'a>, ScheduledObjectSceneError> {
+    prepare_with(scheduler, scheduled, || {
+        prepare_object_composition(plan, expected).map_err(ScheduledObjectSceneError::Pins)
+    })
+}
+
+/// Consume only a render-scene-created witness through the original live work.
+/// The witness retains its validated source; identity strings cannot create it.
+pub fn prepare_scheduled_object_composition_from_witness<'a>(
+    scheduler: &'a FrameScheduler,
+    scheduled: &ScheduledFrame,
+    witness: &ObjectCompositionWitness,
+) -> Result<LiveObjectComposition<'a>, ScheduledObjectSceneError> {
+    prepare_with(scheduler, scheduled, || Ok(witness.clone()))
+}
+
+fn prepare_with<'a>(
+    scheduler: &'a FrameScheduler,
+    scheduled: &ScheduledFrame,
+    witness: impl FnOnce() -> Result<ObjectCompositionWitness, ScheduledObjectSceneError>,
+) -> Result<LiveObjectComposition<'a>, ScheduledObjectSceneError> {
     if !scheduler.is_current(scheduled) {
         return Err(ScheduledObjectSceneError::Inactive);
     }
     let snapshot = scheduler
         .pinned_object_snapshot(scheduled.work_id())
         .ok_or(ScheduledObjectSceneError::RetainedSourceMismatch)?;
-    let composition =
-        prepare_object_composition(plan, expected).map_err(ScheduledObjectSceneError::Pins)?;
+    let composition = witness()?;
     let key = scheduled.key();
     // A constructible paint plan already requires Authored scene-root numeric
     // order, as does object scheduling. No lower-layer scope import is needed.
@@ -117,3 +136,7 @@ pub fn prepare_scheduled_object_composition<'a>(
         },
     })
 }
+
+#[cfg(all(test, feature = "history"))]
+#[path = "../tests/object_scheduled_scene_witness.rs"]
+mod witness_tests;
