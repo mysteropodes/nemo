@@ -96,7 +96,9 @@ function safeSelectionDiagnostics(value) {
 }
 function safeActionDiagnostics(value) {
   check(value && typeof value === 'object' && !Array.isArray(value), 'ax-evidence-refused');
-  const stages = new Set(['window-identity','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity']);
+  const stages = new Set(['window-identity','window-identity-ax-owner','window-identity-application-window-membership','window-identity-pinned-cg-window','window-identity-minimized',
+    'window-identity-pinned-cg-window-list','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity','post-action-ax-owner',
+    'post-action-application-window-membership','post-action-pinned-cg-window','post-action-pinned-cg-window-list','post-action-minimized']);
   check(stages.has(value.stage), 'ax-evidence-refused');
   const clean = { stage:value.stage };
   if (value.elementPath !== undefined) { check(typeof value.elementPath === 'string' && /^(?:\d+(?:\.\d+)*)$/.test(value.elementPath) && value.elementPath.length <= 128, 'ax-evidence-refused'); clean.elementPath=value.elementPath; }
@@ -107,11 +109,18 @@ function safeActionDiagnostics(value) {
   if (value.axPressAdvertised !== undefined) { check(typeof value.axPressAdvertised === 'boolean', 'ax-evidence-refused'); clean.axPressAdvertised=value.axPressAdvertised; }
   if (value.control !== undefined) { check(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle'].includes(value.control), 'ax-evidence-refused'); clean.control=value.control; }
   if (value.routeRefusal !== undefined) { check(['adapter-refused','child-owner','standalone-window'].includes(value.routeRefusal), 'ax-evidence-refused'); clean.routeRefusal=value.routeRefusal; }
+  for (const key of ['axPidQueryError','applicationWindowsQueryError','minimizedQueryError']) {
+    if (value[key] !== undefined) { check(Number.isInteger(value[key]) && value[key] >= -32768 && value[key] <= 0, 'ax-evidence-refused'); clean[key]=value[key]; }
+  }
+  for (const key of ['axPidMatches','applicationWindowsReadable','pinnedAXWindowMember','minimizedReadable','minimized','pinnedCGWindowListReadable'])
+    if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
+  if (value.pinnedCGWindowCount !== undefined) { check(Number.isInteger(value.pinnedCGWindowCount) && value.pinnedCGWindowCount >= 0 && value.pinnedCGWindowCount <= 128, 'ax-evidence-refused'); clean.pinnedCGWindowCount=value.pinnedCGWindowCount; }
   return clean;
 }
 function safeCleanupDiagnostics(values) {
   check(Array.isArray(values) && values.length <= 8, 'cleanup-evidence-refused');
-  const stages = new Set(['helper-exited','exact-helper-terminated','exact-helper-remains','group-absent','group-terminated','group-remains']);
+  const stages = new Set(['helper-exited','exact-helper-terminated','exact-helper-remains','group-absent','group-terminated','group-remains',
+    'helper-pid-refused','exact-helper-signal-error','exact-helper-wait-error','group-probe-error','group-signal-error','group-wait-error','cleanup-loop-error','input-close-error']);
   return values.map(value => {
     check(value && typeof value === 'object' && stages.has(value.stage), 'cleanup-evidence-refused');
     const clean = { stage:value.stage };
@@ -121,8 +130,37 @@ function safeCleanupDiagnostics(values) {
     }
     if (value.signalAttempts !== undefined) { check(Number.isInteger(value.signalAttempts) && value.signalAttempts >= 0 && value.signalAttempts <= 2, 'cleanup-evidence-refused'); clean.signalAttempts=value.signalAttempts; }
     if (value.exitObserved !== undefined) { check(typeof value.exitObserved === 'boolean', 'cleanup-evidence-refused'); clean.exitObserved=value.exitObserved; }
+    for (const key of ['helperPidValid','signalError','probeError']) {
+      if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'cleanup-evidence-refused'); clean[key]=value[key]; }
+    }
+    if (value.signalKind !== undefined) { check(['SIGTERM','SIGKILL'].includes(value.signalKind), 'cleanup-evidence-refused'); clean.signalKind=value.signalKind; }
+    if (value.probePoint !== undefined) { check(['initial','wait-term','after-term','wait-kill','after-kill'].includes(value.probePoint), 'cleanup-evidence-refused'); clean.probePoint=value.probePoint; }
+    if (value.helpersRemaining !== undefined) { check(Number.isInteger(value.helpersRemaining) && value.helpersRemaining >= 0 && value.helpersRemaining <= 8, 'cleanup-evidence-refused'); clean.helpersRemaining=value.helpersRemaining; }
     return clean;
   });
+}
+function cleanupFailureDiagnostics(error, completed = [], helpersRemaining = 0) {
+  const reported = Array.isArray(error?.cleanupDiagnostics) ? error.cleanupDiagnostics : [];
+  if (reported.length > 0) {
+    const room=Math.max(0,8-Math.min(reported.length,8));
+    return [...(room===0?[]:completed.slice(-room)),...reported.slice(-8)];
+  }
+  return [...completed.slice(-7),{stage:'cleanup-loop-error',helpersRemaining:Math.min(Math.max(helpersRemaining,0),8)}];
+}
+async function closeOwnedHelpers(closeInput, children, cleanup) {
+  const completed=[], failures=[];
+  try { closeInput(); } catch { failures.push({stage:'input-close-error',helpersRemaining:Math.min(children.length,8)}); }
+  for (let index=0;index<children.length;index++) {
+    try { completed.push(...(await cleanup(children[index]) || [])); }
+    catch (error) {
+      failures.push(...cleanupFailureDiagnostics(error,[],children.length-index));
+    }
+  }
+  const successBudget=Math.max(0,8-Math.min(failures.length,8));
+  const diagnostics=[...completed.slice(0,successBudget),...failures.slice(-8)];
+  if (failures.length>0)
+    throw Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:diagnostics});
+  return {cleanupDiagnostics:diagnostics};
 }
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
 function actionTarget(action, sheet) {
@@ -346,15 +384,17 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
 }
 async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
-  check(child.pid>0,'helper-cleanup-invalid');
   const observation = { helperPid:child.pid, capturePossible:child.p38CapturePossible !== false };
+  if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,capturePossible:observation.capturePossible}]});
+  const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,...facts}]});
   // This reviewed helper spawns a descendant ONLY for explicit capture. Once
   // its non-capture process exits, do not signal a recycled process-group ID.
   if(child.p38CapturePossible===false){
     for(const kind of ['SIGTERM','SIGKILL']){
       if(child.exitCode!==null||child.signalCode!==null)return [{...observation,stage:'helper-exited',exitObserved:true}];
-      child.kill(kind); // Exact spawned handle; no process-group lookup/rebinding.
-      for(let i=0;i<40&&child.exitCode===null&&child.signalCode===null;i++)await new Promise(resolve=>setTimeout(resolve,50));
+      try { child.kill(kind); } catch { throw failed('exact-helper-signal-error',{signalKind:kind,signalAttempts:kind==='SIGTERM'?1:2,signalError:true}); }
+      for(let i=0;i<40&&child.exitCode===null&&child.signalCode===null;i++)try { await (services.delay?services.delay():new Promise(resolve=>setTimeout(resolve,50))); }
+        catch { throw failed('exact-helper-wait-error',{signalKind:kind,signalAttempts:kind==='SIGTERM'?1:2,probePoint:kind==='SIGTERM'?'wait-term':'wait-kill'}); }
     }
     const exited=child.exitCode!==null||child.signalCode!==null;
     const diagnostics=[{...observation,stage:exited?'exact-helper-terminated':'exact-helper-remains',exitObserved:exited,signalAttempts:2}];
@@ -364,13 +404,20 @@ async function cleanupHelper(child, services = {}) {
   const alive = services.alive || (()=>{try{process.kill(-child.pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}});
   const signal = services.signal || (kind=>{try{process.kill(-child.pid,kind);}catch(e){if(e.code!=='ESRCH')throw e;}});
   const delay = services.delay || (()=>new Promise(resolve=>setTimeout(resolve,50)));
-  let groupAliveBefore=alive();
+  const probe=(point,attempts,signalKind)=>{
+    try { return alive(); }
+    catch { throw failed('group-probe-error',{probePoint:point,signalAttempts:attempts,...(signalKind?{signalKind}:{}),probeError:true}); }
+  };
+  let groupAliveBefore=probe('initial',0);
   if(!groupAliveBefore)return [{...observation,stage:'group-absent',groupAliveBefore:false,signalAttempts:0}];
   let groupAliveAfterTerm,groupAliveAfterKill,signalAttempts=0;
   for(const kind of ['SIGTERM','SIGKILL']){
-    signal(kind); signalAttempts++;
-    for(let i=0;i<40&&alive();i++)await delay();
-    const remains=alive();
+    signalAttempts++;
+    try { signal(kind); } catch { throw failed('group-signal-error',{groupAliveBefore,signalAttempts,signalKind:kind,signalError:true}); }
+    const waitPoint=kind==='SIGTERM'?'wait-term':'wait-kill', afterPoint=kind==='SIGTERM'?'after-term':'after-kill';
+    for(let i=0;i<40&&probe(waitPoint,signalAttempts,kind);i++)try { await delay(); }
+      catch { throw failed('group-wait-error',{groupAliveBefore,signalAttempts,signalKind:kind,probePoint:waitPoint}); }
+    const remains=probe(afterPoint,signalAttempts,kind);
     if(kind==='SIGTERM')groupAliveAfterTerm=remains;
     else groupAliveAfterKill=remains;
     if(!remains)return [{...observation,stage:'group-terminated',groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,signalAttempts}];
@@ -426,11 +473,7 @@ function defaultServices(config) {
     next: inputJSON,
     feedback(value){process.stdout.write(JSON.stringify(value)+'\n');},
     async close() {
-      input.close();
-      const cleanupDiagnostics=[];
-      try { for (const child of [...helpers]) cleanupDiagnostics.push(...(await cleanupHelper(child) || [])); }
-      catch (error) { error.cleanupDiagnostics ||= cleanupDiagnostics; throw error; }
-      return { cleanupDiagnostics };
+      return closeOwnedHelpers(()=>input.close(),[...helpers],cleanupHelper);
     },
     setTimer: setTimeout, clearTimer: clearTimeout,
   };
@@ -449,4 +492,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
