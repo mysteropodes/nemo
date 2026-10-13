@@ -103,6 +103,8 @@
       "rust.desktop.native.application.tests -> rust.desktop.native.application (native_application_tests.rs: use crate::native_application::*;)",
       "rust.desktop.native.application.tests -> rust.desktop.native.application.contract (native_application_tests.rs: use crate::native_application_contract::{...};)",
       "rust.desktop.native.application.tests -> rust.desktop.native.application.ports (native_application_tests.rs: use crate::native_application_ports::{...};)",
+      "rust.desktop.native.application.tests -> rust.desktop.native.application.viewport (native_application_replace_viewport_tests.rs: original viewport replacement controls)",
+      "rust.desktop.native.application.tests -> rust.desktop.native.viewport (native_viewport_borrow_tests.rs: original viewport borrow controls)",
       "rust.desktop.native.application.contract -> rust.desktop.native.application.ports (native_application_contract.rs: use crate::native_application_ports::DesktopResourceResolver;)",
       "rust.desktop.native.application.ports.tests -> rust.desktop.native.application.ports (native_application_ports_tests.rs: use crate::native_application_ports::*;)",
       "rust.desktop.native.application.viewport -> rust.desktop.native.application.contract (native_application_viewport.rs: use crate::native_application_contract::{...};)",
@@ -124,8 +126,8 @@
     "items": []
   },
   "features": {
-    "declared": ["test-play-publication-observer"],
-    "declaredNote": "O1/#1708 declares one default-off, private test-package feature in src-tauri/Cargo.toml. Normal desktop builds expose no observer; all other cfg predicates remain the four plain predicates below.",
+    "declared": ["test-play-publication-observer", "test-object-window-probe"],
+    "declaredNote": "O1/#1708 and N25F3D3B2D2A/#1834 declare two separate default-off, private test-package features in src-tauri/Cargo.toml. Normal desktop builds expose neither observer nor fixed object-window probe; all other cfg predicates remain the four plain predicates below.",
     "allowedCfgs": [
       "test",
       "unix",
