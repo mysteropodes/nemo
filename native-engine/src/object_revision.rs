@@ -4,6 +4,8 @@ use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceSt
 #[path = "encoded_retention_budget.rs"]
 mod encoded_retention_budget;
 #[cfg(feature = "history")]
+pub(crate) use encoded_retention_budget::Reservation as EncodedReservation;
+#[cfg(feature = "history")]
 use std::collections::BTreeMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -30,6 +32,18 @@ pub struct ObjectSnapshot {
 }
 
 impl ObjectSnapshot {
+    #[cfg(all(test, feature = "history"))]
+    pub(crate) fn encoded_test_budget(
+        limit: usize,
+    ) -> encoded_retention_budget::EncodedRetentionBudget {
+        encoded_retention_budget::EncodedRetentionBudget::new(limit).unwrap()
+    }
+    #[cfg(feature = "history")]
+    pub(crate) fn reserve_encoded(cost: usize) -> Result<EncodedReservation, &'static str> {
+        encoded_retention_budget::shared()
+            .reserve(cost)
+            .map_err(|_| "encoded retention unavailable")
+    }
     /// Called only after semantic admission by the snapshot layer.
     pub(crate) fn from_admitted(
         instance_id: String,

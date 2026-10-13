@@ -6,7 +6,11 @@ pub use crate::resource_leases::{
     ViewGeneration, WorkId,
 };
 use crate::resource_leases::{LeaseCounters, LeaseError, LeaseId, ResourceLeaseManager};
-use crate::revision::DocumentSnapshot;
+use crate::revision::{DocumentSnapshot, ObjectSnapshot};
+#[path = "scheduler_object.rs"]
+mod object;
+use object::{FrameKey, FrameLeases, FrameOwner};
+pub use object::{ObjectSchedulePins, ObjectScheduleScope};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 
@@ -37,21 +41,26 @@ impl OutputSpec {
             color_interpretation: color_interpretation.into(),
             alpha_mode: alpha_mode.into(),
         };
-        if output.kind.is_empty()
-            || output.format.is_empty()
-            || output.color_interpretation.is_empty()
-            || output.alpha_mode.is_empty()
+        output.validate()?;
+        Ok(output)
+    }
+
+    fn validate(&self) -> Result<(), ScheduleError> {
+        if self.kind.is_empty()
+            || self.format.is_empty()
+            || self.color_interpretation.is_empty()
+            || self.alpha_mode.is_empty()
         {
             return Err(ScheduleError::InvalidKey(
                 "output kind, format, color interpretation, and alpha mode must be non-empty",
             ));
         }
-        if output.width == 0 || output.height == 0 {
+        if self.width == 0 || self.height == 0 {
             return Err(ScheduleError::InvalidKey(
                 "output dimensions must be greater than zero",
             ));
         }
-        Ok(output)
+        Ok(())
     }
 
     pub fn kind(&self) -> &str {
@@ -137,6 +146,7 @@ impl EvaluationKey {
     }
 
     fn validate(&self) -> Result<(), ScheduleError> {
+        self.output_spec.validate()?;
         if self.document_snapshot_id.is_empty()
             || self.context_id.is_empty()
             || self.quality.is_empty()
@@ -239,20 +249,20 @@ impl std::error::Error for ScheduleError {}
 
 #[derive(Debug)]
 struct ActiveFrame {
-    key: EvaluationKey,
+    key: FrameKey,
     view_generation: ViewGeneration,
     document_id: String,
-    leases: Option<crate::resource_leases::LeaseBundle>,
+    leases: Option<FrameLeases>,
     receipt: Option<ScheduleReceipt>,
 }
 
 /// Local owner for immutable frame work; no compositor or host is activated here.
 #[derive(Debug, Default)]
 pub struct FrameScheduler {
-    current_document_id: Option<String>,
+    current_owner: Option<FrameOwner>,
     next_generation: u64,
     next_work_id: u64,
-    active_by_key: BTreeMap<EvaluationKey, WorkId>,
+    active_by_key: BTreeMap<FrameKey, WorkId>,
     frames: BTreeMap<WorkId, ActiveFrame>,
     leases: ResourceLeaseManager,
 }
@@ -274,82 +284,6 @@ impl FrameScheduler {
             leases: ResourceLeaseManager::with_next_id(next_lease_id),
             ..Self::new()
         }
-    }
-
-    pub fn schedule(
-        &mut self,
-        snapshot: DocumentSnapshot,
-        key: EvaluationKey,
-    ) -> Result<ScheduledFrame, ScheduleError> {
-        key.validate()?;
-        if key.document_snapshot_id() != snapshot.id() {
-            return Err(ScheduleError::SnapshotKeyMismatch {
-                key_snapshot_id: key.document_snapshot_id().to_owned(),
-                actual_snapshot_id: snapshot.id().to_owned(),
-            });
-        }
-        self.validate_document(snapshot.document_id())?;
-
-        if let Some(work_id) = self.active_by_key.get(&key).copied() {
-            let active = self
-                .frames
-                .get(&work_id)
-                .expect("active key always has work");
-            return Ok(ScheduledFrame {
-                work_id,
-                view_generation: active.view_generation,
-                key,
-                admission: ScheduleAdmission::Deduplicated,
-            });
-        }
-
-        let resource_ids = key.declared_resource_versions().keys().cloned();
-        let bundle = self
-            .leases
-            .acquire(snapshot, resource_ids)
-            .map_err(ScheduleError::Lease)?;
-        let generation = match self.next_generation.checked_add(1) {
-            Some(value) => value,
-            None => {
-                self.leases
-                    .release(bundle)
-                    .expect("fresh bundle releases once");
-                return Err(ScheduleError::GenerationExhausted);
-            }
-        };
-        let work = match self.next_work_id.checked_add(1) {
-            Some(value) => value,
-            None => {
-                self.leases
-                    .release(bundle)
-                    .expect("fresh bundle releases once");
-                return Err(ScheduleError::WorkIdExhausted);
-            }
-        };
-        self.next_generation = generation;
-        self.next_work_id = work;
-        if self.current_document_id.is_none() {
-            self.current_document_id = Some(bundle.snapshot().document_id().to_owned());
-        }
-        let work_id = WorkId(work);
-        let view_generation = ViewGeneration(generation);
-        self.active_by_key.insert(key.clone(), work_id);
-        self.frames.insert(
-            work_id,
-            ActiveFrame {
-                key: key.clone(),
-                view_generation,
-                document_id: bundle.snapshot().document_id().to_owned(),
-                leases: Some(bundle),
-                receipt: None,
-            },
-        );
-        Ok(ScheduledFrame {
-            work_id,
-            view_generation,
-            key,
-            admission: ScheduleAdmission::Scheduled,
-        })
     }
 
     pub fn succeed(&mut self, work_id: WorkId) -> Result<ScheduleReceipt, ScheduleError> {
@@ -391,49 +325,6 @@ impl FrameScheduler {
         })
     }
 
-    /// Cancels every old-document frame and records the identity transition.
-    /// Generations intentionally continue across replacement, preventing a
-    /// late old result from ever becoming newer than the replacement's work.
-    pub fn replace_document(
-        &mut self,
-        new_document_id: impl Into<String>,
-    ) -> Result<Vec<ScheduleReceipt>, ScheduleError> {
-        let new_document_id = new_document_id.into();
-        if new_document_id.is_empty() {
-            return Err(ScheduleError::InvalidKey(
-                "replacement document ID must be non-empty",
-            ));
-        }
-        if self.current_document_id.as_deref() == Some(new_document_id.as_str()) {
-            return Err(ScheduleError::InvalidKey(
-                "replacement document ID must differ from the current document",
-            ));
-        }
-        let old_document_id = self.current_document_id.replace(new_document_id.clone());
-        let active: Vec<WorkId> = self
-            .frames
-            .iter()
-            .filter_map(|(id, frame)| frame.receipt.is_none().then_some(*id))
-            .collect();
-        let mut receipts = Vec::with_capacity(active.len());
-        for work_id in active {
-            let old = self.frames[&work_id].document_id.clone();
-            receipts.push(self.terminalize(work_id, |_| {
-                (
-                    FrameTerminalStatus::Replaced {
-                        old_document_id: old,
-                        new_document_id: new_document_id.clone(),
-                    },
-                    PublicationDisposition::NotPublished,
-                )
-            })?);
-        }
-        if old_document_id.is_none() {
-            return Ok(Vec::new());
-        }
-        Ok(receipts)
-    }
-
     pub fn receipt(&self, work_id: WorkId) -> Option<&ScheduleReceipt> {
         self.frames
             .get(&work_id)
@@ -444,16 +335,21 @@ impl FrameScheduler {
         self.frames
             .get(&work_id)
             .and_then(|frame| frame.leases.as_ref())
-            .map(|leases| leases.snapshot())
+            .and_then(FrameLeases::opacity)
+    }
+
+    pub fn pinned_object_snapshot(&self, work_id: WorkId) -> Option<&ObjectSnapshot> {
+        self.frames
+            .get(&work_id)
+            .and_then(|frame| frame.leases.as_ref())
+            .and_then(FrameLeases::object)
     }
 
     pub fn lease_ids(&self, work_id: WorkId) -> Option<(LeaseId, Vec<LeaseId>)> {
-        self.frames.get(&work_id).and_then(|frame| {
-            frame
-                .leases
-                .as_ref()
-                .map(|leases| (leases.snapshot_lease_id(), leases.resource_lease_ids()))
-        })
+        self.frames
+            .get(&work_id)
+            .and_then(|frame| frame.leases.as_ref())
+            .map(FrameLeases::ids)
     }
 
     pub fn lease_counters(&self) -> LeaseCounters {
@@ -463,16 +359,6 @@ impl FrameScheduler {
     #[cfg(test)]
     pub(crate) fn inject_resource_failure_after(&mut self, count: Option<usize>) {
         self.leases.inject_failure_after_resources(count);
-    }
-
-    fn validate_document(&self, document_id: &str) -> Result<(), ScheduleError> {
-        match &self.current_document_id {
-            Some(current) if current != document_id => Err(ScheduleError::WrongDocument {
-                requested_document_id: document_id.to_owned(),
-                current_document_id: current.clone(),
-            }),
-            Some(_) | None => Ok(()),
-        }
     }
 
     fn terminalize(
@@ -492,7 +378,7 @@ impl FrameScheduler {
             let receipt = ScheduleReceipt {
                 work_id,
                 view_generation: frame.view_generation,
-                document_snapshot_id: frame.key.document_snapshot_id().to_owned(),
+                document_snapshot_id: frame.key.evaluation().document_snapshot_id().to_owned(),
                 document_id: frame.document_id.clone(),
                 terminal_status,
                 publication,
@@ -503,7 +389,9 @@ impl FrameScheduler {
                 receipt,
             )
         };
-        self.leases.release(leases).map_err(ScheduleError::Lease)?;
+        leases
+            .release(&mut self.leases)
+            .map_err(ScheduleError::Lease)?;
         self.active_by_key.remove(&key);
         self.frames
             .get_mut(&work_id)
