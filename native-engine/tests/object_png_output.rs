@@ -279,3 +279,180 @@ fn cpu_unsupported_output_cannot_create_a_png_consumption_permit() {
     scheduler.cancel(work.work_id()).unwrap();
     assert_eq!(scheduler.lease_counters().live(), 0);
 }
+
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod accounting {
+    use super::*;
+    use crate::reference_image_asset::measure_allocations;
+    use crate::render_scene::{ReadbackBudget, ReadbackReservation};
+    use std::alloc::Layout;
+    use std::io;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn write(
+        sink: &mut BoundedPngBytes,
+        bytes: &[u8],
+        budget: &ReadbackBudget,
+    ) -> io::Result<usize> {
+        sink.write_using(bytes, |n| budget.reserve(n), ReadbackReservation::allocate)
+    }
+
+    struct Sink<'a>(&'a mut BoundedPngBytes, &'a ReadbackBudget);
+    impl Write for Sink<'_> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            write(self.0, bytes, self.1)
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn cpu_png_capacity_competes_with_retained_pixels_and_old_growth_storage() {
+        let budget = ReadbackBudget::new(30);
+        let reference = budget.retained_reference();
+        let mut sink = BoundedPngBytes::new(12).unwrap();
+        assert_eq!(budget.used(), 12);
+        write(&mut sink, &[1, 2, 3, 4], &budget).unwrap();
+        sink.write_using(
+            &[5, 6, 7, 8],
+            |n| budget.reserve(n),
+            |charge| {
+                assert_eq!(budget.used(), 12 + 4 + 8, "old and new buffers coexist");
+                charge.allocate()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            (sink.bytes.len(), sink.bytes.capacity(), budget.used()),
+            (8, 8, 20)
+        );
+        let before = sink.bytes.clone();
+        assert!(sink
+            .write_using(
+                &[9],
+                |n| budget.reserve(n),
+                |_| panic!("quota must refuse before allocation")
+            )
+            .is_err());
+        assert_eq!(sink.bytes, before);
+        assert_eq!((sink.bytes.capacity(), budget.used()), (8, 20));
+        drop(reference);
+        write(&mut sink, &[9], &budget).unwrap();
+        assert_eq!(
+            (sink.bytes.len(), sink.bytes.capacity(), budget.used()),
+            (9, 12, 12)
+        );
+        // The unused capacity remains charged too, without another allocation.
+        let (_, calls) = measure_allocations(Some(Layout::array::<u8>(12).unwrap()), || {
+            write(&mut sink, &[10, 11, 12], &budget).unwrap();
+        });
+        assert_eq!(calls, [0, 0, 0]);
+        assert_eq!(sink.bytes, (1..=12).collect::<Vec<_>>());
+        assert!(write(&mut sink, &[13], &budget).is_err());
+        assert_eq!(write(&mut sink, &[], &budget).unwrap(), 0);
+        assert_eq!(budget.used(), 12);
+        let (_, calls) = measure_allocations(Some(Layout::array::<u8>(12).unwrap()), || drop(sink));
+        assert_eq!(calls, [0, 1, 0]);
+        assert_eq!(budget.used(), 0);
+    }
+
+    #[test]
+    fn cpu_png_allocation_errors_unwind_and_bad_capacity_preserve_old_storage() {
+        let budget = ReadbackBudget::new(32);
+        for stage in 0..4 {
+            let mut sink = BoundedPngBytes::new(16).unwrap();
+            write(&mut sink, &[1, 2, 3, 4], &budget).unwrap();
+            let (result, calls) =
+                measure_allocations(Some(Layout::array::<u8>(8).unwrap()), || {
+                    catch_unwind(AssertUnwindSafe(|| {
+                        sink.write_using(
+                            &[5],
+                            |n| budget.reserve(n),
+                            |charge| {
+                                assert_eq!(budget.used(), 4 + 8);
+                                if stage == 0 {
+                                    return Err("injected allocation refusal");
+                                }
+                                let mut bytes = charge.allocate()?;
+                                match stage {
+                                    1 => Err("injected error after actual allocation"),
+                                    2 => panic!("injected unwind after actual allocation"),
+                                    _ => {
+                                        bytes.pop();
+                                        Ok(bytes)
+                                    }
+                                }
+                            },
+                        )
+                    }))
+                });
+            if stage == 2 {
+                assert!(result.is_err());
+            } else {
+                assert!(result.unwrap().is_err());
+            }
+            assert_eq!(calls, if stage == 0 { [0, 0, 0] } else { [1, 1, 0] });
+            assert_eq!(sink.bytes, [1, 2, 3, 4]);
+            assert_eq!((sink.bytes.capacity(), budget.used()), (4, 4));
+            drop(sink);
+            assert_eq!(budget.used(), 0);
+        }
+    }
+
+    #[test]
+    fn cpu_png_encoder_bytes_and_charge_survive_move_until_retained_output_drops() {
+        use super::super::ScheduledObjectPng;
+        let rgba = vec![127; 64 * 64 * 4];
+        let expected = encode_rgba8(64, 64, &rgba).unwrap();
+        let budget = ReadbackBudget::new(expected.len() * 3);
+        let mut sink = BoundedPngBytes::new(expected.len()).unwrap();
+        encode_rgba8_into(64, 64, &rgba, Sink(&mut sink, &budget)).unwrap();
+        assert_eq!(sink.bytes, expected);
+        let retained = sink.bytes.capacity();
+        assert_eq!(budget.used(), retained);
+        let snapshot = object_test_owner("png-charge").acquire_snapshot(0).unwrap();
+        let input = plan(&snapshot, 7);
+        let mut scheduler = FrameScheduler::new();
+        let work = schedule(&mut scheduler, &snapshot, 7);
+        let live = prepare(&scheduler, &work, &input, &selector(&snapshot, 7)).unwrap();
+        let png = ScheduledObjectPng {
+            bytes: sink,
+            prepared: live.prepared().clone(),
+        };
+        assert_eq!(png.bytes(&live).unwrap(), expected);
+        assert_eq!(png.dimensions(), (64, 64));
+        assert_eq!(budget.used(), retained);
+        drop(live);
+        scheduler.cancel(work.work_id()).unwrap();
+        let next = schedule(&mut scheduler, &snapshot, 7);
+        let live = prepare(&scheduler, &next, &input, &selector(&snapshot, 7)).unwrap();
+        assert!(
+            png.bytes(&live).is_err(),
+            "new work cannot consume old output"
+        );
+        assert_eq!(
+            budget.used(),
+            retained,
+            "invalid output still owns its allocation"
+        );
+        drop(png);
+        assert_eq!(budget.used(), 0);
+        drop(live);
+        scheduler.cancel(next.work_id()).unwrap();
+    }
+
+    #[test]
+    fn cpu_png_encoder_failure_releases_partial_sink_without_returning_payload() {
+        let rgba = [17, 34, 51, 0, 17, 34, 51, 127];
+        let expected = encode_rgba8(2, 1, &rgba).unwrap();
+        let budget = ReadbackBudget::new(expected.len() * 3);
+        for maximum in [1, expected.len() - 1] {
+            let mut sink = BoundedPngBytes::new(maximum).unwrap();
+            assert!(encode_rgba8_into(2, 1, &rgba, Sink(&mut sink, &budget)).is_err());
+            assert_eq!(budget.used(), sink.bytes.capacity());
+            drop(sink);
+            assert_eq!(budget.used(), 0);
+        }
+    }
+}
