@@ -9,6 +9,7 @@ use std::{
     sync::Mutex,
 };
 use tauri::{Manager, Runtime, WebviewWindowBuilder};
+use tauri_plugin_fs::FsExt;
 
 const PHASES: [&str; 6] = ["ready", "blue", "red", "undo", "redo", "released"];
 const EXPORT_PHASES: [&str; 5] = ["ready", "blue", "refused", "exported", "released"];
@@ -32,7 +33,7 @@ struct Session {
     pid: u32,
     owner: String,
     root: PathBuf,
-    export_root: Option<PathBuf>,
+    export_destination: Option<PathBuf>,
     sink: File,
     cursor: usize,
     waiting: bool,
@@ -121,6 +122,47 @@ fn scoped_export_root(report: &Path, temp: &Path) -> Result<PathBuf, &'static st
         return Err("probe temp scope binding refused");
     }
     Ok(canonical)
+}
+fn scoped_export_destination(
+    report: &Path,
+    temp: &Path,
+    run: &str,
+) -> Result<PathBuf, &'static str> {
+    let root = scoped_export_root(report, temp)?;
+    if uuid::Uuid::parse_str(run).map_or(true, |parsed| parsed.to_string() != run) {
+        return Err("probe export run refused");
+    }
+    let destination = root.join(format!("object-export-{run}"));
+    match fs::symlink_metadata(&destination) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(destination),
+        _ => Err("fresh probe export destination refused"),
+    }
+}
+fn bind_export_scope(
+    destination: &Path,
+    is_allowed: impl Fn(&Path) -> bool,
+    allow_file: impl Fn(&Path) -> Result<(), ()>,
+) -> Result<(), &'static str> {
+    let parent = destination.parent().ok_or("probe export parent missing")?;
+    let sibling = destination.with_file_name(format!(
+        "{}-sibling",
+        destination
+            .file_name()
+            .ok_or("probe export destination missing")?
+            .to_string_lossy()
+    ));
+    if is_allowed(parent) || is_allowed(&sibling) {
+        return Err("probe export scope already broad");
+    }
+    allow_file(destination).map_err(|_| "probe export scope binding refused")?;
+    if !is_allowed(destination)
+        || is_allowed(parent)
+        || is_allowed(&sibling)
+        || is_allowed(&destination.join("frame_0001.png"))
+    {
+        return Err("probe export scope not exact");
+    }
+    Ok(())
 }
 impl Session {
     fn persist(&mut self) -> Result<(), &'static str> {
@@ -275,18 +317,19 @@ pub(crate) fn initialize<R: Runtime>(
         }
         // Pin the validated macOS /var alias to its canonical task root.
         let root = fs::canonicalize(root)?;
-        let export_root = export
-            .then(|| scoped_export_root(&root, &std::env::temp_dir()))
+        let run = uuid::Uuid::new_v4().to_string();
+        let export_destination = export
+            .then(|| scoped_export_destination(&root, &std::env::temp_dir(), &run))
             .transpose()?;
         let mut session = Session {
-            run: uuid::Uuid::new_v4().to_string(),
+            run,
             source: compiled.into(),
             task: runtime.task_key.clone(),
             pid: std::process::id(),
             owner: runtime.owner_token.clone().ok_or("probe owner missing")?,
             sink: sink(&root)?,
             root,
-            export_root,
+            export_destination,
             cursor: 0,
             waiting: false,
             failed: false,
@@ -298,8 +341,19 @@ pub(crate) fn initialize<R: Runtime>(
     } else {
         None
     };
+    let export_destination = session
+        .as_ref()
+        .and_then(|session| session.export_destination.clone());
     if !app.manage(ProbeState(Mutex::new(session))) {
         return Err("probe state already installed".into());
+    }
+    if let Some(destination) = export_destination {
+        let scope = app.fs_scope();
+        bind_export_scope(
+            &destination,
+            |path| scope.is_allowed(path),
+            |path| scope.allow_file(path).map_err(|_| ()),
+        )?;
     }
     Ok(())
 }
@@ -313,9 +367,12 @@ pub(crate) fn attach<'a, R: Runtime, M: Manager<R>>(
         return Ok(builder);
     };
     let script = if session.export {
-        let export_root = session.export_root.as_ref().ok_or("probe temp missing")?;
+        let destination = session
+            .export_destination
+            .as_ref()
+            .ok_or("probe export destination missing")?;
         let config = json!({"runId":session.run,"sourceSha":session.source,"taskKey":session.task,
-            "pid":session.pid,"destinationDirectory":export_root.join(format!("object-export-{}",session.run))});
+            "pid":session.pid,"destinationDirectory":destination});
         format!(
             "window.__NEMO_OBJECT_EXPORT_PROBE_CONFIG__ = {};\n{}",
             config,

@@ -1,9 +1,10 @@
 use crate::task_runtime::object_window_probe::control::{complete, read_ack};
 use crate::task_runtime::object_window_probe::{
-    gate, origin, scoped_export_root, sink, Packet, Session, PHASES,
+    bind_export_scope, gate, origin, scoped_export_destination, scoped_export_root, sink, Packet,
+    Session, PHASES,
 };
 use serde_json::json;
-use std::{fs, path::PathBuf};
+use std::{cell::RefCell, collections::HashSet, fs, path::PathBuf};
 
 struct Fixture {
     root: PathBuf,
@@ -24,7 +25,7 @@ impl Fixture {
             pid: 42,
             owner: "private-owner".into(),
             root: self.root.clone(),
-            export_root: None,
+            export_destination: None,
             sink: sink(&self.root).unwrap(),
             cursor: 0,
             waiting: false,
@@ -260,8 +261,38 @@ fn export_destination_requires_the_task_bound_scoped_temp_root() {
     fs::create_dir(&temp).unwrap();
     fs::create_dir(&foreign).unwrap();
     assert_eq!(scoped_export_root(&report, &temp), Ok(temp.clone()));
+    let run = "11111111-1111-4111-8111-111111111111";
+    let destination = temp.join(format!("object-export-{run}"));
+    assert_eq!(
+        scoped_export_destination(&report, &temp, run),
+        Ok(destination.clone())
+    );
+    assert!(scoped_export_destination(&report, &temp, "../foreign").is_err());
+    assert!(
+        scoped_export_destination(&report, &temp, "11111111-1111-4111-8111-11111111111A").is_err()
+    );
+    let grants = RefCell::new(HashSet::<PathBuf>::new());
+    let is_allowed = |path: &std::path::Path| grants.borrow().contains(path);
+    let allow_file = |path: &std::path::Path| {
+        grants.borrow_mut().insert(path.to_path_buf());
+        Ok(())
+    };
+    bind_export_scope(&destination, is_allowed, allow_file).unwrap();
+    assert_eq!(grants.borrow().len(), 1);
+    assert!(is_allowed(&destination));
+    assert!(!is_allowed(&temp));
+    assert!(!is_allowed(&temp.join("object-export-other")));
+    assert!(!is_allowed(&destination.join("frame_0001.png")));
+    assert!(!is_allowed(&foreign));
+    std::os::unix::fs::symlink(&foreign, temp.join("escape")).unwrap();
+    assert!(!is_allowed(&temp.join("escape/frame_0001.png")));
+    grants.borrow_mut().insert(temp.clone());
+    assert!(bind_export_scope(&destination, is_allowed, allow_file).is_err());
     assert!(scoped_export_root(&report, &report).is_err());
     assert!(scoped_export_root(&report, &foreign).is_err());
+    std::os::unix::fs::symlink(&foreign, &destination).unwrap();
+    assert!(scoped_export_destination(&report, &temp, run).is_err());
+    fs::remove_file(&destination).unwrap();
     #[cfg(target_os = "macos")]
     {
         let alias = temp.to_string_lossy().replacen("/private/var/", "/var/", 1);
@@ -270,6 +301,7 @@ fn export_destination_requires_the_task_bound_scoped_temp_root() {
             Ok(temp.clone())
         );
     }
+    fs::remove_file(temp.join("escape")).unwrap();
     fs::remove_dir(&temp).unwrap();
     std::os::unix::fs::symlink(&foreign, &temp).unwrap();
     assert!(scoped_export_root(&report, &temp).is_err());
