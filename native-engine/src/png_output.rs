@@ -4,6 +4,11 @@ use crate::compositor::{CompositionResult, Compositor};
 use crate::render_scene::{GeometryPaintInput, RenderScene};
 use png::{BitDepth, ColorType, Compression, Encoder, Filter};
 use std::fmt::{Display, Formatter};
+use std::io::Write;
+
+#[path = "object_png_output.rs"]
+mod object;
+pub(crate) use object::{encode_scheduled_object_png, ScheduledObjectPng};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PngOutputError {
@@ -134,6 +139,18 @@ pub(crate) fn validate_readback(
 /// Determinism is guaranteed only for this locked encoder/configuration. It is
 /// not a promise of byte equality with the legacy JavaScript encoder.
 pub fn encode_rgba8(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, PngOutputError> {
+    let mut output = Vec::new();
+    encode_rgba8_into(width, height, rgba, &mut output)?;
+    Ok(output)
+}
+
+/// One encoder/profile for existing opacity output and bounded object output.
+fn encode_rgba8_into(
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    output: impl Write,
+) -> Result<(), PngOutputError> {
     if width == 0 || height == 0 {
         return Err(PngOutputError::new(
             "PNG dimensions must be greater than zero",
@@ -151,9 +168,8 @@ pub fn encode_rgba8(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, Png
         )));
     }
 
-    let mut output = Vec::new();
     {
-        let mut encoder = Encoder::new(&mut output, width, height);
+        let mut encoder = Encoder::new(output, width, height);
         encoder.set_color(ColorType::Rgba);
         encoder.set_depth(BitDepth::Eight);
         encoder.set_filter(Filter::NoFilter);
@@ -168,5 +184,5 @@ pub fn encode_rgba8(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, Png
             .finish()
             .map_err(|error| PngOutputError::new(format!("finish PNG: {error}")))?;
     }
-    Ok(output)
+    Ok(())
 }
