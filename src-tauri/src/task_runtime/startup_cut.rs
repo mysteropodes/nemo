@@ -173,8 +173,8 @@ impl Cut {
         if !self.healthy(retention)
             || !self.correlated(native, &js)
             || !self.advances(&current, &js)
-            || bytes.is_empty()
             || bytes.len() > 1024
+            || bytes.iter().copied().find(|b| !b.is_ascii_whitespace()) != Some(b'{')
         {
             return Err("startup cut refused");
         }
