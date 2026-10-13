@@ -313,6 +313,23 @@ fn typed_bare_drawing_and_limits_refusal_plus_shared_production_entry() {
         [1, 1, 0],
         "production owns and frees exactly one workspace"
     );
+    let wire = serde_json::to_vec(&encoded_wire_test::wire()).unwrap();
+    let (wire_pin, wire_calls) = crate::reference_image_asset::measure_allocations(
+        Some(std::alloc::Layout::new::<crate::object_codec::PngWorkspace>()),
+        || {
+            ObjectSnapshot::from_managed_project_wire(
+                "wire".into(),
+                &wire,
+                encoded_wire_test::limits(),
+            )
+            .unwrap()
+        },
+    );
+    assert_eq!(
+        wire_calls, calls,
+        "wire and retained decode use the same owned workspace"
+    );
+    assert!(wire_pin.project().is_some());
     assert_eq!(
         pixels.rgba8(),
         [17, 34, 51, 255, 68, 85, 102, 128, 119, 136, 153, 0]

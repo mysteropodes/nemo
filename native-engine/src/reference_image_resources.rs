@@ -3,6 +3,7 @@ use crate::object_codec::{
     decode_png_pixels_with_workspace, DecodedPngPixels, ImageAssetError, ImageAssetLimits,
     PngWorkspace, ProjectReferenceState,
 };
+use crate::object_snapshot::charged_png_workspace as charged_workspace;
 use crate::revision::{
     shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
     ObjectSnapshot,
@@ -64,16 +65,6 @@ pub(crate) fn decode_snapshot_reference(
     )
 }
 
-// Box storage must die before charge; scoped AsMut cannot detach either owner.
-struct ChargedWorkspace {
-    storage: Box<PngWorkspace>,
-    _charge: ImageResourceCharge,
-}
-impl AsMut<PngWorkspace> for ChargedWorkspace {
-    fn as_mut(&mut self) -> &mut PngWorkspace {
-        &mut self.storage
-    }
-}
 fn decode_managed(
     snapshot: &ObjectSnapshot,
     limits: ImageAssetLimits,
@@ -86,24 +77,9 @@ fn decode_managed(
         limits,
         budget,
         allocate,
-        || charged_workspace(budget, initialize),
+        || charged_workspace(budget, initialize).map_err(ReferenceResourceError::Budget),
         |pixels| Ok(ReferencePixels(Arc::new(pixels))),
     )
-}
-fn charged_workspace(
-    budget: &ImageResourceBudget,
-    initialize: impl FnOnce() -> Result<PngWorkspace, ImageResourceError>,
-) -> Result<ChargedWorkspace, ReferenceResourceError> {
-    let mut charge = budget
-        .reserve(std::mem::size_of::<PngWorkspace>())
-        .map_err(ReferenceResourceError::Budget)?;
-    let storage = charge
-        .allocate_value(initialize)
-        .map_err(ReferenceResourceError::Budget)?;
-    Ok(ChargedWorkspace {
-        storage,
-        _charge: charge,
-    })
 }
 
 // Explicit test-only uncharged workspace factory preserves the RGBA-only controls.
@@ -181,6 +157,47 @@ mod tests;
 mod workspace_tests {
     use super::*;
     #[test]
+    fn retained_pixels_and_managed_wire_validation_compete_in_one_cpu_domain() {
+        let pin = tests::workspace_fixture();
+        let budget =
+            ImageResourceBudget::isolated(std::mem::size_of::<crate::object_codec::PngWorkspace>())
+                .unwrap();
+        let pixels = crate::read_queries::reference_image_resources::decode_managed(
+            &pin,
+            tests::limits(),
+            &budget,
+            || Ok(crate::object_codec::PngWorkspace::new()),
+            |c| c.allocate(),
+        )
+        .unwrap();
+        let bytes = serde_json::to_vec(&crate::object_codec::encoded_wire_test::wire()).unwrap();
+        assert_eq!(
+            ObjectSnapshot::from_managed_project_wire_cpu_test(
+                "wire".into(),
+                &bytes,
+                crate::object_codec::encoded_wire_test::limits(),
+                &budget
+            )
+            .unwrap_err(),
+            crate::object_codec::ProjectWireError::Budget
+        );
+        assert_eq!(budget.used(), Ok(12));
+        drop(pixels);
+        let snapshot = ObjectSnapshot::from_managed_project_wire_cpu_test(
+            "wire".into(),
+            &bytes,
+            crate::object_codec::encoded_wire_test::limits(),
+            &budget,
+        )
+        .unwrap();
+        assert!(snapshot.project().is_some());
+        assert_eq!(
+            budget.used(),
+            Ok(0),
+            "wire retains encoded source only, never RGBA"
+        );
+    }
+    #[test]
     fn actual_workspace_competes_with_prior_pixels_and_dies_before_current_pixels() {
         let snapshot = tests::workspace_fixture();
         let cost = std::mem::size_of::<PngWorkspace>();
@@ -254,6 +271,7 @@ mod workspace_tests {
                                     _ => Ok(PngWorkspace::new()),
                                 }
                             })
+                            .map_err(ReferenceResourceError::Budget)
                         },
                         |_| panic!("no RGBA after failed workspace verification"),
                     )

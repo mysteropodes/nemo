@@ -18,6 +18,12 @@ pub(crate) enum ProjectWireError {
     #[cfg(feature = "project_media_codec")]
     Png(ImageAssetError),
 }
+#[cfg(feature = "project_media_codec")]
+impl From<ImageAssetError> for ProjectWireError {
+    fn from(error: ImageAssetError) -> Self {
+        Self::Png(error)
+    }
+}
 
 /// Explicit caller limits cannot exceed the staged file ceilings.
 #[derive(Debug, Clone, Copy)]
@@ -107,7 +113,28 @@ pub(crate) fn decode_project(
 pub(crate) fn decode_allocated_project(
     bytes: &[u8],
     limits: ProjectWireLimits,
+    allocate: impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
+) -> Result<ProjectEnvelope, ProjectWireError> {
+    decode_validated_project(
+        bytes,
+        limits,
+        allocate,
+        #[cfg(feature = "project_media_codec")]
+        |source, png| {
+            crate::reference_image_asset::validate_png(source, png)
+                .map(|_| ())
+                .map_err(ProjectWireError::Png)
+        },
+    )
+}
+pub(crate) fn decode_validated_project(
+    bytes: &[u8],
+    limits: ProjectWireLimits,
     mut allocate: impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
+    #[cfg(feature = "project_media_codec")] validate: impl FnOnce(
+        &[u8],
+        ImageAssetLimits,
+    ) -> Result<(), ProjectWireError>,
 ) -> Result<ProjectEnvelope, ProjectWireError> {
     if bytes.len() > limits.envelope_bytes {
         return Err(ProjectWireError::Budget);
@@ -155,6 +182,7 @@ pub(crate) fn decode_allocated_project(
                 asset.ok_or(ProjectWireError::Invalid)?,
                 limits,
                 &mut allocate,
+                validate,
             )?
         }
     };
@@ -241,6 +269,7 @@ fn decode_reference(
     asset: &RawValue,
     limits: ProjectWireLimits,
     allocate: &mut impl FnMut(usize) -> Result<Vec<u8>, ProjectWireError>,
+    validate: impl FnOnce(&[u8], ImageAssetLimits) -> Result<(), ProjectWireError>,
 ) -> Result<ProjectReferenceState, ProjectWireError> {
     let (cap, png) = limits.png.ok_or(ProjectWireError::Budget)?;
     let r: Reference<'_> = object(reference)?;
@@ -294,7 +323,7 @@ fn decode_reference(
         return Err(ProjectWireError::Invalid);
     }
     // Admission reuses decoder checks, not a pixel/encoded-copy result.
-    crate::reference_image_asset::validate_png(&encoded, png).map_err(ProjectWireError::Png)?;
+    validate(&encoded, png)?;
     ProjectReferenceState::admitted_still(
         id,
         name,

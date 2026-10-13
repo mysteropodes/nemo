@@ -13,8 +13,8 @@ use std::collections::HashSet;
 pub(crate) use crate::reference_image_asset::decode_png_pixels;
 #[cfg(feature = "project_media_codec")]
 pub(crate) use crate::reference_image_asset::{
-    decode_png_pixels_with_workspace, DecodedPngPixels, ImageAssetError, ImageAssetLimits,
-    PngWorkspace,
+    decode_png_pixels_with_workspace, validate_png_with_workspace, DecodedPngPixels,
+    ImageAssetError, ImageAssetLimits, PngWorkspace,
 };
 
 #[path = "project_media_codec.rs"]
@@ -22,7 +22,9 @@ mod project;
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
-pub(crate) use project::{decode_allocated_project, ProjectWireError, ProjectWireLimits};
+pub(crate) use project::{
+    decode_allocated_project, decode_validated_project, ProjectWireError, ProjectWireLimits,
+};
 
 /// Literal wire and lifetime harness for the private managed codec consumer.
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
