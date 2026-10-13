@@ -48,10 +48,11 @@ pub(crate) enum ProjectReferenceError {
     Opacity,
     Offset,
     EncodedBudget,
+    Unavailable,
 }
 
 /// Persistent data only: no decoded pixels, source path or runtime handle.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct StillReference {
     id: String,
     name: String,
@@ -87,9 +88,50 @@ pub(crate) enum ProjectReferenceState {
     StillImage(Arc<StillReference>),
 }
 impl ProjectReferenceState {
+    fn validate_settings(
+        name: &str,
+        opacity: f64,
+        offset_frames: i64,
+    ) -> Result<(), ProjectReferenceError> {
+        if name.is_empty()
+            || name.len() > 255
+            || matches!(name, "." | "..")
+            || name.contains(['/', '\\', '\0'])
+        {
+            return Err(ProjectReferenceError::Name);
+        }
+        if !opacity.is_finite() || !(0.0..=1.0).contains(&opacity) {
+            return Err(ProjectReferenceError::Opacity);
+        }
+        if offset_frames.unsigned_abs() > 9_007_199_254_740_991 {
+            return Err(ProjectReferenceError::Offset);
+        }
+        Ok(())
+    }
+    /// Changes settings only: the encoded Arc/ID are never replaced or copied.
+    pub(crate) fn with_settings(
+        &self,
+        name: String,
+        visible: bool,
+        opacity: f64,
+        offset_frames: i64,
+    ) -> Result<Self, ProjectReferenceError> {
+        Self::validate_settings(&name, opacity, offset_frames)?;
+        let Self::StillImage(data) = self else {
+            return Err(ProjectReferenceError::Unavailable);
+        };
+        let mut next = (**data).clone();
+        next.name = name;
+        next.visible = visible;
+        next.opacity = opacity;
+        next.offset_frames = offset_frames;
+        if &next == data.as_ref() {
+            return Ok(self.clone());
+        }
+        Ok(Self::StillImage(Arc::new(next)))
+    }
     /// PRIVATE PRECONDITION: encoded bytes have ALREADY passed PNG admission.
-    /// This floor checks retention/settings only; it is NOT an import/decoder.
-    /// A future wire importer must decode before calling this factory.
+    /// Retention/settings only; wire import must decode BEFORE this factory.
     pub(crate) fn admitted_still(
         id: String,
         name: String,
@@ -102,19 +144,7 @@ impl ProjectReferenceState {
         if id.is_empty() || id.len() > 255 || id.contains('\0') {
             return Err(ProjectReferenceError::Id);
         }
-        if name.is_empty()
-            || name.len() > 255
-            || matches!(name.as_str(), "." | "..")
-            || name.contains(['/', '\\', '\0'])
-        {
-            return Err(ProjectReferenceError::Name);
-        }
-        if !opacity.is_finite() || !(0.0..=1.0).contains(&opacity) {
-            return Err(ProjectReferenceError::Opacity);
-        }
-        if offset_frames.unsigned_abs() > 9_007_199_254_740_991 {
-            return Err(ProjectReferenceError::Offset);
-        }
+        Self::validate_settings(&name, opacity, offset_frames)?;
         if encoded_limit == 0
             || encoded_limit > 16 * 1024 * 1024
             || encoded.is_empty()
@@ -133,8 +163,7 @@ impl ProjectReferenceState {
     }
 }
 
-/// Later ProjectRevisionValue::Project stores this value in the single owner.
-/// Bare drawing compatibility remains separate; that integration is not present.
+/// Immutable composite value retained by the single revision/history owner.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ProjectEnvelope {
     project: ProjectMetadata,
