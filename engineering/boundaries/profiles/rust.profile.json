@@ -20,7 +20,7 @@
       "id": "rust.native.engine.codec",
       "layer": "native-codec",
       "dir": "native-engine/src",
-      "files": ["codec.rs", "project_structure.rs", "object_codec.rs", "project_media_codec.rs", "object_order_codec.rs", "reference_image_asset.rs"],
+      "files": ["codec.rs", "project_structure.rs", "object_codec.rs", "project_media_codec.rs", "object_order_codec.rs", "reference_image_asset.rs", "reference_png_scanlines.rs"],
       "publicApi": ["codec.rs", "project_structure.rs", "object_codec.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "object_desktop_viewport.rs", "object_viewport_consumer.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs", "object_export_job_lifecycle.rs", "object_png_output.rs", "history.rs", "project_structure.rs", "project_media_codec.rs", "render_geometry.rs", "scheduler.rs", "object_scheduler.rs", "object_codec.rs", "object_order_codec.rs", "object_read.rs", "object_fill.rs", "object_history.rs", "object_resource_leases.rs", "object_order_history.rs", "object_command_dispatch.rs", "object_history_dispatch.rs", "object_frame_packet.rs", "object_order_evaluation.rs", "object_render_scene.rs", "object_compositor.rs", "object_scheduled_compositor.rs", "object_scheduled_scene_witness.rs", "reference_image_asset.rs", "image_resource_budget.rs", "reference_image_resources.rs", "expression_noise.rs", "expression_random.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "desktop_viewport.rs", "object_desktop_viewport.rs", "object_viewport_consumer.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs", "object_export_job_lifecycle.rs", "object_png_output.rs", "history.rs", "project_structure.rs", "project_media_codec.rs", "render_geometry.rs", "scheduler.rs", "object_scheduler.rs", "object_codec.rs", "object_order_codec.rs", "object_read.rs", "object_fill.rs", "object_history.rs", "object_resource_leases.rs", "object_order_history.rs", "object_command_dispatch.rs", "object_history_dispatch.rs", "object_frame_packet.rs", "object_order_evaluation.rs", "object_render_scene.rs", "object_compositor.rs", "object_scheduled_compositor.rs", "object_scheduled_scene_witness.rs", "reference_image_asset.rs", "reference_png_scanlines.rs", "image_resource_budget.rs", "reference_image_resources.rs", "expression_noise.rs", "expression_random.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },
