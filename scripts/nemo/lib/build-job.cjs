@@ -130,8 +130,21 @@ function packageArtifacts(app) {
 
 async function runBuildJob(options = {}) {
   const taskId = options.taskId || `desktop-build-${crypto.randomBytes(16).toString('hex')}`;
-  const root = isolation.taskRoot(taskId);
-  const reportDir = path.resolve(options.reportDir || path.join(ROOT, 'reports'));
+  let root; let reportDir;
+  try {
+    // The tasks directory can itself be a symlink; compare physical owner and
+    // destination paths so neither side can hide containment through an alias.
+    root = isolation.canonicalDirectory(isolation.taskRoot(taskId), 'build task root');
+  } catch (error) {
+    return result('blocked', `build task root refused: ${error.message}`);
+  }
+  try {
+    // RUNTIME_ROOT is physical; resolve report destinations through the same
+    // nearest-existing-ancestor rule before the disposable-root containment check.
+    reportDir = isolation.canonicalDirectory(options.reportDir || path.join(ROOT, 'reports'), 'build report directory');
+  } catch (error) {
+    return result('blocked', `build report directory refused: ${error.message}`);
+  }
   const relative = path.relative(root, reportDir);
   if (!relative || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))) {
     return result('blocked', 'build reports must be outside the disposable build task root');

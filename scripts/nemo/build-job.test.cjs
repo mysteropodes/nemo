@@ -52,6 +52,7 @@ function fixture(t) {
 }
 
 function execute(f, mode = 'success', options = {}) {
+  const physicalReports = path.join(fs.realpathSync(f.dir), path.basename(f.reports));
   const script = `
     const fs=require('node:fs'),path=require('node:path');
     const {runBuildJob}=require('./scripts/nemo/lib/build-job.cjs');
@@ -65,7 +66,7 @@ function execute(f, mode = 'success', options = {}) {
   `;
   const r = spawnSync(process.execPath, ['-e', script], {
     cwd: f.dir, encoding: 'utf8', timeout: 30_000,
-    env: { ...process.env, NEMO_ISOLATION_ROOT: f.runtime, NEMO_FIXTURE_REPORTS: f.reports,
+    env: { ...process.env, NEMO_ISOLATION_ROOT: f.runtime, NEMO_FIXTURE_REPORTS: physicalReports,
       NEMO_FIXTURE_STUB: f.stub, NEMO_FIXTURE_MODE: mode, NEMO_FIXTURE_OPTIONS: JSON.stringify(options) },
   });
   assert.equal(r.status, 0, r.stderr);
@@ -165,9 +166,54 @@ test('a package finalization failure is retained and cannot become a pass', t =>
 test('report placement inside disposable state is blocked before starting', t => {
   const f = fixture(t);
   const key = require('node:crypto').createHash('sha256').update('controlled-build').digest('hex');
-  const { result } = execute(f, 'success', { reportDir: path.join(f.runtime, 'tasks', key, 'reports') });
+  const physicalFixture = fs.realpathSync(f.dir);
+  let fixtureAlias = null;
+  if (process.platform === 'darwin' && physicalFixture.startsWith('/private/var/')) {
+    const candidate = physicalFixture.slice('/private'.length);
+    try { if (fs.realpathSync(candidate) === physicalFixture) fixtureAlias = candidate; } catch { /* canonical path is the fallback */ }
+  }
+  const runtimeRoot = fixtureAlias ? path.join(fixtureAlias, path.basename(f.runtime)) : f.runtime;
+  const reportDir = path.join(runtimeRoot, 'tasks', key, 'reports');
+  const { result } = execute(f, 'success', { reportDir });
   assert.equal(result.status, 'blocked');
   assert.equal(fs.existsSync(path.join(f.dir, 'observed-build.json')), false);
+  assert.equal(fs.existsSync(reportDir), false, 'containment refusal must not create report directories');
+});
+
+test('a report symlink resolving into disposable state is blocked before starting', t => {
+  const f = fixture(t);
+  const key = require('node:crypto').createHash('sha256').update('controlled-build').digest('hex');
+  const taskReports = path.join(f.runtime, 'tasks', key, 'reports');
+  fs.mkdirSync(taskReports, { recursive: true });
+  const reportAlias = path.join(f.dir, 'report-alias');
+  try { fs.symlinkSync(taskReports, reportAlias, 'dir'); }
+  catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('directory symlinks are unavailable'); return; }
+    throw error;
+  }
+  const { result } = execute(f, 'success', { reportDir: path.join(reportAlias, 'nested') });
+  assert.equal(result.status, 'blocked');
+  assert.equal(fs.existsSync(path.join(f.dir, 'observed-build.json')), false);
+  assert.equal(fs.existsSync(path.join(taskReports, 'nested')), false, 'refusal must precede report creation');
+});
+
+test('a task-root ancestor symlink cannot hide reports inside the physical disposable root', t => {
+  const f = fixture(t);
+  const key = require('node:crypto').createHash('sha256').update('controlled-build').digest('hex');
+  const externalTasks = path.join(f.dir, 'external-tasks');
+  fs.mkdirSync(f.runtime, { recursive: true });
+  fs.mkdirSync(externalTasks, { recursive: true });
+  try { fs.symlinkSync(externalTasks, path.join(f.runtime, 'tasks'), 'dir'); }
+  catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('directory symlinks are unavailable'); return; }
+    throw error;
+  }
+  const physicalTaskRoot = path.join(externalTasks, key);
+  const reportDir = path.join(f.runtime, 'tasks', key, 'reports');
+  const { result } = execute(f, 'success', { reportDir });
+  assert.equal(result.status, 'blocked');
+  assert.equal(fs.existsSync(path.join(f.dir, 'observed-build.json')), false);
+  assert.equal(fs.existsSync(path.join(physicalTaskRoot, 'reports')), false, 'refusal must precede report creation');
 });
 
 test('the named build job reaches the isolated controller with a harmless local Tauri executable', t => {

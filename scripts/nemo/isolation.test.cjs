@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
-const { spawn } = require('node:child_process');
+const { spawn, execFileSync } = require('node:child_process');
 
 const scratchRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-isolation-test-'));
 process.env.NEMO_ISOLATION_ROOT = scratchRoot;
@@ -20,6 +20,49 @@ process.env.NEMO_ISOLATION_ROOT = scratchRoot;
 const iso = require('./lib/isolation.cjs');
 const identity = require('./lib/identity.cjs');
 const receipt = require('./lib/receipt.cjs');
+
+test('default runtime root uses the physical spelling of the system temp directory', () => {
+  const env = { ...process.env };
+  delete env.NEMO_ISOLATION_ROOT;
+  const root = execFileSync(process.execPath, ['-e', "process.stdout.write(require('./lib/isolation.cjs').RUNTIME_ROOT)"], {
+    cwd: __dirname, env, encoding: 'utf8',
+  });
+  assert.equal(root, path.join(fs.realpathSync(os.tmpdir()), 'nemo-runtime'));
+});
+
+test('explicit isolation-root symlink override resolves to its physical owner root', (t) => {
+  const alias = path.join(path.dirname(scratchRoot), `nemo-isolation-root-alias-${process.pid}`);
+  try { fs.symlinkSync(scratchRoot, alias, 'dir'); }
+  catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('directory symlinks are unavailable'); return; }
+    throw error;
+  }
+  t.after(() => fs.rmSync(alias, { force: true }));
+  const env = { ...process.env, NEMO_ISOLATION_ROOT: alias };
+  const output = execFileSync(process.execPath, ['-e', "const iso=require('./lib/isolation.cjs');const roots=iso.taskRoots('canonical-override-test');process.stdout.write(JSON.stringify({runtimeRoot:iso.RUNTIME_ROOT,roots}))"], {
+    cwd: __dirname, env, encoding: 'utf8',
+  });
+  const result = JSON.parse(output);
+  assert.equal(result.runtimeRoot, fs.realpathSync(scratchRoot));
+  for (const root of Object.values(result.roots)) assert.equal(fs.realpathSync(root), root);
+});
+
+test('dangling isolation-root symlink override is refused', (t) => {
+  const alias = path.join(scratchRoot, `dangling-root-${process.pid}`);
+  const target = path.join(scratchRoot, `missing-target-${process.pid}`);
+  try { fs.symlinkSync(target, alias, 'dir'); }
+  catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('directory symlinks are unavailable'); return; }
+    throw error;
+  }
+  t.after(() => fs.rmSync(alias, { force: true }));
+  const env = { ...process.env, NEMO_ISOLATION_ROOT: alias };
+  const output = execFileSync(process.execPath, ['-e', "try{require('./lib/isolation.cjs');process.stdout.write('accepted')}catch(error){process.stdout.write(error.message)}"], {
+    cwd: __dirname, env, encoding: 'utf8',
+  });
+  assert.equal(output, 'isolation root contains an unresolved symlink');
+  assert.equal(fs.existsSync(target), false);
+});
 
 test.after(() => {
   fs.rmSync(scratchRoot, { recursive: true, force: true });
