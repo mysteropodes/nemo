@@ -5,6 +5,7 @@ import CoreGraphics
 
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
+struct ActionRefusal: Error { let diagnostics: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
@@ -163,7 +164,16 @@ func run() throws {
     // The driver's mandatory identity checks do not consume the 64 UI-action budget.
     if action != "check" { try check(ordinal < 64); ordinal += 1 }
     if action == "quit" { try verify(); try emit(["status":"quit", "pid":pid,"windowId":number]); return }
-    try verify()
+    let requestedPath = request["element"] as? String
+    func pressFailure(_ stage: String, _ extra: [String:Any] = [:]) -> ActionRefusal {
+      var diagnostics: [String:Any] = ["stage":stage]
+      if let requestedPath, requestedPath.range(of:"^\\d+(?:\\.\\d+)*$",options:.regularExpression) != nil,
+         requestedPath.utf8.count <= 128 { diagnostics["elementPath"] = requestedPath }
+      diagnostics.merge(extra) { _, new in new }
+      return ActionRefusal(diagnostics:diagnostics)
+    }
+    do { try verify() }
+    catch { if action == "press" { throw pressFailure("window-identity") }; throw error }
     var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
     let target = request["target"] as? String ?? "main"
     try check(target == "main" || target == "sheet")
@@ -186,10 +196,43 @@ func run() throws {
       try check(target == "main"); try noSheet()
       try check(AXUIElementPerformAction(main,kAXRaiseAction as CFString) == .success)
     case "press", "set", "select":
-      guard let value = request["element"] as? String, !value.isEmpty else { throw Refusal(code:"adapter-refused") }
-      if target == "main" { try noSheet() }
-      let selected = try node(value,selectedRoot), operation = action == "press" ? kAXPressAction : kAXConfirmAction
-      if action != "select" && !supports(selected,operation) { throw Refusal(code:action == "set" ? "confirm-unsupported" : "adapter-refused") }
+      guard let value = requestedPath, !value.isEmpty else {
+        if action == "press" { throw pressFailure("route-resolution",["routeRefusal":"adapter-refused"]) }
+        throw Refusal(code:"adapter-refused")
+      }
+      if target == "main" {
+        do { try noSheet() }
+        catch { if action == "press" { throw pressFailure("sheet-state") }; throw error }
+      }
+      let selected: AXUIElement
+      do { selected = try node(value,selectedRoot) }
+      catch {
+        if action == "press" {
+          let code = (error as? Refusal)?.code ?? "adapter-refused"
+          throw pressFailure("route-resolution",["routeRefusal":allowedReasons.contains(code) ? code : "adapter-refused"])
+        }
+        throw error
+      }
+      let operation = action == "press" ? kAXPressAction : kAXConfirmAction
+      if action == "press" {
+        var actionNames: CFArray?
+        let query = AXUIElementCopyActionNames(selected,&actionNames)
+        let advertised = query == .success && (actionNames as? [String] ?? []).contains(kAXPressAction as String)
+        let roles: Set<String> = [kAXButtonRole,kAXCheckBoxRole,kAXMenuItemRole,kAXRowRole,kAXTextFieldRole]
+        let rawRole = attr(selected,kAXRoleAttribute) as? String ?? ""
+        var facts: [String:Any] = ["axPressQueryError":Int(query.rawValue),"axPressAdvertised":advertised,
+          "role":roles.contains(rawRole) ? rawRole : "other"]
+        let labels = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+        let title = attr(selected,kAXTitleAttribute) as? String ?? "", value = attr(selected,kAXValueAttribute) as? String ?? ""
+        if labels.contains(title) { facts["control"] = title }
+        else if labels.contains(value) { facts["control"] = value }
+        guard query == .success && advertised else { throw pressFailure("axpress-support",facts) }
+        let perform = AXUIElementPerformAction(selected,kAXPressAction as CFString)
+        facts["performActionError"] = Int(perform.rawValue)
+        guard perform == .success else { throw pressFailure("axpress-perform",facts) }
+      } else if action != "select" && !supports(selected,operation) {
+        throw Refusal(code:action == "set" ? "confirm-unsupported" : "adapter-refused")
+      }
       if action == "set" {
         try check(target == "sheet")
         guard let text = request["value"] as? String, text.utf8.count <= 4096 else { throw Refusal(code:"adapter-refused") }
@@ -259,8 +302,9 @@ func run() throws {
         }
         d["stage"] = "row-readback"; result["selectionDiagnostics"] = d
         result["selected"] = true
-      } else { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
-      try verify()
+      } else if action != "press" { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
+      do { try verify() }
+      catch { if action == "press" { throw pressFailure("post-action-identity") }; throw error }
       if target == "sheet" {
         if try members().isEmpty { result["dismissalPendingVerification"] = true }
         else { _ = try verifySheet() }
@@ -334,5 +378,6 @@ func run() throws {
 }
 do { try run() }
 catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
+catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
 catch let error as Refusal { try? emit(["status":"refused","code":allowedReasons.contains(error.code) ? error.code : "adapter-refused"]); exit(1) }
 catch { try? emit(["status":"refused","code":"adapter-refused"]); exit(1) }
