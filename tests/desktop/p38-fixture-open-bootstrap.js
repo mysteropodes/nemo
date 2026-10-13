@@ -126,7 +126,8 @@
           window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    throw new Error('open-path-unavailable');
+    throw new Error(typeof (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) === 'function'
+      ? 'open-path-unavailable' : 'tauri-invoke-unavailable');
   }
   if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
     try { restoreNative = installNativeObserver(); nativeObserverEarly = !!restoreNative; }
@@ -153,7 +154,17 @@
   window.__NEMO_P38_FIXTURE_OPEN_DONE__ = (async () => {
     let restoreOpenPath = null;
     try {
-      await waitForOpenPath();
+      try { await waitForOpenPath(); }
+      catch (_) {
+        // Cursor zero is the only place a pre-ready refusal can be recorded.
+        // If invoke itself is absent there is no trusted channel to persist it;
+        // the external owner reports the prepared-only ready timeout instead.
+        const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+        if (typeof invoke === 'function') {
+          try { await fail('ready', undefined, 'ready-open-path-unavailable'); } catch (_) {}
+        }
+        return 'refused';
+      }
       await checkpoint('ready', 'ready');
       restoreOpenPath = installOpenPathObserver();
       await open('a-opened', 'A');

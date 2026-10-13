@@ -12,7 +12,9 @@ const FAILURE_CODES = Object.freeze({
   config: ['observer-config-refused'],
   'driver-receipt': ['driver-receipt-refused', 'driver-first-failure', 'driver-receipt-timeout'],
   'task-owner': ['task-owner-unavailable'],
-  'probe-manifest': ['probe-manifest-refused', 'probe-manifest-timeout'],
+  'probe-manifest': ['probe-temp-identity-refused', 'probe-temp-read-refused',
+    'probe-manifest-validation-refused', 'probe-manifest-failure-unknown',
+    'probe-manifest-failed-ready-open-path-unavailable', 'probe-ready-timeout', 'probe-manifest-timeout'],
   'helper-start': ['helper-start-failed', 'helper-executable-refused'],
   'helper-pin': ['helper-window-identity-refused'],
   checkpoint: ['driver-first-failure', 'checkpoint-refused', 'checkpoint-timeout'],
@@ -95,17 +97,44 @@ function validateOwner(record, taskId) {
     /^[a-f0-9]{32,128}$/.test(record.ownerToken), 'task-owner', 'task-owner-unavailable');
   return record.ownerToken;
 }
+function validateManifestIdentity(root, manifest, expected) {
+  check(manifest && manifest.schema === 'nemo.p38-fixture-open/1' &&
+    /^[a-f0-9-]{36}$/.test(manifest.runId) && manifest.taskKey === expected.taskKey &&
+    manifest.sourceSha === expected.source && manifest.buildSha === expected.source &&
+    manifest.pid === expected.pid && manifest.window === 'main' &&
+    manifest.origin === 'tauri://localhost/index.html' && Array.isArray(manifest.fixtures) &&
+    manifest.fixtures.length === 2 && Number.isSafeInteger(manifest.checkpoint) &&
+    manifest.checkpoint >= 0 && manifest.checkpoint < PHASES.length &&
+    typeof manifest.waiting === 'boolean' && typeof manifest.failed === 'boolean' &&
+    ['prepared', 'waiting', 'failed', 'accepted', 'refused'].includes(manifest.result),
+  'probe-manifest', 'probe-manifest-validation-refused');
+  for (const [index, id] of ['A', 'B'].entries()) {
+    const fixture = manifest.fixtures[index];
+    const expectedHash = id === 'A'
+      ? 'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180'
+      : 'd30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215';
+    check(fixture && fixture.id === id && fixture.file === path.join(root, `${id}.json`) &&
+      fixture.sha256 === expectedHash && Number.isSafeInteger(fixture.device) && Number.isSafeInteger(fixture.inode),
+    'probe-manifest', 'probe-manifest-validation-refused');
+  }
+  const pins = { schema: manifest.schema, runId: manifest.runId, taskKey: manifest.taskKey,
+    sourceSha: manifest.sourceSha, buildSha: manifest.buildSha, pid: manifest.pid,
+    window: manifest.window, origin: manifest.origin, fixtures: manifest.fixtures };
+  check(/^[a-f0-9]{64}$/.test(manifest.manifestSha256) &&
+    hash(JSON.stringify(pins)) === manifest.manifestSha256,
+  'probe-manifest', 'probe-manifest-validation-refused');
+}
 function validateManifest(root, manifest, expected, owner) {
   check(manifest && manifest.schema === 'nemo.p38-fixture-open/1' &&
     /^[a-f0-9-]{36}$/.test(manifest.runId) && manifest.taskKey === expected.taskKey &&
     manifest.sourceSha === expected.source && manifest.buildSha === expected.source &&
     manifest.pid === expected.pid && manifest.window === 'main' &&
     manifest.origin === 'tauri://localhost/index.html' && Array.isArray(manifest.fixtures) &&
-    manifest.fixtures.length === 2, 'probe-manifest', 'probe-manifest-refused');
+    manifest.fixtures.length === 2, 'probe-manifest', 'probe-manifest-validation-refused');
   const verified = owner.receipt(root, { runId: manifest.runId, taskKey: expected.taskKey,
     sourceSha: expected.source, buildSha: expected.source, pid: expected.pid,
     phase: PHASES[manifest.checkpoint] });
-  check(verified.value.manifestSha256 === manifest.manifestSha256, 'probe-manifest', 'probe-manifest-refused');
+  check(verified.value.manifestSha256 === manifest.manifestSha256, 'probe-manifest', 'probe-manifest-validation-refused');
   return verified.value;
 }
 function helperWindowIsPinned(value, pid, windowId) {
@@ -178,7 +207,7 @@ async function runObserver(config, services) {
     currentStage = 'probe-manifest';
     const probe = await services.waitForProbe(config, expected, deadline);
     check(probe && typeof probe.root === 'string' && path.isAbsolute(probe.root) && probe.manifest,
-      'probe-manifest', 'probe-manifest-refused');
+      'probe-manifest', 'probe-manifest-validation-refused');
     const initial = validateManifest(probe.root, probe.manifest, expected, services.owner);
     outcome.runId = initial.runId; outcome.build = initial.buildSha;
     currentStage = 'helper-start';
@@ -247,13 +276,15 @@ function waitLine(lines, timeoutMs = 10000) {
       observerStage: 'inspection', observerCode: 'helper-input-ended' })), timeoutMs);
   })]).finally(() => clearTimeout(timer));
 }
-function defaultServices(config) {
-  const isolation = require(path.join(ROOT, 'scripts/nemo/lib/isolation.cjs'));
-  const owner = require('./p38-fixture-open-installed.cjs');
+function defaultServices(config, testServices = {}) {
+  const isolation = testServices.isolation || require(path.join(ROOT, 'scripts/nemo/lib/isolation.cjs'));
+  const owner = testServices.owner || require('./p38-fixture-open-installed.cjs');
   const reportDir = path.join(ROOT, 'reports', 'p38-installed-operators', hash(config.grantId));
   const receiptFile = path.join(reportDir, 'receipt.json');
   // This observer runs only while the exact driver task is active.
-  const roots = isolation.taskRoots(config.taskId);
+  const roots = testServices.roots || isolation.taskRoots(config.taskId);
+  const now = testServices.now || Date.now;
+  const pause = testServices.pause || (ms => new Promise(resolve => setTimeout(resolve, ms)));
   const save = value => writeOutcome(reportDir, value);
   async function waitForDriver(_config, deadline) {
     for (;;) {
@@ -268,34 +299,53 @@ function defaultServices(config) {
   }
   function readManifest(root) {
     try { return readJSONNoFollow(path.join(root, 'manifest.json'), 2048); }
-    catch { return null; }
+    catch (error) {
+      if (error.code === 'ENOENT') return null;
+      fail('probe-manifest', 'probe-manifest-validation-refused');
+    }
   }
   async function waitForProbe(_config, expected, deadline) {
-    const tempGuard = pinDirectory(roots.temp, 'probe-manifest', 'probe-manifest-refused');
-    while (Date.now() < deadline) {
-      tempGuard.verify();
+    const tempGuard = pinDirectory(roots.temp, 'probe-manifest', 'probe-temp-identity-refused');
+    let sawPrepared = false;
+    while (now() < deadline) {
+      try { tempGuard.verify(); }
+      catch { fail('probe-manifest', 'probe-temp-identity-refused'); }
       let entries;
       try { entries = fs.readdirSync(roots.temp); }
-      catch { fail('probe-manifest', 'probe-manifest-refused'); }
+      catch { fail('probe-manifest', 'probe-temp-read-refused'); }
       for (const name of entries.slice(0, 128)) {
         if (!/^p38-fixture-open-[a-f0-9-]{36}$/.test(name)) continue;
         const root = path.join(roots.temp, name);
         let meta;
-        try { meta = fs.lstatSync(root); } catch { continue; }
-        if (!meta.isDirectory() || meta.isSymbolicLink() || fs.realpathSync(root) !== root ||
-          path.dirname(root) !== roots.temp) continue;
+        try { meta = fs.lstatSync(root); }
+        catch (error) { if (error.code === 'ENOENT') continue; fail('probe-manifest', 'probe-temp-identity-refused'); }
+        let real;
+        try { real = fs.realpathSync(root); }
+        catch { fail('probe-manifest', 'probe-temp-identity-refused'); }
+        if (!meta.isDirectory() || meta.isSymbolicLink() || real !== root || path.dirname(root) !== roots.temp)
+          fail('probe-manifest', 'probe-temp-identity-refused');
         const manifest = readManifest(root);
-        if (manifest?.pid !== expected.pid || manifest?.taskKey !== expected.taskKey ||
-          manifest?.sourceSha !== expected.source || manifest?.buildSha !== expected.source) continue;
-        if (manifest.failed === true) fail('probe-manifest', 'probe-manifest-refused');
+        if (!manifest) continue;
+        try { validateManifestIdentity(root, manifest, expected); }
+        catch { fail('probe-manifest', 'probe-manifest-validation-refused'); }
+        if (manifest.failed === true) {
+          if (manifest.checkpoint === 0 && manifest.waiting === false &&
+              manifest.failureCode === 'ready-open-path-unavailable') {
+            fail('probe-manifest', 'probe-manifest-failed-ready-open-path-unavailable');
+          }
+          fail('probe-manifest', 'probe-manifest-failure-unknown');
+        }
         // The native probe first publishes a prepared manifest, then waits at
         // checkpoint zero. Discovery must tolerate that startup interval.
-        if (manifest.waiting !== true || manifest.checkpoint !== 0) continue;
+        if (manifest.waiting === false && manifest.checkpoint === 0) { sawPrepared = true; continue; }
+        if (manifest.waiting !== true || manifest.checkpoint !== 0)
+          fail('probe-manifest', 'probe-manifest-validation-refused');
         try { validateManifest(root, manifest, expected, owner); return { root, manifest }; }
-        catch { fail('probe-manifest', 'probe-manifest-refused'); }
+        catch { fail('probe-manifest', 'probe-manifest-validation-refused'); }
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await pause(100);
     }
+    if (sawPrepared) fail('probe-manifest', 'probe-ready-timeout');
     fail('probe-manifest', 'probe-manifest-timeout');
   }
   async function waitForCheckpoint(_config, _expected, probe, _phase, index, deadline) {
@@ -407,4 +457,4 @@ async function main() {
 }
 if (require.main === module) main();
 module.exports = { PHASES, FAILURE_CODES, validateConfig, validateDriverReceipt, validateOwner,
-  validateManifest, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };
+  validateManifest, validateManifestIdentity, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };

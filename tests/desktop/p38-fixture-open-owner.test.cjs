@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
-const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper } = require('./p38-fixture-open-owner.cjs');
+const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, defaultServices } = require('./p38-fixture-open-owner.cjs');
 
 const config = Object.freeze({ taskId:'p38-task-test', grantId:'p38-grant-test',
   helperPath:'/tmp/p38-window-helper', helperSha256:'e'.repeat(64), sourceHead:'b'.repeat(40), timeoutMs:10000 });
@@ -14,6 +15,59 @@ const baseManifest = Object.freeze({ schema:'nemo.p38-fixture-open/1',
   sourceSha:config.sourceHead, buildSha:config.sourceHead, pid:42, window:'main',
   origin:'tauri://localhost/index.html', fixtures:[{id:'A'},{id:'B'}], manifestSha256:'c'.repeat(64),
   waiting:true, failed:false, checkpoint:0 });
+function probeManifest(root, overrides = {}) {
+  const fixtures = [
+    {id:'A',file:path.join(root,'A.json'),sha256:'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180',device:1,inode:2},
+    {id:'B',file:path.join(root,'B.json'),sha256:'d30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215',device:1,inode:3},
+  ];
+  const value={...baseManifest,fixtures,result:overrides.result ||
+    (overrides.failed ? 'failed' : overrides.waiting === false ? 'prepared' : 'waiting'),...overrides};
+  const pins={schema:value.schema,runId:value.runId,taskKey:value.taskKey,sourceSha:value.sourceSha,
+    buildSha:value.buildSha,pid:value.pid,window:value.window,origin:value.origin,fixtures:value.fixtures};
+  value.manifestSha256=crypto.createHash('sha256').update(JSON.stringify(pins)).digest('hex');
+  return value;
+}
+async function probeFailure(manifest, useSymlink = false, receiptMismatch = false) {
+  const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'p38-probe-diagnostic-')));
+  const realTemp=path.join(base,'tmp-real'), temp=path.join(base,'tmp');
+  fs.mkdirSync(realTemp);
+  if(useSymlink)fs.symlinkSync(realTemp,temp); else fs.mkdirSync(temp);
+  if(manifest){
+    const root=path.join(temp,'p38-fixture-open-12345678-1234-1234-1234-123456789abc');
+    fs.mkdirSync(root); fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(probeManifest(root,manifest)));
+  }
+  let tick=0;
+  const services=defaultServices(config,{roots:{temp},isolation:{taskRoots:()=>({temp})},owner:{receipt(){
+    if(receiptMismatch)return {value:{manifestSha256:'f'.repeat(64)}};
+    throw new Error('must not read checkpoint receipt');}},
+    now:()=>tick,pause:async()=>{tick=10;}});
+  try { await services.waitForProbe(config,{pid:42,taskKey:'a'.repeat(64),source:config.sourceHead},5); }
+  catch(error){return {stage:error.observerStage,code:error.observerCode};}
+  finally {fs.rmSync(base,{recursive:true,force:true});}
+  return null;
+}
+test('owner classifies an unsafe temporary-root identity separately',async()=>{
+  assert.deepEqual(await probeFailure(null,true),{stage:'probe-manifest',code:'probe-temp-identity-refused'});
+});
+test('owner preserves only the fixed pre-ready manifest failure code',async()=>{
+  assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'ready-open-path-unavailable',result:'failed'}),
+    {stage:'probe-manifest',code:'probe-manifest-failed-ready-open-path-unavailable'});
+  assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'private path or exception',result:'failed'}),
+    {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
+});
+test('owner rejects manifest identity and pin-shape mismatches with one sanitized category',async()=>{
+  assert.deepEqual(await probeFailure({taskKey:'f'.repeat(64)}),
+    {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
+  assert.deepEqual(await probeFailure({fixtures:[{id:'A'},{id:'B'}]}),
+    {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
+  assert.deepEqual(await probeFailure({},false,true),
+    {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
+});
+test('owner distinguishes a prepared-only ready timeout from missing manifest timeout',async()=>{
+  assert.deepEqual(await probeFailure({waiting:false,failed:false,checkpoint:0}),
+    {stage:'probe-manifest',code:'probe-ready-timeout'});
+  assert.deepEqual(await probeFailure(null),{stage:'probe-manifest',code:'probe-manifest-timeout'});
+});
 function makeServices(overrides = {}) {
   const events = [], saved = [], acks = [];
   let now = 1000;
@@ -106,7 +160,7 @@ const failureCases=[
   ['startup/config',{invalidConfig:true},'config','observer-config-refused'],
   ['driver receipt',{driverFailure:true},'driver-receipt','driver-receipt-refused'],
   ['task owner',{ownerFailure:true},'task-owner','task-owner-unavailable'],
-  ['P38 manifest',{probeFailure:true},'probe-manifest','probe-manifest-refused'],
+  ['P38 manifest',{probeFailure:true},'probe-manifest','probe-manifest-validation-refused'],
   ['helper startup',{helperStartFailure:true},'helper-start','helper-start-failed'],
   ['helper pin',{helperPinFailure:true},'helper-pin','helper-window-identity-refused'],
   ['checkpoint',{checkpointFailure:'ready'},'checkpoint','checkpoint-refused'],

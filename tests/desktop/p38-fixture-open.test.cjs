@@ -19,13 +19,15 @@ function execute(openResults, configPatch = {}, runtime = {}) {
     if(name==='nemo_test_p38_fixture_open_probe')return checkpointInvoke(name,args);
     return runtime.invoke ? Reflect.apply(runtime.invoke,this,arguments) : Promise.resolve({available:false});
   };
-  const core = {invoke:runtime.lateInvoke?null:baseInvoke};
+  const core = {invoke:(runtime.lateInvoke||runtime.missingInvoke)?null:baseInvoke};
   const fs = {readTextFile:function(){return runtime.readTextFile ? Reflect.apply(runtime.readTextFile,this,arguments) : Promise.resolve('{}');}};
-  const project = {openPath:runtime.openPath || async function(path){opened.push(path);return openResults.shift();}};
-  const originalOpen=project.openPath, originalInvoke=baseInvoke, originalRead=fs.readTextFile;
+  const project = runtime.missingOpenPath ? {} : {openPath:runtime.openPath || async function(path){opened.push(path);return openResults.shift();}};
+  const originalOpen=project.openPath, originalInvoke=runtime.missingInvoke?null:baseInvoke, originalRead=fs.readTextFile;
   const window = { [ '__NEMO_P38_FIXTURE_OPEN__' ]:config, __TAURI__:{core,fs} };
   if(!runtime.lateBind)window.SMProject=project;
-  vm.runInNewContext(script, {window, Date, setTimeout, Promise, Object, Number, Error});
+  let tick=0;
+  const clock=runtime.expireImmediately?{now:()=>tick++===0?0:60001}:Date;
+  vm.runInNewContext(script, {window, Date:clock, setTimeout, Promise, Object, Number, Error});
   if(runtime.lateInvoke)core.invoke=baseInvoke;
   if(runtime.bind)runtime.bind({project,core,fs,window});
   if(runtime.lateBind)window.SMProject=project;
@@ -50,6 +52,20 @@ for (const result of [false, {status:'refused'}, {status:'unavailable'}, {status
 test('tampered static identity sends no checkpoint and opens no fixture', async()=>{
   const r=await execute([undefined], {buildSha:'d'.repeat(40)});
   assert.equal(r.result,undefined); assert.deepEqual(r.calls,[]); assert.deepEqual(r.opened,[]);
+});
+
+test('pre-ready openPath absence persists one fixed cursor-zero refusal and opens no fixture', async()=>{
+  const r=await execute([], {}, {missingOpenPath:true,expireImmediately:true});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.deepEqual(r.calls.map(x=>[x.phase,x.status,x.failureCode,x.fixtureId,x.fixtureSha256]),
+    [['ready','failed','ready-open-path-unavailable',undefined,undefined]]);
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|exception|must not leak/);
+  assert.equal(r.restored,true);
+});
+
+test('absent Tauri invoke cannot fabricate a persisted pre-ready checkpoint', async()=>{
+  const r=await execute([], {}, {missingInvoke:true,expireImmediately:true});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.calls,[]); assert.deepEqual(r.opened,[]);
 });
 
 test('categorical native outcomes preserve invoke receiver, arguments, and Promise identity', async()=>{
