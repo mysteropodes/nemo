@@ -379,7 +379,8 @@
         "native_object_serialization_tests.rs",
         "native_object_reopen_tests.rs",
         "native_object_save_tests.rs",
-        "native_object_save_failure_tests.rs", "native_object_v2_persistence_tests.rs", "native_object_v2_refusal_tests.rs"
+        "native_object_save_failure_tests.rs", "native_object_v2_persistence_tests.rs", "native_object_v2_refusal_tests.rs",
+        "native_object_preview_tests.rs", "native_object_preview_lifecycle_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -391,6 +392,7 @@
       "files": [
         "native_dispatch.rs",
         "native_object_host.rs",
+        "native_object_preview.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs"
       ],

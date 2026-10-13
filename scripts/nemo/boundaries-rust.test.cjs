@@ -423,17 +423,39 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     'rust.desktop.native.application.tests': [
       'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
     'rust.desktop.native.host.release.tests': [
-      'application::ApplicationReleaseReceipt', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
-      'document::OpacityDocument', 'export_job::ExportReleaseReconciliation', 'export_job::JobReceipt',
-      'export_job::PendingFrame', 'export_job::ReconciliationStage', 'object_codec::decode_project',
-      'commands::NativeOpacityApplication', 'codec::decode_project'],
+      'application::ApplicationReleaseReceipt', 'codec::decode_project',
+      'commands::NativeOpacityApplication', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+      'compositor::Compositor', 'desktop_viewport::AcquiredSurfaceFrame', 'desktop_viewport::CssBounds',
+      'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PhysicalExtent',
+      'desktop_viewport::PresentationReceipt', 'desktop_viewport::SettledSurfaceFrame',
+      'desktop_viewport::SurfaceAttempt', 'desktop_viewport::SurfacePort',
+      'desktop_viewport::SurfacePresentation', 'desktop_viewport::SurfaceRecoveryError',
+      'desktop_viewport::ViewportMapping', 'desktop_viewport::ViewportStatus',
+      'document::OpacityDocument', 'export_job::ExportReleaseReconciliation',
+      'export_job::JobReceipt', 'export_job::PendingFrame', 'export_job::ReconciliationStage',
+      'object_codec::decode_project', 'object_codec::decode_storage_project',
+      'object_document::FrameScopeKind', 'object_frame_packet::ObjectFrameSelector',
+      'object_snapshot::ObjectSnapshot', 'render_scene::ScheduledFrameIdentity',
+      'resource_leases::WorkId', 'scheduler::OutputSpec'],
     'rust.desktop.native.dispatch': [
-      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'object_snapshot::ObjectSnapshot', 'export_job::ExportReleaseReconciliation',
-      'application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
-      'application::ExportResourceResolver', 'application::NativeApplication',
-      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',
-      'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::JobStatus',
-      'export_job::PendingFrame', 'export_job::StagedArtifactPort'],
+      'application::ApplicationReleaseReceipt', 'application::ExportResourceResolver',
+      'application::NativeApplication', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
+      'compositor::Compositor', 'desktop_viewport::DesktopViewportHost',
+      'desktop_viewport::ObjectViewportFrame', 'desktop_viewport::PresentationReceipt',
+      'desktop_viewport::SurfacePort', 'desktop_viewport::ViewportStatus',
+      'document::OpacityDocument', 'export_job::ExportCompositor',
+      'export_job::ExportReleaseReconciliation', 'export_job::JobReceipt',
+      'export_job::JobStatus', 'export_job::PendingFrame', 'export_job::ReconciliationStage',
+      'export_job::StagedArtifactPort', 'history::NativeObjectHistory',
+      'object_document::ObjectDocument', 'object_frame_packet::ObjectFrameSelector',
+      'object_frame_packet::prepare_object_frame',
+      'object_render_scene::prepare_object_paint_plan',
+      'object_render_scene::prepare_object_render_scene',
+      'object_render_scene::prepare_scheduled_object_composition',
+      'object_snapshot::ObjectSnapshot', 'resource_leases::WorkId',
+      'scheduler::EvaluationKey', 'scheduler::FrameScheduler',
+      'scheduler::ObjectSchedulePins', 'scheduler::ObjectScheduleScope',
+      'scheduler::OutputSpec', 'scheduler::ScheduledFrame'],
   });
   const rustProfile = read('rust.profile.json');
   for (const [moduleId, items] of Object.entries(policy.externalCratePorts.native_engine.moduleItems)) {
@@ -499,7 +521,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_preview_lifecycle_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
   assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
@@ -534,7 +556,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
 use ${prefix}native_engine::application::ApplicationReleaseReceipt;`);
     appendSource(root, file, `use crate::${prefix}application_mcp::ApplicationMcp;
 use crate::${prefix}native_viewport::NativeViewport;
-use ${prefix}native_engine::compositor::Compositor;`);
+use ${prefix}native_engine::compositor::CompositorInstance;`);
     appendSource(root, 'src-tauri/src/native_object_host.rs', `use crate::${prefix}application_mcp::ApplicationMcp;`);
     appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::history::NativeObjectHistory;`);
     appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::commands::NativeOpacityApplication;`);
@@ -547,7 +569,7 @@ use ${prefix}native_engine::compositor::Compositor;`);
     assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'history::NativeObjectHistory'));
     assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'commands::NativeOpacityApplication'));
     assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === 'rust.desktop.native.application.tests' && v.detail.targetModule === seam));
-    for (const [owner, item] of [[id, 'compositor::Compositor'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
+    for (const [owner, item] of [[id, 'compositor::CompositorInstance'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
       assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === owner && v.detail.path === item));
     }
   }
@@ -593,11 +615,12 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
 });
 
 
-test('N25C2f immutable snapshot port belongs only to the actual host seam', (t) => {
+test('N25C2f immutable snapshot port stays within actual host seam and its tests', (t) => {
   const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
   const seam = 'rust.desktop.native.dispatch', item = 'object_snapshot::ObjectSnapshot';
   assert.deepEqual(Object.entries(policy.externalCratePorts.native_engine.moduleItems)
-    .filter(([, ports]) => ports.includes(item)).map(([id]) => id), [seam]);
+    .filter(([, ports]) => ports.includes(item)).map(([id]) => id),
+    ['rust.desktop.native.host.release.tests', seam]);
   const host = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_host.rs'), 'utf8');
   assert.match(host, /snapshot\s*\.\s*dispatch\(request\)/);
   assert.match(host, /acquire_snapshot\(self\.content_revision\(\)\)/);
