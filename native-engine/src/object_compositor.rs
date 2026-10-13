@@ -337,7 +337,7 @@ impl ObjectCompositionResult {
 }
 
 pub(crate) struct ObjectRgba8Readback {
-    bytes: Vec<u8>,
+    bytes: crate::compositor::readback::ReadbackBytes,
     output: ObjectOutputSpec,
     prepared: ObjectCompositionWitness,
 }

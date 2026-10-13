@@ -5,18 +5,19 @@
 
 #[path = "object_compositor.rs"]
 mod object_compositor;
+#[path = "compositor_readback.rs"]
+mod readback;
 #[cfg(all(test, feature = "history"))]
 pub(crate) use object_compositor::scheduled_tests::{
     owner as object_test_owner, plan as object_test_plan, schedule as schedule_test_object,
     selector as object_test_selector,
 };
 pub(crate) use object_compositor::ScheduledObjectCompositionResult;
+use readback::ReadbackBytes;
 
 use crate::render_geometry::LayerShape;
 use crate::render_scene::{RenderScene, ScheduledFrameIdentity};
 use std::fmt::{Display, Formatter};
-use std::sync::mpsc;
-use std::time::Duration;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{BlendMode, Color, Fill};
 use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
@@ -268,75 +269,6 @@ impl Compositor {
         })
     }
 
-    fn readback_texture(
-        &self,
-        texture: &wgpu::Texture,
-        width: u32,
-        height: u32,
-    ) -> Result<Vec<u8>, CompositorError> {
-        let unpadded_bytes_per_row = width
-            .checked_mul(4)
-            .ok_or_else(|| CompositorError::new("RGBA8 readback width overflows bytes per row"))?;
-        let padded_bytes_per_row =
-            align_to(unpadded_bytes_per_row, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
-        let size = u64::from(padded_bytes_per_row)
-            .checked_mul(u64::from(height))
-            .ok_or_else(|| CompositorError::new("RGBA8 readback allocation overflows"))?;
-        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("n12-native-rgba8-readback"),
-            size,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("n12-native-rgba8-copy"),
-            });
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: Some(height),
-                },
-            },
-            wgpu::Extent3d {
-                width: width,
-                height: height,
-                depth_or_array_layers: 1,
-            },
-        );
-        self.queue.submit(Some(encoder.finish()));
-        let slice = buffer.slice(..);
-        let (sender, receiver) = mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |mapped| {
-            let _ = sender.send(mapped.map_err(|error| error.to_string()));
-        });
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .map_err(|error| CompositorError::new(format!("wait for RGBA8 readback: {error}")))?;
-        receiver
-            .recv_timeout(Duration::from_secs(10))
-            .map_err(|error| CompositorError::new(format!("receive RGBA8 readback: {error}")))?
-            .map_err(|error| CompositorError::new(format!("map RGBA8 readback: {error}")))?;
-        let mapped = slice.get_mapped_range();
-        let mut bytes = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
-        for row in mapped.chunks_exact(padded_bytes_per_row as usize) {
-            bytes.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
-        }
-        drop(mapped);
-        buffer.unmap();
-        Ok(bytes)
-    }
-
     fn make_target(&self, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("n12-vello-offscreen"),
@@ -400,7 +332,7 @@ impl CompositionResult {
 pub struct NativeRgba8Readback {
     width: u32,
     height: u32,
-    bytes: Vec<u8>,
+    bytes: ReadbackBytes,
     scheduled_identity: ScheduledFrameIdentity,
     document_id: String,
     content_revision: u64,

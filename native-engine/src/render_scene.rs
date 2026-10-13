@@ -3,6 +3,11 @@
 //! Geometry and paint are a separate, versioned immutable resource. This module
 //! never derives geometry from a frame number or reads mutable document state.
 
+#[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+pub(crate) use crate::read_queries::ReadbackBudget;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub(crate) use crate::read_queries::{reserve_readback_bytes, ReadbackReservation};
+
 use crate::evaluation;
 use crate::render_geometry::{ClosedCubicPath, LayerShape};
 use crate::scheduler::{
