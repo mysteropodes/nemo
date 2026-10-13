@@ -13,6 +13,18 @@ use object::{FrameKey, FrameLeases, FrameOwner};
 pub use object::{ObjectSchedulePins, ObjectScheduleScope};
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+
+/// Process-local provenance, independent of recyclable numeric work IDs.
+/// Retaining the marker prevents its address from being reused while a handle lives.
+#[derive(Debug, Clone, Default)]
+struct SchedulerProvenance(Arc<()>);
+impl PartialEq for SchedulerProvenance {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for SchedulerProvenance {}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OutputSpec {
@@ -168,6 +180,7 @@ impl EvaluationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScheduledFrame {
+    provenance: SchedulerProvenance,
     work_id: WorkId,
     view_generation: ViewGeneration,
     key: EvaluationKey,
@@ -181,6 +194,14 @@ pub enum ScheduleAdmission {
 }
 
 impl ScheduledFrame {
+    /// Deduplicated handles identify the same work despite their admission label.
+    pub(crate) fn same_work_as(&self, other: &Self) -> bool {
+        self.provenance == other.provenance
+            && self.work_id == other.work_id
+            && self.view_generation == other.view_generation
+            && self.key == other.key
+    }
+
     pub fn work_id(&self) -> WorkId {
         self.work_id
     }
@@ -259,6 +280,7 @@ struct ActiveFrame {
 /// Local owner for immutable frame work; no compositor or host is activated here.
 #[derive(Debug, Default)]
 pub struct FrameScheduler {
+    provenance: SchedulerProvenance,
     current_owner: Option<FrameOwner>,
     next_generation: u64,
     next_work_id: u64,
@@ -270,6 +292,19 @@ pub struct FrameScheduler {
 impl FrameScheduler {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Read-only consumption gate. Holding this shared borrow during a consumer
+    /// call prevents cancellation/replacement/new admission until that call ends.
+    pub fn is_current(&self, scheduled: &ScheduledFrame) -> bool {
+        self.provenance == scheduled.provenance
+            && scheduled.view_generation == ViewGeneration(self.next_generation)
+            && self.frames.get(&scheduled.work_id).is_some_and(|frame| {
+                frame.receipt.is_none()
+                    && frame.leases.is_some()
+                    && frame.view_generation == scheduled.view_generation
+                    && frame.key.evaluation() == &scheduled.key
+            })
     }
 
     #[cfg(test)]
