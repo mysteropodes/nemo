@@ -257,6 +257,7 @@
       "files": [
         "native_viewport.rs",
         "native_viewport_appkit.rs",
+        "native_viewport_appkit_binding.rs",
         "native_viewport_appkit_occlusion.rs"
       ],
       "publicApi": [
@@ -305,7 +306,8 @@
       "layer": "viewport-owner",
       "dir": "src-tauri/src",
       "files": [
-        "native_application_viewport.rs"
+        "native_application_viewport.rs",
+        "native_viewport_callbacks.rs"
       ],
       "publicApi": [
         "native_application_viewport.rs"
@@ -359,7 +361,8 @@
       "dir": "src-tauri/src",
       "files": [
         "native_application_tests.rs",
-        "native_application_release_tests.rs"
+        "native_application_release_tests.rs",
+        "native_viewport_borrow_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"

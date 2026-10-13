@@ -186,6 +186,7 @@
           "compositor::CompositorError",
           "compositor::CompositorInstance",
           "desktop_viewport::AcquiredSurfaceFrame",
+          "desktop_viewport::CssPoint",
           "desktop_viewport::DesktopViewportHost",
           "desktop_viewport::PresentationReceipt",
           "desktop_viewport::SettledSurfaceFrame",
@@ -272,6 +273,14 @@
         "rust.desktop.native.application.tests": [
           "application::ExportResourceResolver",
           "compositor::Compositor",
+          "desktop_viewport::AcquiredSurfaceFrame",
+          "desktop_viewport::DesktopViewportHost",
+          "desktop_viewport::SettledSurfaceFrame",
+          "desktop_viewport::SurfaceAttempt",
+          "desktop_viewport::SurfacePort",
+          "desktop_viewport::SurfacePresentation",
+          "desktop_viewport::SurfaceRecoveryError",
+          "desktop_viewport::ViewportMapping",
           "export_job::JobStatus"
         ],
     "rust.desktop.native.host.release.tests": [
