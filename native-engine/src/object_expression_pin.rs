@@ -2,6 +2,8 @@
 //! This module neither executes code nor publishes an evaluated value.
 use crate::history::NativeObjectHistory;
 use crate::object_document::FrameScopeKind;
+#[cfg(feature = "object_expression_runtime")]
+use crate::object_expression_runtime::{DetachedCandidate, ExpressionRefusal};
 use crate::object_frame_packet::{
     raw_expression_numeric, raw_expression_order, ObjectFrameError, ObjectFrameSelector,
 };
@@ -64,6 +66,18 @@ impl ExpressionRequest {
             .acquire_snapshot(owner.content_revision())
             .ok_or(ObjectFrameError::Unavailable)?;
         verify_owner_snapshot(owner, &current, &self.snapshot)
+    }
+
+    /// Only this finalizer can extract a scalar from a fully retired request.
+    /// A real owner advance during engine work invalidates even a finite result.
+    #[cfg(feature = "object_expression_runtime")]
+    pub(crate) fn finalize(
+        self,
+        owner: &NativeObjectHistory,
+        candidate: DetachedCandidate,
+    ) -> Result<f64, ExpressionRefusal> {
+        self.revalidate(owner)?;
+        candidate.into_outcome()
     }
 }
 

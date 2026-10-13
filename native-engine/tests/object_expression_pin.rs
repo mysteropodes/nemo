@@ -322,3 +322,95 @@ fn real_fill_and_undo_stale_old_request_without_touching_intervening_owner() {
         after_undo
     );
 }
+
+#[cfg(feature = "object_expression_runtime")]
+fn bounded_runtime() -> crate::object_expression_runtime::ExpressionLimits {
+    // Exact accepted scratch-control envelope, supplied explicitly by this
+    // test caller. No production workload default is inferred from it.
+    crate::object_expression_runtime::ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap()
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn real_owner_to_retired_runtime_to_final_pin_yields_only_detached_scalar() {
+    use crate::object_expression_runtime::evaluate_for_owner;
+    let mut value = source();
+    value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"][0]["order"]["expression"]
+        ["code"] = json!("value+frame/5");
+    let owner = make_owner(&value);
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let before = (
+        bytes(&owner),
+        owner.content_revision(),
+        owner.history_depths(),
+    );
+    assert_eq!(
+        evaluate_for_owner(&owner, &snapshot, &select(&snapshot, 5), bounded_runtime()),
+        Ok(7.0) // C1 raw 6 at evaluated frame 5, plus frame/5
+    );
+    assert_eq!(
+        (
+            bytes(&owner),
+            owner.content_revision(),
+            owner.history_depths()
+        ),
+        before
+    );
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn real_fill_and_undo_between_detached_evaluation_and_finalization_refuse_stale() {
+    use crate::object_expression_runtime::{evaluate_detached, ExpressionRefusal};
+    let mut value = source();
+    value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"][0]["order"]["expression"]
+        ["code"] = json!("value+frame/5");
+    let mut owner = make_owner(&value);
+    let zero = owner.acquire_snapshot(0).unwrap();
+    let pinned = prepare_expression_request(&owner, &zero, &select(&zero, 5)).unwrap();
+    let candidate = evaluate_detached(&pinned, bounded_runtime()).unwrap();
+    let payload = json!({"command":"object.fill.set","stableTarget":value["objects"][0]["target"],
+        "fill":{"kind":"solid","r":0.5,"g":0.1,"b":0.3,"a":0.5}});
+    let prepared = owner
+        .prepare_fill_json(&serde_json::to_vec(&payload).unwrap())
+        .unwrap();
+    assert_eq!(owner.commit_fill(prepared), Ok(1));
+    let after_fill = (
+        bytes(&owner),
+        owner.content_revision(),
+        owner.history_depths(),
+    );
+    assert_eq!(
+        pinned.finalize(&owner, candidate),
+        Err(ExpressionRefusal::Pin(ObjectFrameError::WrongRevision))
+    );
+    assert_eq!(
+        (
+            bytes(&owner),
+            owner.content_revision(),
+            owner.history_depths()
+        ),
+        after_fill
+    );
+    let one = owner.acquire_snapshot(1).unwrap();
+    let pinned = prepare_expression_request(&owner, &one, &select(&one, 5)).unwrap();
+    let candidate = evaluate_detached(&pinned, bounded_runtime()).unwrap();
+    assert_eq!(owner.undo(1), Ok(2));
+    let after_undo = (
+        bytes(&owner),
+        owner.content_revision(),
+        owner.history_depths(),
+    );
+    assert_eq!(
+        pinned.finalize(&owner, candidate),
+        Err(ExpressionRefusal::Pin(ObjectFrameError::WrongRevision))
+    );
+    assert_eq!(
+        (
+            bytes(&owner),
+            owner.content_revision(),
+            owner.history_depths()
+        ),
+        after_undo
+    );
+}
