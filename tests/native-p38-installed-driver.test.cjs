@@ -173,8 +173,22 @@ test('package proof refusal does not acquire native/window authority',async()=>{
 test('static owned-window adapter excludes global input and requires exact PID/window/AX actions',()=>{
   const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
   assert.ok(s.includes('initialRows.count == 1'));assert.ok(s.includes('AXUIElementGetPid'));assert.ok(s.includes('CFEqual(parent,main)'));
-  assert.ok(s.includes('"-l"+String(number)'));assert.equal(/CGEvent|SystemWide|osascript/.test(s),false);
+  assert.ok(s.includes('"-l"+String(number)'));assert.equal(/\.post\s*\(|CGEventPost\s*\(|SystemWide|osascript/.test(s),false);
+  assert.deepEqual(s.match(/\w+\.postToPid\([^)]*\)/g),['down.postToPid(pid)','up.postToPid(pid)']);
   assert.ok(s.includes('confirm-unsupported'));assert.ok(s.includes('No title/value/children reads from a foreign child'));
+});
+for(const type of ['go-to-folder','location-dismissed']) {
+  test('P38 refuses Reference-only location command before helper: '+type,async()=>{
+    const f=fixture();f.services.next=async()=>({type,target:'sheet',sheetToken:'other'});
+    const result=await runOperator(f.cfg,f.services);
+    assert.equal(result.reason,'action-refused');assert.equal(f.events.includes('window-'+type),false);
+    assert.equal(result.cleanup,'complete');assert.equal(result.helperCleanup,'complete');
+  });
+}
+test('P38 refuses a nested location token even on its existing inspect verb',()=>{
+  const {actionTarget}=require('./desktop/p38-installed-driver.cjs');
+  assert.throws(()=>actionTarget({type:'inspect',target:'sheet',sheetToken:'outer',locationToken:'inner'},
+    {token:'outer',locationToken:'inner'}),/action-refused/);
 });
 test('flat identity and window validators reject unsafe scalar coercions',()=>{
   const f=fixture();assert.throws(()=>verifyIdentity({app:{pid:'123'}},{task:f.cfg.taskId},f.cfg));
