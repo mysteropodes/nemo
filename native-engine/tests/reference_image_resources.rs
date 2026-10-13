@@ -330,6 +330,12 @@ fn typed_bare_drawing_and_limits_refusal_plus_shared_production_entry() {
         "wire and retained decode use the same owned workspace"
     );
     assert!(wire_pin.project().is_some());
+    assert_eq!(pixels.row_stride(), 12);
+    assert_eq!(
+        pixels.rgba8().len(),
+        12,
+        "temporary row is not retained in pixels"
+    );
     assert_eq!(
         pixels.rgba8(),
         [17, 34, 51, 255, 68, 85, 102, 128, 119, 136, 153, 0]

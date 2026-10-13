@@ -154,15 +154,15 @@ struct PngRows {
     width: u32,
     height: u32,
     color: ColorType,
-    row_size: usize,
     stride: usize,
     rgba_size: usize,
 }
 // Both consumers use the existing header, admitted-row and terminal checks.
-fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
+fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>, R: AsMut<[u8]>>(
     source: &[u8],
     budget: ImageAssetLimits,
     workspace: impl FnOnce() -> Result<W, E>,
+    row_buffer: impl FnOnce(usize) -> Result<R, E>,
     mut consume: impl FnMut(PngRows, usize, &[u8]) -> Result<(), E>,
 ) -> Result<PngRows, E> {
     if source.len() > budget.encoded_bytes {
@@ -213,7 +213,9 @@ fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
     {
         return Err(ImageAssetError::Unsupported.into());
     }
-    if reader.output_buffer_size() != Some(raw_size) {
+    if reader.output_buffer_size() != Some(raw_size)
+        || reader.output_line_size(width) != Some(row_size)
+    {
         return Err(ImageAssetError::Malformed.into());
     }
     let stride = (width as usize)
@@ -223,22 +225,24 @@ fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
         width,
         height,
         color,
-        row_size,
         stride,
         rgba_size,
     };
+    let mut row = row_buffer(row_size)?;
+    let data = row.as_mut();
+    if data.len() != row_size {
+        return Err(ImageAssetError::Allocation.into());
+    }
     for index in 0..height as usize {
-        let row = reader
-            .next_row()
-            .map_err(decoder_error)?
-            .ok_or(ImageAssetError::Malformed)?;
-        let data = row.data();
-        if data.len() != rows.row_size {
+        if !matches!(
+            reader.read_row(data).map_err(decoder_error)?,
+            Some(png::InterlaceInfo::Null(_))
+        ) {
             return Err(ImageAssetError::Malformed.into());
         }
         consume(rows, index, data)?;
     }
-    if reader.next_row().map_err(decoder_error)?.is_some()
+    if reader.read_row(data).map_err(decoder_error)?.is_some()
         || reader.info().width != width
         || reader.info().height != height
         || reader.info().color_type != color
@@ -264,7 +268,19 @@ pub(crate) fn validate_png_with_workspace<E: From<ImageAssetError>, W: AsMut<Png
     budget: ImageAssetLimits,
     workspace: impl FnOnce() -> Result<W, E>,
 ) -> Result<(u32, u32), E> {
-    let rows = read_png_rows(source, budget, workspace, |_, _, _| Ok::<(), E>(()))?;
+    validate_png_with_buffers(source, budget, workspace, |n| buffer(n).map_err(Into::into))
+}
+pub(crate) fn validate_png_with_buffers<
+    E: From<ImageAssetError>,
+    W: AsMut<PngWorkspace>,
+    R: AsMut<[u8]>,
+>(
+    source: &[u8],
+    budget: ImageAssetLimits,
+    workspace: impl FnOnce() -> Result<W, E>,
+    row: impl FnOnce(usize) -> Result<R, E>,
+) -> Result<(u32, u32), E> {
+    let rows = read_png_rows(source, budget, workspace, row, |_, _, _| Ok::<(), E>(()))?;
     Ok((rows.width, rows.height))
 }
 
@@ -331,9 +347,28 @@ pub(crate) fn decode_png_pixels_with_workspace<E: From<ImageAssetError>, W: AsMu
     workspace: impl FnOnce() -> Result<W, E>,
     allocate: impl FnOnce(usize) -> Result<Vec<u8>, E>,
 ) -> Result<DecodedPngPixels, E> {
+    decode_png_pixels_with_buffers(
+        source,
+        budget,
+        workspace,
+        |n| buffer(n).map_err(Into::into),
+        allocate,
+    )
+}
+pub(crate) fn decode_png_pixels_with_buffers<
+    E: From<ImageAssetError>,
+    W: AsMut<PngWorkspace>,
+    R: AsMut<[u8]>,
+>(
+    source: &[u8],
+    budget: ImageAssetLimits,
+    workspace: impl FnOnce() -> Result<W, E>,
+    row: impl FnOnce(usize) -> Result<R, E>,
+    allocate: impl FnOnce(usize) -> Result<Vec<u8>, E>,
+) -> Result<DecodedPngPixels, E> {
     let mut allocate = Some(allocate);
     let mut rgba = Vec::new();
-    let rows = read_png_rows(source, budget, workspace, |rows, index, data| {
+    let rows = read_png_rows(source, budget, workspace, row, |rows, index, data| {
         if let Some(allocate) = allocate.take() {
             rgba = allocate(rows.rgba_size)?;
             if rgba.len() != rows.rgba_size {

@@ -47,10 +47,18 @@ fn validate_png_in_domain(
     png: object_codec::ImageAssetLimits,
     cpu: &ImageResourceBudget,
 ) -> Result<(), object_codec::ProjectWireError> {
-    object_codec::validate_png_with_workspace(source, png, || {
-        charged_png_workspace(cpu, || Ok(PngWorkspace::new()))
-            .map_err(|_| object_codec::ProjectWireError::Budget)
-    })
+    object_codec::validate_png_with_buffers(
+        source,
+        png,
+        || {
+            charged_png_workspace(cpu, || Ok(PngWorkspace::new()))
+                .map_err(|_| object_codec::ProjectWireError::Budget)
+        },
+        |n| {
+            cpu.allocate_bytes(n)
+                .map_err(|_| object_codec::ProjectWireError::Budget)
+        },
+    )
     .map(|_| ())
 }
 

@@ -4,6 +4,27 @@ use crate::revision::image_resource_budget::{
 use std::sync::{Arc, Barrier};
 
 #[test]
+#[cfg(feature = "reference_image_asset")]
+fn owned_bytes_have_exact_layout_and_release_storage_before_quota() {
+    use crate::reference_image_asset::measure_allocations;
+    let budget = ImageResourceBudget::isolated(19).unwrap();
+    let layout = std::alloc::Layout::array::<u8>(19).unwrap();
+    let (mut row, calls) = measure_allocations(Some(layout), || budget.allocate_bytes(19).unwrap());
+    assert_eq!(calls, [1, 0, 0]);
+    assert_eq!(row.as_mut(), [0; 19]);
+    row.as_mut().copy_from_slice(&[7; 19]);
+    assert_eq!(budget.used(), Ok(19));
+    let (refused, calls) = measure_allocations(Some(layout), || budget.allocate_bytes(19));
+    assert!(matches!(refused, Err(ImageResourceError::Capacity)));
+    assert_eq!(calls, [0, 0, 0]);
+    let (_, calls) = measure_allocations(Some(layout), || drop(row));
+    assert_eq!(calls, [0, 1, 0]);
+    assert_eq!(budget.used(), Ok(0));
+    assert!(budget.allocate_bytes(0).is_err());
+    assert!(budget.allocate_bytes(20).is_err());
+}
+
+#[test]
 fn typed_layout_cost_null_and_one_shot_initialization_are_checked() {
     #[repr(align(64))]
     struct Aligned(u8);

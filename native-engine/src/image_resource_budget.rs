@@ -48,6 +48,18 @@ impl ImageResourceBudget {
             allocated: false,
         })
     }
+    /// One exact allocation with inseparable charge; only scoped slice borrows escape.
+    pub(crate) fn allocate_bytes(
+        &self,
+        cost: usize,
+    ) -> Result<impl AsMut<[u8]>, ImageResourceError> {
+        let mut charge = self.reserve(cost)?;
+        let bytes = charge.allocate()?;
+        Ok(ChargedBytes {
+            bytes,
+            _charge: charge,
+        })
+    }
     #[cfg(test)]
     pub(crate) fn isolated(limit: usize) -> Result<Self, ImageResourceError> {
         Self::new(limit)
@@ -58,6 +70,17 @@ impl ImageResourceBudget {
             .lock()
             .map(|n| *n)
             .map_err(|_| ImageResourceError::Unavailable)
+    }
+}
+
+// Declaration order destroys actual storage before making its quota reusable.
+struct ChargedBytes {
+    bytes: Vec<u8>,
+    _charge: ImageResourceCharge,
+}
+impl AsMut<[u8]> for ChargedBytes {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.bytes
     }
 }
 
