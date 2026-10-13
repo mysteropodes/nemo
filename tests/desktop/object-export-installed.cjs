@@ -46,6 +46,21 @@ function ownedReportDirectory(reportRoot, taskRoot) {
   directory(canonical);
   return canonical;
 }
+function ownedTempDirectory(tempRoot, reportRoot, taskRoot) {
+  requireCheck(path.isAbsolute(tempRoot) && path.normalize(tempRoot) === tempRoot,
+    'owned temp path refused');
+  const stat = fs.lstatSync(tempRoot);
+  requireCheck(stat.isDirectory() && !stat.isSymbolicLink(), 'owned temp root symlink refused');
+  const canonical = fs.realpathSync(tempRoot);
+  const knownMacAlias = tempRoot.startsWith('/var/folders/') &&
+    canonical === '/private' + tempRoot && fs.realpathSync('/var') === '/private/var';
+  const task = fs.realpathSync(taskRoot);
+  requireCheck((canonical === tempRoot || knownMacAlias) &&
+    canonical === path.join(task, 'tmp') && path.dirname(reportRoot) === task,
+  'owned temp scope binding refused');
+  directory(canonical);
+  return canonical;
+}
 function readProbe(reportRoot, source, instance) {
   const file = path.join(reportRoot, 'object-window-probe.json');
   const stat = fs.lstatSync(file);
@@ -172,6 +187,8 @@ async function main() {
     validateSnapshot(status.value, instance, { isolation, runtime, source, build, app });
     reportRoot = ownedReportDirectory(instance.snapshot.runtime.roots.reports,
       instance.snapshot.runtime.roots.root);
+    const tempRoot = ownedTempDirectory(instance.snapshot.runtime.roots.temp,
+      reportRoot, instance.snapshot.runtime.roots.root);
     requireCheck(instance.info.reservations.join(',') === slots.join(','), 'app/GPU slot reservation missing');
     const ready = await phase(reportRoot, source, instance, 'ready', 0);
     ack(reportRoot, ready, instance.info.ownerToken);
@@ -184,7 +201,7 @@ async function main() {
     const captureHash = hash(capture);
     ack(reportRoot, blue, instance.info.ownerToken, captureHash);
     const refused = await phase(reportRoot, source, instance, 'refused', 2);
-    const destination = path.join(reportRoot, 'object-export-' + refused.runId);
+    const destination = path.join(tempRoot, 'object-export-' + refused.runId);
     requireCheck(!fs.existsSync(destination) && stageEmpty(instance.snapshot.app),
       'wrong-snapshot request left an artifact or staging residue');
     ack(reportRoot, refused, instance.info.ownerToken);
@@ -228,4 +245,4 @@ async function main() {
 if (require.main === module) {
   main().catch(error => { process.stderr.write('installed object export FAIL: ' + error.message + '\n'); process.exitCode = 1; });
 }
-module.exports = { pngPixels, artifactEvidence, ownedReportDirectory, ack, sanitizedProbe };
+module.exports = { pngPixels, artifactEvidence, ownedReportDirectory, ownedTempDirectory, ack, sanitizedProbe };
