@@ -6,7 +6,8 @@ const path = require('node:path');
 const test = require('node:test');
 const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
-const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, defaultServices } = require('./p38-fixture-open-owner.cjs');
+const { PHASES, PROBE_FAILURE_CODES, runObserver, fail, writeOutcome, verifyHelperExecutable,
+  helperEnvironment, stopSpawnedHelper, defaultServices, safeCode } = require('./p38-fixture-open-owner.cjs');
 
 const config = Object.freeze({ taskId:'p38-task-test', grantId:'p38-grant-test',
   helperPath:'/tmp/p38-window-helper', helperSha256:'e'.repeat(64), sourceHead:'b'.repeat(40), timeoutMs:10000 });
@@ -49,9 +50,34 @@ async function probeFailure(manifest, useSymlink = false, receiptMismatch = fals
 test('owner classifies an unsafe temporary-root identity separately',async()=>{
   assert.deepEqual(await probeFailure(null,true),{stage:'probe-manifest',code:'probe-temp-identity-refused'});
 });
-test('owner preserves only the fixed pre-ready manifest failure code',async()=>{
+function rustAllowedFailures(phase) {
+  const source=fs.readFileSync(path.join(__dirname,'../../src-tauri/src/task_runtime/p38_fixture_open_probe_control.rs'),'utf8');
+  const match=source.match(new RegExp(`pub\\(super\\) fn allowed_${phase}_failure\\(code: &str\\) -> bool \\{([\\s\\S]*?)\\n\\}`));
+  assert.ok(match,`Rust ${phase} failure allowlist exists`);
+  return [...match[1].matchAll(/"([^"]+)"/g)].map(item=>item[1]);
+}
+test('owner allowlists and classifies every fixed Rust failure by matching phase cursor',async()=>{
+  for(const phase of ['ready','a','b'])
+    assert.deepEqual(PROBE_FAILURE_CODES[phase],rustAllowedFailures(phase),`${phase} owner/Rust failure allowlists match`);
+  const cases=[['ready',0],['a',1],['b',2]].flatMap(([phase,checkpoint])=>
+    PROBE_FAILURE_CODES[phase].map(failureCode=>({checkpoint,failureCode})));
+  for(const {checkpoint,failureCode} of cases){
+    const category=`probe-manifest-failed-${failureCode}`;
+    assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint,failureCode,result:'failed'}),
+      {stage:'probe-manifest',code:category});
+    assert.equal(safeCode('probe-manifest',category),category);
+  }
+});
+test('owner keeps mismatched, malformed, and private manifest failures sanitized',async()=>{
   assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'ready-open-path-unavailable',result:'failed'}),
     {stage:'probe-manifest',code:'probe-manifest-failed-ready-open-path-unavailable'});
+  for(const manifest of [
+    {failed:true,waiting:false,checkpoint:1,failureCode:'ready-observer-install-failed',result:'failed'},
+    {failed:true,waiting:false,checkpoint:1,failureCode:'b-open-threw',result:'failed'},
+    {failed:true,waiting:true,checkpoint:1,failureCode:'a-open-threw',result:'failed'},
+    {failed:true,waiting:false,checkpoint:1,failureCode:'private path or exception',result:'failed'},
+  ]) assert.deepEqual(await probeFailure(manifest),
+    {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
   assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'private path or exception',result:'failed'}),
     {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
 });
