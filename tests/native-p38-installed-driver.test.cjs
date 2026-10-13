@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
 const { runOperator, verifyIdentity, verifyWindow, captureStartupDiagnostics, classifyStartupStderr } = require('./desktop/p38-installed-driver.cjs');
 const HEAD = 'a'.repeat(40), HASH = 'b'.repeat(64);
 function config() { return { workflow:'P38', grant:{issue:1645,confirmed:true,id:'new-p38-explicit-grant'},
@@ -23,7 +24,7 @@ function fixture(change = {}) {
     if(change.transport)throw Object.assign(Error('transport'),{code:'transport-handshake-refused'});},
     async package(){events.push('package');if(change.package)throw Error('/private/pkg');return {executableSha256:HASH,proofHash:HASH};},
     async journal(){events.push('journal');if(used)throw Object.assign(Error('duplicate'),{code:'grant-already-attempted'});used=true;},
-    save(r){events.push('save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},feedback(){events.push('ephemeral-feedback');},
+    save(r){events.push(r.firstFailure?'save-failure':'save-'+(r.appPid||'pre-pid'));receipts.push(structuredClone(r));},feedback(){events.push('ephemeral-feedback');},
     controller(){return controller;},validate(){events.push('validate');if(change.validate)throw Error('wrong owner');},
     async window(mode,pid,wid,action){events.push('window-'+mode);if(change.window)return change.window(mode,pid,wid,action,fire);
       return {pid,windowId:45,matchedAX:true,...mode==='capture'?{captureSha256:HASH}:{}};},
@@ -90,7 +91,7 @@ test('partial start failure retains only allowlisted startup diagnostics before 
   assert.equal(r.firstFailure.stage,'launch');
   assert.deepEqual(r.firstFailure.startupDiagnostics,{classification:'rust-panic',runtimeState:'failed',signal:'SIGABRT',stderrBytes:18,stderrSha256:HASH,truncated:false});
   const saved=f.receipts.find(receipt=>receipt.firstFailure);
-  assert.ok(f.events.indexOf('save-pre-pid') < f.events.indexOf('cleanup'));
+  assert.ok(f.events.indexOf('save-failure') < f.events.indexOf('cleanup'));
   assert.equal(JSON.stringify(saved).includes('private-owner-token'),false);assert.equal(JSON.stringify(saved).includes('/private/'),false);
 });
 test('startup stderr capture is bounded, hashed, classified and redacts arbitrary text',async t=>{
@@ -105,6 +106,15 @@ test('startup stderr capture is bounded, hashed, classified and redacts arbitrar
   assert.equal(result.stderrSha256,crypto.createHash('sha256').update(raw.subarray(raw.length-16*1024)).digest('hex'));
   assert.equal(JSON.stringify(result).includes('/private/path'),false);assert.equal(JSON.stringify(result).includes('secret-token'),false);
   assert.equal(classifyStartupStderr(Buffer.from('P38 fixture refused /private/secret')),'p38-startup-refusal');
+});
+test('startup stderr capture refuses a FIFO without blocking',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'p38-startup-fifo-')),reports=path.join(root,'reports');
+  fs.mkdirSync(reports);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  execFileSync('mkfifo',[path.join(reports,'native-app.stderr.log')]);
+  const started=Date.now();
+  const result=await captureStartupDiagnostics('task',{taskRoots:()=>({root,reports})},{readNativeStatus:()=>({state:'failed',signal:'SIGABRT'})});
+  assert.ok(Date.now()-started<500,'FIFO refusal must not stall startup cleanup');
+  assert.equal(result.classification,'stderr-unavailable');assert.equal(result.stderrBytes,0);
 });
 for(const phase of ['start','window'])test('prelaunch watchdog bounds held '+phase+' and cleans exactly once',async()=>{
   const hold=fire=>{fire();return new Promise(()=>{});};const f=fixture(phase==='start'?{start:hold}:{window(mode,pid,wid,action,fire){return hold(fire);}});

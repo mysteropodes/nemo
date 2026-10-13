@@ -273,9 +273,15 @@ async function captureStartupDiagnostics(task, isolation, runtime) {
       check(meta.isDirectory() && !meta.isSymbolicLink(), 'startup-log-root-refused');
     }
     check(path.dirname(reports) === root && fs.realpathSync(reports) === path.join(canonicalRoot, 'reports'), 'startup-log-root-refused');
-    const fd = fs.openSync(path.join(reports, 'native-app.stderr.log'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const reportsIdentity = fs.lstatSync(reports), file = path.join(reports, 'native-app.stderr.log');
+    const leaf = fs.lstatSync(file);
+    check(leaf.isFile() && !leaf.isSymbolicLink(), 'startup-log-refused');
+    const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | (fs.constants.O_NONBLOCK || 0));
     try {
-      const meta = fs.fstatSync(fd); check(meta.isFile(), 'startup-log-refused');
+      const meta = fs.fstatSync(fd), reportsAfter = fs.lstatSync(reports);
+      check(meta.isFile() && meta.dev === leaf.dev && meta.ino === leaf.ino && reportsAfter.isDirectory() &&
+        reportsAfter.dev === reportsIdentity.dev && reportsAfter.ino === reportsIdentity.ino &&
+        fs.realpathSync(reports) === path.join(canonicalRoot, 'reports'), 'startup-log-refused');
       const length = Math.min(meta.size, STARTUP_DIAGNOSTIC_LIMIT); truncated = meta.size > length;
       bytes = Buffer.alloc(length);
       let offset = 0;
