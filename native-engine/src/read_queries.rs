@@ -1,5 +1,13 @@
 //! Revision-pinned reads. Receipts contain selectors, never copied documents or JSON results.
 
+#[cfg(feature = "project_media_codec")]
+#[path = "reference_image_resources.rs"]
+mod reference_image_resources;
+#[cfg(feature = "project_media_codec")]
+pub(crate) use reference_image_resources::{
+    decode_snapshot_reference, ReferencePixels, ReferenceResourceError,
+};
+
 use crate::codec;
 use crate::evaluation::{self, EvaluationErrorKind};
 use crate::request_receipts::{

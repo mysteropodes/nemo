@@ -1,5 +1,11 @@
 //! Native document identity, monotonic content revisions, and immutable snapshots.
 
+#[path = "image_resource_budget.rs"]
+mod image_resource_budget;
+pub(crate) use image_resource_budget::{
+    shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
+};
+
 #[path = "object_revision.rs"]
 mod object_revision;
 #[cfg(feature = "history")]

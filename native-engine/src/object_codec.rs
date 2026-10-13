@@ -9,6 +9,11 @@ use crate::object_document::{
 use serde::Deserialize;
 use std::collections::HashSet;
 
+#[cfg(feature = "project_media_codec")]
+pub(crate) use crate::reference_image_asset::{
+    decode_png_pixels, DecodedPngPixels, ImageAssetError, ImageAssetLimits,
+};
+
 #[path = "project_media_codec.rs"]
 mod project;
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
