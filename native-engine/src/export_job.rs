@@ -8,6 +8,8 @@ use crate::export_job_lifecycle::{
 };
 #[path = "object_export_job.rs"]
 mod object;
+#[path = "object_export_host.rs"]
+mod object_host;
 pub use crate::export_job_lifecycle::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, ReconciliationStage,
@@ -24,6 +26,7 @@ use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, WorkId,
 };
 pub(crate) use object::{ObjectExportBegin, ObjectExportJob, PendingObjectFrame};
+pub use object_host::{export_one_object_frame, ObjectHostExportOutcome, ObjectHostExportRequest};
 use std::collections::{BTreeMap, BTreeSet};
 
 const WIDTH: u32 = 320;

@@ -41,6 +41,14 @@ pub(super) struct ObjectPreview {
 }
 
 impl ObjectPreview {
+    /// Lend only the original scheduler when no preview lease or cleanup debt exists.
+    pub(super) fn scheduler_for_export(&mut self) -> Result<&mut FrameScheduler, String> {
+        if self.released || self.pending.is_some() || self.blocked.is_some() {
+            return Err("native object preview work must settle before export".into());
+        }
+        Ok(&mut self.scheduler)
+    }
+
     fn cancel_pending(&mut self) -> Result<(), String> {
         let Some(work) = self.pending.as_ref() else {
             return Ok(());
