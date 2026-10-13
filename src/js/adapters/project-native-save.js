@@ -184,7 +184,7 @@ var NemoProjectNativeSave = (function () {
       },
       openNative:function(path){return object?object.openPath(path):Promise.resolve(null);},
       allowOpen:function(){
-        if(!objectActive()||object.canOpen())return true;
+        if(!object||object.canOpen())return true;
         ports.notice('Native project Open is unavailable while another Open or Save is in progress.');return false;
       }
     });

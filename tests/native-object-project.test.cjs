@@ -306,6 +306,20 @@ test('ordinary replacement waits for both post-reveal animation frames before th
   assert.equal(h.previews.length,4);assert.equal(app.project.getCurrentLabel(),'b — /b.json');
 });
 
+test('a second same-tick initial Open is denied before inactive or legacy routing',async()=>{
+  const h=replacementHost(),app=ordinary(h);
+  const first=app.project.openPath('/a.json');
+  assert.equal(Project.desktop(app.window).blocksLegacy(),true,'queued Open denies old writers immediately');
+  const blockedSave=app.project.saveAs();
+  assert.equal(await app.project.openPath('/b.json'),false);
+  assert.equal((await blockedSave).status,'open-in-progress');
+  assert.match(app.toasts.at(-1),/Open is unavailable/);
+  assert.equal(await first,true);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');assert.equal(app.mutations,0);
+  assert.equal(h.copies.length,0);assert.equal(app.writes.filter(([key])=>key!=='nemo-recents').length,0);
+});
+
 test('Open is refused throughout Save As picker/ack, then uses the current acknowledged owner',async()=>{
   const h=replacementHost(),s=session(h),picker=deferred(),f=files(s,{pick:()=>picker.promise});
   assert.equal(await f.ui.openPath('/a.json'),true);

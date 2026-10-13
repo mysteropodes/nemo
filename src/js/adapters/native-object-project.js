@@ -197,7 +197,7 @@
         receipt.contentRevision!==request.contentRevision||receipt.documentSnapshotId!==request.documentSnapshotId||receipt.published!==true||receipt.cleanupComplete!==true)throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(1,1);return receipt;
     });}
-    return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle';},
+    return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
