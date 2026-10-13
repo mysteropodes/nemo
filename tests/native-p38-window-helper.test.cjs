@@ -172,39 +172,46 @@ test('bounded post-press transition samples are sanitized and never resume a ref
     status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:false,elapsedMs:0,samples:[]}}));
 });
-test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
+test('helper probe, wait and live-group failures stay sanitized and signal-free',async()=>{
   const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
-  const child={pid:321,p38DetachedGroup:true,exitCode:null,signalCode:null};
+  const child={pid:321,p38DetachedGroup:true,exitCode:0,signalCode:null};
   const cases=[
     {stage:'group-probe-error',services:{alive(){throw Error('/private/probe');}}},
-    {stage:'group-signal-error',services:{alive:()=>true,exactAlive:()=>true,signal(){throw Error('/private/signal');}}},
-    {stage:'group-wait-error',services:{alive:()=>true,exactAlive:()=>true,signal:()=>{},delay(){throw Error('/private/delay');}}},
+    {stage:'group-remains',services:{alive:()=>true,delay:async()=>{}}},
+    {stage:'group-wait-error',services:{alive:()=>true,delay(){throw Error('/private/delay');}}},
   ];
   for(const item of cases){
-    await assert.rejects(cleanupHelper(child,item.services),error=>{
+    let signals=0;
+    await assert.rejects(cleanupHelper(child,{...item.services,signal(){signals++;}}),error=>{
       assert.equal(error.cleanupDiagnostics[0].stage,item.stage);
       const {safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
       const sanitized=safeCleanupDiagnostics(error.cleanupDiagnostics);
       assert.equal(JSON.stringify(sanitized).includes('/private/'),false);
+      assert.equal(sanitized[0].signalAttempts,0);
       assert.notEqual(sanitized.length,0);
       return true;
     });
+    assert.equal(signals,0);
   }
 });
-test('non-capture helper cleanup records exact-handle signal and wait exceptions',async()=>{
+test('non-capture helper requires cooperative exit and group absence',async()=>{
   const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
-  const child={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill(){throw Error('/private/exact-signal');}};
-  await assert.rejects(cleanupHelper(child),error=>{
-    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-signal-error',helperPid:321,descendantPossible:false,
-      childExitObserved:false,childSignalObserved:false,
-      signalKind:'SIGTERM',signalAttempts:1,signalError:true}]);return true;
+  const child={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,
+    stdin:{destroyed:false,writableEnded:false,end(){child.exitCode=0;}}};
+  let signals=0;
+  assert.equal((await cleanupHelper(child,{alive:()=>false,signal(){signals++;}}))[0].stage,'helper-exited');
+  assert.equal(signals,0);
+  const waiting={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null};
+  await assert.rejects(cleanupHelper(waiting,{alive:()=>false,signal(){signals++;},delay(){throw Error('/private/wait');}}),error=>{
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'group-wait-error',helperPid:321,descendantPossible:false,
+      childExitObserved:false,childSignalObserved:false,signalAttempts:0,probePoint:'initial'}]);return true;
   });
-  const waiting={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill:()=>{}};
-  await assert.rejects(cleanupHelper(waiting,{delay(){throw Error('/private/exact-wait');}}),error=>{
-    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-wait-error',helperPid:321,descendantPossible:false,
-      childExitObserved:false,childSignalObserved:false,
-      signalKind:'SIGTERM',signalAttempts:1,probePoint:'wait-term'}]);return true;
+  const badInput={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,
+    stdin:{destroyed:false,writableEnded:false,end(){throw Error('/private/stdin');}}};
+  await assert.rejects(cleanupHelper(badInput,{alive:()=>false,signal(){signals++;}}),error=>{
+    assert.equal(safeCleanupDiagnostics(error.cleanupDiagnostics)[0].stage,'helper-stdin-error');return true;
   });
+  assert.equal(signals,0);
 });
 test('cleanup loop preserves detailed exception facts or supplies a bounded fallback stage',()=>{
   const {cleanupFailureDiagnostics,safeCleanupDiagnostics,closeOwnedHelpers}=require('./desktop/p38-installed-driver.cjs');
@@ -292,19 +299,18 @@ test('A/B fixture proof uses exact same-descriptor bytes and rejects swap/hash/n
     fs.unlinkSync(fixtures[1].path);fs.symlinkSync(fixtures[0].path,fixtures[1].path);assert.throws(()=>verifyFixtures({fixtures}),e=>e.code==='fixture-refused');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
-test('exact spawned-helper group cleanup escalates only when needed and refuses unreaped group',async()=>{
+test('helper cleanup observes natural exit and never signals a group',async()=>{
   const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
-  for(const endOn of ['already','SIGTERM','SIGKILL','never']){
-    let live=endOn!=='already';const signals=[];
-    const child={pid:123,p38DetachedGroup:true,exitCode:endOn==='already'?0:null,signalCode:null};
-    const work=cleanupHelper(child,{alive:()=>live,exactAlive:()=>child.exitCode===null,
-      signal:kind=>{signals.push(kind);if(kind===endOn){live=false;child.exitCode=0;}},delay:async()=>{}});
-    if(endOn==='never')await assert.rejects(work,e=>e.code==='helper-group-remains'&&e.cleanupDiagnostics[0].groupAliveAfterKill===true);
-    else {const observations=await work;assert.equal(observations[0].helperPid,123);
-      if(endOn==='already')assert.equal(observations[0].groupAliveBefore,false);
-      else if(endOn==='SIGTERM')assert.equal(observations[0].groupAliveAfterTerm,false);
-      else assert.equal(observations[0].groupAliveAfterKill,false);}
-    assert.deepEqual(signals,endOn==='already'?[]:endOn==='SIGTERM'?['SIGTERM']:['SIGTERM','SIGKILL']);
+  for(const mode of ['already','stdin-exit','group-settles','no-exit','descendant-live']){
+    let live=mode==='group-settles'||mode==='descendant-live',signals=0;
+    const child={pid:123,exitCode:['already','group-settles','descendant-live'].includes(mode)?0:null,signalCode:null,
+      stdin:{destroyed:false,writableEnded:false,end(){if(mode==='stdin-exit')child.exitCode=0;}}};
+    const work=cleanupHelper(child,{alive:()=>live,signal(){signals++;},delay:async()=>{if(mode==='group-settles')live=false;}});
+    if(mode==='no-exit'||mode==='descendant-live')await assert.rejects(work,e=>e.code==='helper-cleanup-failed'&&
+      e.cleanupDiagnostics[0].stage===(mode==='no-exit'?'group-identity-uncertain':'group-remains'));
+    else {const observations=await work;assert.equal(observations[0].stage,'group-absent');
+      assert.equal(observations[0].childExitObserved,true);assert.equal(observations[0].signalAttempts,0);}
+    assert.equal(signals,0,mode);
   }
   await assert.rejects(cleanupHelper({pid:-1}),e=>e.code==='helper-cleanup-invalid');
 });
@@ -357,7 +363,7 @@ test('press helper cleanup refuses a live process group after helper exit',async
     const workerPid=Number(fs.readFileSync(workerPidFile,'utf8'));
     assert.ok(Number.isSafeInteger(workerPid)&&workerPid>0);
     assert.doesNotThrow(()=>process.kill(-helper.pid,0),'the modeled sampler descendant must still occupy the helper group');
-    await assert.rejects(cleanupHelper(helper),error=>error.code==='helper-cleanup-failed'&&
+    await assert.rejects(cleanupHelper(helper,{delay:async()=>{}}),error=>error.code==='helper-cleanup-failed'&&
       error.cleanupDiagnostics?.[0]?.stage==='group-remains'&&
       error.cleanupDiagnostics[0].signalAttempts===0);
     assert.equal(helpers.size,1,'the caller owns set removal after cleanup');
@@ -385,7 +391,8 @@ test('unknown group probes never become absence and expose only fixed error code
   const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
   for(const code of ['EPERM','EACCES','EINVAL','ENOSYS','private-error']){
     let signalled=0;
-    await assert.rejects(cleanupHelper({pid:321},{alive(){throw Object.assign(Error('/private/path'),{code});},signal(){signalled++;}}),e=>{
+    await assert.rejects(cleanupHelper({pid:321},{alive(){throw Object.assign(Error('/private/path'),{code});},
+      signal(){signalled++;},delay:async()=>{}}),e=>{
       const d=safeCleanupDiagnostics(e.cleanupDiagnostics)[0];
       assert.equal(d.stage,'group-probe-error');assert.equal(d.probePoint,'initial');
       assert.equal(d.probeErrorCode,code==='private-error'?'UNKNOWN':code);assert.equal('groupAliveBefore' in d,false);
@@ -395,9 +402,11 @@ test('unknown group probes never become absence and expose only fixed error code
   for(const value of [undefined,null,0,1,'false',{},Promise.resolve(false)])
     await assert.rejects(cleanupHelper({pid:321},{alive:()=>value}),e=>e.cleanupDiagnostics[0].probeErrorCode==='ERR_INVALID_PROBE_RESULT');
   assert.throws(()=>safeCleanupDiagnostics([{stage:'group-probe-error',probeErrorCode:'ESRCH'}]));
-  await assert.rejects(cleanupHelper({pid:321,p38DetachedGroup:true,exitCode:null,signalCode:null},
-    {alive:()=>true,exactAlive:()=>true,signal(){throw Object.assign(Error('private'),{code:'EPERM'});}}),
-    e=>e.cleanupDiagnostics[0].signalErrorCode==='EPERM' && e.cleanupDiagnostics[0].groupAliveBefore===true);
+  let signals=0;
+  await assert.rejects(cleanupHelper({pid:321,p38DetachedGroup:true,exitCode:0,signalCode:null},
+    {alive:()=>true,signal(){signals++;},delay:async()=>{}}),
+    e=>e.cleanupDiagnostics[0].stage==='group-remains'&&e.cleanupDiagnostics[0].groupAliveBefore===true);
+  assert.equal(signals,0);
 });
 test('Go-to-Folder diagnostics preserve bounded categories and reject impossible posted phases',()=>{
   const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
@@ -454,10 +463,10 @@ test('EPERM, absent exit, live descendants and stale group identity never author
     let probes=0,signals=0;
     await assert.rejects(cleanupHelper(child,{alive(){probes++;if(mode==='persistent-denial'||mode==='no-exit'&&probes===1)
       throw Object.assign(Error('private'),{code:'EPERM'});return mode!=='no-exit';},
-      exactAlive:()=>mode!=='recycled-leader',signal(){signals++;},delay:async()=>{}}),error=>{
+      signal(){signals++;},delay:async()=>{}}),error=>{
       const [fact]=safeCleanupDiagnostics(error.cleanupDiagnostics);
-      assert.equal(fact.stage,mode==='persistent-denial'||mode==='no-exit'?'group-probe-error':
-        mode==='descendant-live'?'group-remains':'group-identity-uncertain');
+      assert.equal(fact.stage,mode==='persistent-denial'?'group-probe-error':
+        mode==='no-exit'?'group-identity-uncertain':'group-remains');
       return true;
     });
     assert.equal(signals,0,mode);

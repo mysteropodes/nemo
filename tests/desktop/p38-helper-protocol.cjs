@@ -193,87 +193,40 @@ async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
   const observation = { helperPid:child.pid, descendantPossible:child.p38GroupMayContainDescendants !== false };
   if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,descendantPossible:observation.descendantPossible}]});
-  const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,
-    childExitObserved:Number.isInteger(child.exitCode),childSignalObserved:typeof child.signalCode==='string',...facts}]});
-  const errorCode=error=>['EPERM','EACCES','EINVAL','ENOSYS','ERR_INVALID_PROBE_RESULT'].includes(error?.code)?error.code:'UNKNOWN';
   const exited=()=>Number.isInteger(child.exitCode)||typeof child.signalCode==='string';
+  const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,
+    childExitObserved:Number.isInteger(child.exitCode),childSignalObserved:typeof child.signalCode==='string',signalAttempts:0,...facts}]});
+  const errorCode=error=>['EPERM','EACCES','EINVAL','ENOSYS','ERR_INVALID_PROBE_RESULT'].includes(error?.code)?error.code:'UNKNOWN';
   try { if(child.stdin&&!child.stdin.destroyed&&!child.stdin.writableEnded)child.stdin.end(); }
   catch { throw failed('helper-stdin-error'); }
-  // The helper may own a CG sampler after a refused press or an explicit
-  // capture. Once a non-descendant helper exits, do not signal a recycled PGID.
-  if(child.p38GroupMayContainDescendants===false){
-    for(const kind of ['SIGTERM','SIGKILL']){
-      if(child.exitCode!==null||child.signalCode!==null)return [{...observation,stage:'helper-exited',exitObserved:true}];
-      try { child.kill(kind); } catch { throw failed('exact-helper-signal-error',{signalKind:kind,signalAttempts:kind==='SIGTERM'?1:2,signalError:true}); }
-      for(let i=0;i<40&&child.exitCode===null&&child.signalCode===null;i++)try { await (services.delay?services.delay():new Promise(resolve=>setTimeout(resolve,50))); }
-        catch { throw failed('exact-helper-wait-error',{signalKind:kind,signalAttempts:kind==='SIGTERM'?1:2,probePoint:kind==='SIGTERM'?'wait-term':'wait-kill'}); }
-    }
-    const exited=child.exitCode!==null||child.signalCode!==null;
-    const diagnostics=[{...observation,stage:exited?'exact-helper-terminated':'exact-helper-remains',exitObserved:exited,signalAttempts:2}];
-    if(!exited)throw Object.assign(Error('helper-group-remains'),{code:'helper-group-remains',cleanupDiagnostics:diagnostics});
-    return diagnostics;
-  }
+  // A PID or PGID can be recycled after a separate liveness check. Request
+  // cooperative shutdown over the exact child pipe, then only observe exit
+  // and group absence. Never signal a possibly reassigned process group.
   const alive = services.alive || (()=>{try{process.kill(-child.pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}});
-  const signal = services.signal || (kind=>{try{process.kill(-child.pid,kind);}catch(e){if(e.code!=='ESRCH')throw e;}});
   const delay = services.delay || (()=>new Promise(resolve=>setTimeout(resolve,50)));
-  const exactAlive = services.exactAlive || (()=>child.exitCode===null&&child.signalCode===null&&
-    typeof child.kill==='function'&&child.kill(0)===true);
-  const verifiedGroup=()=>{try{return child.p38DetachedGroup===true&&exactAlive()===true;}catch{return false;}};
-  if(child.stdin)for(let i=0;i<4&&!exited();i++)try { await delay(); }
-    catch { throw failed('group-wait-error',{probePoint:'initial',signalAttempts:0}); }
-  const probe=(point,attempts,signalKind)=>{
-    try { const result=alive(); if(typeof result!=='boolean')throw {code:'ERR_INVALID_PROBE_RESULT'}; return result; }
-    catch(error) { throw failed('group-probe-error',{probePoint:point,signalAttempts:attempts,...(signalKind?{signalKind}:{}),probeError:true,probeErrorCode:errorCode(error)}); }
-  };
-  let groupAliveBefore,transientProbeDenied=false;
-  try { groupAliveBefore=probe('initial',0); }
-  catch(error) {
-    if(error.cleanupDiagnostics?.[0]?.probeErrorCode!=='EPERM')throw error;
-    transientProbeDenied=true;
-    // An inaccessible group is never signaled. Only an observed child exit
-    // followed by ESRCH can turn this transient refusal into completion.
-    for(let i=0;i<20;i++){
-      try { await delay(); } catch { throw failed('group-wait-error',{probePoint:'initial',signalAttempts:0}); }
-      if(!exited())continue;
-      try { groupAliveBefore=probe('initial',0); }
-      catch(next) { if(next.cleanupDiagnostics?.[0]?.probeErrorCode==='EPERM')continue; throw next; }
-      if(groupAliveBefore===false)return [{...observation,stage:'group-absent',groupAliveBefore:false,
-        childExitObserved:true,transientProbeDenied,signalAttempts:0}];
+  let firstKnown, lastKnown, transientProbeDenied=false;
+  for(let i=0;i<40;i++){
+    try {
+      const result=alive();
+      if(typeof result!=='boolean')throw {code:'ERR_INVALID_PROBE_RESULT'};
+      if(firstKnown===undefined)firstKnown=result;
+      lastKnown=result;
+      if(!result&&exited())return [{...observation,stage:observation.descendantPossible?'group-absent':'helper-exited',
+        groupAliveBefore:firstKnown,childExitObserved:true,signalAttempts:0,...(transientProbeDenied?{transientProbeDenied:true}:{})}];
+    } catch(error) {
+      const code=errorCode(error);
+      if(code!=='EPERM')throw failed('group-probe-error',{probePoint:'initial',probeError:true,probeErrorCode:code,
+        ...(transientProbeDenied?{transientProbeDenied:true}:{})});
+      transientProbeDenied=true;
+      lastKnown=undefined;
     }
-    if(groupAliveBefore===true)throw failed('group-remains',{groupAliveBefore:true,transientProbeDenied,signalAttempts:0});
-    throw failed('group-probe-error',{probePoint:'initial',signalAttempts:0,probeError:true,probeErrorCode:'EPERM',transientProbeDenied});
+    if(i<39)try { await delay(); }
+      catch { throw failed('group-wait-error',{probePoint:'initial',...(transientProbeDenied?{transientProbeDenied:true}:{})}); }
   }
-  if(!groupAliveBefore){
-    for(let i=0;i<20&&!exited();i++)try { await delay(); }
-      catch { throw failed('group-wait-error',{probePoint:'initial',signalAttempts:0}); }
-    if(!exited())throw failed('group-identity-uncertain',{probePoint:'initial',signalAttempts:0});
-    if(probe('initial',0))throw failed('group-remains',{groupAliveBefore:true,signalAttempts:0});
-    return [{...observation,stage:'group-absent',groupAliveBefore:false,childExitObserved:true,signalAttempts:0}];
-  }
-  // A dead leader may leave descendants or a recycled PGID. Never signal it.
-  if(exited())throw failed('group-remains',{groupAliveBefore:true,signalAttempts:0});
-  if(!verifiedGroup())
-    throw failed('group-identity-uncertain',{probePoint:'initial',signalAttempts:0});
-  let groupAliveAfterTerm,groupAliveAfterKill,signalAttempts=0;
-  for(const kind of ['SIGTERM','SIGKILL']){
-    if(exited())throw failed('group-remains',{groupAliveBefore,groupAliveAfterTerm,signalAttempts});
-    if(!verifiedGroup())
-      throw failed('group-identity-uncertain',{probePoint:signalAttempts?'after-term':'initial',signalAttempts});
-    signalAttempts++;
-    try { signal(kind); } catch(error) { throw failed('group-signal-error',{groupAliveBefore,signalAttempts,signalKind:kind,signalError:true,signalErrorCode:errorCode(error)}); }
-    const waitPoint=kind==='SIGTERM'?'wait-term':'wait-kill', afterPoint=kind==='SIGTERM'?'after-term':'after-kill';
-    for(let i=0;i<40;i++){
-      if(!probe(waitPoint,signalAttempts,kind)&&exited())break;
-      try { await delay(); }catch { throw failed('group-wait-error',{groupAliveBefore,signalAttempts,signalKind:kind,probePoint:waitPoint}); }
-    }
-    const remains=probe(afterPoint,signalAttempts,kind);
-    if(kind==='SIGTERM')groupAliveAfterTerm=remains;
-    else groupAliveAfterKill=remains;
-    if(!remains&&exited())return [{...observation,stage:'group-terminated',groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,
-      childExitObserved:true,signalAttempts}];
-    if(!remains)throw failed('group-identity-uncertain',{probePoint:afterPoint,signalAttempts});
-    if(exited())throw failed('group-remains',{groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,signalAttempts});
-  }
-  throw Object.assign(Error('helper-group-remains'),{code:'helper-group-remains',cleanupDiagnostics:[{...observation,stage:'group-remains',groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,signalAttempts}]});
+  const facts={probePoint:'initial',...(transientProbeDenied?{transientProbeDenied:true}:{}),
+    ...(firstKnown===undefined?{}:{groupAliveBefore:firstKnown})};
+  if(lastKnown===undefined)throw failed('group-probe-error',{...facts,probeError:true,probeErrorCode:'EPERM'});
+  if(lastKnown)throw failed('group-remains',facts);
+  throw failed('group-identity-uncertain',facts);
 }
 module.exports={safeActionDiagnostics,safeCleanupDiagnostics,cleanupFailureDiagnostics,closeOwnedHelpers,cleanupHelper};
