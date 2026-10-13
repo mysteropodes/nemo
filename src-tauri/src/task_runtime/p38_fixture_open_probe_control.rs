@@ -124,29 +124,12 @@ fn accept_packet(session: &Session, packet: &Packet) -> Result<(), &'static str>
         _ => return Err("P38 checkpoint refused"),
     };
     if packet.status == "failed" {
-        let expected_failure = match (session.cursor, packet.fixture_id.as_deref()) {
-            (1, Some("A"))
-                if packet
-                    .failure_code
-                    .as_deref()
-                    .is_some_and(allowed_a_failure) =>
-            {
-                Some(HASH_A)
-            }
-            (2, Some("B"))
-                if packet
-                    .failure_code
-                    .as_deref()
-                    .is_some_and(allowed_b_failure) =>
-            {
-                Some(HASH_B)
-            }
-            _ => None,
-        };
-        if expected_failure.is_none()
-            || packet.fixture_sha256.as_deref() != expected_failure
-            || packet.status != "failed"
-        {
+        if !valid_failure_packet(
+            session.cursor,
+            packet.fixture_id.as_deref(),
+            packet.fixture_sha256.as_deref(),
+            packet.failure_code.as_deref(),
+        ) {
             return Err("P38 failure checkpoint refused");
         }
         return Err("P38 operation reported a fixed failure");
@@ -159,6 +142,24 @@ fn accept_packet(session: &Session, packet: &Packet) -> Result<(), &'static str>
         return Err("P38 checkpoint payload refused");
     }
     Ok(())
+}
+
+pub(super) fn valid_failure_packet(
+    cursor: usize,
+    fixture_id: Option<&str>,
+    fixture_sha256: Option<&str>,
+    failure_code: Option<&str>,
+) -> bool {
+    match (cursor, fixture_id, fixture_sha256, failure_code) {
+        (0, None, None, Some(code)) => allowed_ready_failure(code),
+        (1, Some("A"), Some(HASH_A), Some(code)) => allowed_a_failure(code),
+        (2, Some("B"), Some(HASH_B), Some(code)) => allowed_b_failure(code),
+        _ => false,
+    }
+}
+
+pub(super) fn allowed_ready_failure(code: &str) -> bool {
+    matches!(code, "ready-open-path-unavailable")
 }
 
 pub(super) fn allowed_a_failure(code: &str) -> bool {
