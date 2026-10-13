@@ -11,6 +11,43 @@ use std::collections::HashSet;
 
 #[path = "project_media_codec.rs"]
 mod project;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use project::{decode_allocated_project, ProjectWireError, ProjectWireLimits};
+
+/// Literal wire and lifetime harness for the private managed codec consumer.
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+pub(crate) mod encoded_wire_test {
+    use super::ProjectWireLimits;
+    pub(crate) fn counted<T>(calls: &std::cell::Cell<usize>, operation: impl FnOnce() -> T) -> T {
+        calls.set(calls.get() + 1);
+        operation()
+    }
+    pub(crate) const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGklEQVR4nGMQVDL+7xKa1sBQ3jGTYdXuM/8BN4oHrU/zhk0AAAAASUVORK5CYII=";
+    pub(crate) fn wire() -> serde_json::Value {
+        serde_json::json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":320,"canvasH":180,"fps":24},
+        "drawing":{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,"layers":[{"layerUid":"L"}],"objects":[]},
+        "viewportReference":{"kind":"still-image","assetId":"media-1","name":"plate.png","visible":true,"opacity":0.5,"offsetFrames":0},
+        "assets":[{"id":"media-1","mediaType":"image/png","encoding":"base64","data":PNG}]})
+    }
+    pub(crate) fn limits() -> ProjectWireLimits {
+        ProjectWireLimits::new(4096, 2048)
+            .unwrap()
+            .with_png_limits(1024, 64, 4096, 4, 4)
+            .unwrap()
+    }
+    pub(crate) struct EncodedDropProbe<'a, R> {
+        pub(crate) permit: R,
+        pub(crate) weak: &'a std::cell::RefCell<std::sync::Weak<Vec<u8>>>,
+    }
+    impl<R> Drop for EncodedDropProbe<'_, R> {
+        fn drop(&mut self) {
+            assert_eq!(self.weak.borrow().strong_count(), 0);
+        }
+    }
+}
 
 #[path = "object_order_codec.rs"]
 mod order;
