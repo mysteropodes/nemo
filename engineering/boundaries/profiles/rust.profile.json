@@ -439,6 +439,7 @@
         "task_runtime/startup_injection.rs",
         "task_runtime/startup_js_host.rs",
         "task_runtime/startup_retention.rs",
+        "task_runtime/startup_retention_health.rs",
         "task_runtime/startup_cut.rs"
       ],
       "publicApi": [
@@ -465,6 +466,7 @@
         "startup_injection_tests.rs",
         "startup_js_host_tests.rs",
         "startup_retention_tests.rs",
+        "startup_retention_health_tests.rs",
         "startup_cut_tests.rs"
       ],
       "publicApi": [],
