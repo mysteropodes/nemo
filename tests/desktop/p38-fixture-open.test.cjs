@@ -112,7 +112,7 @@ test('early native observation precedes and sees the adapter cached invoke bindi
 
 test('late native observation cannot label an adapter-cached open as pre-native refusal', async()=>{
   let cachedInvoke;
-  const result=await execute([], {}, {lateInvoke:true,lateBind:true,
+  const result=await execute([], {}, {lateInvoke:true,
     bind:refs=>{cachedInvoke=refs.core.invoke.bind(refs.core);},
     openPath:function(){
       return Reflect.apply(cachedInvoke,this,['nemo_native_object_bootstrap',{requestJson:'opaque'}])
@@ -123,6 +123,27 @@ test('late native observation cannot label an adapter-cached open as pre-native 
     }});
   assert.equal(result.calls[1].failureCode,'a-observer-late-untrusted');
   assert.equal(result.restored,true);
+});
+
+test('late core with an early project adapter fails closed for A and B', async()=>{
+  for (const fixtureId of ['A','B']) {
+    let cachedInvoke, openCount=0;
+    const result=await execute(fixtureId==='B'?[undefined]:[], {}, {lateInvoke:true,
+      bind:refs=>{cachedInvoke=refs.core.invoke.bind(refs.core);},
+      openPath:function(path){
+        openCount++;
+        if (fixtureId==='B' && path===fixtures.A) return undefined;
+        return Reflect.apply(cachedInvoke,this,['nemo_native_object_bootstrap',{requestJson:'opaque'}])
+          .then(()=>false,()=>false);
+      },invoke:function(command){
+        assert.equal(command,'nemo_native_object_bootstrap');
+        return Promise.reject({code:'unsupported_format'});
+      }});
+    assert.equal(result.result,'refused');
+    assert.equal(openCount,fixtureId==='A'?1:2);
+    assert.equal(result.calls.at(-1).failureCode,`${fixtureId.toLowerCase()}-observer-late-untrusted`);
+    assert.equal(result.restored,true);
+  }
 });
 
 test('synchronous invoke and fs-read throws preserve the original error identity', async()=>{
