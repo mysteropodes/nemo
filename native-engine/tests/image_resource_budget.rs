@@ -4,6 +4,108 @@ use crate::revision::image_resource_budget::{
 use std::sync::{Arc, Barrier};
 
 #[test]
+fn typed_layout_cost_null_and_one_shot_initialization_are_checked() {
+    #[repr(align(64))]
+    struct Aligned(u8);
+    let cost = std::mem::size_of::<Aligned>();
+    let budget = ImageResourceBudget::new(cost * 2).unwrap();
+    let mut charge = budget.reserve(cost).unwrap();
+    let called = std::cell::Cell::new(false);
+    assert!(matches!(
+        charge.allocate_value::<()>(|| {
+            called.set(true);
+            Ok(())
+        }),
+        Err(ImageResourceError::Capacity)
+    ));
+    assert!(!called.get());
+    assert!(matches!(
+        charge.allocate_value::<u8>(|| {
+            called.set(true);
+            Ok(1)
+        }),
+        Err(ImageResourceError::Capacity)
+    ));
+    assert!(!called.get());
+    // SAFETY: null is explicitly permitted by the private allocation contract.
+    unsafe fn null(_: std::alloc::Layout) -> *mut u8 {
+        std::ptr::null_mut()
+    }
+    assert!(matches!(
+        unsafe {
+            charge.allocate_value_using(
+                || {
+                    called.set(true);
+                    Ok(Aligned(1))
+                },
+                null,
+            )
+        },
+        Err(ImageResourceError::Allocation)
+    ));
+    assert!(!called.get());
+    assert!(matches!(
+        charge.allocate_value(|| Ok(Aligned(1))),
+        Err(ImageResourceError::Unavailable)
+    ));
+    drop(charge);
+    let mut charge = budget.reserve(cost).unwrap();
+    let value = charge.allocate_value(|| Ok(Aligned(7))).unwrap();
+    assert_eq!(value.0, 7);
+    assert_eq!((&*value as *const Aligned as usize) % 64, 0);
+    assert!(matches!(
+        charge.allocate_value(|| Ok(Aligned(9))),
+        Err(ImageResourceError::Unavailable)
+    ));
+    drop(value);
+    assert_eq!(budget.used(), Ok(cost));
+    drop(charge);
+    assert_eq!(budget.used(), Ok(0));
+}
+
+#[test]
+#[cfg(feature = "reference_image_asset")]
+fn typed_initializer_and_destructor_failures_deallocate_before_charge_release() {
+    use crate::reference_image_asset::measure_allocations;
+    #[repr(align(64))]
+    struct Value<'a> {
+        budget: &'a ImageResourceBudget,
+        panic_drop: bool,
+    }
+    impl Drop for Value<'_> {
+        fn drop(&mut self) {
+            assert_eq!(self.budget.used(), Ok(std::mem::size_of::<Self>()));
+            if self.panic_drop {
+                panic!("typed destructor unwind");
+            }
+        }
+    }
+    let layout = std::alloc::Layout::new::<Value<'_>>();
+    let budget = ImageResourceBudget::new(layout.size()).unwrap();
+    for stage in 0..4 {
+        let mut charge = budget.reserve(layout.size()).unwrap();
+        let (result, calls) = measure_allocations(Some(layout), || {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let value = charge.allocate_value(|| match stage {
+                    0 => Err(ImageResourceError::Allocation),
+                    1 => panic!("typed initializer unwind"),
+                    _ => Ok(Value {
+                        budget: &budget,
+                        panic_drop: stage == 3,
+                    }),
+                });
+                drop(value);
+            }))
+        });
+        assert_eq!(calls, [1, 1, 0], "one exact Box allocated and destroyed");
+        assert_eq!(result.is_err(), stage == 1 || stage == 3);
+        assert_eq!(budget.used(), Ok(layout.size()));
+        drop(charge);
+        assert_eq!(budget.used(), Ok(0));
+    }
+}
+
+#[test]
 fn fixed_shared_domain_and_scalar_overlap_boundaries() {
     assert!(std::ptr::eq(
         shared_image_resource_budget(),

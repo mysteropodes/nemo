@@ -5,6 +5,11 @@ use std::sync::Arc;
 
 #[path = "reference_png_scanlines.rs"]
 mod reference_png_scanlines;
+#[cfg(test)]
+pub(crate) use reference_png_scanlines::allocations::measure as measure_allocations;
+#[cfg(test)]
+use reference_png_scanlines::allocations::PixelReleaseProbe;
+pub(crate) use reference_png_scanlines::PngWorkspace;
 
 const MAX_ENCODED: usize = 16 * 1024 * 1024;
 const MAX_RGBA: usize = 256 * 1024 * 1024;
@@ -154,9 +159,10 @@ struct PngRows {
     rgba_size: usize,
 }
 // Both consumers use the existing header, admitted-row and terminal checks.
-fn read_png_rows<E: From<ImageAssetError>>(
+fn read_png_rows<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
     source: &[u8],
     budget: ImageAssetLimits,
+    workspace: impl FnOnce() -> Result<W, E>,
     mut consume: impl FnMut(PngRows, usize, &[u8]) -> Result<(), E>,
 ) -> Result<PngRows, E> {
     if source.len() > budget.encoded_bytes {
@@ -199,7 +205,7 @@ fn read_png_rows<E: From<ImageAssetError>>(
         .ok_or(ImageAssetError::DecodedBudget)?;
     // png's row reader can discard surplus inflated data after declared rows.
     // Count the complete borrowed IDAT stream before any controlled pixel buffer.
-    reference_png_scanlines::verify(source, row_size, height as usize)?;
+    reference_png_scanlines::verify_with(source, row_size, height as usize, workspace)?;
     let mut reader = decoder.read_info().map_err(decoder_error)?;
     if reader.info().animation_control.is_some()
         || reader.info().frame_control.is_some()
@@ -251,7 +257,12 @@ pub(crate) fn validate_png(
     source: &[u8],
     budget: ImageAssetLimits,
 ) -> Result<(u32, u32), ImageAssetError> {
-    let rows = read_png_rows(source, budget, |_, _, _| Ok::<(), ImageAssetError>(()))?;
+    let rows = read_png_rows(
+        source,
+        budget,
+        || Ok(Box::new(PngWorkspace::new())),
+        |_, _, _| Ok::<(), ImageAssetError>(()),
+    )?;
     Ok((rows.width, rows.height))
 }
 
@@ -279,22 +290,6 @@ pub(crate) struct DecodedPngPixels {
     #[cfg(test)]
     release_probe: Option<PixelReleaseProbe>,
 }
-#[cfg(test)]
-struct PixelReleaseProbe(Option<Box<dyn FnOnce() + Send + Sync>>);
-#[cfg(test)]
-impl std::fmt::Debug for PixelReleaseProbe {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("release probe")
-    }
-}
-#[cfg(test)]
-impl Drop for PixelReleaseProbe {
-    fn drop(&mut self) {
-        if let Some(probe) = self.0.take() {
-            probe();
-        }
-    }
-}
 impl DecodedPngPixels {
     pub(crate) fn dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
@@ -321,9 +316,22 @@ pub(crate) fn decode_png_pixels<E: From<ImageAssetError>>(
     budget: ImageAssetLimits,
     allocate: impl FnOnce(usize) -> Result<Vec<u8>, E>,
 ) -> Result<DecodedPngPixels, E> {
+    decode_png_pixels_with_workspace(
+        source,
+        budget,
+        || Ok(Box::new(PngWorkspace::new())),
+        allocate,
+    )
+}
+pub(crate) fn decode_png_pixels_with_workspace<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
+    source: &[u8],
+    budget: ImageAssetLimits,
+    workspace: impl FnOnce() -> Result<W, E>,
+    allocate: impl FnOnce(usize) -> Result<Vec<u8>, E>,
+) -> Result<DecodedPngPixels, E> {
     let mut allocate = Some(allocate);
     let mut rgba = Vec::new();
-    let rows = read_png_rows(source, budget, |rows, index, data| {
+    let rows = read_png_rows(source, budget, workspace, |rows, index, data| {
         if let Some(allocate) = allocate.take() {
             rgba = allocate(rows.rgba_size)?;
             if rgba.len() != rows.rgba_size {

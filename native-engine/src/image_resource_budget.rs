@@ -1,4 +1,4 @@
-//! Controlled image payload bytes only; decoder scratch and GPU storage are separate gates.
+//! Controlled image/workspace allocations; remaining decoder/GPU storage is separate.
 use std::sync::{Arc, Mutex, OnceLock};
 
 const MAX_BYTES: usize = 384 * 1024 * 1024;
@@ -69,6 +69,42 @@ pub(crate) struct ImageResourceCharge {
     allocated: bool,
 }
 impl ImageResourceCharge {
+    /// Accounts exactly the Box allocation, not any heap storage nested inside T.
+    /// The composing carrier must destroy its Box before this charge.
+    pub(crate) fn allocate_value<T>(
+        &mut self,
+        initialize: impl FnOnce() -> Result<T, ImageResourceError>,
+    ) -> Result<Box<T>, ImageResourceError> {
+        // SAFETY: alloc returns null or a unique global allocation of this layout.
+        unsafe { self.allocate_value_using(initialize, std::alloc::alloc) }
+    }
+    /// Safety: allocator must return null or unique global storage of the supplied
+    /// layout. Only the production global allocator and a null test stub are used.
+    unsafe fn allocate_value_using<T>(
+        &mut self,
+        initialize: impl FnOnce() -> Result<T, ImageResourceError>,
+        allocator: unsafe fn(std::alloc::Layout) -> *mut u8,
+    ) -> Result<Box<T>, ImageResourceError> {
+        let layout = std::alloc::Layout::new::<T>();
+        if layout.size() == 0 || layout.size() != self.cost {
+            return Err(ImageResourceError::Capacity);
+        }
+        if self.allocated || self.budget.used.is_poisoned() {
+            return Err(ImageResourceError::Unavailable);
+        }
+        self.allocated = true;
+        // SAFETY: caller guarantees global layout/alignment/unique ownership.
+        let pointer = unsafe { allocator(layout) };
+        if pointer.is_null() {
+            return Err(ImageResourceError::Allocation);
+        }
+        // SAFETY: MaybeUninit<T> has exactly T's layout; immediately adopt unique
+        // global storage. Error/unwind deallocates it without dropping an absent T.
+        let mut storage = unsafe { Box::from_raw(pointer.cast::<std::mem::MaybeUninit<T>>()) };
+        storage.write(initialize()?);
+        // SAFETY: one complete T was just written; no intervening fallible action.
+        Ok(unsafe { storage.assume_init() })
+    }
     pub(crate) fn allocate(&mut self) -> Result<Vec<u8>, ImageResourceError> {
         self.allocate_after(|| Ok(()))
     }
