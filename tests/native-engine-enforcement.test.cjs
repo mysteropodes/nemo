@@ -278,8 +278,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(cargoText, /^miniz_oxide = \{ version = "=0\.9\.1", default-features = false, optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
-  assert.deepEqual(members['test-compositor'], ['compositor', 'project_media_codec']);
-  assert.deepEqual(members['test-application'], ['application']);
+  assert.deepEqual(members['test-compositor'], ['compositor']);
+  assert.deepEqual(members['test-application'], ['application', 'project_media_codec']);
   assert.deepEqual(members.object_expression_pin, ['history', 'evaluation']);
   assert.deepEqual(members['test-object_expression_pin'], ['object_expression_pin']);
   assert.deepEqual(members.object_expression_runtime, ['object_expression_pin', 'dep:rquickjs']);
@@ -293,11 +293,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   };
   for (const feature of cargo.features.filter((name) => name !== 'reference_image_asset')) {
     assert.equal(reaches(feature, 'reference_image_asset'),
-      feature === 'project_media_codec' || feature === 'test-codec' || feature === 'test-compositor',
+      feature === 'project_media_codec' || feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private PNG selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'project_media_codec')) {
-    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec' || feature === 'test-compositor',
+    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private attached-codec selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {
