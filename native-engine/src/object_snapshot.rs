@@ -10,139 +10,53 @@ pub use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
 const MAX_MESSAGE_BYTES: usize = 4096;
 
-#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
-mod managed_tests {
-    use super::*;
-    use object_codec::encoded_wire_test::*;
-    use object_codec::{ProjectReferenceState, ProjectWireError};
-    use std::sync::{Arc, Weak};
-    #[test]
-    fn actual_managed_wire_entry_and_old_owner_pins_share_the_exact_blob() {
-        let bytes = serde_json::to_vec(&wire()).unwrap();
-        let snapshot =
-            ObjectSnapshot::from_managed_project_wire("actual".into(), &bytes, limits()).unwrap();
-        let ProjectReferenceState::StillImage(data) = snapshot.project().unwrap().reference_state()
-        else {
-            panic!()
-        };
-        let blob = data.encoded_allocation();
-        assert_eq!(blob.len(), blob.capacity());
-        assert_eq!(&blob[..8], b"\x89PNG\r\n\x1a\n");
-        let weak = Arc::downgrade(blob);
-        drop(data);
-        let mut owner = crate::revision::ObjectRevisionOwner::from_admitted(snapshot.clone());
-        owner.publish(snapshot.document().clone()).unwrap();
-        owner.restore(0).unwrap();
-        let pin = owner.acquire(0).unwrap();
-        assert!(std::ptr::eq(
-            pin.project().unwrap(),
-            snapshot.project().unwrap()
-        ));
-        drop(owner);
-        drop(snapshot);
-        assert!(weak.upgrade().is_some());
-        drop(pin);
-        assert!(weak.upgrade().is_none());
-    }
-    #[test]
-    fn literal_wire_quota_decode_bind_identity_and_unwind_failures_are_atomic() {
-        let budget = ObjectSnapshot::encoded_test_budget(1024);
-        let calls = std::cell::Cell::new(0);
-        let data = wire();
-        let bytes = serde_json::to_vec(&data).unwrap();
-        let entry = |bytes: &[u8]| {
-            ObjectSnapshot::managed_project_wire(
-                "test".into(),
-                bytes,
-                limits(),
-                |n| budget.reserve(n).map_err(|_| "quota"),
-                |p| counted(&calls, || p.allocate().map_err(|_| "alloc")),
-                |p, a| p.bind(a).map_err(|_| "bind"),
-                ObjectSnapshot::from_admitted_project,
-            )
-        };
-        let mut malformed = data.clone();
-        for changed in ["!!!!", "AAAA", &PNG[..PNG.len() - 4]] {
-            malformed["assets"][0]["data"] = changed.into();
-            assert!(entry(&serde_json::to_vec(&malformed).unwrap()).is_err());
-            assert_eq!(budget.used(), Ok(0));
-        }
-        malformed = data.clone();
-        malformed["viewportReference"]["opacity"] = 2.into();
-        assert!(entry(&serde_json::to_vec(&malformed).unwrap()).is_err());
-        assert_eq!(budget.used(), Ok(0));
-        let full = budget.reserve(1024).unwrap();
-        let before = calls.get();
-        assert_eq!(entry(&bytes).unwrap_err(), ProjectWireError::Budget);
-        assert_eq!(calls.get(), before);
-        drop(full);
-        let snapshot = entry(&bytes).unwrap();
-        let cost = budget.used().unwrap();
-        assert!(cost > 0);
-        let remaining = budget.reserve(1024 - cost).unwrap();
-        assert_eq!(entry(&bytes).unwrap_err(), ProjectWireError::Budget);
-        drop(remaining);
-        let escaped = snapshot.project().unwrap().clone();
-        drop(snapshot);
-        assert_eq!(budget.used(), Ok(cost));
-        drop(escaped);
-        assert_eq!(budget.used(), Ok(0));
-        // The observer drops BEFORE its actual permit and sees no surviving blob.
-        for stage in 0..4 {
-            let weak = std::cell::RefCell::new(Weak::new());
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                ObjectSnapshot::managed_project_wire(
-                    "failure".into(),
-                    &bytes,
-                    limits(),
-                    |n| {
-                        Ok(EncodedDropProbe {
-                            permit: budget.reserve(n).map_err(|_| "quota")?,
-                            weak: &weak,
-                        })
-                    },
-                    |p| match stage {
-                        0 => Err("alloc"),
-                        _ => p.permit.allocate().map_err(|_| "alloc"),
-                    },
-                    |p, a| {
-                        *weak.borrow_mut() = Arc::downgrade(a);
-                        match stage {
-                            1 => Err("bind"),
-                            _ => p.permit.bind(a).map_err(|_| "bind"),
-                        }
-                    },
-                    |_, _project| match stage {
-                        3 => panic!("identity unwind"),
-                        _ => Err("identity"),
-                    },
-                )
-            }));
-            if stage == 3 {
-                assert!(result.is_err());
-            } else {
-                assert!(result.unwrap().is_err());
-            }
-            assert_eq!(budget.used(), Ok(0));
-        }
-        let mut empty = data;
-        empty["viewportReference"] = serde_json::Value::Null;
-        empty["assets"] = serde_json::json!([]);
-        let no_media = entry(&serde_json::to_vec(&empty).unwrap()).unwrap();
-        assert!(no_media.project().is_some());
-        assert_eq!(budget.used(), Ok(0));
-        assert!(ObjectSnapshot::managed_project_wire(
-            "".into(),
-            &bytes,
-            limits(),
-            |_| panic!("empty instance before reservation"),
-            |_: &mut ()| unreachable!(),
-            |_, _| unreachable!(),
-            |_, _| unreachable!()
-        )
-        .is_err());
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+use crate::revision::{
+    shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
+};
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+use object_codec::PngWorkspace;
+// Shared within the read-query layer, available without the application feature.
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) struct ChargedPngWorkspace {
+    storage: Box<PngWorkspace>,
+    _charge: ImageResourceCharge,
+}
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+impl AsMut<PngWorkspace> for ChargedPngWorkspace {
+    fn as_mut(&mut self) -> &mut PngWorkspace {
+        &mut self.storage
     }
 }
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) fn charged_png_workspace(
+    budget: &ImageResourceBudget,
+    initialize: impl FnOnce() -> Result<PngWorkspace, ImageResourceError>,
+) -> Result<ChargedPngWorkspace, ImageResourceError> {
+    // Fields destroy storage before charge, including error/unwind in initialization.
+    let mut charge = budget.reserve(std::mem::size_of::<PngWorkspace>())?;
+    let storage = charge.allocate_value(initialize)?;
+    Ok(ChargedPngWorkspace {
+        storage,
+        _charge: charge,
+    })
+}
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+fn validate_png_in_domain(
+    source: &[u8],
+    png: object_codec::ImageAssetLimits,
+    cpu: &ImageResourceBudget,
+) -> Result<(), object_codec::ProjectWireError> {
+    object_codec::validate_png_with_workspace(source, png, || {
+        charged_png_workspace(cpu, || Ok(PngWorkspace::new()))
+            .map_err(|_| object_codec::ProjectWireError::Budget)
+    })
+    .map(|_| ())
+}
+
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+#[path = "../tests/object_project_admission.rs"]
+mod managed_tests;
 
 fn envelope_identifier(value: &str) -> bool {
     let bytes = value.as_bytes();
@@ -224,10 +138,54 @@ impl ObjectSnapshot {
         instance: String,
         bytes: &[u8],
         limits: object_codec::ProjectWireLimits,
+        reserve: impl FnMut(usize) -> Result<R, &'static str>,
+        allocate: impl FnMut(&mut R) -> Result<Vec<u8>, &'static str>,
+        bind: impl FnMut(&mut R, &std::sync::Arc<Vec<u8>>) -> Result<(), &'static str>,
+        identity: impl FnOnce(String, object_codec::ProjectEnvelope) -> Result<Self, &'static str>,
+    ) -> Result<Self, object_codec::ProjectWireError> {
+        Self::managed_project_wire_using(
+            instance,
+            bytes,
+            limits,
+            reserve,
+            allocate,
+            bind,
+            identity,
+            |source, png| validate_png_in_domain(source, png, shared_image_resource_budget()),
+        )
+    }
+    // Test-only domain selection; production entry always uses the shared domain.
+    #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+    pub(crate) fn from_managed_project_wire_cpu_test(
+        instance: String,
+        bytes: &[u8],
+        limits: object_codec::ProjectWireLimits,
+        cpu: &ImageResourceBudget,
+    ) -> Result<Self, object_codec::ProjectWireError> {
+        Self::managed_project_wire_using(
+            instance,
+            bytes,
+            limits,
+            Self::reserve_encoded,
+            |p| p.allocate().map_err(|_| "encoded allocation unavailable"),
+            |p, a| p.bind(a).map_err(|_| "encoded binding unavailable"),
+            Self::from_admitted_project,
+            |source, png| validate_png_in_domain(source, png, cpu),
+        )
+    }
+    #[cfg(all(feature = "history", feature = "project_media_codec"))]
+    fn managed_project_wire_using<R>(
+        instance: String,
+        bytes: &[u8],
+        limits: object_codec::ProjectWireLimits,
         mut reserve: impl FnMut(usize) -> Result<R, &'static str>,
         mut allocate: impl FnMut(&mut R) -> Result<Vec<u8>, &'static str>,
         mut bind: impl FnMut(&mut R, &std::sync::Arc<Vec<u8>>) -> Result<(), &'static str>,
         identity: impl FnOnce(String, object_codec::ProjectEnvelope) -> Result<Self, &'static str>,
+        validate: impl FnOnce(
+            &[u8],
+            object_codec::ImageAssetLimits,
+        ) -> Result<(), object_codec::ProjectWireError>,
     ) -> Result<Self, object_codec::ProjectWireError> {
         use object_codec::{ProjectReferenceState, ProjectWireError};
         if instance.is_empty() {
@@ -235,10 +193,15 @@ impl ObjectSnapshot {
         }
         // Declared before project: unwinding destroys the model/Vec before token.
         let mut token = None;
-        let project = object_codec::decode_allocated_project(bytes, limits, |n| {
-            token = Some(reserve(n).map_err(|_| ProjectWireError::Budget)?);
-            allocate(token.as_mut().unwrap()).map_err(|_| ProjectWireError::Budget)
-        })?;
+        let project = object_codec::decode_validated_project(
+            bytes,
+            limits,
+            |n| {
+                token = Some(reserve(n).map_err(|_| ProjectWireError::Budget)?);
+                allocate(token.as_mut().unwrap()).map_err(|_| ProjectWireError::Budget)
+            },
+            validate,
+        )?;
         if let Some(permit) = token.as_mut() {
             let bound = match project.reference_state() {
                 ProjectReferenceState::StillImage(data) => bind(permit, data.encoded_allocation()),

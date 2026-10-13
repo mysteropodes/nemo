@@ -257,12 +257,14 @@ pub(crate) fn validate_png(
     source: &[u8],
     budget: ImageAssetLimits,
 ) -> Result<(u32, u32), ImageAssetError> {
-    let rows = read_png_rows(
-        source,
-        budget,
-        || Ok(Box::new(PngWorkspace::new())),
-        |_, _, _| Ok::<(), ImageAssetError>(()),
-    )?;
+    validate_png_with_workspace(source, budget, || Ok(Box::new(PngWorkspace::new())))
+}
+pub(crate) fn validate_png_with_workspace<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
+    source: &[u8],
+    budget: ImageAssetLimits,
+    workspace: impl FnOnce() -> Result<W, E>,
+) -> Result<(u32, u32), E> {
+    let rows = read_png_rows(source, budget, workspace, |_, _, _| Ok::<(), E>(()))?;
     Ok((rows.width, rows.height))
 }
 
