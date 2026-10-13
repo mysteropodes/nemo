@@ -35,7 +35,18 @@ async function probeFailure(manifest, useSymlink = false, receiptMismatch = fals
   if(useSymlink)fs.symlinkSync(realTemp,temp); else fs.mkdirSync(temp);
   if(manifest){
     const root=path.join(temp,'p38-fixture-open-12345678-1234-1234-1234-123456789abc');
-    fs.mkdirSync(root); fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(probeManifest(root,manifest)));
+    fs.mkdirSync(root);
+    const {fixtureMutation,...overrides}=manifest;
+    const value=probeManifest(root,overrides);
+    if(fixtureMutation){
+      const fixture=value.fixtures[fixtureMutation.index];
+      if(fixtureMutation.value===undefined)delete fixture[fixtureMutation.field];
+      else fixture[fixtureMutation.field]=fixtureMutation.value;
+      const pins={schema:value.schema,runId:value.runId,taskKey:value.taskKey,sourceSha:value.sourceSha,
+        buildSha:value.buildSha,pid:value.pid,window:value.window,origin:value.origin,fixtures:value.fixtures};
+      value.manifestSha256=crypto.createHash('sha256').update(JSON.stringify(pins)).digest('hex');
+    }
+    fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(value));
   }
   let tick=0;
   const services=defaultServices(config,{roots:{temp},isolation:{taskRoots:()=>({temp})},owner:{receipt(){
@@ -88,6 +99,19 @@ test('owner rejects manifest identity and pin-shape mismatches with one sanitize
     {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
   assert.deepEqual(await probeFailure({},false,true),
     {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
+});
+test('owner refuses wrong A and B fixture IDs and hashes before classifying a fixed failure',async()=>{
+  const mutations=[
+    {label:'A ID',index:0,field:'id',value:'unexpected-a'},
+    {label:'A digest',index:0,field:'sha256',value:'f'.repeat(64)},
+    {label:'B ID',index:1,field:'id',value:'unexpected-b'},
+    {label:'B digest',index:1,field:'sha256',value:'e'.repeat(64)},
+  ];
+  for(const mutation of mutations){
+    const result=await probeFailure({failed:true,waiting:false,checkpoint:0,
+      failureCode:'ready-open-path-unavailable',result:'failed',fixtureMutation:mutation});
+    assert.deepEqual(result,{stage:'probe-manifest',code:'probe-manifest-validation-refused'},mutation.label);
+  }
 });
 test('owner distinguishes a prepared-only ready timeout from missing manifest timeout',async()=>{
   assert.deepEqual(await probeFailure({waiting:false,failed:false,checkpoint:0}),
