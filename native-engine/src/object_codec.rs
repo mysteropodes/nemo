@@ -13,8 +13,8 @@ use std::collections::HashSet;
 pub(crate) use crate::reference_image_asset::decode_png_pixels;
 #[cfg(feature = "project_media_codec")]
 pub(crate) use crate::reference_image_asset::{
-    decode_png_pixels_with_workspace, validate_png_with_workspace, DecodedPngPixels,
-    ImageAssetError, ImageAssetLimits, PngWorkspace,
+    decode_png_pixels_with_buffers, decode_png_pixels_with_workspace, validate_png_with_buffers,
+    validate_png_with_workspace, DecodedPngPixels, ImageAssetError, ImageAssetLimits, PngWorkspace,
 };
 
 #[path = "project_media_codec.rs"]
