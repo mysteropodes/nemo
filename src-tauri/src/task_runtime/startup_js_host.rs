@@ -23,6 +23,7 @@ mod owner;
 mod request;
 #[path = "startup_cut_runtime.rs"]
 pub(super) mod runtime;
+pub(crate) use runtime::footer;
 
 struct Bridge {
     native: Arc<Mutex<LoadLog>>,
@@ -79,6 +80,7 @@ impl Bridge {
 
 #[derive(Default)]
 struct Slot {
+    exchange: footer::Exchange,
     owner: Option<runtime::Binding>,
     bound: bool,
     bridge: Option<Bridge>,
@@ -110,6 +112,7 @@ impl Slot {
             .admit(label, url, pid, body)
     }
     fn close(&mut self) {
+        footer::closed(self);
         if let Some(owner) = self.owner.as_mut() {
             owner.retire();
         }
