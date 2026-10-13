@@ -135,7 +135,7 @@ const EXPECTED_EDGES = [
   'export-job->compositor', 'export-job->png-output', 'export-job->render-scene', 'export-job->resource-leases',
   'export-job->revision', 'export-job->scheduler', 'history->commands', 'history->document',
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
-  'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->scheduler',
+  'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->read-queries', 'render-scene->scheduler',
   'resource-leases->revision', 'revision->document', 'root->application', 'root->codec',
   'scheduler->resource-leases', 'scheduler->revision',
   'commands->read-queries', 'read-queries->codec', 'read-queries->evaluation',
@@ -255,7 +255,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 48);
+  assert.equal(result.edges.length, 49);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');
@@ -278,6 +278,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(cargoText, /^miniz_oxide = \{ version = "=0\.9\.1", default-features = false, optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
+  assert.deepEqual(members['test-compositor'], ['compositor']);
+  assert.deepEqual(members['test-application'], ['application', 'project_media_codec']);
   assert.deepEqual(members.object_expression_pin, ['history', 'evaluation']);
   assert.deepEqual(members['test-object_expression_pin'], ['object_expression_pin']);
   assert.deepEqual(members.object_expression_runtime, ['object_expression_pin', 'dep:rquickjs']);
@@ -291,11 +293,11 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   };
   for (const feature of cargo.features.filter((name) => name !== 'reference_image_asset')) {
     assert.equal(reaches(feature, 'reference_image_asset'),
-      feature === 'project_media_codec' || feature === 'test-codec',
+      feature === 'project_media_codec' || feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private PNG selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'project_media_codec')) {
-    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec',
+    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private attached-codec selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {

@@ -31,7 +31,7 @@ test-scheduler = ["scheduler"]
 test-compositor = ["compositor"]
 test-viewport = ["viewport"]
 test-export_job = ["export_job"]
-test-application = ["application"]
+test-application = ["application", "project_media_codec"]
 test-object_expression_pin = ["object_expression_pin"]
 test-object_expression_runtime = ["object_expression_runtime"]
 

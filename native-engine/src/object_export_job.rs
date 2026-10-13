@@ -66,6 +66,9 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         request: ObjectExportBegin,
         witness: ObjectCompositionWitness,
     ) -> Result<JobReceipt, ExportJobError> {
+        if witness.is_viewport() {
+            return Err(invalid("viewport content is not an artwork export source"));
+        }
         if let Some(job) = &self.record {
             return replay_object_begin(
                 &job.request,

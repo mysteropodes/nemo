@@ -10,7 +10,8 @@ use native_engine::{
     object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_scheduled_object_composition, ObjectPaintPlan,
+        prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
+        ObjectCompositionWitness, ObjectPaintPlan,
     },
     object_snapshot::ObjectSnapshot,
     resource_leases::WorkId,
@@ -32,6 +33,7 @@ struct PreparedObjectPreview {
 pub(super) struct ObjectPreview {
     scheduler: FrameScheduler,
     prepared: Option<PreparedObjectPreview>,
+    reference_cache: Option<ObjectCompositionWitness>,
     pending: Option<ScheduledFrame>,
     blocked: Option<String>,
     released: bool,
@@ -79,6 +81,7 @@ impl ObjectPreview {
         // Mark before cancellation so unwind/retry retains the exact checkpoint.
         self.released = true;
         self.invalidate();
+        self.reference_cache = None;
     }
     pub(super) fn progress(&self, application: ApplicationReleaseReceipt) -> NativeReleaseProgress {
         NativeReleaseProgress {
@@ -113,8 +116,9 @@ impl NativeObjectHost {
         })
     }
 
-    /// CPU preparation precedes any target factory while shared guards remain
-    /// held. The private one-shot token cannot cross owners or callback turns.
+    /// Selector/output/paint preparation precedes any target factory while shared
+    /// guards remain held. Raster decode follows retirement of the old GPU cache.
+    /// The private one-shot token cannot cross owners or callback turns.
     pub(crate) fn with_prepared_object_preview<T>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
@@ -124,7 +128,8 @@ impl NativeObjectHost {
         if self.preview.prepared.is_some() {
             return Err("native object preview preparation is already borrowed".into());
         }
-        self.preview.prepared = Some(self.prepare_object_preview(expected, output)?);
+        let prepared = self.prepare_object_preview(expected, output)?;
+        self.preview.prepared = Some(prepared);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
         self.preview.prepared = None;
         match result {
@@ -216,6 +221,15 @@ impl NativeObjectHost {
             plan,
             key,
         } = prepared;
+        let composition = self.prepare_reference_preview(
+            &plan,
+            key.output_spec().dimensions(),
+            compositor,
+            |previous| {
+                prepare_object_viewport_composition(&plan, expected, previous)
+                    .map_err(|e| format!("preview reference: {e:?}"))
+            },
+        )?;
         if self
             .preview
             .pending
@@ -249,11 +263,10 @@ impl NativeObjectHost {
         self.preview.pending = Some(work.clone());
         self.preview.blocked = Some("preview presentation did not complete".into());
         let result = (|| {
-            let live = prepare_scheduled_object_composition(
+            let live = prepare_scheduled_object_composition_from_witness(
                 &self.preview.scheduler,
                 &work,
-                &plan,
-                expected,
+                &composition,
             )
             .map_err(|e| format!("preview admission: {e:?}"))?;
             let frame =
@@ -289,7 +302,40 @@ impl NativeObjectHost {
         }
         Ok(receipt)
     }
+
+    fn prepare_reference_preview(
+        &mut self,
+        plan: &ObjectPaintPlan,
+        dimensions: (u32, u32),
+        compositor: &mut Compositor,
+        decode: impl FnOnce(
+            Option<&ObjectCompositionWitness>,
+        ) -> Result<ObjectCompositionWitness, String>,
+    ) -> Result<ObjectCompositionWitness, String> {
+        // Both Vello and the host retain charged pixels. A failed reset leaves
+        // both intact; a failed decode leaves neither stale cache and is retryable.
+        compositor
+            .retire_object_reference_for(plan, dimensions)
+            .map_err(|error| error.to_string())?;
+        if self
+            .preview
+            .reference_cache
+            .as_ref()
+            .is_some_and(|previous| !previous.reference_matches_plan(plan))
+        {
+            self.preview.reference_cache = None;
+        }
+        let composition = decode(self.preview.reference_cache.as_ref())?;
+        if composition.has_viewport_reference() {
+            self.preview.reference_cache = Some(composition.clone());
+        }
+        Ok(composition)
+    }
 }
+
+#[cfg(test)]
+#[path = "native_object_reference_preview_tests.rs"]
+mod reference_tests;
 
 #[cfg(test)]
 #[path = "native_object_preview_lifecycle_tests.rs"]
