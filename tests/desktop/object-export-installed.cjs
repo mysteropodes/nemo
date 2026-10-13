@@ -69,11 +69,16 @@ function pngPixels(file) {
 import Foundation
 let data = try Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
 guard let image = NSBitmapImageRep(data: data),
-      let blue = image.colorAt(x: 8, y: 8)?.usingColorSpace(.deviceRGB),
-      let white = image.colorAt(x: 40, y: 40)?.usingColorSpace(.deviceRGB) else { fatalError("PNG decode refused") }
-func pixel(_ c: NSColor) -> [Int] { [c.redComponent, c.greenComponent, c.blueComponent, c.alphaComponent].map { Int(($0 * 255).rounded()) } }
+      image.pixelsWide == 320, image.pixelsHigh == 180,
+      image.bitsPerSample == 8, image.samplesPerPixel == 4, !image.isPlanar,
+      image.bytesPerRow >= 320 * 4,
+      let data = image.bitmapData else { fatalError("PNG decode refused") }
+func pixel(_ x: Int, _ y: Int) -> [Int] {
+  let offset = y * image.bytesPerRow + x * 4
+  return (0..<4).map { Int(data[offset + $0]) }
+}
 let value: [String: Any] = ["width": image.pixelsWide, "height": image.pixelsHigh,
-  "blue": pixel(blue), "white": pixel(white)]
+  "white": pixel(8, 8), "blue": pixel(40, 40)]
 print(String(decoding: try JSONSerialization.data(withJSONObject: value), as: UTF8.self))`;
   const result = spawnSync('/usr/bin/swift', ['-e', source, file], { encoding: 'utf8', timeout: 30_000, maxBuffer: 8192 });
   requireCheck(result.status === 0, 'literal PNG decoder failed');
@@ -82,6 +87,19 @@ print(String(decoding: try JSONSerialization.data(withJSONObject: value), as: UT
     pixels.blue.join(',') === '0,0,255,255' && pixels.white.join(',') === '255,255,255,255',
   'literal pinned PNG pixels differ');
   return pixels;
+}
+function artifactEvidence(destination, app, receipt, runId) {
+  requireCheck(receipt && receipt.apiVersion === 2 && receipt.requestId === 'object-export-' + runId &&
+    receipt.status === 'succeeded' && receipt.published === true && receipt.cleanupComplete === true &&
+    receipt.cleanupStatus === 'complete' && receipt.externalEffectDisposition === 'committed' &&
+    receipt.contentRevision === 0 && receipt.artifactFiles?.join(',') === 'frame_0001.png',
+  'native export receipt not committed to one pinned PNG');
+  requireCheck(fs.readdirSync(destination).join(',') === 'frame_0001.png', 'published manifest differs');
+  const png = path.join(destination, 'frame_0001.png');
+  const bytes = fs.readFileSync(png);
+  requireCheck(bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) && stageEmpty(app),
+    'published PNG signature or staging cleanup differs');
+  return { pngSha256: hash(png), pixels: pngPixels(png) };
 }
 async function main() {
   requireCheck(process.platform === 'darwin' && process.env.NEMO_OBJECT_EXPORT_RUN_APPROVED === '1',
@@ -127,19 +145,11 @@ async function main() {
     ack(reportRoot, refused, instance.info.ownerToken);
     const exported = await phase(reportRoot, source, instance, 'exported', 3);
     const receipt = exported.records[3].export;
-    requireCheck(receipt && receipt.apiVersion === 2 && receipt.requestId === 'object-export-' + exported.runId &&
-      receipt.status === 'succeeded' && receipt.published === true && receipt.cleanupComplete === true &&
-      receipt.cleanupStatus === 'complete' && receipt.externalEffectDisposition === 'committed' &&
-      receipt.contentRevision === 0 && receipt.artifactFiles?.join(',') === 'frame_0001.png',
-    'native export receipt not committed to one pinned PNG');
-    requireCheck(fs.readdirSync(destination).join(',') === 'frame_0001.png', 'published manifest differs');
-    const png = path.join(destination, 'frame_0001.png');
-    const bytes = fs.readFileSync(png);
-    requireCheck(bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')) && stageEmpty(instance.snapshot.app),
-      'published PNG signature or staging cleanup differs');
-    const pixels = pngPixels(png);
-    const pngSha256 = hash(png);
+    const { pixels, pngSha256 } = artifactEvidence(destination, instance.snapshot.app, receipt, exported.runId);
     ack(reportRoot, exported, instance.info.ownerToken);
+    const released = await phase(reportRoot, source, instance, 'released', 4);
+    requireCheck(released.records[4].cleanupSucceeded === true, 'native owner release refused');
+    ack(reportRoot, released, instance.info.ownerToken);
     await until(() => {
       const value = readProbe(reportRoot, source, instance);
       return value.complete === true && value.failed === false && value.checkpoint === 5 &&
@@ -161,4 +171,7 @@ async function main() {
   process.stdout.write(JSON.stringify({ status: 'pass', sourceSha: packet.sourceSha,
     appExecutableSha256: packet.appExecutableSha256, evidence: evidenceFile }) + '\n');
 }
-main().catch(error => { process.stderr.write('installed object export FAIL: ' + error.message + '\n'); process.exitCode = 1; });
+if (require.main === module) {
+  main().catch(error => { process.stderr.write('installed object export FAIL: ' + error.message + '\n'); process.exitCode = 1; });
+}
+module.exports = { pngPixels, artifactEvidence };

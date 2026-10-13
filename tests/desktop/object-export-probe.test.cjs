@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const os = require('node:os');
+const zlib = require('node:zlib');
+const { pngPixels, artifactEvidence } = require('./object-export-installed.cjs');
 const script = fs.readFileSync(path.join(__dirname, 'object-export-probe-bootstrap.js'), 'utf8');
 const runId = '11111111-1111-4111-8111-111111111111';
 const destinationDirectory = '/private/tmp/nemo-runtime/tasks/owned/reports/object-export-' + runId;
@@ -105,3 +108,60 @@ test('foreign runtime, arbitrary config and failed export never claim publicatio
   const failedRelease = await scenario({ failExport: true, failRelease: true });
   assert.equal(failedRelease.phases.at(-1).cleanupSucceeded, false);
 });
+
+test('literal installed PNG oracle checks white outside and blue inside the fixed object',
+  { skip: process.platform !== 'darwin' }, () => {
+    const width = 320, height = 180;
+    const crc = bytes => {
+      let value = 0xffffffff;
+      for (const byte of bytes) {
+        value ^= byte;
+        for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
+      }
+      return (value ^ 0xffffffff) >>> 0;
+    };
+    const chunk = (name, data) => {
+      const type = Buffer.from(name);
+      const length = Buffer.alloc(4), checksum = Buffer.alloc(4);
+      length.writeUInt32BE(data.length); checksum.writeUInt32BE(crc(Buffer.concat([type, data])));
+      return Buffer.concat([length, type, data, checksum]);
+    };
+    const makePng = inverted => {
+      const raw = Buffer.alloc(height * (1 + width * 4));
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const inside = x >= 16 && x < 120 && y >= 16 && y < 120;
+        const blue = inverted ? !inside : inside;
+        const offset = y * (1 + width * 4) + 1 + x * 4;
+        raw.set(blue ? [0, 0, 255, 255] : [255, 255, 255, 255], offset);
+      }
+      const ihdr = Buffer.alloc(13);
+      ihdr.writeUInt32BE(width); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 6;
+      return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr),
+        chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+    };
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-object-export-png-'));
+    try {
+      const destination = path.join(folder, 'published');
+      const cache = path.join(folder, 'cache');
+      fs.mkdirSync(destination); fs.mkdirSync(cache);
+      const file = path.join(destination, 'frame_0001.png');
+      const receipt = { apiVersion: 2, requestId: 'object-export-' + runId,
+        status: 'succeeded', published: true, cleanupComplete: true,
+        cleanupStatus: 'complete', externalEffectDisposition: 'committed',
+        contentRevision: 0, artifactFiles: ['frame_0001.png'] };
+      const app = { dirs: { appCache: cache } };
+      fs.writeFileSync(file, makePng(false));
+      assert.deepEqual(pngPixels(file), { width, height, blue: [0, 0, 255, 255],
+        white: [255, 255, 255, 255] });
+      assert.equal(artifactEvidence(destination, app, receipt, runId).pixels.blue.join(','), '0,0,255,255');
+      fs.writeFileSync(path.join(destination, 'extra.png'), Buffer.from('extra'));
+      assert.throws(() => artifactEvidence(destination, app, receipt, runId), /published manifest differs/);
+      fs.rmSync(path.join(destination, 'extra.png'));
+      fs.mkdirSync(path.join(cache, 'native-export-staging'));
+      fs.writeFileSync(path.join(cache, 'native-export-staging', 'residue'), Buffer.from('residue'));
+      assert.throws(() => artifactEvidence(destination, app, receipt, runId), /staging cleanup differs/);
+      fs.rmSync(path.join(cache, 'native-export-staging'), { recursive: true });
+      fs.writeFileSync(file, makePng(true));
+      assert.throws(() => pngPixels(file), /literal pinned PNG pixels differ/);
+    } finally { fs.rmSync(folder, { recursive: true, force: true }); }
+  });
