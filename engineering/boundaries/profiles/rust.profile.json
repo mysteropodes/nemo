@@ -116,7 +116,7 @@
       "id": "rust.native.engine.export-job",
       "layer": "native-export-job",
       "dir": "native-engine/src",
-      "files": ["export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs"],
+      "files": ["export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs", "object_export_host.rs"],
       "publicApi": ["export_job.rs", "export_job_lifecycle.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -388,7 +388,8 @@
         "native_object_save_failure_tests.rs", "native_object_v2_persistence_tests.rs", "native_object_v2_refusal_tests.rs",
         "native_object_preview_tests.rs", "native_object_preview_lifecycle_tests.rs",
         "native_object_preview_route_tests.rs", "native_object_preview_route_test_support.rs",
-        "native_object_desktop_preview_tests.rs", "native_object_desktop_preview_test_support.rs"
+        "native_object_desktop_preview_tests.rs", "native_object_desktop_preview_test_support.rs",
+        "native_object_export_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
@@ -401,6 +402,7 @@
         "native_dispatch.rs",
         "native_object_host.rs",
         "native_object_preview.rs",
+        "native_object_export.rs",
         "native_dispatch_replacement.rs",
         "native_dispatch_tests.rs"
       ],

@@ -28,6 +28,7 @@ const CANDIDATE_FILES = [
   'native-engine/src/commands.rs',
   'native-engine/src/history.rs',
   'native-engine/src/export_job.rs',
+  'native-engine/src/object_export_host.rs',
   'native-engine/src/export_job_lifecycle.rs',
   'native-engine/tests/export_job_lifecycle.rs',
   'native-engine/src/request_receipts.rs',
@@ -104,7 +105,7 @@ const EXPECTED_EDGES = [
   'codec->document', 'commands->document', 'commands->request-receipts', 'commands->revision',
   'compositor->render-scene', 'desktop-viewport->compositor', 'desktop-viewport->render-scene',
   'desktop-viewport->scheduler', 'evaluation->document', 'evaluation->revision', 'export-job->history',
-  'export-job->png-output', 'export-job->render-scene', 'export-job->resource-leases',
+  'export-job->compositor', 'export-job->png-output', 'export-job->render-scene', 'export-job->resource-leases',
   'export-job->revision', 'export-job->scheduler', 'history->commands', 'history->document',
   'history->request-receipts', 'history->revision', 'png-output->compositor', 'png-output->render-scene',
   'protocol->commands', 'protocol->export-job', 'render-scene->evaluation', 'render-scene->scheduler',
@@ -227,7 +228,7 @@ test('native-engine policy adopts the exact clean internal graph with no excepti
   const result = checkRustCrate(profile, policy, { root: ROOT });
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 45);
+  assert.equal(result.edges.length, 46);
   assert.deepEqual(result.exceptionsApplied, []);
   assert.deepEqual(result.unsupported, []);
   const short = (id) => id.replace('rust.native.engine.', '').replace('rust.native.engine', 'root');

@@ -11,6 +11,8 @@ use native_engine::{
 };
 use std::any::Any;
 
+#[path = "native_object_export.rs"]
+mod export;
 #[path = "native_object_preview.rs"]
 mod preview;
 
@@ -28,6 +30,7 @@ fn envelope_identity(value: &str) -> bool {
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
     preview: preview::ObjectPreview,
+    object_export: Option<ExportReleaseReconciliation>,
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
@@ -42,6 +45,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             preview: preview::ObjectPreview::default(),
+            object_export: None,
             released: None,
         })
     }
@@ -97,8 +101,13 @@ impl NativeDispatch for NativeObjectHost {
             Some(retained) => retained.clone(),
             None => {
                 let (undo_depth, redo_depth) = self.history.history_depths();
-                // No transaction/export/artifact work exists here. Preview work
-                // is reconciled separately below, without claiming surface disposal.
+                let exports = self
+                    .object_export
+                    .clone()
+                    .unwrap_or(ExportReleaseReconciliation {
+                        receipts: Vec::new(),
+                        cleanup_complete: true,
+                    });
                 ApplicationReleaseReceipt {
                     instance_id: self.instance_id().into(),
                     document_id: self.document_id().into(),
@@ -108,11 +117,12 @@ impl NativeDispatch for NativeObjectHost {
                     undo_depth,
                     redo_depth,
                     transaction_stage: ReconciliationStage::Complete,
-                    export_stage: ReconciliationStage::Complete,
-                    exports: ExportReleaseReconciliation {
-                        receipts: Vec::new(),
-                        cleanup_complete: true,
+                    export_stage: if exports.cleanup_complete {
+                        ReconciliationStage::Complete
+                    } else {
+                        ReconciliationStage::Unknown
                     },
+                    exports,
                 }
             }
         };
@@ -145,3 +155,7 @@ mod command_tests;
 #[cfg(test)]
 #[path = "native_object_host_history_tests.rs"]
 mod history_tests;
+
+#[cfg(test)]
+#[path = "native_object_export_tests.rs"]
+mod export_tests;
