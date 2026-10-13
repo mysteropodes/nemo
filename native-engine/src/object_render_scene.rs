@@ -8,7 +8,8 @@ use std::sync::Arc;
 mod scheduled;
 pub(crate) use scheduled::ScheduledObjectComposition;
 pub use scheduled::{
-    prepare_scheduled_object_composition, LiveObjectComposition, ScheduledObjectSceneError,
+    prepare_scheduled_object_composition, prepare_scheduled_object_composition_from_witness,
+    LiveObjectComposition, ScheduledObjectSceneError,
 };
 
 #[path = "object_paint_plan.rs"]
