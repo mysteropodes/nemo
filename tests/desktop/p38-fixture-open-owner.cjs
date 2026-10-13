@@ -146,6 +146,19 @@ function verifyHelperExecutable(file, expectedSha256) {
 function helperEnvironment(grantId, reportRoot) {
   return { NEMO_P38_GRANT: grantId, NEMO_P38_REPORT_ROOT: reportRoot };
 }
+async function stopSpawnedHelper(child) {
+  const waitForClose = async timeoutMs => {
+    if (child.exitCode !== null || child.signalCode !== null) return true;
+    return await Promise.race([
+      new Promise(resolve => child.once('close', () => resolve(true))),
+      new Promise(resolve => setTimeout(() => resolve(false), timeoutMs)),
+    ]);
+  };
+  try { child.kill('SIGTERM'); } catch { fail('helper-start', 'helper-cleanup-incomplete'); }
+  if (await waitForClose(500)) return;
+  try { child.kill('SIGKILL'); } catch { fail('helper-start', 'helper-cleanup-incomplete'); }
+  if (!await waitForClose(500)) fail('helper-start', 'helper-cleanup-incomplete');
+}
 async function runObserver(config, services) {
   const outcome = outcomeBase(config);
   let helper = null, firstFailure = null, currentStage = 'config';
@@ -200,6 +213,7 @@ async function runObserver(config, services) {
     const stage = FAILURE_CODES[error?.observerStage] ? error.observerStage : currentStage;
     firstFailure = { stage, code: safeCode(stage, error?.observerCode || error?.code), elapsedMs: elapsed() };
     outcome.firstFailure = firstFailure;
+    if (error?.helperCleanupIncomplete) outcome.cleanup = 'incomplete';
     try { services.save(outcome); } catch { /* Keep the primary failure; no raw error is recorded. */ }
   } finally {
     if (helper) {
@@ -216,6 +230,7 @@ async function runObserver(config, services) {
     }
     try { services.save(outcome); }
     catch {
+      outcome.status = 'partial';
       if (!firstFailure) outcome.firstFailure = { stage: 'receipt', code: 'receipt-write-failed', elapsedMs: elapsed() };
     }
   }
@@ -310,8 +325,13 @@ function defaultServices(config) {
       check(afterSpawn.dev === pinned.dev && afterSpawn.ino === pinned.ino && afterSpawn.size === pinned.size &&
         afterSpawn.sha256 === pinned.sha256, 'helper-start', 'helper-executable-refused');
     } catch (error) {
-      try { child.kill('SIGKILL'); } catch { /* The spawn failure remains primary. */ }
-      fail('helper-start', error?.observerCode || 'helper-executable-refused');
+      let cleanupIncomplete = false;
+      try { await stopSpawnedHelper(child); } catch { cleanupIncomplete = true; }
+      const refusal = new Error('helper-start-failed');
+      refusal.observerStage = 'helper-start';
+      refusal.observerCode = error?.observerCode || 'helper-executable-refused';
+      refusal.helperCleanupIncomplete = cleanupIncomplete;
+      throw refusal;
     }
     const input = readline.createInterface({ input: child.stdout, terminal: false });
     const lines = input[Symbol.asyncIterator]();
@@ -387,4 +407,4 @@ async function main() {
 }
 if (require.main === module) main();
 module.exports = { PHASES, FAILURE_CODES, validateConfig, validateDriverReceipt, validateOwner,
-  validateManifest, verifyHelperExecutable, helperEnvironment, runObserver, defaultServices, writeOutcome, safeCode, fail };
+  validateManifest, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };

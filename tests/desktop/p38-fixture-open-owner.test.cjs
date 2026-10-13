@@ -4,7 +4,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment } = require('./p38-fixture-open-owner.cjs');
+const { EventEmitter } = require('node:events');
+const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper } = require('./p38-fixture-open-owner.cjs');
 
 const config = Object.freeze({ taskId:'p38-task-test', grantId:'p38-grant-test',
   helperPath:'/tmp/p38-window-helper', helperSha256:'e'.repeat(64), sourceHead:'b'.repeat(40), timeoutMs:10000 });
@@ -142,6 +143,47 @@ test('helper cleanup failure is preserved after a successful observation',async(
   assert.equal(result.cleanup,'incomplete');
   assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},
     {stage:'cleanup',code:'helper-cleanup-incomplete'});
+});
+
+test('final receipt failure changes an observed outcome to partial',async()=>{
+  const f=makeServices();
+  f.services.save=()=>{ throw new Error('private filesystem detail'); };
+  const result=await runObserver(config,f.services);
+  assert.equal(result.status,'partial');
+  assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},
+    {stage:'receipt',code:'receipt-write-failed'});
+});
+
+test('incomplete cleanup after helper start refusal is recorded without replacing the primary failure',async()=>{
+  const f=makeServices();
+  f.services.startHelper=async()=>{
+    const error=new Error('private executable detail');
+    error.observerStage='helper-start'; error.observerCode='helper-executable-refused'; error.helperCleanupIncomplete=true;
+    throw error;
+  };
+  const result=await runObserver(config,f.services);
+  assert.equal(result.cleanup,'incomplete');
+  assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},
+    {stage:'helper-start',code:'helper-executable-refused'});
+  assert.equal(f.saved[0].cleanup,'incomplete');
+});
+
+test('spawned helper termination waits for close after SIGTERM',async()=>{
+  const child=new EventEmitter();
+  child.exitCode=null; child.signalCode=null;
+  const signals=[];
+  child.kill=signal=>{ signals.push(signal); child.signalCode=signal; setImmediate(()=>child.emit('close',null,signal)); return true; };
+  await stopSpawnedHelper(child);
+  assert.deepEqual(signals,['SIGTERM']);
+});
+
+test('spawned helper termination escalates and reports when close never arrives',async()=>{
+  const child=new EventEmitter();
+  child.exitCode=null; child.signalCode=null;
+  const signals=[];
+  child.kill=signal=>{ signals.push(signal); return true; };
+  await assert.rejects(stopSpawnedHelper(child),error=>error.observerCode==='helper-cleanup-incomplete');
+  assert.deepEqual(signals,['SIGTERM','SIGKILL']);
 });
 
 test('driver first failure is terminal and no helper is started',async()=>{
