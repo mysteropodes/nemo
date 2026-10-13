@@ -68,6 +68,10 @@ struct ObjectReadResult {
 }
 
 impl ObjectSnapshot {
+    /// Shared strict drawing admission for the private composite-owner entry.
+    pub(crate) fn validate_drawing(document: &ObjectDocument) -> Result<(), ObjectCodecError> {
+        object_codec::validate_storage(document)
+    }
     /// Constructor revalidates even a caller's directly deserialized struct.
     /// Each admitted instance is a fresh incarnation; nothing edits revision 0.
     pub fn new(
@@ -197,6 +201,12 @@ impl ObjectSnapshot {
             return failure(
                 DispatchErrorCode::NotFound,
                 "Object serialization revision is unavailable.",
+            );
+        }
+        if self.project().is_some() {
+            return failure(
+                DispatchErrorCode::Unavailable,
+                "Project persistence is unavailable through drawing-only serialization.",
             );
         }
         let bytes = match object_codec::encode_storage_project(self.document()) {
