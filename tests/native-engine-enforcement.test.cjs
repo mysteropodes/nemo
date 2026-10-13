@@ -46,11 +46,16 @@ const CANDIDATE_FILES = [
   'native-engine/src/project_media_codec.rs',
   'native-engine/tests/project_media_codec.rs',
   'native-engine/tests/object_project_admission.rs',
+  'native-engine/src/object_project_admission.rs',
+  'native-engine/src/object_project_history.rs',
+  'native-engine/tests/object_project_history.rs',
+  'native-engine/tests/project_media_workflow.rs',
   'native-engine/src/reference_image_asset.rs',
   'native-engine/src/reference_png_scanlines.rs',
   'native-engine/tests/reference_image_asset.rs',
   'native-engine/tests/reference_png_scanlines.rs',
   'native-engine/src/object_snapshot.rs',
+  'native-engine/src/object_reference_revision.rs',
   'native-engine/src/object_frame_packet.rs',
   'native-engine/src/object_expression_pin.rs',
   'native-engine/tests/object_expression_pin.rs',
@@ -383,6 +388,28 @@ test('N25F3C2A1P expression pins remain private and fail closed without source r
   for (const [id, file] of [
     ['rust.native.engine.application', 'native-engine/src/object_expression_pin.rs'],
     ['rust.native.engine.tests', 'native-engine/tests/object_expression_pin.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('P37C1-DESKTOP project history children are private and fail closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.provenance.nativeStillReferenceHistoryWorkflowRegistration, /P37C1-DESKTOP\/#1864/);
+  for (const [id, file] of [
+    ['rust.native.engine.revision', 'native-engine/src/object_reference_revision.rs'],
+    ['rust.native.engine.read-queries', 'native-engine/src/object_project_admission.rs'],
+    ['rust.native.engine.history', 'native-engine/src/object_project_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_project_history.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/project_media_workflow.rs'],
   ]) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);
