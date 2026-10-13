@@ -25,7 +25,7 @@ function fixture(change = {}) {
     async window(mode,pid,wid,action){events.push('window-'+mode);if(change.window)return change.window(mode,pid,wid,action,fire);
       return {pid,windowId:45,matchedAX:true,...mode==='capture'?{captureSha256:HASH}:{}};},
     async next(){return actions.shift();},setTimer(fn){events.push('watchdog');fire=fn;return 0;},clearTimer(){events.push('timer-clear');},
-    async close(){events.push('helpers-close');}};
+    async close(){events.push('helpers-close');if(change.close)throw Error('/private/helper-secret');}};
   return {cfg,services,events,receipts,get attempts(){return attempts;},get cleaned(){return cleaned;}};
 }
 test('synthetic one-run persists flat PID before discovery/UI and always uses exact window',async()=>{
@@ -48,11 +48,13 @@ for(const mode of ['nested','missing','negative','wrong-task','wrong-child','wro
     if(mode==='negative')s.app.pid=-1;if(mode==='wrong-task')s.app.taskId='foreign';if(mode==='wrong-child')s.runtime.childPid=456;
     if(mode==='wrong-source')s.source.startup.head='c'.repeat(40);if(mode==='source-mismatch')s.source.matches=false;return s;}});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.appPid,null);assert.equal(f.cleaned,1);
+  assert.equal(r.firstFailure.code,r.reason);assert.equal(r.firstFailure.stage,'identity');
   assert.equal(f.events.some(e=>e.startsWith('window-')),false);
 });
 for(const mode of ['pid','id','ax'])test('synthetic discovery rejects '+mode+' mismatch and cleans owner',async()=>{
   const f=fixture({window(){return {pid:mode==='pid'?456:123,windowId:mode==='id'?0:45,matchedAX:mode!=='ax'};}});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.windowId,null);assert.equal(f.cleaned,1);
+  assert.deepEqual(r.firstFailure,{code:'owned-window-refused',stage:'identity'});
 });
 test('a changed window between actions refuses instead of selecting another window',async()=>{
   const f=fixture({window(mode){return {pid:123,windowId:mode==='discover'?45:46,matchedAX:true};}});
@@ -69,7 +71,8 @@ for(const phase of ['start','window'])test('prelaunch watchdog bounds held '+pha
 });
 test('cleanup failure is explicit partial, never a complete installed result',async()=>{
   const f=fixture({cleanup:true});const r=await runOperator(f.cfg,f.services);assert.equal(r.cleanup,'incomplete');assert.equal(r.status,'partial');
-  assert.equal(r.reason,'cleanup-incomplete');assert.equal(JSON.stringify(r).includes('/private/secret'),false);
+  assert.equal(r.reason,'cleanup-incomplete');assert.deepEqual(r.firstFailure,{code:'cleanup-incomplete',stage:'owner-cleanup'});
+  assert.equal(JSON.stringify(r).includes('/private/secret'),false);
 });
 test('a reused grant journal never launches a second process',async()=>{
   const f=fixture();await runOperator(f.cfg,f.services);const r=await runOperator(f.cfg,f.services);
@@ -91,8 +94,31 @@ test('flat identity and window validators reject unsafe scalar coercions',()=>{
 });
 test('helper cleanup failure does not skip official native cleanup or report complete cleanup',async()=>{
   const f=fixture();f.services.close=async()=>{throw Error('helper group alive');};
-  const r=await runOperator(f.cfg,f.services);assert.equal(f.cleaned,1);assert.equal(r.cleanup,'incomplete');
+  const r=await runOperator(f.cfg,f.services);assert.equal(f.cleaned,1);assert.equal(r.cleanup,'complete');
   assert.equal(r.helperCleanup,'incomplete');assert.equal(r.status,'partial');
+  assert.deepEqual(r.firstFailure,{code:'helper-cleanup-incomplete',stage:'helper-cleanup'});
+});
+test('first exact-sheet refusal survives both cleanup failures and is saved before cleanup',async()=>{
+  const token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',f=fixture({close:true,cleanup:true});let step=0;
+  f.cfg.fixtures=[{path:'/private/fixture-A.json'}];
+  f.services.next=async()=>step++===0?{type:'pin-sheet'}:{type:'set',target:'sheet',sheetToken:token,element:'0.7',value:f.cfg.fixtures[0].path};
+  f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'?{target:'sheet',sheetToken:token}:{}),
+    ...(mode==='set'?{status:'refused',code:'confirm-unsupported',value:'/private/helper-secret'}:{})});
+  const close=f.services.close;
+  f.services.close=async()=>{assert.ok(f.receipts.some(x=>x.firstFailure?.code==='confirm-unsupported'));
+    return close();};
+  const r=await runOperator(f.cfg,f.services);
+  assert.equal(r.status,'partial');assert.equal(r.reason,'confirm-unsupported');
+  assert.deepEqual(r.firstFailure,{code:'confirm-unsupported',stage:'window-set-sheet'});
+  assert.equal(r.helperCleanup,'incomplete');assert.equal(r.cleanup,'incomplete');
+  assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+  const saved=f.receipts.find(x=>x.firstFailure?.code==='confirm-unsupported');
+  assert.ok(saved);assert.equal(saved.stage,'window-set-sheet');
+  for(const value of [r,...f.receipts]){
+    const serialized=JSON.stringify(value);
+    for(const secret of [token,'/private/fixture-A.json','/private/helper-secret'])assert.equal(serialized.includes(secret),false);
+  }
 });
 test('changed runtime PID after discovery cannot dispatch any interaction',async()=>{
   let reads=0;const f=fixture({snapshot(s){if(++reads>1){s.app.pid=456;s.runtime.childPid=456;}return s;}});
@@ -234,8 +260,18 @@ for(const reason of ['sheet-owner','sheet-parent','sheet-replaced','standalone-w
   test('bounded '+reason+' helper refusal stays partial and always cleans without retry',async()=>{
     const f=fixture({window(mode,pid){return mode==='discover'?{pid,windowId:45,matchedAX:true}:{status:'refused',code:reason,pid,windowId:45,matchedAX:true};}});
     const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.reason,reason);assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+    assert.equal(r.firstFailure.code,reason);assert.equal(r.firstFailure.stage,'window-inspect-main');
   });
 }
+test('unrecognized refusal and cleanup messages cannot enter the first-failure receipt',async()=>{
+  const f=fixture({close:true,cleanup:true,window(mode,pid){return mode==='discover'?{pid,windowId:45,matchedAX:true}:
+    {status:'refused',code:'/private/secret',pid,windowId:45,matchedAX:true};}});
+  const r=await runOperator(f.cfg,f.services);
+  assert.deepEqual(r.firstFailure,{code:'adapter-refused',stage:'window-inspect-main'});
+  assert.equal(r.reason,'adapter-refused');assert.equal(r.helperCleanup,'incomplete');assert.equal(r.cleanup,'incomplete');
+  assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+  for(const value of [r,...f.receipts])assert.equal(JSON.stringify(value).includes('/private/'),false);
+});
 test('blocked local child metadata persists without foreign values or arbitrary reasons',()=>{
   const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
   const r=safeWindowEvidence({pid:123,windowId:45,matchedAX:true,nodes:[{path:'0',role:'other',blocked:'child-owner',value:'private',title:'secret'},
