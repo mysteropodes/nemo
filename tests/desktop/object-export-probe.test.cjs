@@ -6,10 +6,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const os = require('node:os');
 const zlib = require('node:zlib');
-const { pngPixels, artifactEvidence, ownedReportDirectory, ack, sanitizedProbe } = require('./object-export-installed.cjs');
+const { pngPixels, artifactEvidence, ownedReportDirectory, ownedTempDirectory, ack, sanitizedProbe } = require('./object-export-installed.cjs');
 const script = fs.readFileSync(path.join(__dirname, 'object-export-probe-bootstrap.js'), 'utf8');
 const runId = '11111111-1111-4111-8111-111111111111';
-const destinationDirectory = '/private/tmp/nemo-runtime/tasks/owned/reports/object-export-' + runId;
+const destinationDirectory = '/private/tmp/nemo-runtime/tasks/owned/tmp/object-export-' + runId;
 const config = { runId, pid: 42, taskKey: 'a'.repeat(64), sourceSha: 'b'.repeat(40), destinationDirectory };
 async function scenario(options = {}) {
   const calls = [], phases = [], exports = [];
@@ -53,7 +53,9 @@ async function scenario(options = {}) {
       assert.equal(request.lifecycleGeneration, 7);
       assert.deepEqual(request.outputSpec, { kind: 'frame', format: 'rgba8', width: 320,
         height: 180, colorInterpretation: 'srgb', alphaMode: 'straight' });
-      if (request.documentSnapshotId.endsWith('-wrong') && !options.staleReturnsSuccess) throw new Error('snapshot refused');
+      if (options.scopeDenied) throw { code: 'invalid_request' };
+      if (request.documentSnapshotId.endsWith('-wrong') && !options.staleReturnsSuccess)
+        throw { code: options.staleErrorCode || 'unavailable' };
       if (options.failExport) throw new Error('export failed');
       return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId,
         documentId: request.documentId, contentRevision: 0, documentSnapshotId: 'owned-snapshot',
@@ -106,6 +108,13 @@ test('foreign runtime, arbitrary config and failed export never claim publicatio
     assert.equal(result.phases.at(-1).failureStage,
       options.failPreview ? 'preview' : 'export');
     assert.equal(result.phases.some(p => p.phase === 'exported'), false);
+    assert.equal(result.released, true);
+  }
+  for (const options of [{ scopeDenied: true }, { staleErrorCode: 'invalid_request' }]) {
+    const result = await scenario(options);
+    assert.equal(result.phases.at(-1).failureStage, 'stale-refusal');
+    assert.equal(result.phases.some(p => p.phase === 'refused'), false);
+    assert.equal(result.exports.length, 1);
     assert.equal(result.released, true);
   }
   const staleSuccess = await scenario({ staleReturnsSuccess: true });
@@ -229,11 +238,19 @@ test('owned report root admits only the real macOS var/folders alias after task 
     try {
       assert.notEqual(aliasTask, canonicalTask, 'real macOS var/folders alias required');
       fs.mkdirSync(path.join(aliasTask, 'reports'));
+      fs.mkdirSync(path.join(aliasTask, 'tmp'));
       fs.mkdirSync(path.join(foreign, 'reports'));
+      fs.mkdirSync(path.join(foreign, 'tmp'));
       fs.mkdirSync(path.join(arbitrary, 'reports'));
       const canonicalReports = path.join(canonicalTask, 'reports');
+      const canonicalTemp = path.join(canonicalTask, 'tmp');
       assert.equal(ownedReportDirectory(path.join(aliasTask, 'reports'), aliasTask), canonicalReports);
       assert.equal(ownedReportDirectory(canonicalReports, canonicalTask), canonicalReports);
+      assert.equal(ownedTempDirectory(path.join(aliasTask, 'tmp'), canonicalReports, aliasTask), canonicalTemp);
+      assert.throws(() => ownedTempDirectory(path.join(foreign, 'tmp'), canonicalReports, aliasTask),
+        /owned temp scope binding refused/);
+      assert.throws(() => ownedTempDirectory(path.join(aliasTask, 'reports'), canonicalReports, aliasTask),
+        /owned temp scope binding refused/);
       assert.throws(() => ownedReportDirectory(path.join(foreign, 'reports'), aliasTask),
         /owned report root differs from task/);
       assert.throws(() => ownedReportDirectory(path.join(arbitrary, 'reports'), arbitrary),
@@ -242,6 +259,10 @@ test('owned report root admits only the real macOS var/folders alias after task 
       fs.symlinkSync(path.join(foreign, 'reports'), path.join(aliasTask, 'reports'));
       assert.throws(() => ownedReportDirectory(path.join(aliasTask, 'reports'), aliasTask),
         /owned report path symlink refused/);
+      fs.rmSync(canonicalTemp, { recursive: true });
+      fs.symlinkSync(path.join(foreign, 'tmp'), path.join(aliasTask, 'tmp'));
+      assert.throws(() => ownedTempDirectory(path.join(aliasTask, 'tmp'), canonicalReports, aliasTask),
+        /owned temp root symlink refused/);
     } finally {
       fs.rmSync(rawTask, { recursive: true, force: true });
       fs.rmSync(foreign, { recursive: true, force: true });

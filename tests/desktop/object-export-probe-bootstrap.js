@@ -6,7 +6,7 @@
       !/^[a-f0-9-]{36}$/.test(config.runId) || !/^[a-f0-9]{40}$/.test(config.sourceSha) ||
       !/^[a-f0-9]{64}$/.test(config.taskKey) || !Number.isSafeInteger(config.pid) || config.pid <= 0 ||
       typeof config.destinationDirectory !== 'string' ||
-      !config.destinationDirectory.endsWith('/reports/object-export-' + config.runId) ||
+      !config.destinationDirectory.endsWith('/tmp/object-export-' + config.runId) ||
       window.__NEMO_OBJECT_EXPORT_PROBE_STARTED__) return;
   window.__NEMO_OBJECT_EXPORT_PROBE_STARTED__ = true;
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -117,7 +117,7 @@
       try {
         await invoke('nemo_native_object_export', { requestJson: JSON.stringify(exportRequest(
           'object-export-refused-' + config.runId, pins.documentSnapshotId + '-wrong')) });
-      } catch (_) { refused = true; }
+      } catch (error) { refused = error?.code === 'unavailable'; }
       check(refused);
       failureStage = 'refusal-checkpoint';
       await checkpoint('refused', 'refused', { revision: 0 });

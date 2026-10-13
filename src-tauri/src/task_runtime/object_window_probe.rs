@@ -32,6 +32,7 @@ struct Session {
     pid: u32,
     owner: String,
     root: PathBuf,
+    export_root: Option<PathBuf>,
     sink: File,
     cursor: usize,
     waiting: bool,
@@ -107,6 +108,19 @@ fn sink(root: &Path) -> Result<File, &'static str> {
     options
         .open(root.join("object-window-probe.json"))
         .map_err(|_| "fresh probe receipt refused")
+}
+fn scoped_export_root(report: &Path, temp: &Path) -> Result<PathBuf, &'static str> {
+    safe_root(report)?;
+    let meta = fs::symlink_metadata(temp).map_err(|_| "probe temp root unavailable")?;
+    let canonical = fs::canonicalize(temp).map_err(|_| "probe temp root unavailable")?;
+    if !report.ends_with("reports")
+        || !meta.is_dir()
+        || meta.file_type().is_symlink()
+        || canonical != report.with_file_name("tmp")
+    {
+        return Err("probe temp scope binding refused");
+    }
+    Ok(canonical)
 }
 impl Session {
     fn persist(&mut self) -> Result<(), &'static str> {
@@ -259,9 +273,11 @@ pub(crate) fn initialize<R: Runtime>(
         if fs::symlink_metadata(&root)?.file_type().is_symlink() {
             return Err("probe report binding is a symlink".into());
         }
-        // macOS's normal /var -> /private/var alias is canonicalized once,
-        // after exact runtime/report binding and leaf checks, then pinned.
+        // Pin the validated macOS /var alias to its canonical task root.
         let root = fs::canonicalize(root)?;
+        let export_root = export
+            .then(|| scoped_export_root(&root, &std::env::temp_dir()))
+            .transpose()?;
         let mut session = Session {
             run: uuid::Uuid::new_v4().to_string(),
             source: compiled.into(),
@@ -270,6 +286,7 @@ pub(crate) fn initialize<R: Runtime>(
             owner: runtime.owner_token.clone().ok_or("probe owner missing")?,
             sink: sink(&root)?,
             root,
+            export_root,
             cursor: 0,
             waiting: false,
             failed: false,
@@ -296,8 +313,9 @@ pub(crate) fn attach<'a, R: Runtime, M: Manager<R>>(
         return Ok(builder);
     };
     let script = if session.export {
+        let export_root = session.export_root.as_ref().ok_or("probe temp missing")?;
         let config = json!({"runId":session.run,"sourceSha":session.source,"taskKey":session.task,
-            "pid":session.pid,"destinationDirectory":session.root.join(format!("object-export-{}",session.run))});
+            "pid":session.pid,"destinationDirectory":export_root.join(format!("object-export-{}",session.run))});
         format!(
             "window.__NEMO_OBJECT_EXPORT_PROBE_CONFIG__ = {};\n{}",
             config,

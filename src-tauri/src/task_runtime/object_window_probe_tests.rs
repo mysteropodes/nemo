@@ -1,5 +1,7 @@
 use crate::task_runtime::object_window_probe::control::{complete, read_ack};
-use crate::task_runtime::object_window_probe::{gate, origin, sink, Packet, Session, PHASES};
+use crate::task_runtime::object_window_probe::{
+    gate, origin, scoped_export_root, sink, Packet, Session, PHASES,
+};
 use serde_json::json;
 use std::{fs, path::PathBuf};
 
@@ -22,6 +24,7 @@ impl Fixture {
             pid: 42,
             owner: "private-owner".into(),
             root: self.root.clone(),
+            export_root: None,
             sink: sink(&self.root).unwrap(),
             cursor: 0,
             waiting: false,
@@ -245,6 +248,31 @@ fn fresh_receipt_and_control_refuse_symlink_roots_and_leafs() {
         "private-owner"
     )
     .is_err());
+}
+#[cfg(unix)]
+#[test]
+fn export_destination_requires_the_task_bound_scoped_temp_root() {
+    let fixture = Fixture::new();
+    let report = fixture.root.join("reports");
+    let temp = fixture.root.join("tmp");
+    let foreign = fixture.root.join("foreign");
+    fs::create_dir(&report).unwrap();
+    fs::create_dir(&temp).unwrap();
+    fs::create_dir(&foreign).unwrap();
+    assert_eq!(scoped_export_root(&report, &temp), Ok(temp.clone()));
+    assert!(scoped_export_root(&report, &report).is_err());
+    assert!(scoped_export_root(&report, &foreign).is_err());
+    #[cfg(target_os = "macos")]
+    {
+        let alias = temp.to_string_lossy().replacen("/private/var/", "/var/", 1);
+        assert_eq!(
+            scoped_export_root(&report, PathBuf::from(alias).as_path()),
+            Ok(temp.clone())
+        );
+    }
+    fs::remove_dir(&temp).unwrap();
+    std::os::unix::fs::symlink(&foreign, &temp).unwrap();
+    assert!(scoped_export_root(&report, &temp).is_err());
 }
 
 #[test]
