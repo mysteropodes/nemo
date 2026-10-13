@@ -90,9 +90,12 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   assert.deepEqual(policy.externalCratePorts.native_engine.moduleItems, {
     'rust.desktop.mcp.adapter': [
       'application::ExportResourceResolver', 'application::NativeApplication',
-      'commands::OpacityRequest', 'document::OpacityDocument', 'object_document::ObjectDocument',
+      'commands::OpacityRequest', 'compositor::Compositor',
+      'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
+      'desktop_viewport::SurfacePort', 'document::OpacityDocument', 'object_document::ObjectDocument',
+      'object_frame_packet::ObjectFrameSelector',
       'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
-      'protocol::OP_JOB_EXPORT_PNG_BEGIN'],
+      'protocol::OP_JOB_EXPORT_PNG_BEGIN', 'scheduler::OutputSpec'],
     'rust.desktop.mcp.adapter.tests': [
       'application::REPRODUCTION_FIXTURE',
       'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
