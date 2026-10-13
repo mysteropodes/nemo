@@ -175,8 +175,12 @@
         // If invoke itself is absent there is no trusted channel to persist it;
         // the external owner reports the prepared-only ready timeout instead.
         const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-        if (cause === readinessFailure.openPathUnavailable && typeof invoke === 'function') {
-          try { await fail('ready', undefined, 'ready-open-path-unavailable'); } catch (_) {}
+        const failureCode = cause === readinessFailure.openPathUnavailable
+          ? 'ready-open-path-unavailable'
+          : cause === readinessFailure.observerInstallFailed
+            ? 'ready-observer-install-failed' : null;
+        if (failureCode && typeof invoke === 'function') {
+          try { await fail('ready', undefined, failureCode); } catch (_) {}
         }
         return 'refused';
       }

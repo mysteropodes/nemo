@@ -68,6 +68,7 @@ fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
 fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
     use super::control::{allowed_ready_failure, valid_failure_packet};
     assert!(allowed_ready_failure("ready-open-path-unavailable"));
+    assert!(allowed_ready_failure("ready-observer-install-failed"));
     assert!(!allowed_ready_failure("ready-tauri-invoke-unavailable"));
     assert!(!allowed_ready_failure("private exception or path"));
     assert!(valid_failure_packet(
@@ -75,6 +76,12 @@ fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
         None,
         None,
         Some("ready-open-path-unavailable")
+    ));
+    assert!(valid_failure_packet(
+        0,
+        None,
+        None,
+        Some("ready-observer-install-failed")
     ));
     assert!(!valid_failure_packet(
         0,
@@ -95,10 +102,22 @@ fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
         Some("private exception or path")
     ));
     assert!(!valid_failure_packet(
+        0,
+        Some("A"),
+        Some(HASH_A),
+        Some("ready-observer-install-failed")
+    ));
+    assert!(!valid_failure_packet(
         1,
         None,
         None,
         Some("ready-open-path-unavailable")
+    ));
+    assert!(!valid_failure_packet(
+        1,
+        None,
+        None,
+        Some("ready-observer-install-failed")
     ));
 }
 
