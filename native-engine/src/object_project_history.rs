@@ -5,10 +5,69 @@ use crate::history::object_history::{
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
 
+/// Immutable admitted source, bound to the original owner. No writable history
+/// or replacement authority exists until this token is consumed by that owner.
+#[derive(Debug)]
+pub struct PreparedProjectReplacement {
+    origin: ObjectSnapshot,
+    next: ObjectSnapshot,
+}
+
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
 
 impl NativeObjectHistory {
+    pub fn prepare_project_replacement(
+        &self,
+        snapshot_id: &str,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
+        let origin = self
+            .acquire_snapshot(self.content_revision())
+            .filter(|snapshot| snapshot.snapshot_id() == snapshot_id)
+            .ok_or(DispatchErrorCode::StaleRevision)?;
+        if origin.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        let next = ObjectSnapshot::admit_project_file(self.instance_id().into(), bytes)?;
+        Ok(PreparedProjectReplacement { origin, next })
+    }
+
+    pub fn validate_project_replacement(
+        &self,
+        prepared: &PreparedProjectReplacement,
+    ) -> Result<(), DispatchErrorCode> {
+        let current = self
+            .acquire_snapshot(self.content_revision())
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        if prepared.origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if prepared.origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if prepared.origin.snapshot_id() != current.snapshot_id()
+            || prepared.origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        Ok(())
+    }
+
+    /// Host cleanup/reservation precedes this consuming commit. The same owner
+    /// receives a fresh document incarnation; A's immutable readers stay valid.
+    pub fn commit_project_replacement(
+        &mut self,
+        prepared: PreparedProjectReplacement,
+    ) -> Result<(), DispatchErrorCode> {
+        self.validate_project_replacement(&prepared)?;
+        self.owner.replace_admitted_snapshot(prepared.next);
+        self.undo.clear();
+        self.redo.clear();
+        self.receipts = StageReceipts::default();
+        Ok(())
+    }
+
     pub fn from_project_file(
         instance: impl Into<String>,
         bytes: &[u8],
@@ -100,3 +159,7 @@ impl NativeObjectHistory {
 #[cfg(test)]
 #[path = "../tests/project_media_workflow.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/object_project_replacement.rs"]
+mod replacement_tests;

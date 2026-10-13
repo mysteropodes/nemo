@@ -21,6 +21,8 @@ mod project_tests;
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]
 mod project_workflow;
+#[cfg(feature = "project_media_codec")]
+pub use project_workflow::PreparedProjectReplacement;
 
 /// One non-Clone owner. Construction always admits a fresh document incarnation.
 #[derive(Debug)]

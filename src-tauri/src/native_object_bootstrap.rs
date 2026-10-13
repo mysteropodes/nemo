@@ -10,6 +10,9 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_reopen.rs"]
 mod reopen;
 
+#[path = "native_object_project_replace.rs"]
+mod replace;
+
 #[path = "native_object_reference.rs"]
 mod reference;
 #[path = "native_object_save.rs"]
@@ -51,7 +54,7 @@ struct ObjectBootstrapRequest {
     cancelled_before_dispatch: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ObjectBootstrapReceipt {
     api_version: u32,
@@ -147,12 +150,50 @@ pub(super) fn bootstrap_file_bytes(
 }
 
 #[tauri::command]
-pub(crate) fn nemo_native_object_bootstrap(
+pub(crate) async fn nemo_native_object_bootstrap(
+    app: tauri::AppHandle,
     window: tauri::Window,
-    state: tauri::State<ApplicationMcp>,
+    state: tauri::State<'_, ApplicationMcp>,
     request_json: String,
 ) -> HostResult<ObjectBootstrapReceipt> {
     require_main(&window)?;
+    if let Some(request) =
+        reopen::file_request(&request_json).filter(|request| request.replace.is_some())
+    {
+        let admitted = replace::prepare(&state, request, |path| {
+            window
+                .try_fs_scope()
+                .is_some_and(|scope| scope.is_allowed(path))
+        })?;
+        let replace::Admission::Execute {
+            generation,
+            request_id,
+            fingerprint,
+            prepared,
+        } = admitted
+        else {
+            let replace::Admission::Replay(receipt) = admitted else {
+                unreachable!()
+            };
+            return Ok(receipt);
+        };
+        state.invalidate_native_subscriber(&app);
+        let native = state.native_state();
+        let scheduled = native.clone();
+        let scheduled_id = request_id.clone();
+        let instance = state.instance_id().to_owned();
+        let result =
+            crate::native_application_viewport::on_main_thread_committed(&app, move || {
+                replace::complete(&scheduled, generation, &scheduled_id, prepared, || {
+                    crate::native_application_viewport::release(&instance)
+                        .map(|released| (released.work_ids, released.status))
+                })
+            })
+            .await;
+        return result.or_else(|_| {
+            replace::reconcile_executor(&native, generation, &request_id, &fingerprint)
+        });
+    }
     reopen::bootstrap_request(&state, &request_json, |path| {
         window
             .try_fs_scope()

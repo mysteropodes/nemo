@@ -5,7 +5,7 @@ use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
     document::OpacityDocument,
     export_job::{ExportReleaseReconciliation, JobReceipt, PendingFrame, ReconciliationStage},
-    history::NativeObjectHistory,
+    history::{NativeObjectHistory, PreparedProjectReplacement},
     object_document::ObjectDocument,
     object_snapshot::ObjectSnapshot,
 };
@@ -34,6 +34,55 @@ pub(crate) struct NativeObjectHost {
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
+    pub(crate) fn matches_project_snapshot(&self, snapshot: &str) -> bool {
+        self.released.is_none()
+            && self
+                .history
+                .acquire_snapshot(self.content_revision())
+                .is_some_and(|current| current.snapshot_id() == snapshot)
+    }
+    pub(crate) fn prepare_project_replacement(
+        &self,
+        snapshot: &str,
+        bytes: &[u8],
+    ) -> Result<PreparedProjectReplacement, String> {
+        if self.released.is_some() {
+            return Err("native project owner was released".into());
+        }
+        self.history
+            .prepare_project_replacement(snapshot, bytes)
+            .map_err(|error| format!("native project replacement admission: {error:?}"))
+    }
+    pub(crate) fn validate_project_replacement(
+        &self,
+        prepared: &PreparedProjectReplacement,
+    ) -> Result<(), String> {
+        if self.released.is_some() {
+            return Err("native project owner was released".into());
+        }
+        self.history
+            .validate_project_replacement(prepared)
+            .map_err(|_| "native project replacement origin changed".into())
+    }
+    pub(crate) fn commit_project_replacement(
+        &mut self,
+        prepared: PreparedProjectReplacement,
+    ) -> Result<(), String> {
+        if !self
+            .release_progress()
+            .is_some_and(|progress| progress.reconciliation_complete())
+        {
+            return Err("native project replacement requires complete owner cleanup".into());
+        }
+        self.history
+            .commit_project_replacement(prepared)
+            .map_err(|_| "native project replacement origin changed".to_string())?;
+        self.preview = preview::ObjectPreview::default();
+        self.object_export = None;
+        self.released = None;
+        Ok(())
+    }
+
     pub(crate) fn project_file_info(&self) -> Result<serde_json::Value, String> {
         self.history
             .project_file_info()
