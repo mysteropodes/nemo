@@ -16,6 +16,9 @@ mod retention;
 #[path = "startup_cut.rs"]
 mod cut;
 
+#[path = "startup_cut_owner.rs"]
+mod owner;
+
 struct Bridge {
     native: Arc<Mutex<LoadLog>>,
     stream: JsStream,
