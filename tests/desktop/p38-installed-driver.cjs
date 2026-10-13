@@ -80,6 +80,20 @@ function safeWindowEvidence(result) {
   if (typeof result.truncated === 'boolean') clean.truncated = result.truncated;
   return clean;
 }
+function safeSelectionDiagnostics(value) {
+  check(value && typeof value === 'object' && !Array.isArray(value), 'ax-evidence-refused');
+  const stages = new Set(['row-capability','row-write','row-readback']);
+  check(stages.has(value.stage), 'ax-evidence-refused');
+  const clean = { stage:value.stage };
+  for (const key of ['rowQueryError','rowSettableQueryError','rowSetError','rowReadbackError',
+    'outlineSelectedRowsQueryError','outlineSelectedRowsSettableQueryError','outlineRowsQueryError']) {
+    if (value[key] !== undefined) { check(Number.isInteger(value[key]) && value[key] >= -32768 && value[key] <= 0, 'ax-evidence-refused'); clean[key]=value[key]; }
+  }
+  for (const key of ['rowSelected','rowSelectedAfter','rowSettable','outlineFound','outlineSelectedRowsSettable',
+    'outlineSelectedRowsReadable','outlineSelectedRowMember','outlineSelectedRowsOwned','outlineRowsReadable','outlineRowMember','outlineRowsOwned'])
+    if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
+  return clean;
+}
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
 function actionTarget(action, sheet) {
   const target = action.target || 'main'; check(['main','sheet'].includes(target), 'target-refused');
@@ -121,7 +135,8 @@ function verifyWindow(info, pid, expected) {
   return info.windowId;
 }
 function windowResult(info,pid,expected) {
-  if(info?.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(info.code)?info.code:'adapter-refused'});
+  if(info?.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(info.code)?info.code:'adapter-refused',
+    ...(info.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(info.selectionDiagnostics)} : {})});
   check(info?.status===undefined||['ok','pinned'].includes(info.status),'owned-window-refused');
   return verifyWindow(info,pid,expected);
 }
@@ -189,6 +204,7 @@ async function runOperator(config, services) {
       const completed = { type:action.type, ordinal, durationMs:Math.max(0,Math.round(performance.now()-actionStarted)), operatorWaitMs };
       if (result.captureSha256) completed.captureSha256 = result.captureSha256;
       for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
+      if (result.selectionDiagnostics && action.type === 'select') completed.selectionDiagnostics = safeSelectionDiagnostics(result.selectionDiagnostics);
       receipt.actions.push(completed); delete receipt.inFlightAction; actionStartedAt = null;
       save();
     }
@@ -201,6 +217,7 @@ async function runOperator(config, services) {
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended','inspect-budget-refused',
       'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
+      ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
       ...(actionStartedAt !== null ? { action:{...receipt.inFlightAction,durationMs:Math.max(0,Math.round(performance.now()-actionStartedAt))} } : {}) });
     receipt.status = 'partial'; save(); // Persist the first safe refusal before cleanup can fail.
   }
@@ -281,7 +298,8 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       check(!line.done && line.value.length<=1024*1024,'helper-input-ended');
       let value;try{value=JSON.parse(line.value);}catch{throw Object.assign(Error('helper-malformed'),{code:'helper-malformed'});}
       check(value&&typeof value==='object'&&!Array.isArray(value),'helper-malformed');
-      if(value.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(value.code)?value.code:'adapter-refused'});
+      if(value.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(value.code)?value.code:'adapter-refused',
+        ...(value.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(value.selectionDiagnostics)} : {})});
       return value;
     } finally {clearTimeout(timer);}
   }
@@ -380,4 +398,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };

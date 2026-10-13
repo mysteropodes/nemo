@@ -180,7 +180,7 @@ test('atomic receipt updates do not follow a malicious receipt symlink',()=>{
 test('static persisted AX evidence is restricted to known control/alert facts',()=>{
   const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('try project(child,childPath,level+1)'));
   assert.equal(/facts\["(?:title|value)"\]/.test(s),false);assert.ok(s.includes('switch-unavailable'));
-  assert.ok(s.includes('projectionLimit(depth,maxNodes)'));assert.ok(s.includes('kAXSelectedAttribute) as? Bool == true'));
+  assert.ok(s.includes('projectionLimit(depth,maxNodes)'));assert.ok(s.includes('rowSelectedAfter'));
   const d=fs.readFileSync('tests/desktop/p38-installed-driver.cjs','utf8');assert.ok(d.includes('OPERATOR ASSERTION'));
 });
 test('JS persistence boundary strips arbitrary helper fields and AX values',()=>{
@@ -311,6 +311,29 @@ test('bounded sheet projection facts retain selection/enabled state and reject u
   f.services.next=async()=>step++===0?{type:'pin-sheet'}:{type:'inspect',target:'sheet',sheetToken:token,depth:6,maxNodes:129};
   f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,...(mode==='pin-sheet'?{target:'sheet',sheetToken:token}:{})});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.reason,'inspect-budget-refused');assert.equal(r.cleanup,'complete');
+});
+test('selection capability diagnostics are allowlisted, bounded, and survive cleanup failures',async()=>{
+  const {safeSelectionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const diagnostics={stage:'row-capability',rowQueryError:0,rowSettableQueryError:-25205,rowSettable:false,
+    outlineFound:true,outlineSelectedRowsQueryError:-25205,outlineSelectedRowsSettableQueryError:0,outlineSelectedRowsSettable:true,
+    outlineSelectedRowsReadable:true,outlineSelectedRowMember:false,outlineSelectedRowsOwned:true,
+    outlineRowsQueryError:0,outlineRowsReadable:true,outlineRowMember:true,outlineRowsOwned:true,privatePath:'/private/secret'};
+  const clean=safeSelectionDiagnostics(diagnostics);
+  assert.equal(clean.outlineSelectedRowsSettable,true);assert.equal(clean.rowSettable,false);
+  assert.equal(clean.outlineSelectedRowMember,false);assert.equal(clean.outlineRowMember,true);
+  const capabilityOnly=safeSelectionDiagnostics({stage:'row-capability',rowQueryError:0,rowSettableQueryError:-25205,rowSettable:false});
+  assert.equal(capabilityOnly.rowSetError,undefined);assert.equal(capabilityOnly.rowReadbackError,undefined);
+  assert.equal(JSON.stringify(clean).includes('private'),false);
+  assert.throws(()=>safeSelectionDiagnostics({...diagnostics,stage:'/private'}));
+  assert.throws(()=>safeSelectionDiagnostics({...diagnostics,rowQueryError:999999}));
+  const f=fixture({close:true,cleanup:true});let step=0;
+  f.services.next=async()=>step++===0?{type:'pin-sheet'}:{type:'select',target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',element:'0.2'};
+  f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'?{target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa'}:{}),
+    ...(mode==='select'?{status:'refused',code:'adapter-refused',selectionDiagnostics:diagnostics}:{})});
+  const result=await runOperator(f.cfg,f.services);
+  assert.equal(result.firstFailure.code,'adapter-refused');assert.deepEqual(result.firstFailure.selectionDiagnostics,clean);
+  assert.equal(result.helperCleanup,'incomplete');assert.equal(result.cleanup,'incomplete');
 });
 test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
   const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
