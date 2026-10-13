@@ -10,6 +10,10 @@ use crate::render_scene::ScheduledFrameIdentity;
 use crate::scheduler::{ViewGeneration, WorkId};
 use std::collections::BTreeMap;
 
+#[path = "object_viewport_consumer.rs"]
+mod object_consumer;
+pub use object_consumer::ObjectViewportFrame;
+
 #[rustfmt::skip]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PhysicalExtent { pub width: u32, pub height: u32 }
