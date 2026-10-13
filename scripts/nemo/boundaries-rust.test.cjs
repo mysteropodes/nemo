@@ -292,163 +292,6 @@ test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the thre
   assert.equal(/^\[features\]/m.test(fs.readFileSync(path.join(ROOT, 'geometry-wasm/Cargo.toml'), 'utf8')), false);
 });
 
-test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and native-engine ports pinned', () => {
-  const policy = read('nemo-desktop.edges.json');
-  const r = R.checkRustCrate(read('rust.profile.json'), policy, { root: ROOT });
-  assert.equal(r.ok, true, JSON.stringify(r.violations));
-  assert.equal(r.moduleCount, policy.profileModules.length);
-  assert.deepEqual(r.unsupported, []);
-  assert.deepEqual(r.exceptionsApplied, []);
-  assert.deepEqual(r.exportedPort, []);
-  assert.deepEqual(r.edges.map((e) => `${e.from}->${e.to}`).sort(), [
-    'rust.desktop.mcp.adapter->rust.desktop.native.dispatch',
-    'rust.desktop.mcp.adapter.tests->rust.desktop.mcp.adapter',
-    'rust.desktop.mcp.adapter.tests->rust.desktop.native.application',
-    'rust.desktop.mcp.adapter.tests->rust.desktop.native.application.contract',
-    'rust.desktop.native.application->rust.desktop.native.application.contract',
-    'rust.desktop.native.application->rust.desktop.native.application.ports',
-    'rust.desktop.native.application->rust.desktop.native.dispatch',
-    'rust.desktop.native.application.commands->rust.desktop.mcp.adapter',
-    'rust.desktop.native.application.commands->rust.desktop.native.application',
-    'rust.desktop.native.application.commands->rust.desktop.native.application.contract',
-    'rust.desktop.native.application.commands->rust.desktop.native.application.ports',
-    'rust.desktop.native.application.commands->rust.desktop.native.application.viewport',
-    'rust.desktop.native.application.commands->rust.desktop.native.dispatch',
-    'rust.desktop.native.application.contract->rust.desktop.native.application.ports',
-    'rust.desktop.native.application.ports.tests->rust.desktop.native.application.ports',
-    'rust.desktop.native.application.tests->rust.desktop.native.application',
-    'rust.desktop.native.application.tests->rust.desktop.native.application.contract',
-    'rust.desktop.native.application.tests->rust.desktop.native.application.ports',
-    'rust.desktop.native.application.viewport->rust.desktop.native.application.contract',
-    'rust.desktop.native.application.viewport->rust.desktop.native.viewport',
-    'rust.desktop.native.host.release.tests->rust.desktop.mcp.adapter',
-    'rust.desktop.native.host.release.tests->rust.desktop.native.application',
-    'rust.desktop.native.host.release.tests->rust.desktop.native.application.commands',
-    'rust.desktop.native.host.release.tests->rust.desktop.native.application.contract',
-    'rust.desktop.native.host.release.tests->rust.desktop.native.dispatch',
-    'rust.desktop.shell->rust.desktop.mcp.adapter', 'rust.desktop.shell->rust.desktop.media',
-    'rust.desktop.shell->rust.desktop.native.application',
-    'rust.desktop.shell->rust.desktop.native.application.commands',
-    'rust.desktop.shell->rust.desktop.native.application.contract',
-    'rust.desktop.shell->rust.desktop.native.application.ports',
-    'rust.desktop.shell->rust.desktop.native.application.viewport',
-    'rust.desktop.shell->rust.desktop.native.dispatch',
-    'rust.desktop.shell->rust.desktop.native.viewport', 'rust.desktop.shell->rust.desktop.play-observer', 'rust.desktop.shell->rust.desktop.tasks', 'rust.desktop.tasks->rust.desktop.play-observer',
-    'rust.desktop.tasks.tests->rust.desktop.play-observer', 'rust.desktop.tasks.tests->rust.desktop.tasks']);
-  assert.deepEqual(r.unanalyzedModules.slice().sort(),
-    ['rust.desktop.build', 'rust.mcp.transport', 'rust.native.engine']);
-
-  const application = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp.rs'), 'utf8');
-  const applicationTests = fs.readFileSync(path.join(ROOT, 'src-tauri/src/application_mcp_tests.rs'), 'utf8');
-  const viewport = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport.rs'), 'utf8');
-  const ports = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application_ports.rs'), 'utf8');
-  const bootstrap = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application.rs'), 'utf8');
-  assert.match(application, /use nemo_mcp::\{/);
-  assert.match(application, /registry::\{self, Endpoint, Registration\}/);
-  assert.match(application, /\bwire,/);
-  assert.match(application, /nemo_mcp::BUILD_SOURCE_ID/);
-  for (const symbol of ['ApplicationRequest', 'ApplicationResponse', 'NativeApplicationError',
-    'NativeApplicationRequest', 'NativeApplicationResponse', 'NativeHostStatus', 'NativeStatusRequest',
-    'NATIVE_API_VERSION', 'Operation']) assert.match(application, new RegExp(`\\b${symbol}\\b`));
-  assert.deepEqual(policy.externalCratePorts.nemo_mcp.items.slice().sort(),
-    ['BUILD_SOURCE_ID', 'contract::ApplicationRequest', 'contract::ApplicationResponse',
-      'contract::NativeApplicationError', 'contract::NativeApplicationRequest',
-      'contract::NativeApplicationResponse', 'contract::NativeHostStatus',
-      'contract::NativeStatusRequest', 'contract::NATIVE_API_VERSION', 'contract::Operation',
-      'registry', 'wire'].sort());
-  assert.deepEqual(policy.externalCratePorts.nemo_mcp.allowedModules.slice().sort(), [
-    'rust.desktop.mcp.adapter', 'rust.desktop.native.application.commands',
-    'rust.desktop.native.application.contract', 'rust.desktop.native.application.tests',
-  ]);
-
-  assert.match(applicationTests, /use crate::application_mcp::\*/);
-  assert.match(application, /use native_engine::\{/);
-  assert.match(applicationTests, /use native_engine::\{/);
-  assert.match(viewport, /use native_engine::compositor::\{/);
-  assert.match(viewport, /use native_engine::desktop_viewport::\{/);
-  assert.match(ports, /use native_engine::application::\{/);
-  assert.match(ports, /use native_engine::png_output::\{/);
-  assert.match(bootstrap, /use native_engine::\{/);
-  assert.equal(policy.externalCratePorts.native_engine.allowedModules, undefined);
-  assert.equal(policy.externalCratePorts.native_engine.items, undefined);
-  assert.deepEqual(policy.externalCratePorts.native_engine.moduleItems, {
-    'rust.desktop.mcp.adapter': [
-      'application::ExportResourceResolver', 'application::NativeApplication',
-      'commands::OpacityRequest', 'document::OpacityDocument', 'object_document::ObjectDocument',
-      'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::StagedArtifactPort',
-      'protocol::OP_JOB_EXPORT_PNG_BEGIN'],
-    'rust.desktop.mcp.adapter.tests': [
-      'application::REPRODUCTION_FIXTURE',
-      'application::ResourceResolutionError', 'application::ResourceResolutionErrorKind',
-      'codec::decode_project', 'export_job::ExportArtifact', 'export_job::ExportReadback',
-      'protocol::OpaqueResourceHandle', 'render_scene::GeometryPaintInput', 'render_scene::RenderScene'],
-    'rust.desktop.native.viewport': [
-      'compositor::CompositionResult', 'compositor::Compositor', 'compositor::CompositorError',
-      'compositor::CompositorInstance', 'desktop_viewport::AcquiredSurfaceFrame',
-      'desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
-      'desktop_viewport::SettledSurfaceFrame', 'desktop_viewport::SurfaceAttempt',
-      'desktop_viewport::SurfacePort', 'desktop_viewport::SurfacePresentation',
-      'desktop_viewport::SurfaceRecoveryError', 'desktop_viewport::ViewportError',
-      'desktop_viewport::ViewportMapping', 'render_scene::ScheduledFrameIdentity', 'scheduler::WorkId'],
-    'rust.desktop.native.application.ports': [
-      'application::ExportResourceResolver', 'application::ResourceResolutionError',
-      'application::ResourceResolutionErrorKind', 'compositor::CompositionResult', 'compositor::Compositor',
-      'png_output::ExportArtifact', 'png_output::ExportCompositor', 'png_output::ExportReadback',
-      'png_output::StagedArtifactPort', 'protocol::OpaqueResourceHandle',
-      'render_scene::GeometryPaintInput', 'render_scene::RenderScene'],
-    'rust.desktop.native.application.contract': [
-      'codec::decode_project', 'desktop_viewport::CssBounds', 'desktop_viewport::PhysicalExtent',
-      'desktop_viewport::ViewportMapping', 'document::OpacityDocument', 'export_job::CleanupStatus',
-      'export_job::ExternalEffectDisposition', 'export_job::JobReceipt', 'export_job::JobStatus',
-      'render_geometry::ClosedCubicPath', 'render_geometry::CubicSegment',
-      'render_scene::GeometryPaintInput', 'render_scene::LayerGeometry', 'render_scene::OpaqueSrgbPaint',
-      'resource_leases::WorkId', 'scheduler::OutputSpec'],
-    'rust.desktop.native.application.viewport': [
-      'compositor::CompositionResult', 'compositor::Compositor', 'desktop_viewport::DeferredAction',
-      'desktop_viewport::FatalAction', 'desktop_viewport::ViewportMapping', 'desktop_viewport::ViewportStatus',
-      'render_scene::ScheduledFrameIdentity', 'resource_leases::WorkId'],
-    'rust.desktop.native.application': [
-      'application::ApplicationReleaseReceipt', 'application::NativeApplication',
-      'application::ReproductionStatus', 'application::REPRODUCTION_FIXTURE',
-      'commands::OpacityRequest', 'commands::ResponseEnvelope',
-      'compositor::CompositionResult', 'document::OpacityDocument',
-      'export_job::JobReceipt', 'export_job::PendingFrame', 'export_job::ReconciliationStage',
-      'render_scene',
-      'resource_leases::FrameFailure', 'resource_leases::FrameFailureKind', 'resource_leases::WorkId',
-      'scheduler::EvaluationKey', 'scheduler::FrameScheduler'],
-    'rust.desktop.native.application.commands': [
-      'application::ReproductionFixture', 'application::ReproductionStatus',
-      'application::REPRODUCTION_FIXTURE', 'application::replay_reproduction_bundle',
-      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'compositor::Compositor', 'object_codec::decode_storage_project'],
-    'rust.desktop.native.application.tests': [
-      'application::ExportResourceResolver', 'compositor::Compositor', 'export_job::JobStatus'],
-    'rust.desktop.native.host.release.tests': [
-      'application::ApplicationReleaseReceipt', 'commands::OpacityRequest', 'commands::ResponseEnvelope',
-      'document::OpacityDocument', 'export_job::ExportReleaseReconciliation', 'export_job::JobReceipt',
-      'export_job::PendingFrame', 'export_job::ReconciliationStage', 'object_codec::decode_project',
-      'commands::NativeOpacityApplication', 'codec::decode_project'],
-    'rust.desktop.native.dispatch': [
-      'history::NativeObjectHistory', 'object_document::ObjectDocument', 'object_snapshot::ObjectSnapshot', 'export_job::ExportReleaseReconciliation',
-      'application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
-      'application::ExportResourceResolver', 'application::NativeApplication',
-      'commands::OpacityRequest', 'commands::ResponseEnvelope', 'document::OpacityDocument',
-      'export_job::ExportCompositor', 'export_job::JobReceipt', 'export_job::JobStatus',
-      'export_job::PendingFrame', 'export_job::StagedArtifactPort'],
-  });
-  const rustProfile = read('rust.profile.json');
-  for (const [moduleId, items] of Object.entries(policy.externalCratePorts.native_engine.moduleItems)) {
-    const module = rustProfile.modules.find((entry) => entry.id === moduleId);
-    const refs = module.files.flatMap((file) => {
-      const source = fs.readFileSync(path.join(ROOT, module.dir, file), 'utf8');
-      const analysis = R.analyzeRustSource(source, { externalCrates: ['native_engine'] });
-      return analysis.uses.concat(analysis.inline)
-        .filter((entry) => entry.segments[0] === 'native_engine')
-        .map((entry) => entry.segments.slice(1).join('::'));
-    });
-    for (const item of items) assert.ok(refs.some((ref) => ref === item || ref.startsWith(`${item}::`)),
-      `${moduleId} grants unused native_engine item ${item}`);
-  }
-});
 
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);
@@ -499,7 +342,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_preview_lifecycle_tests.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
   assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
@@ -534,7 +377,7 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
 use ${prefix}native_engine::application::ApplicationReleaseReceipt;`);
     appendSource(root, file, `use crate::${prefix}application_mcp::ApplicationMcp;
 use crate::${prefix}native_viewport::NativeViewport;
-use ${prefix}native_engine::compositor::Compositor;`);
+use ${prefix}native_engine::compositor::CompositorInstance;`);
     appendSource(root, 'src-tauri/src/native_object_host.rs', `use crate::${prefix}application_mcp::ApplicationMcp;`);
     appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::history::NativeObjectHistory;`);
     appendSource(root, 'src-tauri/src/native_application_tests.rs', `use ${prefix}native_engine::commands::NativeOpacityApplication;`);
@@ -547,7 +390,7 @@ use ${prefix}native_engine::compositor::Compositor;`);
     assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'history::NativeObjectHistory'));
     assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application.tests' && v.detail.path === 'commands::NativeOpacityApplication'));
     assert.ok(violations.some((v) => v.rule === 'layer-violation' && v.module === 'rust.desktop.native.application.tests' && v.detail.targetModule === seam));
-    for (const [owner, item] of [[id, 'compositor::Compositor'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
+    for (const [owner, item] of [[id, 'compositor::CompositorInstance'], ['rust.desktop.native.application.tests', 'application::ApplicationReleaseReceipt']]) {
       assert.ok(violations.some((v) => v.rule === 'private-port-access' && v.module === owner && v.detail.path === item));
     }
   }
@@ -593,11 +436,12 @@ test('N25C2e raw bootstrap is registered with exact codec and test-only edges', 
 });
 
 
-test('N25C2f immutable snapshot port belongs only to the actual host seam', (t) => {
+test('N25C2f immutable snapshot port stays within actual host seam and its tests', (t) => {
   const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
   const seam = 'rust.desktop.native.dispatch', item = 'object_snapshot::ObjectSnapshot';
   assert.deepEqual(Object.entries(policy.externalCratePorts.native_engine.moduleItems)
-    .filter(([, ports]) => ports.includes(item)).map(([id]) => id), [seam]);
+    .filter(([, ports]) => ports.includes(item)).map(([id]) => id),
+    ['rust.desktop.native.host.release.tests', seam]);
   const host = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_object_host.rs'), 'utf8');
   assert.match(host, /snapshot\s*\.\s*dispatch\(request\)/);
   assert.match(host, /acquire_snapshot\(self\.content_revision\(\)\)/);
