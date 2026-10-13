@@ -22,9 +22,11 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   const fs = {readTextFile:function(){return runtime.readTextFile ? Reflect.apply(runtime.readTextFile,this,arguments) : Promise.resolve('{}');}};
   const project = {openPath:runtime.openPath || async function(path){opened.push(path);return openResults.shift();}};
   const originalOpen=project.openPath, originalInvoke=core.invoke, originalRead=fs.readTextFile;
-  if(runtime.bind)runtime.bind({project,core,fs});
-  const window = { [ '__NEMO_P38_FIXTURE_OPEN__' ]:config, __TAURI__:{core,fs}, SMProject:project };
+  const window = { [ '__NEMO_P38_FIXTURE_OPEN__' ]:config, __TAURI__:{core,fs} };
+  if(!runtime.lateBind)window.SMProject=project;
   vm.runInNewContext(script, {window, Date, setTimeout, Promise, Object, Number, Error});
+  if(runtime.bind)runtime.bind({project,core,fs,window});
+  if(runtime.lateBind)window.SMProject=project;
   return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,
     restored:project.openPath===originalOpen&&core.invoke===originalInvoke&&fs.readTextFile===originalRead}));
 }
@@ -90,6 +92,39 @@ test('fs-read outcome is categorical and arbitrary rejection text is not retaine
   assert.equal(result.calls[1].failureCode,'a-fs-read-rejected');
   assert.doesNotMatch(JSON.stringify(result.calls),/private|secret|unsupported_format|must not leak/);
   assert.equal(result.restored,true);
+});
+
+test('early native observation precedes and sees the adapter cached invoke binding', async()=>{
+  let cachedInvoke;
+  const result=await execute([], {}, {lateBind:true,bind:refs=>{cachedInvoke=refs.core.invoke.bind(refs.core);},
+    openPath:function(){
+      return Reflect.apply(cachedInvoke,this,['nemo_native_object_bootstrap',{requestJson:'opaque'}])
+        .then(()=>false,()=>false);
+    },invoke:function(command){
+      assert.equal(command,'nemo_native_object_bootstrap');
+      return Promise.reject({code:'unsupported_format'});
+    }});
+  assert.equal(result.calls[1].failureCode,'a-native-bootstrap-unsupported-format');
+  assert.equal(result.restored,true);
+});
+
+test('synchronous invoke and fs-read throws preserve the original error identity', async()=>{
+  const invokeMarker={kind:'invoke-marker'}, fsMarker={kind:'fs-marker'};
+  let coreRef,fsRef;
+  const invokeResult=await execute([], {}, {openPath:function(){
+    try { Reflect.apply(coreRef.invoke,coreRef,['nemo_native_object_client_status']); }
+    catch(error) { assert.equal(error,invokeMarker); }
+    return false;
+  },invoke:function(){throw invokeMarker;},bind:refs=>{coreRef=refs.core;}});
+  assert.equal(invokeResult.calls[1].failureCode,'a-native-status-rejected');
+  assert.equal(invokeResult.restored,true);
+  const fsResult=await execute([], {}, {openPath:function(){
+    try { Reflect.apply(fsRef.readTextFile,fsRef,['/private/path/A.json']); }
+    catch(error) { assert.equal(error,fsMarker); }
+    return false;
+  },readTextFile:function(){throw fsMarker;},bind:refs=>{fsRef=refs.fs;}});
+  assert.equal(fsResult.calls[1].failureCode,'a-fs-read-rejected');
+  assert.equal(fsResult.restored,true);
 });
 
 test('native status gates are reported as fixed availability categories', async()=>{
