@@ -1,6 +1,9 @@
 //! Immutable object revision storage. Admission and command policy live above it.
 use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
 #[cfg(feature = "history")]
+#[path = "encoded_retention_budget.rs"]
+mod encoded_retention_budget;
+#[cfg(feature = "history")]
 use std::collections::BTreeMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -40,7 +43,38 @@ impl ObjectSnapshot {
         instance_id: String,
         project: ProjectEnvelope,
     ) -> Result<Self, &'static str> {
-        Self::from_value(instance_id, ProjectRevisionValue::Project(project))
+        Self::project_entry(
+            instance_id,
+            project,
+            encoded_retention_budget::shared(),
+            Self::from_value,
+        )
+    }
+    #[cfg(feature = "history")]
+    fn project_entry(
+        instance_id: String,
+        project: ProjectEnvelope,
+        budget: &encoded_retention_budget::EncodedRetentionBudget,
+        identity: impl FnOnce(String, ProjectRevisionValue) -> Result<Self, &'static str>,
+    ) -> Result<Self, &'static str> {
+        if instance_id.is_empty() {
+            return Err("instanceId must be nonempty");
+        }
+        let admission = match project.reference_state() {
+            ProjectReferenceState::NoMedia => None,
+            ProjectReferenceState::StillImage(data) => Some(
+                budget
+                    .admit(data.encoded_allocation())
+                    .map_err(|_| "encoded retention unavailable")?,
+            ),
+        };
+        let snapshot = identity(instance_id, ProjectRevisionValue::Project(project))?;
+        if let Some(admission) = admission {
+            admission
+                .commit()
+                .map_err(|_| "encoded retention unavailable")?;
+        }
+        Ok(snapshot)
     }
     fn from_value(instance_id: String, value: ProjectRevisionValue) -> Result<Self, &'static str> {
         if instance_id.is_empty() {
@@ -180,6 +214,172 @@ impl ObjectRevisionOwner {
 #[cfg(all(test, feature = "history"))]
 mod tests {
     use super::*;
+    fn quota_project(bytes: Vec<u8>) -> ProjectEnvelope {
+        let drawing: ObjectDocument = serde_json::from_value(serde_json::json!({
+            "format":"nemo.native-object-document","formatVersion":1,"totalFrames":1,
+            "layers":[{"layerUid":"L"}],"objects":[]}))
+        .unwrap();
+        ObjectSnapshot::validate_drawing(&drawing).unwrap();
+        let project = ProjectEnvelope::no_media(
+            crate::object_document::ProjectMetadata::new(320, 180, 24.).unwrap(),
+            drawing,
+        );
+        // Opaque already-admitted retention fixture; no PNG decoding claim.
+        project.with_reference(
+            ProjectReferenceState::admitted_still(
+                "media-1".into(),
+                "plate.png".into(),
+                true,
+                1.,
+                0,
+                bytes,
+                1024,
+            )
+            .unwrap(),
+        )
+    }
+    fn allocation(project: &ProjectEnvelope) -> Arc<Vec<u8>> {
+        let ProjectReferenceState::StillImage(data) = project.reference_state() else {
+            panic!()
+        };
+        Arc::clone(data.encoded_allocation())
+    }
+
+    #[test]
+    fn real_owner_entry_counts_aliases_pins_and_escaped_models_until_blob_dies() {
+        let project = quota_project(vec![1, 2, 3]);
+        let other = quota_project(vec![1, 2, 3]);
+        let cost = allocation(&project).capacity();
+        let other_cost = allocation(&other).capacity();
+        let budget =
+            encoded_retention_budget::EncodedRetentionBudget::new(cost + other_cost - 1).unwrap();
+        let first = ObjectSnapshot::project_entry(
+            "first".into(),
+            project.clone(),
+            &budget,
+            ObjectSnapshot::from_value,
+        )
+        .unwrap();
+        let second = ObjectSnapshot::project_entry(
+            "second".into(),
+            project.clone(),
+            &budget,
+            ObjectSnapshot::from_value,
+        )
+        .unwrap();
+        assert_ne!(first.document_id(), second.document_id());
+        assert_eq!(budget.used(), Ok(cost));
+        let mut owner = ObjectRevisionOwner::from_admitted(first);
+        let pinned = owner.acquire(0).unwrap();
+        let escaped = pinned.project().unwrap().clone();
+        let reference = escaped.reference_state();
+        owner.publish(project.drawing().clone()).unwrap();
+        let changed = project
+            .reference_state()
+            .with_settings("after.png".into(), false, 0.5, 2)
+            .unwrap();
+        owner.publish_reference(changed).unwrap();
+        owner.restore(0).unwrap();
+        assert_eq!(budget.used(), Ok(cost));
+        owner
+            .publish_reference(ProjectReferenceState::NoMedia)
+            .unwrap();
+        assert_eq!(budget.used(), Ok(cost));
+        assert!(ObjectSnapshot::project_entry(
+            "over".into(),
+            other.clone(),
+            &budget,
+            ObjectSnapshot::from_value
+        )
+        .is_err());
+        assert_eq!(owner.content_revision(), 4);
+        assert!(owner.acquire(5).is_none());
+        drop(owner);
+        drop(project);
+        drop(second);
+        assert_eq!(budget.used(), Ok(cost));
+        drop(pinned);
+        assert_eq!(budget.used(), Ok(cost));
+        drop(escaped);
+        assert_eq!(budget.used(), Ok(cost));
+        drop(reference);
+        assert_eq!(budget.used(), Ok(0));
+        let admitted = ObjectSnapshot::project_entry(
+            "reaped".into(),
+            other,
+            &budget,
+            ObjectSnapshot::from_value,
+        )
+        .unwrap();
+        assert_eq!(budget.used(), Ok(other_cost));
+        drop(admitted);
+        assert_eq!(budget.used(), Ok(0));
+    }
+
+    #[test]
+    fn owner_identity_failure_rolls_back_only_uncommitted_adoption() {
+        let project = quota_project(vec![1, 2, 3]);
+        let cost = allocation(&project).capacity();
+        let budget = encoded_retention_budget::EncodedRetentionBudget::new(cost).unwrap();
+        let no_media = project.with_reference(ProjectReferenceState::NoMedia);
+        let plain = ObjectSnapshot::project_entry(
+            "no-media".into(),
+            no_media,
+            &budget,
+            ObjectSnapshot::from_value,
+        )
+        .unwrap();
+        assert!(plain.project().is_some());
+        assert_eq!(budget.used(), Ok(0));
+        let bare = ObjectSnapshot::from_admitted("bare".into(), project.drawing().clone()).unwrap();
+        assert!(bare.project().is_none());
+        assert_eq!(budget.used(), Ok(0));
+        assert!(ObjectSnapshot::project_entry(
+            "fail".into(),
+            project.clone(),
+            &budget,
+            |_, _| Err("injected identity failure")
+        )
+        .is_err());
+        assert_eq!(budget.used(), Ok(0));
+        assert!(ObjectSnapshot::project_entry(
+            "".into(),
+            project.clone(),
+            &budget,
+            ObjectSnapshot::from_value
+        )
+        .is_err());
+        assert_eq!(budget.used(), Ok(0));
+        let admitted = ObjectSnapshot::project_entry(
+            "live".into(),
+            project.clone(),
+            &budget,
+            ObjectSnapshot::from_value,
+        )
+        .unwrap();
+        assert!(ObjectSnapshot::project_entry(
+            "fail".into(),
+            project.clone(),
+            &budget,
+            |_, _| Err("injected identity failure")
+        )
+        .is_err());
+        assert_eq!(budget.used(), Ok(cost));
+        assert_eq!(admitted.content_revision(), 0);
+        let mut owned = Vec::with_capacity(cost + 1);
+        owned.extend_from_slice(&[1, 2, 3]);
+        let oversized = quota_project(owned);
+        assert!(
+            ObjectSnapshot::project_entry("large".into(), oversized, &budget, |_, _| panic!(
+                "quota refusal must precede identity allocation"
+            ))
+            .is_err()
+        );
+        assert_eq!(budget.used(), Ok(cost));
+        drop(project);
+        drop(admitted);
+        assert_eq!(budget.used(), Ok(0));
+    }
 
     #[test]
     fn safe_integer_exhaustion_preserves_all_retained_snapshots_and_head() {
