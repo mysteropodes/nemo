@@ -27,6 +27,9 @@ engine_modules! {
 #[cfg(feature = "reference_image_asset")]
 pub(crate) mod reference_image_asset;
 
+#[cfg(feature = "object_expression_pin")]
+pub(crate) mod object_expression_pin;
+
 // Each named Cargo target uses this existing file as a harness. Selecting its
 // test feature resolves the real future test file; absent tests fail compilation.
 // No feature enabled means no test module, not a placeholder passing test.
@@ -68,3 +71,7 @@ test_modules! {
     "test-application" => object_frame_packet_application_tests = "../tests/object_frame_packet.rs";
     "test-application" => object_render_scene_application_tests = "../tests/object_render_scene.rs";
 }
+
+#[cfg(all(test, feature = "test-object_expression_pin"))]
+#[path = "../tests/object_expression_pin.rs"]
+mod object_expression_pin_tests;

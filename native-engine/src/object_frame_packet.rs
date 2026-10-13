@@ -1,6 +1,6 @@
 //! Internal CPU scene inputs from one admitted immutable object snapshot.
 //! Array positions are provenance only; composition policy belongs to consumers.
-use crate::object_document::{FrameScopeKind, ObjectLayer, ObjectRecord};
+use crate::object_document::{AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord};
 use crate::revision::ObjectSnapshot;
 use std::collections::HashMap;
 
@@ -30,6 +30,85 @@ pub enum ObjectFrameError {
     FrameOutOfRange,
     InvalidSource,
     Unavailable,
+}
+
+/// Private raw Order lookup. Unlike prepare_object_frame, this does not ask C1
+/// to compose an active expression; callers may only inspect its authored data.
+pub(crate) fn raw_expression_order<'a>(
+    snapshot: &'a ObjectSnapshot,
+    context_id: &str,
+    scope_kind: &FrameScopeKind,
+    source_frame: u32,
+    layer_uid: &str,
+    stroke_id: Option<&str>,
+) -> Result<&'a AuthoredOrder, ObjectFrameError> {
+    let document = snapshot.document();
+    if document.format_version() != 2 || *scope_kind != FrameScopeKind::Authored {
+        return Err(ObjectFrameError::Unavailable);
+    }
+    if context_id != "scene-root" {
+        return Err(ObjectFrameError::InvalidContext);
+    }
+    if source_frame >= document.total_frames() {
+        return Err(ObjectFrameError::FrameOutOfRange);
+    }
+    let plan = document
+        .composition_order
+        .value()
+        .ok_or(ObjectFrameError::Unavailable)?;
+    let context = plan
+        .contexts
+        .iter()
+        .find(|context| context.context_id == context_id)
+        .ok_or(ObjectFrameError::InvalidSource)?;
+    if !document
+        .layers()
+        .iter()
+        .any(|layer| layer.layer_uid() == layer_uid)
+    {
+        return Err(ObjectFrameError::InvalidSource);
+    }
+    match stroke_id {
+        None => context
+            .layers
+            .iter()
+            .find(|layer| layer.layer_uid == layer_uid)
+            .map(|layer| &layer.order)
+            .ok_or(ObjectFrameError::InvalidSource),
+        Some(stroke_id) => {
+            let matching_record = document.objects().iter().any(|record| {
+                let target = record.target();
+                target.context_id() == context_id
+                    && target.scope_kind() == scope_kind
+                    && target.frame() == source_frame
+                    && target.layer_uid() == layer_uid
+                    && target.stroke_id() == stroke_id
+            });
+            if !matching_record {
+                return Err(ObjectFrameError::InvalidSource);
+            }
+            context
+                .scopes
+                .iter()
+                .find(|scope| {
+                    scope.frame_scope.kind == *scope_kind && scope.frame_scope.frame == source_frame
+                })
+                .and_then(|scope| {
+                    scope.elements.iter().find(|element| {
+                        element.layer_uid == layer_uid && element.stroke_id == stroke_id
+                    })
+                })
+                .map(|element| &element.order)
+                .ok_or(ObjectFrameError::InvalidSource)
+        }
+    }
+}
+
+pub(crate) fn raw_expression_numeric(
+    order: &AuthoredOrder,
+    evaluated_frame: u32,
+) -> Result<f64, ObjectFrameError> {
+    order::numeric(order, evaluated_frame)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
