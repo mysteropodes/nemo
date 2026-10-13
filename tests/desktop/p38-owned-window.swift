@@ -33,6 +33,7 @@ func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [St
   guard owner == pid else { return ["path":path,"role":"other","blocked":"child-owner"] }
   return read()
 }
+func projectionLimit(_ depth: Int, _ nodes: Int) throws { try check(depth >= 1 && depth <= 5 && nodes >= 1 && nodes <= 128) }
 func xy(_ node: AXUIElement) -> CGPoint? {
   guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
@@ -65,6 +66,9 @@ func selfTest() throws {
     try check(fact["blocked"] as? String == "child-owner" && reads == 0)
   }
   _ = localFacts("0",123,123) { reads += 1; return ["control":"Open"] }; try check(reads == 1)
+  try projectionLimit(5,128)
+  var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
+  refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
@@ -197,6 +201,8 @@ func run() throws {
         var settable = DarwinBoolean(false)
         try check(AXUIElementIsAttributeSettable(selected,kAXSelectedAttribute as CFString,&settable) == .success && settable.boolValue)
         try check(AXUIElementSetAttributeValue(selected,kAXSelectedAttribute as CFString,kCFBooleanTrue) == .success)
+        try check(attr(selected,kAXSelectedAttribute) as? Bool == true)
+        result["selected"] = true
       } else { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
       try verify()
       if target == "sheet" {
@@ -217,6 +223,8 @@ func run() throws {
         let role = attr(current,kAXRoleAttribute) as? String ?? ""
         let title = attr(current,kAXTitleAttribute) as? String ?? "", value = attr(current,kAXValueAttribute) as? String ?? ""
         var facts: [String:Any] = ["path":path,"role":roles.contains(role) ? role : "other","press":supports(current,kAXPressAction),"confirm":supports(current,kAXConfirmAction)]
+        if let selected = attr(current,kAXSelectedAttribute) as? Bool { facts["selected"] = selected }
+        if let enabled = attr(current,kAXEnabledAttribute) as? Bool { facts["enabled"] = enabled }
         if labels.contains(title) { facts["control"] = title }
         else if labels.contains(value) { facts["control"] = value }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
@@ -224,12 +232,30 @@ func run() throws {
         return facts
         }
       }
-      var nodes = [fact(selected,base)]
-      let rawChildren = attr(selected,kAXChildrenAttribute) as? [AXUIElement]
-      let list = rawChildren ?? []; try check(list.count < 4096)
-      if rawChildren == nil { nodes[0]["blocked"] = "children-unavailable" }
-      for (index,child) in list.enumerated() { nodes.append(fact(child,base.isEmpty ? String(index) : base+"."+String(index))) }
+      let depth = request["depth"] as? Int ?? 1, maxNodes = request["maxNodes"] as? Int ?? 128
+      try projectionLimit(depth,maxNodes)
+      var nodes = [[String:Any]]()
+      var truncated = false
+      func project(_ current: AXUIElement, _ path: String, _ level: Int) throws {
+        var owner: pid_t = 0
+        guard AXUIElementGetPid(current,&owner) == .success, owner == pid else { nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return }
+        if level > 0 && attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
+        nodes.append(fact(current,path))
+        guard level < depth else { return }
+        let rawChildren = attr(current,kAXChildrenAttribute) as? [AXUIElement]
+        guard let list = rawChildren else { nodes[nodes.count-1]["blocked"] = "children-unavailable"; return }
+        try check(list.count < 4096)
+        for (index,child) in list.enumerated() {
+          if nodes.count >= maxNodes { truncated = true; return }
+          let childPath = path.isEmpty ? String(index) : path+"."+String(index)
+          var childOwner: pid_t = 0
+          guard AXUIElementGetPid(child,&childOwner) == .success, childOwner == pid else { nodes.append(["path":childPath,"role":"other","blocked":"child-owner"]); continue }
+          try project(child,childPath,level+1)
+        }
+      }
+      try project(selected,base,0)
       result["nodes"] = nodes
+      result["truncated"] = truncated
       if target == "sheet" { _ = try verifySheet() }
     case "capture":
       try check(target == "main")

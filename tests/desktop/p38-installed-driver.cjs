@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
+const { performance } = require('node:perf_hooks');
 const ROOT = path.resolve(__dirname, '../..');
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function check(value, code) { if (!value) throw Object.assign(new Error(code), { code }); }
@@ -66,16 +67,18 @@ function safeWindowEvidence(result) {
   const controls = new Set(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle']);
   const alerts = new Set(['switch-unavailable','active-close-unavailable']);
   check(Array.isArray(result.nodes) && result.nodes.length <= 4096, 'ax-evidence-refused');
-  return { pid: result.pid, windowId: result.windowId, matchedAX: result.matchedAX,
+  const clean = { pid: result.pid, windowId: result.windowId, matchedAX: result.matchedAX,
     nodes: result.nodes.map(node => {
       check(node && typeof node.path === 'string' && /^(?:\d+(?:\.\d+)*)?$/.test(node.path) && node.path.length <= 128, 'ax-evidence-refused');
       const clean = { path: node.path, role: roles.has(node.role) ? node.role : 'other' };
       if (controls.has(node.control)) clean.control = node.control;
       if (alerts.has(node.alert)) clean.alert = node.alert;
       if (['child-owner','children-unavailable'].includes(node.blocked)) clean.blocked = node.blocked;
-      for (const key of ['press','confirm']) if (typeof node[key] === 'boolean') clean[key] = node[key];
+      for (const key of ['press','confirm','selected','enabled']) if (typeof node[key] === 'boolean') clean[key] = node[key];
       return clean;
     }) };
+  if (typeof result.truncated === 'boolean') clean.truncated = result.truncated;
+  return clean;
 }
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
 function actionTarget(action, sheet) {
@@ -128,7 +131,7 @@ async function runOperator(config, services) {
   const receipt = { schema: 'nemo.p38-operator/1', issue: 1645, grant: config.grant.id,
     source: config.sourceHead, task: config.taskId, startAttempts: 0, appPid: null, windowId: null,
     actions: [], status: 'partial', cleanup: 'not-required', helperCleanup: 'not-required', installedAcceptance: 'not-established' };
-  let controller, instance, app, timer, expire, failure = null; const sheet = { token:null };
+  let controller, instance, app, timer, expire, failure = null, actionStartedAt = null, operatorWaitStartedAt = null; const sheet = { token:null }, runStarted = performance.now();
   const deadline = new Promise((_, reject) => { expire = () => reject(Object.assign(new Error('watchdog-timeout'), { code: 'watchdog-timeout' })); });
   const bounded = work => Promise.race([work, deadline]);
   const save = () => services.save(receipt);
@@ -151,13 +154,23 @@ async function runOperator(config, services) {
     receipt.windowId = windowResult(await bounded(services.window('discover', receipt.appPid)), receipt.appPid); save();
     for (;;) {
       check(receipt.actions.length < 64, 'action-budget-exhausted');
+      receipt.stage = 'awaiting-operator-input'; receipt.operatorWaitStartedElapsedMs = Math.round(performance.now() - runStarted); save();
+      const waitStarted = performance.now(); operatorWaitStartedAt = waitStarted;
       const action = await bounded(services.next());
+      const operatorWaitMs = Math.max(0, Math.round(performance.now() - waitStarted));
+      operatorWaitStartedAt = null;
+      receipt.operatorWaitMs = (receipt.operatorWaitMs || 0) + operatorWaitMs;
       check(action && ['inspect', 'press', 'set', 'select', 'raise', 'capture', 'pin-sheet', 'sheet-dismissed', 'stop'].includes(action.type), 'action-refused');
-      if (action.type === 'stop') { check(!sheet.token, 'sheet-active'); break; }
+      if (action.type === 'stop') { check(!sheet.token, 'sheet-active'); receipt.stage = 'operator-stop'; break; }
       actionTarget(action, sheet);
+      const ordinal = receipt.actions.length + 1, actionStarted = performance.now(); actionStartedAt = actionStarted;
+      receipt.inFlightAction = { type:action.type, ordinal };
       receipt.stage = 'window-'+action.type+'-'+(action.target||'main'); save();
       if (['press', 'set', 'select'].includes(action.type)) check(typeof action.element === 'string' && /^\d+(?:\.\d+)*$/.test(action.element) && action.element.length<=128, 'element-refused');
-      if (action.type === 'inspect') check(action.element === undefined || typeof action.element === 'string' && /^(?:\d+(?:\.\d+)*)?$/.test(action.element) && action.element.length<=128, 'element-refused');
+      if (action.type === 'inspect') {
+        check(action.element === undefined || typeof action.element === 'string' && /^(?:\d+(?:\.\d+)*)?$/.test(action.element) && action.element.length<=128, 'element-refused');
+        if (action.depth !== undefined || action.maxNodes !== undefined) check(action.target === 'sheet' && Number.isInteger(action.depth) && action.depth >= 1 && action.depth <= 5 && Number.isInteger(action.maxNodes) && action.maxNodes >= 1 && action.maxNodes <= 128, 'inspect-budget-refused');
+      }
       if (action.type === 'set') check(action.target==='sheet' && typeof action.value === 'string' && action.value.length <= 4096 &&
         config.fixtures?.some(item=>action.value===item.path), 'fixture-refused');
       const status = await bounded(controller.status(instance));
@@ -173,17 +186,22 @@ async function runOperator(config, services) {
         await bounded(services.feedback({target:'sheet',ordinal:receipt.actions.length+1,token:sheet.token}));
       }
       if (result.captureSha256) check(/^[a-f0-9]{64}$/.test(result.captureSha256), 'capture-proof-refused');
-      receipt.actions.push({ type: action.type, ordinal: receipt.actions.length + 1,
-        ...(result.captureSha256 ? { captureSha256: result.captureSha256 } : {}) });
+      const completed = { type:action.type, ordinal, durationMs:Math.max(0,Math.round(performance.now()-actionStarted)), operatorWaitMs };
+      if (result.captureSha256) completed.captureSha256 = result.captureSha256;
+      for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
+      receipt.actions.push(completed); delete receipt.inFlightAction; actionStartedAt = null;
       save();
     }
     receipt.status = 'operator-complete'; // No claim that tab/alert/native evidence passes.
-  } catch (error) { failure = error; receipt.reason = ['watchdog-timeout','native-identity-refused','flat-app-pid-required','owned-window-refused',
+  } catch (error) { failure = error;
+    if (operatorWaitStartedAt !== null) { receipt.operatorWaitTimedOutMs = Math.max(0,Math.round(performance.now()-operatorWaitStartedAt)); receipt.operatorWaitMs = (receipt.operatorWaitMs || 0) + receipt.operatorWaitTimedOutMs; }
+    receipt.reason = ['watchdog-timeout','native-identity-refused','flat-app-pid-required','owned-window-refused',
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
       'source-head-refused','fresh-build-proof-required','window-helper-refused','grant-already-attempted',
-      'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended',
+      'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended','inspect-budget-refused',
       'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
-    receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight' });
+    receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
+      ...(actionStartedAt !== null ? { action:{...receipt.inFlightAction,durationMs:Math.max(0,Math.round(performance.now()-actionStartedAt))} } : {}) });
     receipt.status = 'partial'; save(); // Persist the first safe refusal before cleanup can fail.
   }
   finally {
@@ -221,7 +239,8 @@ function verifyFixtures(config) {
     }
   }
 
-function createWindowTransport(config,directory,getGuard,helpers) {
+function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs=10000) {
+  check(Number.isInteger(helperTimeoutMs) && helperTimeoutMs >= 1 && helperTimeoutMs <= 10000, 'helper-timeout-refused');
   let channel=null, ordinal=0;
   async function helper(mode, pid, windowId, action = {}) {
     const reportGuard = getGuard(); reportGuard.verify();
@@ -258,7 +277,7 @@ function createWindowTransport(config,directory,getGuard,helpers) {
     let timer;
     try {
       const line = await Promise.race([channel.lines.next(),new Promise((_,reject)=>{
-        timer=setTimeout(()=>reject(Object.assign(Error('helper-input-ended'),{code:'helper-input-ended'})),10000);})]);
+        timer=setTimeout(()=>reject(Object.assign(Error('helper-input-ended'),{code:'helper-input-ended'})),helperTimeoutMs);})]);
       check(!line.done && line.value.length<=1024*1024,'helper-input-ended');
       let value;try{value=JSON.parse(line.value);}catch{throw Object.assign(Error('helper-malformed'),{code:'helper-malformed'});}
       check(value&&typeof value==='object'&&!Array.isArray(value),'helper-malformed');

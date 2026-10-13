@@ -38,6 +38,26 @@ test('synthetic one-run persists flat PID before discovery/UI and always uses ex
   assert.equal(f.events.filter(e=>e==='window-check').length,4);assert.equal(result.actions.length,4);
   assert.equal(JSON.stringify(result).includes('private-path'),false);
 });
+test('bounded operator think time is separate from action time and each action receipt is timed',async()=>{
+  const f=fixture();let step=0;f.services.next=async()=>{
+    await new Promise(resolve=>setTimeout(resolve,25));
+    return step++===0?{type:'inspect'}:{type:'stop'};
+  };
+  const r=await runOperator(f.cfg,f.services);
+  assert.equal(r.status,'operator-complete');assert.equal(r.actions.length,1);
+  assert.ok(r.actions[0].operatorWaitMs>=15);assert.ok(r.actions[0].durationMs>=0);
+  assert.ok(r.operatorWaitMs>=r.actions[0].operatorWaitMs);
+  assert.equal(r.cleanup,'complete');assert.equal(f.attempts,1);
+});
+test('global watchdog timeout while waiting for the operator is truthfully staged and cleaned',async()=>{
+  const f=fixture();f.services.next=async()=>{f.services._fire();return new Promise(()=>{});};
+  const original=f.services.setTimer;f.services.setTimer=(fn)=>{f.services._fire=fn;return original(fn);};
+  const r=await runOperator(f.cfg,f.services);
+  assert.equal(r.status,'partial');assert.equal(r.reason,'watchdog-timeout');
+  assert.equal(r.firstFailure.stage,'awaiting-operator-input');assert.equal(r.firstFailure.action,undefined);
+  assert.ok(Number.isInteger(r.operatorWaitTimedOutMs));assert.equal(r.operatorWaitMs,r.operatorWaitTimedOutMs);
+  assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');assert.equal(f.attempts,1);
+});
 for(const grant of [null,{issue:1573,confirmed:true,id:'N20R'}, {issue:1645,confirmed:false,id:'pending'},
   {issue:1645,confirmed:true,id:'6121922271'}])test('pending/foreign/consumed grant cannot access package or launch: '+JSON.stringify(grant),async()=>{
   const f=fixture();f.cfg.grant=grant;await assert.rejects(runOperator(f.cfg,f.services));assert.deepEqual(f.events,[]);
@@ -54,7 +74,7 @@ for(const mode of ['nested','missing','negative','wrong-task','wrong-child','wro
 for(const mode of ['pid','id','ax'])test('synthetic discovery rejects '+mode+' mismatch and cleans owner',async()=>{
   const f=fixture({window(){return {pid:mode==='pid'?456:123,windowId:mode==='id'?0:45,matchedAX:mode!=='ax'};}});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.windowId,null);assert.equal(f.cleaned,1);
-  assert.deepEqual(r.firstFailure,{code:'owned-window-refused',stage:'identity'});
+  assert.equal(r.firstFailure.code,'owned-window-refused');assert.equal(r.firstFailure.stage,'identity');assert.ok(Number.isInteger(r.firstFailure.elapsedMs));
 });
 test('a changed window between actions refuses instead of selecting another window',async()=>{
   const f=fixture({window(mode){return {pid:123,windowId:mode==='discover'?45:46,matchedAX:true};}});
@@ -71,7 +91,7 @@ for(const phase of ['start','window'])test('prelaunch watchdog bounds held '+pha
 });
 test('cleanup failure is explicit partial, never a complete installed result',async()=>{
   const f=fixture({cleanup:true});const r=await runOperator(f.cfg,f.services);assert.equal(r.cleanup,'incomplete');assert.equal(r.status,'partial');
-  assert.equal(r.reason,'cleanup-incomplete');assert.deepEqual(r.firstFailure,{code:'cleanup-incomplete',stage:'owner-cleanup'});
+  assert.equal(r.reason,'cleanup-incomplete');assert.equal(r.firstFailure.code,'cleanup-incomplete');assert.equal(r.firstFailure.stage,'owner-cleanup');
   assert.equal(JSON.stringify(r).includes('/private/secret'),false);
 });
 test('a reused grant journal never launches a second process',async()=>{
@@ -96,7 +116,7 @@ test('helper cleanup failure does not skip official native cleanup or report com
   const f=fixture();f.services.close=async()=>{throw Error('helper group alive');};
   const r=await runOperator(f.cfg,f.services);assert.equal(f.cleaned,1);assert.equal(r.cleanup,'complete');
   assert.equal(r.helperCleanup,'incomplete');assert.equal(r.status,'partial');
-  assert.deepEqual(r.firstFailure,{code:'helper-cleanup-incomplete',stage:'helper-cleanup'});
+  assert.equal(r.firstFailure.code,'helper-cleanup-incomplete');assert.equal(r.firstFailure.stage,'helper-cleanup');
 });
 test('first exact-sheet refusal survives both cleanup failures and is saved before cleanup',async()=>{
   const token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',f=fixture({close:true,cleanup:true});let step=0;
@@ -110,7 +130,8 @@ test('first exact-sheet refusal survives both cleanup failures and is saved befo
     return close();};
   const r=await runOperator(f.cfg,f.services);
   assert.equal(r.status,'partial');assert.equal(r.reason,'confirm-unsupported');
-  assert.deepEqual(r.firstFailure,{code:'confirm-unsupported',stage:'window-set-sheet'});
+  assert.equal(r.firstFailure.code,'confirm-unsupported');assert.equal(r.firstFailure.stage,'window-set-sheet');
+  assert.deepEqual(r.firstFailure.action,{type:'set',ordinal:2,durationMs:r.firstFailure.action.durationMs});
   assert.equal(r.helperCleanup,'incomplete');assert.equal(r.cleanup,'incomplete');
   assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
   const saved=f.receipts.find(x=>x.firstFailure?.code==='confirm-unsupported');
@@ -157,8 +178,9 @@ test('atomic receipt updates do not follow a malicious receipt symlink',()=>{
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 test('static persisted AX evidence is restricted to known control/alert facts',()=>{
-  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('nodes.append(fact(child,'));
+  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('try project(child,childPath,level+1)'));
   assert.equal(/facts\["(?:title|value)"\]/.test(s),false);assert.ok(s.includes('switch-unavailable'));
+  assert.ok(s.includes('projectionLimit(depth,maxNodes)'));assert.ok(s.includes('kAXSelectedAttribute) as? Bool == true'));
   const d=fs.readFileSync('tests/desktop/p38-installed-driver.cjs','utf8');assert.ok(d.includes('OPERATOR ASSERTION'));
 });
 test('JS persistence boundary strips arbitrary helper fields and AX values',()=>{
@@ -267,7 +289,8 @@ test('unrecognized refusal and cleanup messages cannot enter the first-failure r
   const f=fixture({close:true,cleanup:true,window(mode,pid){return mode==='discover'?{pid,windowId:45,matchedAX:true}:
     {status:'refused',code:'/private/secret',pid,windowId:45,matchedAX:true};}});
   const r=await runOperator(f.cfg,f.services);
-  assert.deepEqual(r.firstFailure,{code:'adapter-refused',stage:'window-inspect-main'});
+  assert.equal(r.firstFailure.code,'adapter-refused');assert.equal(r.firstFailure.stage,'window-inspect-main');
+  assert.deepEqual(r.firstFailure.action,{type:'inspect',ordinal:1,durationMs:r.firstFailure.action.durationMs});
   assert.equal(r.reason,'adapter-refused');assert.equal(r.helperCleanup,'incomplete');assert.equal(r.cleanup,'incomplete');
   assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
   for(const value of [r,...f.receipts])assert.equal(JSON.stringify(value).includes('/private/'),false);
@@ -278,6 +301,16 @@ test('blocked local child metadata persists without foreign values or arbitrary 
     {path:'1',role:'AXGroup',blocked:'children-unavailable',press:false,confirm:false},{path:'2',role:'other',blocked:'private'}]});
   assert.equal(r.nodes[0].blocked,'child-owner');assert.equal(r.nodes[1].blocked,'children-unavailable');assert.equal(r.nodes[2].blocked,undefined);
   assert.equal(JSON.stringify(r).includes('private'),false);assert.equal(JSON.stringify(r).includes('secret'),false);
+});
+test('bounded sheet projection facts retain selection/enabled state and reject unsafe budgets',async()=>{
+  const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
+  const result=safeWindowEvidence({pid:123,windowId:45,matchedAX:true,truncated:true,nodes:[
+    {path:'0',role:'AXRow',selected:true,enabled:true,value:'/private/secret'}]});
+  assert.equal(result.truncated,true);assert.deepEqual(result.nodes[0],{path:'0',role:'AXRow',selected:true,enabled:true});
+  const token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',f=fixture();let step=0;
+  f.services.next=async()=>step++===0?{type:'pin-sheet'}:{type:'inspect',target:'sheet',sheetToken:token,depth:6,maxNodes:129};
+  f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,...(mode==='pin-sheet'?{target:'sheet',sheetToken:token}:{})});
+  const r=await runOperator(f.cfg,f.services);assert.equal(r.reason,'inspect-budget-refused');assert.equal(r.cleanup,'complete');
 });
 test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
   const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
@@ -308,18 +341,18 @@ test('exact spawned-helper group cleanup escalates only when needed and refuses 
   await assert.rejects(cleanupHelper({pid:-1}),e=>e.code==='helper-cleanup-invalid');
 });
 
-for(const mode of ['positive','EOF','malformed','foreign','refused','oversized'])test('real Node-only modeled helper pipe '+mode+' is framed/tracked/cleaned',async()=>{
+for(const mode of ['positive','EOF','malformed','foreign','refused','oversized','timeout'])test('real Node-only modeled helper pipe '+mode+' is framed/tracked/cleaned',async()=>{
   // Disposable Node stub only. Never Nemo, macOS AX, a native window or installed evidence.
   const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs'),crypto=require('node:crypto');
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-node-')),helpers=new Set();
   try{
     const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,'{}');return{label,path:file,sha256:crypto.createHash('sha256').update('{}').digest('hex')};});
     const script=path.join(dir,'modeled-helper');
-    const before=mode==='EOF'?'process.exit(0);':mode==='malformed'?"console.log('not-json');":
+    const before=mode==='EOF'?'process.exit(0);':mode==='timeout'?'':mode==='malformed'?"console.log('not-json');":
       mode==='oversized'?"console.log('x'.repeat(1048577));":mode==='refused'?"console.log(JSON.stringify({status:'refused',code:'confirm-unsupported'}));":
       "console.log(JSON.stringify({status:'pinned',pid:"+(mode==='foreign'?124:123)+",windowId:45,matchedAX:true}));";
     fs.writeFileSync(script,'#!/usr/bin/env node\n'+before+"\nrequire('node:readline').createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);console.log(JSON.stringify({...r,status:'ok',matchedAX:true}));});\n",{mode:0o700});
-    const guard=safeDirectory(dir,['reports']),window=createWindowTransport({windowHelper:script,grant:{id:'model-only'},fixtures},guard.directory,()=>guard,helpers);
+    const guard=safeDirectory(dir,['reports']),window=createWindowTransport({windowHelper:script,grant:{id:'model-only'},fixtures},guard.directory,()=>guard,helpers,mode==='timeout'?20:10000);
     if(mode==='positive'){
       assert.equal((await window('discover',123)).windowId,45);
       assert.equal((await window('check',123,45)).type,'check');assert.equal(helpers.size,1);
