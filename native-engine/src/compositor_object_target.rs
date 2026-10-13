@@ -43,11 +43,13 @@ impl Drop for ObjectTarget {
         let texture = self.texture.take().expect("owned object texture");
         let view = self.view.take();
         let reservation = self.reservation.take().expect("owned target reservation");
+        // Close admission NOW, before registering the completion fence. A
+        // cloned private handle must not submit work beyond that fence. wgpu
+        // retains native storage for work already submitted before destruction.
+        texture.destroy();
         let retire = move || {
             drop(view);
-            // Also invalidate a cloned private texture/view: no live uncharged
-            // allocation survives just because a downstream handle escaped.
-            texture.destroy();
+            // Keep the owned storage handle and charge through admitted work.
             drop(texture);
             drop(reservation);
         };

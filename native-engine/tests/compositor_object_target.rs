@@ -175,51 +175,60 @@ fn gpu_target_render_failure_unwind_and_success_wait_for_queue_completion() {
 
 #[test]
 fn gpu_target_retirement_invalidates_escaped_private_texture_and_view() {
-    let gpu = Compositor::new().unwrap();
-    let budget = ReadbackBudget::new(24);
-    let output = target(&gpu, &budget);
-    let escaped = output.texture().clone();
-    let view = output.view().clone();
-    drop(output);
-    assert_eq!(budget.used(), 0);
-    let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("destroyed-target-control"),
-        size: 512,
-        usage: wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
-    let scope = gpu.device.push_error_scope(wgpu::ErrorFilter::Validation);
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture: &escaped,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: &buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(256),
-                rows_per_image: Some(2),
+    let mut gpu = Compositor::new().unwrap();
+    for submitted in [false, true] {
+        let budget = ReadbackBudget::new(24);
+        let mut output = target(&gpu, &budget);
+        if submitted {
+            output
+                .render(|view| gpu.render_target(view, 3, 2, vello::peniko::Color::WHITE))
+                .unwrap();
+        }
+        let escaped = output.texture().clone();
+        let view = output.view().clone();
+        drop(output);
+        assert_eq!(budget.used(), if submitted { 24 } else { 0 });
+        // Attempt an actual later copy before polling the original submitted work.
+        // The queued charge remains held, but every escaped handle is already dead.
+        let buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("destroyed-target-control"),
+            size: 512,
+            usage: wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let scope = gpu.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &escaped,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
-        },
-        wgpu::Extent3d {
-            width: 3,
-            height: 2,
-            depth_or_array_layers: 1,
-        },
-    );
-    gpu.queue.submit([encoder.finish()]);
-    complete(&gpu);
-    let error = pollster::block_on(scope.pop()).expect("escaped GPU source must be destroyed");
-    assert!(error.to_string().contains("destroyed"), "{error}");
-    drop(view);
-    drop(escaped);
-    assert_eq!(budget.used(), 0);
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(256),
+                    rows_per_image: Some(2),
+                },
+            },
+            wgpu::Extent3d {
+                width: 3,
+                height: 2,
+                depth_or_array_layers: 1,
+            },
+        );
+        gpu.queue.submit([encoder.finish()]);
+        complete(&gpu);
+        let error = pollster::block_on(scope.pop()).expect("escaped GPU source must be destroyed");
+        assert!(error.to_string().contains("destroyed"), "{error}");
+        drop(view);
+        drop(escaped);
+        assert_eq!(budget.used(), 0);
+    }
 }
 
 // A child runs just this test so the production shared domain is genuinely
