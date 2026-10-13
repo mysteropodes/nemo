@@ -4,7 +4,8 @@
 //! returns an owned acquired-frame token which must be consumed before recovery.
 //! N13 creates no GPU context, desktop window, renderer, or pixel readback path.
 
-use crate::compositor::{CompositionResult, Compositor};
+use crate::compositor::{CompositionResult, Compositor, ScheduledObjectCompositionResult};
+use crate::object_render_scene::LiveObjectComposition;
 use crate::render_scene::ScheduledFrameIdentity;
 use crate::scheduler::{ViewGeneration, WorkId};
 use std::collections::BTreeMap;
@@ -146,6 +147,21 @@ fn consume_attempt<F: AcquiredSurfaceFrame>(attempt: SurfaceAttempt<F>) -> Surfa
     }
 }
 
+fn acquire_source<P: SurfacePort>(port: &mut P, source: &SurfacePresentation<'_>) -> SurfaceEvent {
+    consume_attempt(port.acquire(SurfacePresentation {
+        instance: source.instance,
+        adapter: source.adapter,
+        device: source.device,
+        queue: source.queue,
+        texture: source.texture,
+        texture_view: source.texture_view,
+        source_extent: source.source_extent,
+        surface_extent: source.surface_extent,
+        scale_policy: source.scale_policy,
+        identity: source.identity,
+    }))
+}
+
 pub struct DesktopViewportHost<P> {
     port: P,
     mapping: ViewportMapping,
@@ -215,47 +231,70 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
         compositor: &Compositor,
         result: &CompositionResult,
     ) -> Result<PresentationReceipt, ViewportError> {
-        let identity = result.scheduled_identity().clone();
-        if let Some(receipt) = self.prepare_present(identity.clone())? {
-            return Ok(receipt);
-        }
-        let actual = PhysicalExtent {
-            width: result.dimensions().0,
-            height: result.dimensions().1,
-        };
-        if actual != self.mapping.composition_extent() {
-            return Err(ViewportError::CompositionExtentMismatch {
-                expected: self.mapping.composition_extent(),
-                actual,
-            });
-        }
-        let mapping = self.mapping;
-        let first = consume_attempt(self.port.acquire(SurfacePresentation {
+        self.present_source(SurfacePresentation {
             instance: compositor.instance(),
             adapter: compositor.adapter(),
             device: compositor.device(),
             queue: compositor.queue(),
             texture: result.texture(),
             texture_view: result.texture_view(),
-            source_extent: mapping.composition_extent(),
-            surface_extent: mapping.physical_extent(),
+            source_extent: PhysicalExtent {
+                width: result.dimensions().0,
+                height: result.dimensions().1,
+            },
+            surface_extent: self.mapping.physical_extent(),
             scale_policy: SurfaceScalePolicy::StretchToSurface,
-            identity: &identity,
-        }));
-        self.complete_event(identity.clone(), first, |port| {
-            consume_attempt(port.acquire(SurfacePresentation {
-                instance: compositor.instance(),
-                adapter: compositor.adapter(),
-                device: compositor.device(),
-                queue: compositor.queue(),
-                texture: result.texture(),
-                texture_view: result.texture_view(),
-                source_extent: mapping.composition_extent(),
-                surface_extent: mapping.physical_extent(),
-                scale_policy: SurfaceScalePolicy::StretchToSurface,
-                identity: &identity,
-            }))
+            identity: result.scheduled_identity(),
         })
+    }
+    pub(crate) fn present_scheduled_object(
+        &mut self,
+        compositor: &Compositor,
+        result: &ScheduledObjectCompositionResult,
+        live: &LiveObjectComposition<'_>,
+    ) -> Result<PresentationReceipt, ViewportError> {
+        let source = compositor
+            .scheduled_object_surface(result, live)
+            .map_err(|_| ViewportError::IdentityMismatch(result.identity().work_id()))?;
+        let actual = PhysicalExtent {
+            width: source.dimensions.0,
+            height: source.dimensions.1,
+        };
+        // Current work/GPU/extent must be rechecked even for a cached receipt.
+        self.require_extent(actual)?;
+        self.present_source(SurfacePresentation {
+            instance: source.instance,
+            adapter: source.adapter,
+            device: source.device,
+            queue: source.queue,
+            texture: source.texture,
+            texture_view: source.texture_view,
+            source_extent: actual,
+            surface_extent: self.mapping.physical_extent(),
+            scale_policy: SurfaceScalePolicy::StretchToSurface,
+            identity: source.identity,
+        })
+    }
+    fn require_extent(&self, actual: PhysicalExtent) -> Result<(), ViewportError> {
+        if actual != self.mapping.composition_extent() {
+            return Err(ViewportError::CompositionExtentMismatch {
+                expected: self.mapping.composition_extent(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+    fn present_source(
+        &mut self,
+        source: SurfacePresentation<'_>,
+    ) -> Result<PresentationReceipt, ViewportError> {
+        let identity = source.identity.clone();
+        if let Some(receipt) = self.prepare_present(identity.clone())? {
+            return Ok(receipt);
+        }
+        self.require_extent(source.source_extent)?;
+        let first = acquire_source(&mut self.port, &source);
+        self.complete_event(identity, first, |port| acquire_source(port, &source))
     }
     pub fn pending_work_ids(&self) -> Vec<WorkId> {
         self.pending.keys().copied().collect()
@@ -447,30 +486,5 @@ impl<P: SurfacePort> DesktopViewportHost<P> {
 }
 
 #[cfg(test)]
-impl<P: SurfacePort> DesktopViewportHost<P> {
-    pub(crate) fn simulate_port_completion(
-        &mut self,
-        identity: ScheduledFrameIdentity,
-    ) -> Result<PresentationReceipt, ViewportError> {
-        if let Some(receipt) = self.prepare_present(identity.clone())? {
-            return Ok(receipt);
-        }
-        let first = consume_attempt(self.port.simulated_acquire(&identity));
-        self.complete_event(identity.clone(), first, |port| {
-            consume_attempt(port.simulated_acquire(&identity))
-        })
-    }
-    pub(crate) fn test_port(&self) -> &P {
-        &self.port
-    }
-    pub(crate) fn test_port_mut(&mut self) -> &mut P {
-        &mut self.port
-    }
-    pub(crate) fn register_under_for_test(
-        &mut self,
-        work_id: WorkId,
-        identity: ScheduledFrameIdentity,
-    ) -> Result<(), ViewportError> {
-        self.register_as(work_id, identity)
-    }
-}
+#[path = "../tests/object_desktop_viewport.rs"]
+mod object_tests;

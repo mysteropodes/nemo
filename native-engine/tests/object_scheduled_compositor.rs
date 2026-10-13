@@ -16,7 +16,7 @@ use crate::scheduler::{
 };
 use serde_json::json;
 
-fn owner(instance: &str) -> NativeObjectHistory {
+pub(crate) fn owner(instance: &str) -> NativeObjectHistory {
     let mut source = paint_test_document(&[0, 7]);
     source["objects"]
         .as_array_mut()
@@ -47,7 +47,7 @@ fn owner(instance: &str) -> NativeObjectHistory {
     )
     .unwrap()
 }
-fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
+pub(crate) fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {
         instance_id: snapshot.instance_id(),
         document_id: snapshot.document_id(),
@@ -58,7 +58,7 @@ fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
         frame,
     }
 }
-fn plan(snapshot: &ObjectSnapshot, frame: u32) -> ObjectPaintPlan {
+pub(crate) fn plan(snapshot: &ObjectSnapshot, frame: u32) -> ObjectPaintPlan {
     let pins = selector(snapshot, frame);
     let packet = prepare_object_frame(snapshot, &pins).unwrap();
     let scene = prepare_object_render_scene(&packet, &pins).unwrap();
@@ -89,7 +89,7 @@ fn pins(snapshot: &ObjectSnapshot, frame: u32) -> ObjectSchedulePins {
         scope: ObjectScheduleScope::Authored,
     }
 }
-fn schedule(
+pub(crate) fn schedule(
     scheduler: &mut FrameScheduler,
     snapshot: &ObjectSnapshot,
     frame: u32,
@@ -118,7 +118,10 @@ fn cpu_scheduler_provenance_rejects_equal_numeric_ids_and_survives_owner_moves()
     let mut b = FrameScheduler::new();
     let first = schedule(&mut a, &snapshot, 7);
     let foreign = schedule(&mut b, &snapshot, 7);
-    assert_eq!(
+    assert_eq!(first.work_id(), foreign.work_id());
+    assert_eq!(first.view_generation(), foreign.view_generation());
+    assert_eq!(first.key(), foreign.key());
+    assert_ne!(
         ScheduledFrameIdentity::from_scheduled(&first),
         ScheduledFrameIdentity::from_scheduled(&foreign)
     );
