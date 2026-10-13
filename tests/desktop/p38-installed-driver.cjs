@@ -77,6 +77,7 @@ function safeWindowEvidence(result, reference = false) {
       if (alerts.has(node.alert)) clean.alert = node.alert;
       if (['child-owner','children-unavailable'].includes(node.blocked)) clean.blocked = node.blocked;
       for (const key of ['press','confirm','selected','enabled']) if (typeof node[key] === 'boolean') clean[key] = node[key];
+      if(node.role==='AXTextField' && ['plain','search','other','unreadable'].includes(node.textFieldKind)) clean.textFieldKind=node.textFieldKind;
       return clean;
     }) };
   if (typeof result.truncated === 'boolean') clean.truncated = result.truncated;
@@ -100,14 +101,19 @@ function safeActionDiagnostics(value) {
   check(value && typeof value === 'object' && !Array.isArray(value), 'ax-evidence-refused');
   const stages = new Set(['window-identity','window-identity-ax-owner','window-identity-application-window-membership','window-identity-pinned-cg-window','window-identity-minimized',
     'window-identity-pinned-cg-window-list','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity','post-action-ax-owner',
-    'post-action-application-window-membership','post-action-pinned-cg-window','post-action-pinned-cg-window-list','post-action-minimized']);
+    'post-action-application-window-membership','post-action-pinned-cg-window','post-action-pinned-cg-window-list','post-action-minimized',
+    'axtext-request','axtext-identity','axtext-role','axtext-confirm-support','axtext-value-settable','axtext-write','axtext-readback','axtext-confirm']);
   check(stages.has(value.stage), 'ax-evidence-refused');
   const clean = { stage:value.stage };
   if (value.elementPath !== undefined) { check(typeof value.elementPath === 'string' && /^(?:\d+(?:\.\d+)*)$/.test(value.elementPath) && value.elementPath.length <= 128, 'ax-evidence-refused'); clean.elementPath=value.elementPath; }
   if (value.role !== undefined) { check(['AXButton','AXCheckBox','AXMenuItem','AXRow','AXTextField','other'].includes(value.role), 'ax-evidence-refused'); clean.role=value.role; }
-  for (const key of ['axPressQueryError','performActionError']) {
+  for (const key of ['axPressQueryError','performActionError','subroleQueryError','focusSettableQueryError','focusedQueryError',
+    'valueSettableQueryError','valueWriteError','valueReadbackError','confirmQueryError','confirmError']) {
     if (value[key] !== undefined) { check(Number.isInteger(value[key]) && value[key] >= -32768 && value[key] <= 0, 'ax-evidence-refused'); clean[key]=value[key]; }
   }
+  for(const key of ['enabled','focusSettable','focusedMatches','valueSettable','valueMatches','confirmAdvertised'])
+    if(value[key]!==undefined){check(typeof value[key]==='boolean','ax-evidence-refused');clean[key]=value[key];}
+  if(value.textFieldKind!==undefined){check(['plain','search','other','unreadable'].includes(value.textFieldKind),'ax-evidence-refused');clean.textFieldKind=value.textFieldKind;}
   if (value.axPressAdvertised !== undefined) { check(typeof value.axPressAdvertised === 'boolean', 'ax-evidence-refused'); clean.axPressAdvertised=value.axPressAdvertised; }
   if (value.control !== undefined) { check(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle'].includes(value.control), 'ax-evidence-refused'); clean.control=value.control; }
   if (value.routeRefusal !== undefined) { check(['adapter-refused','child-owner','standalone-window'].includes(value.routeRefusal), 'ax-evidence-refused'); clean.routeRefusal=value.routeRefusal; }
@@ -223,6 +229,8 @@ function safeCleanupDiagnostics(values) {
     }
     if (value.signalKind !== undefined) { check(['SIGTERM','SIGKILL'].includes(value.signalKind), 'cleanup-evidence-refused'); clean.signalKind=value.signalKind; }
     if (value.probePoint !== undefined) { check(['initial','wait-term','after-term','wait-kill','after-kill'].includes(value.probePoint), 'cleanup-evidence-refused'); clean.probePoint=value.probePoint; }
+    for(const key of ['probeErrorCode','signalErrorCode']) if(value[key]!==undefined){
+      check(['EPERM','EACCES','EINVAL','ENOSYS','ERR_INVALID_PROBE_RESULT','UNKNOWN'].includes(value[key]),'cleanup-evidence-refused');clean[key]=value[key];}
     if (value.helpersRemaining !== undefined) { check(Number.isInteger(value.helpersRemaining) && value.helpersRemaining >= 0 && value.helpersRemaining <= 8, 'cleanup-evidence-refused'); clean.helpersRemaining=value.helpersRemaining; }
     return clean;
   });
@@ -443,6 +451,12 @@ async function runScopedOperator(config, services, reference) {
       }
       const result = await bounded(services.window(action.type, receipt.appPid, receipt.windowId, action));
       windowResult(result, receipt.appPid, receipt.windowId);
+      if(action.type==='set'){
+        check(result.actionDiagnostics,'value-refused'); const text=safeActionDiagnostics(result.actionDiagnostics);
+        check(text.stage==='axtext-confirm' && text.role==='AXTextField' && text.textFieldKind==='plain' && text.enabled===true &&
+          text.valueSettableQueryError===0 && text.valueSettable===true && text.valueWriteError===0 && text.valueReadbackError===0 &&
+          text.valueMatches===true && text.confirmQueryError===0 && text.confirmAdvertised===true && text.confirmError===0,'value-refused');
+      }
       sheetResult(action, sheet, result);
       if(action.type==='pin-sheet'){
         check(typeof services.feedback==='function','sheet-feedback-required');
@@ -453,7 +467,7 @@ async function runScopedOperator(config, services, reference) {
       if (result.captureSha256) completed.captureSha256 = result.captureSha256;
       for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
       if (result.selectionDiagnostics && action.type === 'select') completed.selectionDiagnostics = safeSelectionDiagnostics(result.selectionDiagnostics);
-      if (result.actionDiagnostics && action.type === 'press') completed.actionDiagnostics = safeActionDiagnostics(result.actionDiagnostics);
+      if (result.actionDiagnostics && ['press','set'].includes(action.type)) completed.actionDiagnostics = safeActionDiagnostics(result.actionDiagnostics);
       receipt.actions.push(completed); delete receipt.inFlightAction; actionStartedAt = null;
       save();
     }
@@ -580,6 +594,7 @@ async function cleanupHelper(child, services = {}) {
   const observation = { helperPid:child.pid, descendantPossible:child.p38GroupMayContainDescendants !== false };
   if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,descendantPossible:observation.descendantPossible}]});
   const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,...facts}]});
+  const errorCode=error=>['EPERM','EACCES','EINVAL','ENOSYS','ERR_INVALID_PROBE_RESULT'].includes(error?.code)?error.code:'UNKNOWN';
   // The helper may own a CG sampler after a refused press or an explicit
   // capture. Once a non-descendant helper exits, do not signal a recycled PGID.
   if(child.p38GroupMayContainDescendants===false){
@@ -598,15 +613,15 @@ async function cleanupHelper(child, services = {}) {
   const signal = services.signal || (kind=>{try{process.kill(-child.pid,kind);}catch(e){if(e.code!=='ESRCH')throw e;}});
   const delay = services.delay || (()=>new Promise(resolve=>setTimeout(resolve,50)));
   const probe=(point,attempts,signalKind)=>{
-    try { return alive(); }
-    catch { throw failed('group-probe-error',{probePoint:point,signalAttempts:attempts,...(signalKind?{signalKind}:{}),probeError:true}); }
+    try { const result=alive(); if(typeof result!=='boolean')throw {code:'ERR_INVALID_PROBE_RESULT'}; return result; }
+    catch(error) { throw failed('group-probe-error',{probePoint:point,signalAttempts:attempts,...(signalKind?{signalKind}:{}),probeError:true,probeErrorCode:errorCode(error)}); }
   };
   let groupAliveBefore=probe('initial',0);
   if(!groupAliveBefore)return [{...observation,stage:'group-absent',groupAliveBefore:false,signalAttempts:0}];
   let groupAliveAfterTerm,groupAliveAfterKill,signalAttempts=0;
   for(const kind of ['SIGTERM','SIGKILL']){
     signalAttempts++;
-    try { signal(kind); } catch { throw failed('group-signal-error',{groupAliveBefore,signalAttempts,signalKind:kind,signalError:true}); }
+    try { signal(kind); } catch(error) { throw failed('group-signal-error',{groupAliveBefore,signalAttempts,signalKind:kind,signalError:true,signalErrorCode:errorCode(error)}); }
     const waitPoint=kind==='SIGTERM'?'wait-term':'wait-kill', afterPoint=kind==='SIGTERM'?'after-term':'after-kill';
     for(let i=0;i<40&&probe(waitPoint,signalAttempts,kind);i++)try { await delay(); }
       catch { throw failed('group-wait-error',{groupAliveBefore,signalAttempts,signalKind:kind,probePoint:waitPoint}); }

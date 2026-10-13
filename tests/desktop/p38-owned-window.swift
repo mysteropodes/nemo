@@ -7,6 +7,39 @@ import Darwin
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
 struct ActionRefusal: Error { let diagnostics: [String:Any] }
+func textFieldKind(_ query: AXError, _ subrole: String?) -> String {
+  if query == .attributeUnsupported || query == .noValue { return "plain" }
+  guard query == .success, let subrole else { return "unreadable" }
+  if subrole == kAXSearchFieldSubrole { return "search" }
+  return subrole.isEmpty || subrole == kAXUnknownSubrole ? "plain" : "other"
+}
+// The production AX writer and static fault controls share this exact sequence.
+// Focus is diagnostic only: AXValue addresses the retained field, not the keyboard.
+func enterSheetText(_ facts: [String:Any], identity: () throws -> Void,
+  write: () -> Int, read: () -> (Int, Bool), confirm: () -> Int) throws -> [String:Any] {
+  var d = facts
+  func require(_ valid: Bool, _ stage: String) throws {
+    if !valid { d["stage"] = stage; throw ActionRefusal(diagnostics:d) }
+  }
+  func pinned() throws {
+    do { try identity() } catch { d["stage"] = "axtext-identity"; throw ActionRefusal(diagnostics:d) }
+  }
+  try pinned()
+  try require(d["role"] as? String == "AXTextField" && d["textFieldKind"] as? String == "plain" &&
+    d["enabled"] as? Bool == true, "axtext-role")
+  try require(d["confirmQueryError"] as? Int == 0 && d["confirmAdvertised"] as? Bool == true, "axtext-confirm-support")
+  try require(d["valueSettableQueryError"] as? Int == 0 && d["valueSettable"] as? Bool == true, "axtext-value-settable")
+  try pinned()
+  let written = write(); d["valueWriteError"] = written
+  try require(written == 0, "axtext-write")
+  try pinned()
+  let (readError, matches) = read(); d["valueReadbackError"] = readError; d["valueMatches"] = matches
+  try require(readError == 0 && matches, "axtext-readback")
+  try pinned()
+  let confirmed = confirm(); d["confirmError"] = confirmed
+  try require(confirmed == 0, "axtext-confirm")
+  d["stage"] = "axtext-confirm"; return d
+}
 struct IdentityRefusal: Error { let stage: String; let facts: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
@@ -188,6 +221,36 @@ func boundedPinnedCGWindowSample(_ pid:pid_t, _ window:UInt32, _ deadline:UInt64
   }
 }
 func selfTest() throws {
+  try check(textFieldKind(.success,kAXSearchFieldSubrole) == "search")
+  try check(textFieldKind(.attributeUnsupported,nil) == "plain")
+  try check(textFieldKind(.cannotComplete,nil) == "unreadable")
+  try check(textFieldKind(.success,"AXSecureTextField") == "other")
+  for fault in ["none","search","disabled","confirm-support","value-settable","write","read","mismatch","confirm",
+    "identity-1","identity-2","identity-3","identity-4"] {
+    var events = [String](), pins = 0
+    let facts: [String:Any] = ["role":"AXTextField","textFieldKind":fault == "search" ? "search" : "plain",
+      "enabled":fault != "disabled","confirmQueryError":0,"confirmAdvertised":fault != "confirm-support",
+      "valueSettableQueryError":0,"valueSettable":fault != "value-settable",
+      "focusSettableQueryError":-25205,"focusSettable":false,"focusedQueryError":0,"focusedMatches":false]
+    var result: [String:Any]?, failure: String?
+    do { result = try enterSheetText(facts,identity:{ pins += 1; events.append("identity")
+      try check(fault != "identity-\(pins)") },
+      write:{ events.append("write"); return fault == "write" ? -25204 : 0 },
+      read:{ events.append("read"); return (fault == "read" ? -25204 : 0,fault != "mismatch") },
+      confirm:{ events.append("confirm"); return fault == "confirm" ? -25204 : 0 })
+    } catch let error as ActionRefusal { failure = error.diagnostics["stage"] as? String }
+    if fault == "none" {
+      try check(result?["valueMatches"] as? Bool == true && result?["stage"] as? String == "axtext-confirm")
+      try check(events == ["identity","identity","write","identity","read","identity","confirm"])
+    } else {
+      let expected = fault.hasPrefix("identity") ? "axtext-identity" :
+        ["search":"axtext-role","disabled":"axtext-role","confirm-support":"axtext-confirm-support",
+         "value-settable":"axtext-value-settable","write":"axtext-write","read":"axtext-readback",
+         "mismatch":"axtext-readback","confirm":"axtext-confirm"][fault]
+      try check(failure == expected && result == nil)
+      try check(events.contains("confirm") == (fault == "confirm"))
+    }
+  }
   for (mode,prefix,reference) in [("--persistent","NEMO_P38_",false),("--reference-persistent","NEMO_REFERENCE_",true)] {
     let scoped = try operatorScope(mode,[prefix+"GRANT":"scoped-run",prefix+"REPORT_ROOT":"/test-only"])
     try check(scoped.reference == reference && scoped.report == "/test-only")
@@ -287,7 +350,7 @@ func selfTest() throws {
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
-    "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"foreignReads":0, "runtimeAX":false])
+    "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -572,8 +635,8 @@ func run() throws {
       return ActionRefusal(diagnostics:diagnostics)
     }
     do { try verify() }
-    catch let error as IdentityRefusal { if action == "press" { throw pressFailure("window-identity-"+error.stage,error.facts) }; throw error }
-    catch { if action == "press" { throw pressFailure("window-identity") }; throw error }
+    catch let error as IdentityRefusal { if action == "press" || action == "set" { throw pressFailure("window-identity-"+error.stage,error.facts) }; throw error }
+    catch { if action == "press" || action == "set" { throw pressFailure("window-identity") }; throw error }
     var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
     let target = request["target"] as? String ?? "main"
     try check(target == "main" || target == "sheet")
@@ -597,23 +660,22 @@ func run() throws {
       try check(AXUIElementPerformAction(main,kAXRaiseAction as CFString) == .success)
     case "press", "set", "select":
       guard let value = requestedPath, !value.isEmpty else {
-        if action == "press" { throw pressFailure("route-resolution",["routeRefusal":"adapter-refused"]) }
+        if action == "press" || action == "set" { throw pressFailure("route-resolution",["routeRefusal":"adapter-refused"]) }
         throw Refusal(code:"adapter-refused")
       }
       if target == "main" {
         do { try noSheet() }
-        catch { if action == "press" { throw pressFailure("sheet-state") }; throw error }
+        catch { if action == "press" || action == "set" { throw pressFailure("sheet-state") }; throw error }
       }
       let selected: AXUIElement
       do { selected = try node(value,selectedRoot) }
       catch {
-        if action == "press" {
+        if action == "press" || action == "set" {
           let code = (error as? Refusal)?.code ?? "adapter-refused"
           throw pressFailure("route-resolution",["routeRefusal":allowedReasons.contains(code) ? code : "adapter-refused"])
         }
         throw error
       }
-      let operation = action == "press" ? kAXPressAction : kAXConfirmAction
       if action == "press" {
         var actionNames: CFArray?
         let query = AXUIElementCopyActionNames(selected,&actionNames)
@@ -631,19 +693,37 @@ func run() throws {
         let perform = AXUIElementPerformAction(selected,kAXPressAction as CFString)
         facts["performActionError"] = Int(perform.rawValue)
         guard perform == .success else { throw pressFailure("axpress-perform",facts) }
-      } else if action != "select" && !supports(selected,operation) {
-        throw Refusal(code:action == "set" ? "confirm-unsupported" : "adapter-refused")
       }
       if action == "set" {
-        try check(target == "sheet")
-        guard let text = request["value"] as? String, text.utf8.count <= 4096 else { throw Refusal(code:"adapter-refused") }
-        try check(attr(selected,kAXRoleAttribute) as? String == kAXTextFieldRole)
-        var focusable = DarwinBoolean(false)
-        try check(AXUIElementIsAttributeSettable(selected,kAXFocusedAttribute as CFString,&focusable) == .success && focusable.boolValue)
-        try check(AXUIElementSetAttributeValue(selected,kAXFocusedAttribute as CFString,kCFBooleanTrue) == .success)
-        guard let focused = attr(application,kAXFocusedUIElementAttribute) else { throw Refusal(code:"adapter-refused") }
-        try check(CFEqual(focused,selected))
-        try check(AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,text as CFString) == .success)
+        guard target == "sheet", let text = request["value"] as? String, !text.isEmpty,
+          text.utf8.count <= 4096 else { throw pressFailure("axtext-request") }
+        func pinnedField() throws {
+          try verify(); let retained = try verifySheet()
+          try check(owns(selected,pid) && CFEqual(try node(value,retained),selected))
+        }
+        do { try pinnedField() } catch { throw pressFailure("axtext-identity") }
+        var subrole: CFTypeRef?, focused: CFTypeRef?, actionNames: CFArray?
+        let subroleQuery = AXUIElementCopyAttributeValue(selected,kAXSubroleAttribute as CFString,&subrole)
+        var focusable = DarwinBoolean(false), writable = DarwinBoolean(false)
+        let focusQuery = AXUIElementIsAttributeSettable(selected,kAXFocusedAttribute as CFString,&focusable)
+        let focusedQuery = AXUIElementCopyAttributeValue(application,kAXFocusedUIElementAttribute as CFString,&focused)
+        let valueQuery = AXUIElementIsAttributeSettable(selected,kAXValueAttribute as CFString,&writable)
+        let confirmQuery = AXUIElementCopyActionNames(selected,&actionNames)
+        let facts: [String:Any] = ["role":attr(selected,kAXRoleAttribute) as? String == kAXTextFieldRole ? "AXTextField" : "other",
+          "enabled":attr(selected,kAXEnabledAttribute) as? Bool == true,
+          "textFieldKind":textFieldKind(subroleQuery,subrole as? String),"subroleQueryError":Int(subroleQuery.rawValue),
+          "focusSettableQueryError":Int(focusQuery.rawValue),"focusSettable":focusQuery == .success && focusable.boolValue,
+          "focusedQueryError":Int(focusedQuery.rawValue),"focusedMatches":focusedQuery == .success && focused.map { CFEqual($0,selected) } == true,
+          "valueSettableQueryError":Int(valueQuery.rawValue),"valueSettable":valueQuery == .success && writable.boolValue,
+          "confirmQueryError":Int(confirmQuery.rawValue),"confirmAdvertised":confirmQuery == .success && (actionNames as? [String] ?? []).contains(kAXConfirmAction as String)]
+        do {
+          var evidence = try enterSheetText(facts,identity:pinnedField,
+            write:{ Int(AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,text as CFString).rawValue) },
+            read:{ var readback: CFTypeRef?; let error = AXUIElementCopyAttributeValue(selected,kAXValueAttribute as CFString,&readback)
+              return (Int(error.rawValue),error == .success && (readback as? String) == text) },
+            confirm:{ Int(AXUIElementPerformAction(selected,kAXConfirmAction as CFString).rawValue) })
+          evidence["elementPath"] = value; result["actionDiagnostics"] = evidence
+        } catch let error as ActionRefusal { throw pressFailure(error.diagnostics["stage"] as? String ?? "axtext-request",error.diagnostics) }
       }
       if action == "select" {
         try check(target == "sheet" && attr(selected,kAXRoleAttribute) as? String == kAXRowRole)
@@ -703,7 +783,7 @@ func run() throws {
         }
         d["stage"] = "row-readback"; result["selectionDiagnostics"] = d
         result["selected"] = true
-      } else if action != "press" { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
+      }
       do { try verify() }
       catch let error as IdentityRefusal {
         if action == "press" {
@@ -719,9 +799,10 @@ func run() throws {
           }
           throw pressFailure("post-action-"+error.stage,facts)
         }
+        if action == "set" { throw pressFailure("post-action-"+error.stage,error.facts) }
         throw error
       }
-      catch { if action == "press" { throw pressFailure("post-action-identity") }; throw error }
+      catch { if action == "press" || action == "set" { throw pressFailure("post-action-identity") }; throw error }
       if target == "sheet" {
         if try members().isEmpty { result["dismissalPendingVerification"] = true }
         else { _ = try verifySheet() }
@@ -747,6 +828,10 @@ func run() throws {
         var facts: [String:Any] = ["path":path,"role":roles.contains(role) ? role : "other","press":supports(current,kAXPressAction),"confirm":supports(current,kAXConfirmAction)]
         if let selected = attr(current,kAXSelectedAttribute) as? Bool { facts["selected"] = selected }
         if let enabled = attr(current,kAXEnabledAttribute) as? Bool { facts["enabled"] = enabled }
+        if role == kAXTextFieldRole { var subrole: CFTypeRef?
+          let query = AXUIElementCopyAttributeValue(current,kAXSubroleAttribute as CFString,&subrole)
+          facts["textFieldKind"] = textFieldKind(query,subrole as? String)
+        }
         if labels.contains(title) { facts["control"] = title }
         else if labels.contains(value) { facts["control"] = value }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
