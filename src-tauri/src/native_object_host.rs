@@ -34,6 +34,57 @@ pub(crate) struct NativeObjectHost {
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
+    pub(crate) fn project_file_info(&self) -> Result<serde_json::Value, String> {
+        self.history
+            .project_file_info()
+            .map_err(|_| "native project metadata unavailable".into())
+    }
+    pub(crate) fn project_file_snapshot(
+        &self,
+        revision: u64,
+        snapshot: &str,
+    ) -> Result<Option<Vec<u8>>, String> {
+        if !self.history.is_project_file() {
+            return Ok(None);
+        }
+        self.history
+            .serialize_project_file(revision, snapshot)
+            .map(Some)
+            .map_err(|_| "native project snapshot is unavailable".into())
+    }
+    pub(crate) fn project_reference(
+        &mut self,
+        snapshot: &str,
+        request: &OpacityRequest,
+        png: Option<&[u8]>,
+    ) -> Result<ResponseEnvelope, String> {
+        let current = self
+            .history
+            .acquire_snapshot(self.content_revision())
+            .ok_or("native reference snapshot unavailable")?;
+        if current.snapshot_id() != snapshot {
+            return Err("native reference snapshot is stale".into());
+        }
+        let before = self.content_revision();
+        let result = self.history.dispatch_reference_command(request, png);
+        if self.content_revision() != before {
+            self.preview.invalidate();
+        }
+        result.map_err(|_| "native reference request identity or body refused".into())
+    }
+    pub(crate) fn from_project_file(instance_id: String, bytes: &[u8]) -> Result<Self, String> {
+        if !envelope_identity(&instance_id) {
+            return Err("native project instance identity is invalid".into());
+        }
+        let history = NativeObjectHistory::from_project_file(instance_id, bytes)
+            .map_err(|_| "native project file admission failed")?;
+        Ok(Self {
+            history,
+            preview: preview::ObjectPreview::default(),
+            object_export: None,
+            released: None,
+        })
+    }
     pub(crate) fn new(instance_id: String, document: ObjectDocument) -> Result<Self, String> {
         if !envelope_identity(&instance_id) {
             return Err("native object host instance identity is invalid".into());

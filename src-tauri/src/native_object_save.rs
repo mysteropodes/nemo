@@ -118,6 +118,66 @@ pub(super) fn save_request(
             "object destination outside existing filesystem scope",
         ));
     }
+    let bytes = match state
+        .native_project_file_snapshot(
+            &request.document_id,
+            request.at_revision,
+            &request.document_snapshot_id,
+        )
+        .map_err(|_| host_error("unavailable", "native project snapshot refused"))?
+    {
+        Some(bytes) => bytes,
+        None => bare_bytes(state, &request)?,
+    };
+    effect("snapshot", &destination)
+        .map_err(|_| host_error("unavailable", "object publication preparation refused"))?;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    effect("create", &staged)
+        .map_err(|_| host_error("unavailable", "object staging preparation refused"))?;
+    let mut file = options
+        .open(&staged)
+        .map_err(|_| host_error("unavailable", "object staging creation refused"))?;
+    let published = (|| -> std::io::Result<()> {
+        effect("write", &staged)?;
+        file.write_all(&bytes)?;
+        effect("sync", &staged)?;
+        file.sync_all()?;
+        effect("link", &staged)?;
+        if !owned_regular(&staged, &file) {
+            return Err(std::io::Error::other("staging identity changed"));
+        }
+        // Atomic no-replace publication. Scope/check/open/link are still separate
+        // path operations: adversarial parent/staging replacement is not solved.
+        fs::hard_link(&staged, &destination)
+    })();
+    if published.is_err() {
+        let cleaned = cleanup(&staged, &file);
+        let mut error = host_error("unavailable", "object new-file publication refused");
+        error.details = Some(json!({"published":false,"cleanupPending":!cleaned}));
+        return Err(error);
+    }
+    let cleaned = effect("cleanup", &staged).is_ok() && cleanup(&staged, &file);
+    Ok(SaveReceipt {
+        api_version: request.api_version,
+        request_id: request.request_id,
+        instance_id: request.instance_id,
+        document_id: request.document_id,
+        at_revision: request.at_revision,
+        document_snapshot_id: request.document_snapshot_id,
+        byte_count: bytes.len(),
+        published: true,
+        cleanup_pending: !cleaned,
+    })
+}
+
+fn bare_bytes(state: &ApplicationMcp, request: &SaveRequest) -> HostResult<Vec<u8>> {
+    let invalid = || host_error("invalid_request", "invalid object serialization response");
     let query = json!({"apiVersion":request.api_version,"requestId":request.request_id,
         "instanceId":request.instance_id,"documentId":request.document_id,
         "operation":"query.document.object.serialize","payload":{"atRevision":request.at_revision}});
@@ -151,51 +211,7 @@ pub(super) fn save_request(
     if serde_json::to_vec(&response).map_or(true, |b| b.len() > 4096) {
         return Err(invalid());
     }
-    effect("snapshot", &destination)
-        .map_err(|_| host_error("unavailable", "object publication preparation refused"))?;
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    effect("create", &staged)
-        .map_err(|_| host_error("unavailable", "object staging preparation refused"))?;
-    let mut file = options
-        .open(&staged)
-        .map_err(|_| host_error("unavailable", "object staging creation refused"))?;
-    let published = (|| -> std::io::Result<()> {
-        effect("write", &staged)?;
-        file.write_all(bytes)?;
-        effect("sync", &staged)?;
-        file.sync_all()?;
-        effect("link", &staged)?;
-        if !owned_regular(&staged, &file) {
-            return Err(std::io::Error::other("staging identity changed"));
-        }
-        // Atomic no-replace publication. Scope/check/open/link are still separate
-        // path operations: adversarial parent/staging replacement is not solved.
-        fs::hard_link(&staged, &destination)
-    })();
-    if published.is_err() {
-        let cleaned = cleanup(&staged, &file);
-        let mut error = host_error("unavailable", "object new-file publication refused");
-        error.details = Some(json!({"published":false,"cleanupPending":!cleaned}));
-        return Err(error);
-    }
-    let cleaned = effect("cleanup", &staged).is_ok() && cleanup(&staged, &file);
-    Ok(SaveReceipt {
-        api_version: request.api_version,
-        request_id: request.request_id,
-        instance_id: request.instance_id,
-        document_id: request.document_id,
-        at_revision: request.at_revision,
-        document_snapshot_id: request.document_snapshot_id,
-        byte_count: bytes.len(),
-        published: true,
-        cleanup_pending: !cleaned,
-    })
+    Ok(bytes.to_vec())
 }
 
 #[tauri::command]

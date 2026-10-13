@@ -118,7 +118,7 @@ impl ObjectSnapshot {
         }
         bytes.copy_from_slice(source);
         let (visible, opacity, offset) = match &before {
-            ProjectReferenceState::NoMedia => (true, 1.0, 0),
+            ProjectReferenceState::NoMedia => (true, 0.5, 0),
             ProjectReferenceState::StillImage(previous) => (
                 previous.visible(),
                 previous.opacity(),
