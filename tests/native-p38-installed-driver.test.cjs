@@ -140,6 +140,18 @@ test('startup stderr capture refuses a FIFO without blocking',async t=>{
   assert.ok(Date.now()-started<500,'FIFO refusal must not stall startup cleanup');
   assert.equal(result.classification,'stderr-unavailable');assert.equal(result.stderrBytes,0);
 });
+test('startup stderr capture refuses a symlinked report root',async t=>{
+  if(process.platform==='win32')return t.skip('directory symlinks are not portable on Windows');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'p38-startup-symlink-'));
+  const taskRoot=path.join(root,'task'),target=path.join(root,'outside-reports'),reports=path.join(taskRoot,'reports');
+  fs.mkdirSync(taskRoot);fs.mkdirSync(target);fs.symlinkSync(target,reports,'dir');
+  fs.writeFileSync(path.join(target,'native-app.stderr.log'),"thread 'main' panicked at /private/secret-token");
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const result=await captureStartupDiagnostics('task',{taskRoots:()=>({root:taskRoot,reports})},{readNativeStatus:()=>({state:'active'})});
+  assert.equal(result.classification,'stderr-unavailable');assert.equal(result.stderrBytes,0);
+  assert.equal(result.stderrSha256,crypto.createHash('sha256').update(Buffer.alloc(0)).digest('hex'));
+  assert.equal(JSON.stringify(result).includes('secret-token'),false);
+});
 for(const phase of ['start','window'])test('prelaunch watchdog bounds held '+phase+' and cleans exactly once',async()=>{
   const hold=fire=>{fire();return new Promise(()=>{});};const f=fixture(phase==='start'?{start:hold}:{window(mode,pid,wid,action,fire){return hold(fire);}});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.reason,'watchdog-timeout');assert.equal(f.cleaned,1);assert.equal(f.attempts,1);

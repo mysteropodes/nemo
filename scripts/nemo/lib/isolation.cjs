@@ -18,11 +18,40 @@ const { exists, nowIso } = require('./util.cjs');
 const identity = require('./identity.cjs'); // property access below (identity.sourceIdentity()),
 // deliberately not destructured, so tests can substitute identity.sourceIdentity without editing this file.
 
+// Resolve a configured root through its nearest existing ancestor without
+// creating anything during module loading. macOS commonly spells the temp
+// directory through /var while realpath returns /private/var; child runtimes
+// compare these paths literally when checking their isolated roots.
+function canonicalRoot(configured) {
+  let candidate = path.resolve(configured);
+  const missing = [];
+  for (;;) {
+    try {
+      const physical = fs.realpathSync(candidate);
+      if (!fs.statSync(physical).isDirectory()) throw new Error('isolation root ancestor is not a directory');
+      return path.join(physical, ...missing);
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+      // A dangling symlink is not a missing path component. Refuse it instead
+      // of appending task roots through an unresolved alias.
+      try {
+        if (fs.lstatSync(candidate).isSymbolicLink()) throw new Error('isolation root contains an unresolved symlink');
+      } catch (statError) {
+        if (statError.code !== 'ENOENT' && statError.code !== 'ENOTDIR') throw statError;
+      }
+      const parent = path.dirname(candidate);
+      if (parent === candidate) throw error;
+      missing.unshift(path.basename(candidate));
+      candidate = parent;
+    }
+  }
+}
+
 // Root that holds all isolated task state. Deliberately OUTSIDE the repo
 // (os.tmpdir(), not `reports/`) so this module needs no .gitignore change
 // and nothing here survives (or needs to survive) `git clean`. Override with
 // NEMO_ISOLATION_ROOT for tests or a shared machine-wide cache location.
-const RUNTIME_ROOT = process.env.NEMO_ISOLATION_ROOT || path.join(os.tmpdir(), 'nemo-runtime');
+const RUNTIME_ROOT = canonicalRoot(process.env.NEMO_ISOLATION_ROOT || path.join(os.tmpdir(), 'nemo-runtime'));
 const SLOTS_DIR = path.join(RUNTIME_ROOT, 'slots');
 
 // Scratch band for reserved ports. Distinct from the `npm run serve` default
