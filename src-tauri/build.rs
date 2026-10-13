@@ -75,11 +75,18 @@ fn main() {
     // rerun-if-changed for the whole frontend tree forces a fresh embed
     // (and a real recompile, not a 0.7s no-op) whenever those files change.
     println!("cargo:rerun-if-changed=../src");
-    if std::env::var_os("CARGO_FEATURE_TEST_OBJECT_WINDOW_PROBE").is_some() {
+    let object_probe = std::env::var_os("CARGO_FEATURE_TEST_OBJECT_WINDOW_PROBE").is_some();
+    let p38_probe = std::env::var_os("CARGO_FEATURE_TEST_P38_FIXTURE_OPEN_PROBE").is_some();
+    if object_probe || p38_probe {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("repository parent");
-        println!("cargo:rerun-if-env-changed=NEMO_OBJECT_PROBE_BUILD_NONCE");
+        if object_probe {
+            println!("cargo:rerun-if-env-changed=NEMO_OBJECT_PROBE_BUILD_NONCE");
+        }
+        if p38_probe {
+            println!("cargo:rerun-if-env-changed=NEMO_P38_FIXTURE_OPEN_BUILD_NONCE");
+        }
         track_git_path(repo, "HEAD");
         track_git_path(repo, "index");
         if let Some(reference) = git(repo, &["symbolic-ref", "-q", "HEAD"]) {
@@ -92,11 +99,20 @@ fn main() {
             && source.bytes().all(|byte| byte.is_ascii_hexdigit())
             && git(repo, &["status", "--porcelain", "--untracked-files=normal"])
                 .is_some_and(|status| status.is_empty());
-        println!("cargo:rustc-env=NEMO_OBJECT_PROBE_BUILD_SHA={source}");
-        println!(
-            "cargo:rustc-env=NEMO_OBJECT_PROBE_BUILD_CLEAN={}",
-            if clean { "1" } else { "0" }
-        );
+        if object_probe {
+            println!("cargo:rustc-env=NEMO_OBJECT_PROBE_BUILD_SHA={source}");
+            println!(
+                "cargo:rustc-env=NEMO_OBJECT_PROBE_BUILD_CLEAN={}",
+                if clean { "1" } else { "0" }
+            );
+        }
+        if p38_probe {
+            println!("cargo:rustc-env=NEMO_P38_FIXTURE_OPEN_BUILD_SHA={source}");
+            println!(
+                "cargo:rustc-env=NEMO_P38_FIXTURE_OPEN_BUILD_CLEAN={}",
+                if clean { "1" } else { "0" }
+            );
+        }
     }
     tauri_build::build()
 }

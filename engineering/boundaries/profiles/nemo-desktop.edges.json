@@ -126,13 +126,14 @@
     "items": []
   },
   "features": {
-    "declared": ["test-play-publication-observer", "test-object-window-probe"],
-    "declaredNote": "O1/#1708 and N25F3D3B2D2A/#1834 declare two separate default-off, private test-package features in src-tauri/Cargo.toml. Normal desktop builds expose neither observer nor fixed object-window probe; all other cfg predicates remain the four plain predicates below.",
+    "declared": ["test-play-publication-observer", "test-object-window-probe", "test-p38-fixture-open-probe"],
+    "declaredNote": "O1/#1708, N25F3D3B2D2A/#1834 and P38/#1858 declare three separate default-off, private test-package features in src-tauri/Cargo.toml. Normal desktop builds expose none of these probes. The Linux target cfg selects the correct no-follow open flag for the private P38 fixture bridge; all other cfg predicates remain unchanged.",
     "allowedCfgs": [
       "test",
       "unix",
       "debug_assertions",
-      "target_os = \"macos\""
+      "target_os = \"macos\"",
+      "target_os = \"linux\""
     ]
   },
   "externalCratePorts": {

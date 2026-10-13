@@ -274,6 +274,8 @@ pub fn run() {
             task_runtime::nemo_task_runtime_release,
             #[cfg(feature = "test-object-window-probe")]
             task_runtime::object_window_probe::nemo_test_object_window_probe,
+            #[cfg(feature = "test-p38-fixture-open-probe")]
+            task_runtime::p38_fixture_open_probe::control::nemo_test_p38_fixture_open_probe,
             #[cfg(feature = "test-play-publication-observer")]
             task_runtime::nemo_test_play_observer,
             #[cfg(feature = "test-play-publication-observer")]
