@@ -1,0 +1,238 @@
+//! Original application authority plus real desktop destination controls.
+use crate::application_mcp::ApplicationMcp;
+use crate::native_application_contract::host_error;
+use crate::native_object_desktop_export::{
+    admit_request, export_with_target, port::LazyDesktopArtifactPort, MAX_PNG_BYTES,
+};
+use native_engine::{
+    compositor::Compositor, export_job::StagedArtifactPort, object_codec::decode_storage_project,
+};
+use serde_json::{json, Value};
+use std::{cell::Cell, fs, path::PathBuf};
+
+struct Scratch(PathBuf);
+impl Scratch {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!("nemo-object-route-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&path).unwrap();
+        Self(path.canonicalize().unwrap())
+    }
+    fn destination(&self) -> PathBuf {
+        self.0.join("object-png-sequence")
+    }
+    fn stage(&self) -> PathBuf {
+        self.0.join("stage")
+    }
+}
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn object_document() -> Value {
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap();
+    let mut record = cases["records"][0].clone();
+    record["target"] = json!({"contextId":"scene-root","frameScope":{"kind":"authored","frame":0},"layerUid":"L0","strokeId":"a"});
+    record["geometry"]["segments"] =
+        json!([[4,4],[28,4],[28,28],[4,28]].map(|[x,y]|
+        json!({"point":{"x":x,"y":y},"handleIn":{"x":0,"y":0},"handleOut":{"x":0,"y":0}})));
+    record["fill"] = json!({"kind":"solid","r":0,"g":0,"b":1,"a":1});
+    json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
+        "layers":[{"layerUid":"L0"}],"objects":[record],"compositionOrder":{
+            "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+            "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
+            "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[{"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]}],
+            "migration":"explicit-plan-required","referencePolicy":"unresolved"}})
+}
+
+fn fixture(scratch: &Scratch) -> (ApplicationMcp, Value) {
+    let state = ApplicationMcp::default();
+    let (document_id, revision) = state
+        .install_native_object(
+            decode_storage_project(&serde_json::to_vec(&object_document()).unwrap()).unwrap(),
+        )
+        .unwrap();
+    let generation = state.native_state().lock().unwrap().active().unwrap().0;
+    let query = json!({"apiVersion":2,"requestId":"object-export-pins","instanceId":state.instance_id(),
+        "documentId":document_id,"operation":"query.document.object.serialize","payload":{"atRevision":revision}});
+    let response = state
+        .serialize_object_file_snapshot(&query.to_string())
+        .unwrap();
+    assert!(response.ok);
+    let raw = json!({"apiVersion":2,"requestId":"original-png-export","instanceId":state.instance_id(),
+        "documentId":document_id,"contentRevision":revision,
+        "documentSnapshotId":response.result.unwrap()["documentSnapshotId"],
+        "lifecycleGeneration":generation,"contextId":"scene-root","scopeKind":"authored","frame":0,
+        "outputSpec":{"kind":"frame","format":"rgba8","width":320,"height":180,
+            "colorInterpretation":"srgb","alphaMode":"straight"},
+        "viewport":{"cssBounds":{"x":0,"y":0,"width":320,"height":180},
+            "physicalExtent":{"width":320,"height":180},"compositionExtent":{"width":320,"height":180},
+            "reportedDpr":1},"destinationDirectory":scratch.destination(),"maximumEncodedBytes":65536});
+    (state, raw)
+}
+
+#[test]
+fn raw_admission_refuses_unscoped_collision_symlink_and_invalid_pins() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture(&scratch);
+    assert!(admit_request(&raw.to_string(), state.instance_id(), |_| false).is_err());
+    for (field, value) in [
+        ("instanceId", json!("foreign")),
+        ("lifecycleGeneration", json!(0)),
+        ("scopeKind", json!("reference")),
+        ("maximumEncodedBytes", json!(0)),
+        ("maximumEncodedBytes", json!(MAX_PNG_BYTES + 1)),
+        ("cancelledBeforeDispatch", json!(true)),
+    ] {
+        let mut changed = raw.clone();
+        changed[field] = value;
+        assert!(
+            admit_request(&changed.to_string(), state.instance_id(), |_| true).is_err(),
+            "{field}"
+        );
+    }
+    let mut changed = raw.clone();
+    changed["destinationDirectory"] = json!("relative-output");
+    assert!(admit_request(&changed.to_string(), state.instance_id(), |_| true).is_err());
+    changed = raw.clone();
+    changed["outputSpec"]["width"] = json!(64);
+    assert!(admit_request(&changed.to_string(), state.instance_id(), |_| true).is_err());
+    let duplicate = raw.to_string().replacen('{', "{\"apiVersion\":2,", 1);
+    assert!(admit_request(&duplicate, state.instance_id(), |_| true).is_err());
+    fs::create_dir(scratch.destination()).unwrap();
+    fs::write(scratch.destination().join("original"), b"preserve").unwrap();
+    assert!(admit_request(&raw.to_string(), state.instance_id(), |_| true).is_err());
+    assert_eq!(
+        fs::read(scratch.destination().join("original")).unwrap(),
+        b"preserve"
+    );
+    fs::remove_dir_all(scratch.destination()).unwrap();
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&scratch.0, scratch.destination()).unwrap();
+        assert!(admit_request(&raw.to_string(), state.instance_id(), |_| true).is_err());
+    }
+}
+
+#[test]
+fn original_owner_and_revision_barriers_precede_any_target_callback() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture(&scratch);
+    let invoked = Cell::new(0);
+    for (field, value) in [
+        ("documentId", json!("foreign")),
+        ("contentRevision", json!(1)),
+        ("lifecycleGeneration", json!(999)),
+    ] {
+        let mut changed = raw.clone();
+        changed[field] = value;
+        let admitted = admit_request(&changed.to_string(), state.instance_id(), |_| true).unwrap();
+        assert!(export_with_target(&state, &admitted, scratch.stage(), |_| {
+            invoked.set(invoked.get() + 1);
+            Err(host_error("internal", "unexpected target"))
+        })
+        .is_err());
+    }
+    assert_eq!(invoked.get(), 0);
+    assert!(!scratch.stage().exists());
+    let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
+    assert!(export_with_target(&state, &admitted, scratch.stage(), |_| {
+        invoked.set(invoked.get() + 1);
+        Err(host_error("unavailable", "controlled target refusal"))
+    })
+    .is_err());
+    assert_eq!(invoked.get(), 1);
+    assert!(!scratch.stage().exists());
+}
+
+#[test]
+fn lazy_artifact_port_refuses_pre_begin_operations_without_filesystem_effects() {
+    let scratch = Scratch::new();
+    let mut port = LazyDesktopArtifactPort::new(
+        scratch.stage(),
+        "object-output".into(),
+        scratch.destination(),
+    );
+    assert!(port
+        .write_frame("job", "frame_0001.png", b"invalid")
+        .is_err());
+    assert!(port.publish("job", "object-output", &[]).is_err());
+    assert!(port.begin_staging("job", "foreign").is_err());
+    assert!(port.cleanup("job").is_ok());
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+}
+
+#[cfg(target_os = "macos")]
+fn decoded_pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
+    use objc::runtime::Object;
+    use objc::{class, msg_send, sel, sel_impl};
+    unsafe {
+        let data: *mut Object = msg_send![class!(NSData), alloc];
+        let data: *mut Object = msg_send![data, initWithBytes:bytes.as_ptr() length:bytes.len()];
+        let image: *mut Object = msg_send![class!(NSBitmapImageRep), alloc];
+        let image: *mut Object = msg_send![image, initWithData:data];
+        assert!(!image.is_null());
+        let width: usize = msg_send![image, pixelsWide];
+        let height: usize = msg_send![image, pixelsHigh];
+        assert_eq!((width, height), (320, 180));
+        let stride: usize = msg_send![image, bytesPerRow];
+        let pixels: *const u8 = msg_send![image, bitmapData];
+        assert!(!pixels.is_null() && stride >= 320 * 4);
+        let pixel = std::slice::from_raw_parts(pixels.add(y * stride + x * 4), 4);
+        let result = [pixel[0], pixel[1], pixel[2], pixel[3]];
+        let _: () = msg_send![image, release];
+        let _: () = msg_send![data, release];
+        result
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn exact_application_owner_publishes_literal_png_through_real_port() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture(&scratch);
+    let mut gpu = Compositor::new().unwrap();
+    let mut stale = raw.clone();
+    stale["documentSnapshotId"] = json!("foreign-snapshot");
+    let stale = admit_request(&stale.to_string(), state.instance_id(), |_| true).unwrap();
+    assert!(
+        export_with_target(&state, &stale, scratch.stage(), |consumer| {
+            consumer
+                .run(&mut gpu)
+                .map_err(|message| host_error("unavailable", message))
+        })
+        .is_err()
+    );
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+
+    let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
+    let result = export_with_target(&state, &admitted, scratch.stage(), |consumer| {
+        consumer
+            .run(&mut gpu)
+            .map_err(|message| host_error("unavailable", message))
+    })
+    .unwrap();
+    assert_eq!(result.status, "succeeded");
+    assert_eq!(result.external_effect_disposition, "committed");
+    assert!(result.published && result.cleanup_complete);
+    assert_eq!(result.artifact_files, ["frame_0001.png"]);
+    let bytes = fs::read(scratch.destination().join("frame_0001.png")).unwrap();
+    assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
+    assert_eq!(decoded_pixel(&bytes, 8, 8), [0, 0, 255, 255]);
+    assert_eq!(decoded_pixel(&bytes, 40, 40), [255; 4]);
+    assert_eq!(fs::read_dir(scratch.stage()).unwrap().count(), 0);
+    assert!(
+        export_with_target(&state, &admitted, scratch.stage(), |consumer| {
+            consumer
+                .run(&mut gpu)
+                .map_err(|message| host_error("unavailable", message))
+        })
+        .is_err()
+    );
+}
