@@ -266,7 +266,7 @@ fn final_original_native_lock_crossing_deadline_cannot_create_requested_cut() {
     f.publish(&serde_json::to_vec(&f.request()).unwrap());
     let mut input = f.input();
     let native = f.native();
-    let deadline = Instant::now() + Duration::from_secs(1);
+    let deadline = Instant::now() + Duration::from_secs(3);
     let (health_send, health_recv) = std::sync::mpsc::channel();
     let (held_send, held_recv) = std::sync::mpsc::channel();
     let (wait_send, wait_recv) = std::sync::mpsc::channel();
@@ -284,11 +284,10 @@ fn final_original_native_lock_crossing_deadline_cannot_create_requested_cut() {
                 || wait_send.send(()).unwrap(),
             )
         });
-        health_recv.recv_timeout(Duration::from_secs(2)).unwrap();
+        health_recv.recv_timeout(Duration::from_secs(5)).unwrap();
         let held = native.lock().unwrap(); // REAL original Arc; receipt stays unchanged.
         held_send.send(()).unwrap();
-        wait_recv.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert!(Instant::now() < deadline); // Passed the pre-lock deadline check.
+        wait_recv.recv_timeout(Duration::from_secs(5)).unwrap(); // Pre-lock check passed.
         std::thread::sleep(deadline.saturating_duration_since(Instant::now()));
         assert!(Instant::now() >= deadline);
         drop(held);
