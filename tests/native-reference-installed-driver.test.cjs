@@ -241,3 +241,33 @@ test('real child transport chooses Reference entrypoint/environment and retires 
   } finally {await shared.closeOwnedHelpers(()=>{},[...helpers],shared.cleanupHelper);}
   assert.equal(helpers.size,0);
 });
+
+for(const fault of ['none','missing','mismatch','confirm','identity','search']) {
+  test('Reference sheet set requires categorical exact readback proof: '+fault,async t=>{
+    const token='11111111-1111-4111-8111-111111111111';let n=0,sets=0;
+    const diagnostics={stage:'axtext-confirm',elementPath:'0.7',role:'AXTextField',textFieldKind:'plain',enabled:true,
+      focusSettableQueryError:-25205,focusSettable:false,focusedQueryError:0,focusedMatches:false,
+      valueSettableQueryError:0,valueSettable:true,valueWriteError:0,valueReadbackError:0,valueMatches:true,
+      confirmQueryError:0,confirmAdvertised:true,confirmError:0};
+    const f=modeled(t,{window(mode,pid,wid,action){
+      const result={pid,windowId:45,matchedAX:true};
+      if(mode==='pin-sheet')return {...result,target:'sheet',sheetToken:token};
+      if(mode==='sheet-dismissed')return {...result,dismissed:true};
+      if(mode!=='set')return result;
+      sets++;const d={...diagnostics};
+      if(fault==='mismatch')d.valueMatches=false;
+      if(fault==='confirm')d.confirmError=-25204;
+      if(fault==='search'){d.stage='axtext-role';d.textFieldKind='search';}
+      if(fault==='identity')return {...result,pid:999};
+      return {...result,target:'sheet',sheetToken:token,...(fault==='missing'?{}:{actionDiagnostics:{...d,value:'/private/secret'}})};
+    }});
+    f.services.next=async()=>[{type:'pin-sheet'},{type:'set',target:'sheet',sheetToken:token,element:'0.7',
+      value:path.join(f.workspace.directory,'A.json')},{type:'sheet-dismissed',sheetToken:token},{type:'stop'}][n++];
+    const result=await driver.runOperator(f.config,f.services);
+    assert.equal(sets,1);assert.equal(result.status,fault==='none'?'operator-complete':'partial',JSON.stringify(result));
+    if(fault==='none')assert.deepEqual(result.actions[1].actionDiagnostics,diagnostics);
+    else assert.ok(result.firstFailure);
+    assert.equal(result.installedAcceptance,'not-established');assert.equal(result.cleanup,'complete');
+    assert.equal(JSON.stringify(result).includes('/private/secret'),false);
+  });
+}

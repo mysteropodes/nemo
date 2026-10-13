@@ -728,7 +728,7 @@ test('cleanup exception facts do not replace the saved first refusal',async()=>{
   assert.deepEqual(result.firstFailure.actionDiagnostics,safeActionDiagnostics(diagnostic));
   assert.equal(result.helperCleanup,'incomplete');
   assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-probe-error',helperPid:321,descendantPossible:true,
-    probePoint:'initial',signalAttempts:0,probeError:true}]);
+    probePoint:'initial',signalAttempts:0,probeError:true,probeErrorCode:'UNKNOWN'}]);
   assert.equal(result.cleanup,'complete');assert.equal(JSON.stringify(result).includes('/private/'),false);
 });
 test('modeled helper transport preserves sanitized press diagnostics in the first-failure receipt',async()=>{
@@ -843,4 +843,36 @@ test('press helper cleanup retains and kills its process group after helper exit
     for(const child of [...helpers])await cleanupHelper(child).catch(()=>{});
     fs.rmSync(dir,{recursive:true,force:true});
   }
+});
+
+test('text-entry diagnostics keep only categorical capabilities and readback equality',()=>{
+  const {safeActionDiagnostics,safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
+  const facts={stage:'axtext-readback',elementPath:'0.7',role:'AXTextField',textFieldKind:'plain',enabled:true,
+    focusSettableQueryError:-25205,focusSettable:false,focusedQueryError:0,focusedMatches:false,
+    valueSettableQueryError:0,valueSettable:true,valueWriteError:0,valueReadbackError:0,valueMatches:false,
+    confirmQueryError:0,confirmAdvertised:true};
+  assert.deepEqual(safeActionDiagnostics({...facts,value:'/private/secret',focusedTitle:'secret',message:'secret'}),facts);
+  for(const patch of [{textFieldKind:'/private/search'},{valueReadbackError:1},{valueMatches:'true'},{stage:'anything'}])
+    assert.throws(()=>safeActionDiagnostics({...facts,...patch}));
+  const projection=safeWindowEvidence({pid:123,windowId:45,matchedAX:true,nodes:[
+    {path:'0.7',role:'AXTextField',textFieldKind:'search',value:'/private/secret'},
+    {path:'1',role:'AXButton',textFieldKind:'plain'}]});
+  assert.deepEqual(projection.nodes,[{path:'0.7',role:'AXTextField',textFieldKind:'search'},{path:'1',role:'AXButton'}]);
+});
+test('unknown group probes never become absence and expose only fixed error codes',async()=>{
+  const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  for(const code of ['EPERM','EACCES','EINVAL','ENOSYS','private-error']){
+    let signalled=0;
+    await assert.rejects(cleanupHelper({pid:321},{alive(){throw Object.assign(Error('/private/path'),{code});},signal(){signalled++;}}),e=>{
+      const d=safeCleanupDiagnostics(e.cleanupDiagnostics)[0];
+      assert.equal(d.stage,'group-probe-error');assert.equal(d.probePoint,'initial');
+      assert.equal(d.probeErrorCode,code==='private-error'?'UNKNOWN':code);assert.equal('groupAliveBefore' in d,false);
+      assert.equal(JSON.stringify(d).includes('/private/'),false);return true;
+    });assert.equal(signalled,0);
+  }
+  for(const value of [undefined,null,0,1,'false',{},Promise.resolve(false)])
+    await assert.rejects(cleanupHelper({pid:321},{alive:()=>value}),e=>e.cleanupDiagnostics[0].probeErrorCode==='ERR_INVALID_PROBE_RESULT');
+  assert.throws(()=>safeCleanupDiagnostics([{stage:'group-probe-error',probeErrorCode:'ESRCH'}]));
+  await assert.rejects(cleanupHelper({pid:321},{alive:()=>true,signal(){throw Object.assign(Error('private'),{code:'EPERM'});}}),
+    e=>e.cleanupDiagnostics[0].signalErrorCode==='EPERM' && e.cleanupDiagnostics[0].groupAliveBefore===true);
 });
