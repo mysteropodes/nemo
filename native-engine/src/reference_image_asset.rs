@@ -141,10 +141,21 @@ fn container(bytes: &[u8]) -> Result<(), ImageAssetError> {
     }
 }
 
-pub(crate) fn decode_png(
+#[derive(Clone, Copy)]
+struct PngRows {
+    width: u32,
+    height: u32,
+    color: ColorType,
+    row_size: usize,
+    stride: usize,
+    rgba_size: usize,
+}
+// Both consumers use the existing header, admitted-row and terminal checks.
+fn read_png_rows(
     source: &[u8],
     budget: ImageAssetLimits,
-) -> Result<ReferenceImageAsset, ImageAssetError> {
+    mut consume: impl FnMut(PngRows, usize, &[u8]) -> Result<(), ImageAssetError>,
+) -> Result<PngRows, ImageAssetError> {
     if source.len() > budget.encoded_bytes {
         return Err(ImageAssetError::EncodedBudget);
     }
@@ -196,24 +207,24 @@ pub(crate) fn decode_png(
     let stride = (width as usize)
         .checked_mul(4)
         .ok_or(ImageAssetError::DecodedBudget)?;
-    let mut rgba = buffer(rgba_size)?;
-    for target in rgba.chunks_exact_mut(stride) {
+    let rows = PngRows {
+        width,
+        height,
+        color,
+        row_size,
+        stride,
+        rgba_size,
+    };
+    for index in 0..height as usize {
         let row = reader
             .next_row()
             .map_err(decoder_error)?
             .ok_or(ImageAssetError::Malformed)?;
         let data = row.data();
-        if data.len() != row_size {
+        if data.len() != rows.row_size {
             return Err(ImageAssetError::Malformed);
         }
-        if color == ColorType::Rgb {
-            for (rgb, pixel) in data.chunks_exact(3).zip(target.chunks_exact_mut(4)) {
-                pixel[..3].copy_from_slice(rgb);
-                pixel[3] = 255;
-            }
-        } else {
-            target.copy_from_slice(data);
-        }
+        consume(rows, index, data)?;
     }
     if reader.next_row().map_err(decoder_error)?.is_some()
         || reader.info().width != width
@@ -224,11 +235,46 @@ pub(crate) fn decode_png(
         return Err(ImageAssetError::Malformed);
     }
     reader.finish().map_err(decoder_error)?;
+    Ok(rows)
+}
+
+/// Borrowed decoder-check parity, without final pixel/source buffers.
+/// Known decoder gap: excess inflated pixels after declared rows can be ignored.
+/// Decoder-internal row/workspace allocations still obey PNG Limits.
+pub(crate) fn validate_png(
+    source: &[u8],
+    budget: ImageAssetLimits,
+) -> Result<(u32, u32), ImageAssetError> {
+    let rows = read_png_rows(source, budget, |_, _, _| Ok(()))?;
+    Ok((rows.width, rows.height))
+}
+
+pub(crate) fn decode_png(
+    source: &[u8],
+    budget: ImageAssetLimits,
+) -> Result<ReferenceImageAsset, ImageAssetError> {
+    let mut rgba = Vec::new();
+    let rows = read_png_rows(source, budget, |rows, index, data| {
+        if rgba.is_empty() {
+            rgba = buffer(rows.rgba_size)?;
+        }
+        let start = index * rows.stride;
+        let target = &mut rgba[start..start + rows.stride];
+        if rows.color == ColorType::Rgb {
+            for (rgb, pixel) in data.chunks_exact(3).zip(target.chunks_exact_mut(4)) {
+                pixel[..3].copy_from_slice(rgb);
+                pixel[3] = 255;
+            }
+        } else {
+            target.copy_from_slice(data);
+        }
+        Ok(())
+    })?;
     let mut encoded = buffer(source.len())?;
     encoded.copy_from_slice(source);
     Ok(ReferenceImageAsset {
-        width,
-        height,
+        width: rows.width,
+        height: rows.height,
         // Arc<Vec> shares payloads without copying a large Vec into Arc<[u8]>.
         encoded: Arc::new(encoded),
         rgba: Arc::new(rgba),
