@@ -3,6 +3,9 @@ use png::{BitDepth, ColorType, DecodeOptions, Decoder, DecodingError, Limits};
 use std::io::{BufReader, Cursor};
 use std::sync::Arc;
 
+#[path = "reference_png_scanlines.rs"]
+mod reference_png_scanlines;
+
 const MAX_ENCODED: usize = 16 * 1024 * 1024;
 const MAX_RGBA: usize = 256 * 1024 * 1024;
 const MAX_DECODER: usize = 64 * 1024 * 1024;
@@ -191,6 +194,12 @@ fn read_png_rows<E: From<ImageAssetError>>(
     let raw_size = pixels
         .checked_mul(channels)
         .ok_or(ImageAssetError::DecodedBudget)?;
+    let row_size = (width as usize)
+        .checked_mul(channels)
+        .ok_or(ImageAssetError::DecodedBudget)?;
+    // png's row reader can discard surplus inflated data after declared rows.
+    // Count the complete borrowed IDAT stream before any controlled pixel buffer.
+    reference_png_scanlines::verify(source, row_size, height as usize)?;
     let mut reader = decoder.read_info().map_err(decoder_error)?;
     if reader.info().animation_control.is_some()
         || reader.info().frame_control.is_some()
@@ -201,9 +210,6 @@ fn read_png_rows<E: From<ImageAssetError>>(
     if reader.output_buffer_size() != Some(raw_size) {
         return Err(ImageAssetError::Malformed.into());
     }
-    let row_size = (width as usize)
-        .checked_mul(channels)
-        .ok_or(ImageAssetError::DecodedBudget)?;
     let stride = (width as usize)
         .checked_mul(4)
         .ok_or(ImageAssetError::DecodedBudget)?;
@@ -239,7 +245,7 @@ fn read_png_rows<E: From<ImageAssetError>>(
 }
 
 /// Borrowed decoder-check parity, without final pixel/source buffers.
-/// Known decoder gap: excess inflated pixels after declared rows can be ignored.
+/// Complete filtered-row length is checked before the existing pixel decoder.
 /// Decoder-internal row/workspace allocations still obey PNG Limits.
 pub(crate) fn validate_png(
     source: &[u8],

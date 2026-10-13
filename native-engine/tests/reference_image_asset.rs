@@ -82,10 +82,10 @@ fn borrowed_validation_has_literal_dimensions_and_current_decoder_path_parity() 
         trailing.push(0);
         assert_eq!(parity(&trailing, limits()), Err(ImageAssetError::Malformed));
     }
-    // Known OLD decoder gap: corrected width2 ignores excess inflated pixels.
+    // Corrected width2 must refuse the surplus pixels before row delivery.
     assert_eq!(
         parity(&header(bytes(RGBA), 2, 1, 8, 6, 0), limits()),
-        Ok((2, 1))
+        Err(ImageAssetError::Malformed)
     );
     for (w, h) in [(3, 2), (3, 3)] {
         // Correct IHDR CRC: insufficient declared rows must still refuse.
