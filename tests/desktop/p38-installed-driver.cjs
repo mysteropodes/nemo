@@ -67,6 +67,7 @@ function safeWindowEvidence(result, reference = false) {
   if(reference)roles.add('AXPopUpButton');
   const controls = new Set(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle']);
   if (reference) for (const label of require('./reference-installed-policy.cjs').labels) controls.add(label);
+  if (reference) for (const label of ['Go','Go to the folder:','Go to folder:','Go to Folder','Go to the folder']) controls.add(label);
   const alerts = new Set(['switch-unavailable','active-close-unavailable']);
   check(Array.isArray(result.nodes) && result.nodes.length <= 4096, 'ax-evidence-refused');
   const clean = { pid: result.pid, windowId: result.windowId, matchedAX: result.matchedAX,
@@ -102,7 +103,8 @@ function safeActionDiagnostics(value) {
   const stages = new Set(['window-identity','window-identity-ax-owner','window-identity-application-window-membership','window-identity-pinned-cg-window','window-identity-minimized',
     'window-identity-pinned-cg-window-list','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity','post-action-ax-owner',
     'post-action-application-window-membership','post-action-pinned-cg-window','post-action-pinned-cg-window-list','post-action-minimized',
-    'axtext-request','axtext-identity','axtext-role','axtext-confirm-support','axtext-value-settable','axtext-write','axtext-readback','axtext-confirm']);
+    'axtext-request','axtext-identity','axtext-role','axtext-confirm-support','axtext-value-settable','axtext-write','axtext-readback','axtext-confirm',
+    'goto-state','goto-context','goto-layout','goto-discovery','goto-deadline','goto-dismissal']);
   check(stages.has(value.stage), 'ax-evidence-refused');
   const clean = { stage:value.stage };
   if (value.elementPath !== undefined) { check(typeof value.elementPath === 'string' && /^(?:\d+(?:\.\d+)*)$/.test(value.elementPath) && value.elementPath.length <= 128, 'ax-evidence-refused'); clean.elementPath=value.elementPath; }
@@ -336,10 +338,20 @@ async function captureStartupDiagnostics(task, isolation, runtime) {
     ...(status && ['starting','active','stopped','exited','failed','reconciliation-required'].includes(status.state) ? { runtimeState: status.state } : {}),
     ...(status && typeof status.signal === 'string' ? { signal: status.signal } : {}), stderrBytes: bytes.length, stderrSha256: hash(bytes), truncated });
 }
-function actionTarget(action, sheet) {
+function actionTarget(action, sheet, reference = false) {
   const target = action.target || 'main'; check(['main','sheet'].includes(target), 'target-refused');
+  const locationAction = ['go-to-folder','location-dismissed'].includes(action.type);
+  check(reference || !locationAction && action.locationToken === undefined, 'action-refused');
+  if (sheet.locationToken) check(target === 'sheet' && action.locationToken === sheet.locationToken &&
+    ['inspect','press','set','location-dismissed'].includes(action.type), 'location-token-refused');
+  else check(action.locationToken === undefined && action.type !== 'location-dismissed', 'location-token-refused');
+  if (action.type === 'go-to-folder') {
+    check(target === 'sheet' && !sheet.locationAttempted && !sheet.locationToken, 'location-state-refused');
+    // No caller-supplied key/event/field data belongs to this fixed command.
+    check(Object.keys(action).every(key=>['type','target','sheetToken'].includes(key)), 'action-refused');
+  }
   if (target === 'sheet') check(sheet.token && action.sheetToken === sheet.token &&
-    ['inspect','press','set','select'].includes(action.type), 'sheet-token-refused');
+    ['inspect','press','set','select',...(reference ? ['go-to-folder','location-dismissed'] : [])].includes(action.type), 'sheet-token-refused');
   else if (sheet.token) check(['pin-sheet','sheet-dismissed','capture'].includes(action.type), 'sheet-active');
   if (action.type === 'sheet-dismissed') check(sheet.token && action.sheetToken === sheet.token, 'sheet-token-refused');
   return target;
@@ -348,9 +360,22 @@ function sheetResult(action, sheet, result) {
   if (action.type === 'pin-sheet') {
     check(result.target === 'sheet' && typeof result.sheetToken === 'string' &&
       /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(result.sheetToken) &&
-      (!sheet.token || sheet.token === result.sheetToken), 'sheet-token-refused'); sheet.token = result.sheetToken;
+      (!sheet.token || sheet.token === result.sheetToken), 'sheet-token-refused');
+    if (!sheet.token) sheet.locationAttempted = false;
+    sheet.token = result.sheetToken;
   } else if (action.type === 'sheet-dismissed') { check(result.dismissed === true, 'sheet-active'); sheet.token = null; }
   else if (action.target === 'sheet') check(result.target === 'sheet' && result.sheetToken === sheet.token, 'sheet-token-refused');
+  if (action.type === 'go-to-folder') {
+    check(result.commandPosted === true && result.locationReady === true && typeof result.locationToken === 'string' &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(result.locationToken) &&
+      result.locationToken !== sheet.token, 'location-token-refused');
+    sheet.locationToken = result.locationToken;
+  } else if (sheet.locationToken) {
+    check(result.locationToken === sheet.locationToken, 'location-token-refused');
+    if (action.type === 'location-dismissed') {
+      check(result.locationDismissed === true, 'location-state-refused'); sheet.locationToken = null;
+    }
+  } else check(result.locationToken === undefined, 'location-token-refused');
 }
 async function transportReady(read, write, isTTY, nonce = crypto.randomUUID()) {
   check(isTTY === true, 'transport-pty-required');
@@ -423,9 +448,10 @@ async function runScopedOperator(config, services, reference) {
       const operatorWaitMs = Math.max(0, Math.round(performance.now() - waitStarted));
       operatorWaitStartedAt = null;
       receipt.operatorWaitMs = (receipt.operatorWaitMs || 0) + operatorWaitMs;
-      check(action && ['inspect', 'press', 'set', 'select', 'raise', 'capture', 'pin-sheet', 'sheet-dismissed', 'stop', ...(reference ? ['artifacts'] : [])].includes(action.type), 'action-refused');
+      check(action && ['inspect', 'press', 'set', 'select', 'raise', 'capture', 'pin-sheet', 'sheet-dismissed', 'stop', ...(reference ? ['artifacts','go-to-folder','location-dismissed'] : [])].includes(action.type), 'action-refused');
       if (action.type === 'stop') { check(!sheet.token, 'sheet-active'); receipt.stage = 'operator-stop'; break; }
-      actionTarget(action, sheet);
+      actionTarget(action, sheet, !!reference);
+      if (action.type === 'go-to-folder') sheet.locationAttempted = true;
       const ordinal = receipt.actions.length + 1, actionStarted = performance.now(); actionStartedAt = actionStarted;
       receipt.inFlightAction = { type:action.type, ordinal };
       receipt.stage = 'window-'+action.type+'-'+(action.target||'main'); save();
@@ -458,12 +484,14 @@ async function runScopedOperator(config, services, reference) {
           text.valueMatches===true && text.confirmQueryError===0 && text.confirmAdvertised===true && text.confirmError===0,'value-refused');
       }
       sheetResult(action, sheet, result);
-      if(action.type==='pin-sheet'){
+      if(action.type==='pin-sheet' || action.type==='go-to-folder'){
         check(typeof services.feedback==='function','sheet-feedback-required');
-        await bounded(services.feedback({target:'sheet',ordinal:receipt.actions.length+1,token:sheet.token}));
+        await bounded(services.feedback({target:'sheet',ordinal:receipt.actions.length+1,token:sheet.token,
+          ...(sheet.locationToken ? {locationToken:sheet.locationToken} : {})}));
       }
       if (result.captureSha256) check(/^[a-f0-9]{64}$/.test(result.captureSha256), 'capture-proof-refused');
       const completed = { type:action.type, ordinal, durationMs:Math.max(0,Math.round(performance.now()-actionStarted)), operatorWaitMs };
+      for (const key of ['commandPosted','locationReady','locationDismissed']) if (typeof result[key] === 'boolean') completed[key] = result[key];
       if (result.captureSha256) completed.captureSha256 = result.captureSha256;
       for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
       if (result.selectionDiagnostics && action.type === 'select') completed.selectionDiagnostics = safeSelectionDiagnostics(result.selectionDiagnostics);
@@ -478,7 +506,8 @@ async function runScopedOperator(config, services, reference) {
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
       'source-head-refused','fresh-build-proof-required','window-helper-refused','grant-already-attempted',
       'transport-pty-required','transport-handshake-refused','transport-required','operator-input-ended','helper-input-ended','inspect-budget-refused',
-      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS,...(reference ? reference.errors : [])].includes(error.code) ? error.code : 'operator-failed';
+      'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',
+      'location-token-refused','location-state-refused',...REFUSALS,...(reference ? reference.errors : [])].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
       ...(safeStartupDiagnostics(error.startupDiagnostics) ? { startupDiagnostics: safeStartupDiagnostics(error.startupDiagnostics) } : {}),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),

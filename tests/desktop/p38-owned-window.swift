@@ -3,10 +3,44 @@ import Foundation
 import ApplicationServices
 import CoreGraphics
 import Darwin
+import Carbon
 
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
 struct ActionRefusal: Error { let diagnostics: [String:Any] }
+func locationCheck(_ ok: Bool, _ stage: String) throws {
+  if !ok { throw ActionRefusal(diagnostics:["stage":stage]) }
+}
+// Production and fault controls share the one-shot event ordering. A posted
+// process event is not proof that the original sheet received the command.
+func goToFolder(_ reference: Bool, attempted: Bool, consume: () -> Void, context: () throws -> Void,
+  down: () -> Void, up: () -> Void, discover: () throws -> Void) throws {
+  try locationCheck(reference && !attempted,"goto-state"); consume()
+  try context()
+  // No fallible AX query or waiting between the exact-PID down/up pair.
+  down(); up()
+  try context()
+  try discover()
+}
+func locationCandidateValid(_ fresh: Bool, _ owned: Bool, _ modal: Bool, _ semantic: Bool,
+  _ fields: Int, _ kind: String, _ enabled: Bool, _ writable: Bool, _ confirm: Bool) -> Bool {
+  fresh && owned && modal && semantic && fields == 1 && kind == "plain" && enabled && writable && confirm
+}
+func ownedAncestor<Node>(_ candidate: Node, _ ancestor: Node, equal: (Node,Node)->Bool,
+  owned: (Node)->Bool, isWindow: (Node)->Bool, parent: (Node)->Node?, children: (Node)->[Node]?) -> Bool {
+  var current = candidate, visited = [Node]()
+  for _ in 0..<20 {
+    guard owned(current), !visited.contains(where:{ equal($0,current) }) else { return false }
+    if equal(current,ancestor) { return true }
+    guard !isWindow(current), let next = parent(current), owned(next),
+      let rows = children(next), rows.count <= 512, rows.contains(where:{ equal($0,current) }) else { return false }
+    visited.append(current); current = next
+  }
+  return false
+}
+func locationContextValid(_ mains: Int, _ windowsOwned: Bool, _ focusedWindowOwned: Bool, _ focusDescends: Bool) -> Bool {
+  mains == 1 && windowsOwned && focusedWindowOwned && focusDescends
+}
 func textFieldKind(_ query: AXError, _ subrole: String?) -> String {
   if query == .attributeUnsupported || query == .noValue { return "plain" }
   guard query == .success, let subrole else { return "unreadable" }
@@ -43,7 +77,7 @@ func enterSheetText(_ facts: [String:Any], identity: () throws -> Void,
 struct IdentityRefusal: Error { let stage: String; let facts: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
-let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
+let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "go-to-folder", "location-dismissed", "quit"]
 func operatorScope(_ mode: String, _ environment: [String:String]) throws -> (reference:Bool, report:String) {
   try check(mode == "--persistent" || mode == "--reference-persistent")
   let reference = mode == "--reference-persistent"
@@ -221,6 +255,40 @@ func boundedPinnedCGWindowSample(_ pid:pid_t, _ window:UInt32, _ deadline:UInt64
   }
 }
 func selfTest() throws {
+  for fault in ["none","foreign","window","parent","child","cycle","unreadable","oversized"] {
+    var reads = 0
+    let ok = ownedAncestor(3,1,equal:==,owned:{ $0 != (fault == "foreign" ? 3 : -1) },
+      isWindow:{ _ in reads += 1; return fault == "window" },
+      parent:{ item in fault == "parent" ? nil : (fault == "cycle" ? 3 : item-1) },
+      children:{ item in fault == "unreadable" ? nil : (fault == "oversized" ? Array(repeating:3,count:513) : [fault == "child" ? 99 : item+1]) })
+    try check(ok == (fault == "none"))
+    if fault == "foreign" { try check(reads == 0) }
+  }
+  try check(locationContextValid(1,true,true,true))
+  try check(!locationContextValid(2,true,true,true) && !locationContextValid(1,false,true,true) &&
+    !locationContextValid(1,true,false,true) && !locationContextValid(1,true,true,false))
+  for fault in ["none","p38","repeat","pid","window","focus","ancestor","layout","after-down","duplicate","search","absent","timeout"] {
+    var attempted = fault == "repeat", events = [String](), contexts = 0, refused = false
+    do {
+      try goToFolder(fault != "p38",attempted:attempted,consume:{ attempted = true },context:{
+        contexts += 1; events.append("context")
+        try locationCheck(!["pid","window","focus","ancestor","layout"].contains(fault) && !(fault == "after-down" && contexts == 2),"goto-context")
+      },down:{ events.append("down") },up:{ events.append("up") },discover:{
+        events.append("discover"); try locationCheck(!["duplicate","search","absent","timeout"].contains(fault),"goto-discovery")
+      })
+    } catch is ActionRefusal { refused = true }
+    try check(refused == (fault != "none"))
+    if events.contains("down") { try check(events.filter { $0 == "up" }.count == 1 && events.firstIndex(of:"up")! > events.firstIndex(of:"down")!) }
+    else { try check(!events.contains("up") && !events.contains("discover")) }
+    if fault == "after-down" { try check(events == ["context","down","up","context"]) }
+    if fault == "none" { try check(events == ["context","down","up","context","discover"]) }
+    if fault != "p38" { try check(attempted) }
+  }
+  try check(locationCandidateValid(true,true,true,true,1,"plain",true,true,true))
+  for index in 0..<9 {
+    try check(!locationCandidateValid(index != 0,index != 1,index != 2,index != 3,index == 4 ? 2 : 1,
+      index == 5 ? "search" : "plain",index != 6,index != 7,index != 8))
+  }
   try check(textFieldKind(.success,kAXSearchFieldSubrole) == "search")
   try check(textFieldKind(.attributeUnsupported,nil) == "plain")
   try check(textFieldKind(.cannotComplete,nil) == "unreadable")
@@ -350,7 +418,8 @@ func selfTest() throws {
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
-    "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,"foreignReads":0, "runtimeAX":false])
+    "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
+    "goToFolderSequenceCases":13,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -392,6 +461,13 @@ func run() throws {
   try check(matched.count == 1); let main = matched[0]
   var ordinal = 0
   var sheet: AXUIElement? = nil, sheetToken: String? = nil
+  var location: AXUIElement? = nil, locationField: AXUIElement? = nil, locationToken: String? = nil
+  var locationAttempted = false
+  func descendant(_ candidate: AXUIElement, _ ancestor: AXUIElement) -> Bool {
+    ownedAncestor(candidate,ancestor,equal:{ CFEqual($0,$1) },owned:{ owns($0,pid) },
+      isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },
+      parent:{ axElement(attr($0,kAXParentAttribute)) },children:{ attr($0,kAXChildrenAttribute) as? [AXUIElement] })
+  }
   // Public SDK defines AXSheet + AXParent/AXChildren, not an AXSheets constant.
   // Derive attachment from that documented relationship, never same-PID alone.
   func members() throws -> [AXUIElement] {
@@ -403,6 +479,7 @@ func run() throws {
       if attr(candidate,kAXRoleAttribute) as? String != kAXSheetRole { continue }
       guard let rawParent = attr(candidate,kAXParentAttribute), CFGetTypeID(rawParent) == AXUIElementGetTypeID() else { throw Refusal(code:"sheet-parent") }
       let parent = rawParent as! AXUIElement
+      if scope.reference && locationAttempted, let outer = sheet, !CFEqual(candidate,outer), descendant(candidate,outer) { continue }
       if !owns(parent,pid) || !CFEqual(parent,main) { throw Refusal(code:"sheet-parent") }
       if !attached.contains(where:{ CFEqual($0,candidate) }) { attached.append(candidate) }
     }
@@ -617,12 +694,61 @@ func run() throws {
   func supports(_ node: AXUIElement, _ action: String) -> Bool {
     var list: CFArray?; return AXUIElementCopyActionNames(node,&list) == .success && (list as? [String] ?? []).contains(action)
   }
+  // Bounded, complete ownership walk. An unreadable/truncated topology is not
+  // absence. Every edge must be attested by both AXChildren and AXParent.
+  func locationTree(_ root: AXUIElement, _ deadline: UInt64 = DispatchTime.now().uptimeNanoseconds + 1_000_000_000) throws -> [AXUIElement] {
+    var found = [AXUIElement]()
+    func walk(_ current: AXUIElement, _ depth: Int) throws {
+      try locationCheck(DispatchTime.now().uptimeNanoseconds < deadline,"goto-deadline")
+      try locationCheck(depth <= 12 && found.count < 512 && owns(current,pid) &&
+        !found.contains(where:{ CFEqual($0,current) }) && attr(current,kAXRoleAttribute) as? String != kAXWindowRole,"goto-discovery")
+      try locationCheck(AXUIElementSetMessagingTimeout(current,0.03) == .success,"goto-discovery")
+      found.append(current)
+      var raw: CFTypeRef?
+      let error = AXUIElementCopyAttributeValue(current,kAXChildrenAttribute as CFString,&raw)
+      if error == .attributeUnsupported || error == .noValue { return }
+      guard error == .success, let rows = raw as? [AXUIElement], rows.count <= 512 else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
+      for child in rows {
+        try locationCheck(owns(child,pid),"goto-discovery")
+        guard let parent = axElement(attr(child,kAXParentAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
+        try locationCheck(owns(parent,pid) && CFEqual(parent,current),"goto-discovery"); try walk(child,depth+1)
+      }
+    }
+    try walk(root,0); try locationCheck(DispatchTime.now().uptimeNanoseconds < deadline,"goto-deadline"); return found
+  }
+  func modal(_ candidate: AXUIElement) -> Bool {
+    let role = attr(candidate,kAXRoleAttribute) as? String
+    return role == kAXSheetRole || (role == kAXGroupRole && attr(candidate,kAXSubroleAttribute) as? String == kAXDialogSubrole)
+  }
+  func locationContext(_ focusRoot: AXUIElement? = nil) throws {
+    do { try verify(); _ = try verifySheet() } catch { throw ActionRefusal(diagnostics:["stage":"goto-context"]) }
+    guard let outer = sheet, let rows = attr(application,kAXWindowsAttribute) as? [AXUIElement],
+      let focusedWindow = axElement(attr(application,kAXFocusedWindowAttribute)),
+      let focused = axElement(attr(application,kAXFocusedUIElementAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-context"]) }
+    try locationCheck(locationContextValid(rows.filter { CFEqual($0,main) }.count,
+      rows.allSatisfy { owns($0,pid) && (CFEqual($0,main) || descendant($0,outer)) },
+      owns(focusedWindow,pid) && (CFEqual(focusedWindow,main) || descendant(focusedWindow,outer)),
+      descendant(focused,focusRoot ?? location ?? outer)),"goto-context")
+  }
+  func verifyLocation() throws -> AXUIElement {
+    try locationContext()
+    guard let retained = location, let field = locationField, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
+    let tree = try locationTree(outer), modals = tree.filter { !CFEqual($0,outer) && modal($0) }
+    try locationCheck(modals.count == 1 && CFEqual(modals[0],retained) && descendant(retained,outer) && descendant(field,retained),"goto-discovery")
+    var subrole: CFTypeRef?, writable = DarwinBoolean(false)
+    let query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
+    try locationCheck(attr(field,kAXRoleAttribute) as? String == kAXTextFieldRole && textFieldKind(query,subrole as? String) == "plain" &&
+      attr(field,kAXEnabledAttribute) as? Bool == true && AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable) == .success &&
+      writable.boolValue && supports(field,kAXConfirmAction),"goto-discovery")
+    return retained
+  }
   try emit(["status":"pinned", "pid":pid, "windowId":number, "matchedAX":true])
   while let line = readLine() {
     try check(line.utf8.count <= 8192)
     guard let raw = line.data(using:.utf8), let request = try JSONSerialization.jsonObject(with:raw) as? [String:Any],
           let action = request["type"] as? String, actions.contains(action), request["pid"] as? Int32 == pid,
           request["windowId"] as? UInt32 == number else { throw Refusal(code:"adapter-refused") }
+    try locationCheck(scope.reference || !["go-to-folder","location-dismissed"].contains(action) && request["locationToken"] == nil,"goto-state")
     // The driver's mandatory identity checks do not consume the 64 UI-action budget.
     if action != "check" { try check(ordinal < (scope.reference ? 128 : 64)); ordinal += 1 }
     if action == "quit" { try verify(); try emit(["status":"quit", "pid":pid,"windowId":number]); return }
@@ -645,12 +771,70 @@ func run() throws {
       try check(request["sheetToken"] as? String == sheetToken && sheetToken != nil)
       selectedRoot = try verifySheet(); result["target"] = "sheet"; result["sheetToken"] = sheetToken
     }
+    if let token = locationToken, action != "check" {
+      try locationCheck(target == "sheet" && request["locationToken"] as? String == token &&
+        ["inspect","set","press","location-dismissed"].contains(action),"goto-state")
+      if action != "location-dismissed" { selectedRoot = try verifyLocation() }
+      result["locationToken"] = token
+    } else { try locationCheck(request["locationToken"] == nil,"goto-state") }
     switch action {
+    case "go-to-folder":
+      try locationCheck(scope.reference && target == "sheet" && !locationAttempted && location == nil,"goto-state")
+      try locationCheck(Set(request.keys).isSubset(of:["type","target","pid","windowId","sheetToken"]) &&
+        AXUIElementSetMessagingTimeout(application,0.03) == .success && AXUIElementSetMessagingTimeout(main,0.03) == .success,"goto-state")
+      let before = try locationTree(selectedRoot)
+      try locationCheck(!before.contains { !CFEqual($0,selectedRoot) && modal($0) },"goto-discovery")
+      try locationCheck(before.contains { attr($0,kAXRoleAttribute) as? String == kAXButtonRole &&
+        attr($0,kAXTitleAttribute) as? String == "Open" && supports($0,kAXPressAction) },"goto-context")
+      let source = CGEventSource(stateID:.privateState)
+      guard let down = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:true),
+        let up = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:false) else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
+      down.flags = [.maskCommand,.maskShift]; up.flags = [.maskCommand,.maskShift]
+      try goToFolder(scope.reference,attempted:locationAttempted,consume:{ locationAttempted = true },context:{
+        try locationContext()
+        // The fixed physical G key is admitted only for these known layouts.
+        guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+          let rawID = TISGetInputSourceProperty(input,kTISPropertyInputSourceID) else { throw ActionRefusal(diagnostics:["stage":"goto-layout"]) }
+        let inputID = Unmanaged<CFString>.fromOpaque(rawID).takeUnretainedValue() as String
+        try locationCheck(["com.apple.keylayout.US","com.apple.keylayout.ABC"].contains(inputID),"goto-layout")
+      },down:{ down.postToPid(pid) },up:{ up.postToPid(pid) },discover:{
+        let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+        while DispatchTime.now().uptimeNanoseconds < deadline {
+          try locationContext()
+          let tree = try locationTree(selectedRoot,deadline)
+          let candidates = tree.filter { !CFEqual($0,selectedRoot) && modal($0) }
+          if candidates.isEmpty { Thread.sleep(forTimeInterval:0.05); continue }
+          try locationCheck(candidates.count == 1,"goto-discovery")
+          let candidate = candidates[0], contents = try locationTree(candidate,deadline)
+          let fields = contents.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole }
+          let labels: Set<String> = ["Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]
+          let semantic = contents.contains { item in
+            [kAXTitleAttribute,kAXDescriptionAttribute,kAXValueAttribute].contains { labels.contains(attr(item,$0) as? String ?? "") }
+          }
+          var subrole: CFTypeRef?, writable = DarwinBoolean(false)
+          guard fields.count == 1 else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
+          let field = fields[0], query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
+          let writeQuery = AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable)
+          try locationCheck(locationCandidateValid(!before.contains { CFEqual($0,candidate) || CFEqual($0,field) },descendant(candidate,selectedRoot),
+            modal(candidate),semantic,fields.count,textFieldKind(query,subrole as? String),attr(field,kAXEnabledAttribute) as? Bool == true,
+            writeQuery == .success && writable.boolValue,supports(field,kAXConfirmAction)),"goto-discovery")
+          location = candidate; locationField = field; locationToken = UUID().uuidString.lowercased()
+          _ = try verifyLocation(); result["locationToken"] = locationToken; result["locationReady"] = true; result["commandPosted"] = true
+          return
+        }
+        throw ActionRefusal(diagnostics:["stage":"goto-deadline"])
+      })
+    case "location-dismissed":
+      guard let retained = location, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
+      try locationContext(outer)
+      let tree = try locationTree(outer)
+      try locationCheck(!tree.contains { CFEqual($0,retained) || !CFEqual($0,outer) && modal($0) },"goto-dismissal")
+      location = nil; locationField = nil; locationToken = nil; result["locationDismissed"] = true
     case "pin-sheet":
       try check(target == "main")
       let actual = try members(); try check(actual.count == 1 && owns(actual[0],pid))
       if let retained = sheet { try check(CFEqual(actual[0],retained)); _ = try verifySheet() }
-      else { sheet = actual[0]; sheetToken = UUID().uuidString.lowercased() }
+      else { sheet = actual[0]; sheetToken = UUID().uuidString.lowercased(); locationAttempted = false }
       result["target"] = "sheet"; result["sheetToken"] = sheetToken
     case "sheet-dismissed":
       try check(target == "main" && sheet != nil && sheetToken != nil && request["sheetToken"] as? String == sheetToken)
@@ -677,6 +861,8 @@ func run() throws {
         throw error
       }
       if action == "press" {
+        if location != nil { try locationCheck(attr(selected,kAXTitleAttribute) as? String == "Cancel" &&
+          attr(selected,kAXRoleAttribute) as? String == kAXButtonRole && attr(selected,kAXEnabledAttribute) as? Bool == true,"goto-state") }
         var actionNames: CFArray?
         let query = AXUIElementCopyActionNames(selected,&actionNames)
         let advertised = query == .success && (actionNames as? [String] ?? []).contains(kAXPressAction as String)
@@ -699,7 +885,9 @@ func run() throws {
           text.utf8.count <= 4096 else { throw pressFailure("axtext-request") }
         func pinnedField() throws {
           try verify(); let retained = try verifySheet()
-          try check(owns(selected,pid) && CFEqual(try node(value,retained),selected))
+          let root = location == nil ? retained : try verifyLocation()
+          try check(owns(selected,pid) && CFEqual(try node(value,root),selected))
+          if let field = locationField { try check(CFEqual(selected,field)) }
         }
         do { try pinnedField() } catch { throw pressFailure("axtext-identity") }
         var subrole: CFTypeRef?, focused: CFTypeRef?, actionNames: CFArray?
@@ -817,7 +1005,8 @@ func run() throws {
       if scope.reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
         "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
         "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
-        "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace"]) }
+        "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace",
+        "Go","Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]) }
       func fact(_ current: AXUIElement, _ path: String) -> [String:Any] {
         // No title/value/children reads from a foreign child; expose blocked route only.
         var owner: pid_t = 0

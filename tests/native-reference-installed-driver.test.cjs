@@ -9,6 +9,7 @@ const shared=require('./desktop/p38-installed-driver.cjs');
 const RGBA=Buffer.from('89504e470d0a1a0a0000000d49484452000000030000000108060000001be014b40000001549444154789c63105432feef129ad650de319301001b41047d056017fe0000000049454e44ae426082','hex');
 const RGB=Buffer.from('89504e470d0a1a0a0000000d4948445200000002000000020802000000fdd49a730000001649444154789c63e051b2389162c4c0cec1c9c5cd0300124401fe0da78d180000000049454e44ae426082','hex');
 const SAVED={drawing:{color:'blue'},reference:'second'},HEAD='a'.repeat(40),DRIVER='d'.repeat(40),HASH='b'.repeat(64);
+const OUTER='11111111-1111-4111-8111-111111111111',INNER='22222222-2222-4222-8222-222222222222';
 function setup(t) {
   const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'nemo-reference-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -21,6 +22,48 @@ function setup(t) {
       {x:0,y:0,rgba:[17,34,51,255]},{x:1,y:0,rgba:[68,85,102,128]},{x:2,y:0,rgba:[119,136,153,0]}]}};
   const report=shared.safeDirectory(root,['report']),journal=shared.safeDirectory(root,['journal']);
   return {root,config,report,journal,prepare:()=>policy.prepareWorkspace(config,report)};
+}
+for(const fault of ['none','no-proof','same-token','wrong-pid','wrong-window','old-inner','early-dismissal','repeat',
+  'search','mismatch','arbitrary-keys','outer-while-inner','eof','timeout']) {
+  test('Reference owned location lifecycle is terminal and bounded: '+fault,async t=>{
+    let index=0,commands=0,sets=0;const feedback=[];
+    const outer={target:'sheet',sheetToken:OUTER},inner={...outer,locationToken:INNER};
+    const f=modeled(t,{window(mode,pid,wid,action){
+      const result={pid,windowId:45,matchedAX:true};
+      if(mode==='pin-sheet')return {...result,...outer};
+      if(mode==='go-to-folder'){
+        commands++;return {...result,...outer,commandPosted:true,locationReady:fault!=='no-proof',
+          locationToken:fault==='same-token'?OUTER:INNER,...(fault==='wrong-pid'?{pid:999}:{}),...(fault==='wrong-window'?{windowId:46}:{})};
+      }
+      if(mode==='set')sets++;
+      if(mode==='sheet-dismissed')return {...result,dismissed:true};
+      return {...result,...(action?.target==='sheet'?outer:{}),...(action?.locationToken?{locationToken:action.locationToken}:{}),
+        ...(mode==='location-dismissed'?{locationDismissed:fault!=='early-dismissal'}:{}),
+        ...(mode==='set'?{actionDiagnostics:{stage:'axtext-confirm',role:'AXTextField',textFieldKind:fault==='search'?'search':'plain',enabled:true,
+          valueSettableQueryError:0,valueSettable:true,valueWriteError:0,valueReadbackError:0,valueMatches:fault!=='mismatch',
+          confirmQueryError:0,confirmAdvertised:true,confirmError:0}}:{})};
+    },next(workspace,fire){
+      const actions=[{type:'pin-sheet'},{type:'go-to-folder',...outer,...(fault==='arbitrary-keys'?{keyCode:5}:{})},
+        {type:'inspect',...inner,...(fault==='old-inner'?{locationToken:OUTER}:{}),...(fault==='outer-while-inner'?{locationToken:undefined}:{})},
+        {type:'set',...inner,element:'0.1',value:path.join(workspace.directory,'A.json')},
+        {type:'location-dismissed',...inner},{type:fault==='repeat'?'go-to-folder':'inspect',...outer},
+        {type:'press',...outer,element:'0.10'},{type:'sheet-dismissed',sheetToken:OUTER},{type:'stop'}];
+      if(index===2 && fault==='eof')throw Object.assign(Error('EOF'),{code:'operator-input-ended'});
+      if(index===2 && fault==='timeout'){fire();return new Promise(()=>{});}
+      return actions[index++];
+    }});
+    f.services.feedback=value=>feedback.push(value);
+    const result=await driver.runOperator(f.config,f.services);
+    assert.equal(result.status,fault==='none'?'operator-complete':'partial',JSON.stringify(result));
+    assert.equal(result.installedAcceptance,'not-established');assert.equal(result.cleanup,'complete');assert.equal(result.helperCleanup,'complete');
+    assert.equal(commands,fault==='arbitrary-keys'?0:1);assert.ok(sets<=1);
+    if(fault==='none'){
+      assert.deepEqual(feedback,[{target:'sheet',ordinal:1,token:OUTER},{target:'sheet',ordinal:2,token:OUTER,locationToken:INNER}]);
+      assert.equal(result.actions[1].locationReady,true);assert.equal(result.actions[4].locationDismissed,true);
+      assert.equal(result.actions[3].actionDiagnostics.valueMatches,true);
+    } else assert.ok(result.firstFailure);
+    if(['old-inner','outer-while-inner','eof','timeout','arbitrary-keys'].includes(fault))assert.equal(sets,0);
+  });
 }
 function outputs(workspace) {
   fs.writeFileSync(workspace.saved,JSON.stringify({reference:'second',drawing:{color:'blue'}},null,2));
