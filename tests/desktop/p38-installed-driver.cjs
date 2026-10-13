@@ -148,7 +148,7 @@ function safeActionDiagnostics(value) {
     const observation=value.transitionObservation;
     const statuses=new Set(['timeout-config-refused','deadline','inconclusive','membership-returned','persistent-omission']);
     check(observation&&typeof observation==='object'&&!Array.isArray(observation)&&statuses.has(observation.status), 'ax-evidence-refused');
-    check(observation.budgetMs===750&&observation.budgetKind==='best-effort'&&
+    check(observation.budgetMs===750&&observation.budgetKind==='parent-supervised-one-shot'&&
       observation.budgetScope==='transition-samples-only'&&typeof observation.axTimeoutsConfigured==='boolean', 'ax-evidence-refused');
     check(Number.isInteger(observation.elapsedMs)&&observation.elapsedMs>=0&&observation.elapsedMs<=10000, 'ax-evidence-refused');
     if(observation.status!=='deadline')check(observation.elapsedMs<=750,'ax-evidence-refused');
@@ -162,11 +162,25 @@ function safeActionDiagnostics(value) {
       check(sample&&typeof sample==='object'&&!Array.isArray(sample)&&sample.sampleIndex===index, 'ax-evidence-refused');
       check(Number.isInteger(sample.elapsedMs)&&sample.elapsedMs>=0&&sample.elapsedMs<=observation.elapsedMs, 'ax-evidence-refused');
       const cleanSample={sampleIndex:index,elapsedMs:sample.elapsedMs};
+      if(sample.sampleDeadlineReached!==true||sample.pinnedCGWindowListReadable!==undefined||sample.pinnedCGWindowCount!==undefined)
+        check(['complete','failed','deadline'].includes(sample.cgWorkerStatus),'ax-evidence-refused');
       for(const key of ['axPidQueryError','applicationWindowsQueryError','minimizedQueryError','retainedMainChildrenQueryError'])
         if(sample[key]!==undefined){check(Number.isInteger(sample[key])&&sample[key]>=-32768&&sample[key]<=0,'ax-evidence-refused');cleanSample[key]=sample[key];}
       for(const key of ['axPidMatches','applicationWindowsReadable','pinnedAXWindowMember','minimizedReadable','minimized',
         'pinnedCGWindowListReadable','retainedMainChildrenReadable','retainedMainChildrenCountCapped','sampleDeadlineReached'])
         if(sample[key]!==undefined){check(typeof sample[key]==='boolean','ax-evidence-refused');cleanSample[key]=sample[key];}
+      if(sample.cgWorkerStatus!==undefined){check(['complete','failed','deadline'].includes(sample.cgWorkerStatus),'ax-evidence-refused');cleanSample.cgWorkerStatus=sample.cgWorkerStatus;}
+      if(sample.cgWorkerCleanup!==undefined){check(['complete','incomplete','not-started'].includes(sample.cgWorkerCleanup),'ax-evidence-refused');cleanSample.cgWorkerCleanup=sample.cgWorkerCleanup;}
+      if(sample.cgWorkerStatus==='complete'){
+        check(sample.cgWorkerCleanup==='complete'&&typeof sample.pinnedCGWindowListReadable==='boolean','ax-evidence-refused');
+        if(sample.pinnedCGWindowListReadable)check(Number.isInteger(sample.pinnedCGWindowCount)&&sample.pinnedCGWindowCount>=0&&sample.pinnedCGWindowCount<=128,'ax-evidence-refused');
+        else check(sample.pinnedCGWindowCount===undefined,'ax-evidence-refused');
+      }
+      if(sample.cgWorkerStatus==='failed')check(sample.cgWorkerCleanup==='complete'&&sample.pinnedCGWindowListReadable===false,'ax-evidence-refused');
+      if(sample.cgWorkerStatus==='deadline')check(observation.status==='deadline'&&sample.sampleDeadlineReached===true&&
+        sample.pinnedCGWindowListReadable===false&&sample.pinnedCGWindowCount===undefined&&
+        ['complete','incomplete','not-started'].includes(sample.cgWorkerCleanup),'ax-evidence-refused');
+      if(sample.cgWorkerCleanup==='incomplete')check(sample.cgWorkerStatus==='deadline','ax-evidence-refused');
       for(const key of ['pinnedCGWindowCount','retainedMainChildrenCount'])
         if(sample[key]!==undefined){const max=key==='retainedMainChildrenCount'?4096:128;check(Number.isInteger(sample[key])&&sample[key]>=0&&sample[key]<=max,'ax-evidence-refused');cleanSample[key]=sample[key];}
       check(sample.retainedMainChildFacts===undefined&&sample.retainedMainSheetProbe===undefined,'ax-evidence-refused');
@@ -183,7 +197,7 @@ function safeActionDiagnostics(value) {
         sampleFacts.every(sample=>sample.pinnedAXWindowMember===false)?'persistent-omission':'inconclusive';
       check(observation.status===derived,'ax-evidence-refused');
     }
-    clean.transitionObservation={status:observation.status,budgetMs:750,budgetKind:'best-effort',
+    clean.transitionObservation={status:observation.status,budgetMs:750,budgetKind:'parent-supervised-one-shot',
       budgetScope:'transition-samples-only',axTimeoutsConfigured:observation.axTimeoutsConfigured,
       elapsedMs:observation.elapsedMs,samples:sampleFacts};
   }

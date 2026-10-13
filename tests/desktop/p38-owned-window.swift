@@ -2,6 +2,7 @@
 import Foundation
 import ApplicationServices
 import CoreGraphics
+import Darwin
 
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
@@ -72,6 +73,11 @@ func shouldProbeRetainedMainChildren(_ stage: String, _ facts: [String:Any]) -> 
     facts["minimizedReadable"] as? Bool == true && facts["minimized"] as? Bool == false &&
     facts["pinnedCGWindowListReadable"] as? Bool == true && facts["pinnedCGWindowCount"] as? Int == 1
 }
+func pinnedCGWindowCount(_ rows:[[String:Any]]?, _ pid:pid_t, _ window:UInt32) -> Int? {
+  guard let rows else { return nil }
+  return rows.filter { $0[kCGWindowNumber as String] as? UInt32 == window &&
+    ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0 }.count
+}
 func transitionObservationStatus(_ samples: [[String:Any]], _ deadlineExceeded: Bool = false) -> String {
   if deadlineExceeded { return "deadline" }
   guard samples.count == 2 else { return "inconclusive" }
@@ -91,6 +97,20 @@ func transitionObservationStatus(_ samples: [[String:Any]], _ deadlineExceeded: 
   if samples.allSatisfy({ $0["pinnedAXWindowMember"] as? Bool == false }) { return "persistent-omission" }
   return "inconclusive"
 }
+enum BoundedWorkerWait { case completed(Data), timedOut, failed }
+enum BoundedWorkerResult { case completed(Data), deadline(cleanupComplete:Bool), failed }
+func superviseBoundedWorker(deadline:UInt64, now:()->UInt64,
+  waitFor:(UInt64)->BoundedWorkerWait, terminateAndCollect:()->Bool, killAndCollect:()->Bool) -> BoundedWorkerResult {
+  let current=now(), remaining=deadline > current ? deadline-current : 0
+  switch waitFor(remaining) {
+  case .failed: return .failed
+  case .completed(let data):
+    return now() < deadline ? .completed(data) : .deadline(cleanupComplete:true)
+  case .timedOut:
+    if terminateAndCollect() { return .deadline(cleanupComplete:true) }
+    return .deadline(cleanupComplete:killAndCollect())
+  }
+}
 func xy(_ node: AXUIElement) -> CGPoint? {
   guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
@@ -105,12 +125,70 @@ func emit(_ value: [String: Any]) throws {
   let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
   print(String(data: data, encoding: .utf8)!); fflush(stdout)
 }
+func cgWindowSampleWorker(_ arguments:[String]) throws {
+  try check(arguments.count == 4 && arguments[1] == "--p38-cg-sample")
+  guard let pid=Int32(arguments[2]),pid>0,let window=UInt32(arguments[3]),window>0 else { throw Refusal(code:"adapter-refused") }
+  let rows=CGWindowListCopyWindowInfo([.optionAll,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]]
+  guard let count=pinnedCGWindowCount(rows,pid,window) else {
+    try emit(["schema":"nemo.p38-cg-sample/1","pid":Int(pid),"windowId":Int(window),"readable":false]);return
+  }
+  try emit(["schema":"nemo.p38-cg-sample/1","pid":Int(pid),"windowId":Int(window),"readable":true,"count":count])
+}
+func boundedPinnedCGWindowSample(_ pid:pid_t, _ window:UInt32, _ deadline:UInt64) -> [String:Any] {
+  let now = { DispatchTime.now().uptimeNanoseconds }
+  func failed() -> [String:Any] { ["pinnedCGWindowListReadable":false,"cgWorkerStatus":"failed","cgWorkerCleanup":"complete"] }
+  guard now() < deadline, let executable=Bundle.main.executableURL else {
+    return ["pinnedCGWindowListReadable":false,"cgWorkerStatus":"deadline","cgWorkerCleanup":"not-started","sampleDeadlineReached":true]
+  }
+  let process=Process(), output=Pipe(), exited=DispatchSemaphore(value:0)
+  process.executableURL=executable
+  process.arguments=["--p38-cg-sample",String(pid),String(window)]
+  process.environment=[:]
+  process.standardInput=FileHandle.nullDevice
+  process.standardOutput=output
+  process.standardError=FileHandle.nullDevice
+  process.terminationHandler={ _ in exited.signal() }
+  do { try process.run() } catch { return failed() }
+  let result=superviseBoundedWorker(deadline:deadline,now:now,waitFor:{ remaining in
+    let nanos=min(remaining,UInt64(Int.max))
+    guard exited.wait(timeout: .now() + .nanoseconds(Int(nanos))) == .success else { return .timedOut }
+    guard process.terminationReason == .exit && process.terminationStatus == 0 else { return .failed }
+    let data=output.fileHandleForReading.readDataToEndOfFile()
+    return data.count <= 4096 ? .completed(data) : .failed
+  },terminateAndCollect:{
+    if process.isRunning { process.terminate() }
+    return exited.wait(timeout: .now() + .milliseconds(40)) == .success || !process.isRunning
+  },killAndCollect:{
+    if process.isRunning { _ = Darwin.kill(process.processIdentifier,SIGKILL) }
+    return exited.wait(timeout: .now() + .milliseconds(40)) == .success || !process.isRunning
+  })
+  switch result {
+  case .failed: return failed()
+  case .deadline(let cleanupComplete):
+    return ["pinnedCGWindowListReadable":false,"cgWorkerStatus":"deadline",
+      "cgWorkerCleanup":cleanupComplete ? "complete" : "incomplete","sampleDeadlineReached":true]
+  case .completed(let data):
+    guard let object=try? JSONSerialization.jsonObject(with:data),let value=object as? [String:Any],
+      value["schema"] as? String == "nemo.p38-cg-sample/1",value["pid"] as? Int == Int(pid),
+      value["windowId"] as? Int == Int(window),let readable=value["readable"] as? Bool else { return failed() }
+    var facts:[String:Any]=["pinnedCGWindowListReadable":readable,"cgWorkerStatus":"complete","cgWorkerCleanup":"complete"]
+    if readable {
+      guard let count=value["count"] as? Int,count>=0,count<=128 else { return failed() }
+      facts["pinnedCGWindowCount"]=count
+    }
+    return facts
+  }
+}
 func selfTest() throws {
   try check(try route("0.12.3") == [0,12,3])
   for input in ["-1", "0..1", ".0", "1.", "x", "4096", "999999999999999999999", String(repeating: "1.", count: 21)] {
     var refused = false; do { _ = try route(input) } catch { refused = true }; try check(refused)
   }
   try check(!actions.contains("key") && !actions.contains("focus") && !actions.contains("launch"))
+  let cgRows:[[String:Any]]=[[kCGWindowNumber as String:UInt32(9),kCGWindowOwnerPID as String:Int32(42),kCGWindowLayer as String:0],
+    [kCGWindowNumber as String:UInt32(9),kCGWindowOwnerPID as String:Int32(43),kCGWindowLayer as String:0],
+    [kCGWindowNumber as String:UInt32(9),kCGWindowOwnerPID as String:Int32(42),kCGWindowLayer as String:1]]
+  try check(pinnedCGWindowCount(cgRows,42,9) == 1 && pinnedCGWindowCount(nil,42,9) == nil)
   for (ownerError,ownerMatches,windowsError,windowsReadable,member,minimizedError,minimizedReadable,minimized,cgReadable,cgCount,expected) in [
     (0,false,0,true,true,0,true,false,true,1,"ax-owner"), (0,true,-25205,true,true,0,true,false,true,1,"application-window-membership"),
     (0,true,0,false,true,0,true,false,true,1,"application-window-membership"), (0,true,0,true,false,0,true,false,true,1,"application-window-membership"),
@@ -158,6 +236,23 @@ func selfTest() throws {
   var errorTransitionSample = stableTransitionSample; errorTransitionSample["applicationWindowsQueryError"] = -25205
   try check(transitionObservationStatus([stableTransitionSample,errorTransitionSample]) == "inconclusive")
   try check(transitionObservationStatus([stableTransitionSample,stableTransitionSample,stableTransitionSample]) == "inconclusive")
+  var fakeNow:UInt64=10,termCount=0,killCount=0
+  let timely=superviseBoundedWorker(deadline:20,now:{fakeNow},waitFor:{ remaining in
+    if remaining != 10 { return .failed };fakeNow=19;return .completed(Data([1]))
+  },terminateAndCollect:{termCount+=1;return true},killAndCollect:{killCount+=1;return true})
+  if case .completed(let data)=timely { try check(data == Data([1])) } else { throw Refusal(code:"adapter-refused") }
+  fakeNow=10
+  let late=superviseBoundedWorker(deadline:20,now:{fakeNow},waitFor:{ _ in
+    fakeNow=21
+    return .completed(Data([2]))
+  },
+    terminateAndCollect:{termCount+=1;return true},killAndCollect:{killCount+=1;return true})
+  if case .deadline(let cleanup)=late { try check(cleanup) } else { throw Refusal(code:"adapter-refused") }
+  fakeNow=10
+  let timedOut=superviseBoundedWorker(deadline:20,now:{fakeNow},waitFor:{ _ in .timedOut },
+    terminateAndCollect:{termCount+=1;return false},killAndCollect:{killCount+=1;return false})
+  if case .deadline(let cleanup)=timedOut { try check(!cleanup) } else { throw Refusal(code:"adapter-refused") }
+  try check(termCount == 1 && killCount == 1)
   var returnedAfterBudget = stableTransitionSample; returnedAfterBudget["pinnedAXWindowMember"] = true
   try check(transitionObservationStatus([stableTransitionSample,returnedAfterBudget],true) == "deadline")
   try check(try sheetProof([11],[11:123],[11:1],123,1,nil) == 11)
@@ -176,11 +271,12 @@ func selfTest() throws {
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
-    "retainedMainProbeCases":15,"transitionObservationCases":6,"foreignReads":0, "runtimeAX":false])
+    "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
   if args == [args[0], "--self-test"] { try selfTest(); return }
+  if args.count == 4 && args[1] == "--p38-cg-sample" { try cgWindowSampleWorker(args); return }
   try check(args.count == 3 && args[1] == "--persistent" && ProcessInfo.processInfo.environment["NEMO_P38_GRANT"]?.isEmpty == false)
   guard let pid = Int32(args[2]), pid > 0, let report = ProcessInfo.processInfo.environment["NEMO_P38_REPORT_ROOT"] else { throw Refusal(code:"adapter-refused") }
   let initialRows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []).filter {
@@ -329,7 +425,7 @@ func run() throws {
       let completed = DispatchTime.now().uptimeNanoseconds
       let overrun = completed >= deadline
       return ["status":overrun ? "deadline" : suggestedStatus,"budgetMs":750,
-        "budgetKind":"best-effort","budgetScope":"transition-samples-only",
+        "budgetKind":"parent-supervised-one-shot","budgetScope":"transition-samples-only",
         "axTimeoutsConfigured":timeoutsConfigured,"elapsedMs":Int((completed-started)/1_000_000),"samples":samples]
     }
     // AX message timeouts precede every data query in either post-refusal probe.
@@ -341,8 +437,7 @@ func run() throws {
     timeoutsConfigured = mainTimeout == .success
     if expired() { return result("deadline",[]) }
     guard timeoutsConfigured else { return result("timeout-config-refused",[]) }
-    // AX calls have per-element timeouts. The transition-sample budget is best-effort
-    // because synchronous CoreGraphics calls cannot be interrupted; each return is checked.
+    // The CG query runs in a one-shot child so the retained owner can enforce its deadline.
     func sample(_ index: Int) -> ([String:Any],Bool) {
       var facts: [String:Any] = ["sampleIndex":index,"elapsedMs":elapsedMs()]
       func reachedDeadline() -> Bool {
@@ -373,17 +468,9 @@ func run() throws {
       if let minimizedValue { facts["minimized"] = minimizedValue }
       if reachedDeadline() { return (facts,true) }
 
-      let cgRows = CGWindowListCopyWindowInfo([.optionAll,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]]
-      facts["pinnedCGWindowListReadable"] = cgRows != nil
-      if reachedDeadline() { return (facts,true) }
-      let identities = cgRows?.filter {
-        $0[kCGWindowNumber as String] as? UInt32 == number &&
-          ($0[kCGWindowOwnerPID as String] as? Int32) == pid &&
-          ($0[kCGWindowLayer as String] as? Int) == 0
-      } ?? []
-      if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
+      facts.merge(boundedPinnedCGWindowSample(pid,number,deadline)) { _,new in new }
+      if facts["sampleDeadlineReached"] as? Bool == true || reachedDeadline() { return (facts,true) }
 
-      if reachedDeadline() { return (facts,true) }
       var rawChildren: CFTypeRef?
       let childrenError = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
       let childRows = childrenError == .success ? rawChildren as? [AXUIElement] : nil

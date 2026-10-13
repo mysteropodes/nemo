@@ -542,7 +542,16 @@ test('bounded post-press transition samples are sanitized and never resume a ref
   assert.match(sampler,/for index in 0\.\.\<2/);
   assert.match(sampler,/AXUIElementSetMessagingTimeout/);
   assert.match(sampler,/kAXChildrenAttribute/);
-  assert.match(sampler,/budgetKind":"best-effort/);
+  assert.match(sampler,/budgetKind":"parent-supervised-one-shot/);
+  assert.match(sampler,/boundedPinnedCGWindowSample\(pid,number,deadline\)/);
+  assert.doesNotMatch(sampler,/CGWindowListCopyWindowInfo/);
+  assert.match(helperSource,/func cgWindowSampleWorker\(_ arguments:\[String\]\)/);
+  assert.match(helperSource,/process\.arguments=\["--p38-cg-sample",String\(pid\),String\(window\)\]/);
+  assert.match(helperSource,/process\.environment=\[:\]/);
+  assert.match(helperSource,/process\.terminationReason == \.exit && process\.terminationStatus == 0/);
+  assert.match(helperSource,/superviseBoundedWorker\(deadline:deadline/);
+  assert.match(helperSource,/fakeNow=21\s+return \.completed\(Data\(\[2\]\)\)/);
+  assert.match(helperSource,/workerDeadlineCases":3/);
   assert.match(sampler,/budgetScope":"transition-samples-only/);
   assert.match(sampler,/facts\["sampleDeadlineReached"\] = true/);
   assert.match(sampler,/transitionObservationStatus\(samples,overrun\)/);
@@ -560,6 +569,7 @@ test('bounded post-press transition samples are sanitized and never resume a ref
   const stable=(index,extra={})=>({sampleIndex:index,elapsedMs:index?330:0,axPidQueryError:0,axPidMatches:true,
     applicationWindowsQueryError:0,applicationWindowsReadable:true,pinnedAXWindowMember:false,
     minimizedQueryError:0,minimizedReadable:true,minimized:false,pinnedCGWindowListReadable:true,pinnedCGWindowCount:1,
+    cgWorkerStatus:'complete',cgWorkerCleanup:'complete',
     retainedMainChildrenQueryError:0,retainedMainChildrenReadable:true,retainedMainChildrenCount:1,
     retainedMainChildrenCountCapped:false,...extra});
   const scenarios=[
@@ -572,7 +582,7 @@ test('bounded post-press transition samples are sanitized and never resume a ref
   ];
   for(const scenario of scenarios){
     const diagnostic={stage:'post-action-application-window-membership',elementPath:'2',transitionObservation:{
-      status:scenario.status,budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+      status:scenario.status,budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
       axTimeoutsConfigured:true,elapsedMs:480,samples:scenario.samples},privatePath:'/private/identity'};
     const clean=safeActionDiagnostics(diagnostic);
     assert.equal(clean.transitionObservation.status,scenario.status,scenario.name);
@@ -593,38 +603,58 @@ test('bounded post-press transition samples are sanitized and never resume a ref
     assert.equal(f.events.filter(event=>event==='window-press').length,1,scenario.name);
   }
   const timeout=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    status:'timeout-config-refused',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:false,elapsedMs:8,samples:[]}});
-  assert.deepEqual(timeout.transitionObservation,{status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',
+  assert.deepEqual(timeout.transitionObservation,{status:'timeout-config-refused',budgetMs:750,budgetKind:'parent-supervised-one-shot',
     budgetScope:'transition-samples-only',axTimeoutsConfigured:false,elapsedMs:8,samples:[]});
   const deadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:true,elapsedMs:740,samples:[stable(0)]}});
   assert.equal(deadline.transitionObservation.status,'deadline');
   const overrunDeadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:true,elapsedMs:810,
     samples:[stable(0),stable(1,{pinnedAXWindowMember:true,sampleDeadlineReached:true})]}});
   assert.equal(overrunDeadline.transitionObservation.elapsedMs,810);
   assert.equal(overrunDeadline.transitionObservation.status,'deadline');
+  const workerDeadline={stage:'post-action-application-window-membership',elementPath:'2',transitionObservation:{
+    status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
+    axTimeoutsConfigured:true,elapsedMs:812,samples:[{sampleIndex:0,elapsedMs:750,sampleDeadlineReached:true,
+      pinnedCGWindowListReadable:false,cgWorkerStatus:'deadline',cgWorkerCleanup:'incomplete'}]}};
+  const workerTimeoutClean=safeActionDiagnostics(workerDeadline);
+  assert.equal(workerTimeoutClean.transitionObservation.status,'deadline');
+  assert.equal(workerTimeoutClean.transitionObservation.samples[0].pinnedCGWindowCount,undefined);
+  assert.equal(workerTimeoutClean.transitionObservation.samples[0].cgWorkerCleanup,'incomplete');
+  assert.throws(()=>safeActionDiagnostics({...workerDeadline,transitionObservation:{...workerDeadline.transitionObservation,
+    samples:[{...workerDeadline.transitionObservation.samples[0],pinnedCGWindowCount:1}]}}));
+  const terminal=fixture();let terminalRequests=0,terminalPresses=0;
+  terminal.services.next=async()=>{terminalRequests++;return{type:'press',element:'2'};};
+  terminal.services.window=async(mode,pid,wid)=>{
+    if(mode==='discover'||mode==='check')return{pid,windowId:45,matchedAX:true};
+    if(mode==='press'){terminalPresses++;return{status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:workerDeadline};}
+    throw Error('unexpected-resumed-action');
+  };
+  const terminalResult=await runOperator(terminal.cfg,terminal.services);
+  assert.equal(terminalResult.firstFailure.actionDiagnostics?.transitionObservation?.status,'deadline',JSON.stringify(terminalResult.firstFailure));
+  assert.equal(terminalRequests,1);assert.equal(terminalPresses,1);
   for(const observation of [
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:751,samples:[stable(0),stable(1)]},
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1),stable(2)]},
-    {status:'attached-sheet-observed',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1)]},
-    {status:'timeout-config-refused',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,elapsedMs:0,samples:[stable(0)]},
-    {status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:10001,samples:[stable(0),stable(1)]},
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1,{pinnedCGWindowCount:0})]},
-    {status:'membership-returned',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,
+    {status:'persistent-omission',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:751,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1),stable(2)]},
+    {status:'attached-sheet-observed',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1)]},
+    {status:'timeout-config-refused',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,elapsedMs:0,samples:[stable(0)]},
+    {status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:10001,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,samples:[stable(0),stable(1,{pinnedCGWindowCount:0})]},
+    {status:'membership-returned',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:true,elapsedMs:500,
       samples:[stable(0),stable(1,{pinnedAXWindowMember:true,sampleDeadlineReached:true})]},
-    {status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,
+    {status:'persistent-omission',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',axTimeoutsConfigured:false,
       elapsedMs:500,samples:[stable(0),stable(1)]},
   ])assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:observation}));
   assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
-    status:'persistent-omission',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    status:'persistent-omission',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:true,elapsedMs:750,
     samples:[stable(0),stable(1,{pinnedAXWindowMember:true})]}}));
   assert.throws(()=>safeActionDiagnostics({stage:'axpress-perform',transitionObservation:{
-    status:'deadline',budgetMs:750,budgetKind:'best-effort',budgetScope:'transition-samples-only',
+    status:'deadline',budgetMs:750,budgetKind:'parent-supervised-one-shot',budgetScope:'transition-samples-only',
     axTimeoutsConfigured:false,elapsedMs:0,samples:[]}}));
 });
 test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
