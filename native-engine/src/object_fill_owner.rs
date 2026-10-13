@@ -30,6 +30,11 @@ pub(crate) struct ObjectFillOwner {
 
 impl ObjectFillOwner {
     #[cfg(feature = "project_media_codec")]
+    pub(crate) fn replace_admitted_snapshot(&mut self, snapshot: ObjectSnapshot) {
+        self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
+    }
+
+    #[cfg(feature = "project_media_codec")]
     pub(crate) fn from_project_file(
         instance: String,
         bytes: &[u8],

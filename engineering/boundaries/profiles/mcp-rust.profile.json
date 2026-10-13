@@ -14,7 +14,7 @@
       "id": "mcp.desktop",
       "layer": "adapters",
       "dir": "src-tauri/src",
-      "files": ["application_mcp.rs", "native_revision_sync.rs"],
+      "files": ["application_mcp.rs", "native_application_reservations.rs", "native_revision_sync.rs"],
       "publicApi": ["application_mcp.rs"],
       "sizeProfile": "Rust production module"
     },

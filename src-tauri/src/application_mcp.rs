@@ -47,6 +47,9 @@ pub(crate) use object_client::{
     nemo_native_status,
 };
 
+#[path = "native_application_reservations.rs"]
+mod reservations;
+
 type Pending = Arc<Mutex<HashMap<String, oneshot::Sender<ApplicationResponse>>>>;
 
 #[path = "native_revision_sync.rs"]
@@ -80,56 +83,8 @@ impl ApplicationMcp {
         &self.instance_id
     }
 
-    pub(crate) fn reserve_native_install(&self) -> Result<NativeInstallReservation, String> {
-        let mut native = self
-            .native
-            .lock()
-            .map_err(|_| "native application lock unavailable")?;
-        let generation = native.reserve_install()?;
-        self.revisions.invalidate();
-        drop(native);
-        Ok(NativeInstallReservation::new(
-            Arc::clone(&self.native),
-            generation,
-        ))
-    }
-
     pub(crate) fn native_state(&self) -> NativeState {
         Arc::clone(&self.native)
-    }
-
-    pub(crate) fn reserve_native_replacement(
-        &self,
-        identity: crate::native_dispatch::ReplacementIdentity<'_>,
-        preflight: impl FnOnce(&mut dyn NativeDispatch) -> Result<(), String>,
-    ) -> Result<crate::native_dispatch::ReplacementAdmission, String> {
-        let mut native = self
-            .native
-            .lock()
-            .map_err(|_| "unavailable:native application lock unavailable")?;
-        let admission = native.admit_replace_identity(identity, preflight)?;
-        if matches!(
-            admission,
-            crate::native_dispatch::ReplacementAdmission::Execute(_)
-        ) {
-            self.revisions.invalidate();
-        }
-        Ok(admission)
-    }
-
-    pub(crate) fn install_dispatch(
-        &self,
-        generation: u64,
-        application: Box<dyn NativeDispatch>,
-    ) -> Result<(), String> {
-        if application.instance_id() != self.instance_id {
-            return Err("native application instance mismatch".into());
-        }
-        let mut native = self
-            .native
-            .lock()
-            .map_err(|_| "native application lock unavailable")?;
-        native.install(generation, application)
     }
 
     /// Return the committed owner's identity without a later mutable status read.
