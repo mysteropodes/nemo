@@ -69,7 +69,7 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
   window.NemoProjectNativeVersionRestore = require('../src/js/adapters/project-native-version-restore.js');
   class Reader { readAsText(file) { if (file.error) this.onerror(new Error('read failed')); else this.onload({ target: { result: file.text } }); } }
   const context = { window, SM: window.SM, document, FileReader: Reader, Blob: class { constructor(parts) { this.parts = parts; } }, URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
-    localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : null; }, setItem(key, value) { writes.push([key, value]); }, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
+    localStorage: { getItem(key) { return key === 'nemo-auto' ? auto : writes.findLast(([saved]) => saved === key)?.[1] || null; }, setItem(key, value) { writes.push([key, value]); }, removeItem() {} }, state: {}, userLayers: [], _symbolPaperLayers: {}, showToast(message) { toasts.push(message); },
     requestAnimationFrame(fn) { if (deferFrames) frames.push(fn); else fn(); }, view: { update() { repaints++; } }, saveAllLayerFrames() {
       if (nativeGuard) window.NemoNativeOpacityLegacySurface.requireLegacyWrite(window, 'save-all-layer-frames');
       mutations++;

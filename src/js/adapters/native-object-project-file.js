@@ -6,7 +6,7 @@
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   function create(session,ports,workflow,acknowledgement){
-    var baseline=null,saving=false;
+    var baseline=null,saving=false,opening=false;
     var saved=acknowledgement.create({
       readUISession:ports.readUI,readPresentedObjectSession:session.readPresentedObjectSession,
       commitSavedMetadata:function(plan){
@@ -17,15 +17,27 @@
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
     async function openPath(path){
+      if(saving||opening)return false;
+      opening=true;
       try{
-        var info=await session.openPath(path);if(!info)return null;
-        await ports.reveal(info);
-        await session.presentPreview(0);
-        ports.opened(path,info);baseline=info.documentDigest;ports.repaint();return true;
-      }catch(error){ports.failed(error);return false;}
+        var info=await session.openPath(path,{
+          confirm:async function(previous){return !previous||baseline===previous.documentDigest||
+            !!(ports.confirmReplace&&await ports.confirmReplace());},
+          occlude:ports.occlude,reveal:ports.reveal,restore:ports.restore,
+          commit:function(current){
+            if(ports.opened(path,current)!==true)throw new Error('Native project UI publication failed');
+            baseline=current.documentDigest;ports.repaint();
+          }
+        });
+        return info===null?null:!!info;
+      }catch(error){
+        if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
+        else{baseline=null;ports.failed(error);ports.repaint();}
+        return false;
+      }finally{opening=false;}
     }
     async function saveAs(){
-      if(saving)return {status:'save-in-progress'};
+      if(saving||opening)return {status:saving?'save-in-progress':'open-in-progress',acknowledged:false};
       saving=true;
       try{
         var options={requestId:session.requestId('save'),pinRequestId:session.requestId('save-pin'),project:true};
@@ -39,7 +51,9 @@
       }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused'};}
       finally{saving=false;}
     }
-    return Object.freeze({openPath:openPath,saveAs:saveAs,isDirty:function(){var info=session.info();return !baseline||!info||info.documentDigest!==baseline;}});
+    return Object.freeze({openPath:openPath,saveAs:saveAs,
+      canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
+      isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
   function projectView(root,info){
     // These rows are read-side UI projections. The native edit guard denies
@@ -58,6 +72,7 @@
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
     if(!session)return null;
+    var startWasHidden=false;
     function commit(path,info){
       var name=root.SMProjectDocument.baseName(path);
       // Persist recents before changing the visible file identity.
@@ -65,20 +80,29 @@
     }
     var ui=create(session,{
       readUI:function(){return {handle:ports.read().tabId||'native-project-opening',generation:1};},
+      confirmReplace:function(){return root.__TAURI__.dialog.ask('Unsaved changes will be lost. Open another project?',
+        {title:'Unsaved changes',kind:'warning',okLabel:'Discard and open',cancelLabel:'Cancel'});},
+      occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
+      restore:function(previous){if(previous&&startWasHidden)ports.hide();},
       reveal:async function(info){
         projectView(root,info);ports.hide();
-        await new Promise(function(resolve){root.requestAnimationFrame(function(){root.requestAnimationFrame(resolve);});});
+        await new Promise(function(resolve,reject){var done=false,timer=setTimeout(function(){
+            if(done)return;done=true;reject(new Error('Native project layout did not settle'));
+          },1500);
+          function finish(){if(done)return;done=true;clearTimeout(timer);resolve();}
+          root.requestAnimationFrame(function(){root.requestAnimationFrame(finish);});});
       },
-      opened:function(path,info){commit(path,info);ports.opened();ports.notice('Opened: '+ports.read().name);},
+      opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
       commit:commit,repaint:ports.repaint,
       pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
       notice:function(result,written,error){
         ports.notice(result.acknowledged?'Saved: '+ports.read().name:error?'Save failed: '+(error.message||error):
           written&&written.receipt&&written.receipt.published?'File written; current saved status was not confirmed.':'Save cancelled or unavailable. Choose a new file path.');
       },
+      refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath});
+    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind});
 }));
