@@ -325,7 +325,7 @@ async function runOperator(config, services) {
       if (['press', 'set', 'select'].includes(action.type)) check(typeof action.element === 'string' && /^\d+(?:\.\d+)*$/.test(action.element) && action.element.length<=128, 'element-refused');
       if (action.type === 'inspect') {
         check(action.element === undefined || typeof action.element === 'string' && /^(?:\d+(?:\.\d+)*)?$/.test(action.element) && action.element.length<=128, 'element-refused');
-        if (action.depth !== undefined || action.maxNodes !== undefined) check(action.target === 'sheet' && Number.isInteger(action.depth) && action.depth >= 1 && action.depth <= 5 && Number.isInteger(action.maxNodes) && action.maxNodes >= 1 && action.maxNodes <= 128, 'inspect-budget-refused');
+        if (action.depth !== undefined || action.maxNodes !== undefined) check(['main','sheet'].includes(action.target || 'main') && Number.isInteger(action.depth) && action.depth >= 1 && action.depth <= 5 && Number.isInteger(action.maxNodes) && action.maxNodes >= 1 && action.maxNodes <= 128, 'inspect-budget-refused');
       }
       if (action.type === 'set') check(action.target==='sheet' && typeof action.value === 'string' && action.value.length <= 4096 &&
         config.fixtures?.some(item=>action.value===item.path), 'fixture-refused');

@@ -312,6 +312,58 @@ test('bounded sheet projection facts retain selection/enabled state and reject u
   f.services.window=async(mode,pid)=>({pid,windowId:45,matchedAX:true,...(mode==='pin-sheet'?{target:'sheet',sheetToken:token}:{})});
   const r=await runOperator(f.cfg,f.services);assert.equal(r.reason,'inspect-budget-refused');assert.equal(r.cleanup,'complete');
 });
+test('bounded main inspect accepts valid budgets while refusing malformed or unsafe budgets before per-action window access',async()=>{
+  const valid=fixture();let step=0;
+  valid.services.next=async()=>step++===0?{type:'inspect',target:'main',depth:3,maxNodes:32}:{type:'stop'};
+  const calls=[];valid.services.window=async(mode,pid,wid,action)=>{
+    calls.push({mode,action});return {pid,windowId:45,matchedAX:true,...mode==='capture'?{captureSha256:HASH}:{}};
+  };
+  const accepted=await runOperator(valid.cfg,valid.services);
+  assert.equal(accepted.status,'operator-complete');assert.equal(accepted.actions.length,1);
+  assert.deepEqual(calls.filter(call=>call.mode==='inspect').map(call=>call.action),[{type:'inspect',target:'main',depth:3,maxNodes:32}]);
+
+  const defaultMain=fixture();let defaultStep=0;
+  defaultMain.services.next=async()=>defaultStep++===0?{type:'inspect',depth:2,maxNodes:16}:{type:'stop'};
+  const defaultCalls=[];defaultMain.services.window=async(mode,pid,wid,action)=>{
+    if(mode==='inspect')defaultCalls.push(action);
+    return {pid,windowId:45,matchedAX:true};
+  };
+  const defaultAccepted=await runOperator(defaultMain.cfg,defaultMain.services);
+  assert.equal(defaultAccepted.status,'operator-complete');
+  assert.deepEqual(defaultCalls,[{type:'inspect',depth:2,maxNodes:16}]);
+
+  const token='da5f47f9-5681-4e71-a0b6-aa7578b6b5fa',sheet=fixture();let sheetStep=0;
+  sheet.services.next=async()=>[
+    {type:'pin-sheet'},
+    {type:'inspect',target:'sheet',sheetToken:token,depth:2,maxNodes:24},
+    {type:'sheet-dismissed',sheetToken:token},
+    {type:'stop'},
+  ][sheetStep++];
+  const sheetInspects=[];sheet.services.window=async(mode,pid,wid,action)=>{
+    if(mode==='inspect')sheetInspects.push(action);
+    return {pid,windowId:45,matchedAX:true,
+      ...(mode==='pin-sheet'||action?.target==='sheet'?{target:'sheet',sheetToken:token}:{}),
+      ...(mode==='sheet-dismissed'?{dismissed:true}:{})};
+  };
+  const sheetResult=await runOperator(sheet.cfg,sheet.services);
+  assert.equal(sheetResult.status,'operator-complete');
+  assert.deepEqual(sheetInspects,[{type:'inspect',target:'sheet',sheetToken:token,depth:2,maxNodes:24}]);
+
+  for(const action of [
+    {type:'inspect',target:'main',depth:0,maxNodes:32},
+    {type:'inspect',target:'main',depth:6,maxNodes:32},
+    {type:'inspect',target:'main',depth:3,maxNodes:0},
+    {type:'inspect',target:'main',depth:3,maxNodes:129},
+    {type:'inspect',target:'main',depth:3},
+  ]){
+    const f=fixture();f.services.next=async()=>action;const perActionCalls=[];
+    f.services.window=async(mode,pid,wid,a)=>{perActionCalls.push(mode);return {pid,windowId:45,matchedAX:true};};
+    const refused=await runOperator(f.cfg,f.services);
+    assert.equal(refused.reason,'inspect-budget-refused',JSON.stringify(action));
+    assert.deepEqual(perActionCalls,['discover'],JSON.stringify(action));
+    assert.equal(refused.cleanup,'complete');
+  }
+});
 test('selection capability diagnostics are allowlisted, bounded, and survive cleanup failures',async()=>{
   const {safeSelectionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
   const diagnostics={stage:'row-capability',rowQueryError:0,rowSettableQueryError:-25205,rowSettable:false,
