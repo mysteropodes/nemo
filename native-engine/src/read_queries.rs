@@ -8,6 +8,51 @@ pub(crate) use reference_image_resources::{
     decode_snapshot_reference, ReferencePixels, ReferenceResourceError,
 };
 
+#[cfg(feature = "project_media_codec")]
+pub(crate) struct VisibleReferenceRead {
+    pub pixels: ReferencePixels,
+    pub canvas: (u32, u32),
+    pub opacity: f64,
+}
+
+/// Settings come from the current immutable snapshot. Reusing a raster requires
+/// identity of its retained encoded allocation, never equal IDs or paths.
+#[cfg(feature = "project_media_codec")]
+pub(crate) fn visible_reference(
+    snapshot: &crate::revision::ObjectSnapshot,
+    previous: Option<&ReferencePixels>,
+) -> Result<Option<VisibleReferenceRead>, ReferenceResourceError> {
+    use crate::object_codec::{ImageAssetLimits, ProjectReferenceState};
+    let Some(project) = snapshot.project() else {
+        return Ok(None);
+    };
+    let ProjectReferenceState::StillImage(image) = project.reference_state() else {
+        return Ok(None);
+    };
+    if !image.visible() || image.opacity() == 0.0 {
+        return Ok(None);
+    }
+    let pixels = match previous.filter(|pixels| pixels.matches_image(snapshot)) {
+        Some(pixels) => pixels.clone(),
+        // Same operating envelope as native project/attachment admission.
+        None => decode_snapshot_reference(
+            snapshot,
+            ImageAssetLimits::new(
+                16 * 1024 * 1024,
+                256 * 1024 * 1024,
+                64 * 1024 * 1024,
+                8192,
+                8192,
+            )?,
+        )?,
+    };
+    Ok(Some(VisibleReferenceRead {
+        pixels,
+        canvas: project.project().canvas_dimensions(),
+        opacity: image.opacity(),
+    }))
+}
+
 use crate::codec;
 use crate::evaluation::{self, EvaluationErrorKind};
 use crate::request_receipts::{

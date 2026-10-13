@@ -50,6 +50,11 @@ pub(crate) fn encode_scheduled_object_png(
     live: &LiveObjectComposition<'_>,
     maximum_encoded_bytes: usize,
 ) -> Result<ScheduledObjectPng, PngOutputError> {
+    if live.prepared().composition().is_viewport() {
+        return Err(PngOutputError::new(
+            "viewport reference content is not an artwork export",
+        ));
+    }
     let mut output = BoundedPngBytes::new(maximum_encoded_bytes)?;
     let pixels = compositor
         .readback_scheduled_object_rgba8(result, live)

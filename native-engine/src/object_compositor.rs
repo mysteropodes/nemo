@@ -135,10 +135,37 @@ impl Compositor {
         for command in plan.commands() {
             color(command)?;
         }
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        let reference_image = prepared
+            .reference_image()
+            .map(|(image, _, _)| image.data.id());
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        let restore_image_atlas = self.scene.encoding().resources.patches.is_empty()
+            || self.last_reference_image != reference_image;
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.last_reference_image = None;
+        }
         self.scene.reset();
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        if let Some((image, transform, opacity)) = prepared.reference_image() {
+            // Vello 0.9's solid-only resolve replaces the atlas with a 1x1
+            // texture but retains image residency. Restore each image when it
+            // becomes active after export, hiding or another image; undo may
+            // revive an older cache entry whose atlas pixels were lost too.
+            if restore_image_atlas {
+                self.renderer.mark_override_image_dirty(image);
+            }
+            let brush = vello::peniko::ImageBrush::new(image.clone()).multiply_alpha(opacity);
+            self.scene.draw_image(&brush, transform);
+        }
         self.emit_object_commands(plan.commands())?;
         let (texture, view) = self.make_target(output.width, output.height);
         self.render_target(&view, output.width, output.height, Color::WHITE)?;
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.last_reference_image = reference_image;
+        }
         Ok(ObjectCompositionResult {
             instance: self.instance.clone(),
             device: self.device.clone(),

@@ -4,6 +4,12 @@ use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFra
 use crate::render_geometry::{ClosedCubicPath, CubicSegment};
 use std::sync::Arc;
 
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[path = "object_reference_scene.rs"]
+mod reference;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+pub use reference::prepare_object_viewport_composition;
+
 #[path = "object_scheduled_scene.rs"]
 mod scheduled;
 pub(crate) use scheduled::ScheduledObjectComposition;
@@ -29,6 +35,9 @@ pub use paint::{
 #[derive(Debug, Clone)]
 pub struct ObjectCompositionWitness {
     plan: ObjectPaintPlan,
+    viewport: bool,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    reference: Option<reference::ReferenceScene>,
 }
 
 pub fn prepare_object_composition(
@@ -36,10 +45,19 @@ pub fn prepare_object_composition(
     expected: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectCompositionWitness, ObjectSceneError> {
     validate_pins(plan.packet(), expected)?;
-    Ok(ObjectCompositionWitness { plan: plan.clone() })
+    Ok(ObjectCompositionWitness {
+        plan: plan.clone(),
+        viewport: false,
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        reference: None,
+    })
 }
 
 impl ObjectCompositionWitness {
+    /// Viewport content is never an artwork export source, even with no image.
+    pub(crate) fn is_viewport(&self) -> bool {
+        self.viewport
+    }
     pub fn plan(&self) -> &ObjectPaintPlan {
         &self.plan
     }
@@ -64,7 +82,8 @@ impl ObjectCompositionWitness {
     /// Compare all original pins, including scope, without leaking evaluator
     /// selector/packet types into composition consumers.
     pub fn same_identity_as(&self, other: &Self) -> bool {
-        self.instance_id() == other.instance_id()
+        self.viewport == other.viewport
+            && self.instance_id() == other.instance_id()
             && self.document_id() == other.document_id()
             && self.content_revision() == other.content_revision()
             && self.document_snapshot_id() == other.document_snapshot_id()
@@ -76,6 +95,7 @@ impl ObjectCompositionWitness {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectSceneError {
+    ReferenceUnavailable,
     WrongInstance,
     WrongDocument,
     WrongRevision,

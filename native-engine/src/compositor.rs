@@ -50,6 +50,8 @@ pub struct Compositor {
     queue: wgpu::Queue,
     renderer: Renderer,
     scene: Scene,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    last_reference_image: Option<u64>,
 }
 
 /// First half of native GPU construction. A window host creates its surface
@@ -118,6 +120,8 @@ impl CompositorInstance {
             queue,
             renderer,
             scene: Scene::new(),
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            last_reference_image: None,
         })
     }
 }

@@ -148,6 +148,10 @@ pub struct ObjectFramePacket {
 }
 
 impl ObjectFramePacket {
+    /// Read-side consumers borrow the same retained source that passed selection.
+    pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
+        &self.snapshot
+    }
     /// Explicit partial numeric composition; records() remains source provenance.
     pub fn numeric_order(&self) -> Option<&NumericOrderPlan> {
         self.numeric_order.as_ref()

@@ -50,6 +50,20 @@ impl ReferencePixels {
     pub(crate) fn snapshot(&self) -> &ObjectSnapshot {
         &self.0.snapshot
     }
+    pub(crate) fn same_allocation_as(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+    pub(crate) fn matches_image(&self, snapshot: &ObjectSnapshot) -> bool {
+        snapshot.project().is_some_and(|project| {
+            matches!(project.reference_state(), ProjectReferenceState::StillImage(image)
+                if Arc::ptr_eq(&self.0.encoded, image.encoded_allocation()))
+        })
+    }
+}
+impl AsRef<[u8]> for ReferencePixels {
+    fn as_ref(&self) -> &[u8] {
+        self.rgba8()
+    }
 }
 
 pub(crate) fn decode_snapshot_reference(

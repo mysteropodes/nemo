@@ -10,7 +10,8 @@ use native_engine::{
     object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_scheduled_object_composition, ObjectPaintPlan,
+        prepare_object_viewport_composition, prepare_scheduled_object_composition_from_witness,
+        ObjectCompositionWitness,
     },
     object_snapshot::ObjectSnapshot,
     resource_leases::WorkId,
@@ -24,7 +25,7 @@ use std::collections::BTreeSet;
 // CPU-only admission; never exported, cloned or detached from this owner.
 struct PreparedObjectPreview {
     snapshot: ObjectSnapshot,
-    plan: ObjectPaintPlan,
+    composition: ObjectCompositionWitness,
     key: EvaluationKey,
 }
 
@@ -32,6 +33,7 @@ struct PreparedObjectPreview {
 pub(super) struct ObjectPreview {
     scheduler: FrameScheduler,
     prepared: Option<PreparedObjectPreview>,
+    reference_cache: Option<ObjectCompositionWitness>,
     pending: Option<ScheduledFrame>,
     blocked: Option<String>,
     released: bool,
@@ -79,6 +81,7 @@ impl ObjectPreview {
         // Mark before cancellation so unwind/retry retains the exact checkpoint.
         self.released = true;
         self.invalidate();
+        self.reference_cache = None;
     }
     pub(super) fn progress(&self, application: ApplicationReleaseReceipt) -> NativeReleaseProgress {
         NativeReleaseProgress {
@@ -124,7 +127,11 @@ impl NativeObjectHost {
         if self.preview.prepared.is_some() {
             return Err("native object preview preparation is already borrowed".into());
         }
-        self.preview.prepared = Some(self.prepare_object_preview(expected, output)?);
+        let prepared = self.prepare_object_preview(expected, output)?;
+        if prepared.composition.has_viewport_reference() {
+            self.preview.reference_cache = Some(prepared.composition.clone());
+        }
+        self.preview.prepared = Some(prepared);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
         self.preview.prepared = None;
         match result {
@@ -158,6 +165,12 @@ impl NativeObjectHost {
             .map_err(|e| format!("preview scene: {e:?}"))?;
         let plan = prepare_object_paint_plan(&scene, expected)
             .map_err(|e| format!("preview paint: {e:?}"))?;
+        let composition = prepare_object_viewport_composition(
+            &plan,
+            expected,
+            self.preview.reference_cache.as_ref(),
+        )
+        .map_err(|e| format!("preview reference: {e:?}"))?;
         if output.kind() != "frame"
             || output.format() != "rgba8"
             || output.color_interpretation() != "srgb"
@@ -176,7 +189,7 @@ impl NativeObjectHost {
         .map_err(|e| e.to_string())?;
         Ok(PreparedObjectPreview {
             snapshot,
-            plan,
+            composition,
             key,
         })
     }
@@ -199,7 +212,7 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(self.history.content_revision())
             .ok_or("native object preview current snapshot is unavailable")?;
-        let packet = prepared.plan.packet();
+        let packet = prepared.composition.plan().packet();
         if current.snapshot_id() != prepared.snapshot.snapshot_id()
             || current.instance_id() != expected.instance_id
             || current.document_id() != expected.document_id
@@ -213,7 +226,7 @@ impl NativeObjectHost {
         }
         let PreparedObjectPreview {
             snapshot,
-            plan,
+            composition,
             key,
         } = prepared;
         if self
@@ -249,11 +262,10 @@ impl NativeObjectHost {
         self.preview.pending = Some(work.clone());
         self.preview.blocked = Some("preview presentation did not complete".into());
         let result = (|| {
-            let live = prepare_scheduled_object_composition(
+            let live = prepare_scheduled_object_composition_from_witness(
                 &self.preview.scheduler,
                 &work,
-                &plan,
-                expected,
+                &composition,
             )
             .map_err(|e| format!("preview admission: {e:?}"))?;
             let frame =
@@ -290,6 +302,10 @@ impl NativeObjectHost {
         Ok(receipt)
     }
 }
+
+#[cfg(test)]
+#[path = "native_object_reference_preview_tests.rs"]
+mod reference_tests;
 
 #[cfg(test)]
 #[path = "native_object_preview_lifecycle_tests.rs"]
