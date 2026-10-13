@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { runOperator, verifyIdentity, verifyWindow, captureStartupDiagnostics, classifyStartupStderr } = require('./desktop/p38-installed-driver.cjs');
+const { runOperator, verifyIdentity, verifyWindow, captureStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome } = require('./desktop/p38-installed-driver.cjs');
 const HEAD = 'a'.repeat(40), HASH = 'b'.repeat(64);
 function config() { return { workflow:'P38', grant:{issue:1645,confirmed:true,id:'new-p38-explicit-grant'},
   taskId:'p38-synthetic',sourceHead:HEAD,timeoutMs:1000 }; }
@@ -85,11 +85,11 @@ test('a changed window between actions refuses instead of selecting another wind
   const r=await runOperator(f.cfg,f.services);assert.equal(r.status,'partial');assert.equal(r.actions.length,0);assert.equal(f.cleaned,1);
 });
 test('partial start failure retains only allowlisted startup diagnostics before owner cleanup',async()=>{
-  const f=fixture({start(){throw Object.assign(Error('/private/partial-start'),{startupDiagnostics:{classification:'rust-panic',runtimeState:'failed',signal:'SIGABRT',stderrBytes:18,stderrSha256:HASH,truncated:false,raw:'/private/secret private-owner-token'}});}});
+  const f=fixture({start(){throw Object.assign(Error('/private/partial-start'),{startupDiagnostics:{classification:'rust-panic',runtimeState:'failed',manifestOutcome:'manifest-not-written',signal:'SIGABRT',stderrBytes:18,stderrSha256:HASH,truncated:false,raw:'/private/secret private-owner-token'}});}});
   const r=await runOperator(f.cfg,f.services);
   assert.equal(f.attempts,1);assert.equal(f.cleaned,1);assert.equal(r.cleanup,'complete');assert.equal(r.status,'partial');assert.equal(r.reason,'operator-failed');
   assert.equal(r.firstFailure.stage,'launch');
-  assert.deepEqual(r.firstFailure.startupDiagnostics,{classification:'rust-panic',runtimeState:'failed',signal:'SIGABRT',stderrBytes:18,stderrSha256:HASH,truncated:false});
+  assert.deepEqual(r.firstFailure.startupDiagnostics,{classification:'rust-panic',runtimeState:'failed',manifestOutcome:'manifest-not-written',signal:'SIGABRT',stderrBytes:18,stderrSha256:HASH,truncated:false});
   const saved=f.receipts.find(receipt=>receipt.firstFailure);
   assert.ok(f.events.indexOf('save-failure') < f.events.indexOf('cleanup'));
   assert.equal(JSON.stringify(saved).includes('private-owner-token'),false);assert.equal(JSON.stringify(saved).includes('/private/'),false);
@@ -100,12 +100,36 @@ test('startup stderr capture is bounded, hashed, classified and redacts arbitrar
   const raw=Buffer.concat([Buffer.alloc(20*1024,0x78),Buffer.from("thread 'main' panicked at /private/path secret-token")]);
   fs.writeFileSync(path.join(reports,'native-app.stderr.log'),raw,{mode:0o600});
   const taskRoots={root,reports};
-  const result=await captureStartupDiagnostics('task',{taskRoots:()=>taskRoots},{readNativeStatus:()=>({state:'failed',signal:'SIGABRT'})});
+  const result=await captureStartupDiagnostics('task',{taskRoots:()=>taskRoots},{readNativeStatus:()=>({state:'failed',signal:'SIGABRT',appRuntimeError:'app did not write its runtime manifest'})});
   assert.equal(result.classification,'rust-panic');assert.equal(result.runtimeState,'failed');assert.equal(result.signal,'SIGABRT');
+  assert.equal(result.manifestOutcome,'manifest-not-written');
   assert.equal(result.stderrBytes,16*1024);assert.equal(result.truncated,true);
   assert.equal(result.stderrSha256,crypto.createHash('sha256').update(raw.subarray(raw.length-16*1024)).digest('hex'));
   assert.equal(JSON.stringify(result).includes('/private/path'),false);assert.equal(JSON.stringify(result).includes('secret-token'),false);
   assert.equal(classifyStartupStderr(Buffer.from('P38 fixture refused /private/secret')),'p38-startup-refusal');
+});
+test('manifest startup outcomes are classified without retaining runtime error text',async t=>{
+  const cases=[
+    [null,'status-unavailable'],
+    [{state:'active'},'manifest-pending'],
+    [{state:'active',appRuntimeError:'app did not write its runtime manifest'},'manifest-not-written'],
+    [{state:'active',appRuntimeError:'app manifest is not a nemo.native-runtime/1 document'},'manifest-invalid-schema'],
+    [{state:'active',appRuntimeError:'app manifest belongs to task /private/path-token'},'manifest-task-mismatch'],
+    [{state:'active',appRuntimeError:'/private/unknown-token'},'manifest-error-other'],
+    [{state:'active',appRuntime:{schema:'nemo.native-runtime/1'}},'manifest-present'],
+  ];
+  for(const [status,expected] of cases){
+    const outcome=classifyManifestOutcome(status);assert.equal(outcome,expected);
+    assert.equal(JSON.stringify({manifestOutcome:outcome}).includes('private'),false);
+  }
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'p38-manifest-status-')),reports=path.join(root,'reports');
+  fs.mkdirSync(reports);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const started=Date.now();
+  const result=await captureStartupDiagnostics('task',{taskRoots:()=>({root,reports})},
+    {readNativeStatus:()=>({state:'active',appRuntimeError:'app manifest belongs to task /private/path-token'})});
+  assert.ok(Date.now()-started<500,'known manifest result should be captured without waiting for launcher exit');
+  assert.equal(result.runtimeState,'active');assert.equal(result.manifestOutcome,'manifest-task-mismatch');
+  assert.equal(JSON.stringify(result).includes('/private/path-token'),false);
 });
 test('startup stderr capture refuses a FIFO without blocking',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'p38-startup-fifo-')),reports=path.join(root,'reports');
