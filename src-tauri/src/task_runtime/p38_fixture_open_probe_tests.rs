@@ -65,6 +65,44 @@ fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
 }
 
 #[test]
+fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
+    use super::control::{allowed_ready_failure, valid_failure_packet};
+    assert!(allowed_ready_failure("ready-open-path-unavailable"));
+    assert!(!allowed_ready_failure("ready-tauri-invoke-unavailable"));
+    assert!(!allowed_ready_failure("private exception or path"));
+    assert!(valid_failure_packet(
+        0,
+        None,
+        None,
+        Some("ready-open-path-unavailable")
+    ));
+    assert!(!valid_failure_packet(
+        0,
+        Some("A"),
+        Some(HASH_A),
+        Some("ready-open-path-unavailable")
+    ));
+    assert!(!valid_failure_packet(
+        0,
+        None,
+        Some(HASH_A),
+        Some("ready-open-path-unavailable")
+    ));
+    assert!(!valid_failure_packet(
+        0,
+        None,
+        None,
+        Some("private exception or path")
+    ));
+    assert!(!valid_failure_packet(
+        1,
+        None,
+        None,
+        Some("ready-open-path-unavailable")
+    ));
+}
+
+#[test]
 fn disabled_probe_is_inert_and_enabled_probe_requires_exact_release_identity() {
     assert_eq!(
         gate(false, false, false, false, false, false, "", ""),
