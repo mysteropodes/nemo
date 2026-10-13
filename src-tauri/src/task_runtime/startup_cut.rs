@@ -161,16 +161,13 @@ impl Cut {
         self.phase = Phase::Refused;
         Err("startup cut refused")
     }
-    pub(super) fn finish(
-        &mut self,
+    fn parse_footer(
+        &self,
         bytes: &[u8],
         native: &LoadLog,
         stream: &JsStream,
         retention: Option<&RetentionEvidence>,
-    ) -> Result<Phase, &'static str> {
-        if self.phase == Phase::Refused {
-            return Err("startup cut terminal");
-        }
+    ) -> Result<Footer, &'static str> {
         let js = stream.projection();
         let current = native.receipt();
         if !self.healthy(retention)
@@ -179,10 +176,10 @@ impl Cut {
             || bytes.is_empty()
             || bytes.len() > 1024
         {
-            return self.fail();
+            return Err("startup cut refused");
         }
         let Ok(footer) = serde_json::from_slice::<Footer>(bytes) else {
-            return self.fail();
+            return Err("startup cut refused");
         };
         let safe = 9_007_199_254_740_991;
         let accounted = footer
@@ -208,8 +205,42 @@ impl Cut {
                     || footer.dropped != 0
                     || footer.late != 0))
         {
-            return self.fail();
+            return Err("startup cut refused");
         }
+        Ok(footer)
+    }
+    /// Provisional evidence only. Caller owns failure latching and final health
+    /// reconciliation; successful validation never freezes late counters.
+    pub(super) fn validate_provisional(
+        &self,
+        bytes: &[u8],
+        native: &LoadLog,
+        stream: &JsStream,
+        retention: Option<&RetentionEvidence>,
+    ) -> Result<(), &'static str> {
+        if self.phase != Phase::Draining {
+            return Err("startup cut is not draining");
+        }
+        self.parse_footer(bytes, native, stream, retention)
+            .map(|_| ())
+    }
+    pub(super) fn finish(
+        &mut self,
+        bytes: &[u8],
+        native: &LoadLog,
+        stream: &JsStream,
+        retention: Option<&RetentionEvidence>,
+    ) -> Result<Phase, &'static str> {
+        if self.phase == Phase::Refused {
+            return Err("startup cut terminal");
+        }
+        let footer = match self.parse_footer(bytes, native, stream, retention) {
+            Ok(footer) => footer,
+            Err(_) => return self.fail(),
+        };
+        let js = stream.projection();
+        let current = native.receipt();
+        let accepted = js["accepted"].as_u64().unwrap();
         if matches!(self.phase, Phase::SealedObserved | Phase::SealedPartial) {
             return if self.footer.as_ref() == Some(&footer)
                 && self.native == current
@@ -283,3 +314,7 @@ impl Cut {
 #[cfg(test)]
 #[path = "startup_cut_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "startup_cut_provisional_tests.rs"]
+mod provisional_tests;
