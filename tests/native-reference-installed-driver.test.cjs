@@ -264,6 +264,17 @@ test('P38 default fixture and label vocabulary remain closed to Reference inputs
   assert.throws(()=>shared.verifyFixtures({...f.config,fixtures:f.config.references}),/fixture-refused/);
   assert.throws(()=>policy.authorize({...f.config,workflow:'P38'}),/new-reference-grant-required/);
 });
+test('Reference shares exact-exit and ESRCH helper cleanup',async()=>{
+  const child={pid:321,p38DetachedGroup:true,exitCode:0,signalCode:null};
+  let probes=0,signals=0;
+  const cleanup=await shared.closeOwnedHelpers(()=>{},[child],helper=>shared.cleanupHelper(helper,{
+    alive(){if(++probes===1)throw Object.assign(Error('private'),{code:'EPERM'});return false;},
+    signal(){signals++;},delay:async()=>{}}));
+  assert.equal(cleanup.cleanupDiagnostics[0].stage,'group-absent');
+  assert.equal(cleanup.cleanupDiagnostics[0].transientProbeDenied,true);
+  assert.equal(cleanup.cleanupDiagnostics[0].childExitObserved,true);
+  assert.equal(signals,0);
+});
 test('real child transport chooses Reference entrypoint/environment and retires only its helper',async t=>{
   const f=setup(t);f.prepare();const helpers=new Set();
   const helper=path.join(f.root,'modeled-helper');
