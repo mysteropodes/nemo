@@ -29,6 +29,7 @@ tauri-build = { version = "2", features = [] }
 default = []
 test-play-publication-observer = []
 test-object-window-probe = []
+test-p38-fixture-open-probe = []
 
 [dependencies]
 nemo-mcp = { path = "../nemo-mcp" }
