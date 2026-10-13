@@ -10,8 +10,9 @@ use native_engine::{
     object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
     object_render_scene::{
         prepare_object_paint_plan, prepare_object_render_scene,
-        prepare_scheduled_object_composition,
+        prepare_scheduled_object_composition, ObjectPaintPlan,
     },
+    object_snapshot::ObjectSnapshot,
     resource_leases::WorkId,
     scheduler::{
         EvaluationKey, FrameScheduler, ObjectSchedulePins, ObjectScheduleScope, OutputSpec,
@@ -20,9 +21,17 @@ use native_engine::{
 };
 use std::collections::BTreeSet;
 
+// CPU-only admission; never exported, cloned or detached from this owner.
+struct PreparedObjectPreview {
+    snapshot: ObjectSnapshot,
+    plan: ObjectPaintPlan,
+    key: EvaluationKey,
+}
+
 #[derive(Default)]
 pub(super) struct ObjectPreview {
     scheduler: FrameScheduler,
+    prepared: Option<PreparedObjectPreview>,
     pending: Option<ScheduledFrame>,
     blocked: Option<String>,
     released: bool,
@@ -53,6 +62,7 @@ impl ObjectPreview {
         Ok(())
     }
     pub(super) fn invalidate(&mut self) {
+        self.prepared = None;
         if let Err(error) = self.cancel_pending() {
             self.blocked = Some(error);
         }
@@ -90,6 +100,36 @@ impl NativeObjectHost {
         compositor: &mut Compositor,
         viewport: &mut DesktopViewportHost<P>,
     ) -> Result<PresentationReceipt, String> {
+        self.with_prepared_object_preview(expected, output, |owner| {
+            owner.present_prepared_object_preview(expected, compositor, viewport)
+        })
+    }
+
+    /// CPU preparation precedes any target factory while shared guards remain
+    /// held. The private one-shot token cannot cross owners or callback turns.
+    pub(crate) fn with_prepared_object_preview<T>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        if self.preview.prepared.is_some() {
+            return Err("native object preview preparation is already borrowed".into());
+        }
+        self.preview.prepared = Some(self.prepare_object_preview(expected, output)?);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
+        self.preview.prepared = None;
+        match result {
+            Ok(result) => result,
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
+    }
+
+    fn prepare_object_preview(
+        &self,
+        expected: &ObjectFrameSelector<'_>,
+        output: OutputSpec,
+    ) -> Result<PreparedObjectPreview, String> {
         if self.released.is_some() || self.preview.released {
             return Err("native object host was released".into());
         }
@@ -126,6 +166,48 @@ impl NativeObjectHost {
             [],
         )
         .map_err(|e| e.to_string())?;
+        Ok(PreparedObjectPreview {
+            snapshot,
+            plan,
+            key,
+        })
+    }
+
+    pub(crate) fn present_prepared_object_preview<P: SurfacePort>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        compositor: &mut Compositor,
+        viewport: &mut DesktopViewportHost<P>,
+    ) -> Result<PresentationReceipt, String> {
+        let prepared = self
+            .preview
+            .prepared
+            .take()
+            .ok_or("native object preview has no current CPU preparation")?;
+        if self.released.is_some() || self.preview.released || self.preview.blocked.is_some() {
+            return Err("native object preview owner requires cleanup or was released".into());
+        }
+        let current = self
+            .history
+            .acquire_snapshot(self.history.content_revision())
+            .ok_or("native object preview current snapshot is unavailable")?;
+        let packet = prepared.plan.packet();
+        if current.snapshot_id() != prepared.snapshot.snapshot_id()
+            || current.instance_id() != expected.instance_id
+            || current.document_id() != expected.document_id
+            || current.content_revision() != expected.content_revision
+            || packet.document_snapshot_id() != expected.document_snapshot_id
+            || packet.context_id() != expected.context_id
+            || packet.scope_kind() != &expected.scope_kind
+            || packet.frame() != expected.frame
+        {
+            return Err("native object preview prepared pins are stale or foreign".into());
+        }
+        let PreparedObjectPreview {
+            snapshot,
+            plan,
+            key,
+        } = prepared;
         if self
             .preview
             .pending
