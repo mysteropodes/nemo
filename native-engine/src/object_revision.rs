@@ -11,6 +11,9 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_reference_revision.rs"]
+mod reference_attachment;
 
 static NEXT_OBJECT_DOCUMENT: AtomicU64 = AtomicU64::new(1);
 #[cfg(feature = "history")]

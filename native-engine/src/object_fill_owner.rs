@@ -29,6 +29,41 @@ pub(crate) struct ObjectFillOwner {
 }
 
 impl ObjectFillOwner {
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn from_project_file(
+        instance: String,
+        bytes: &[u8],
+    ) -> Result<Self, DispatchErrorCode> {
+        let snapshot = ObjectSnapshot::admit_project_file(instance, bytes)?;
+        Ok(Self {
+            revisions: ObjectRevisionOwner::from_admitted(snapshot),
+        })
+    }
+    #[cfg(feature = "project_media_codec")]
+    pub(crate) fn commit_reference_attachment(
+        &mut self,
+        candidate: crate::object_snapshot::PreparedReferenceAttachment,
+    ) -> Result<u64, DispatchErrorCode> {
+        let current = self.current_snapshot();
+        let origin = candidate.origin();
+        if origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if origin.snapshot_id() != current.snapshot_id()
+            || origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        if !candidate.changed() {
+            return Ok(self.content_revision());
+        }
+        self.revisions
+            .publish_admitted_reference(candidate.into_reference())
+            .map_err(|_| DispatchErrorCode::Unavailable)
+    }
     pub(crate) fn prepare_reference_edit(
         &self,
         edit: ReferenceEdit,
