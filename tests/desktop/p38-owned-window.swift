@@ -4,6 +4,7 @@ import ApplicationServices
 import CoreGraphics
 
 struct Refusal: Error { let code: String }
+struct SelectionRefusal: Error { let diagnostics: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
@@ -24,6 +25,10 @@ func route(_ raw: String) throws -> [Int] {
 func attr(_ node: AXUIElement, _ key: String) -> CFTypeRef? {
   var value: CFTypeRef?
   return AXUIElementCopyAttributeValue(node, key as CFString, &value) == .success ? value : nil
+}
+func axElement(_ value: CFTypeRef?) -> AXUIElement? {
+  guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+  return (value as! AXUIElement)
 }
 func children(_ node: AXUIElement) -> [AXUIElement] { attr(node, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
 func owns(_ node: AXUIElement, _ pid: pid_t) -> Bool {
@@ -198,10 +203,61 @@ func run() throws {
       }
       if action == "select" {
         try check(target == "sheet" && attr(selected,kAXRoleAttribute) as? String == kAXRowRole)
-        var settable = DarwinBoolean(false)
-        try check(AXUIElementIsAttributeSettable(selected,kAXSelectedAttribute as CFString,&settable) == .success && settable.boolValue)
-        try check(AXUIElementSetAttributeValue(selected,kAXSelectedAttribute as CFString,kCFBooleanTrue) == .success)
-        try check(attr(selected,kAXSelectedAttribute) as? Bool == true)
+        func axError(_ error: AXError) -> Int { Int(error.rawValue) }
+        var d: [String:Any] = ["outlineFound":false,"outlineSelectedRowsReadable":false,
+          "outlineSelectedRowMember":false,"outlineSelectedRowsOwned":false,
+          "outlineRowsReadable":false,"outlineRowMember":false,"outlineRowsOwned":false]
+        var rowValue: CFTypeRef?
+        let rowQuery = AXUIElementCopyAttributeValue(selected,kAXSelectedAttribute as CFString,&rowValue)
+        d["rowQueryError"] = axError(rowQuery); if rowQuery == .success, let b = rowValue as? Bool { d["rowSelected"] = b }
+        var rowSettable = DarwinBoolean(false)
+        let rowCapability = AXUIElementIsAttributeSettable(selected,kAXSelectedAttribute as CFString,&rowSettable)
+        d["rowSettableQueryError"] = axError(rowCapability); d["rowSettable"] = rowCapability == .success && rowSettable.boolValue
+        // Query the nearest same-process owning AXOutline, but never write AXSelectedRows.
+        var parent = axElement(attr(selected,kAXParentAttribute))
+        for _ in 0..<20 {
+          guard let current = parent, owns(current,pid) else { break }
+          if attr(current,kAXRoleAttribute) as? String == "AXOutline" {
+            d["outlineFound"] = true
+            var selectedRowsValue: CFTypeRef?
+            let selectedRowsError = AXUIElementCopyAttributeValue(current,"AXSelectedRows" as CFString,&selectedRowsValue)
+            d["outlineSelectedRowsQueryError"] = axError(selectedRowsError)
+            var outlineSettable = DarwinBoolean(false)
+            let capability = AXUIElementIsAttributeSettable(current,"AXSelectedRows" as CFString,&outlineSettable)
+            d["outlineSelectedRowsSettableQueryError"] = axError(capability)
+            d["outlineSelectedRowsSettable"] = capability == .success && outlineSettable.boolValue
+            if selectedRowsError == .success, let rows = selectedRowsValue as? [AXUIElement], rows.count <= 128 {
+              d["outlineSelectedRowsReadable"] = true
+              let owned = rows.allSatisfy { owns($0,pid) }
+              d["outlineSelectedRowsOwned"] = owned
+              d["outlineSelectedRowMember"] = owned && rows.contains { CFEqual($0,selected) }
+            }
+            var outlineRowsValue: CFTypeRef?
+            let outlineRowsError = AXUIElementCopyAttributeValue(current,kAXRowsAttribute as CFString,&outlineRowsValue)
+            d["outlineRowsQueryError"] = axError(outlineRowsError)
+            if outlineRowsError == .success, let rows = outlineRowsValue as? [AXUIElement], rows.count <= 128 {
+              d["outlineRowsReadable"] = true
+              let owned = rows.allSatisfy { owns($0,pid) }
+              d["outlineRowsOwned"] = owned
+              d["outlineRowMember"] = owned && rows.contains { CFEqual($0,selected) }
+            }
+            break
+          }
+          parent = axElement(attr(current,kAXParentAttribute))
+        }
+        guard rowQuery == .success, rowCapability == .success, rowSettable.boolValue else {
+          throw SelectionRefusal(diagnostics:d.merging(["stage":"row-capability"]){$1})
+        }
+        let setError = AXUIElementSetAttributeValue(selected,kAXSelectedAttribute as CFString,kCFBooleanTrue)
+        d["rowSetError"] = axError(setError)
+        guard setError == .success else { throw SelectionRefusal(diagnostics:d.merging(["stage":"row-write"]){$1}) }
+        var readback: CFTypeRef?
+        let readError = AXUIElementCopyAttributeValue(selected,kAXSelectedAttribute as CFString,&readback)
+        d["rowReadbackError"] = axError(readError); if readError == .success, let b = readback as? Bool { d["rowSelectedAfter"] = b }
+        guard readError == .success, (readback as? Bool) == true else {
+          throw SelectionRefusal(diagnostics:d.merging(["stage":"row-readback"]){$1})
+        }
+        d["stage"] = "row-readback"; result["selectionDiagnostics"] = d
         result["selected"] = true
       } else { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
       try verify()
@@ -277,5 +333,6 @@ func run() throws {
   }
 }
 do { try run() }
+catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
 catch let error as Refusal { try? emit(["status":"refused","code":allowedReasons.contains(error.code) ? error.code : "adapter-refused"]); exit(1) }
 catch { try? emit(["status":"refused","code":"adapter-refused"]); exit(1) }
