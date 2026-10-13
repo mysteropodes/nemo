@@ -8,7 +8,30 @@ use std::io::Write;
 
 #[path = "object_png_output.rs"]
 mod object;
+use crate::object_render_scene::LiveObjectComposition;
 pub(crate) use object::{encode_scheduled_object_png, ScheduledObjectPng};
+
+/// Borrow the caller's original compositor; no GPU or publication owner is made.
+pub(crate) trait ObjectPngEncoder {
+    fn encode_object_png(
+        &mut self,
+        live: &LiveObjectComposition<'_>,
+        maximum_encoded_bytes: usize,
+    ) -> Result<ScheduledObjectPng, String>;
+}
+impl ObjectPngEncoder for Compositor {
+    fn encode_object_png(
+        &mut self,
+        live: &LiveObjectComposition<'_>,
+        maximum_encoded_bytes: usize,
+    ) -> Result<ScheduledObjectPng, String> {
+        let result = self
+            .compose_scheduled_object(live)
+            .map_err(|e| e.to_string())?;
+        encode_scheduled_object_png(self, &result, live, maximum_encoded_bytes)
+            .map_err(|e| e.to_string())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PngOutputError {
