@@ -70,7 +70,7 @@ function launchProcess(cli, args, options) {
   return state;
 }
 
-function createController({ root, app, env = process.env, timeout = 30_000, cli = path.join(root, 'scripts/nemo/native.cjs') }) {
+function createController({ root, app, env = process.env, timeout = 30_000, cli = path.join(root, 'scripts/nemo/native.cjs'), startupDiagnostics }) {
   const instances = [];
   const commands = new Set();
   const options = { root, env };
@@ -88,20 +88,28 @@ function createController({ root, app, env = process.env, timeout = 30_000, cli 
     if (reserve.length) args.push('--reserve', reserve.join(','));
     const instance = { task, process: launchProcess(cli, args, options), info: null, stopped: false };
     instances.push(instance); // Track before readiness so partial starts also get cleanup.
-    await until(() => {
-      const state = instance.process;
-      instance.info = state.frames.find(frame => frame.started === true) || instance.info;
-      requireCheck(!state.finished && !state.spawnError && !state.malformed && !state.overflow, 'native launcher failed before readiness');
-      return instance.info;
-    }, 'native launcher readiness timed out', timeout);
-    requireCheck(instance.info.taskId === task && typeof instance.info.ownerToken === 'string' && instance.info.ownerToken.length > 0, 'native launcher returned invalid ownership');
-    await until(() => {
-      const state = instance.process;
-      requireCheck(!state.finished && !state.malformed && !state.overflow, 'native launcher exited before app manifest');
-      const frame = state.frames.find(value => Object.hasOwn(value, 'appRuntime'));
-      if (frame) requireCheck(frame.appRuntime && !frame.appRuntimeError, 'native app did not disclose a valid runtime manifest');
-      return frame;
-    }, 'native app manifest timed out', timeout);
+    try {
+      await until(() => {
+        const state = instance.process;
+        instance.info = state.frames.find(frame => frame.started === true) || instance.info;
+        requireCheck(!state.finished && !state.spawnError && !state.malformed && !state.overflow, 'native launcher failed before readiness');
+        return instance.info;
+      }, 'native launcher readiness timed out', timeout);
+      requireCheck(instance.info.taskId === task && typeof instance.info.ownerToken === 'string' && instance.info.ownerToken.length > 0, 'native launcher returned invalid ownership');
+      await until(() => {
+        const state = instance.process;
+        requireCheck(!state.finished && !state.malformed && !state.overflow, 'native launcher exited before app manifest');
+        const frame = state.frames.find(value => Object.hasOwn(value, 'appRuntime'));
+        if (frame) requireCheck(frame.appRuntime && !frame.appRuntimeError, 'native app did not disclose a valid runtime manifest');
+        return frame;
+      }, 'native app manifest timed out', timeout);
+    } catch (error) {
+      if (typeof startupDiagnostics === 'function') {
+        try { error.startupDiagnostics = await startupDiagnostics(task); }
+        catch { error.startupDiagnostics = { classification: 'diagnostic-capture-failed' }; }
+      }
+      throw error;
+    }
     return instance;
   }
   async function status(instance, owner = instance.info.ownerToken) {
