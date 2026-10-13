@@ -694,11 +694,13 @@ test('non-capture helper cleanup records exact-handle signal and wait exceptions
   const child={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill(){throw Error('/private/exact-signal');}};
   await assert.rejects(cleanupHelper(child),error=>{
     assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-signal-error',helperPid:321,descendantPossible:false,
+      childExitObserved:false,childSignalObserved:false,
       signalKind:'SIGTERM',signalAttempts:1,signalError:true}]);return true;
   });
   const waiting={pid:321,p38GroupMayContainDescendants:false,exitCode:null,signalCode:null,kill:()=>{}};
   await assert.rejects(cleanupHelper(waiting,{delay(){throw Error('/private/exact-wait');}}),error=>{
     assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-wait-error',helperPid:321,descendantPossible:false,
+      childExitObserved:false,childSignalObserved:false,
       signalKind:'SIGTERM',signalAttempts:1,probePoint:'wait-term'}]);return true;
   });
 });
@@ -742,6 +744,7 @@ test('cleanup exception facts do not replace the saved first refusal',async()=>{
   assert.deepEqual(result.firstFailure.actionDiagnostics,safeActionDiagnostics(diagnostic));
   assert.equal(result.helperCleanup,'incomplete');
   assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-probe-error',helperPid:321,descendantPossible:true,
+    childExitObserved:false,childSignalObserved:false,
     probePoint:'initial',signalAttempts:0,probeError:true,probeErrorCode:'UNKNOWN'}]);
   assert.equal(result.cleanup,'complete');assert.equal(JSON.stringify(result).includes('/private/'),false);
 });
@@ -889,4 +892,39 @@ test('unknown group probes never become absence and expose only fixed error code
   assert.throws(()=>safeCleanupDiagnostics([{stage:'group-probe-error',probeErrorCode:'ESRCH'}]));
   await assert.rejects(cleanupHelper({pid:321},{alive:()=>true,signal(){throw Object.assign(Error('private'),{code:'EPERM'});}}),
     e=>e.cleanupDiagnostics[0].signalErrorCode==='EPERM' && e.cleanupDiagnostics[0].groupAliveBefore===true);
+});
+test('Go-to-Folder diagnostics preserve bounded categories and reject impossible posted phases',()=>{
+  const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const facts={stage:'goto-discovery',gotoPhase:'pre-tree',commandPosted:false,gotoReason:'child-owner-query',
+    gotoRoute:'0.1',gotoDepth:2,gotoNodeCount:5,gotoQueryError:-25204,ownerMatches:false};
+  assert.deepEqual(safeActionDiagnostics({...facts,title:'private',value:'/private/file',ownerPid:999,rawAX:{secret:true}}),facts);
+  assert.deepEqual(safeActionDiagnostics({...facts,gotoRoute:'',gotoDepth:0}),{...facts,gotoRoute:'',gotoDepth:0});
+  for(const phase of ['posted-pair','post-context','discovery','retained-verification'])
+    assert.equal(safeActionDiagnostics({...facts,gotoPhase:phase,commandPosted:true}).commandPosted,true);
+  assert.deepEqual(safeActionDiagnostics({stage:'goto-ready',gotoPhase:'complete',commandPosted:true}),
+    {stage:'goto-ready',gotoPhase:'complete',commandPosted:true});
+  for(const patch of [{gotoPhase:'private'},{commandPosted:true},{commandPosted:'false'},{commandPosted:undefined},
+    {gotoPhase:undefined},{gotoPhase:'discovery'},{gotoReason:'/private/reason'},{gotoRoute:'/private/path'},
+    {gotoRoute:'512'},{gotoRoute:Array(14).fill('0').join('.')},{gotoDepth:14},{gotoDepth:-1},
+    {gotoNodeCount:513},{gotoCandidateCount:513},{gotoFieldCount:513},{gotoChildCount:514},{gotoChildCount:1.2},
+    {gotoQueryError:1},{gotoQueryError:-32769},{ownerMatches:1},{parentMatches:'false'},
+    {candidateFresh:0},{candidateOwned:null},{semanticMatched:'yes'},{stage:'axpress-perform'},{stage:'goto-ready'},
+    {gotoPhase:'complete',commandPosted:true}])
+    assert.throws(()=>safeActionDiagnostics({...facts,...patch}),/ax-evidence-refused/);
+  assert.equal(safeActionDiagnostics({...facts,gotoChildCount:513}).gotoChildCount,513); // Saturated over-limit count.
+});
+test('cleanup child exit observations never turn a refused group probe into absence',async()=>{
+  const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  for(const child of [{pid:321},{pid:321,exitCode:null,signalCode:null},{pid:321,exitCode:1,signalCode:null},
+    {pid:321,exitCode:null,signalCode:'SIGTERM'}]){
+    let signals=0;
+    await assert.rejects(cleanupHelper(child,{alive(){throw Object.assign(Error('private'),{code:'EPERM'});},signal(){signals++;}}),error=>{
+      const [d]=safeCleanupDiagnostics(error.cleanupDiagnostics);
+      assert.equal(d.stage,'group-probe-error');assert.equal(d.probeErrorCode,'EPERM');assert.equal(d.signalAttempts,0);
+      assert.equal(d.childExitObserved,Number.isInteger(child.exitCode));assert.equal(d.childSignalObserved,typeof child.signalCode==='string');
+      assert.equal('groupAliveBefore' in d,false);return true;
+    });assert.equal(signals,0);
+  }
+  assert.throws(()=>safeCleanupDiagnostics([{stage:'group-probe-error',childExitObserved:'yes'}]));
+  assert.throws(()=>safeCleanupDiagnostics([{stage:'group-probe-error',childSignalObserved:1}]));
 });

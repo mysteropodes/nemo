@@ -314,3 +314,41 @@ for(const fault of ['none','missing','mismatch','confirm','identity','search']) 
     assert.equal(JSON.stringify(result).includes('/private/secret'),false);
   });
 }
+for(const posted of [false,true])test('Reference child transport retains '+(posted?'post':'pre')+'-pair refusal evidence without retry',async t=>{
+  const f=modeled(t),helpers=new Set(),helper=path.join(f.root,'diagnostic-helper');
+  const diagnostic={stage:'goto-discovery',gotoPhase:posted?'discovery':'pre-tree',commandPosted:posted,
+    gotoReason:'child-owner-mismatch',gotoRoute:'0.1',gotoDepth:2,gotoNodeCount:5,gotoQueryError:0,ownerMatches:false};
+  fs.writeFileSync(helper,'#!'+process.execPath+'\n'+
+    'const pid=Number(process.argv[3]),emit=v=>process.stdout.write(JSON.stringify(v)+"\\n");'+
+    'emit({status:"pinned",pid,windowId:45,matchedAX:true});'+
+    'require("node:readline").createInterface({input:process.stdin}).on("line",line=>{const v=JSON.parse(line);'+
+    'if(v.type==="go-to-folder"){emit({status:"refused",code:"adapter-refused",actionDiagnostics:'+JSON.stringify({...diagnostic,
+      title:'private-title',value:'/private/fixture',ownerPid:777,rawAX:{secret:true}})+'});return;}'+
+    'emit({status:"ok",type:v.type,pid,windowId:45,matchedAX:true,...(v.type==="pin-sheet"?{target:"sheet",sheetToken:'+JSON.stringify(OUTER)+'}:{})});});\n',{mode:0o700});
+  f.config.windowHelper=helper;
+  const transport=shared.createWindowTransport(f.config,f.report.directory,()=>f.report,helpers),calls=[];
+  f.services.window=async(...args)=>{calls.push(args[0]);return transport(...args);};
+  f.services.close=()=>shared.closeOwnedHelpers(()=>{},[...helpers],shared.cleanupHelper);
+  f.actions=[{type:'pin-sheet'},{type:'go-to-folder',target:'sheet',sheetToken:OUTER},{type:'go-to-folder',target:'sheet',sheetToken:OUTER}];
+  const result=await driver.runOperator(f.config,f.services);
+  assert.equal(result.status,'partial');assert.equal(result.firstFailure.code,'adapter-refused');
+  assert.deepEqual(result.firstFailure.actionDiagnostics,diagnostic);
+  assert.equal(result.firstFailure.action.type,'go-to-folder');assert.equal(result.firstFailure.action.ordinal,2);
+  assert.equal(result.actions.length,1);assert.equal(calls.filter(v=>v==='go-to-folder').length,1);
+  assert.ok(f.receipts.some(r=>r.firstFailure?.actionDiagnostics?.commandPosted===posted));
+  assert.equal(result.installedAcceptance,'not-established');assert.equal(result.helperCleanup,'complete');assert.equal(helpers.size,0);
+  for(const secret of ['private-title','/private/fixture','ownerPid','rawAX'])assert.equal(JSON.stringify(result).includes(secret),false);
+});
+test('Reference completed Go-to-Folder action records posting separately from installed acceptance',async t=>{
+  const diagnostic={stage:'goto-ready',gotoPhase:'complete',commandPosted:true};
+  const f=modeled(t,{window(mode,pid){return {pid,windowId:45,matchedAX:true,
+    ...(mode==='pin-sheet'||mode==='go-to-folder'?{target:'sheet',sheetToken:OUTER}:{}),
+    ...(mode==='location-dismissed'?{target:'sheet',sheetToken:OUTER,locationToken:INNER,locationDismissed:true}:{}),
+    ...(mode==='sheet-dismissed'?{dismissed:true}:{}),
+    ...(mode==='go-to-folder'?{locationToken:INNER,locationReady:true,commandPosted:true,actionDiagnostics:diagnostic}:{})};}});
+  f.actions=[{type:'pin-sheet'},{type:'go-to-folder',target:'sheet',sheetToken:OUTER},
+    {type:'location-dismissed',target:'sheet',sheetToken:OUTER,locationToken:INNER},{type:'sheet-dismissed',sheetToken:OUTER},{type:'stop'}];
+  const result=await driver.runOperator(f.config,f.services);
+  assert.equal(result.status,'operator-complete',JSON.stringify(result));assert.deepEqual(result.actions[1].actionDiagnostics,diagnostic);
+  assert.equal(result.actions[1].commandPosted,true);assert.equal(result.installedAcceptance,'not-established');
+});
