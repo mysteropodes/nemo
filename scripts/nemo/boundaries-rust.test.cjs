@@ -342,9 +342,9 @@ test('N25C2a/C2d private host registration and exact lifecycle grants fail close
   const file = 'src-tauri/src/native_application_dispatch_release_tests.rs';
   const module = profile.modules.find((m) => m.id === id);
   assert.deepEqual(module, { id, layer: 'host-release-tests', dir: 'src-tauri/src',
-    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_preview_lifecycle_tests.rs', 'native_object_preview_route_tests.rs', 'native_object_preview_route_test_support.rs'], publicApi: [], sizeProfile: 'Rust production module' });
+    files: [path.basename(file), 'native_object_host_tests.rs', 'native_object_bootstrap_tests.rs', 'native_object_host_read_tests.rs', 'native_object_host_command_tests.rs', 'native_object_host_history_tests.rs', 'native_object_client_tests.rs', 'native_object_client_admission_tests.rs', 'native_object_serialization_tests.rs', 'native_object_reopen_tests.rs', 'native_object_save_tests.rs', 'native_object_save_failure_tests.rs', 'native_object_v2_persistence_tests.rs', 'native_object_v2_refusal_tests.rs', 'native_object_preview_tests.rs', 'native_object_preview_lifecycle_tests.rs', 'native_object_preview_route_tests.rs', 'native_object_preview_route_test_support.rs', 'native_object_desktop_preview_tests.rs', 'native_object_desktop_preview_test_support.rs'], publicApi: [], sizeProfile: 'Rust production module' });
   assert.equal(profile.sizeProfiles[module.sizeProfile].hardMax, 500);
-  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter']);
+  assert.deepEqual(policy.layerRules['host-release-tests'].allowedLayers, ['bootstrap', 'host-contract', 'host-seam', 'mcp-adapter', 'command-adapter', 'viewport-owner']);
   assert.equal(policy.layerRules.tests.allowedLayers.includes('host-seam'), false);
   for (const [owner, items] of [[seam, ['application::ApplicationReleaseReceipt', 'export_job::ReconciliationStage', 'resource_leases::WorkId',
       'history::NativeObjectHistory', 'object_document::ObjectDocument', 'object_snapshot::ObjectSnapshot', 'export_job::ExportReleaseReconciliation']],
@@ -434,6 +434,43 @@ test('N25F3D3B2D1 original viewport borrow has exact children and separate produ
   appendSource(root, 'src-tauri/src/native_application.rs', 'use native_engine::desktop_viewport::SurfaceAttempt;');
   assert.ok(R.checkRustCrate(profile, policy, { root }).violations.some((v) =>
     v.rule === 'private-port-access' && v.module === 'rust.desktop.native.application' && v.detail.path === 'desktop_viewport::SurfaceAttempt'));
+});
+
+test('N25F3D3B2D2 original desktop preview registers only its private modules and exact ports', () => {
+  const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
+  const module = (id) => profile.modules.find((entry) => entry.id === id);
+  const command = 'rust.desktop.native.application.commands';
+  const owner = 'rust.desktop.native.application.viewport';
+  const tests = 'rust.desktop.native.host.release.tests';
+  const seam = 'rust.desktop.native.dispatch';
+  for (const [id, file] of [[command, 'native_object_desktop_preview.rs'],
+    [owner, 'native_object_viewport.rs'],
+    [tests, 'native_object_desktop_preview_tests.rs'],
+    [tests, 'native_object_desktop_preview_test_support.rs']]) {
+    assert.ok(module(id).files.includes(file), `${id}: ${file}`);
+    assert.equal(module(id).publicApi.includes(file), false);
+  }
+  const shell = fs.readFileSync(path.join(ROOT, 'src-tauri/src/lib.rs'), 'utf8');
+  assert.match(shell, /mod native_object_desktop_preview;/);
+  assert.match(shell, /native_object_desktop_preview::nemo_native_object_preview,/);
+  const ports = policy.externalCratePorts.native_engine.moduleItems;
+  const commandItems = ['desktop_viewport::DesktopViewportHost', 'desktop_viewport::PresentationReceipt',
+    'desktop_viewport::SurfacePort', 'object_document::FrameScopeKind',
+    'object_frame_packet::ObjectFrameSelector', 'scheduler::OutputSpec'];
+  for (const item of commandItems) assert.ok(ports[command].includes(item));
+  assert.ok(ports[seam].includes('object_render_scene::ObjectPaintPlan'));
+  for (const [id, item] of [[command, 'desktop_viewport::SurfacePort'],
+    [seam, 'object_render_scene::ObjectPaintPlan']]) {
+    const denied = structuredClone(policy);
+    denied.externalCratePorts.native_engine.moduleItems[id] = ports[id].filter((entry) => entry !== item);
+    assert.ok(R.checkRustCrate(profile, denied, { root: ROOT }).violations.some((v) =>
+      v.rule === 'private-port-access' && v.module === id && v.detail.path === item), `${id}: ${item}`);
+  }
+  const edgeDenied = structuredClone(policy);
+  edgeDenied.layerRules['host-release-tests'].allowedLayers =
+    edgeDenied.layerRules['host-release-tests'].allowedLayers.filter((layer) => layer !== 'viewport-owner');
+  assert.ok(R.checkRustCrate(profile, edgeDenied, { root: ROOT }).violations.some((v) =>
+    v.rule === 'layer-violation' && v.module === tests && v.detail.targetModule === owner));
 });
 
 test('N25C2e raw bootstrap is registered with exact codec and test-only edges', (t) => {
