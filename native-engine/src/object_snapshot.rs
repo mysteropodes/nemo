@@ -11,6 +11,12 @@ use serde::{Deserialize, Serialize};
 const MAX_MESSAGE_BYTES: usize = 4096;
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[path = "object_project_admission.rs"]
+mod project_admission;
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+pub(crate) use project_admission::PreparedReferenceAttachment;
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
 use crate::revision::{
     shared_image_resource_budget, ImageResourceBudget, ImageResourceCharge, ImageResourceError,
 };
