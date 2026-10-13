@@ -8,18 +8,102 @@ import Carbon
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
 struct ActionRefusal: Error { let diagnostics: [String:Any] }
-func locationCheck(_ ok: Bool, _ stage: String) throws {
-  if !ok { throw ActionRefusal(diagnostics:["stage":stage]) }
+func locationCheck(_ ok: Bool, _ stage: String, _ reason: String? = nil) throws {
+  if !ok {
+    var facts: [String:Any] = ["stage":stage]
+    if let reason { facts["gotoReason"] = reason }
+    throw ActionRefusal(diagnostics:facts)
+  }
+}
+// This records calls to postToPid, never key delivery or native UI acceptance.
+final class LocationTrace {
+  var phase = "request"
+  private(set) var pairPosted = false
+  func postedPair() { pairPosted = true; phase = "posted-pair" }
+  func facts(_ original: [String:Any]) -> [String:Any] {
+    var result = original
+    result["gotoPhase"] = phase; result["commandPosted"] = pairPosted
+    return result
+  }
+  func observe<T>(_ body: () throws -> T) throws -> T {
+    do { return try body() }
+    catch let error as ActionRefusal { throw ActionRefusal(diagnostics:facts(error.diagnostics)) }
+    catch { throw ActionRefusal(diagnostics:facts(["stage":"goto-state","gotoReason":"unexpected-refusal"])) }
+  }
+}
+func locationPredicate(_ ok: Bool, _ reason: String, _ facts: [String:Any] = [:]) throws {
+  if !ok {
+    var result = facts; result["stage"] = "goto-discovery"; result["gotoReason"] = reason
+    throw ActionRefusal(diagnostics:result)
+  }
+}
+// Production AX and static fault controls use this same complete walk. An
+// unreadable owner is not absence; no role/parent/children read follows it.
+func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
+  equal: (Node,Node)->Bool, owner: (Node)->(Int,Bool), isWindow: (Node)->Bool,
+  timeout: (Node)->Int, children: (Node)->(Int,[Node]?), parent: (Node)->(Int,Node?)) throws -> [Node] {
+  var found = [Node]()
+  func walk(_ current: Node, _ route: String, _ depth: Int) throws {
+    let facts: [String:Any] = ["gotoRoute":route,"gotoDepth":depth,"gotoNodeCount":found.count]
+    func require(_ ok: Bool, _ reason: String, _ extra: [String:Any] = [:]) throws {
+      var observed = facts; observed["gotoNodeCount"] = found.count
+      try locationPredicate(ok,reason,observed.merging(extra) { _,new in new })
+    }
+    func owned(_ node: Node, _ kind: String) throws {
+      let (error,matches) = owner(node)
+      try require(error == 0,kind+"-owner-query",["gotoQueryError":error,"ownerMatches":false])
+      try require(matches,kind+"-owner-mismatch",["gotoQueryError":error,"ownerMatches":matches])
+    }
+    if now() >= deadline { throw ActionRefusal(diagnostics:facts.merging(["stage":"goto-deadline","gotoReason":"walk-deadline"]) { _,new in new }) }
+    try require(depth <= 12,"depth-limit"); try require(found.count < 512,"node-limit")
+    try owned(current,"node")
+    try require(!found.contains { equal($0,current) },"cycle")
+    try require(!isWindow(current),"standalone-window")
+    let timeoutError = timeout(current)
+    try require(timeoutError == 0,"timeout-config",["gotoQueryError":timeoutError])
+    found.append(current)
+    let (error,rows) = children(current)
+    if error == Int(AXError.attributeUnsupported.rawValue) || error == Int(AXError.noValue.rawValue) { return }
+    try require(error == 0,"children-query",["gotoQueryError":error])
+    try require(rows != nil,"children-shape",["gotoQueryError":error])
+    let list = rows!
+    try require(list.count <= 512,"children-limit",["gotoChildCount":min(list.count,513)])
+    for (index,child) in list.enumerated() {
+      let childRoute = route.isEmpty ? String(index) : route+"."+String(index)
+      // Attribute a failed edge to its child route, before entering that node.
+      let edge: [String:Any] = ["gotoRoute":childRoute,"gotoDepth":depth+1,"gotoNodeCount":found.count]
+      func edgeRequire(_ ok: Bool, _ reason: String, _ extra: [String:Any] = [:]) throws {
+        try locationPredicate(ok,reason,edge.merging(extra) { _,new in new })
+      }
+      let (childError,childOwned) = owner(child)
+      try edgeRequire(childError == 0,"child-owner-query",["gotoQueryError":childError,"ownerMatches":false])
+      try edgeRequire(childOwned,"child-owner-mismatch",["gotoQueryError":childError,"ownerMatches":childOwned])
+      let (parentError,ancestor) = parent(child)
+      try edgeRequire(parentError == 0,"parent-query",["gotoQueryError":parentError])
+      try edgeRequire(ancestor != nil,"parent-shape",["gotoQueryError":parentError])
+      let (ownerError,parentOwned) = owner(ancestor!)
+      try edgeRequire(ownerError == 0,"parent-owner-query",["gotoQueryError":ownerError,"ownerMatches":false])
+      try edgeRequire(parentOwned,"parent-owner-mismatch",["gotoQueryError":ownerError,"ownerMatches":parentOwned])
+      try edgeRequire(equal(ancestor!,current),"parent-edge",["parentMatches":false])
+      try walk(child,childRoute,depth+1)
+    }
+  }
+  try walk(root,"",0)
+  if now() >= deadline { throw ActionRefusal(diagnostics:["stage":"goto-deadline","gotoReason":"walk-deadline","gotoRoute":"","gotoDepth":0,"gotoNodeCount":found.count]) }
+  return found
 }
 // Production and fault controls share the one-shot event ordering. A posted
 // process event is not proof that the original sheet received the command.
-func goToFolder(_ reference: Bool, attempted: Bool, consume: () -> Void, context: () throws -> Void,
+func goToFolder(_ reference: Bool, attempted: Bool, trace: LocationTrace, consume: () -> Void, context: () throws -> Void,
   down: () -> Void, up: () -> Void, discover: () throws -> Void) throws {
   try locationCheck(reference && !attempted,"goto-state"); consume()
+  trace.phase = "pre-context"
   try context()
   // No fallible AX query or waiting between the exact-PID down/up pair.
-  down(); up()
+  down(); up(); trace.postedPair()
+  trace.phase = "post-context"
   try context()
+  trace.phase = "discovery"
   try discover()
 }
 func locationCandidateValid(_ fresh: Bool, _ owned: Bool, _ modal: Bool, _ semantic: Bool,
@@ -39,7 +123,13 @@ func ownedAncestor<Node>(_ candidate: Node, _ ancestor: Node, equal: (Node,Node)
   return false
 }
 func locationContextValid(_ mains: Int, _ windowsOwned: Bool, _ focusedWindowOwned: Bool, _ focusDescends: Bool) -> Bool {
-  mains == 1 && windowsOwned && focusedWindowOwned && focusDescends
+  locationContextFailure(mains,windowsOwned,focusedWindowOwned,focusDescends) == nil
+}
+func locationContextFailure(_ mains: Int, _ windowsOwned: Bool, _ focusedWindowOwned: Bool, _ focusDescends: Bool) -> String? {
+  if mains != 1 { return "context-main-count" }
+  if !windowsOwned { return "context-windows-owner" }
+  if !focusedWindowOwned { return "context-focused-window" }
+  return focusDescends ? nil : "context-focus-ancestry"
 }
 func textFieldKind(_ query: AXError, _ subrole: String?) -> String {
   if query == .attributeUnsupported || query == .noValue { return "plain" }
@@ -269,20 +359,89 @@ func selfTest() throws {
     !locationContextValid(1,true,false,true) && !locationContextValid(1,true,true,false))
   for fault in ["none","p38","repeat","pid","window","focus","ancestor","layout","after-down","duplicate","search","absent","timeout"] {
     var attempted = fault == "repeat", events = [String](), contexts = 0, refused = false
+    let trace = LocationTrace()
     do {
-      try goToFolder(fault != "p38",attempted:attempted,consume:{ attempted = true },context:{
+      try trace.observe { try goToFolder(fault != "p38",attempted:attempted,trace:trace,consume:{ attempted = true },context:{
         contexts += 1; events.append("context")
         try locationCheck(!["pid","window","focus","ancestor","layout"].contains(fault) && !(fault == "after-down" && contexts == 2),"goto-context")
       },down:{ events.append("down") },up:{ events.append("up") },discover:{
         events.append("discover"); try locationCheck(!["duplicate","search","absent","timeout"].contains(fault),"goto-discovery")
-      })
-    } catch is ActionRefusal { refused = true }
+      }) }
+    } catch let error as ActionRefusal {
+      refused = true
+      try check(error.diagnostics["commandPosted"] as? Bool == events.contains("down"))
+      if fault == "after-down" { try check(error.diagnostics["gotoPhase"] as? String == "post-context") }
+    }
     try check(refused == (fault != "none"))
-    if events.contains("down") { try check(events.filter { $0 == "up" }.count == 1 && events.firstIndex(of:"up")! > events.firstIndex(of:"down")!) }
+    try check(trace.pairPosted == events.contains("down"))
+    if events.contains("down") { try check(events.filter { $0 == "up" }.count == 1 && events.firstIndex(of:"up")! == events.firstIndex(of:"down")!+1) }
     else { try check(!events.contains("up") && !events.contains("discover")) }
     if fault == "after-down" { try check(events == ["context","down","up","context"]) }
     if fault == "none" { try check(events == ["context","down","up","context","discover"]) }
     if fault != "p38" { try check(attempted) }
+  }
+  let walkCases = ["none","unsupported-leaf","novalue-leaf","node-owner-query","node-owner-mismatch","child-owner-query","child-owner-mismatch",
+    "parent-query","parent-shape","parent-owner-query","parent-owner-mismatch","parent-edge","children-query","children-shape","children-limit",
+    "timeout-config","standalone-window","cycle","depth-limit","node-limit","walk-deadline","final-deadline"]
+  for fault in walkCases {
+    var ownerReads = [Int:Int](), attributeReads = [Int](), ticks = 0, diagnostic: [String:Any]?
+    do {
+      let walked = try locationWalk(0,deadline:10,now:{ ticks += 1; return fault == "walk-deadline" || fault == "final-deadline" && ticks == 3 ? 10 : 0 },
+        equal:==,owner:{ node in
+          ownerReads[node,default:0] += 1
+          let target = node == 0 && ownerReads[node] == 1 ? "node" : node == 0 && ownerReads[node] == 2 ? "parent" : "child"
+          if fault == target+"-owner-query" { return (-25204,false) }
+          return (0,fault != target+"-owner-mismatch")
+        },isWindow:{ node in attributeReads.append(node); return fault == "standalone-window" && node == 1 },
+        timeout:{ node in attributeReads.append(node); return fault == "timeout-config" ? -25204 : 0 },children:{ node in
+          attributeReads.append(node)
+          if fault == "unsupported-leaf" && node == 1 { return (-25205,nil) }
+          if fault == "novalue-leaf" && node == 1 { return (-25212,nil) }
+          if fault == "children-query" { return (-25204,nil) }
+          if fault == "children-shape" { return (0,nil) }
+          if fault == "children-limit" { return (0,Array(repeating:1,count:513)) }
+          if fault == "node-limit" { return (0,node == 0 ? Array(1...512) : []) }
+          if fault == "depth-limit" { return (0,node < 13 ? [node+1] : []) }
+          if fault == "cycle" { return (0,[1-node]) }
+          return (0,node == 0 ? [1] : [])
+        },parent:{ node in
+          attributeReads.append(node)
+          if fault == "parent-query" { return (-25204,nil) }
+          if fault == "parent-shape" { return (0,nil) }
+          if fault == "parent-edge" { return (0,2) }
+          if fault == "cycle" { return (0,1-node) }
+          return (0,fault == "depth-limit" ? node-1 : 0)
+        })
+      try check(walked == [0,1] && ["none","unsupported-leaf","novalue-leaf"].contains(fault))
+    } catch let error as ActionRefusal { diagnostic = error.diagnostics }
+    if ["none","unsupported-leaf","novalue-leaf"].contains(fault) { try check(diagnostic == nil) }
+    else { try check(diagnostic?["gotoReason"] as? String == (fault == "final-deadline" ? "walk-deadline" : fault)) }
+    if fault.hasPrefix("node-owner-") { try check(attributeReads.isEmpty) }
+    if fault.hasPrefix("child-owner-") { try check(!attributeReads.contains(1) && diagnostic?["gotoRoute"] as? String == "0") }
+    if fault == "depth-limit" { try check(diagnostic?["gotoDepth"] as? Int == 13) }
+    if fault == "node-limit" { try check(diagnostic?["gotoNodeCount"] as? Int == 512) }
+  }
+  // Reproduce the same unowned child before and after the command through the
+  // production walk and sequencer, rather than manufacturing a receipt result.
+  for posted in [false,true] {
+    let trace = LocationTrace(); var events = [String](), refused = false
+    func failingWalk() throws {
+      let ownership: (Int)->(Int,Bool) = { (0,$0 == 0) }
+      let descendants: (Int)->(Int,[Int]?) = { (0,$0 == 0 ? [1] : []) }
+      let ancestor: (Int)->(Int,Int?) = { _ in (0,0) }
+      let _: [Int] = try locationWalk(0,deadline:10,now:{ 0 },equal:{ $0 == $1 },owner:ownership,
+        isWindow:{ _ in false },timeout:{ _ in 0 },children:descendants,parent:ancestor)
+    }
+    do { try trace.observe {
+      trace.phase = "pre-tree"
+      if !posted { try failingWalk() }
+      try goToFolder(true,attempted:false,trace:trace,consume:{},context:{},down:{ events.append("down") },up:{ events.append("up") },discover:failingWalk)
+    } } catch let error as ActionRefusal {
+      refused = true
+      try check(error.diagnostics["gotoReason"] as? String == "child-owner-mismatch" && error.diagnostics["gotoRoute"] as? String == "0")
+      try check(error.diagnostics["commandPosted"] as? Bool == posted && error.diagnostics["gotoPhase"] as? String == (posted ? "discovery" : "pre-tree"))
+    }
+    try check(refused && events == (posted ? ["down","up"] : []))
   }
   try check(locationCandidateValid(true,true,true,true,1,"plain",true,true,true))
   for index in 0..<9 {
@@ -419,7 +578,7 @@ func selfTest() throws {
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
-    "goToFolderSequenceCases":13,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
+    "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -697,49 +856,45 @@ func run() throws {
   // Bounded, complete ownership walk. An unreadable/truncated topology is not
   // absence. Every edge must be attested by both AXChildren and AXParent.
   func locationTree(_ root: AXUIElement, _ deadline: UInt64 = DispatchTime.now().uptimeNanoseconds + 1_000_000_000) throws -> [AXUIElement] {
-    var found = [AXUIElement]()
-    func walk(_ current: AXUIElement, _ depth: Int) throws {
-      try locationCheck(DispatchTime.now().uptimeNanoseconds < deadline,"goto-deadline")
-      try locationCheck(depth <= 12 && found.count < 512 && owns(current,pid) &&
-        !found.contains(where:{ CFEqual($0,current) }) && attr(current,kAXRoleAttribute) as? String != kAXWindowRole,"goto-discovery")
-      try locationCheck(AXUIElementSetMessagingTimeout(current,0.03) == .success,"goto-discovery")
-      found.append(current)
-      var raw: CFTypeRef?
-      let error = AXUIElementCopyAttributeValue(current,kAXChildrenAttribute as CFString,&raw)
-      if error == .attributeUnsupported || error == .noValue { return }
-      guard error == .success, let rows = raw as? [AXUIElement], rows.count <= 512 else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
-      for child in rows {
-        try locationCheck(owns(child,pid),"goto-discovery")
-        guard let parent = axElement(attr(child,kAXParentAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
-        try locationCheck(owns(parent,pid) && CFEqual(parent,current),"goto-discovery"); try walk(child,depth+1)
-      }
-    }
-    try walk(root,0); try locationCheck(DispatchTime.now().uptimeNanoseconds < deadline,"goto-deadline"); return found
+    try locationWalk(root,deadline:deadline,now:{ DispatchTime.now().uptimeNanoseconds },equal:{ CFEqual($0,$1) },owner:{ node in
+      var actual: pid_t = 0; let error = AXUIElementGetPid(node,&actual)
+      return (Int(error.rawValue),error == .success && actual == pid)
+    },isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },
+      timeout:{ Int(AXUIElementSetMessagingTimeout($0,0.03).rawValue) },children:{ node in
+      var raw: CFTypeRef?; let error = AXUIElementCopyAttributeValue(node,kAXChildrenAttribute as CFString,&raw)
+      return (Int(error.rawValue),raw as? [AXUIElement])
+    },parent:{ node in
+      var raw: CFTypeRef?; let error = AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
+      return (Int(error.rawValue),axElement(raw))
+    })
   }
   func modal(_ candidate: AXUIElement) -> Bool {
     let role = attr(candidate,kAXRoleAttribute) as? String
     return role == kAXSheetRole || (role == kAXGroupRole && attr(candidate,kAXSubroleAttribute) as? String == kAXDialogSubrole)
   }
   func locationContext(_ focusRoot: AXUIElement? = nil) throws {
-    do { try verify(); _ = try verifySheet() } catch { throw ActionRefusal(diagnostics:["stage":"goto-context"]) }
+    do { try verify(); _ = try verifySheet() } catch { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
     guard let outer = sheet, let rows = attr(application,kAXWindowsAttribute) as? [AXUIElement],
       let focusedWindow = axElement(attr(application,kAXFocusedWindowAttribute)),
-      let focused = axElement(attr(application,kAXFocusedUIElementAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-context"]) }
-    try locationCheck(locationContextValid(rows.filter { CFEqual($0,main) }.count,
+      let focused = axElement(attr(application,kAXFocusedUIElementAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-shape"]) }
+    let reason = locationContextFailure(rows.filter { CFEqual($0,main) }.count,
       rows.allSatisfy { owns($0,pid) && (CFEqual($0,main) || descendant($0,outer)) },
       owns(focusedWindow,pid) && (CFEqual(focusedWindow,main) || descendant(focusedWindow,outer)),
-      descendant(focused,focusRoot ?? location ?? outer)),"goto-context")
+      descendant(focused,focusRoot ?? location ?? outer))
+    try locationCheck(reason == nil,"goto-context",reason)
   }
   func verifyLocation() throws -> AXUIElement {
     try locationContext()
     guard let retained = location, let field = locationField, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
     let tree = try locationTree(outer), modals = tree.filter { !CFEqual($0,outer) && modal($0) }
-    try locationCheck(modals.count == 1 && CFEqual(modals[0],retained) && descendant(retained,outer) && descendant(field,retained),"goto-discovery")
+    try locationPredicate(modals.count == 1,"retained-modal-count",["gotoCandidateCount":modals.count])
+    try locationPredicate(CFEqual(modals[0],retained),"retained-modal-identity")
+    try locationPredicate(descendant(retained,outer) && descendant(field,retained),"retained-ancestry")
     var subrole: CFTypeRef?, writable = DarwinBoolean(false)
     let query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
-    try locationCheck(attr(field,kAXRoleAttribute) as? String == kAXTextFieldRole && textFieldKind(query,subrole as? String) == "plain" &&
+    try locationPredicate(attr(field,kAXRoleAttribute) as? String == kAXTextFieldRole && textFieldKind(query,subrole as? String) == "plain" &&
       attr(field,kAXEnabledAttribute) as? Bool == true && AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable) == .success &&
-      writable.boolValue && supports(field,kAXConfirmAction),"goto-discovery")
+      writable.boolValue && supports(field,kAXConfirmAction),"retained-field")
     return retained
   }
   try emit(["status":"pinned", "pid":pid, "windowId":number, "matchedAX":true])
@@ -779,51 +934,62 @@ func run() throws {
     } else { try locationCheck(request["locationToken"] == nil,"goto-state") }
     switch action {
     case "go-to-folder":
-      try locationCheck(scope.reference && target == "sheet" && !locationAttempted && location == nil,"goto-state")
-      try locationCheck(Set(request.keys).isSubset(of:["type","target","pid","windowId","sheetToken"]) &&
-        AXUIElementSetMessagingTimeout(application,0.03) == .success && AXUIElementSetMessagingTimeout(main,0.03) == .success,"goto-state")
-      let before = try locationTree(selectedRoot)
-      try locationCheck(!before.contains { !CFEqual($0,selectedRoot) && modal($0) },"goto-discovery")
-      try locationCheck(before.contains { attr($0,kAXRoleAttribute) as? String == kAXButtonRole &&
-        attr($0,kAXTitleAttribute) as? String == "Open" && supports($0,kAXPressAction) },"goto-context")
-      let source = CGEventSource(stateID:.privateState)
-      guard let down = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:true),
-        let up = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:false) else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
-      down.flags = [.maskCommand,.maskShift]; up.flags = [.maskCommand,.maskShift]
-      try goToFolder(scope.reference,attempted:locationAttempted,consume:{ locationAttempted = true },context:{
-        try locationContext()
-        // The fixed physical G key is admitted only for these known layouts.
-        guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-          let rawID = TISGetInputSourceProperty(input,kTISPropertyInputSourceID) else { throw ActionRefusal(diagnostics:["stage":"goto-layout"]) }
-        let inputID = Unmanaged<CFString>.fromOpaque(rawID).takeUnretainedValue() as String
-        try locationCheck(["com.apple.keylayout.US","com.apple.keylayout.ABC"].contains(inputID),"goto-layout")
-      },down:{ down.postToPid(pid) },up:{ up.postToPid(pid) },discover:{
-        let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
-        while DispatchTime.now().uptimeNanoseconds < deadline {
+      let trace = LocationTrace()
+      try trace.observe {
+        try locationCheck(scope.reference && target == "sheet" && !locationAttempted && location == nil,"goto-state")
+        try locationCheck(Set(request.keys).isSubset(of:["type","target","pid","windowId","sheetToken"]) &&
+          AXUIElementSetMessagingTimeout(application,0.03) == .success && AXUIElementSetMessagingTimeout(main,0.03) == .success,"goto-state")
+        trace.phase = "pre-tree"
+        let before = try locationTree(selectedRoot)
+        let priorModals = before.filter { !CFEqual($0,selectedRoot) && modal($0) }
+        try locationPredicate(priorModals.isEmpty,"preexisting-modal",["gotoCandidateCount":priorModals.count])
+        try locationCheck(before.contains { attr($0,kAXRoleAttribute) as? String == kAXButtonRole &&
+          attr($0,kAXTitleAttribute) as? String == "Open" && supports($0,kAXPressAction) },"goto-context","outer-open-control")
+        let source = CGEventSource(stateID:.privateState)
+        guard let down = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:true),
+          let up = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:false) else { throw ActionRefusal(diagnostics:["stage":"goto-state","gotoReason":"event-allocation"]) }
+        down.flags = [.maskCommand,.maskShift]; up.flags = [.maskCommand,.maskShift]
+        try goToFolder(scope.reference,attempted:locationAttempted,trace:trace,consume:{ locationAttempted = true },context:{
           try locationContext()
-          let tree = try locationTree(selectedRoot,deadline)
-          let candidates = tree.filter { !CFEqual($0,selectedRoot) && modal($0) }
-          if candidates.isEmpty { Thread.sleep(forTimeInterval:0.05); continue }
-          try locationCheck(candidates.count == 1,"goto-discovery")
-          let candidate = candidates[0], contents = try locationTree(candidate,deadline)
-          let fields = contents.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole }
-          let labels: Set<String> = ["Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]
-          let semantic = contents.contains { item in
-            [kAXTitleAttribute,kAXDescriptionAttribute,kAXValueAttribute].contains { labels.contains(attr(item,$0) as? String ?? "") }
+          // The fixed physical G key is admitted only for these known layouts.
+          guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+            let rawID = TISGetInputSourceProperty(input,kTISPropertyInputSourceID) else { throw ActionRefusal(diagnostics:["stage":"goto-layout","gotoReason":"layout-query"]) }
+          let inputID = Unmanaged<CFString>.fromOpaque(rawID).takeUnretainedValue() as String
+          try locationCheck(["com.apple.keylayout.US","com.apple.keylayout.ABC"].contains(inputID),"goto-layout","layout-unsupported")
+        },down:{ down.postToPid(pid) },up:{ up.postToPid(pid) },discover:{
+          let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+          while DispatchTime.now().uptimeNanoseconds < deadline {
+            try locationContext()
+            let tree = try locationTree(selectedRoot,deadline)
+            let candidates = tree.filter { !CFEqual($0,selectedRoot) && modal($0) }
+            if candidates.isEmpty { Thread.sleep(forTimeInterval:0.05); continue }
+            try locationPredicate(candidates.count == 1,"candidate-count",["gotoCandidateCount":candidates.count])
+            let candidate = candidates[0], contents = try locationTree(candidate,deadline)
+            let fields = contents.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole }
+            let labels: Set<String> = ["Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]
+            let semantic = contents.contains { item in
+              [kAXTitleAttribute,kAXDescriptionAttribute,kAXValueAttribute].contains { labels.contains(attr(item,$0) as? String ?? "") }
+            }
+            var subrole: CFTypeRef?, writable = DarwinBoolean(false)
+            try locationPredicate(fields.count == 1,"field-count",["gotoFieldCount":fields.count])
+            let field = fields[0], query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
+            let writeQuery = AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable)
+            let fresh = !before.contains { CFEqual($0,candidate) || CFEqual($0,field) }, owned = descendant(candidate,selectedRoot)
+            let kind = textFieldKind(query,subrole as? String), enabled = attr(field,kAXEnabledAttribute) as? Bool == true
+            let settable = writeQuery == .success && writable.boolValue, confirm = supports(field,kAXConfirmAction)
+            try locationPredicate(locationCandidateValid(fresh,owned,modal(candidate),semantic,fields.count,kind,enabled,settable,confirm),
+              "candidate-proof",["candidateFresh":fresh,"candidateOwned":owned,"semanticMatched":semantic,
+              "gotoFieldCount":fields.count,"textFieldKind":kind,"enabled":enabled,"valueSettable":settable,"confirmAdvertised":confirm,
+              "subroleQueryError":Int(query.rawValue),"valueSettableQueryError":Int(writeQuery.rawValue)])
+            location = candidate; locationField = field; locationToken = UUID().uuidString.lowercased()
+            trace.phase = "retained-verification"
+            _ = try verifyLocation(); result["locationToken"] = locationToken; result["locationReady"] = true; result["commandPosted"] = trace.pairPosted
+            trace.phase = "complete"; result["actionDiagnostics"] = trace.facts(["stage":"goto-ready"])
+            return
           }
-          var subrole: CFTypeRef?, writable = DarwinBoolean(false)
-          guard fields.count == 1 else { throw ActionRefusal(diagnostics:["stage":"goto-discovery"]) }
-          let field = fields[0], query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
-          let writeQuery = AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable)
-          try locationCheck(locationCandidateValid(!before.contains { CFEqual($0,candidate) || CFEqual($0,field) },descendant(candidate,selectedRoot),
-            modal(candidate),semantic,fields.count,textFieldKind(query,subrole as? String),attr(field,kAXEnabledAttribute) as? Bool == true,
-            writeQuery == .success && writable.boolValue,supports(field,kAXConfirmAction)),"goto-discovery")
-          location = candidate; locationField = field; locationToken = UUID().uuidString.lowercased()
-          _ = try verifyLocation(); result["locationToken"] = locationToken; result["locationReady"] = true; result["commandPosted"] = true
-          return
-        }
-        throw ActionRefusal(diagnostics:["stage":"goto-deadline"])
-      })
+          throw ActionRefusal(diagnostics:["stage":"goto-deadline","gotoReason":"candidate-deadline","gotoCandidateCount":0])
+        })
+      }
     case "location-dismissed":
       guard let retained = location, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
       try locationContext(outer)

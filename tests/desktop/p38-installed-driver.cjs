@@ -104,9 +104,35 @@ function safeActionDiagnostics(value) {
     'window-identity-pinned-cg-window-list','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity','post-action-ax-owner',
     'post-action-application-window-membership','post-action-pinned-cg-window','post-action-pinned-cg-window-list','post-action-minimized',
     'axtext-request','axtext-identity','axtext-role','axtext-confirm-support','axtext-value-settable','axtext-write','axtext-readback','axtext-confirm',
-    'goto-state','goto-context','goto-layout','goto-discovery','goto-deadline','goto-dismissal']);
+    'goto-state','goto-context','goto-layout','goto-discovery','goto-deadline','goto-dismissal','goto-ready']);
   check(stages.has(value.stage), 'ax-evidence-refused');
   const clean = { stage:value.stage };
+  if(value.gotoPhase!==undefined || value.commandPosted!==undefined){
+    const before=['request','pre-tree','pre-context'],after=['posted-pair','post-context','discovery','retained-verification','complete'];
+    check(value.stage.startsWith('goto-') && [...before,...after].includes(value.gotoPhase) && typeof value.commandPosted==='boolean' &&
+      value.commandPosted===after.includes(value.gotoPhase),'ax-evidence-refused');
+    clean.gotoPhase=value.gotoPhase;clean.commandPosted=value.commandPosted;
+  }
+  if(value.stage==='goto-ready' || value.gotoPhase==='complete')
+    check(value.stage==='goto-ready' && value.gotoPhase==='complete' && value.commandPosted===true,'ax-evidence-refused');
+  if(value.gotoReason!==undefined){
+    check(value.stage.startsWith('goto-') && ['unexpected-refusal','walk-deadline','depth-limit','node-limit','node-owner-query','node-owner-mismatch',
+      'cycle','standalone-window','timeout-config','children-query','children-shape','children-limit','child-owner-query','child-owner-mismatch',
+      'parent-query','parent-shape','parent-owner-query','parent-owner-mismatch','parent-edge','retained-modal-count','retained-modal-identity',
+      'retained-ancestry','retained-field','preexisting-modal','candidate-count','field-count','candidate-proof','candidate-deadline',
+      'context-identity','context-shape','context-main-count','context-windows-owner','context-focused-window','context-focus-ancestry',
+      'outer-open-control','event-allocation','layout-query','layout-unsupported'].includes(value.gotoReason),'ax-evidence-refused');
+    clean.gotoReason=value.gotoReason;
+  }
+  if(value.gotoRoute!==undefined){
+    check(typeof value.gotoRoute==='string' && value.gotoRoute.length<=64 && /^(?:\d{1,3}(?:\.\d{1,3}){0,12})?$/.test(value.gotoRoute) &&
+      (value.gotoRoute==='' || value.gotoRoute.split('.').every(n=>Number(n)<=511)),'ax-evidence-refused');clean.gotoRoute=value.gotoRoute;
+  }
+  for(const [key,max] of [['gotoDepth',13],['gotoNodeCount',512],['gotoChildCount',513],['gotoCandidateCount',512],['gotoFieldCount',512]])
+    if(value[key]!==undefined){check(Number.isInteger(value[key])&&value[key]>=0&&value[key]<=max,'ax-evidence-refused');clean[key]=value[key];}
+  if(value.gotoQueryError!==undefined){check(Number.isInteger(value.gotoQueryError)&&value.gotoQueryError>=-32768&&value.gotoQueryError<=0,'ax-evidence-refused');clean.gotoQueryError=value.gotoQueryError;}
+  for(const key of ['ownerMatches','parentMatches','candidateFresh','candidateOwned','semanticMatched'])
+    if(value[key]!==undefined){check(typeof value[key]==='boolean','ax-evidence-refused');clean[key]=value[key];}
   if (value.elementPath !== undefined) { check(typeof value.elementPath === 'string' && /^(?:\d+(?:\.\d+)*)$/.test(value.elementPath) && value.elementPath.length <= 128, 'ax-evidence-refused'); clean.elementPath=value.elementPath; }
   if (value.role !== undefined) { check(['AXButton','AXCheckBox','AXMenuItem','AXRow','AXTextField','other'].includes(value.role), 'ax-evidence-refused'); clean.role=value.role; }
   for (const key of ['axPressQueryError','performActionError','subroleQueryError','focusSettableQueryError','focusedQueryError',
@@ -221,7 +247,7 @@ function safeCleanupDiagnostics(values) {
     check(value && typeof value === 'object' && stages.has(value.stage), 'cleanup-evidence-refused');
     const clean = { stage:value.stage };
     if (value.helperPid !== undefined) { check(Number.isSafeInteger(value.helperPid) && value.helperPid > 0 && value.helperPid <= 2147483647, 'cleanup-evidence-refused'); clean.helperPid=value.helperPid; }
-    for (const key of ['descendantPossible','groupAliveBefore','groupAliveAfterTerm','groupAliveAfterKill']) {
+    for (const key of ['descendantPossible','groupAliveBefore','groupAliveAfterTerm','groupAliveAfterKill','childExitObserved','childSignalObserved']) {
       if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'cleanup-evidence-refused'); clean[key]=value[key]; }
     }
     if (value.signalAttempts !== undefined) { check(Number.isInteger(value.signalAttempts) && value.signalAttempts >= 0 && value.signalAttempts <= 2, 'cleanup-evidence-refused'); clean.signalAttempts=value.signalAttempts; }
@@ -483,6 +509,8 @@ async function runScopedOperator(config, services, reference) {
           text.valueSettableQueryError===0 && text.valueSettable===true && text.valueWriteError===0 && text.valueReadbackError===0 &&
           text.valueMatches===true && text.confirmQueryError===0 && text.confirmAdvertised===true && text.confirmError===0,'value-refused');
       }
+      if(action.type==='go-to-folder' && result.actionDiagnostics)
+        check(safeActionDiagnostics(result.actionDiagnostics).stage==='goto-ready','location-state-refused');
       sheetResult(action, sheet, result);
       if(action.type==='pin-sheet' || action.type==='go-to-folder'){
         check(typeof services.feedback==='function','sheet-feedback-required');
@@ -495,7 +523,7 @@ async function runScopedOperator(config, services, reference) {
       if (result.captureSha256) completed.captureSha256 = result.captureSha256;
       for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
       if (result.selectionDiagnostics && action.type === 'select') completed.selectionDiagnostics = safeSelectionDiagnostics(result.selectionDiagnostics);
-      if (result.actionDiagnostics && ['press','set'].includes(action.type)) completed.actionDiagnostics = safeActionDiagnostics(result.actionDiagnostics);
+      if (result.actionDiagnostics && ['press','set','go-to-folder'].includes(action.type)) completed.actionDiagnostics = safeActionDiagnostics(result.actionDiagnostics);
       receipt.actions.push(completed); delete receipt.inFlightAction; actionStartedAt = null;
       save();
     }
@@ -622,7 +650,8 @@ async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
   const observation = { helperPid:child.pid, descendantPossible:child.p38GroupMayContainDescendants !== false };
   if(child.pid<=0||child.pid>2147483647)throw Object.assign(Error('helper-cleanup-invalid'),{code:'helper-cleanup-invalid',cleanupDiagnostics:[{stage:'helper-pid-refused',helperPidValid:false,descendantPossible:observation.descendantPossible}]});
-  const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,...facts}]});
+  const failed=(stage,facts={})=>Object.assign(Error('helper-cleanup-failed'),{code:'helper-cleanup-failed',cleanupDiagnostics:[{...observation,stage,
+    childExitObserved:Number.isInteger(child.exitCode),childSignalObserved:typeof child.signalCode==='string',...facts}]});
   const errorCode=error=>['EPERM','EACCES','EINVAL','ENOSYS','ERR_INVALID_PROBE_RESULT'].includes(error?.code)?error.code:'UNKNOWN';
   // The helper may own a CG sampler after a refused press or an explicit
   // capture. Once a non-descendant helper exits, do not signal a recycled PGID.
