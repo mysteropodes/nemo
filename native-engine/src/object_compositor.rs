@@ -71,6 +71,28 @@ fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
 }
 
 impl Compositor {
+    /// Borrow the same texture and GPU under a live scheduler permit. No raw
+    /// scheduled texture can escape for later consumption without that borrow.
+    pub(crate) fn scheduled_object_surface<'a>(
+        &'a self,
+        result: &'a ScheduledObjectCompositionResult,
+        live: &'a LiveObjectComposition<'a>,
+    ) -> Result<ScheduledObjectSurface<'a>, CompositorError> {
+        check_live(live, &result.prepared)?;
+        self.check_object_device(&result.pixels)?;
+        Ok(ScheduledObjectSurface {
+            instance: &self.instance,
+            adapter: &self.adapter,
+            device: &self.device,
+            queue: &self.queue,
+            texture: &result.pixels.texture,
+            texture_view: &result.pixels.view,
+            dimensions: result.prepared.dimensions(),
+            identity: result.identity(),
+            _live: live,
+        })
+    }
+
     pub(crate) fn compose_scheduled_object(
         &mut self,
         live: &LiveObjectComposition<'_>,
@@ -147,14 +169,7 @@ impl Compositor {
         &self,
         result: &ObjectCompositionResult,
     ) -> Result<ObjectRgba8Readback, CompositorError> {
-        // Pinned WGPU CoreDevice equality uses an instance-local ID. Instance
-        // equality also pins the retained Global context's Arc address, so an
-        // equal numeric device ID in another context never reaches this copy.
-        if result.instance != self.instance || result.device != self.device {
-            return Err(CompositorError::new(
-                "object pixels belong to a different GPU device",
-            ));
-        }
+        self.check_object_device(result)?;
         output_budget(
             result.output.width,
             result.output.height,
@@ -170,6 +185,30 @@ impl Compositor {
             prepared: result.prepared.clone(),
         })
     }
+
+    fn check_object_device(&self, result: &ObjectCompositionResult) -> Result<(), CompositorError> {
+        // Pinned WGPU CoreDevice equality uses an instance-local ID. Instance
+        // equality also pins the retained Global context's Arc address, so an
+        // equal numeric device ID in another context never reaches this copy.
+        if result.instance != self.instance || result.device != self.device {
+            return Err(CompositorError::new(
+                "object pixels belong to a different GPU device",
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) struct ScheduledObjectSurface<'a> {
+    pub(crate) instance: &'a wgpu::Instance,
+    pub(crate) adapter: &'a wgpu::Adapter,
+    pub(crate) device: &'a wgpu::Device,
+    pub(crate) queue: &'a wgpu::Queue,
+    pub(crate) texture: &'a wgpu::Texture,
+    pub(crate) texture_view: &'a wgpu::TextureView,
+    pub(crate) dimensions: (u32, u32),
+    pub(crate) identity: &'a ScheduledFrameIdentity,
+    _live: &'a LiveObjectComposition<'a>,
 }
 
 fn check_live(
@@ -251,4 +290,4 @@ mod tests;
 
 #[cfg(all(test, feature = "history"))]
 #[path = "../tests/object_scheduled_compositor.rs"]
-mod scheduled_tests;
+pub(super) mod scheduled_tests;
