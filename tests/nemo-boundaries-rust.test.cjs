@@ -236,7 +236,8 @@ const REGISTERED_LEAVES = [
   ['N16 registers the native desktop host and focused MCP host test without exclusions or a frozen-baseline waiver', [
     'src-tauri/src/application_mcp_tests.rs', 'src-tauri/src/native_viewport.rs']],
   ['N20R4 registers the AppKit viewport and replacement quarantine test children without a size waiver', [
-    'src-tauri/src/native_application_replace_viewport_tests.rs', 'src-tauri/src/native_viewport_appkit.rs']],
+    'src-tauri/src/native_application_replace_viewport_tests.rs', 'src-tauri/src/native_viewport_appkit.rs',
+    'src-tauri/src/native_viewport_appkit_binding.rs']],
   ['N18A registers the dormant native host split without exclusions or a frozen-baseline waiver', [
     'src-tauri/src/native_application.rs', 'src-tauri/src/native_application_commands.rs',
     'src-tauri/src/native_application_contract.rs', 'src-tauri/src/native_application_ports.rs',
@@ -260,15 +261,19 @@ function rustMethodBody(source, signature, from = 0) {
   assert.fail(`unclosed ${signature}`);
 }
 
-function assertProductionViewportQuarantine(source) {
-  const native = source.indexOf('impl NativeViewport {');
-  const retire = rustMethodBody(source, 'pub(crate) fn retire_replacement(', native);
-  const dispose = rustMethodBody(source, 'pub(crate) fn dispose(', native);
-  const rebind = rustMethodBody(source, 'pub(crate) fn rebind_existing(', native);
+function assertProductionViewportQuarantine(source, binding, gpu) {
+  const native = binding.indexOf('impl NativeViewport {');
+  const retire = rustMethodBody(binding, 'pub(crate) fn retire_replacement(', native);
+  const dispose = rustMethodBody(binding, 'pub(crate) fn dispose(', native);
+  const rebind = rustMethodBody(binding, 'pub(crate) fn rebind_existing(', native);
   const port = rustMethodBody(source, 'fn dispose(&mut self)', source.indexOf('impl SurfacePort for MacOsSurfacePort'));
+  const gpuRetire = rustMethodBody(gpu, 'pub(crate) fn retire<');
+  const gpuRebind = rustMethodBody(gpu, 'pub(crate) fn rebind<');
   assert.match(retire, /self\.dispose\(\)/, 'retirement must invoke host disposal');
-  assert.match(dispose, /self\.host\s*\.take\(\)[\s\S]*host\.dispose\(\)/,
-    'disposal must take and dispose the retained host');
+  assert.match(dispose, /self\.gpu\.retire\(&mut self\.host\)/,
+    'disposal must use the original GPU binding to retire the retained host');
+  assert.match(gpuRetire, /host\.take\(\)[\s\S]*value\.dispose\(\)/,
+    'retirement must take and dispose the retained host');
   assert.ok(port.indexOf('self.surface.take()') < port.indexOf('self.view.dispose()')
     && port.includes('self.surface.take()') && port.includes('self.view.dispose()'),
   'the production surface must drop before its AppKit view');
@@ -276,8 +281,14 @@ function assertProductionViewportQuarantine(source) {
     'rebind must reuse the retained compositor instance');
   assert.match(rebind, /MacOsSurfacePort::new\(surface,\s*view,\s*compositor,\s*self\.mapping\)/,
     'rebind must configure the fresh surface on that compositor');
-  assert.match(rebind, /self\.host\s*=\s*Some\(DesktopViewportHost::new\(port,\s*self\.mapping\)\)/,
-    'rebind must install a fresh blank host');
+  assert.match(rebind, /self\.gpu\.rebind\(&mut self\.host,\s*compositor/,
+    'rebind must delegate to the original GPU binding');
+  assert.match(rebind, /Ok\(DesktopViewportHost::new\(port,\s*self\.mapping\)\)/,
+    'rebind must construct a fresh blank host');
+  assert.match(gpuRebind, /self\.require_context\(compositor\)\?/,
+    'rebind must verify the original GPU context');
+  assert.match(gpuRebind, /\*host\s*=\s*Some\(create\(\)\?\)/,
+    'rebind must install only the checked fresh host');
   assert.doesNotMatch(rebind, /from_window\(/, 'rebind must not make a new compositor');
 }
 
@@ -292,17 +303,25 @@ function assertProductionViewportOwner(source) {
 
 test('N20R4 production AppKit quarantine wiring rejects no-op retirement and fresh compositor', () => {
   const source = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport_appkit.rs'), 'utf8');
+  const binding = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport_appkit_binding.rs'), 'utf8');
+  const gpu = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_viewport.rs'), 'utf8');
   const owner = fs.readFileSync(path.join(ROOT, 'src-tauri/src/native_application_viewport.rs'), 'utf8');
-  assertProductionViewportQuarantine(source);
+  assertProductionViewportQuarantine(source, binding, gpu);
   assertProductionViewportOwner(owner);
-  const noRetirement = source.replace('self.dispose()\n    }\n\n    /// Build', 'Vec::new()\n    }\n\n    /// Build');
-  const newCompositor = source.replace('create_surface(compositor.instance(), &view)', 'create_surface(CompositorInstance::new().instance(), &view)');
+  const noRetirement = binding.replace('self.dispose()', 'Vec::new()');
+  const newCompositor = binding.replace('create_surface(compositor.instance(), &view)', 'create_surface(CompositorInstance::new().instance(), &view)');
+  const noHostDisposal = gpu.replace('host.take()', 'None');
+  const noGpuCheck = gpu.replace('self.require_context(compositor)?;', '');
   const noOwnerRetirement = owner.replaceAll('value.viewport.retire_replacement()', 'Vec::new()');
-  assert.notEqual(noRetirement, source);
-  assert.notEqual(newCompositor, source);
+  assert.notEqual(noRetirement, binding);
+  assert.notEqual(newCompositor, binding);
+  assert.notEqual(noHostDisposal, gpu);
+  assert.notEqual(noGpuCheck, gpu);
   assert.notEqual(noOwnerRetirement, owner);
-  assert.throws(() => assertProductionViewportQuarantine(noRetirement));
-  assert.throws(() => assertProductionViewportQuarantine(newCompositor));
+  assert.throws(() => assertProductionViewportQuarantine(source, noRetirement, gpu));
+  assert.throws(() => assertProductionViewportQuarantine(source, newCompositor, gpu));
+  assert.throws(() => assertProductionViewportQuarantine(source, binding, noHostDisposal));
+  assert.throws(() => assertProductionViewportQuarantine(source, binding, noGpuCheck));
   assert.throws(() => assertProductionViewportOwner(noOwnerRetirement));
 });
 
