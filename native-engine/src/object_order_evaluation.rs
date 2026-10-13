@@ -103,7 +103,7 @@ fn default_curve() -> Vec<CurveSample> {
     })
     .collect()
 }
-fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
+pub(super) fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFrameError> {
     let Some(track) = order.track.value().filter(|t| !t.keys.is_empty()) else {
         return order
             .static_value
