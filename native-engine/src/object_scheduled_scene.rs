@@ -7,7 +7,7 @@ use crate::render_scene::ScheduledFrameIdentity;
 use crate::scheduler::{FrameScheduler, ScheduledFrame};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ScheduledObjectSceneError {
+pub enum ScheduledObjectSceneError {
     Inactive,
     Pins(ObjectSceneError),
     RetainedSourceMismatch,
@@ -36,11 +36,18 @@ impl ScheduledObjectComposition {
 
 /// Borrow the real scheduler throughout each compose/readback/byte-access call.
 /// An owned result may outlive this permit, but consuming it needs a fresh one.
-pub(crate) struct LiveObjectComposition<'a> {
+pub struct LiveObjectComposition<'a> {
     scheduler: &'a FrameScheduler,
     prepared: ScheduledObjectComposition,
 }
 impl LiveObjectComposition<'_> {
+    /// Diagnostic identity only; it cannot replace this live scheduler borrow.
+    pub fn identity(&self) -> &ScheduledFrameIdentity {
+        self.prepared.identity()
+    }
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.prepared.dimensions()
+    }
     pub(crate) fn prepared(&self) -> &ScheduledObjectComposition {
         &self.prepared
     }
@@ -63,7 +70,7 @@ impl LiveObjectComposition<'_> {
     }
 }
 
-pub(crate) fn prepare_scheduled_object_composition<'a>(
+pub fn prepare_scheduled_object_composition<'a>(
     scheduler: &'a FrameScheduler,
     scheduled: &ScheduledFrame,
     plan: &ObjectPaintPlan,
