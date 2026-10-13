@@ -312,4 +312,12 @@ fn actual_pending_loss_and_postcut_late_counts_never_become_observed() {
         Ok(Phase::SealedObserved)
     );
     assert!(f.finish(&mut cut, &output["footer"]).is_err()); // old retention version
+    let mut cut = f.cut();
+    cut.begin_drain().unwrap();
+    let mut footer = output["footer"].clone();
+    footer["cutId"] = json!(cut.id());
+    assert_eq!(f.finish(&mut cut, &footer), Ok(Phase::SealedObserved));
+    let bytes = serde_json::to_vec(&footer).unwrap();
+    assert!(cut.finish(&bytes, &f.native, &f.js, Some(&h)).is_err());
+    assert_eq!(cut.phase(), Phase::Refused); // newer proof is not exact replay
 }

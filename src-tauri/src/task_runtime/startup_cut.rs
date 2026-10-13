@@ -214,6 +214,7 @@ impl Cut {
             return if self.footer.as_ref() == Some(&footer)
                 && self.native == current
                 && self.js == js
+                && retention.unwrap().version == self.version
             {
                 Ok(self.phase)
             } else {
