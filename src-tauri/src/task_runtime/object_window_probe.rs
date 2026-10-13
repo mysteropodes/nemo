@@ -11,6 +11,7 @@ use std::{
 use tauri::{Manager, Runtime, WebviewWindowBuilder};
 
 const PHASES: [&str; 6] = ["ready", "blue", "red", "undo", "redo", "released"];
+const EXPORT_PHASES: [&str; 5] = ["ready", "blue", "refused", "exported", "released"];
 const MAX_BYTES: usize = 2048;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -21,6 +22,7 @@ struct Packet {
     work_id: Option<String>,
     revision: Option<u64>,
     cleanup_succeeded: Option<bool>,
+    export: Option<control::ExportEvidence>,
 }
 struct Session {
     run: String,
@@ -34,6 +36,7 @@ struct Session {
     waiting: bool,
     failed: bool,
     records: Vec<Value>,
+    export: bool,
 }
 pub(crate) struct ProbeState(Mutex<Option<Session>>);
 
@@ -107,9 +110,19 @@ fn sink(root: &Path) -> Result<File, &'static str> {
 impl Session {
     fn persist(&mut self) -> Result<(), &'static str> {
         safe_root(&self.root)?;
-        let value = json!({"schema":"nemo.object-window-probe/1","runId":self.run,"sourceSha":self.source,
+        let schema = if self.export {
+            "nemo.object-window-export-probe/1"
+        } else {
+            "nemo.object-window-probe/1"
+        };
+        let phases = if self.export {
+            EXPORT_PHASES.len()
+        } else {
+            PHASES.len()
+        };
+        let value = json!({"schema":schema,"runId":self.run,"sourceSha":self.source,
             "taskKey":self.task,"pid":self.pid,"window":"main","checkpoint":self.cursor,
-            "waiting":self.waiting,"failed":self.failed,"complete":self.cursor==PHASES.len()&&!self.failed&&!self.waiting,"records":self.records});
+            "waiting":self.waiting,"failed":self.failed,"complete":self.cursor==phases&&!self.failed&&!self.waiting,"records":self.records});
         let bytes = serde_json::to_vec(&value).map_err(|_| "probe receipt invalid")?;
         if bytes.len() > 8192 {
             return Err("probe receipt bound exceeded");
@@ -126,6 +139,9 @@ impl Session {
             .map_err(|_| "probe receipt unavailable")
     }
     fn admit(&mut self, packet: &Packet) -> Result<bool, &'static str> {
+        if self.export {
+            return control::admit_export(self, packet);
+        }
         if packet.run_id != self.run || self.waiting || self.cursor >= PHASES.len() {
             return Err("probe run or sequence refused");
         }
@@ -133,6 +149,7 @@ impl Session {
             if packet.status != "operation_failed"
                 || packet.work_id.is_some()
                 || packet.revision.is_some()
+                || packet.export.is_some()
             {
                 return Err("probe failure refused");
             }
@@ -150,6 +167,7 @@ impl Session {
         }
         if self.failed
             || packet.cleanup_succeeded.is_some()
+            || packet.export.is_some()
             || (!(1..5).contains(&self.cursor)
                 && (packet.work_id.is_some() || packet.revision.is_some()))
         {
@@ -186,10 +204,17 @@ pub(crate) fn initialize<R: Runtime>(
     app: &tauri::App<R>,
     runtime: Option<&TaskRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let enabled = std::env::var("NEMO_TEST_OBJECT_WINDOW_PROBE")
+    let preview = std::env::var("NEMO_TEST_OBJECT_WINDOW_PROBE")
         .ok()
         .as_deref()
         == Some("1");
+    let export = std::env::var("NEMO_TEST_OBJECT_EXPORT_PROBE")
+        .ok()
+        .as_deref()
+        == Some("1");
+    if preview && export {
+        return Err("object probes are mutually exclusive".into());
+    }
     let windows = &app.config().app.windows;
     let compiled = option_env!("NEMO_OBJECT_PROBE_BUILD_SHA").unwrap_or("");
     let expected = std::env::var("NEMO_OBJECT_PROBE_EXPECTED_SOURCE").unwrap_or_default();
@@ -197,7 +222,7 @@ pub(crate) fn initialize<R: Runtime>(
         && windows[0].label == "main"
         && windows[0].url == tauri::WebviewUrl::App(PathBuf::from("index.html"));
     let allowed = gate(
-        enabled,
+        preview || export,
         !cfg!(debug_assertions),
         runtime.is_some(),
         runtime
@@ -246,6 +271,7 @@ pub(crate) fn initialize<R: Runtime>(
             waiting: false,
             failed: false,
             records: vec![],
+            export,
         };
         session.persist()?;
         Some(session)
@@ -266,12 +292,22 @@ pub(crate) fn attach<'a, R: Runtime, M: Manager<R>>(
     let Some(session) = guard.as_ref() else {
         return Ok(builder);
     };
-    let config = json!({"runId":session.run,"sourceSha":session.source,"taskKey":session.task,"pid":session.pid});
-    let script = format!(
-        "window.__NEMO_OBJECT_WINDOW_PROBE_CONFIG__ = {};\n{}",
-        config,
-        include_str!("../../../tests/desktop/object-window-probe-bootstrap.js")
-    );
+    let script = if session.export {
+        let config = json!({"runId":session.run,"sourceSha":session.source,"taskKey":session.task,
+            "pid":session.pid,"destinationDirectory":session.root.join(format!("object-export-{}",session.run))});
+        format!(
+            "window.__NEMO_OBJECT_EXPORT_PROBE_CONFIG__ = {};\n{}",
+            config,
+            include_str!("../../../tests/desktop/object-export-probe-bootstrap.js")
+        )
+    } else {
+        let config = json!({"runId":session.run,"sourceSha":session.source,"taskKey":session.task,"pid":session.pid});
+        format!(
+            "window.__NEMO_OBJECT_WINDOW_PROBE_CONFIG__ = {};\n{}",
+            config,
+            include_str!("../../../tests/desktop/object-window-probe-bootstrap.js")
+        )
+    };
     Ok(builder
         .initialization_script(script)
         .on_page_load(|window, payload| {
