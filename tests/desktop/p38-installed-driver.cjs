@@ -115,6 +115,33 @@ function safeActionDiagnostics(value) {
   for (const key of ['axPidMatches','applicationWindowsReadable','pinnedAXWindowMember','minimizedReadable','minimized','pinnedCGWindowListReadable'])
     if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
   if (value.pinnedCGWindowCount !== undefined) { check(Number.isInteger(value.pinnedCGWindowCount) && value.pinnedCGWindowCount >= 0 && value.pinnedCGWindowCount <= 128, 'ax-evidence-refused'); clean.pinnedCGWindowCount=value.pinnedCGWindowCount; }
+  for (const key of ['retainedMainChildrenQueryError'])
+    if (value[key] !== undefined) { check(Number.isInteger(value[key]) && value[key] >= -32768 && value[key] <= 0, 'ax-evidence-refused'); clean[key]=value[key]; }
+  for (const key of ['retainedMainChildrenReadable','retainedMainChildrenCountCapped','retainedMainChildrenTruncated'])
+    if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
+  if (value.retainedMainChildrenCount !== undefined) {
+    check(Number.isInteger(value.retainedMainChildrenCount) && value.retainedMainChildrenCount >= 0 && value.retainedMainChildrenCount <= 4096, 'ax-evidence-refused');
+    clean.retainedMainChildrenCount=value.retainedMainChildrenCount;
+  }
+  if (value.retainedMainSheetProbe !== undefined) {
+    check(['children-query-error','children-unreadable','children-truncated','candidate-probe-incomplete','no-attached-sheet','one-attached-sheet','multiple-attached-sheets'].includes(value.retainedMainSheetProbe), 'ax-evidence-refused');
+    clean.retainedMainSheetProbe=value.retainedMainSheetProbe;
+  }
+  if (value.retainedMainChildFacts !== undefined) {
+    check(Array.isArray(value.retainedMainChildFacts) && value.retainedMainChildFacts.length <= 64, 'ax-evidence-refused');
+    clean.retainedMainChildFacts=value.retainedMainChildFacts.map(fact=>{
+      check(fact && typeof fact === 'object' && !Array.isArray(fact), 'ax-evidence-refused');
+      const safe={};
+      if(fact.index!==undefined){check(Number.isInteger(fact.index)&&fact.index>=0&&fact.index<64,'ax-evidence-refused');safe.index=fact.index;}
+      for(const key of ['candidatePidQueryError','candidateRoleQueryError','candidateParentQueryError','candidateParentPidQueryError'])
+        if(fact[key]!==undefined){check(Number.isInteger(fact[key])&&fact[key]>=-32768&&fact[key]<=0,'ax-evidence-refused');safe[key]=fact[key];}
+      if(fact.candidatePid!==undefined){check(Number.isSafeInteger(fact.candidatePid)&&fact.candidatePid>=0&&fact.candidatePid<=2147483647,'ax-evidence-refused');safe.candidatePid=fact.candidatePid;}
+      for(const key of ['candidatePidMatches','candidateRoleReadable','candidateParentReadable','candidateParentPidMatches','candidateParentIsRetainedMain'])
+        if(fact[key]!==undefined){check(typeof fact[key]==='boolean','ax-evidence-refused');safe[key]=fact[key];}
+      if(fact.candidateRole!==undefined){check(['AXSheet','other'].includes(fact.candidateRole),'ax-evidence-refused');safe.candidateRole=fact.candidateRole;}
+      return safe;
+    });
+  }
   return clean;
 }
 function safeCleanupDiagnostics(values) {
