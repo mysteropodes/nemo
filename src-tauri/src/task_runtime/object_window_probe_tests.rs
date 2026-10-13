@@ -1,0 +1,247 @@
+use crate::task_runtime::object_window_probe::control::{complete, read_ack};
+use crate::task_runtime::object_window_probe::{gate, origin, sink, Packet, Session, PHASES};
+use serde_json::json;
+use std::{fs, path::PathBuf};
+
+struct Fixture {
+    root: PathBuf,
+}
+impl Fixture {
+    fn new() -> Self {
+        let root = std::env::temp_dir().join(format!("nemo-object-probe-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&root).unwrap();
+        Self {
+            root: fs::canonicalize(root).unwrap(),
+        }
+    }
+    fn session(&self) -> Session {
+        Session {
+            run: "11111111-1111-4111-8111-111111111111".into(),
+            source: "a".repeat(40),
+            task: "b".repeat(64),
+            pid: 42,
+            owner: "private-owner".into(),
+            root: self.root.clone(),
+            sink: sink(&self.root).unwrap(),
+            cursor: 0,
+            waiting: false,
+            failed: false,
+            records: vec![],
+        }
+    }
+    fn ack(&self, value: serde_json::Value) {
+        fs::write(
+            self.root.join("object-window-probe-control.json"),
+            value.to_string(),
+        )
+        .unwrap();
+    }
+}
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+fn packet(
+    run: &str,
+    phase: &str,
+    status: &str,
+    revision: Option<u64>,
+    work: Option<&str>,
+) -> Packet {
+    serde_json::from_value(
+        json!({"runId":run,"phase":phase,"status":status,"revision":revision,"workId":work}),
+    )
+    .unwrap()
+}
+#[test]
+fn default_off_and_every_source_owner_or_window_gate_refuse_before_attach() {
+    assert_eq!(
+        gate(false, false, false, false, false, false, "", ""),
+        Ok(false)
+    );
+    let hash = "a".repeat(40);
+    assert_eq!(
+        gate(true, true, true, true, true, true, &hash, &hash),
+        Ok(true)
+    );
+    for index in 0..5 {
+        let mut flags = [true; 5];
+        flags[index] = false;
+        assert!(
+            gate(true, flags[0], flags[1], flags[2], flags[3], flags[4], &hash, &hash).is_err()
+        );
+    }
+    assert!(gate(true, true, true, true, true, true, &hash, &"b".repeat(40)).is_err());
+    assert!(gate(true, true, true, true, true, true, "dirty", "dirty").is_err());
+    assert!(origin(
+        "main",
+        &tauri::Url::parse("tauri://localhost/index.html").unwrap()
+    ));
+    for (label, url) in [
+        ("other", "tauri://localhost/index.html"),
+        ("main", "https://localhost/index.html"),
+        ("main", "tauri://localhost/index.html?eval=1"),
+        ("main", "tauri://localhost/other.html"),
+        ("main", "tauri://localhost:12/index.html"),
+    ] {
+        assert!(!origin(label, &tauri::Url::parse(url).unwrap()));
+    }
+}
+#[test]
+fn exact_sequence_requires_presented_revision_and_external_ack_before_continuation() {
+    let fixture = Fixture::new();
+    let mut session = fixture.session();
+    let run = session.run.clone();
+    assert!(session
+        .admit(&packet("foreign", "ready", "ready", None, None))
+        .is_err());
+    assert!(session
+        .admit(&packet(&run, "red", "presented", Some(1), Some("work")))
+        .is_err());
+    assert!(session
+        .admit(&packet(&run, "ready", "ready", Some(0), None))
+        .is_err());
+    for (index, phase) in PHASES.iter().enumerate() {
+        let frame = (1..5).contains(&index);
+        let status = if index == 0 {
+            "ready"
+        } else if index == 5 {
+            "succeeded"
+        } else {
+            "presented"
+        };
+        let row = packet(
+            &run,
+            phase,
+            status,
+            frame.then_some(index.saturating_sub(1) as u64),
+            frame.then_some("work-current"),
+        );
+        if frame {
+            assert!(session
+                .admit(&packet(
+                    &run,
+                    phase,
+                    "deferred-timeout",
+                    row.revision,
+                    Some("work")
+                ))
+                .is_err());
+            assert!(session
+                .admit(&packet(&run, phase, "presented", Some(99), Some("work")))
+                .is_err());
+        }
+        assert_eq!(session.admit(&row), Ok(true));
+        assert!(session.waiting);
+        assert!(session.admit(&row).is_err());
+        assert!(complete(&mut session, "foreign", index, Ok(())).is_err());
+        assert!(complete(&mut session, &run, index + 1, Ok(())).is_err());
+        assert!(session.waiting);
+        complete(&mut session, &run, index, Ok(())).unwrap();
+    }
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
+            .unwrap();
+    assert_eq!(receipt["complete"], true);
+    assert_eq!(receipt["records"].as_array().unwrap().len(), 6);
+    assert!(!receipt.to_string().contains("private-owner"));
+    assert!(session
+        .admit(&packet(&run, "ready", "ready", None, None))
+        .is_err());
+}
+#[test]
+fn failure_is_bounded_terminal_and_cleanup_can_be_recorded_after_native_timeout() {
+    let fixture = Fixture::new();
+    let mut session = fixture.session();
+    let run = session.run.clone();
+    session
+        .admit(&packet(&run, "ready", "ready", None, None))
+        .unwrap();
+    assert!(complete(&mut session, &run, 0, Err("probe checkpoint timed out")).is_err());
+    assert!(session.failed);
+    assert!(!session.waiting);
+    let mut fail = packet(&run, "failed", "operation_failed", None, None);
+    fail.cleanup_succeeded = Some(true);
+    assert_eq!(session.admit(&fail), Ok(false));
+    assert!(session.failed);
+    assert!(session.admit(&fail).is_err());
+    assert!(session
+        .admit(&packet(&run, "ready", "ready", None, None))
+        .is_err());
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
+            .unwrap();
+    assert_eq!(receipt["records"][1]["cleanupSucceeded"], true);
+    assert_eq!(receipt["complete"], false);
+    assert!(serde_json::from_str::<Packet>(
+        "{\"runId\":\"x\",\"runId\":\"y\",\"phase\":\"ready\",\"status\":\"ready\"}"
+    )
+    .is_err());
+    assert!(serde_json::from_value::<Packet>(
+        json!({"runId":"x","phase":"ready","status":"ready","script":"arbitrary"})
+    )
+    .is_err());
+}
+#[test]
+fn control_is_data_only_owned_run_source_checkpoint_and_rejects_unsafe_paths() {
+    let fixture = Fixture::new();
+    let source = "a".repeat(40);
+    let run = "owned-run";
+    let read = || read_ack(&fixture.root, run, &source, 2, "private-owner");
+    assert_eq!(read(), Ok(false));
+    let value = json!({"runId":run,"sourceSha":source,"checkpoint":2,"ownerToken":"private-owner","screenshotSha256":"b".repeat(64)});
+    fixture.ack(value.clone());
+    assert_eq!(read(), Ok(true));
+    for field in ["runId", "sourceSha", "ownerToken", "screenshotSha256"] {
+        let mut wrong = value.clone();
+        wrong[field] = json!("wrong");
+        fixture.ack(wrong);
+        assert!(read().is_err(), "{field}");
+    }
+    let mut stale = value.clone();
+    stale["checkpoint"] = json!(1);
+    fixture.ack(stale);
+    assert_eq!(read(), Ok(false));
+    let mut future = value.clone();
+    future["checkpoint"] = json!(3);
+    fixture.ack(future);
+    assert!(read().is_err());
+    let mut arbitrary = value.clone();
+    arbitrary["eval"] = json!("code");
+    fixture.ack(arbitrary);
+    assert!(read().is_err());
+    fs::write(
+        fixture.root.join("object-window-probe-control.json"),
+        " ".repeat(2049),
+    )
+    .unwrap();
+    assert!(read().is_err());
+    fs::remove_file(fixture.root.join("object-window-probe-control.json")).unwrap();
+    fs::create_dir(fixture.root.join("object-window-probe-control.json")).unwrap();
+    assert!(read().is_err());
+}
+#[cfg(unix)]
+#[test]
+fn fresh_receipt_and_control_refuse_symlink_roots_and_leafs() {
+    let fixture = Fixture::new();
+    drop(fixture.session());
+    assert!(sink(&fixture.root).is_err());
+    let alias = fixture.root.with_extension("alias");
+    std::os::unix::fs::symlink(&fixture.root, &alias).unwrap();
+    assert!(sink(&alias).is_err());
+    fs::remove_file(alias).unwrap();
+    std::os::unix::fs::symlink(
+        fixture.root.join("object-window-probe.json"),
+        fixture.root.join("object-window-probe-control.json"),
+    )
+    .unwrap();
+    assert!(read_ack(
+        &fixture.root,
+        "owned-run",
+        &"a".repeat(40),
+        0,
+        "private-owner"
+    )
+    .is_err());
+}

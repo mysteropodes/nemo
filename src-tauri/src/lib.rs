@@ -270,6 +270,8 @@ pub fn run() {
             vectorize::vectorize_image,
             task_runtime::nemo_task_runtime,
             task_runtime::nemo_task_runtime_release,
+            #[cfg(feature = "test-object-window-probe")]
+            task_runtime::object_window_probe::nemo_test_object_window_probe,
             #[cfg(feature = "test-play-publication-observer")]
             task_runtime::nemo_test_play_observer,
             #[cfg(feature = "test-play-publication-observer")]

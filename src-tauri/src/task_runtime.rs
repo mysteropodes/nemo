@@ -50,6 +50,10 @@ pub(crate) mod startup_observer;
 
 /// Manifest schema written into the task's `tauri-data` root.
 pub const SCHEMA: &str = "nemo.native-runtime/1";
+#[cfg(any(test, feature = "test-object-window-probe"))]
+#[path = "task_runtime/object_window_probe.rs"]
+pub(crate) mod object_window_probe;
+
 /// File name of that manifest, inside `NEMO_TAURI_DATA_DIR`.
 pub const MANIFEST_FILE: &str = "native-runtime.json";
 
@@ -277,6 +281,8 @@ pub fn start<R: Runtime>(
     runtime: Option<TaskRuntime>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
+    #[cfg(feature = "test-object-window-probe")]
+    object_window_probe::initialize(app, runtime.as_ref())?;
     #[cfg(feature = "test-play-publication-observer")]
     app.manage(TestPlayState(Mutex::new(None)));
     #[cfg(feature = "test-play-publication-observer")]
@@ -317,6 +323,8 @@ pub fn start<R: Runtime>(
         };
         #[cfg(feature = "test-play-publication-observer")]
         let builder = startup_observer::attach(builder, startup.clone())?;
+        #[cfg(feature = "test-object-window-probe")]
+        let builder = object_window_probe::attach(builder, &handle)?;
         let native_window = builder.data_store_identifier(store).build()?;
         #[cfg(feature = "test-play-publication-observer")]
         startup_observer::created(&startup, &native_window);
