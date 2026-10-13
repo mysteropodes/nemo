@@ -14,6 +14,7 @@ mod native_application_ports;
 mod native_application_viewport;
 mod native_dispatch;
 mod native_object_bootstrap;
+mod native_object_desktop_export;
 mod native_object_desktop_preview;
 mod native_reproduction_session;
 mod native_viewport;
@@ -247,6 +248,7 @@ pub fn run() {
             application_mcp::nemo_native_revision_sync,
             native_application_commands::nemo_native_bootstrap,
             native_object_bootstrap::nemo_native_object_bootstrap,
+            native_object_desktop_export::nemo_native_object_export,
             native_object_desktop_preview::nemo_native_object_preview,
             native_object_bootstrap::nemo_native_object_save_as,
             native_reproduction_session::nemo_native_reproduction_session,
