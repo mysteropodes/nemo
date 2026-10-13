@@ -271,7 +271,11 @@ pub fn run() {
             #[cfg(feature = "test-play-publication-observer")]
             task_runtime::nemo_test_play_observer,
             #[cfg(feature = "test-play-publication-observer")]
-            task_runtime::startup_observer::host::nemo_test_startup_record
+            task_runtime::startup_observer::host::nemo_test_startup_record,
+            #[cfg(feature = "test-play-publication-observer")]
+            task_runtime::startup_observer::host::footer::nemo_test_startup_cut_drained,
+            #[cfg(feature = "test-play-publication-observer")]
+            task_runtime::startup_observer::host::footer::nemo_test_startup_cut_snapshot
         ])
         // "Vérifier les mises à jour…" in the app (StrokeMotion) menu — same
         // check the Réglages button and the silent startup check already
