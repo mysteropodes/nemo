@@ -10,6 +10,48 @@ use crate::revision::{
 };
 use std::sync::Arc;
 
+/// Dependency-neutral reservation for the compositor's controlled readback
+/// allocations. This is the same payload domain as retained reference pixels.
+#[derive(Debug)]
+pub(crate) struct ReadbackReservation(ImageResourceCharge);
+impl ReadbackReservation {
+    pub(crate) fn allocate(&mut self) -> Result<Vec<u8>, &'static str> {
+        self.0
+            .allocate()
+            .map_err(|_| "readback pixel allocation refused")
+    }
+}
+pub(crate) fn reserve_readback_bytes(bytes: usize) -> Result<ReadbackReservation, &'static str> {
+    shared_image_resource_budget()
+        .reserve(bytes)
+        .map(ReadbackReservation)
+        .map_err(|_| "readback payload budget refused")
+}
+#[cfg(test)]
+pub(crate) struct ReadbackBudget(ImageResourceBudget);
+#[cfg(test)]
+impl ReadbackBudget {
+    pub(crate) fn new(limit: usize) -> Self {
+        Self(ImageResourceBudget::isolated(limit).unwrap())
+    }
+    pub(crate) fn reserve(&self, bytes: usize) -> Result<ReadbackReservation, &'static str> {
+        self.0
+            .reserve(bytes)
+            .map(ReadbackReservation)
+            .map_err(|_| "readback payload budget refused")
+    }
+    pub(crate) fn used(&self) -> usize {
+        self.0.used().unwrap()
+    }
+    pub(crate) fn retained_reference(&self) -> ReferencePixels {
+        // Reuse the original literal PNG decoder oracle in this isolated domain.
+        decode_with_budget(&tests::workspace_fixture(), tests::limits(), &self.0, |c| {
+            c.allocate()
+        })
+        .unwrap()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ReferenceResourceError {
     BareDrawing,

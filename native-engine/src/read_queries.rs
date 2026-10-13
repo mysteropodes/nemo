@@ -3,9 +3,12 @@
 #[cfg(feature = "project_media_codec")]
 #[path = "reference_image_resources.rs"]
 mod reference_image_resources;
+#[cfg(all(test, feature = "project_media_codec"))]
+pub(crate) use reference_image_resources::ReadbackBudget;
 #[cfg(feature = "project_media_codec")]
 pub(crate) use reference_image_resources::{
-    decode_snapshot_reference, ReferencePixels, ReferenceResourceError,
+    decode_snapshot_reference, reserve_readback_bytes, ReadbackReservation, ReferencePixels,
+    ReferenceResourceError,
 };
 
 #[cfg(feature = "project_media_codec")]
