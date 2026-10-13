@@ -1,0 +1,244 @@
+//! Shared route acceptance cases; reusable actual-owner fixtures are private.
+use crate::application_mcp::revision_sync::object_preview_route::tests::support::{
+    fill, output, Fixture, Opacity,
+};
+use crate::application_mcp::revision_sync::{RevisionBinding, RevisionControl};
+use crate::native_dispatch::{NativeDispatch, NativePhase};
+use native_engine::{
+    commands::NativeOpacityApplication, desktop_viewport::ViewportStatus,
+    document::OpacityDocument, object_document::FrameScopeKind, scheduler::OutputSpec,
+};
+use serde_json::json;
+#[path = "native_object_preview_route_test_support.rs"]
+mod support;
+
+#[test]
+fn gpu_current_route_holds_both_guards_and_refuses_every_stale_pin_before_acquisition() {
+    let mut f = Fixture::new();
+    f.mode.set(1);
+    let first = f.run().unwrap();
+    assert!(matches!(first.status(), ViewportStatus::Deferred(_)));
+    for field in 0..8 {
+        let mut p = f.pins.clone();
+        match field {
+            0 => p.instance = "foreign".into(),
+            1 => p.document = "foreign".into(),
+            2 => p.revision += 1,
+            3 => p.snapshot = "foreign".into(),
+            4 => p.generation += 1,
+            _ => {}
+        }
+        let mut selector = p.selector();
+        match field {
+            5 => selector.context_id = "foreign",
+            6 => selector.scope_kind = FrameScopeKind::Reference,
+            7 => selector.frame = 1,
+            _ => {}
+        }
+        assert!(f
+            .state
+            .present_object_preview(p.generation, &selector, output(), &mut f.gpu, &mut f.view)
+            .is_err());
+    }
+    let wrong = OutputSpec::new("frame", "rgba8", 64, 64, "linear", "straight").unwrap();
+    assert!(f
+        .state
+        .present_object_preview(
+            f.pins.generation,
+            &f.pins.selector(),
+            wrong,
+            &mut f.gpu,
+            &mut f.view
+        )
+        .is_err());
+    assert_eq!(f.calls.get(), 1);
+    f.mode.set(0);
+    let receipt = f.run().unwrap();
+    assert_eq!(receipt.identity(), first.identity());
+    assert_eq!(receipt.status(), &ViewportStatus::Presented);
+    f.release();
+    assert!(f.run().is_err());
+    let old_generation = f.pins.generation;
+    f.reinstall();
+    assert_ne!(f.pins.generation, old_generation);
+    assert!(f
+        .state
+        .present_object_preview(
+            old_generation,
+            &f.pins.selector(),
+            output(),
+            &mut f.gpu,
+            &mut f.view
+        )
+        .unwrap_err()
+        .contains("generation"));
+    assert_eq!(f.calls.get(), 2);
+}
+
+#[test]
+fn gpu_common_fill_undo_redo_invalidate_retained_preview_and_refresh_owner_pins() {
+    let mut f = Fixture::new();
+    f.mode.set(1);
+    let mut old = f.run().unwrap();
+    for (operation, payload, pixel) in [
+        (
+            "command.document.object.fill.set",
+            fill(1),
+            [255, 0, 0, 255],
+        ),
+        (
+            "command.document.object.undo",
+            json!({"command":"object.undo"}),
+            [0, 0, 255, 255],
+        ),
+        (
+            "command.document.object.redo",
+            json!({"command":"object.redo"}),
+            [255, 0, 0, 255],
+        ),
+    ] {
+        let response = f.command(operation, payload, false).response;
+        assert!(response.ok);
+        assert!(f.run().is_err());
+        f.refresh();
+        f.expected_pixel.set(pixel);
+        let next = f.run().unwrap();
+        assert_ne!(next.identity().work_id(), old.identity().work_id());
+        assert_eq!(
+            next.identity().evaluation_key().document_snapshot_id(),
+            f.pins.snapshot
+        );
+        old = next;
+    }
+    let released = f.release();
+    assert_eq!(released.cancelled_preview_work_ids.len(), 1);
+    assert_eq!(released.disposed_viewport_work_ids.len(), 4);
+}
+
+#[test]
+fn gpu_real_external_revision_pending_acknowledged_and_failed_barriers_refuse_preview() {
+    let mut f = Fixture::new();
+    let binding: RevisionBinding = serde_json::from_value(
+        f.state
+            .revisions
+            .control(&f.state.native, RevisionControl::Binding)
+            .unwrap(),
+    )
+    .unwrap();
+    f.state
+        .revisions
+        .control(
+            &f.state.native,
+            RevisionControl::Subscribe {
+                binding: binding.clone(),
+            },
+        )
+        .unwrap();
+    let delivery = f.command("command.document.object.fill.set", fill(1), true);
+    assert!(delivery.response.ok);
+    let (event, mut receiver) = delivery.notification.unwrap();
+    f.refresh();
+    assert!(f.run().unwrap_err().contains("pending"));
+    f.state
+        .revisions
+        .control(
+            &f.state.native,
+            RevisionControl::Acknowledge {
+                subscription_id: binding.subscription_id.clone(),
+                event: event.clone(),
+            },
+        )
+        .unwrap();
+    assert_eq!(receiver.try_recv(), Ok(()));
+    assert!(f.run().unwrap_err().contains("pending"));
+    assert!(f.state.revisions.settle(&f.state.native, &event, true));
+    f.expected_pixel.set([255, 0, 0, 255]);
+    assert_eq!(f.run().unwrap().status(), &ViewportStatus::Presented);
+    let delivery = f.command("command.document.object.fill.set", fill(0), true);
+    assert!(delivery.response.ok);
+    assert!(delivery.notification.is_some());
+    f.refresh();
+    f.state
+        .revisions
+        .control(
+            &f.state.native,
+            RevisionControl::Disconnect {
+                subscription_id: binding.subscription_id,
+            },
+        )
+        .unwrap();
+    assert!(f.run().unwrap_err().contains("indeterminate"));
+    assert_eq!(f.calls.get(), 1);
+    f.release();
+}
+
+#[test]
+fn gpu_consumer_unwind_preserves_owner_debt_without_poisoning_shared_locks() {
+    let mut f = Fixture::new();
+    f.mode.set(2);
+    assert!(f.run().unwrap_err().contains("panicked"));
+    assert!(f.state.native.lock().is_ok());
+    assert!(f.state.revisions.0.lock().is_ok());
+    assert!(f.run().unwrap_err().contains("cleanup"));
+    assert_eq!(f.calls.get(), 1);
+    let released = f.release();
+    assert_eq!(released.cancelled_preview_work_ids.len(), 1);
+    assert_eq!(released.disposed_viewport_work_ids.len(), 1);
+    assert!(f.run().is_err());
+}
+
+#[test]
+fn gpu_non_object_and_inactive_lifecycle_phases_never_invoke_surface() {
+    for phase in 0..5 {
+        let mut f = Fixture::new();
+        if phase == 4 {
+            f.release();
+            let document: OpacityDocument = serde_json::from_slice(include_bytes!(
+                "../../native-engine/tests/fixtures/opacity-v2/project.json"
+            ))
+            .unwrap();
+            let owner =
+                Opacity(NativeOpacityApplication::new(f.state.instance_id(), document).unwrap());
+            f.pins.document = owner.document_id().into();
+            f.pins.revision = owner.content_revision();
+            let reservation = f.state.reserve_native_install().unwrap();
+            f.pins.generation = reservation.generation();
+            f.state
+                .install_dispatch(reservation.generation(), Box::new(owner))
+                .unwrap();
+        } else {
+            let mut guard = f.state.native.lock().unwrap();
+            let NativePhase::Active {
+                generation,
+                application,
+                ..
+            } = std::mem::replace(&mut guard.phase, NativePhase::Vacant)
+            else {
+                unreachable!()
+            };
+            guard.phase = match phase {
+                0 => NativePhase::Vacant,
+                1 => NativePhase::Replacing {
+                    generation,
+                    application,
+                    progress: Default::default(),
+                },
+                2 => NativePhase::Releasing {
+                    generation,
+                    application: Some(application),
+                    request_id: "pending".into(),
+                    fingerprint: vec![],
+                },
+                _ => {
+                    drop(application);
+                    NativePhase::Vacant
+                }
+            };
+            if phase == 3 {
+                guard.reserve_install().unwrap();
+            }
+        }
+        assert!(f.run().is_err());
+        assert_eq!(f.calls.get(), 0);
+    }
+}

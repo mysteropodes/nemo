@@ -16,6 +16,9 @@ use tokio::{io::AsyncReadExt, net::TcpStream, sync::oneshot};
 #[path = "native_revision_dispatch.rs"]
 mod dispatch_core;
 
+#[path = "native_object_preview_route.rs"]
+mod object_preview_route;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RevisionBinding {
