@@ -494,7 +494,7 @@ func selfTest() throws {
         if control == "owned-child" { return (0,true,123) }
         return (0,false,control == "unknown-child" ? 0 : 456)
       },foreignChild:{ provenance.append(($0,$1)) },isWindow:{ node in
-        if node == 1 { foreignReads += 1 }; return control == "foreign-modal"
+        if node == 1 { foreignReads += 1 }; return node == 1 && control == "foreign-modal"
       },timeout:{ _ in 0 },children:{ ($0 == 0 ? (0,[1]) : (0,[])) },parent:{ _ in (0,0) })
     } } catch let error as ActionRefusal { diagnostic = error.diagnostics }
     if control == "owned-child" { try check(diagnostic == nil && provenance.isEmpty && foreignReads == 1) }
