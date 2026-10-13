@@ -467,7 +467,8 @@
         "startup_js_host_tests.rs",
         "startup_retention_tests.rs",
         "startup_retention_health_tests.rs",
-        "startup_cut_tests.rs"
+        "startup_cut_tests.rs",
+        "startup_cut_provisional_tests.rs"
       ],
       "publicApi": [],
       "sizeProfile": "Rust production module"
