@@ -216,6 +216,27 @@ fn gpu_original_host_presents_reference_reuses_deferred_work_and_drops_cache_on_
     pixel(&trace, 8, 8, [255; 4]);
     pixel(&trace, 32, 32, [255, 0, 0, 255]);
     assert_eq!(owner.preview.scheduler.lease_counters().live(), 0);
+    let old_cache = owner.preview.reference_cache.as_ref().unwrap().clone();
+    let current = snapshot(&owner);
+    let mut bad = selector(&current, 0);
+    bad.document_snapshot_id = "foreign";
+    assert!(owner
+        .present_object_preview(&bad, output(), &mut gpu, &mut viewport)
+        .is_err());
+    let bad_output =
+        native_engine::scheduler::OutputSpec::new("frame", "rgba8", 4097, 64, "srgb", "straight")
+            .unwrap();
+    assert!(owner
+        .present_object_preview(&selector(&current, 0), bad_output, &mut gpu, &mut viewport)
+        .is_err());
+    assert!(owner
+        .preview
+        .reference_cache
+        .as_ref()
+        .unwrap()
+        .same_identity_as(&old_cache));
+    assert_eq!(owner.preview.scheduler.lease_counters().live(), 0);
+    drop(old_cache);
     reference(
         &mut owner,
         "settings",
@@ -268,7 +289,63 @@ fn cpu_reference_preview_refuses_wrong_pins_before_target_and_preserves_deferred
     owner
         .with_prepared_object_preview(&selector(&original, 0), output(), |_| Ok(()))
         .unwrap();
+    // CPU pins alone cannot retain/decode pixels before the original compositor
+    // has retired a potentially old Vello image cache.
+    assert!(owner.preview.reference_cache.is_none());
+    assert!(owner.release_project().unwrap().reconciliation_complete());
+    assert!(owner.preview.reference_cache.is_none());
+}
+
+#[test]
+fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
+    let mut owner = host();
+    attach(&mut owner);
+    let mut gpu = Compositor::new().unwrap();
+    let device = gpu.device().clone();
+    let (mut viewport, trace) = viewport();
+    present(&mut owner, &mut gpu, &mut viewport);
+    pixel(&trace, 8, 32, [128, 128, 255, 255]);
+    let red = "89504e470d0a1a0a0000000d4948445200000002000000010806000000f4227f8a0000000e49444154789c63f8cfc0f01f040110f803fd4e95c16f0000000049454e44ae426082";
+    let bytes: Vec<_> = red
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
+        .collect();
+    reference(
+        &mut owner,
+        "attach",
+        json!({"id":"ref","name":"replacement.png"}),
+        Some(&bytes),
+    );
+    let current = snapshot(&owner);
+    let prepared = owner
+        .prepare_object_preview(&selector(&current, 0), output())
+        .unwrap();
     assert!(owner.preview.reference_cache.is_some());
+    let count = trace.borrow().acquired;
+    let failed = owner.prepare_reference_preview(&prepared.plan, (64, 64), &mut gpu, |previous| {
+        assert!(
+            previous.is_none(),
+            "old host raster must be gone before replacement decode"
+        );
+        Err("injected decoder capacity refusal".into())
+    });
+    assert!(failed.unwrap_err().contains("capacity refusal"));
+    assert!(owner.preview.reference_cache.is_none());
+    assert!(owner.preview.pending.is_none());
+    assert!(owner.preview.blocked.is_none());
+    assert_eq!(
+        trace.borrow().acquired,
+        count,
+        "failed decode must not present"
+    );
+    assert_eq!(gpu.device(), &device);
+    present(&mut owner, &mut gpu, &mut viewport);
+    pixel(&trace, 8, 32, [255, 128, 128, 255]);
+    owner.history.undo(owner.content_revision()).unwrap();
+    owner.preview.invalidate();
+    present(&mut owner, &mut gpu, &mut viewport);
+    pixel(&trace, 8, 32, [128, 128, 255, 255]);
     assert!(owner.release_project().unwrap().reconciliation_complete());
     assert!(owner.preview.reference_cache.is_none());
 }

@@ -385,3 +385,93 @@ fn gpu_reference_fit_order_controls_history_reopen_and_actual_export_exclusion()
     pixel(&alpha, 56, 8, [208, 212, 217, 255]);
     pixel(&alpha, 8, 56, [255; 4]);
 }
+
+#[test]
+fn gpu_retiring_changed_reference_frees_renderer_blob_before_replacement_quota() {
+    use crate::revision::{ImageResourceBudget, ImageResourceCharge};
+    use std::sync::Arc;
+    struct ChargedPixels {
+        bytes: Vec<u8>,
+        _charge: ImageResourceCharge,
+    }
+    impl AsRef<[u8]> for ChargedPixels {
+        fn as_ref(&self) -> &[u8] {
+            &self.bytes
+        }
+    }
+    // Same ratio as the real 256 MiB image / 384 MiB shared budget, with actual
+    // charged storage and a real Vello upload; no large allocations or global counters.
+    let budget = ImageResourceBudget::isolated(12).unwrap();
+    let mut owner = owner();
+    attach(&mut owner, BLUE);
+    let mut old = viewport(&owner, 0, None);
+    let mut charge = budget.reserve(8).unwrap();
+    let mut bytes = charge.allocate().unwrap();
+    bytes.copy_from_slice(&[0, 0, 255, 255, 255, 255, 255, 255]);
+    let tracked = Arc::new(ChargedPixels {
+        bytes,
+        _charge: charge,
+    });
+    let weak = Arc::downgrade(&tracked);
+    old.reference.as_mut().unwrap().image.data = vello::peniko::Blob::new(tracked);
+    let mut gpu = Compositor::new().unwrap();
+    let device = gpu.device().clone();
+    pixel(&rgba(&mut gpu, &owner, &old), 8, 32, [128, 128, 255, 255]);
+    assert!(!gpu
+        .retire_object_reference_for(old.plan(), (64, 64))
+        .unwrap());
+    drop(old);
+    assert!(
+        weak.upgrade().is_some(),
+        "the real renderer must retain the charged Blob"
+    );
+    assert!(budget.reserve(8).is_err());
+    settings(&mut owner, false, 0.25);
+    let same_image = plan(&snapshot(&owner), 0);
+    assert!(!gpu
+        .retire_object_reference_for(&same_image, (64, 64))
+        .unwrap());
+    assert_eq!(
+        budget.used().unwrap(),
+        8,
+        "settings must not reset the renderer"
+    );
+    attach(&mut owner, RED);
+    let replacement = plan(&snapshot(&owner), 0);
+    assert!(gpu
+        .retire_object_reference_for(&replacement, (4097, 64))
+        .is_err());
+    assert!(
+        budget.reserve(8).is_err(),
+        "bad output cannot disturb the old cache"
+    );
+    assert!(gpu
+        .retire_object_reference_for(&replacement, (64, 64))
+        .unwrap());
+    assert_eq!(gpu.device(), &device);
+    assert!(
+        weak.upgrade().is_none(),
+        "resolver and Scene must both release the old Blob"
+    );
+    assert_eq!(budget.used().unwrap(), 0);
+    let mut next_charge = budget.reserve(8).unwrap();
+    let next_bytes = next_charge.allocate().unwrap();
+    assert_eq!(next_bytes.len(), 8);
+    settings(&mut owner, true, 0.5);
+    pixel(
+        &rgba(&mut gpu, &owner, &viewport(&owner, 0, None)),
+        8,
+        32,
+        [255, 128, 128, 255],
+    );
+    mutate(&mut owner, "remove", json!({}), None);
+    assert!(gpu
+        .retire_object_reference_for(&plan(&snapshot(&owner), 0), (64, 64))
+        .unwrap());
+    assert!(!gpu
+        .retire_object_reference_for(&plan(&snapshot(&owner), 0), (64, 64))
+        .unwrap());
+    drop(next_bytes);
+    drop(next_charge);
+    assert_eq!(budget.used().unwrap(), 0);
+}

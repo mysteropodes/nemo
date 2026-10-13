@@ -70,6 +70,14 @@ pub fn prepare_object_viewport_composition(
 }
 
 impl ObjectCompositionWitness {
+    /// Compares only the original encoded allocation. Visibility, opacity and
+    /// frame changes can reuse it; replacement/removal cannot retain its raster.
+    pub fn reference_matches_plan(&self, plan: &ObjectPaintPlan) -> bool {
+        self.reference
+            .as_ref()
+            .is_some_and(|reference| reference.pixels.matches_image(plan.packet().snapshot()))
+    }
+
     pub(crate) fn reference_image(&self) -> Option<(&ImageData, Affine, f32)> {
         self.reference
             .as_ref()

@@ -52,6 +52,8 @@ pub struct Compositor {
     scene: Scene,
     #[cfg(all(feature = "application", feature = "project_media_codec"))]
     last_reference_image: Option<u64>,
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    retained_object_reference: Option<crate::object_render_scene::ObjectCompositionWitness>,
 }
 
 /// First half of native GPU construction. A window host creates its surface
@@ -122,6 +124,8 @@ impl CompositorInstance {
             scene: Scene::new(),
             #[cfg(all(feature = "application", feature = "project_media_codec"))]
             last_reference_image: None,
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            retained_object_reference: None,
         })
     }
 }

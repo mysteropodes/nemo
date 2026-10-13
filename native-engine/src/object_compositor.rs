@@ -71,6 +71,46 @@ fn color(command: ObjectPaintCommand<'_>) -> Result<Color, CompositorError> {
 }
 
 impl Compositor {
+    /// Retire the old image's CPU Blob in Vello's private resolver before the
+    /// caller decodes its replacement. The compositor/device/queue stay fixed.
+    /// Call only after selector, output and paint admission. Construct first so
+    /// a failed reset preserves the old cache and remains safe to retry.
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    pub fn retire_object_reference_for(
+        &mut self,
+        plan: &crate::object_render_scene::ObjectPaintPlan,
+        dimensions: (u32, u32),
+    ) -> Result<bool, CompositorError> {
+        output_budget(
+            dimensions.0,
+            dimensions.1,
+            self.device.limits().max_texture_dimension_2d,
+        )?;
+        for command in plan.commands() {
+            color(command)?;
+        }
+        if self
+            .retained_object_reference
+            .as_ref()
+            .is_none_or(|previous| previous.reference_matches_plan(plan))
+        {
+            return Ok(false);
+        }
+        let renderer = vello::Renderer::new(
+            &self.device,
+            vello::RendererOptions {
+                antialiasing_support: vello::AaSupport::area_only(),
+                ..Default::default()
+            },
+        )
+        .map_err(|error| CompositorError::new(format!("reset Vello image cache: {error}")))?;
+        self.renderer = renderer;
+        self.scene.reset();
+        self.retained_object_reference = None;
+        self.last_reference_image = None;
+        Ok(true)
+    }
+
     /// Borrow the same texture and GPU under a live scheduler permit. No raw
     /// scheduled texture can escape for later consumption without that borrow.
     pub(crate) fn scheduled_object_surface<'a>(
@@ -149,6 +189,8 @@ impl Compositor {
         self.scene.reset();
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         if let Some((image, transform, opacity)) = prepared.reference_image() {
+            // Retain identity before fallible rendering, including error/unwind.
+            self.retained_object_reference = Some(prepared.clone());
             // Vello 0.9's solid-only resolve replaces the atlas with a 1x1
             // texture but retains image residency. Restore each image when it
             // becomes active after export, hiding or another image; undo may
