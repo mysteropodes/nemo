@@ -36,7 +36,7 @@
       "id": "rust.native.engine.revision",
       "layer": "native-revision",
       "dir": "native-engine/src",
-      "files": ["revision.rs", "object_revision.rs"],
+      "files": ["revision.rs", "object_revision.rs", "encoded_retention_budget.rs"],
       "publicApi": ["revision.rs"],
       "sizeProfile": "Rust production module"
     },

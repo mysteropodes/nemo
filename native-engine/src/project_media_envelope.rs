@@ -80,6 +80,9 @@ impl StillReference {
     pub(crate) fn encoded_png(&self) -> &[u8] {
         &self.encoded
     }
+    pub(crate) fn encoded_allocation(&self) -> &Arc<Vec<u8>> {
+        &self.encoded
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -385,16 +388,11 @@ mod tests {
             let ProjectReferenceState::StillImage(data) = attached.reference_state() else {
                 panic!()
             };
-            assert_eq!(
-                (
-                    data.id(),
-                    data.name(),
-                    data.visible(),
-                    data.opacity(),
-                    data.offset_frames()
-                ),
-                ("media-1", "plate.png", true, 0.5, -7)
-            );
+            assert_eq!(data.id(), "media-1");
+            assert_eq!(data.name(), "plate.png");
+            assert!(data.visible());
+            assert_eq!(data.opacity(), 0.5);
+            assert_eq!(data.offset_frames(), -7);
             assert_eq!(data.encoded_png(), png());
             assert_eq!(data.encoded_png().as_ptr(), source_ptr);
             let clone = attached.clone();
