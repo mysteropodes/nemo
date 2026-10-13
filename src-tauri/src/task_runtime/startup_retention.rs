@@ -6,6 +6,9 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+#[path = "startup_retention_health.rs"]
+mod health;
+
 const MAX_BYTES: usize = 16 * 1024;
 const FILE: &str = "startup-js.json";
 struct Disk {
@@ -16,6 +19,7 @@ struct Disk {
     bytes: Vec<u8>,
 }
 pub(super) struct Store {
+    roots: health::RootIdentity,
     disk: Mutex<Disk>,
     path: PathBuf,
     dev: u64,
@@ -162,6 +166,7 @@ impl Store {
         {
             return Err("startup retention pins refused");
         }
+        let roots = health::RootIdentity::capture(&root)?;
         let path = root.join(FILE);
         let mut options = OpenOptions::new();
         options.read(true).write(true).create_new(true).mode(0o600);
@@ -173,7 +178,9 @@ impl Store {
         let meta = file
             .metadata()
             .map_err(|_| "startup retention file refused")?;
+        roots.verify(&root)?;
         Ok(Self {
+            roots,
             disk: Mutex::new(Disk {
                 file,
                 version: 0,
