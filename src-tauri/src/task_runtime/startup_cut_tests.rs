@@ -14,12 +14,8 @@ impl Fixture {
     fn new(loaded: bool) -> Self {
         let path = std::env::temp_dir().join(format!("nemo-cut-{}", uuid::Uuid::new_v4()));
         let file = std::fs::File::create(&path).unwrap();
-        let mut native = LoadLog::new(
-            uuid::Uuid::new_v4().to_string(),
-            "a".repeat(64),
-            std::process::id(),
-            file,
-        );
+        let run = uuid::Uuid::new_v4().to_string();
+        let mut native = LoadLog::new(run, "a".repeat(64), std::process::id(), file);
         if loaded {
             let run = native.run.clone();
             native.confirm_creation("main", native.pid, &run);
@@ -44,23 +40,15 @@ impl Fixture {
     fn admit(&mut self, records: &Value) {
         let url = tauri::Url::parse("tauri://localhost/index.html").unwrap();
         for record in records.as_array().unwrap() {
+            let bytes = serde_json::to_vec(record).unwrap();
             self.js
-                .accept_json(
-                    "main",
-                    &url,
-                    self.native.pid,
-                    &serde_json::to_vec(record).unwrap(),
-                )
+                .accept_json("main", &url, self.native.pid, &bytes)
                 .unwrap();
         }
     }
     fn finish(&self, cut: &mut Cut, footer: &Value) -> Result<Phase, &'static str> {
-        cut.finish(
-            &serde_json::to_vec(footer).unwrap(),
-            &self.native,
-            &self.js,
-            Some(&self.health()),
-        )
+        let bytes = serde_json::to_vec(footer).unwrap();
+        cut.finish(&bytes, &self.native, &self.js, Some(&self.health()))
     }
 }
 impl Drop for Fixture {
@@ -87,23 +75,14 @@ if(v.mode!=='no-raf'){for(let i=0;i<2;i++){const [id,f]=frames.entries().next().
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../tests/desktop/startup-observer-bootstrap.js");
     let mut child = Command::new("node")
-        .arg("-e")
-        .arg(program)
+        .args(["-e", program])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(
-            serde_json::to_string(&json!({"source":source,
-        "run":run,"cut":cut,"mode":mode}))
-            .unwrap()
-            .as_bytes(),
-        )
-        .unwrap();
+    let payload =
+        serde_json::to_vec(&json!({"source":source,"run":run,"cut":cut,"mode":mode})).unwrap();
+    child.stdin.take().unwrap().write_all(&payload).unwrap();
     let output = child.wait_with_output().unwrap();
     assert!(output.status.success());
     serde_json::from_slice(&output.stdout).unwrap()
@@ -320,4 +299,59 @@ fn actual_pending_loss_and_postcut_late_counts_never_become_observed() {
     let bytes = serde_json::to_vec(&footer).unwrap();
     assert!(cut.finish(&bytes, &f.native, &f.js, Some(&h)).is_err());
     assert_eq!(cut.phase(), Phase::Refused); // newer proof is not exact replay
+}
+
+#[test]
+fn footer_object_shape_refuses_matching_array_without_provisional_terminalization() {
+    let mut f = Fixture::new(true);
+    let seed = f.cut();
+    let output = actual_kj(&f.native.run, seed.id(), "clean");
+    f.admit(&output["records"]);
+    for case in ["array", "", " \t\r\n", "null", "7", "true"] {
+        let mut cut = f.cut();
+        cut.begin_drain().unwrap();
+        let mut footer = output["footer"].clone();
+        footer["cutId"] = json!(cut.id());
+        let array = json!([
+            footer["runId"],
+            footer["loadGeneration"],
+            footer["cutId"],
+            footer["status"],
+            footer["generated"],
+            footer["sent"],
+            footer["failed"],
+            footer["dropped"],
+            footer["late"],
+            footer["pending"],
+            footer["visiblePaint"]
+        ]);
+        let bytes = if case == "array" {
+            serde_json::to_vec(&array).unwrap()
+        } else {
+            case.as_bytes().to_vec()
+        };
+        let before = (cut.version, cut.native.clone(), cut.js.clone());
+        assert!(cut
+            .validate_provisional(&bytes, &f.native, &f.js, Some(&f.health()))
+            .is_err());
+        assert_eq!(cut.phase(), Phase::Draining);
+        assert_eq!((cut.version, cut.native.clone(), cut.js.clone()), before);
+        assert!(cut
+            .finish(&bytes, &f.native, &f.js, Some(&f.health()))
+            .is_err());
+        assert_eq!(cut.phase(), Phase::Refused);
+    }
+    let mut cut = f.cut();
+    cut.begin_drain().unwrap();
+    let mut footer = output["footer"].clone();
+    footer["cutId"] = json!(cut.id());
+    let object = format!(" \t\r\n{}", serde_json::to_string(&footer).unwrap());
+    assert_eq!(
+        cut.validate_provisional(object.as_bytes(), &f.native, &f.js, Some(&f.health())),
+        Ok(())
+    );
+    assert_eq!(
+        cut.finish(object.as_bytes(), &f.native, &f.js, Some(&f.health())),
+        Ok(Phase::SealedObserved)
+    );
 }
