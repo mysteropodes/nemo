@@ -142,6 +142,43 @@ function safeActionDiagnostics(value) {
       return safe;
     });
   }
+  if (value.transitionObservation !== undefined) {
+    check(value.stage==='post-action-application-window-membership', 'ax-evidence-refused');
+    const observation=value.transitionObservation;
+    const statuses=new Set(['timeout-config-refused','deadline','inconclusive','membership-returned','persistent-omission']);
+    check(observation&&typeof observation==='object'&&!Array.isArray(observation)&&statuses.has(observation.status), 'ax-evidence-refused');
+    check(Number.isInteger(observation.elapsedMs)&&observation.elapsedMs>=0&&observation.elapsedMs<=10000, 'ax-evidence-refused');
+    if(observation.status!=='deadline')check(observation.elapsedMs<=750,'ax-evidence-refused');
+    check(Array.isArray(observation.samples)&&observation.samples.length<=2, 'ax-evidence-refused');
+    if(observation.status==='timeout-config-refused')check(observation.samples.length===0, 'ax-evidence-refused');
+    if(observation.status==='inconclusive'||observation.status==='membership-returned'||observation.status==='persistent-omission')
+      check(observation.samples.length===2, 'ax-evidence-refused');
+    if(observation.status==='deadline')check(observation.samples.length<=2, 'ax-evidence-refused');
+    const sampleFacts=observation.samples.map((sample,index)=>{
+      check(sample&&typeof sample==='object'&&!Array.isArray(sample)&&sample.sampleIndex===index, 'ax-evidence-refused');
+      check(Number.isInteger(sample.elapsedMs)&&sample.elapsedMs>=0&&sample.elapsedMs<=observation.elapsedMs, 'ax-evidence-refused');
+      const cleanSample={sampleIndex:index,elapsedMs:sample.elapsedMs};
+      for(const key of ['axPidQueryError','applicationWindowsQueryError','minimizedQueryError','retainedMainChildrenQueryError'])
+        if(sample[key]!==undefined){check(Number.isInteger(sample[key])&&sample[key]>=-32768&&sample[key]<=0,'ax-evidence-refused');cleanSample[key]=sample[key];}
+      for(const key of ['axPidMatches','applicationWindowsReadable','pinnedAXWindowMember','minimizedReadable','minimized',
+        'pinnedCGWindowListReadable','retainedMainChildrenReadable','retainedMainChildrenCountCapped'])
+        if(sample[key]!==undefined){check(typeof sample[key]==='boolean','ax-evidence-refused');cleanSample[key]=sample[key];}
+      for(const key of ['pinnedCGWindowCount','retainedMainChildrenCount'])
+        if(sample[key]!==undefined){const max=key==='retainedMainChildrenCount'?4096:128;check(Number.isInteger(sample[key])&&sample[key]>=0&&sample[key]<=max,'ax-evidence-refused');cleanSample[key]=sample[key];}
+      check(sample.retainedMainChildFacts===undefined&&sample.retainedMainSheetProbe===undefined,'ax-evidence-refused');
+      return cleanSample;
+    });
+    if(sampleFacts.length===2&&observation.status!=='deadline'){
+      const usable=sampleFacts.every(sample=>sample.axPidMatches===true&&sample.applicationWindowsQueryError===0&&
+        sample.applicationWindowsReadable===true&&sample.minimizedQueryError===0&&sample.minimizedReadable===true&&
+        sample.minimized===false&&sample.pinnedCGWindowListReadable===true&&sample.pinnedCGWindowCount===1&&
+        sample.retainedMainChildrenQueryError===0&&sample.retainedMainChildrenReadable===true);
+      const derived=!usable?'inconclusive':sampleFacts.some(sample=>sample.pinnedAXWindowMember===true)?'membership-returned':
+        sampleFacts.every(sample=>sample.pinnedAXWindowMember===false)?'persistent-omission':'inconclusive';
+      check(observation.status===derived,'ax-evidence-refused');
+    }
+    clean.transitionObservation={status:observation.status,elapsedMs:observation.elapsedMs,samples:sampleFacts};
+  }
   return clean;
 }
 function safeCleanupDiagnostics(values) {

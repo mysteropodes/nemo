@@ -412,6 +412,72 @@ test('retained-main sheet probe is bounded, identity-gated, sanitized and never 
   assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainChildFacts:[{index:0,candidateRole:'/private'}]}));
   assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',retainedMainChildFacts:[{index:0,candidatePid:999999999999}]}));
 });
+test('bounded post-press transition samples are sanitized and never resume a refused press',async()=>{
+  const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const helperSource=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
+  const samplerStart=helperSource.indexOf('  func transitionObservationDiagnostic()');
+  const samplerEnd=helperSource.indexOf('  func verify()',samplerStart);
+  const sampler=helperSource.slice(samplerStart,samplerEnd);
+  assert.ok(samplerStart>=0&&samplerEnd>samplerStart);
+  assert.match(sampler,/let deadline = started \+ 750_000_000/);
+  assert.match(sampler,/for index in 0\.\.\<2/);
+  assert.match(sampler,/AXUIElementSetMessagingTimeout/);
+  assert.match(sampler,/kAXChildrenAttribute/);
+  assert.doesNotMatch(sampler,/AXUIElementPerformAction|AXUIElementPostKeyboardEvent|CGEvent/);
+  assert.match(helperSource,/facts\["transitionObservation"\] = transitionObservationDiagnostic\(\)/);
+  const stable=(index,extra={})=>({sampleIndex:index,elapsedMs:index?330:0,axPidQueryError:0,axPidMatches:true,
+    applicationWindowsQueryError:0,applicationWindowsReadable:true,pinnedAXWindowMember:false,
+    minimizedQueryError:0,minimizedReadable:true,minimized:false,pinnedCGWindowListReadable:true,pinnedCGWindowCount:1,
+    retainedMainChildrenQueryError:0,retainedMainChildrenReadable:true,retainedMainChildrenCount:1,
+    retainedMainChildrenCountCapped:false,...extra});
+  const scenarios=[
+    {name:'membership returns',status:'membership-returned',samples:[stable(0),stable(1,{pinnedAXWindowMember:true})]},
+    {name:'direct child count changes',status:'persistent-omission',samples:[stable(0),stable(1,{retainedMainChildrenCount:2})]},
+    {name:'persistent omission',status:'persistent-omission',samples:[stable(0),stable(1)]},
+    {name:'identity drift',status:'inconclusive',samples:[stable(0),stable(1,{axPidMatches:false})]},
+    {name:'AX query error',status:'inconclusive',samples:[stable(0),stable(1,{applicationWindowsQueryError:-25205,applicationWindowsReadable:false})]},
+    {name:'direct child query error',status:'inconclusive',samples:[stable(0),stable(1,{retainedMainChildrenQueryError:-25205,retainedMainChildrenReadable:false})]},
+  ];
+  for(const scenario of scenarios){
+    const diagnostic={stage:'post-action-application-window-membership',elementPath:'2',transitionObservation:{
+      status:scenario.status,elapsedMs:480,samples:scenario.samples},privatePath:'/private/identity'};
+    const clean=safeActionDiagnostics(diagnostic);
+    assert.equal(clean.transitionObservation.status,scenario.status,scenario.name);
+    assert.equal(clean.transitionObservation.samples.length,2,scenario.name);
+    assert.equal(JSON.stringify(clean).includes('/private/'),false,scenario.name);
+    const f=fixture();let requests=0,presses=0;f.services.next=async()=>{requests++;return{type:'press',element:'2'};};
+    f.services.window=async(mode,pid,wid,action)=>{
+      f.events.push('window-'+mode);
+      if(mode==='discover')return{pid,windowId:45,matchedAX:true};
+      if(mode==='press'){presses++;return{status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:diagnostic};}
+      return{status:'ok',pid,windowId:45,matchedAX:true};
+    };
+    const result=await runOperator(f.cfg,f.services);
+    assert.equal(result.status,'partial',scenario.name);assert.equal(result.reason,'adapter-refused',scenario.name);
+    assert.equal(result.firstFailure.actionDiagnostics.transitionObservation.status,scenario.status,scenario.name);
+    assert.equal(result.installedAcceptance,'not-established',scenario.name);
+    assert.equal(requests,1,scenario.name);assert.equal(presses,1,scenario.name);
+    assert.equal(f.events.filter(event=>event==='window-press').length,1,scenario.name);
+  }
+  const timeout=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
+    status:'timeout-config-refused',elapsedMs:0,samples:[]}});
+  assert.deepEqual(timeout.transitionObservation,{status:'timeout-config-refused',elapsedMs:0,samples:[]});
+  const deadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
+    status:'deadline',elapsedMs:740,samples:[stable(0)]}});
+  assert.equal(deadline.transitionObservation.status,'deadline');
+  const overrunDeadline=safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:{
+    status:'deadline',elapsedMs:810,samples:[stable(0),stable(1)]}});
+  assert.equal(overrunDeadline.transitionObservation.elapsedMs,810);
+  for(const observation of [
+    {status:'persistent-omission',elapsedMs:751,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',elapsedMs:500,samples:[stable(0),stable(1),stable(2)]},
+    {status:'attached-sheet-observed',elapsedMs:500,samples:[stable(0),stable(1)]},
+    {status:'timeout-config-refused',elapsedMs:0,samples:[stable(0)]},
+    {status:'deadline',elapsedMs:10001,samples:[stable(0),stable(1)]},
+    {status:'persistent-omission',elapsedMs:500,samples:[stable(0),stable(1,{pinnedCGWindowCount:0})]},
+  ])assert.throws(()=>safeActionDiagnostics({stage:'post-action-application-window-membership',transitionObservation:observation}));
+  assert.throws(()=>safeActionDiagnostics({stage:'axpress-perform',transitionObservation:{status:'deadline',elapsedMs:0,samples:[]}}));
+});
 test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
   const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
   const cases=[
