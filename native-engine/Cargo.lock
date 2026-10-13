@@ -588,6 +588,7 @@ name = "nemo-native-engine"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "flate2",
  "png",
  "pollster",
  "raw-window-handle",
