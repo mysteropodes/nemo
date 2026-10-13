@@ -6,6 +6,7 @@ import CoreGraphics
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
 struct ActionRefusal: Error { let diagnostics: [String:Any] }
+struct IdentityRefusal: Error { let stage: String; let facts: [String:Any] }
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "quit"]
@@ -40,6 +41,16 @@ func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [St
   return read()
 }
 func projectionLimit(_ depth: Int, _ nodes: Int) throws { try check(depth >= 1 && depth <= 5 && nodes >= 1 && nodes <= 128) }
+func identityFailureStage(_ ownerQuery: Int, _ ownerMatches: Bool, _ windowsQuery: Int,
+  _ windowsReadable: Bool, _ pinnedAXMember: Bool, _ minimizedQuery: Int, _ minimizedReadable: Bool, _ minimized: Bool,
+  _ pinnedCGReadable: Bool, _ pinnedCGCount: Int) -> String? {
+  if ownerQuery != 0 || !ownerMatches { return "ax-owner" }
+  if windowsQuery != 0 || !windowsReadable || !pinnedAXMember { return "application-window-membership" }
+  if !pinnedCGReadable { return "pinned-cg-window-list" }
+  if pinnedCGCount != 1 { return "pinned-cg-window" }
+  if minimizedQuery != 0 || !minimizedReadable || minimized { return "minimized" }
+  return nil
+}
 func xy(_ node: AXUIElement) -> CGPoint? {
   guard let raw = attr(node, kAXPositionAttribute), CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
   var value = CGPoint.zero
@@ -60,6 +71,14 @@ func selfTest() throws {
     var refused = false; do { _ = try route(input) } catch { refused = true }; try check(refused)
   }
   try check(!actions.contains("key") && !actions.contains("focus") && !actions.contains("launch"))
+  for (ownerError,ownerMatches,windowsError,windowsReadable,member,minimizedError,minimizedReadable,minimized,cgReadable,cgCount,expected) in [
+    (0,false,0,true,true,0,true,false,true,1,"ax-owner"), (0,true,-25205,true,true,0,true,false,true,1,"application-window-membership"),
+    (0,true,0,false,true,0,true,false,true,1,"application-window-membership"), (0,true,0,true,false,0,true,false,true,1,"application-window-membership"),
+    (0,true,0,true,true,0,true,false,false,0,"pinned-cg-window-list"), (0,true,0,true,true,0,true,false,true,0,"pinned-cg-window"),
+    (0,true,0,true,true,0,true,true,true,1,"minimized"), (0,true,0,true,true,-25205,true,false,true,1,"minimized"),
+    (0,true,0,true,true,0,false,false,true,1,"minimized")
+  ] { try check(identityFailureStage(ownerError,ownerMatches,windowsError,windowsReadable,member,minimizedError,minimizedReadable,minimized,cgReadable,cgCount) == expected) }
+  try check(identityFailureStage(0,true,0,true,true,0,true,false,true,1) == nil)
   try check(try sheetProof([11],[11:123],[11:1],123,1,nil) == 11)
   try check(try sheetProof([11],[11:123],[11:1],123,1,11) == 11)
   for (members,owners,parents,retained) in [([], [11:123], [11:1], nil), ([11,12],[11:123,12:123],[11:1,12:1],nil), ([11],[11:124],[11:1],nil),
@@ -75,7 +94,7 @@ func selfTest() throws {
   try projectionLimit(5,128)
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
-  try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "foreignReads":0, "runtimeAX":false])
+  try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9, "foreignReads":0, "runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -92,13 +111,15 @@ func run() throws {
   try check(physical.path == reportURL.path && FileManager.default.fileExists(atPath: physical.path))
   let reportIdentity = try FileManager.default.attributesOfItem(atPath: physical.path)
   try check(reportIdentity[.type] as? FileAttributeType == .typeDirectory)
-  func cg(_ all: Bool) -> [[String:Any]] {
+  func cg(_ all: Bool) -> [[String:Any]]? {
     let flags: CGWindowListOption = all ? [.optionAll,.excludeDesktopElements] : [.optionOnScreenOnly,.excludeDesktopElements]
-    return (CGWindowListCopyWindowInfo(flags,kCGNullWindowID) as? [[String:Any]] ?? []).filter {
+    guard let rows = CGWindowListCopyWindowInfo(flags,kCGNullWindowID) as? [[String:Any]] else { return nil }
+    return rows.filter {
       ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
     }
   }
-  let initial = cg(false); try check(initial.count == 1)
+  guard let initial = cg(false) else { throw Refusal(code:"adapter-refused") }
+  try check(initial.count == 1)
   guard let row = initial.first, row[kCGWindowNumber as String] as? UInt32 == number,
         let bounds = row[kCGWindowBounds as String] as? [String:CGFloat] else { throw Refusal(code:"adapter-refused") }
   try check(AXIsProcessTrusted())
@@ -136,11 +157,27 @@ func run() throws {
   }
   func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
   func verify() throws {
-    try check(owns(main,pid) && (attr(application,kAXWindowsAttribute) as? [AXUIElement] ?? []).contains { CFEqual($0,main) })
-    let minimized = attr(main,kAXMinimizedAttribute) as? Bool ?? false
-    let identities = cg(true).filter { $0[kCGWindowNumber as String] as? UInt32 == number }
-    // Retain the exact main AX object across picker presentation; no rediscovery.
-    try check(identities.count == 1 && !minimized)
+    var actualPID: pid_t = 0
+    let ownerError = AXUIElementGetPid(main,&actualPID)
+    var rawWindows: CFTypeRef?
+    let windowsError = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
+    let windows = windowsError == .success ? rawWindows as? [AXUIElement] : nil
+    let pinnedAXMember = windows?.contains { CFEqual($0,main) } ?? false
+    var rawMinimized: CFTypeRef?
+    let minimizedError = AXUIElementCopyAttributeValue(main,kAXMinimizedAttribute as CFString,&rawMinimized)
+    let minimizedValue = minimizedError == .success ? (rawMinimized as? Bool) : nil
+    let minimizedReadable = minimizedValue != nil, minimized = minimizedValue ?? false
+    let cgRows = cg(true), identities = cgRows?.filter { $0[kCGWindowNumber as String] as? UInt32 == number } ?? []
+    let stage = identityFailureStage(Int(ownerError.rawValue),ownerError == .success && actualPID == pid,
+      Int(windowsError.rawValue),windows != nil,pinnedAXMember,Int(minimizedError.rawValue),minimizedReadable,minimized,cgRows != nil,identities.count)
+    guard let stage else { return }
+    // Keep the pinned AX object and original CGWindowID; record facts without rediscovery.
+    var facts: [String:Any] = ["axPidQueryError":Int(ownerError.rawValue),"axPidMatches":ownerError == .success && actualPID == pid,
+      "applicationWindowsQueryError":Int(windowsError.rawValue),"applicationWindowsReadable":windows != nil,
+      "pinnedAXWindowMember":pinnedAXMember,"minimizedQueryError":Int(minimizedError.rawValue),
+      "minimizedReadable":minimizedReadable,"minimized":minimized,"pinnedCGWindowListReadable":cgRows != nil]
+    if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
+    throw IdentityRefusal(stage:stage,facts:facts)
   }
   func node(_ value: String, _ root: AXUIElement) throws -> AXUIElement {
     var current = root
@@ -173,6 +210,7 @@ func run() throws {
       return ActionRefusal(diagnostics:diagnostics)
     }
     do { try verify() }
+    catch let error as IdentityRefusal { if action == "press" { throw pressFailure("window-identity-"+error.stage,error.facts) }; throw error }
     catch { if action == "press" { throw pressFailure("window-identity") }; throw error }
     var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
     let target = request["target"] as? String ?? "main"
@@ -304,6 +342,7 @@ func run() throws {
         result["selected"] = true
       } else if action != "press" { try check(AXUIElementPerformAction(selected,operation as CFString) == .success) }
       do { try verify() }
+      catch let error as IdentityRefusal { if action == "press" { throw pressFailure("post-action-"+error.stage,error.facts) }; throw error }
       catch { if action == "press" { throw pressFailure("post-action-identity") }; throw error }
       if target == "sheet" {
         if try members().isEmpty { result["dismissalPendingVerification"] = true }

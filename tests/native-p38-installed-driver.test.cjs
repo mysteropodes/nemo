@@ -358,6 +358,96 @@ test('main press diagnostics distinguish route, AXPress support and perform outc
   assert.equal(result.helperCleanup,'incomplete');assert.equal(result.cleanup,'complete');
   for(const receipt of f.receipts)assert.equal(JSON.stringify(receipt).includes('/private/'),false);
 });
+test('post-press identity receipts retain bounded per-predicate facts and reject arbitrary evidence',()=>{
+  const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const facts={stage:'post-action-application-window-membership',elementPath:'2',axPidQueryError:0,axPidMatches:true,
+    applicationWindowsQueryError:-25205,applicationWindowsReadable:false,pinnedAXWindowMember:false,
+    minimizedQueryError:0,minimizedReadable:false,minimized:false,pinnedCGWindowCount:1,privatePath:'/private/identity'};
+  const clean=safeActionDiagnostics(facts);
+  assert.deepEqual(clean,{stage:facts.stage,elementPath:'2',axPidQueryError:0,axPidMatches:true,
+    applicationWindowsQueryError:-25205,applicationWindowsReadable:false,pinnedAXWindowMember:false,
+    minimizedQueryError:0,minimizedReadable:false,minimized:false,pinnedCGWindowCount:1});
+  assert.throws(()=>safeActionDiagnostics({...facts,stage:'post-action-identity/secret'}));
+  assert.throws(()=>safeActionDiagnostics({...facts,pinnedCGWindowCount:999}));
+  assert.throws(()=>safeActionDiagnostics({...facts,applicationWindowsReadable:'/private'}));
+  const unavailable=safeActionDiagnostics({stage:'post-action-pinned-cg-window-list',elementPath:'2',pinnedCGWindowListReadable:false});
+  assert.deepEqual(unavailable,{stage:'post-action-pinned-cg-window-list',elementPath:'2',pinnedCGWindowListReadable:false});
+  assert.equal(unavailable.pinnedCGWindowCount,undefined);
+});
+test('helper liveness, signal and wait exceptions produce sanitized incomplete cleanup facts',async()=>{
+  const {cleanupHelper}=require('./desktop/p38-installed-driver.cjs');
+  const cases=[
+    {stage:'group-probe-error',services:{alive(){throw Error('/private/probe');}}},
+    {stage:'group-signal-error',services:{alive:()=>true,signal(){throw Error('/private/signal');}}},
+    {stage:'group-wait-error',services:{alive:()=>true,signal:()=>{},delay(){throw Error('/private/delay');}}},
+  ];
+  for(const item of cases){
+    await assert.rejects(cleanupHelper({pid:321},item.services),error=>{
+      assert.equal(error.cleanupDiagnostics[0].stage,item.stage);
+      const {safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+      const sanitized=safeCleanupDiagnostics(error.cleanupDiagnostics);
+      assert.equal(JSON.stringify(sanitized).includes('/private/'),false);
+      assert.notEqual(sanitized.length,0);
+      return true;
+    });
+  }
+});
+test('non-capture helper cleanup records exact-handle signal and wait exceptions',async()=>{
+  const {cleanupHelper,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const child={pid:321,p38CapturePossible:false,exitCode:null,signalCode:null,kill(){throw Error('/private/exact-signal');}};
+  await assert.rejects(cleanupHelper(child),error=>{
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-signal-error',helperPid:321,capturePossible:false,
+      signalKind:'SIGTERM',signalAttempts:1,signalError:true}]);return true;
+  });
+  const waiting={pid:321,p38CapturePossible:false,exitCode:null,signalCode:null,kill:()=>{}};
+  await assert.rejects(cleanupHelper(waiting,{delay(){throw Error('/private/exact-wait');}}),error=>{
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[{stage:'exact-helper-wait-error',helperPid:321,capturePossible:false,
+      signalKind:'SIGTERM',signalAttempts:1,probePoint:'wait-term'}]);return true;
+  });
+});
+test('cleanup loop preserves detailed exception facts or supplies a bounded fallback stage',()=>{
+  const {cleanupFailureDiagnostics,safeCleanupDiagnostics,closeOwnedHelpers}=require('./desktop/p38-installed-driver.cjs');
+  const prior=[{stage:'group-absent',helperPid:123,capturePossible:true,groupAliveBefore:false,signalAttempts:0}];
+  const fallback=cleanupFailureDiagnostics(Error('/private/close'),prior,99);
+  assert.deepEqual(safeCleanupDiagnostics(fallback),[...prior,{stage:'cleanup-loop-error',helpersRemaining:8}]);
+  const reported=[{stage:'group-probe-error',helperPid:123,capturePossible:true,probePoint:'initial',signalAttempts:0,probeError:true}];
+  assert.deepEqual(cleanupFailureDiagnostics(Error('ignored'),prior,1),[...prior,{stage:'cleanup-loop-error',helpersRemaining:1}]);
+  assert.deepEqual(cleanupFailureDiagnostics(Object.assign(Error('private'),{cleanupDiagnostics:reported}),prior,1),[...prior,...reported]);
+});
+test('input-close failure still attempts helper cleanup and retains both observations',async()=>{
+  const {closeOwnedHelpers,safeCleanupDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  let cleaned=0;
+  await assert.rejects(closeOwnedHelpers(()=>{throw Error('/private/stdin');},[{pid:12},{pid:13}],async child=>{
+    cleaned++; if(child.pid===12)throw Object.assign(Error('/private/helper'),{cleanupDiagnostics:[{stage:'group-signal-error',helperPid:12,capturePossible:true,
+      groupAliveBefore:true,signalAttempts:1,signalKind:'SIGTERM',signalError:true}]});
+    return [{stage:'group-absent',helperPid:13,capturePossible:true,groupAliveBefore:false,signalAttempts:0}];
+  }),error=>{
+    assert.equal(cleaned,2);
+    assert.deepEqual(safeCleanupDiagnostics(error.cleanupDiagnostics),[
+      {stage:'group-absent',helperPid:13,capturePossible:true,groupAliveBefore:false,signalAttempts:0},
+      {stage:'input-close-error',helpersRemaining:2},
+      {stage:'group-signal-error',helperPid:12,capturePossible:true,groupAliveBefore:true,signalAttempts:1,signalKind:'SIGTERM',signalError:true},
+    ]);
+    assert.equal(JSON.stringify(error.cleanupDiagnostics).includes('/private/'),false);return true;
+  });
+});
+test('cleanup exception facts do not replace the saved first refusal',async()=>{
+  const {cleanupHelper,safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const diagnostic={stage:'post-action-pinned-cg-window',elementPath:'2',axPidQueryError:0,axPidMatches:true,
+    applicationWindowsQueryError:0,applicationWindowsReadable:true,pinnedAXWindowMember:true,
+    minimizedQueryError:0,minimizedReadable:true,minimized:false,pinnedCGWindowCount:0};
+  const f=fixture();f.services.next=async()=>({type:'press',element:'2'});
+  f.services.window=async(mode,pid)=>mode==='discover'?{pid,windowId:45,matchedAX:true}:
+    {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:diagnostic};
+  f.services.close=async()=>cleanupHelper({pid:321},{alive(){throw Error('/private/probe');}});
+  const result=await runOperator(f.cfg,f.services);
+  assert.equal(result.firstFailure.code,'adapter-refused');
+  assert.deepEqual(result.firstFailure.actionDiagnostics,safeActionDiagnostics(diagnostic));
+  assert.equal(result.helperCleanup,'incomplete');
+  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-probe-error',helperPid:321,capturePossible:true,
+    probePoint:'initial',signalAttempts:0,probeError:true}]);
+  assert.equal(result.cleanup,'complete');assert.equal(JSON.stringify(result).includes('/private/'),false);
+});
 test('modeled helper transport preserves sanitized press diagnostics in the first-failure receipt',async()=>{
   const crypto=require('node:crypto'),os=require('node:os'),path=require('node:path');
   const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs');
