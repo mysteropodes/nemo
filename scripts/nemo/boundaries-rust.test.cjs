@@ -292,6 +292,27 @@ test('adopted geometry-wasm policy holds at HEAD: no violation, exactly the thre
   assert.equal(/^\[features\]/m.test(fs.readFileSync(path.join(ROOT, 'geometry-wasm/Cargo.toml'), 'utf8')), false);
 });
 
+test('P37C1C4A CPU payload children stay private within revision and read-query layers', () => {
+  const profile = read('rust.profile.json'), policy = read('native-engine.edges.json');
+  const owner = (id) => profile.modules.find((entry) => entry.id === `rust.native.engine.${id}`);
+  for (const [id, file] of [
+    ['revision', 'image_resource_budget.rs'],
+    ['read-queries', 'reference_image_resources.rs'],
+  ]) {
+    assert.ok(owner(id).files.includes(file));
+    assert.equal(owner(id).publicApi.includes(file), false);
+  }
+  const result = R.checkRustCrate(profile, policy, { root: ROOT });
+  assert.equal(result.ok, true, JSON.stringify(result.violations));
+  assert.deepEqual(result.unsupported, []);
+  const pairs = new Set(result.edges.map((edge) => `${edge.from}->${edge.to}`));
+  for (const forbidden of [
+    'rust.native.engine.revision->rust.native.engine.codec',
+    'rust.native.engine.read-queries->rust.native.engine.history',
+    'rust.native.engine.codec->rust.native.engine.revision',
+  ]) assert.equal(pairs.has(forbidden), false, `${forbidden} must stay denied`);
+});
+
 
 test('desktop native-engine grants are module-local: host, host tests and viewport cannot borrow another module item', (t) => {
   const root = desktopFixture(t);
