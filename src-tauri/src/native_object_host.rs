@@ -1,4 +1,4 @@
-//! Typed object host with immutable current-revision reads and resource-free cleanup.
+//! Sole object history owner with immutable reads and reconciled preview work.
 use crate::native_dispatch::{NativeDispatch, NativeReleaseProgress};
 use native_engine::{
     application::ApplicationReleaseReceipt,
@@ -10,6 +10,9 @@ use native_engine::{
     object_snapshot::ObjectSnapshot,
 };
 use std::any::Any;
+
+#[path = "native_object_preview.rs"]
+mod preview;
 
 fn envelope_identity(value: &str) -> bool {
     let bytes = value.as_bytes();
@@ -24,6 +27,7 @@ fn envelope_identity(value: &str) -> bool {
 /// Exactly one admitted engine owner; no cloned authority or writable host mirror.
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
+    preview: preview::ObjectPreview,
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
@@ -37,17 +41,9 @@ impl NativeObjectHost {
         }
         Ok(Self {
             history,
+            preview: preview::ObjectPreview::default(),
             released: None,
         })
-    }
-    fn progress(application: ApplicationReleaseReceipt) -> NativeReleaseProgress {
-        NativeReleaseProgress {
-            application,
-            cancelled_preview: Vec::new(),
-            unresolved_preview: Vec::new(),
-            preview_error: None,
-            preview_stage: ReconciliationStage::Complete,
-        }
     }
 }
 impl NativeDispatch for NativeObjectHost {
@@ -67,10 +63,15 @@ impl NativeDispatch for NativeObjectHost {
         if self.released.is_some() {
             return Err("native object host was released".into());
         }
-        if let Some(response) = self
-            .history
-            .try_dispatch_object_command(&request)
-            .map_err(|_| "native object command correlation is invalid".to_string())?
+        let before = self.history.content_revision();
+        let command = self.history.try_dispatch_object_command(&request);
+        if self.history.content_revision() != before {
+            // The command already committed. Cleanup failure is retained by the
+            // preview owner; it must not falsify this command's revision/result.
+            self.preview.invalidate();
+        }
+        if let Some(response) =
+            command.map_err(|_| "native object command correlation is invalid".to_string())?
         {
             return Ok(response);
         }
@@ -96,8 +97,8 @@ impl NativeDispatch for NativeObjectHost {
             Some(retained) => retained.clone(),
             None => {
                 let (undo_depth, redo_depth) = self.history.history_depths();
-                // This owner never creates transactions, jobs, preview/viewport work,
-                // GPU resources or filesystem artifacts; these empty stages are complete.
+                // No transaction/export/artifact work exists here. Preview work
+                // is reconciled separately below, without claiming surface disposal.
                 ApplicationReleaseReceipt {
                     instance_id: self.instance_id().into(),
                     document_id: self.document_id().into(),
@@ -116,10 +117,13 @@ impl NativeDispatch for NativeObjectHost {
             }
         };
         self.released = Some(application.clone());
-        Ok(Self::progress(application))
+        self.preview.release();
+        Ok(self.preview.progress(application))
     }
     fn release_progress(&self) -> Option<NativeReleaseProgress> {
-        self.released.clone().map(Self::progress)
+        self.released
+            .clone()
+            .map(|application| self.preview.progress(application))
     }
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
