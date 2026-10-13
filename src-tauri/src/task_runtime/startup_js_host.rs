@@ -10,6 +10,9 @@ use tauri::{
     Manager, Runtime, State, WebviewWindow, WindowEvent,
 };
 
+#[path = "startup_retention.rs"]
+mod retention;
+
 struct Bridge {
     native: Arc<Mutex<LoadLog>>,
     stream: JsStream,
@@ -67,6 +70,8 @@ impl Bridge {
 struct Slot {
     bound: bool,
     bridge: Option<Bridge>,
+    version: u64,
+    retention_failed: bool,
 }
 impl Slot {
     fn bind(&mut self, observer: Observer) -> Result<(), &'static str> {
@@ -84,6 +89,9 @@ impl Slot {
         pid: u32,
         body: &InvokeBody,
     ) -> Result<bool, &'static str> {
+        if self.retention_failed {
+            return Err("startup retention failed");
+        }
         self.bridge
             .as_mut()
             .ok_or("startup disabled")?
@@ -94,10 +102,24 @@ impl Slot {
             bridge.stream.fence(Fence::Closed);
         }
     }
+    fn snapshot(&mut self) -> Result<Option<(u64, Value)>, &'static str> {
+        let Some(bridge) = self.bridge.as_ref() else {
+            return Ok(None);
+        };
+        if self.retention_failed {
+            return Err("startup retention failed");
+        }
+        let Some(next) = self.version.checked_add(1) else {
+            self.retention_failed = true;
+            return Err("startup retention version exhausted");
+        };
+        self.version = next;
+        Ok(Some((self.version, bridge.projection())))
+    }
 }
 
 #[derive(Default)]
-pub(crate) struct StartupTransport(Arc<Mutex<Slot>>);
+pub(crate) struct StartupTransport(Arc<Mutex<Slot>>, Arc<Mutex<Option<Arc<retention::Store>>>>);
 
 pub(in crate::task_runtime) fn initialize<R: Runtime>(
     app: &tauri::App<R>,
@@ -110,22 +132,50 @@ pub(in crate::task_runtime) fn initialize<R: Runtime>(
 pub(in crate::task_runtime) fn bind<R: Runtime>(
     handle: &tauri::AppHandle<R>,
     observer: Observer,
+    runtime: &super::super::TaskRuntime,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = handle.state::<StartupTransport>();
-    let mut slot = state.0.lock().map_err(|_| "startup bridge unavailable")?;
-    slot.bind(observer)?;
+    let initial = {
+        let mut slot = state.0.lock().map_err(|_| "startup bridge unavailable")?;
+        slot.bind(observer)?;
+        slot.snapshot()?
+    };
+    if let Some((version, snapshot)) = initial {
+        // Owned root validation, open, encode and IO AFTER producer guards.
+        let owned = runtime
+            .data_dir
+            .parent()
+            .ok_or("startup retention root refused")?
+            .join("reports");
+        let actual = std::path::PathBuf::from(std::env::var("NEMO_REPORT_DIR")?);
+        let store = Arc::new(retention::Store::open(&actual, &owned, &snapshot)?);
+        store.publish(version, &snapshot)?;
+        *state
+            .1
+            .lock()
+            .map_err(|_| "startup retention unavailable")? = Some(store);
+    }
     Ok(())
 }
 pub(super) fn watch_destroyed<R: Runtime>(window: &WebviewWindow<R>) {
     if window.label() != "main" {
         return;
     }
-    let slot = window.app_handle().state::<StartupTransport>().0.clone();
+    let state = window.app_handle().state::<StartupTransport>();
+    let slot = state.0.clone();
+    let store = state.1.clone();
     // Capture only metadata Arc; never Window/AppHandle back into its manager.
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
             if let Ok(mut slot) = slot.lock() {
                 slot.close();
+                let snapshot = slot.snapshot();
+                drop(slot);
+                if let (Ok(Some((version, snapshot))), Ok(store)) = (snapshot, store.lock()) {
+                    if let Some(store) = store.as_ref() {
+                        let _ = store.publish(version, &snapshot);
+                    }
+                }
             }
         }
     });
@@ -151,16 +201,46 @@ pub(crate) fn nemo_test_startup_record<R: Runtime>(
     // These are native-injected sender reads, before ANY metadata lock. url()
     // may marshal to the GUI: never invoke it under bridge/native guards.
     let label = window.label().to_owned();
-    let url = window
-        .url()
-        .map_err(|_| "startup sender unavailable".to_owned())?;
+    let url = window.url().map_err(|_| ());
     let pid = std::process::id();
-    state
-        .0
+    transact(
+        &state,
+        &label,
+        url.as_ref().map_err(|_| ()),
+        pid,
+        request.body(),
+    )
+    .map_err(str::to_owned)
+}
+
+fn transact(
+    state: &StartupTransport,
+    label: &str,
+    url: Result<&tauri::Url, ()>,
+    pid: u32,
+    body: &InvokeBody,
+) -> Result<bool, &'static str> {
+    let store = state
+        .1
         .lock()
-        .map_err(|_| "startup bridge unavailable".to_owned())?
-        .admit(&label, &url, pid, request.body())
-        .map_err(str::to_owned)
+        .map_err(|_| "startup retention unavailable")?
+        .clone()
+        .ok_or("startup retention disabled")?;
+    let (result, snapshot) = {
+        let mut slot = state.0.lock().map_err(|_| "startup bridge unavailable")?;
+        let result = match url {
+            Ok(url) => slot.admit(label, url, pid, body),
+            Err(_) => {
+                if let Some(bridge) = slot.bridge.as_mut() {
+                    bridge.adapter_refused = true;
+                }
+                Err("startup sender unavailable")
+            }
+        };
+        (result, slot.snapshot()?.ok_or("startup disabled")?)
+    };
+    store.publish(snapshot.0, &snapshot.1)?; // No bridge/native guard retained.
+    result
 }
 
 #[cfg(test)]
