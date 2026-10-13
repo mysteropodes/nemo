@@ -589,6 +589,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "flate2",
+ "miniz_oxide 0.9.1",
  "png",
  "pollster",
  "raw-window-handle",

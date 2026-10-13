@@ -1,32 +1,58 @@
-//! Strict filtered-stream length only. The existing PNG reader owns CRC/pixels.
-//! Caller scratch is fixed; inflater/backend workspace is not a quota claim.
+//! Strict filtered-stream length. The existing PNG reader owns CRC/pixels.
 use crate::reference_image_asset::ImageAssetError;
-use flate2::{Decompress, FlushDecompress, Status};
+use miniz_oxide::{
+    inflate::stream::{inflate, InflateState},
+    DataFormat, MZError, MZFlush, MZStatus,
+};
 
 const SCRATCH: usize = 8192;
-struct Scanlines {
-    inflater: Decompress,
+/// Locked miniz 0.9.1 state, dictionary and Huffman tables are inline arrays.
+/// new/inflate/core use no boxed convenience API or dynamic buffer, including
+/// when with-alloc is unified ON. This type owns no nested heap allocation.
+pub(crate) struct PngWorkspace {
+    inflater: InflateState,
+    scratch: [u8; SCRATCH],
+}
+impl PngWorkspace {
+    pub(crate) fn new() -> Self {
+        Self {
+            inflater: InflateState::new(DataFormat::Zlib),
+            scratch: [0; SCRATCH],
+        }
+    }
+}
+impl AsMut<PngWorkspace> for PngWorkspace {
+    fn as_mut(&mut self) -> &mut PngWorkspace {
+        self
+    }
+}
+struct Scanlines<W = Box<PngWorkspace>> {
+    workspace: W,
     expected: usize,
+    emitted: usize,
     done: bool,
 }
-impl Scanlines {
+fn expected(row_bytes: usize, height: usize) -> Result<usize, ImageAssetError> {
+    row_bytes
+        .checked_add(1)
+        .and_then(|row| row.checked_mul(height))
+        .filter(|_| row_bytes > 0 && height > 0)
+        .ok_or(ImageAssetError::DecodedBudget)
+}
+#[cfg(test)]
+impl Scanlines<Box<PngWorkspace>> {
     fn new(row_bytes: usize, height: usize) -> Result<Self, ImageAssetError> {
-        let expected = row_bytes
-            .checked_add(1)
-            .and_then(|row| row.checked_mul(height))
-            .filter(|_| row_bytes > 0 && height > 0)
-            .ok_or(ImageAssetError::DecodedBudget)?;
+        let expected = expected(row_bytes, height)?;
         Ok(Self {
-            inflater: Decompress::new(true),
+            workspace: Box::new(PngWorkspace::new()),
             expected,
+            emitted: 0,
             done: false,
         })
     }
-    fn feed(
-        &mut self,
-        mut input: &[u8],
-        scratch: &mut [u8; SCRATCH],
-    ) -> Result<(), ImageAssetError> {
+}
+impl<W: AsMut<PngWorkspace>> Scanlines<W> {
+    fn feed(&mut self, mut input: &[u8]) -> Result<(), ImageAssetError> {
         if self.done {
             return if input.is_empty() {
                 Ok(())
@@ -35,63 +61,58 @@ impl Scanlines {
             };
         }
         loop {
-            let before_in = self.inflater.total_in();
-            let before_out = self.inflater.total_out();
-            let emitted = usize::try_from(before_out).map_err(|_| ImageAssetError::Malformed)?;
             let remaining = self
                 .expected
-                .checked_sub(emitted)
+                .checked_sub(self.emitted)
                 .ok_or(ImageAssetError::Malformed)?;
-            // One sentinel byte detects surplus even exactly at the declared boundary.
+            // One sentinel catches surplus even exactly at the declared boundary.
             let capacity = if remaining >= SCRATCH {
                 SCRATCH
             } else {
                 remaining + 1
             };
-            let status = self
-                .inflater
-                .decompress(input, &mut scratch[..capacity], FlushDecompress::None)
-                .map_err(|_| ImageAssetError::Malformed)?;
-            let consumed = usize::try_from(
-                self.inflater
-                    .total_in()
-                    .checked_sub(before_in)
-                    .ok_or(ImageAssetError::Malformed)?,
-            )
-            .map_err(|_| ImageAssetError::Malformed)?;
-            let produced = usize::try_from(
-                self.inflater
-                    .total_out()
-                    .checked_sub(before_out)
-                    .ok_or(ImageAssetError::Malformed)?,
-            )
-            .map_err(|_| ImageAssetError::Malformed)?;
-            input = input.get(consumed..).ok_or(ImageAssetError::Malformed)?;
-            if produced > capacity || self.inflater.total_out() > self.expected as u64 {
+            let work = self.workspace.as_mut();
+            let result = inflate(
+                &mut work.inflater,
+                input,
+                &mut work.scratch[..capacity],
+                MZFlush::None,
+            );
+            input = input
+                .get(result.bytes_consumed..)
+                .ok_or(ImageAssetError::Malformed)?;
+            self.emitted = self
+                .emitted
+                .checked_add(result.bytes_written)
+                .ok_or(ImageAssetError::Malformed)?;
+            if result.bytes_written > capacity || self.emitted > self.expected {
                 return Err(ImageAssetError::Malformed);
             }
-            if status == Status::StreamEnd {
-                if !input.is_empty() || self.inflater.total_out() != self.expected as u64 {
-                    return Err(ImageAssetError::Malformed);
+            match result.status {
+                Ok(MZStatus::StreamEnd) => {
+                    if !input.is_empty() || self.emitted != self.expected {
+                        return Err(ImageAssetError::Malformed);
+                    }
+                    self.done = true;
+                    return Ok(());
                 }
-                self.done = true;
-                return Ok(());
+                Ok(MZStatus::Ok) | Err(MZError::Buf) => (),
+                _ => return Err(ImageAssetError::Malformed),
             }
-            if consumed == 0 && produced == 0 {
-                // Empty input may await the next IDAT. Nonempty stalled input refuses.
+            if result.bytes_consumed == 0 && result.bytes_written == 0 {
                 return if input.is_empty() {
                     Ok(())
                 } else {
                     Err(ImageAssetError::Malformed)
                 };
             }
-            if input.is_empty() && produced < capacity {
+            if input.is_empty() && result.bytes_written < capacity {
                 return Ok(());
             }
         }
     }
-    fn finish(mut self, scratch: &mut [u8; SCRATCH]) -> Result<(), ImageAssetError> {
-        self.feed(&[], scratch)?;
+    fn finish(mut self) -> Result<(), ImageAssetError> {
+        self.feed(&[])?;
         if self.done {
             Ok(())
         } else {
@@ -100,18 +121,34 @@ impl Scanlines {
     }
 }
 
-/// Rewalk borrowed chunks without concatenating IDAT or retaining inflated data.
-/// The parent already admitted dimensions, subtype, encoded size and container.
+#[cfg(test)]
 pub(super) fn verify(
     source: &[u8],
     row_bytes: usize,
     height: usize,
 ) -> Result<(), ImageAssetError> {
+    verify_with(source, row_bytes, height, || {
+        Ok(Box::new(PngWorkspace::new()))
+    })
+}
+/// Own the supplied workspace through verification, then destroy it before pixels.
+/// Rewalk borrowed chunks without concatenating IDAT or retaining inflated data.
+pub(super) fn verify_with<E: From<ImageAssetError>, W: AsMut<PngWorkspace>>(
+    source: &[u8],
+    row_bytes: usize,
+    height: usize,
+    allocate: impl FnOnce() -> Result<W, E>,
+) -> Result<(), E> {
     if !source.starts_with(b"\x89PNG\r\n\x1a\n") {
-        return Err(ImageAssetError::Malformed);
+        return Err(ImageAssetError::Malformed.into());
     }
-    let mut stream = Scanlines::new(row_bytes, height)?;
-    let mut scratch = [0; SCRATCH];
+    let expected = expected(row_bytes, height)?;
+    let mut stream = Scanlines {
+        workspace: allocate()?,
+        expected,
+        emitted: 0,
+        done: false,
+    };
     let mut offset = 8usize;
     let mut idat_phase = 0;
     loop {
@@ -125,24 +162,24 @@ pub(super) fn verify(
             .ok_or(ImageAssetError::Malformed)?;
         let chunk_end = data_end.checked_add(4).ok_or(ImageAssetError::Malformed)?;
         if chunk_end > source.len() {
-            return Err(ImageAssetError::Malformed);
+            return Err(ImageAssetError::Malformed.into());
         }
         let kind = &header[4..];
         if kind == b"IDAT" {
             if idat_phase == 2 {
-                return Err(ImageAssetError::Malformed);
+                return Err(ImageAssetError::Malformed.into());
             }
             idat_phase = 1;
-            stream.feed(&source[header_end..data_end], &mut scratch)?;
+            stream.feed(&source[header_end..data_end])?;
         } else {
             if idat_phase == 1 {
                 idat_phase = 2;
             }
             if kind == b"IEND" {
                 if length != 0 || chunk_end != source.len() || idat_phase == 0 {
-                    return Err(ImageAssetError::Malformed);
+                    return Err(ImageAssetError::Malformed.into());
                 }
-                return stream.finish(&mut scratch);
+                return stream.finish().map_err(Into::into);
             }
         }
         offset = chunk_end;
@@ -152,3 +189,84 @@ pub(super) fn verify(
 #[cfg(test)]
 #[path = "../tests/reference_png_scanlines.rs"]
 mod tests;
+
+// Thread-local test instrumentation; production allocation behavior is unchanged.
+#[cfg(test)]
+pub(crate) mod allocations {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
+    // Callback runs after the pixel Vec field dies, before its carrier's charge.
+    pub(crate) struct PixelReleaseProbe(pub(crate) Option<Box<dyn FnOnce() + Send + Sync>>);
+    impl std::fmt::Debug for PixelReleaseProbe {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("release probe")
+        }
+    }
+    impl Drop for PixelReleaseProbe {
+        fn drop(&mut self) {
+            if let Some(probe) = self.0.take() {
+                probe();
+            }
+        }
+    }
+    #[derive(Clone, Copy)]
+    struct Counts {
+        on: bool,
+        layout: Option<Layout>,
+        calls: [usize; 3],
+    }
+    thread_local! {
+        static COUNTS: Cell<Counts> = const { Cell::new(Counts { on: false, layout: None, calls: [0; 3] }) };
+    }
+    fn note(layout: Layout, operation: usize) {
+        let _ = COUNTS.try_with(|cell| {
+            let mut counts = cell.get();
+            if counts.on && counts.layout.is_none_or(|l| l == layout) {
+                counts.calls[operation] = counts.calls[operation].saturating_add(1);
+                cell.set(counts);
+            }
+        });
+    }
+    struct Observed;
+    // SAFETY: forwards every allocation/deallocation unchanged to System; the
+    // Cell observer performs no allocation, pointer dereference or ownership change.
+    unsafe impl GlobalAlloc for Observed {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            note(layout, 0);
+            unsafe { System.alloc(layout) }
+        }
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            note(layout, 0);
+            unsafe { System.alloc_zeroed(layout) }
+        }
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            note(layout, 1);
+            unsafe { System.dealloc(pointer, layout) }
+        }
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            note(layout, 2);
+            unsafe { System.realloc(pointer, layout, size) }
+        }
+    }
+    #[global_allocator]
+    static ALLOCATOR: Observed = Observed;
+    pub(crate) fn measure<R>(layout: Option<Layout>, run: impl FnOnce() -> R) -> (R, [usize; 3]) {
+        struct Reset(Counts);
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                COUNTS.with(|c| c.set(self.0));
+            }
+        }
+        let prior = COUNTS.with(|c| {
+            c.replace(Counts {
+                on: true,
+                layout,
+                calls: [0; 3],
+            })
+        });
+        assert!(!prior.on, "allocation measurements must not nest");
+        let _reset = Reset(prior);
+        let value = run();
+        (value, COUNTS.with(|c| c.get().calls))
+    }
+}

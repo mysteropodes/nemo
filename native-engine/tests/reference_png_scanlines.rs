@@ -4,6 +4,38 @@ use crate::reference_image_asset::{
 };
 use std::cell::Cell;
 
+#[test]
+fn inline_workspace_init_and_actual_stream_path_make_no_heap_allocation() {
+    use crate::reference_image_asset::reference_png_scanlines::verify_with;
+    use crate::reference_image_asset::{measure_allocations, PngWorkspace};
+    // Independent Python zlib fixture: filter0 + "abcdefgh" repeated4096,
+    // raw32769 bytes, dynamic Huffman block, crossing the full32768-byte window.
+    let dynamic = bytes("789cedc531010020080030aa0a28f64f6010b767b1b27a9fb9b66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66ddbb66dfffc037c5e42ef");
+    assert_eq!((dynamic[2] >> 1) & 3, 2);
+    let fixtures = [
+        (bytes(RGBA), 12),
+        (
+            png(8192, 1, &[chunk(b"IDAT", &stored(&vec![0; 32769]))]),
+            32768,
+        ),
+        (png(8192, 1, &[chunk(b"IDAT", &dynamic)]), 32768),
+    ];
+    for (index, (source, row_bytes)) in fixtures.into_iter().enumerate() {
+        let (result, calls) = measure_allocations(None, || {
+            let mut workspace = PngWorkspace::new();
+            verify_with::<ImageAssetError, _>(&source, row_bytes, 1, || Ok(&mut workspace))
+        });
+        assert_eq!(result, Ok(()), "workspace fixture {index}");
+        assert_eq!(calls, [0, 0, 0], "init/feed has no alloc/dealloc/realloc");
+    }
+    assert!(std::mem::size_of::<PngWorkspace>() >= SCRATCH + 32768);
+    eprintln!(
+        "strict workspace: {} bytes, alignment {}",
+        std::mem::size_of::<PngWorkspace>(),
+        std::mem::align_of::<PngWorkspace>()
+    );
+}
+
 // Original frozen corpus; pixel expectations are independent manual values.
 const RGBA: &str = "89504e470d0a1a0a0000000d49484452000000030000000108060000001be014b40000001549444154789c63105432feef129ad650de319301001b41047d056017fe0000000049454e44ae426082";
 const RGB: &str = "89504e470d0a1a0a0000000d4948445200000002000000020802000000fdd49a730000001649444154789c63e051b2389162c4c0cec1c9c5cd0300124401fe0da78d180000000049454e44ae426082";
@@ -207,11 +239,10 @@ fn fixed_scratch_boundaries_and_final_sentinel_do_not_discard_extra_output() {
             Err(ImageAssetError::Malformed)
         );
         let mut guard = Scanlines::new(length - 1, 1).unwrap();
-        let mut scratch = [0; SCRATCH];
         for byte in &encoded {
-            guard.feed(&[*byte], &mut scratch).unwrap();
+            guard.feed(&[*byte]).unwrap();
         }
-        assert_eq!(guard.finish(&mut scratch), Ok(()));
+        assert_eq!(guard.finish(), Ok(()));
     }
 }
 
@@ -228,9 +259,8 @@ fn stalled_final_drain_checked_length_and_chunk_bounds_fail_closed() {
     assert!(Scanlines::new(0, 1).is_err());
     assert!(Scanlines::new(4, 0).is_err());
     let mut guard = Scanlines::new(4, 1).unwrap();
-    let mut scratch = [0; SCRATCH];
-    assert_eq!(guard.feed(&[0x78, 0x01], &mut scratch), Ok(()));
-    assert_eq!(guard.finish(&mut scratch), Err(ImageAssetError::Malformed));
+    assert_eq!(guard.feed(&[0x78, 0x01]), Ok(()));
+    assert_eq!(guard.finish(), Err(ImageAssetError::Malformed));
     let source = png(1, 1, &[chunk(b"IDAT", &stored(&[0, 17, 34, 51, 255]))]);
     for length in 0..source.len() {
         assert!(verify(&source[..length], 4, 1).is_err());

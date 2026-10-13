@@ -254,8 +254,9 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.deepEqual(Object.keys(members), cargo.features);
   assert.deepEqual(members.default, []);
   assert.deepEqual(members.codec, ['dep:serde', 'dep:serde_json']);
-  assert.deepEqual(members.reference_image_asset, ['dep:png', 'dep:flate2']);
+  assert.deepEqual(members.reference_image_asset, ['dep:png', 'dep:flate2', 'dep:miniz_oxide']);
   assert.match(cargoText, /^flate2 = \{ version = "=1\.1\.10", default-features = false, features = \["rust_backend"\], optional = true \}$/m);
+  assert.match(cargoText, /^miniz_oxide = \{ version = "=0\.9\.1", default-features = false, optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
   const reaches = (feature, target, graph = members, seen = new Set()) => {
@@ -340,6 +341,7 @@ test('P37C1C4 retained-reference CPU and PNG children have exact private source 
   ];
   assert.match(coverage.provenance.nativeReferenceCpuPayloadBudgetRegistration, /P37C1C4A\/#1843/);
   assert.match(coverage.provenance.nativeReferencePngScanlineStrictnessRegistration, /P37C1C4B\/#1848/);
+  assert.match(coverage.provenance.nativeReferenceInflateWorkspaceRegistration, /P37C1C4C\/#1851/);
   for (const [id, file] of children) {
     const owner = profile.modules.find((entry) => entry.id === id);
     assert.ok(owner?.files.includes(path.basename(file)), `${id} must own ${file}`);

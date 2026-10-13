@@ -22,7 +22,7 @@ fn bytes(hex: &str) -> Vec<u8> {
         .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
         .collect()
 }
-fn limits() -> ImageAssetLimits {
+pub(super) fn limits() -> ImageAssetLimits {
     ImageAssetLimits::new(1024, 64, 4096, 4, 4).unwrap()
 }
 fn snapshot(hex: &str) -> ObjectSnapshot {
@@ -37,6 +37,12 @@ fn snapshot(hex: &str) -> ObjectSnapshot {
 }
 fn decode(snapshot: &ObjectSnapshot, budget: &ImageResourceBudget) -> ReferencePixels {
     decode_with_budget(snapshot, limits(), budget, |c| c.allocate()).unwrap()
+}
+pub(super) fn workspace_fixture() -> ObjectSnapshot {
+    snapshot(RGBA)
+}
+pub(super) fn workspace_png() -> Vec<u8> {
+    bytes(RGBA)
 }
 
 #[test]
@@ -226,7 +232,7 @@ fn allocator_failure_wrong_buffer_and_unwind_never_escape_a_charge() {
     }
 }
 
-fn crc(input: &[u8]) -> [u8; 4] {
+pub(super) fn crc(input: &[u8]) -> [u8; 4] {
     let mut value = !0u32;
     for &byte in input {
         value ^= u32::from(byte);
@@ -298,7 +304,15 @@ fn typed_bare_drawing_and_limits_refusal_plus_shared_production_entry() {
         ReferenceResourceError::Decode(ImageAssetError::DecodedBudget)
     );
     assert_eq!(budget.used(), Ok(0));
-    let pixels = decode_snapshot_reference(&snapshot, limits()).unwrap();
+    let (pixels, calls) = crate::reference_image_asset::measure_allocations(
+        Some(std::alloc::Layout::new::<crate::object_codec::PngWorkspace>()),
+        || decode_snapshot_reference(&snapshot, limits()).unwrap(),
+    );
+    assert_eq!(
+        calls,
+        [1, 1, 0],
+        "production owns and frees exactly one workspace"
+    );
     assert_eq!(
         pixels.rgba8(),
         [17, 34, 51, 255, 68, 85, 102, 128, 119, 136, 153, 0]
