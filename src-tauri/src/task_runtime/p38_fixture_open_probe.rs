@@ -18,7 +18,9 @@ const BUILD_SHA: &str = match option_env!("NEMO_P38_FIXTURE_OPEN_BUILD_SHA") {
     Some(value) => value,
     None => "",
 };
-const BUILD_CLEAN: bool = matches!(option_env!("NEMO_P38_FIXTURE_OPEN_BUILD_CLEAN"), Some("1"));
+fn build_clean() -> bool {
+    option_env!("NEMO_P38_FIXTURE_OPEN_BUILD_CLEAN") == Some("1")
+}
 const FIXTURE_A: &[u8] = include_bytes!("../../../tests/fixtures/p38/open/A.json");
 const FIXTURE_B: &[u8] = include_bytes!("../../../tests/fixtures/p38/open/B.json");
 const HASH_A: &str = "f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180";
@@ -230,7 +232,7 @@ pub(crate) fn initialize<R: Runtime>(
             .and_then(|r| r.owner_token.as_ref())
             .is_some_and(|v| !v.is_empty()),
         single_main,
-        BUILD_CLEAN,
+        build_clean(),
         BUILD_SHA,
         &expected,
     )?;
