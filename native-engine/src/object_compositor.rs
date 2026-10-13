@@ -1,4 +1,5 @@
 //! D2 headless object pixels on the existing compositor; never presentation.
+use crate::compositor::object_target::ObjectTarget;
 use crate::compositor::{align_to, Compositor, CompositorError};
 use crate::object_render_scene::{
     LiveObjectComposition, ObjectCompositionWitness, ObjectPaintCommand, ScheduledObjectComposition,
@@ -125,8 +126,8 @@ impl Compositor {
             adapter: &self.adapter,
             device: &self.device,
             queue: &self.queue,
-            texture: &result.pixels.texture,
-            texture_view: &result.pixels.view,
+            texture: result.pixels.target.texture(),
+            texture_view: result.pixels.target.view(),
             dimensions: result.prepared.dimensions(),
             identity: result.identity(),
             _live: live,
@@ -202,8 +203,9 @@ impl Compositor {
             self.scene.draw_image(&brush, transform);
         }
         self.emit_object_commands(plan.commands())?;
-        let (texture, view) = self.make_target(output.width, output.height);
-        self.render_target(&view, output.width, output.height, Color::WHITE)?;
+        let mut target = self.make_object_target(output.width, output.height)?;
+        target
+            .render(|view| self.render_target(view, output.width, output.height, Color::WHITE))?;
         #[cfg(all(feature = "application", feature = "project_media_codec"))]
         {
             self.last_reference_image = reference_image;
@@ -211,8 +213,7 @@ impl Compositor {
         Ok(ObjectCompositionResult {
             instance: self.instance.clone(),
             device: self.device.clone(),
-            texture,
-            view,
+            target,
             output,
             prepared: prepared.clone(),
         })
@@ -246,7 +247,7 @@ impl Compositor {
         )?;
         Ok(ObjectRgba8Readback {
             bytes: self.readback_texture(
-                &result.texture,
+                result.target.texture(),
                 result.output.width,
                 result.output.height,
             )?,
@@ -322,8 +323,7 @@ impl ScheduledObjectRgba8Readback {
 pub(crate) struct ObjectCompositionResult {
     instance: wgpu::Instance,
     device: wgpu::Device,
-    texture: wgpu::Texture,
-    view: wgpu::TextureView,
+    target: ObjectTarget,
     output: ObjectOutputSpec,
     prepared: ObjectCompositionWitness,
 }
@@ -332,7 +332,7 @@ impl ObjectCompositionResult {
         &self.prepared
     }
     pub(crate) fn texture_view(&self) -> &wgpu::TextureView {
-        &self.view
+        self.target.view()
     }
 }
 

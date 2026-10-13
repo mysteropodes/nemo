@@ -5,6 +5,8 @@
 
 #[path = "object_compositor.rs"]
 mod object_compositor;
+#[path = "compositor_object_target.rs"]
+mod object_target;
 #[path = "compositor_readback.rs"]
 mod readback;
 #[cfg(all(test, feature = "history"))]
