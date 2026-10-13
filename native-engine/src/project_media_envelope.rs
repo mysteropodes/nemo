@@ -158,6 +158,14 @@ impl ProjectEnvelope {
     pub(crate) fn drawing(&self) -> &ObjectDocument {
         &self.drawing
     }
+    /// Replacement drawing has already passed the existing command admission.
+    pub(crate) fn with_drawing(&self, drawing: ObjectDocument) -> Self {
+        Self {
+            project: self.project,
+            drawing: Arc::new(drawing),
+            reference: self.reference.clone(),
+        }
+    }
     /// Returns a new immutable value sharing the ORIGINAL drawing authority.
     /// It does not publish a revision, mutate history or activate media.
     pub(crate) fn with_reference(&self, reference: ProjectReferenceState) -> Self {
