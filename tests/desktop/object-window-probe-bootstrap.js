@@ -19,7 +19,7 @@
         scopes: [{ frameScope: { kind: 'authored', frame: 0 }, elements: [{ layerUid: 'L0', strokeId: 'a', naturalPosition: 0, order: {} }] }] }],
       migration: 'explicit-plan-required', referencePolicy: 'unresolved' }
   };
-  let invoke, instanceId, pins, closed = false, ordinal = 0;
+  let invoke, instanceId, pins, cleanupIdentity, releaseRequest, closed = false, ordinal = 0;
   const check = value => { if (!value) throw new Error('fixed scenario refused'); };
   async function checkpoint(phase, status, frame) {
     const payload = { runId: config.runId, phase, status };
@@ -28,8 +28,11 @@
     await invoke('nemo_test_object_window_probe', { payloadJson: JSON.stringify(payload) });
   }
   async function current() {
-    pins = await invoke('nemo_native_object_client_status');
-    check(pins.available === true && pins.instanceId === instanceId && Number.isSafeInteger(pins.contentRevision) && Number.isSafeInteger(pins.lifecycleGeneration));
+    const status = await invoke('nemo_native_object_client_status');
+    check(status.available === true && status.instanceId === instanceId && status.documentId === cleanupIdentity.documentId &&
+      Number.isSafeInteger(status.contentRevision) && status.contentRevision >= cleanupIdentity.contentRevision && Number.isSafeInteger(status.lifecycleGeneration));
+    cleanupIdentity.contentRevision = status.contentRevision;
+    pins = status;
     const read = await dispatch('query.document.object', { atRevision: pins.contentRevision, stableTarget: target }, false);
     check(typeof read.result.documentSnapshotId === 'string');
     pins.documentSnapshotId = read.result.documentSnapshotId;
@@ -39,7 +42,11 @@
       instanceId, documentId: pins.documentId, operation, payload };
     if (mutation) request.expectedRevision = pins.contentRevision;
     const result = await invoke('nemo_native_object_dispatch', { requestJson: JSON.stringify(request) });
-    check(result.ok === true && result.instanceId === instanceId && result.documentId === pins.documentId);
+    check(result.ok === true && result.instanceId === instanceId && result.documentId === cleanupIdentity.documentId);
+    if (mutation) {
+      check(Number.isSafeInteger(result.contentRevision) && result.contentRevision >= cleanupIdentity.contentRevision);
+      cleanupIdentity.contentRevision = result.contentRevision;
+    }
     return result;
   }
   async function present() {
@@ -60,11 +67,18 @@
     throw new Error('presentation unavailable');
   }
   async function release() {
-    if (!pins || closed) return;
-    const status = await invoke('nemo_native_object_client_status');
-    check(status.available === true && status.instanceId === instanceId && status.documentId === pins.documentId);
-    const receipt = await invoke('nemo_native_release', { request: { apiVersion: 2,
-      requestId: 'object-probe-release-' + config.runId, instanceId, documentId: status.documentId, expectedRevision: status.contentRevision } });
+    if (!cleanupIdentity || closed) return;
+    if (!releaseRequest) {
+      let revision = cleanupIdentity.contentRevision;
+      try {
+        const status = await invoke('nemo_native_object_client_status');
+        if (status.available === true && status.instanceId === cleanupIdentity.instanceId && status.documentId === cleanupIdentity.documentId &&
+            Number.isSafeInteger(status.contentRevision) && status.contentRevision >= revision) revision = status.contentRevision;
+      } catch (_) { /* The original commit receipt remains the cleanup authority. */ }
+      releaseRequest = { apiVersion: 2, requestId: 'object-probe-release-' + config.runId,
+        instanceId: cleanupIdentity.instanceId, documentId: cleanupIdentity.documentId, expectedRevision: revision };
+    }
+    const receipt = await invoke('nemo_native_release', { request: releaseRequest });
     check(receipt.status === 'succeeded' && receipt.reentryAvailable === true);
     closed = true;
   }
@@ -78,8 +92,11 @@
       await checkpoint('ready', 'ready');
       const identity = await invoke('nemo_mcp_identity'); instanceId = identity.instanceId;
       check(typeof instanceId === 'string');
-      await invoke('nemo_native_object_bootstrap', { requestJson: JSON.stringify({ apiVersion: 2,
+      const bootstrap = await invoke('nemo_native_object_bootstrap', { requestJson: JSON.stringify({ apiVersion: 2,
         requestId: 'object-probe-bootstrap-' + config.runId, instanceId, documentJson: JSON.stringify(document) }) });
+      check(bootstrap.instanceId === instanceId && typeof bootstrap.documentId === 'string' && bootstrap.documentId.length > 0 &&
+        Number.isSafeInteger(bootstrap.contentRevision) && bootstrap.contentRevision >= 0);
+      cleanupIdentity = { instanceId, documentId: bootstrap.documentId, contentRevision: bootstrap.contentRevision };
       await current(); check(pins.contentRevision === 0); await checkpoint('blue', 'presented', await present());
       await dispatch('command.document.object.fill.set', { command: 'object.fill.set', stableTarget: target,
         fill: { kind: 'solid', r: 1, g: 0, b: 0, a: 1 } }, true);

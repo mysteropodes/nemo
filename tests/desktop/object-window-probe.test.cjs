@@ -7,19 +7,20 @@ const path = require('node:path');
 const script = fs.readFileSync(path.join(__dirname, 'object-window-probe-bootstrap.js'), 'utf8');
 const config = { runId: '11111111-1111-4111-8111-111111111111', pid: 42, taskKey: 'a'.repeat(64), sourceSha: 'b'.repeat(40) };
 async function scenario(options = {}) {
-  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume;
+  const calls = [], phases = []; let revision = 0, previews = 0, release = false, resume, statusCalls = 0;
   const invoke = async (name, args) => {
     calls.push({ name, args });
     if (name === 'nemo_task_runtime') return { pid: options.foreign ? 43 : 42, taskKey: config.taskKey, windows: ['main'] };
     if (name === 'nemo_test_object_window_probe') { const payload = JSON.parse(args.payloadJson); phases.push(payload); if (payload.phase === options.blockAt) await new Promise(resolve => { resume = resolve; }); return; }
     if (name === 'nemo_mcp_identity') return { instanceId: 'owned-instance' };
-    if (name === 'nemo_native_object_bootstrap') { const request = JSON.parse(args.requestJson); assert.equal(request.instanceId, 'owned-instance'); return {}; }
-    if (name === 'nemo_native_object_client_status') return { available: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, lifecycleGeneration: 7 };
+    if (name === 'nemo_native_object_bootstrap') { const request = JSON.parse(args.requestJson); assert.equal(request.instanceId, 'owned-instance'); return { instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: 0 }; }
+    if (name === 'nemo_native_object_client_status') { statusCalls++; if (options.failStatusAlways || (options.failFirstStatus && statusCalls === 1) || (options.failStatusAfterEdit && revision > 0)) throw new Error('status unavailable'); return { available: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, lifecycleGeneration: 7 }; }
     if (name === 'nemo_native_object_dispatch') {
       const request = JSON.parse(args.requestJson);
       assert.equal(request.instanceId, 'owned-instance'); assert.equal(request.documentId, 'owned-doc');
+      if (options.failRead && request.operation === 'query.document.object') throw new Error('query unavailable');
       if (request.operation.startsWith('command.')) { assert.equal(request.expectedRevision, revision); revision++; }
-      return { ok: true, instanceId: 'owned-instance', documentId: 'owned-doc', result: { documentSnapshotId: 'snapshot-' + revision } };
+      return { ok: true, instanceId: 'owned-instance', documentId: 'owned-doc', contentRevision: revision, result: { documentSnapshotId: 'snapshot-' + revision } };
     }
     if (name === 'nemo_native_object_preview') {
       const request = JSON.parse(args.requestJson); assert.equal(request.contentRevision, revision); assert.equal(request.documentSnapshotId, 'snapshot-' + revision);
@@ -27,7 +28,7 @@ async function scenario(options = {}) {
       previews++; if (options.failPreview) throw new Error('not-presented');
       return { status: options.defer && previews === 1 ? 'deferred-timeout' : 'presented', workId: 'work-' + revision, viewGeneration: 1 };
     }
-    if (name === 'nemo_native_release') { assert.equal(args.request.expectedRevision, revision); release = true; return { status: 'succeeded', reentryAvailable: true }; }
+    if (name === 'nemo_native_release') { assert.equal(args.request.instanceId, 'owned-instance'); assert.equal(args.request.documentId, 'owned-doc'); assert.equal(args.request.expectedRevision, revision); if (options.failRelease) throw new Error('release unavailable'); release = true; return { status: 'succeeded', reentryAvailable: true }; }
     throw new Error('unknown invoke');
   };
   const window = { __NEMO_OBJECT_WINDOW_PROBE_CONFIG__: { ...config, ...options.config }, __TAURI__: { core: { invoke } }, devicePixelRatio: 2 };
@@ -78,4 +79,31 @@ test('a visual checkpoint prevents the next mutation until its owned acknowledgm
   result.resume();
   for (let tick = 0; tick < 100 && !result.phases.some(p => p.phase === 'released'); tick++) await Promise.resolve();
   assert.equal(mutations().length, 3); assert.equal(result.phases.at(-1).phase, 'released');
+});
+
+test('bootstrap commit is released even when status or first object read fails before pins', async () => {
+  for (const options of [{ failFirstStatus: true }, { failStatusAlways: true }, { failRead: true }]) {
+    const result = await scenario(options);
+    assert.deepEqual(result.phases.map(p => p.phase), ['ready', 'failed']);
+    assert.equal(result.previews, 0); assert.equal(result.release, true);
+    assert.equal(result.phases.at(-1).cleanupSucceeded, true);
+    const releases = result.calls.filter(c => c.name === 'nemo_native_release');
+    assert.equal(releases.length, 1); assert.equal(releases[0].args.request.expectedRevision, 0);
+    assert.equal(releases[0].args.request.documentId, 'owned-doc');
+  }
+});
+test('early status failure with failed cleanup remains failed and never claims pixels or release', async () => {
+  const result = await scenario({ failStatusAlways: true, failRelease: true });
+  assert.deepEqual(result.phases.map(p => p.phase), ['ready', 'failed']);
+  assert.equal(result.previews, 0); assert.equal(result.release, false);
+  assert.equal(result.phases.at(-1).cleanupSucceeded, false);
+  assert.equal(result.calls.filter(c => c.name === 'nemo_native_release').length, 1);
+});
+
+test('committed edit revision remains cleanup authority when the subsequent status is unavailable', async () => {
+  const result = await scenario({ failStatusAfterEdit: true });
+  assert.deepEqual(result.phases.map(p => p.phase), ['ready', 'blue', 'failed']);
+  assert.equal(result.release, true); assert.equal(result.phases.at(-1).cleanupSucceeded, true);
+  const release = result.calls.find(c => c.name === 'nemo_native_release');
+  assert.equal(release.args.request.documentId, 'owned-doc'); assert.equal(release.args.request.expectedRevision, 1);
 });
