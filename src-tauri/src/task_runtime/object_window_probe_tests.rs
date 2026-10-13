@@ -357,6 +357,7 @@ fn export_mode_failure_never_completes_after_bad_artifact_or_ack_timeout() {
     assert!(complete(&mut session, &run, 0, Err("probe checkpoint timed out")).is_err());
     let mut failed = packet(&run, "failed", "operation_failed", None, None);
     failed.cleanup_succeeded = Some(false);
+    failed.failure_stage = Some("blue-checkpoint".into());
     assert_eq!(session.admit(&failed), Ok(false));
     let receipt: serde_json::Value =
         serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
@@ -364,4 +365,41 @@ fn export_mode_failure_never_completes_after_bad_artifact_or_ack_timeout() {
     assert_eq!(receipt["complete"], false);
     assert_eq!(receipt["failed"], true);
     assert_eq!(receipt["records"][1]["cleanupSucceeded"], false);
+    assert_eq!(receipt["records"][1]["failureStage"], "blue-checkpoint");
+}
+
+#[test]
+fn export_failure_stage_is_fixed_and_never_accepted_on_success_packets() {
+    let fixture = Fixture::new();
+    let mut session = fixture.session();
+    session.export = true;
+    let run = session.run.clone();
+    let mut ready = packet(&run, "ready", "ready", None, None);
+    ready.failure_stage = Some("ready".into());
+    assert!(session.admit(&ready).is_err());
+    session
+        .admit(&packet(&run, "ready", "ready", None, None))
+        .unwrap();
+    complete(&mut session, &run, 0, Ok(())).unwrap();
+    for stage in ["arbitrary", "private-owner", "", "failed"] {
+        let mut failed = packet(&run, "failed", "operation_failed", None, None);
+        failed.cleanup_succeeded = Some(true);
+        failed.failure_stage = Some(stage.into());
+        assert!(session.admit(&failed).is_err(), "{stage}");
+    }
+    let mut no_stage = packet(&run, "failed", "operation_failed", None, None);
+    no_stage.cleanup_succeeded = Some(true);
+    assert!(session.admit(&no_stage).is_err());
+    let mut failed = packet(&run, "failed", "operation_failed", None, None);
+    failed.cleanup_succeeded = Some(true);
+    failed.failure_stage = Some("stale-refusal".into());
+    assert_eq!(session.admit(&failed), Ok(false));
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        receipt["records"].as_array().unwrap().last().unwrap()["failureStage"],
+        "stale-refusal"
+    );
+    assert!(!receipt.to_string().contains("private-owner"));
 }

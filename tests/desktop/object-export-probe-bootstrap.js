@@ -23,6 +23,7 @@
       migration: 'explicit-plan-required', referencePolicy: 'unresolved' }
   };
   let invoke, instanceId, pins, cleanupIdentity, releaseRequest, closed = false;
+  let failureStage = 'runtime-binding';
   const check = value => { if (!value) throw new Error('fixed export scenario refused'); };
   async function checkpoint(phase, status, extra = {}) {
     await invoke('nemo_test_object_window_probe', { payloadJson: JSON.stringify({ runId: config.runId, phase, status, ...extra }) });
@@ -94,23 +95,33 @@
       const runtime = await invoke('nemo_task_runtime');
       check(runtime.pid === config.pid && runtime.taskKey === config.taskKey &&
         runtime.windows?.length === 1 && runtime.windows[0] === 'main');
+      failureStage = 'ready';
       await checkpoint('ready', 'ready');
+      failureStage = 'identity';
       const identity = await invoke('nemo_mcp_identity'); instanceId = identity.instanceId;
       check(typeof instanceId === 'string' && instanceId.length > 0);
+      failureStage = 'bootstrap';
       const bootstrap = await invoke('nemo_native_object_bootstrap', { requestJson: JSON.stringify({ apiVersion: 2,
         requestId: 'object-export-bootstrap-' + config.runId, instanceId, documentJson: JSON.stringify(document) }) });
       check(bootstrap.instanceId === instanceId && typeof bootstrap.documentId === 'string' &&
         bootstrap.documentId.length > 0 && bootstrap.contentRevision === 0);
       cleanupIdentity = { instanceId, documentId: bootstrap.documentId, contentRevision: 0 };
+      failureStage = 'pins';
       await current();
-      await checkpoint('blue', 'presented', { workId: (await present()).workId, revision: 0 });
+      failureStage = 'preview';
+      const presented = await present();
+      failureStage = 'blue-checkpoint';
+      await checkpoint('blue', 'presented', { workId: presented.workId, revision: 0 });
+      failureStage = 'stale-refusal';
       let refused = false;
       try {
         await invoke('nemo_native_object_export', { requestJson: JSON.stringify(exportRequest(
           'object-export-refused-' + config.runId, pins.documentSnapshotId + '-wrong')) });
       } catch (_) { refused = true; }
       check(refused);
+      failureStage = 'refusal-checkpoint';
       await checkpoint('refused', 'refused', { revision: 0 });
+      failureStage = 'export';
       const receipt = await invoke('nemo_native_object_export', { requestJson: JSON.stringify(exportRequest(
         'object-export-' + config.runId, pins.documentSnapshotId)) });
       check(receipt.apiVersion === 2 && receipt.requestId === 'object-export-' + config.runId &&
@@ -120,13 +131,16 @@
         receipt.externalEffectDisposition === 'committed' && receipt.errorCode == null &&
         receipt.published === true && receipt.cleanupComplete === true &&
         receipt.artifactFiles?.length === 1 && receipt.artifactFiles[0] === 'frame_0001.png');
+      failureStage = 'export-checkpoint';
       await checkpoint('exported', 'succeeded', { revision: 0, export: receipt });
+      failureStage = 'release';
       await release();
+      failureStage = 'release-checkpoint';
       await checkpoint('released', 'succeeded', { cleanupSucceeded: true });
     } catch (_) {
       if (invoke) {
         try { await release(); } catch (_) { /* Never claim cleanup after refusal. */ }
-        try { await checkpoint('failed', 'operation_failed', { cleanupSucceeded: closed }); } catch (_) { /* No synthetic success. */ }
+        try { await checkpoint('failed', 'operation_failed', { cleanupSucceeded: closed, failureStage }); } catch (_) { /* No synthetic success. */ }
       }
     }
   }
