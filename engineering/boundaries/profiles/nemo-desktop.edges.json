@@ -282,9 +282,11 @@
           "export_job::JobStatus",
           "export_job::ObjectHostExportOutcome",
           "export_job::StagedArtifactPort",
+          "history::PreparedProjectReplacement",
           "object_codec::decode_storage_project",
           "object_document::FrameScopeKind",
           "object_frame_packet::ObjectFrameSelector",
+          "resource_leases::WorkId",
           "scheduler::OutputSpec"
         ],
         "rust.desktop.native.application.tests": [
@@ -327,6 +329,7 @@
       "export_job::PendingFrame",
       "export_job::ReconciliationStage",
       "export_job::StagedArtifactPort",
+      "history::PreparedProjectReplacement",
       "object_codec::decode_project",
       "object_codec::decode_storage_project",
       "object_document::FrameScopeKind",
@@ -360,6 +363,7 @@
       "export_job::StagedArtifactPort",
       "export_job::export_one_object_frame",
       "history::NativeObjectHistory",
+      "history::PreparedProjectReplacement",
       "object_document::ObjectDocument",
       "object_frame_packet::ObjectFrameSelector",
       "object_frame_packet::prepare_object_frame",
