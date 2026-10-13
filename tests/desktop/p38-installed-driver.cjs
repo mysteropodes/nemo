@@ -94,6 +94,36 @@ function safeSelectionDiagnostics(value) {
     if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
   return clean;
 }
+function safeActionDiagnostics(value) {
+  check(value && typeof value === 'object' && !Array.isArray(value), 'ax-evidence-refused');
+  const stages = new Set(['window-identity','sheet-state','route-resolution','axpress-support','axpress-perform','post-action-identity']);
+  check(stages.has(value.stage), 'ax-evidence-refused');
+  const clean = { stage:value.stage };
+  if (value.elementPath !== undefined) { check(typeof value.elementPath === 'string' && /^(?:\d+(?:\.\d+)*)$/.test(value.elementPath) && value.elementPath.length <= 128, 'ax-evidence-refused'); clean.elementPath=value.elementPath; }
+  if (value.role !== undefined) { check(['AXButton','AXCheckBox','AXMenuItem','AXRow','AXTextField','other'].includes(value.role), 'ax-evidence-refused'); clean.role=value.role; }
+  for (const key of ['axPressQueryError','performActionError']) {
+    if (value[key] !== undefined) { check(Number.isInteger(value[key]) && value[key] >= -32768 && value[key] <= 0, 'ax-evidence-refused'); clean[key]=value[key]; }
+  }
+  if (value.axPressAdvertised !== undefined) { check(typeof value.axPressAdvertised === 'boolean', 'ax-evidence-refused'); clean.axPressAdvertised=value.axPressAdvertised; }
+  if (value.control !== undefined) { check(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle'].includes(value.control), 'ax-evidence-refused'); clean.control=value.control; }
+  if (value.routeRefusal !== undefined) { check(['adapter-refused','child-owner','standalone-window'].includes(value.routeRefusal), 'ax-evidence-refused'); clean.routeRefusal=value.routeRefusal; }
+  return clean;
+}
+function safeCleanupDiagnostics(values) {
+  check(Array.isArray(values) && values.length <= 8, 'cleanup-evidence-refused');
+  const stages = new Set(['helper-exited','exact-helper-terminated','exact-helper-remains','group-absent','group-terminated','group-remains']);
+  return values.map(value => {
+    check(value && typeof value === 'object' && stages.has(value.stage), 'cleanup-evidence-refused');
+    const clean = { stage:value.stage };
+    if (value.helperPid !== undefined) { check(Number.isSafeInteger(value.helperPid) && value.helperPid > 0 && value.helperPid <= 2147483647, 'cleanup-evidence-refused'); clean.helperPid=value.helperPid; }
+    for (const key of ['capturePossible','groupAliveBefore','groupAliveAfterTerm','groupAliveAfterKill']) {
+      if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'cleanup-evidence-refused'); clean[key]=value[key]; }
+    }
+    if (value.signalAttempts !== undefined) { check(Number.isInteger(value.signalAttempts) && value.signalAttempts >= 0 && value.signalAttempts <= 2, 'cleanup-evidence-refused'); clean.signalAttempts=value.signalAttempts; }
+    if (value.exitObserved !== undefined) { check(typeof value.exitObserved === 'boolean', 'cleanup-evidence-refused'); clean.exitObserved=value.exitObserved; }
+    return clean;
+  });
+}
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
 function actionTarget(action, sheet) {
   const target = action.target || 'main'; check(['main','sheet'].includes(target), 'target-refused');
@@ -136,7 +166,8 @@ function verifyWindow(info, pid, expected) {
 }
 function windowResult(info,pid,expected) {
   if(info?.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(info.code)?info.code:'adapter-refused',
-    ...(info.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(info.selectionDiagnostics)} : {})});
+    ...(info.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(info.selectionDiagnostics)} : {}),
+    ...(info.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(info.actionDiagnostics)} : {})});
   check(info?.status===undefined||['ok','pinned'].includes(info.status),'owned-window-refused');
   return verifyWindow(info,pid,expected);
 }
@@ -205,6 +236,7 @@ async function runOperator(config, services) {
       if (result.captureSha256) completed.captureSha256 = result.captureSha256;
       for (const key of ['selected','enabled','truncated']) if (typeof result[key] === 'boolean') completed[key] = result[key];
       if (result.selectionDiagnostics && action.type === 'select') completed.selectionDiagnostics = safeSelectionDiagnostics(result.selectionDiagnostics);
+      if (result.actionDiagnostics && action.type === 'press') completed.actionDiagnostics = safeActionDiagnostics(result.actionDiagnostics);
       receipt.actions.push(completed); delete receipt.inFlightAction; actionStartedAt = null;
       save();
     }
@@ -218,13 +250,19 @@ async function runOperator(config, services) {
       'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',...REFUSALS].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
+      ...(error.actionDiagnostics ? { actionDiagnostics:safeActionDiagnostics(error.actionDiagnostics) } : {}),
       ...(actionStartedAt !== null ? { action:{...receipt.inFlightAction,durationMs:Math.max(0,Math.round(performance.now()-actionStartedAt))} } : {}) });
     receipt.status = 'partial'; save(); // Persist the first safe refusal before cleanup can fail.
   }
   finally {
     if (timer !== undefined) services.clearTimer(timer);
-    try { if (services.close) await services.close(); receipt.helperCleanup = 'complete'; }
-    catch (_) { failure = true; receipt.helperCleanup = 'incomplete';
+    try {
+      const cleanup = services.close ? await services.close() : null;
+      if (cleanup?.cleanupDiagnostics) receipt.helperCleanupDiagnostics = safeCleanupDiagnostics(cleanup.cleanupDiagnostics);
+      receipt.helperCleanup = 'complete';
+    }
+    catch (error) { failure = true; receipt.helperCleanup = 'incomplete';
+      if (error.cleanupDiagnostics) receipt.helperCleanupDiagnostics = safeCleanupDiagnostics(error.cleanupDiagnostics);
       if (!receipt.firstFailure) { receipt.reason = 'helper-cleanup-incomplete';
         receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: 'helper-cleanup' }); }
     }
@@ -299,7 +337,8 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       let value;try{value=JSON.parse(line.value);}catch{throw Object.assign(Error('helper-malformed'),{code:'helper-malformed'});}
       check(value&&typeof value==='object'&&!Array.isArray(value),'helper-malformed');
       if(value.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(value.code)?value.code:'adapter-refused',
-        ...(value.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(value.selectionDiagnostics)} : {})});
+        ...(value.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(value.selectionDiagnostics)} : {}),
+        ...(value.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(value.actionDiagnostics)} : {})});
       return value;
     } finally {clearTimeout(timer);}
   }
@@ -308,26 +347,35 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
 async function cleanupHelper(child, services = {}) {
   if(!Number.isSafeInteger(child.pid))return; // Spawn failed before any process was created.
   check(child.pid>0,'helper-cleanup-invalid');
+  const observation = { helperPid:child.pid, capturePossible:child.p38CapturePossible !== false };
   // This reviewed helper spawns a descendant ONLY for explicit capture. Once
   // its non-capture process exits, do not signal a recycled process-group ID.
   if(child.p38CapturePossible===false){
     for(const kind of ['SIGTERM','SIGKILL']){
-      if(child.exitCode!==null||child.signalCode!==null)return;
+      if(child.exitCode!==null||child.signalCode!==null)return [{...observation,stage:'helper-exited',exitObserved:true}];
       child.kill(kind); // Exact spawned handle; no process-group lookup/rebinding.
       for(let i=0;i<40&&child.exitCode===null&&child.signalCode===null;i++)await new Promise(resolve=>setTimeout(resolve,50));
     }
-    check(child.exitCode!==null||child.signalCode!==null,'helper-group-remains');return;
+    const exited=child.exitCode!==null||child.signalCode!==null;
+    const diagnostics=[{...observation,stage:exited?'exact-helper-terminated':'exact-helper-remains',exitObserved:exited,signalAttempts:2}];
+    if(!exited)throw Object.assign(Error('helper-group-remains'),{code:'helper-group-remains',cleanupDiagnostics:diagnostics});
+    return diagnostics;
   }
   const alive = services.alive || (()=>{try{process.kill(-child.pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}});
   const signal = services.signal || (kind=>{try{process.kill(-child.pid,kind);}catch(e){if(e.code!=='ESRCH')throw e;}});
   const delay = services.delay || (()=>new Promise(resolve=>setTimeout(resolve,50)));
-  if(!alive())return;
+  let groupAliveBefore=alive();
+  if(!groupAliveBefore)return [{...observation,stage:'group-absent',groupAliveBefore:false,signalAttempts:0}];
+  let groupAliveAfterTerm,groupAliveAfterKill,signalAttempts=0;
   for(const kind of ['SIGTERM','SIGKILL']){
-    signal(kind);
+    signal(kind); signalAttempts++;
     for(let i=0;i<40&&alive();i++)await delay();
-    if(!alive())return;
+    const remains=alive();
+    if(kind==='SIGTERM')groupAliveAfterTerm=remains;
+    else groupAliveAfterKill=remains;
+    if(!remains)return [{...observation,stage:'group-terminated',groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,signalAttempts}];
   }
-  check(false,'helper-group-remains');
+  throw Object.assign(Error('helper-group-remains'),{code:'helper-group-remains',cleanupDiagnostics:[{...observation,stage:'group-remains',groupAliveBefore,groupAliveAfterTerm,groupAliveAfterKill,signalAttempts}]});
 }
 function defaultServices(config) {
   const harness = require('./native-harness.cjs');
@@ -379,7 +427,10 @@ function defaultServices(config) {
     feedback(value){process.stdout.write(JSON.stringify(value)+'\n');},
     async close() {
       input.close();
-      for (const child of [...helpers]) await cleanupHelper(child);
+      const cleanupDiagnostics=[];
+      try { for (const child of [...helpers]) cleanupDiagnostics.push(...(await cleanupHelper(child) || [])); }
+      catch (error) { error.cleanupDiagnostics ||= cleanupDiagnostics; throw error; }
+      return { cleanupDiagnostics };
     },
     setTimer: setTimeout, clearTimer: clearTimeout,
   };
@@ -398,4 +449,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };

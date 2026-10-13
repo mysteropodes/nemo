@@ -335,6 +335,53 @@ test('selection capability diagnostics are allowlisted, bounded, and survive cle
   assert.equal(result.firstFailure.code,'adapter-refused');assert.deepEqual(result.firstFailure.selectionDiagnostics,clean);
   assert.equal(result.helperCleanup,'incomplete');assert.equal(result.cleanup,'incomplete');
 });
+test('main press diagnostics distinguish route, AXPress support and perform outcomes without leaking strings',async()=>{
+  const {safeActionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const diagnostic={stage:'axpress-perform',elementPath:'2',role:'AXButton',control:'Open Project…',
+    axPressQueryError:0,axPressAdvertised:true,performActionError:-25200,privatePath:'/private/secret'};
+  const clean=safeActionDiagnostics(diagnostic);
+  assert.deepEqual(clean,{stage:'axpress-perform',elementPath:'2',role:'AXButton',control:'Open Project…',
+    axPressQueryError:0,axPressAdvertised:true,performActionError:-25200});
+  assert.throws(()=>safeActionDiagnostics({...diagnostic,stage:'/private'}));
+  assert.throws(()=>safeActionDiagnostics({...diagnostic,elementPath:'../secret'}));
+  assert.throws(()=>safeActionDiagnostics({...diagnostic,performActionError:999999}));
+  const f=fixture();f.services.next=async()=>({type:'press',element:'2'});
+  f.services.window=async(mode,pid)=>mode==='discover'?{pid,windowId:45,matchedAX:true}:
+    {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,actionDiagnostics:diagnostic};
+  f.services.close=async()=>{throw Object.assign(Error('/private/group'),{cleanupDiagnostics:[{stage:'group-remains',helperPid:321,capturePossible:true,
+    groupAliveBefore:true,groupAliveAfterTerm:true,groupAliveAfterKill:true,signalAttempts:2}]});};
+  const result=await runOperator(f.cfg,f.services);
+  assert.equal(result.firstFailure.code,'adapter-refused');assert.equal(result.firstFailure.stage,'window-press-main');
+  assert.deepEqual(result.firstFailure.actionDiagnostics,clean);
+  assert.deepEqual(result.helperCleanupDiagnostics,[{stage:'group-remains',helperPid:321,capturePossible:true,
+    groupAliveBefore:true,groupAliveAfterTerm:true,groupAliveAfterKill:true,signalAttempts:2}]);
+  assert.equal(result.helperCleanup,'incomplete');assert.equal(result.cleanup,'complete');
+  for(const receipt of f.receipts)assert.equal(JSON.stringify(receipt).includes('/private/'),false);
+});
+test('modeled helper transport preserves sanitized press diagnostics in the first-failure receipt',async()=>{
+  const crypto=require('node:crypto'),os=require('node:os'),path=require('node:path');
+  const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-press-diagnostics-')),helpers=new Set();
+  try{
+    const reports=safeDirectory(dir,['reports']),fixtureRoot=path.join(dir,'fixtures');fs.mkdirSync(fixtureRoot);
+    const fixtures=['A','B'].map(label=>{const file=path.join(fixtureRoot,label+'.json');fs.writeFileSync(file,JSON.stringify({label}));
+      return{label,path:file,sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')};});
+    const helper=path.join(dir,'modeled-helper'),diagnostics={stage:'axpress-perform',elementPath:'2',role:'AXButton',
+      axPressQueryError:0,axPressAdvertised:true,performActionError:-25200,privatePath:'/private/secret'};
+    fs.writeFileSync(helper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({status:"pinned",pid:123,windowId:45,matchedAX:true}));\n'+
+      'require("node:readline").createInterface({input:process.stdin}).on("line",line=>{const r=JSON.parse(line);const out=r.type==="check"?{status:"ok",type:r.type,pid:r.pid,windowId:r.windowId,matchedAX:true}:'+
+      '{status:"refused",code:"adapter-refused",pid:r.pid,windowId:r.windowId,matchedAX:true,actionDiagnostics:'+JSON.stringify(diagnostics)+'};console.log(JSON.stringify(out));});\n',{mode:0o700});
+    const cfg={windowHelper:helper,grant:{id:'modeled-diagnostics'},fixtures},window=createWindowTransport(cfg,reports.directory,()=>reports,helpers);
+    const f=fixture();f.cfg.fixtures=fixtures;f.services.window=window;f.services.next=async()=>({type:'press',element:'2'});
+    f.services.close=async()=>{for(const child of [...helpers])await cleanupHelper(child);};
+    const receipt=await runOperator(f.cfg,f.services);
+    assert.equal(receipt.firstFailure.code,'adapter-refused');
+    assert.deepEqual(receipt.firstFailure.actionDiagnostics,{stage:'axpress-perform',elementPath:'2',role:'AXButton',
+      axPressQueryError:0,axPressAdvertised:true,performActionError:-25200});
+    assert.equal(receipt.startAttempts,1);assert.equal(receipt.cleanup,'complete');assert.equal(receipt.helperCleanup,'complete');
+    assert.equal(JSON.stringify(receipt).includes('/private/'),false);
+  }finally{for(const child of [...helpers])await cleanupHelper(child);fs.rmSync(dir,{recursive:true,force:true});}
+});
 test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
   const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
   const start=source.indexOf('    case "inspect":'),end=source.indexOf('    case "capture":',start),body=source.slice(start,end);
@@ -358,7 +405,11 @@ test('exact spawned-helper group cleanup escalates only when needed and refuses 
   for(const endOn of ['already','SIGTERM','SIGKILL','never']){
     let live=endOn!=='already';const signals=[];
     const work=cleanupHelper({pid:123},{alive:()=>live,signal:kind=>{signals.push(kind);if(kind===endOn)live=false;},delay:async()=>{}});
-    if(endOn==='never')await assert.rejects(work,e=>e.code==='helper-group-remains');else await work;
+    if(endOn==='never')await assert.rejects(work,e=>e.code==='helper-group-remains'&&e.cleanupDiagnostics[0].groupAliveAfterKill===true);
+    else {const observations=await work;assert.equal(observations[0].helperPid,123);
+      if(endOn==='already')assert.equal(observations[0].groupAliveBefore,false);
+      else if(endOn==='SIGTERM')assert.equal(observations[0].groupAliveAfterTerm,false);
+      else assert.equal(observations[0].groupAliveAfterKill,false);}
     assert.deepEqual(signals,endOn==='already'?[]:endOn==='SIGTERM'?['SIGTERM']:['SIGTERM','SIGKILL']);
   }
   await assert.rejects(cleanupHelper({pid:-1}),e=>e.code==='helper-cleanup-invalid');
