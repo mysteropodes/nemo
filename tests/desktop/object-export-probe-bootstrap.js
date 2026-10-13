@@ -117,7 +117,17 @@
       try {
         await invoke('nemo_native_object_export', { requestJson: JSON.stringify(exportRequest(
           'object-export-refused-' + config.runId, pins.documentSnapshotId + '-wrong')) });
-      } catch (error) { refused = error?.code === 'unavailable'; }
+        failureStage = 'stale-refusal-no-error';
+      } catch (error) {
+        const code = error && typeof error === 'object' && typeof error.code === 'string'
+          ? error.code : null;
+        refused = code === 'unavailable';
+        if (!refused) {
+          failureStage = code === 'invalid_request' ? 'stale-refusal-invalid-request'
+            : error === null || typeof error !== 'object' ? 'stale-refusal-non-object'
+              : code === null ? 'stale-refusal-no-code' : 'stale-refusal-other-code';
+        }
+      }
       check(refused);
       failureStage = 'refusal-checkpoint';
       await checkpoint('refused', 'refused', { revision: 0 });

@@ -101,7 +101,9 @@ function ack(reportRoot, receipt, owner, captureSha256 = null) {
 function sanitizedProbe(receipt) {
   const phases = new Set(['ready', 'blue', 'refused', 'exported', 'released', 'failed']);
   const stages = new Set(['runtime-binding', 'ready', 'identity', 'bootstrap', 'pins',
-    'preview', 'blue-checkpoint', 'stale-refusal', 'refusal-checkpoint', 'export',
+    'preview', 'blue-checkpoint', 'stale-refusal', 'stale-refusal-invalid-request',
+    'stale-refusal-non-object', 'stale-refusal-no-code', 'stale-refusal-other-code',
+    'stale-refusal-no-error', 'refusal-checkpoint', 'export',
     'export-checkpoint', 'release', 'release-checkpoint']);
   const rows = receipt.records.map(row => {
     requireCheck(phases.has(row.phase), 'probe diagnostic phase refused');
@@ -179,7 +181,7 @@ async function main() {
   const env = { ...process.env, NEMO_TEST_OBJECT_EXPORT_PROBE: '1', NEMO_TEST_OBJECT_WINDOW_PROBE: '0',
     NEMO_OBJECT_PROBE_EXPECTED_SOURCE: source.head };
   const controller = createController({ root, app: app.bundle, env, timeout: 120_000 });
-  let instance, reportRoot, packet, stopped = false, error;
+  let instance, reportRoot, packet, tempRootAlias, stopped = false, error;
   try {
     instance = await controller.start(task, slots);
     const status = await controller.status(instance);
@@ -189,6 +191,7 @@ async function main() {
       instance.snapshot.runtime.roots.root);
     const tempRoot = ownedTempDirectory(instance.snapshot.runtime.roots.temp,
       reportRoot, instance.snapshot.runtime.roots.root);
+    tempRootAlias = tempRoot !== instance.snapshot.runtime.roots.temp;
     requireCheck(instance.info.reservations.join(',') === slots.join(','), 'app/GPU slot reservation missing');
     const ready = await phase(reportRoot, source, instance, 'ready', 0);
     ack(reportRoot, ready, instance.info.ownerToken);
@@ -231,7 +234,12 @@ async function main() {
     if (instance && reportRoot) {
       try {
         const probe = readProbe(reportRoot, source, instance);
-        fs.writeFileSync(failureFile, JSON.stringify(sanitizedProbe(probe)) + '\n',
+        const diagnostic = sanitizedProbe(probe);
+        if (typeof tempRootAlias === 'boolean') {
+          diagnostic.tempRootAlias = tempRootAlias;
+          diagnostic.destinationPathClass = 'canonical-task-temp';
+        }
+        fs.writeFileSync(failureFile, JSON.stringify(diagnostic) + '\n',
           { flag: 'wx', mode: 0o600 });
       } catch (_) { /* Preserve the original refusal; never copy raw private probe data. */ }
     }
