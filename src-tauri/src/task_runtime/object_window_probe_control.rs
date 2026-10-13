@@ -2,13 +2,132 @@
 use crate::task_runtime::object_window_probe::origin;
 use crate::task_runtime::object_window_probe::Session;
 use crate::task_runtime::object_window_probe::{hex, safe_root, Packet, ProbeState, MAX_BYTES};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, OpenOptions},
     io::Read,
     path::Path,
 };
 use tauri::Manager;
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct ExportEvidence {
+    api_version: u32,
+    request_id: String,
+    instance_id: String,
+    document_id: String,
+    content_revision: u64,
+    document_snapshot_id: String,
+    status: String,
+    cleanup_status: String,
+    external_effect_disposition: String,
+    error_code: Option<String>,
+    artifact_files: Vec<String>,
+    published: bool,
+    cleanup_complete: bool,
+}
+
+pub(super) fn admit_export(session: &mut Session, packet: &Packet) -> Result<bool, &'static str> {
+    use super::EXPORT_PHASES;
+    if packet.run_id != session.run || session.waiting || session.cursor >= EXPORT_PHASES.len() {
+        return Err("export probe run or sequence refused");
+    }
+    if packet.phase == "failed" {
+        if packet.status != "operation_failed"
+            || packet.work_id.is_some()
+            || packet.revision.is_some()
+            || packet.export.is_some()
+            || packet.cleanup_succeeded.is_none()
+            || session
+                .records
+                .last()
+                .is_some_and(|row| row["phase"] == "failed")
+        {
+            return Err("export probe failure refused");
+        }
+        session.failed = true;
+        session.records.push(
+            serde_json::json!({"phase":"failed","status":"operation_failed",
+            "cleanupSucceeded":packet.cleanup_succeeded}),
+        );
+        session.persist()?;
+        return Ok(false);
+    }
+    if session.failed || packet.phase != EXPORT_PHASES[session.cursor] {
+        return Err("export probe checkpoint refused");
+    }
+    let phase = session.cursor;
+    let valid = match phase {
+        0 => {
+            packet.status == "ready"
+                && packet.work_id.is_none()
+                && packet.revision.is_none()
+                && packet.export.is_none()
+                && packet.cleanup_succeeded.is_none()
+        }
+        1 => {
+            packet.status == "presented"
+                && packet.revision == Some(0)
+                && packet
+                    .work_id
+                    .as_ref()
+                    .is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                && packet.export.is_none()
+                && packet.cleanup_succeeded.is_none()
+        }
+        2 => {
+            packet.status == "refused"
+                && packet.revision == Some(0)
+                && packet.work_id.is_none()
+                && packet.export.is_none()
+                && packet.cleanup_succeeded.is_none()
+        }
+        3 => {
+            packet.status == "succeeded"
+                && packet.revision == Some(0)
+                && packet.work_id.is_none()
+                && packet.cleanup_succeeded.is_none()
+                && packet.export.as_ref().is_some_and(|value| {
+                    value.api_version == 2
+                        && value.request_id == format!("object-export-{}", session.run)
+                        && !value.instance_id.is_empty()
+                        && value.instance_id.len() <= 128
+                        && !value.document_id.is_empty()
+                        && value.document_id.len() <= 128
+                        && !value.document_snapshot_id.is_empty()
+                        && value.document_snapshot_id.len() <= 128
+                        && value.content_revision == 0
+                        && value.status == "succeeded"
+                        && value.cleanup_status == "complete"
+                        && value.external_effect_disposition == "committed"
+                        && value.error_code.is_none()
+                        && value.artifact_files == ["frame_0001.png"]
+                        && value.published
+                        && value.cleanup_complete
+                })
+        }
+        4 => {
+            packet.status == "succeeded"
+                && packet.revision.is_none()
+                && packet.work_id.is_none()
+                && packet.export.is_none()
+                && packet.cleanup_succeeded == Some(true)
+        }
+        _ => false,
+    };
+    if !valid {
+        return Err("export probe receipt refused");
+    }
+    session.records.push(
+        serde_json::json!({"phase":packet.phase,"status":packet.status,
+        "workId":packet.work_id,"revision":packet.revision,"export":packet.export,
+        "cleanupSucceeded":packet.cleanup_succeeded}),
+    );
+    session.waiting = true;
+    session.persist()?;
+    Ok(true)
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

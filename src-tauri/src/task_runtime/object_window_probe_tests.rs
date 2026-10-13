@@ -27,6 +27,7 @@ impl Fixture {
             waiting: false,
             failed: false,
             records: vec![],
+            export: false,
         }
     }
     fn ack(&self, value: serde_json::Value) {
@@ -244,4 +245,123 @@ fn fresh_receipt_and_control_refuse_symlink_roots_and_leafs() {
         "private-owner"
     )
     .is_err());
+}
+
+#[test]
+fn fixed_export_mode_requires_refusal_published_manifest_and_release_ack() {
+    let fixture = Fixture::new();
+    let mut session = fixture.session();
+    session.export = true;
+    session.persist().unwrap();
+    let run = session.run.clone();
+    let export = json!({"apiVersion":2,"requestId":format!("object-export-{run}"),
+        "instanceId":"owned-instance","documentId":"owned-doc","contentRevision":0,
+        "documentSnapshotId":"owned-snapshot","status":"succeeded","cleanupStatus":"complete",
+        "externalEffectDisposition":"committed","errorCode":null,
+        "artifactFiles":["frame_0001.png"],"published":true,"cleanupComplete":true});
+    let row = |phase: &str,
+               status: &str,
+               revision: Option<u64>,
+               work: Option<&str>,
+               evidence: Option<serde_json::Value>,
+               cleanup: Option<bool>| {
+        serde_json::from_value::<Packet>(json!({"runId":run,"phase":phase,"status":status,
+            "revision":revision,"workId":work,"export":evidence,"cleanupSucceeded":cleanup}))
+        .unwrap()
+    };
+    assert!(session
+        .admit(&row(
+            "exported",
+            "succeeded",
+            Some(0),
+            None,
+            Some(export.clone()),
+            None
+        ))
+        .is_err());
+    for (index, packet) in [
+        row("ready", "ready", None, None, None, None),
+        row(
+            "blue",
+            "presented",
+            Some(0),
+            Some("native-work-1"),
+            None,
+            None,
+        ),
+        row("refused", "refused", Some(0), None, None, None),
+        row(
+            "exported",
+            "succeeded",
+            Some(0),
+            None,
+            Some(export.clone()),
+            None,
+        ),
+        row("released", "succeeded", None, None, None, Some(true)),
+    ]
+    .iter()
+    .enumerate()
+    {
+        if index == 3 {
+            let mut false_claim = export.clone();
+            false_claim["published"] = json!(false);
+            assert!(session
+                .admit(&row(
+                    "exported",
+                    "succeeded",
+                    Some(0),
+                    None,
+                    Some(false_claim),
+                    None
+                ))
+                .is_err());
+            let mut foreign = export.clone();
+            foreign["requestId"] = json!("foreign");
+            assert!(session
+                .admit(&row(
+                    "exported",
+                    "succeeded",
+                    Some(0),
+                    None,
+                    Some(foreign),
+                    None
+                ))
+                .is_err());
+        }
+        assert_eq!(session.admit(packet), Ok(true));
+        assert!(session.admit(packet).is_err());
+        complete(&mut session, &run, index, Ok(())).unwrap();
+    }
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
+            .unwrap();
+    assert_eq!(receipt["schema"], "nemo.object-window-export-probe/1");
+    assert_eq!(receipt["complete"], true);
+    assert_eq!(
+        receipt["records"][3]["export"]["artifactFiles"],
+        json!(["frame_0001.png"])
+    );
+    assert!(!receipt.to_string().contains("private-owner"));
+}
+
+#[test]
+fn export_mode_failure_never_completes_after_bad_artifact_or_ack_timeout() {
+    let fixture = Fixture::new();
+    let mut session = fixture.session();
+    session.export = true;
+    let run = session.run.clone();
+    session
+        .admit(&packet(&run, "ready", "ready", None, None))
+        .unwrap();
+    assert!(complete(&mut session, &run, 0, Err("probe checkpoint timed out")).is_err());
+    let mut failed = packet(&run, "failed", "operation_failed", None, None);
+    failed.cleanup_succeeded = Some(false);
+    assert_eq!(session.admit(&failed), Ok(false));
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.root.join("object-window-probe.json")).unwrap())
+            .unwrap();
+    assert_eq!(receipt["complete"], false);
+    assert_eq!(receipt["failed"], true);
+    assert_eq!(receipt["records"][1]["cleanupSucceeded"], false);
 }
