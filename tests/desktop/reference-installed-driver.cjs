@@ -54,7 +54,8 @@ function packageProof(config) {
   verifyProvenance(config,{driver,source,app,proof,helperProof,helperSourceSha256,helperSha256:hash(helper.bytes)});
   const driverProof = {sourceHead:config.driverHead,helperSourceSha256,helperSha256:config.helperSha256,
     driverSha256:hash(fs.readFileSync(__filename)),policySha256:hash(fs.readFileSync(path.join(__dirname,'reference-installed-policy.cjs'))),
-    transportSha256:hash(fs.readFileSync(path.join(__dirname,'p38-installed-driver.cjs')))};
+    transportSha256:hash(fs.readFileSync(path.join(__dirname,'p38-installed-driver.cjs'))),
+    helperProtocolSha256:hash(fs.readFileSync(path.join(__dirname,'p38-helper-protocol.cjs')))};
   return {...app,source,build:modules.identity.buildIdentity(),proofHash:hash(policy.readFile(config.buildProof).bytes),driverProof,modules};
 }
 async function transportReady(read,write,isTTY,nonce=crypto.randomUUID()) {
