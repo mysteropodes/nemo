@@ -42,17 +42,26 @@ enum OwnedOwnerQuery: String {
 enum OwnedChildrenQuery: String {
   case success, unsupported, noValue = "no-value", failed, wrongType = "wrong-type"
 }
+enum OwnedChildrenCountQuery: String {
+  case zero = "success-zero", positive = "success-positive", unsupported, noValue = "no-value", failed, invalid
+}
 
-// Only a successful, correctly typed array is readable; absent leaf attributes
-// and service-owned nodes retain exactly the same refusal authority as before.
+// No-value is empty only with an independently owned zero-count witness for
+// this observation. Unsupported/failed/inconsistent queries stay unreadable.
 struct OwnedChildren<Node> {
   let query: OwnedChildrenQuery
   let values: [Node]?
-  init(query: OwnedChildrenQuery, values: [Node]?) {
+  let countQuery: OwnedChildrenCountQuery?
+  let ownerRefusal: OwnedOwnerQuery?
+  init(query: OwnedChildrenQuery, values: [Node]?, countQuery: OwnedChildrenCountQuery? = nil,
+    ownerRefusal: OwnedOwnerQuery? = nil) {
     self.query = query == .success && values == nil ? .wrongType : query
-    self.values = self.query == .success ? values : nil
+    self.countQuery = countQuery; self.ownerRefusal = ownerRefusal
+    let empty = self.query == .noValue && values == nil && countQuery == .zero && ownerRefusal == nil
+    self.values = ownerRefusal != nil ? nil : self.query == .success ? values : empty ? [] : nil
   }
   var diagnostic: String { query == .success && values?.isEmpty == true ? "success-empty" : query.rawValue }
+  var witness: String? { query == .noValue && countQuery == .zero && values?.isEmpty == true && ownerRefusal == nil ? "empty-count-confirmed" : nil }
 }
 
 // One retained semantic object; a changed route/label/owner is never re-pinned.
@@ -109,7 +118,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
   guard ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
   phase("ax-children-query","attribute-value-unreadable")
   let rootObservation = children(root), rootChildren = rootObservation.values
-  guard ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
+  guard rootObservation.ownerRefusal == nil && ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
   if let list = rootChildren { try check(list.count < 4096) }
   if paged {
     guard let list = rootChildren else { cursor = nil; throw Refusal(code:"children-unavailable") }
@@ -149,12 +158,17 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     }
     phase("ax-children-query","attribute-value-unreadable")
     let observation = level == 0 ? rootObservation : children(current)
+    if let failure = observation.ownerRefusal {
+      foreign = true; nodes[nodes.count-1] = blocked(path,failure); return
+    }
     let afterChildren = ownership(current)
     guard afterChildren == .matched else {
       foreign = true; nodes[nodes.count-1] = blocked(path,afterChildren); return
     }
     nodes[nodes.count-1]["ownerQuery"] = afterChildren.rawValue
     nodes[nodes.count-1]["childrenQuery"] = observation.diagnostic
+    if let countQuery = observation.countQuery { nodes[nodes.count-1]["childrenCountQuery"] = countQuery.rawValue }
+    if let witness = observation.witness { nodes[nodes.count-1]["childrenWitness"] = witness }
     guard let list = observation.values else {
       unreadable = true
       if level < depth { nodes[nodes.count-1]["blocked"] = "children-unavailable" }

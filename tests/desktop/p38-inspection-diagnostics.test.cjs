@@ -22,13 +22,16 @@ function rawEvidence() {
 // Independent literal oracle: three nodes, two missing counts, one blocked node
 // of each kind. The actual helper/source is not used to regenerate these values.
 const expected = {
-  schema: 'nemo.p38-inspection-completeness/1',
+  schema: 'nemo.p38-inspection-completeness/2',
   flags: { complete: 'false', truncated: 'false', depthClipped: 'false', childrenUnreadable: 'true', foreignChildren: 'true' },
   nodeCount: 3, missingChildCount: 2,
   blocked: { categories: { 'child-owner': 1, 'children-unavailable': 1 }, absent: 1, unclassified: 0 },
   ownerQuery: { categories: { matched: 2, mismatch: 0, 'query-failed': 1 }, absent: 0, unclassified: 0 },
   childrenQuery: { categories: { success: 1, 'success-empty': 0, unsupported: 0, 'no-value': 1, failed: 0, 'wrong-type': 0 },
     absent: 1, unclassified: 0 },
+  childrenCountQuery: { categories: { 'success-zero': 0, 'success-positive': 0, unsupported: 0, 'no-value': 0, failed: 0, invalid: 0 },
+    absent: 3, unclassified: 0 },
+  childrenWitness: { categories: { 'empty-count-confirmed': 0 }, absent: 3, unclassified: 0 },
 };
 
 test('opt-in sanitizer preserves only bounded categorical totals and leaves default consumers unchanged', () => {
@@ -217,4 +220,33 @@ test('failure adapters reject private or malformed diagnostics without changing 
   assert.deepEqual(diagnostics.failureCompleteness({ code: 'inspection-completeness-refused', completeness: safe }),
     { completeness: { ...expected, boundary: 'projected-nodes' } });
   assert.doesNotThrow(() => diagnostics.requireCompleteness(true, { private: 'PRIVATE' }, 'projected-nodes'));
+});
+test('P38 and Reference preserve raw no-value only with the exact same owned zero-count witness', async () => {
+  const node = { path: '0', role: 'AXGroup', control: 'Project tabs', ownerQuery: 'matched', childrenQuery: 'no-value',
+    childrenCountQuery: 'success-zero', childrenWitness: 'empty-count-confirmed', childCount: 0 };
+  const raw = { status: 'ok', type: 'inspect', pid: 42, windowId: 9, matchedAX: true,
+    complete: true, truncated: false, depthClipped: false, childrenUnreadable: false, foreignChildren: false, nodes: [node] };
+  for (const reference of [false, true]) {
+    const first = safeWindowEvidence(raw, reference);
+    assert.equal(first.nodes[0].childrenQuery, 'no-value');
+    assert.equal(first.nodes[0].childrenWitness, 'empty-count-confirmed');
+    assert.deepEqual(safeWindowEvidence(first, reference), first); // Actual repeated projection stays valid.
+  }
+  for (const mutate of [x => delete x.childrenWitness, x => delete x.childrenCountQuery,
+    x => x.childrenCountQuery = 'success-positive', x => x.childrenCountQuery = 'no-value',
+    x => x.ownerQuery = 'mismatch', x => x.ownerQuery = 'query-failed', x => x.childrenQuery = 'success-empty',
+    x => x.childCount = 1, x => x.blocked = 'children-unavailable', x => x.childrenWitness = 'PRIVATE-WITNESS']) {
+    const bad = structuredClone(raw); mutate(bad.nodes[0]);
+    assert.throws(() => safeWindowEvidence(bad), /ax-evidence-refused/);
+  }
+  const snapshot = await semantic.observeProjectTabs(async request => request.projectTabs ?
+    { ...raw, projectTabs: { path: '0', token: '12345678-1234-1234-1234-123456789abc' } } :
+    { ...raw, nodes: [{ path: '', role: 'AXWindow', childCount: 1 }, node] }, { pid: 42, windowId: 9 });
+  assert.doesNotThrow(() => semantic.visibleEvidence(snapshot, { phase: 'ready', pid: 42, windowId: 9 }));
+  const summary = safeWindowEvidence(raw, false, true).completenessSummary;
+  assert.equal(summary.childrenQuery.categories['no-value'], 1);
+  assert.equal(summary.childrenCountQuery.categories['success-zero'], 1);
+  assert.equal(summary.childrenWitness.categories['empty-count-confirmed'], 1);
+  assert.equal(summary.missingChildCount, 0);
+  assert.equal(diagnostics.validateCompletenessSummary({ ...summary, schema: 'nemo.p38-inspection-completeness/1' }), undefined);
 });

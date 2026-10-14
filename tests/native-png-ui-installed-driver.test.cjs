@@ -324,9 +324,13 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   function slice(begin,end){const a=source.indexOf(begin),b=source.indexOf(end,a);assert.ok(a>=0&&b>a);return source.slice(a,b);}
   const gates=slice('    let target = request["target"]','    switch action {');
   const inspect=slice('    case "inspect":','    case "capture":').replace('    case "inspect":','');
+  const childSource=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-children-query.swift'),'utf8').replace(/^import .*$/gm,'');
+  const childStart=childSource.indexOf('func ownedAXChildren('),childEnd=childSource.indexOf('func ownedChildrenQuerySelfTest()',childStart);
+  assert.ok(childStart>=0&&childEnd>childStart);
+  const childBinding=childSource.slice(childStart,childEnd),childCore=childSource.slice(0,childStart);
   const definitions=slice('struct ProcessStart:','func processStart(')+slice('func localFacts(','// A path is diagnostic')+
     slice('func boundedOwnedTree<','func guardedElementAction(')+
-    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'');
+    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'')+childCore;
   const verify=slice('  func verifyService()','  try emit(["status":"pinned"');
   const node=slice('  func node(_ value:','  func supports(');
   const code=`import Foundation
@@ -389,6 +393,8 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
   func AXUIElementCopyAttributeValue(_ n:Int,_ key:CFString,_ out:inout CFTypeRef?)->AXError{
     if key as String==kAXChildrenAttribute {out=attr(n,kAXChildrenAttribute);return .success};out=nil;return .attributeUnsupported
   }
+  func AXUIElementGetAttributeValueCount(_ n:Int,_ key:CFString,_ out:inout CFIndex)->AXError{.noValue}
+  ${childBinding}
   func AXUIElementIsAttributeSettable(_ n:Int,_ key:CFString,_ out:inout DarwinBoolean)->AXError{out=DarwinBoolean(true);return .success}
   func verify()throws{try check(fault != "stale-nemo")}
   func verifySheet()throws->Int{try check(fault != "detached-sheet");return 2}
@@ -542,4 +548,24 @@ test('PNG pages require observed roots and exact retained continuation; metadata
   P.verifyAction(f.c,{type:'press',element:candidate.path},{}, {...complete,target:'main',nodes:[candidate]});
   for(const bad of [{childCount:'/private'},{nextChildOffset:4096},{complete:'yes'},{depthClipped:{}},{pageToken:'private-token'}])
     assert.throws(()=>P.sanitizeHelper({status:'ok',type:'inspect',...bad}));
+});
+test('PNG no-value emptiness requires correlated matched-owner zero-count evidence',()=>{
+  const identity={status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,
+    complete:true,truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false};
+  const node={path:'0',role:'AXButton',ownerQuery:'matched',childrenQuery:'no-value',childCount:0,
+    childrenCountQuery:'success-zero',childrenWitness:'empty-count-confirmed',press:true};
+  const clean=P.sanitizeHelper({...identity,nodes:[node]});
+  assert.equal(clean.nodes[0].childrenQuery,'no-value');
+  assert.equal(clean.nodes[0].childrenWitness,'empty-count-confirmed');
+  for(const change of [n=>delete n.childrenWitness,n=>delete n.childrenCountQuery,n=>n.childCount=1,
+    n=>n.childrenCountQuery='success-positive',n=>n.childrenCountQuery='failed',n=>n.childrenQuery='unsupported',
+    n=>n.ownerQuery='mismatch',n=>n.blocked='children-unavailable',n=>n.childrenWitness='private-secret']){
+    const bad=structuredClone(node);change(bad);
+    assert.throws(()=>P.sanitizeHelper({...identity,nodes:[bad]}),/png-query-refused/);
+  }
+  for(const outcome of ['success-positive','unsupported','no-value','failed','invalid']){
+    const unreadable={...node,childrenCountQuery:outcome};delete unreadable.childCount;delete unreadable.childrenWitness;
+    const negative=P.sanitizeHelper({...identity,complete:false,childrenUnreadable:true,nodes:[unreadable]});
+    assert.equal(negative.complete,false);assert.equal(negative.nodes[0].childCount,undefined);
+  }
 });
