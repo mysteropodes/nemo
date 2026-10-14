@@ -180,6 +180,15 @@ func guardedElementAction(_ identity:() throws->Bool, _ action:() throws->Void) 
   guard try identity() else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
   try action()
 }
+func unresolvedServiceBlocksSheetMutation(_ target:String, _ action:String, _ serviceRootPresent:Bool,
+  _ locationTokenPresent:Bool) -> Bool {
+  target == "sheet" && ["press","set","select"].contains(action) && serviceRootPresent && !locationTokenPresent
+}
+func requireResolvedSheetMutation(_ target:String, _ action:String, _ serviceRootPresent:Bool,
+  _ locationTokenPresent:Bool) throws {
+  try locationCheck(!unresolvedServiceBlocksSheetMutation(target,action,serviceRootPresent,locationTokenPresent),
+    "goto-state","unresolved-transition")
+}
 func locationCandidateValid(_ fresh: Bool, _ owned: Bool, _ modal: Bool, _ semantic: Bool,
   _ fields: Int, _ kind: String, _ enabled: Bool, _ writable: Bool, _ confirm: Bool) -> Bool {
   fresh && owned && modal && semantic && fields == 1 && kind == "plain" && enabled && writable && confirm
@@ -586,6 +595,20 @@ func selfTest() throws {
   var staleAction=false,staleRefused=false
   do { try guardedElementAction({ false },{ staleAction=true }) } catch { staleRefused=true }
   try check(staleRefused && !staleAction)
+  for action in ["press","set","select"] {
+    var actionsPerformed=0,refused=false
+    do {
+      try requireResolvedSheetMutation("sheet",action,true,false)
+      actionsPerformed += 1
+    } catch let error as ActionRefusal {
+      refused = error.diagnostics["gotoReason"] as? String == "unresolved-transition"
+    }
+    try check(refused && actionsPerformed == 0)
+  }
+  try check(!unresolvedServiceBlocksSheetMutation("sheet","press",false,false) &&
+    !unresolvedServiceBlocksSheetMutation("sheet","press",true,true) &&
+    !unresolvedServiceBlocksSheetMutation("sheet","inspect",true,false) &&
+    !unresolvedServiceBlocksSheetMutation("main","press",true,false))
   for fault in ["none","p38","repeat","pid","window","focus","ancestor","layout","after-action","duplicate","search","absent","timeout"] {
     var attempted = fault == "repeat", events = [String](), contexts = 0, refused = false
     let trace = LocationTrace()
@@ -855,7 +878,8 @@ func selfTest() throws {
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
     "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,
     "privateOwnerCases":5,"privatePathClassCases":4,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,
-    "serviceIdentityCases":5,"serviceAttachmentCases":5,"focusedFieldCases":4,"foreignReads":0,"runtimeAX":false])
+    "serviceIdentityCases":5,"serviceAttachmentCases":5,"focusedFieldCases":4,"unresolvedTransitionCases":3,
+    "foreignReads":0,"runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -1311,6 +1335,7 @@ func run() throws {
       if action != "location-dismissed" { selectedRoot = try verifyLocation() }
       result["locationToken"] = token
     } else { try locationCheck(request["locationToken"] == nil,"goto-state") }
+    try requireResolvedSheetMutation(target,action,serviceRoot != nil,locationToken != nil)
     switch action {
     case "go-to-folder":
       let trace = LocationTrace()

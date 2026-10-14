@@ -156,6 +156,9 @@ test('static owned-window adapter excludes global input and requires exact PID/w
   assert.ok(s.includes('com.apple.appkit.xpc.openAndSavePanelService'));
   assert.ok(s.includes('AXUIElementPerformAction(opener,kAXPressAction as CFString)'));
   assert.ok(s.includes('AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,text as CFString)'));
+  assert.ok(s.includes('try requireResolvedSheetMutation(target,action,serviceRoot != nil,locationToken != nil)'));
+  assert.ok(s.includes('func requireResolvedSheetMutation('));
+  assert.ok(s.includes('"unresolvedTransitionCases":3'));
   assert.ok(s.includes('"serviceIdentityCases":5'));assert.ok(s.includes('"serviceAttachmentCases":5'));
   assert.ok(s.includes('confirm-unsupported'));assert.ok(s.includes('No title/value/children reads from a foreign child'));
 });
