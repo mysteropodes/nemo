@@ -9,7 +9,9 @@ use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{DesktopViewportHost, SurfacePort, ViewportMapping},
-    export_job::{ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome},
+    export_job::{
+        ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, MAX_OBJECT_EXPORT_FRAMES,
+    },
     object_document::FrameScopeKind,
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
@@ -44,12 +46,17 @@ struct ObjectExportRequest {
     context_id: String,
     scope_kind: FrameScopeKind,
     frame: u32,
+    #[serde(default, deserialize_with = "non_null_frames")]
+    frames: Option<Vec<u32>>,
     output_spec: OutputSpecInput,
     viewport: ViewportInput,
     destination_directory: String,
     maximum_encoded_bytes: usize,
     #[serde(default)]
     cancelled_before_dispatch: bool,
+}
+fn non_null_frames<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<u32>>, D::Error> {
+    Vec::<u32>::deserialize(d).map(Some)
 }
 impl ObjectExportRequest {
     fn selector(&self) -> ObjectFrameSelector<'_> {
@@ -99,6 +106,12 @@ fn admit_request(
         || request.scope_kind != FrameScopeKind::Authored
         || request.maximum_encoded_bytes == 0
         || request.maximum_encoded_bytes > MAX_PNG_BYTES
+        || request.frames.as_ref().is_some_and(|frames| {
+            frames.is_empty()
+                || frames.len() > MAX_OBJECT_EXPORT_FRAMES
+                || frames.first() != Some(&request.frame)
+                || frames.windows(2).any(|pair| pair[0] >= pair[1])
+        })
     {
         return Err(invalid());
     }
@@ -214,6 +227,7 @@ fn receipt(
 struct ObjectExportConsumer<'a> {
     owner: &'a mut NativeObjectHost,
     selector: ObjectFrameSelector<'a>,
+    frames: Vec<u32>,
     request_id: String,
     output: OutputSpec,
     maximum_encoded_bytes: usize,
@@ -224,8 +238,9 @@ impl ObjectExportConsumer<'_> {
     fn run(self, compositor: &mut Compositor) -> Result<ObjectHostExportOutcome, String> {
         let mut port =
             LazyDesktopArtifactPort::new(self.staging_root, OUTPUT_HANDLE.into(), self.destination);
-        self.owner.export_pinned_object_png(
+        self.owner.export_pinned_object_png_frames(
             &self.selector,
+            &self.frames,
             self.request_id,
             OUTPUT_HANDLE.into(),
             self.output,
@@ -259,6 +274,11 @@ fn export_with_target(
             Ok(target(ObjectExportConsumer {
                 owner,
                 selector: selector.clone(),
+                frames: admitted
+                    .request
+                    .frames
+                    .clone()
+                    .unwrap_or_else(|| vec![selector.frame]),
                 request_id: admitted.request.request_id.clone(),
                 output: admitted.output.clone(),
                 maximum_encoded_bytes: admitted.request.maximum_encoded_bytes,

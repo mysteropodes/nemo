@@ -26,7 +26,10 @@ use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, WorkId,
 };
 pub(crate) use object::{ObjectExportBegin, ObjectExportJob, PendingObjectFrame};
-pub use object_host::{export_one_object_frame, ObjectHostExportOutcome, ObjectHostExportRequest};
+pub use object_host::{
+    export_object_frames, export_one_object_frame, ObjectHostExportOutcome,
+    ObjectHostExportRequest, MAX_OBJECT_EXPORT_FRAMES,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 const WIDTH: u32 = 320;

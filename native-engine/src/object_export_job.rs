@@ -1,7 +1,8 @@
-//! One pinned object frame. The host must reconcile before releasing this job.
+//! A bounded pinned object frame sequence. The host must reconcile before releasing this job.
 use crate::export_job::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, StagedArtifactPort,
+    MAX_OBJECT_EXPORT_FRAMES,
 };
 use crate::export_job_lifecycle::{
     cleanup_allows_release, invoke, replay_object_begin, retain_cleanup_failure,
@@ -12,11 +13,13 @@ use crate::object_render_scene::{
     prepare_scheduled_object_composition_from_witness as prepare, ObjectCompositionWitness,
 };
 use crate::png_output::{ObjectPngEncoder, ScheduledObjectPng};
+use crate::revision::ObjectSnapshot;
 use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, ObjectSchedulePins, OutputSpec,
     ScheduledFrame,
 };
 
+#[cfg(test)]
 const FRAME: &str = "frame_0001.png";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ObjectExportBegin {
@@ -34,6 +37,10 @@ pub(crate) struct PendingObjectFrame {
 struct Record {
     request: ObjectExportBegin,
     witness: ObjectCompositionWitness,
+    first_witness: ObjectCompositionWitness,
+    snapshot: ObjectSnapshot,
+    frames: Vec<u32>,
+    cursor: usize,
     work: ScheduledFrame,
     work_active: bool,
     in_flight: bool,
@@ -66,6 +73,23 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         request: ObjectExportBegin,
         witness: ObjectCompositionWitness,
     ) -> Result<JobReceipt, ExportJobError> {
+        let frame = request.pins.frame;
+        self.begin_frames(history, request, witness, vec![frame])
+    }
+    pub(crate) fn begin_frames(
+        &mut self,
+        history: &NativeObjectHistory,
+        request: ObjectExportBegin,
+        witness: ObjectCompositionWitness,
+        frames: Vec<u32>,
+    ) -> Result<JobReceipt, ExportJobError> {
+        if frames.is_empty()
+            || frames.len() > MAX_OBJECT_EXPORT_FRAMES
+            || frames.first() != Some(&request.pins.frame)
+            || frames.windows(2).any(|pair| pair[0] >= pair[1])
+        {
+            return Err(invalid("bounded strictly ascending source frames required"));
+        }
         if witness.is_viewport() {
             return Err(invalid("viewport content is not an artwork export source"));
         }
@@ -73,7 +97,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
             return replay_object_begin(
                 &job.request,
                 &request,
-                job.witness.same_identity_as(&witness),
+                job.frames == frames && job.first_witness.same_identity_as(&witness),
                 &job.receipt,
             );
         }
@@ -84,6 +108,12 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
             ));
         }
         let snapshot = validate_object_begin(history, &request, self.scheduler)?;
+        if frames
+            .iter()
+            .any(|frame| *frame >= snapshot.document().total_frames())
+        {
+            return Err(invalid("source frame is outside the pinned document"));
+        }
         let pins = &request.pins;
         let key = EvaluationKey::new(
             &pins.document_snapshot_id,
@@ -96,7 +126,7 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         .map_err(|e| invalid(e.to_string()))?;
         let work = self
             .scheduler
-            .schedule_object(snapshot, pins.clone(), key)
+            .schedule_object(snapshot.clone(), pins.clone(), key)
             .map_err(|e| invalid(e.to_string()))?;
         if let Err(error) = prepare(self.scheduler, &work, &witness) {
             self.scheduler
@@ -120,7 +150,11 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         };
         self.record = Some(Record {
             request,
+            first_witness: witness.clone(),
             witness,
+            snapshot,
+            frames,
+            cursor: 0,
             work,
             work_active: true,
             in_flight: false,
@@ -211,6 +245,11 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
         let witness = job.witness.clone();
         let job_id = job.receipt.job_id.clone();
         let target = job.request.target.clone();
+        let name = format!("frame_{:04}.png", job.cursor + 1);
+        let final_frame = job.cursor + 1 == job.frames.len();
+        let files: Vec<_> = (1..=job.frames.len())
+            .map(|i| format!("frame_{i:04}.png"))
+            .collect();
         let result = (|| {
             let live = prepare(self.scheduler, &work, &witness)
                 .map_err(|e| ("frame_failed", format!("{e:?}")))?;
@@ -218,10 +257,12 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
                 .png
                 .bytes(&live)
                 .map_err(|e| ("frame_failed", e.to_string()))?;
-            invoke(|| self.port.write_frame(&job_id, FRAME, bytes))
+            invoke(|| self.port.write_frame(&job_id, &name, bytes))
                 .map_err(|e| ("write_failed", e))?;
+            if !final_frame {
+                return Ok(None);
+            }
             self.record.as_mut().unwrap().publication_attempted = true;
-            let files = vec![FRAME.to_owned()];
             let artifact = invoke(|| self.port.publish(&job_id, &target, &files))
                 .map_err(|e| ("publish_failed", e))?;
             if artifact.target != target || artifact.files != files {
@@ -230,24 +271,71 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
                     "artifact manifest does not match pinned target/frame".into(),
                 ));
             }
-            Ok(artifact) // Same actual live scheduler borrow covers bytes/write/publish.
+            Ok(Some(artifact)) // Same live borrow covers final bytes/write/publish.
         })();
         match result {
             Ok(artifact) => match self.scheduler.succeed(work.work_id()) {
                 Ok(_) => {
                     let job = self.record.as_mut().unwrap();
                     job.work_active = false;
-                    job.receipt.status = JobStatus::Succeeded;
-                    job.receipt.progress = 1.0;
-                    job.receipt.artifact = Some(artifact);
-                    job.receipt.cleanup.status = CleanupStatus::Complete;
-                    job.receipt.external_effect_disposition = ExternalEffectDisposition::Committed;
+                    job.in_flight = false;
+                    job.cursor += 1;
+                    job.receipt.progress = job.cursor as f64 / job.frames.len() as f64;
+                    if let Some(artifact) = artifact {
+                        job.receipt.status = JobStatus::Succeeded;
+                        job.receipt.artifact = Some(artifact);
+                        job.receipt.cleanup.status = CleanupStatus::Complete;
+                        job.receipt.external_effect_disposition =
+                            ExternalEffectDisposition::Committed;
+                    }
                 }
                 Err(error) => {
                     self.terminate(JobStatus::Failed, "schedule_failed", error.to_string())
                 }
             },
             Err((code, error)) => self.terminate(JobStatus::Failed, code, error),
+        }
+        self.status()
+    }
+    pub(crate) fn next_frame(
+        &mut self,
+        witness: Result<ObjectCompositionWitness, String>,
+    ) -> Result<JobReceipt, ExportJobError> {
+        let job = self
+            .record
+            .as_mut()
+            .ok_or_else(|| invalid("object export not begun"))?;
+        if job.receipt.status != JobStatus::Running || job.work_active || job.in_flight {
+            return Err(invalid("next frame requires settled previous work"));
+        }
+        let result = (|| {
+            let witness = witness?;
+            if witness.is_viewport() {
+                return Err("viewport is not an export source".into());
+            }
+            let mut pins = job.request.pins.clone();
+            pins.frame = *job.frames.get(job.cursor).ok_or("sequence exhausted")?;
+            let key = EvaluationKey::new(
+                &pins.document_snapshot_id,
+                &pins.context_id,
+                pins.frame,
+                "final",
+                job.request.output.clone(),
+                [],
+            )
+            .map_err(|error| error.to_string())?;
+            job.work = self
+                .scheduler
+                .schedule_object(job.snapshot.clone(), pins, key)
+                .map_err(|error| error.to_string())?;
+            job.work_active = true; // Retain new work before witness validation.
+            job.witness = witness;
+            prepare(self.scheduler, &job.work, &job.witness)
+                .map_err(|error| format!("{error:?}"))?;
+            Ok(())
+        })();
+        if let Err(error) = result {
+            self.terminate(JobStatus::Failed, "frame_failed", error);
         }
         self.status()
     }
@@ -311,13 +399,17 @@ impl<'a, P: StagedArtifactPort> ObjectExportJob<'a, P> {
     }
     fn terminate(&mut self, status: JobStatus, code: &'static str, error: String) {
         let job = self.record.as_mut().unwrap();
-        let settlement = if job.work_active && status == JobStatus::Failed {
-            self.scheduler.fail(
-                job.work.work_id(),
-                FrameFailure::new(FrameFailureKind::Worker, error.clone()),
-            )
+        let settlement = if !job.work_active {
+            Ok(())
+        } else if status == JobStatus::Failed {
+            self.scheduler
+                .fail(
+                    job.work.work_id(),
+                    FrameFailure::new(FrameFailureKind::Worker, error.clone()),
+                )
+                .map(|_| ())
         } else {
-            self.scheduler.cancel(job.work.work_id())
+            self.scheduler.cancel(job.work.work_id()).map(|_| ())
         };
         if settlement.is_ok() {
             job.work_active = false;

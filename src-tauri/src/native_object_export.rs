@@ -3,7 +3,7 @@ use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
     export_job::{
-        export_one_object_frame, CleanupStatus, ExportReleaseReconciliation,
+        export_object_frames, CleanupStatus, ExportReleaseReconciliation,
         ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
@@ -35,11 +35,41 @@ impl ObjectExportSession {
 }
 
 impl NativeObjectHost {
+    #[cfg(test)]
+    pub(crate) fn export_test_state(&mut self) -> Result<(u64, (usize, usize)), String> {
+        Ok((
+            self.preview.scheduler_for_export()?.lease_counters().live(),
+            self.history.history_depths(),
+        ))
+    }
+
     /// A synchronous private source consumer. The later application route must
     /// lend the original desktop port and GPU under its native/revision guards.
     pub(crate) fn export_pinned_object_png<P: StagedArtifactPort>(
         &mut self,
         expected: &ObjectFrameSelector<'_>,
+        request_id: String,
+        target: String,
+        output: OutputSpec,
+        maximum_encoded_bytes: usize,
+        port: &mut P,
+        compositor: &mut Compositor,
+    ) -> Result<ObjectHostExportOutcome, String> {
+        self.export_pinned_object_png_frames(
+            expected,
+            &[expected.frame],
+            request_id,
+            target,
+            output,
+            maximum_encoded_bytes,
+            port,
+            compositor,
+        )
+    }
+    pub(crate) fn export_pinned_object_png_frames<P: StagedArtifactPort>(
+        &mut self,
+        expected: &ObjectFrameSelector<'_>,
+        frames: &[u32],
         request_id: String,
         target: String,
         output: OutputSpec,
@@ -65,17 +95,34 @@ impl NativeObjectHost {
             .history
             .acquire_snapshot(expected.content_revision)
             .ok_or("native object export snapshot is unavailable")?;
-        let packet = prepare_object_frame(&snapshot, expected)
-            .map_err(|error| format!("object export selector: {error:?}"))?;
-        let scene = prepare_object_render_scene(&packet, expected)
-            .map_err(|error| format!("object export scene: {error:?}"))?;
-        let plan = prepare_object_paint_plan(&scene, expected)
-            .map_err(|error| format!("object export paint: {error:?}"))?;
-        let witness = prepare_object_composition(&plan, expected)
-            .map_err(|error| format!("object export witness: {error:?}"))?;
+        let witness_for = |frame| {
+            let selector = ObjectFrameSelector {
+                frame,
+                ..expected.clone()
+            };
+            let packet = prepare_object_frame(&snapshot, &selector)
+                .map_err(|error| format!("object export selector: {error:?}"))?;
+            let scene = prepare_object_render_scene(&packet, &selector)
+                .map_err(|error| format!("object export scene: {error:?}"))?;
+            let plan = prepare_object_paint_plan(&scene, &selector)
+                .map_err(|error| format!("object export paint: {error:?}"))?;
+            prepare_object_composition(&plan, &selector)
+                .map_err(|error| format!("object export witness: {error:?}"))
+        };
+        // Preserve the single-frame pre-staging selector refusal contract.
+        let mut first = Some(witness_for(expected.frame)?);
+        let witnesses = |frame| {
+            if frame == expected.frame {
+                first
+                    .take()
+                    .ok_or_else(|| "initial object witness already consumed".into())
+            } else {
+                witness_for(frame)
+            }
+        };
         let scheduler = self.preview.scheduler_for_export()?;
         let session_request_id = request_id.clone();
-        let outcome = export_one_object_frame(
+        let outcome = export_object_frames(
             &self.history,
             scheduler,
             port,
@@ -95,7 +142,8 @@ impl NativeObjectHost {
                 output,
                 maximum_encoded_bytes,
             },
-            witness,
+            frames,
+            witnesses,
         );
         if !outcome.release.receipts.is_empty() || !outcome.release.cleanup_complete {
             self.object_export = Some(ObjectExportSession {
