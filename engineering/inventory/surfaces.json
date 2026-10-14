@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "9ce4e7f2b5ac80c0546406c0adcf93da6bf90de3",
-  "describe": "v0.7.0-alpha.4-1754-g9ce4e7f2-dirty"
+  "head": "ba837d750ecef23fb97f15360e8b854cf8b5bf8a",
+  "describe": "v0.7.0-alpha.4-1756-gba837d75-dirty"
  },
- "inputsDigest": "ffceb04b6e2e53b11594fd5de8001f51a17913867f09e40d6ee2c8b65888df1d",
+ "inputsDigest": "a097ae725045b8edb880babb20958f3a7dd1c9b02bcf5d106a8dfcb8869ba9ff",
  "states": [
   "inventoried",
   "characterized",
@@ -2471,7 +2471,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:705 initStartScreen()"
+    "src/js/project.js:714 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3354,7 +3354,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:702 initStartScreen()"
+    "src/js/project.js:711 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3435,7 +3435,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:701 initStartScreen()"
+    "src/js/project.js:710 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4655,7 +4655,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:699 initStartScreen()"
+    "src/js/project.js:708 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4695,7 +4695,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:700 initStartScreen()"
+    "src/js/project.js:709 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7842,7 +7842,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:706 initStartScreen()"
+    "src/js/project.js:715 initStartScreen()"
    ],
    "events": [
     "change"
@@ -15794,9 +15794,13 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:696 initStartScreen()"
+    "src/js/project.js:703 initStartScreen()",
+    "src/js/project.js:704 initStartScreen()",
+    "src/js/project.js:705 initStartScreen()"
    ],
    "events": [
+    "keydown",
+    "keyup",
     "click"
    ],
    "exposure": [
@@ -15817,8 +15821,8 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 65,
-    "via": "chain",
+    "functionsVisited": 66,
+    "via": "variable startOpen",
     "references": []
    },
    "fixtures": [
