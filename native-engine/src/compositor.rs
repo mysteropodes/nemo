@@ -17,7 +17,7 @@ pub(crate) use object_compositor::scheduled_tests::{
 pub(crate) use object_compositor::ScheduledObjectCompositionResult;
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 use object_target::ObjectTarget;
-use readback::ReadbackBytes;
+pub use readback::ReadbackBytes;
 
 use crate::render_geometry::LayerShape;
 use crate::render_scene::{RenderScene, ScheduledFrameIdentity};
@@ -412,6 +412,11 @@ impl NativeRgba8Readback {
 
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// Retain the original pixels and their charge without copying the payload.
+    pub(crate) fn retained_bytes(&self) -> ReadbackBytes {
+        self.bytes.clone()
     }
 
     pub fn document_snapshot_id(&self) -> &str {

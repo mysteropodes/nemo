@@ -244,7 +244,7 @@ pub(crate) fn assert_cap_exports(
             .zip(readbacks)
             .zip([(0, 20), (10, 50), (20, 80)])
     {
-        assert_eq!(png, &(pixels.width, pixels.height, pixels.bytes.clone()));
+        assert_eq!(png, &(pixels.width, pixels.height, pixels.bytes.to_vec()));
         assert_eq!(pixels.document_snapshot_id, snapshot_id);
         assert_eq!((pixels.content_revision, pixels.source_frame), (0, frame));
         assert_cap_pixels(&pixels.bytes, opacity, 64);

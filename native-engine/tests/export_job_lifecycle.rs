@@ -58,7 +58,7 @@ impl ExportCompositor for Compositor {
         Ok(ExportReadback {
             width: 320,
             height: 180,
-            bytes: [1, 2, 3, 255].repeat(320 * 180),
+            bytes: [1, 2, 3, 255].repeat(320 * 180).try_into().unwrap(),
             document_snapshot_id: scene.document_snapshot_id().into(),
             document_id: scene.document_id().into(),
             content_revision: scene.content_revision(),
