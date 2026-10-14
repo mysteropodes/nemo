@@ -188,6 +188,10 @@ func safeInspectionContext(_ stage: String, _ queryClass: String) -> [String:Str
   guard inspectionQueryClasses[stage]?.contains(queryClass) == true else { return nil }
   return ["stage":stage,"queryClass":queryClass]
 }
+func inspectionDiagnosticForRefusal(_ code: String, _ stage: String, _ queryClass: String) -> [String:String]? {
+  guard code == "adapter-refused" else { return nil }
+  return safeInspectionContext(stage,queryClass)
+}
 func setInspectionContext(_ stage: String, _ queryClass: String) {
   if activeInspectionContext != nil { activeInspectionContext = InspectionContext(stage:stage,queryClass:queryClass) }
 }
@@ -683,6 +687,9 @@ func selfTest() throws {
     try check(safeInspectionContext(stage,queryClass) != nil)
   } }
   try check(safeInspectionContext("private-path","private-value") == nil)
+  try check(inspectionDiagnosticForRefusal("adapter-refused","main-children-query","attribute-query-failed") != nil)
+  try check(inspectionDiagnosticForRefusal("sheet-owner","main-children-query","attribute-query-failed") == nil)
+  try check(inspectionDiagnosticForRefusal("adapter-refused","private-path","private-value") == nil)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
     "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,
@@ -1391,10 +1398,16 @@ func run() throws {
 do { try run() }
 catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
 catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
-catch let error as InspectionRefusal { try? emit(["status":"refused","code":"adapter-refused","inspectionDiagnostics":["stage":error.stage,"queryClass":error.queryClass]]); exit(1) }
+catch let error as InspectionRefusal {
+  var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
+  if let diagnostic = safeInspectionContext(error.stage,error.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+  try? emit(result); exit(1)
+}
 catch let error as Refusal {
-  var result: [String:Any] = ["status":"refused","code":allowedReasons.contains(error.code) ? error.code : "adapter-refused"]
-  if let context = activeInspectionContext, let diagnostic = safeInspectionContext(context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+  let code = allowedReasons.contains(error.code) ? error.code : "adapter-refused"
+  var result: [String:Any] = ["status":"refused","code":code]
+  if let context = activeInspectionContext,
+     let diagnostic = inspectionDiagnosticForRefusal(code,context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
   try? emit(result); exit(1)
 }
 catch {
