@@ -34,7 +34,8 @@ const FAILURE_CODES = Object.freeze({
   'task-owner': ['task-owner-unavailable'],
   'probe-manifest': ['probe-temp-identity-refused', 'probe-temp-read-refused',
     'probe-manifest-validation-refused', 'probe-manifest-failure-unknown',
-    ...PROBE_FAILURE_CATEGORIES, 'probe-ready-timeout', 'probe-manifest-timeout'],
+    ...PROBE_FAILURE_CATEGORIES, 'probe-manifest-failed-post-wait-validation-refused',
+    'probe-ready-timeout', 'probe-manifest-timeout'],
   'helper-start': ['helper-start-failed', 'helper-executable-refused'],
   'helper-pin': ['helper-window-identity-refused'],
   checkpoint: ['driver-first-failure', 'checkpoint-refused', 'checkpoint-timeout'],
@@ -52,6 +53,20 @@ function failedManifestCategory(manifest) {
   const phase = PROBE_FAILURE_PHASES.find(item => item.checkpoint === manifest.checkpoint &&
     item.codes.includes(manifest.failureCode));
   return phase ? `probe-manifest-failed-${manifest.failureCode}` : 'probe-manifest-failure-unknown';
+}
+function checkpointFailureCategory(root, manifest, expected, phase, index) {
+  if (manifest.failed !== true || manifest.waiting !== false || manifest.result !== 'failed')
+    return 'probe-manifest-failure-unknown';
+  try {
+    validateManifestIdentity(root, manifest, expected);
+  } catch {
+    return 'probe-manifest-failure-unknown';
+  }
+  if (manifest.checkpoint === index) return phase === PHASES[index] ? failedManifestCategory(manifest) : 'probe-manifest-failure-unknown';
+  if (phase === PHASES[index] && index > 0 && manifest.checkpoint === index - 1 &&
+      manifest.failureCode === 'post-wait-validation-refused')
+    return 'probe-manifest-failed-post-wait-validation-refused';
+  return 'probe-manifest-failure-unknown';
 }
 function validId(value) { return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value); }
 function validateConfig(config) {
@@ -305,7 +320,7 @@ function waitLine(lines, timeoutMs = 10000) {
 function defaultServices(config, testServices = {}) {
   const isolation = testServices.isolation || require(path.join(ROOT, 'scripts/nemo/lib/isolation.cjs'));
   const owner = testServices.owner || require('./p38-fixture-open-installed.cjs');
-  const reportDir = path.join(ROOT, 'reports', 'p38-installed-operators', hash(config.grantId));
+  const reportDir = testServices.reportDir || path.join(ROOT, 'reports', 'p38-installed-operators', hash(config.grantId));
   const receiptFile = path.join(reportDir, 'receipt.json');
   // This observer runs only while the exact driver task is active.
   const roots = testServices.roots || isolation.taskRoots(config.taskId);
@@ -370,15 +385,18 @@ function defaultServices(config, testServices = {}) {
     if (sawPrepared) fail('probe-manifest', 'probe-ready-timeout');
     fail('probe-manifest', 'probe-manifest-timeout');
   }
-  async function waitForCheckpoint(_config, _expected, probe, _phase, index, deadline) {
+  async function waitForCheckpoint(_config, expected, probe, phase, index, deadline) {
     while (Date.now() < deadline) {
       let driver;
       try { driver = readJSONNoFollow(receiptFile); }
       catch { fail('checkpoint', 'driver-first-failure'); }
       if (driver?.firstFailure) fail('checkpoint', 'driver-first-failure');
       const manifest = readManifest(probe.root);
-      if (manifest?.failed) fail('checkpoint', 'checkpoint-refused');
-      if (manifest?.waiting === true && manifest?.checkpoint === index) return manifest;
+      if (manifest && (manifest.failed !== false || ['failed','refused'].includes(manifest.result))) {
+        const code = checkpointFailureCategory(probe.root, manifest, expected, phase, index);
+        fail('probe-manifest', code);
+      }
+      if (manifest?.waiting === true && manifest?.failed === false && manifest?.checkpoint === index) return manifest;
       await new Promise(resolve => setTimeout(resolve, 75));
     }
     fail('checkpoint', 'checkpoint-timeout');

@@ -58,6 +58,84 @@ async function probeFailure(manifest, useSymlink = false, receiptMismatch = fals
   finally {fs.rmSync(base,{recursive:true,force:true});}
   return null;
 }
+async function checkpointFailure(manifestOverrides, phase = 'a-opened', index = 1) {
+  const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'p38-checkpoint-failure-')));
+  const temp=path.join(base,'tmp'), reportDir=path.join(base,'reports');
+  fs.mkdirSync(temp); fs.mkdirSync(reportDir);
+  const root=path.join(temp,'p38-fixture-open-12345678-1234-1234-1234-123456789abc'); fs.mkdirSync(root);
+  const manifest=probeManifest(root,{failed:true,waiting:false,checkpoint:1,failureCode:'a-fs-read-rejected',result:'failed',...manifestOverrides});
+  fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(manifest));
+  fs.writeFileSync(path.join(reportDir,'receipt.json'),JSON.stringify({schema:'nemo.p38-operator/1',grant:config.grantId,
+    task:config.taskId,source:config.sourceHead,appPid:42,windowId:6068}));
+  const expected={taskId:config.taskId,taskKey:'a'.repeat(64),source:config.sourceHead,pid:42,windowId:6068};
+  const services=defaultServices(config,{roots:{temp},reportDir,isolation:{taskRoots:()=>({temp})},owner:{}});
+  try { await services.waitForCheckpoint(config,expected,{root,manifest},phase,index,Date.now()+1000); }
+  catch(error) { return {stage:error.observerStage,code:error.observerCode}; }
+  finally { fs.rmSync(base,{recursive:true,force:true}); }
+  return null;
+}
+async function checkpointObservation(failure={checkpoint:1,failureCode:'a-fs-read-rejected'}) {
+  const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'p38-checkpoint-observation-')));
+  const temp=path.join(base,'tmp'),reportDir=path.join(base,'reports');fs.mkdirSync(temp);fs.mkdirSync(reportDir);
+  const root=path.join(temp,'p38-fixture-open-12345678-1234-1234-1234-123456789abc');fs.mkdirSync(root);
+  const manifestPath=path.join(root,'manifest.json');fs.writeFileSync(manifestPath,JSON.stringify(probeManifest(root)));
+  fs.writeFileSync(path.join(reportDir,'receipt.json'),JSON.stringify({schema:'nemo.p38-operator/1',grant:config.grantId,
+    task:config.taskId,source:config.sourceHead,appPid:42,windowId:6068}));
+  const owner={receipt:()=>({value:JSON.parse(fs.readFileSync(manifestPath,'utf8'))}),visibleEvidence(){},
+    acknowledge(_root,expected){if(expected.phase==='ready')fs.writeFileSync(manifestPath,JSON.stringify(probeManifest(root,
+      {failed:true,waiting:false,result:'failed',...failure})));}};
+  const defaults=defaultServices(config,{roots:{temp},reportDir,isolation:{taskRoots:()=>({temp}),idKey:()=> 'a'.repeat(64)},owner});
+  const services={...defaults,readOwner:async()=>({taskId:config.taskId,ownerToken:'d'.repeat(32)}),
+    startHelper:async()=>({next:async()=>({status:'pinned',pid:42,windowId:6068,matchedAX:true}),
+      inspect:async()=>({pid:42,windowId:6068,matchedAX:true,nodes:[]}),close:async()=>{}})};
+  try {
+    const result=await runObserver(config,services);
+    const saved=JSON.parse(fs.readFileSync(path.join(reportDir,'owner-observation.json'),'utf8'));
+    return {firstFailure:result.firstFailure,observations:result.observations,cleanup:result.cleanup,saved:saved.firstFailure};
+  } finally {fs.rmSync(base,{recursive:true,force:true});}
+}
+test('checkpoint failure preserves only its phase-aligned fixed manifest cause',async()=>{
+  assert.deepEqual(await checkpointFailure({}),
+    {stage:'probe-manifest',code:'probe-manifest-failed-a-fs-read-rejected'});
+  for(const overrides of [
+    {checkpoint:1,failureCode:'post-wait-validation-refused'},
+    {failureCode:'private /Users/example/A.json exception'},
+    {taskKey:'f'.repeat(64)},
+    {checkpoint:0,failureCode:'ready-open-path-unavailable'},
+    {result:'refused'},
+    {failed:false,result:'refused'},
+    {failed:0,result:'waiting'},
+  ]) assert.deepEqual(await checkpointFailure(overrides),
+    {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
+});
+test('post-wait validation has a distinct fixed category only on the prior cursor',async()=>{
+  const source=fs.readFileSync(path.join(__dirname,'../../src-tauri/src/task_runtime/p38_fixture_open_probe_control.rs'),'utf8');
+  assert.match(source,/session\.failure_code = Some\("post-wait-validation-refused"\.into\(\)\);/);
+  const expected={stage:'probe-manifest',code:'probe-manifest-failed-post-wait-validation-refused'};
+  assert.deepEqual(await checkpointFailure({checkpoint:0,failureCode:'post-wait-validation-refused'}),expected);
+  assert.equal(safeCode(expected.stage,expected.code),expected.code);
+  for(const [overrides,phase,index] of [
+    [{checkpoint:1,failureCode:'a-fs-read-rejected'},'b-opened',1],
+    [{checkpoint:1,failureCode:'post-wait-validation-refused'},'a-opened',1],
+    [{checkpoint:0,failureCode:'post-wait-validation-refused'},'b-opened',1],
+  ]) assert.deepEqual(await checkpointFailure(overrides,phase,index),
+    {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
+});
+test('owner observation retains the fixed A-phase cause after ready acknowledgement',async()=>{
+  const result=await checkpointObservation();
+  const failure={stage:'probe-manifest',code:'probe-manifest-failed-a-fs-read-rejected'};
+  assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},failure);
+  assert.deepEqual(result.saved&&{stage:result.saved.stage,code:result.saved.code},failure);
+  assert.deepEqual(result.observations.map(item=>[item.phase,item.decision]),[['ready','accepted']]);
+  assert.equal(result.cleanup,'complete');
+});
+test('owner observation distinguishes post-wait validation from A refusal',async()=>{
+  const result=await checkpointObservation({checkpoint:0,failureCode:'post-wait-validation-refused'});
+  const failure={stage:'probe-manifest',code:'probe-manifest-failed-post-wait-validation-refused'};
+  assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},failure);
+  assert.deepEqual(result.saved&&{stage:result.saved.stage,code:result.saved.code},failure);
+  assert.deepEqual(result.observations.map(item=>item.phase),['ready']);
+});
 test('owner classifies an unsafe temporary-root identity separately',async()=>{
   assert.deepEqual(await probeFailure(null,true),{stage:'probe-manifest',code:'probe-temp-identity-refused'});
 });
