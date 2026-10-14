@@ -5,6 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
+const INSPECTION_CODES = Object.freeze(['inspection-budget-refused', 'inspection-transport-refused',
+  'inspection-status-refused', 'inspection-identity-refused', 'inspection-projection-refused',
+  'inspection-root-refused', 'inspection-completeness-refused', 'inspection-page-refused',
+  'inspection-marker-refused', 'inspection-region-refused']);
 const hashes = Object.freeze({
   A:'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',
   B:'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6'
@@ -99,45 +103,48 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
   const seen=new Map(),queue=[''];
   const complete=s=>s.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>s[k]===false);
   async function read(request) {
-    check(state.actions++<63,'probe-visible-state-refused'); // Leave the existing 64th action for quit.
-    const raw=await inspect({type:'inspect',target:'main',pid:identity.pid,windowId:identity.windowId,maxNodes:128,...request});
-    check(raw?.status==='ok'&&raw.type==='inspect','ax-evidence-refused');
-    const s=safeWindowEvidence(raw);verifyWindow(s,identity.pid,identity.windowId);
-    check(s.nodes.length>0&&s.nodes.length<=128&&s.nodes[0].path===(request.element||'')&&
-      s.foreignChildren===false&&s.childrenUnreadable===false&&
-      s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),'ax-evidence-refused');
+    check(state.actions++<63,'inspection-budget-refused'); // Leave the existing 64th action for quit.
+    let raw,s;
+    try {raw=await inspect({type:'inspect',target:'main',pid:identity.pid,windowId:identity.windowId,maxNodes:128,...request});}
+    catch(error) {if(error?.observerStage==='inspection')throw error;check(false,'inspection-transport-refused');}
+    check(raw?.status==='ok'&&raw.type==='inspect','inspection-status-refused');
+    try {verifyWindow(raw,identity.pid,identity.windowId);} catch {check(false,'inspection-identity-refused');}
+    try {s=safeWindowEvidence(raw);} catch {check(false,'inspection-projection-refused');}
+    check(s.nodes.length>0&&s.nodes.length<=128&&s.nodes[0].path===(request.element||''),'inspection-root-refused');
+    check(s.foreignChildren===false&&s.childrenUnreadable===false&&
+      s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),'inspection-completeness-refused');
     return s;
   }
   function collect(nodes) {
     for(const n of nodes) {
-      check(!seen.has(n.path)||JSON.stringify(seen.get(n.path))===JSON.stringify(n),'ax-evidence-refused');
-      seen.set(n.path,n);check(seen.size<=4096,'ax-evidence-refused');
+      check(!seen.has(n.path)||JSON.stringify(seen.get(n.path))===JSON.stringify(n),'inspection-page-refused');
+      seen.set(n.path,n);check(seen.size<=4096,'inspection-budget-refused');
     }
   }
   while(queue.length) {
     const element=queue.shift(),first=await read({element,depth:5});
     if(complete(first)) {collect(first.nodes);continue;}
-    check(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean','ax-evidence-refused');
+    check(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean','inspection-completeness-refused');
     let offset=0,token,count,root,done=false;
     while(!done) {
       const s=await read({element,depth:1,childOffset:offset,...(offset?{pageToken:token}:{})});
       check(s.childOffset===offset&&s.childCount===s.nodes[0].childCount&&
         s.nextChildOffset-offset===s.nodes.length-1&&
         (count===undefined||count===s.childCount&&token===s.pageToken&&JSON.stringify(root)===JSON.stringify(s.nodes[0]))&&
-        s.childrenComplete===(s.nextChildOffset===s.childCount),'ax-evidence-refused');
+        s.childrenComplete===(s.nextChildOffset===s.childCount),'inspection-page-refused');
       root=s.nodes[0];count=s.childCount;token=s.pageToken;done=s.childrenComplete;
       check(new Set(s.nodes.map(n=>n.path)).size===s.nodes.length&&s.nodes.slice(1).every((n,i)=>
-        n.path===(element?element+'.':'')+(offset+i)),'ax-evidence-refused');
+        n.path===(element?element+'.':'')+(offset+i)),'inspection-page-refused');
       collect(s.nodes);
       for(const n of s.nodes.slice(1))if(n.childCount>0)queue.push(n.path);
       offset=s.nextChildOffset;
     }
   }
   const markers=[...seen.values()].filter(n=>n.control==='Project tabs');
-  check(markers.length===1,'probe-visible-state-refused');
+  check(markers.length===1,'inspection-marker-refused');
   const region=await read({element:markers[0].path,depth:5,projectTabs:true,...(state.token?{projectTabsToken:state.token}:{})});
   check(complete(region)&&region.projectTabs?.path===markers[0].path&&
-    (!state.token||state.token===region.projectTabs.token),'probe-visible-state-refused');
+    (!state.token||state.token===region.projectTabs.token),'inspection-region-refused');
   state.token=region.projectTabs.token;
   const paths=new Set(region.nodes.map(n=>n.path));
   return {...region,projectTabs:{...region.projectTabs,unique:true},nodes:[...region.nodes,
@@ -159,4 +166,4 @@ function acknowledge(root, expected, ownerToken, decision, snapshot) {
   guard.verify();
   return {phase:expected.phase,decision,windowId:expected.windowId};
 }
-module.exports={receipt,visibleEvidence,acknowledge,observeProjectTabs};
+module.exports={receipt,visibleEvidence,acknowledge,observeProjectTabs,INSPECTION_CODES};

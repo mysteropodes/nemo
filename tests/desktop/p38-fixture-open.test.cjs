@@ -410,6 +410,46 @@ test('tampered static identity sends no checkpoint and opens no fixture',async()
   const r=await execute([true,true],{buildSha:'d'.repeat(40)});
   assert.equal(r.result,undefined); assert.deepEqual(r.calls,[]); assert.deepEqual(r.opened,[]);
 });
+test('first inspection diagnostic uses only literal finite categories, with no later read',async()=>{
+  const {observeProjectTabs}=require('./p38-fixture-open-installed.cjs'),identity={pid:42,windowId:9};
+  const token='12345678-1234-1234-1234-123456789abc';
+  const reply=request=>({status:'ok',type:'inspect',...identity,matchedAX:true,complete:true,
+    truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false,
+    nodes:request.projectTabs?[{path:'0',role:'AXGroup',control:'Project tabs',childCount:0}]:[
+      {path:'',role:'AXWindow',childCount:1},{path:'0',role:'AXGroup',control:'Project tabs',childCount:0}],
+    ...(request.projectTabs?{projectTabs:{path:'0',token}}:{})});
+  const cases=[
+    ['inspection-status-refused',s=>s.status='refused'],
+    ['inspection-status-refused',s=>s.type='private-type'],
+    ['inspection-identity-refused',s=>s.pid=777],
+    ['inspection-identity-refused',s=>s.windowId=10],
+    ['inspection-identity-refused',s=>s.matchedAX=false],
+    ['inspection-projection-refused',s=>s.nodes[0].path='/private/AX/path'],
+    ['inspection-projection-refused',s=>s.nodes[0].childCount=-1],
+    ['inspection-root-refused',s=>s.nodes=[]],
+    ['inspection-root-refused',s=>s.nodes[0].path='2'],
+    ['inspection-completeness-refused',s=>s.foreignChildren=true],
+    ['inspection-completeness-refused',s=>s.childrenUnreadable=true],
+    ['inspection-completeness-refused',s=>s.nodes[0].blocked='child-owner'],
+    ['inspection-completeness-refused',s=>delete s.nodes[0].childCount],
+    ['inspection-completeness-refused',s=>delete s.complete],
+    ['inspection-marker-refused',s=>s.nodes[1].control='private-title'],
+    ['inspection-marker-refused',s=>s.nodes.push({...s.nodes[1],path:'1'})],
+  ];
+  for(const [code,mutate] of cases){let reads=0;await assert.rejects(observeProjectTabs(async request=>{
+    reads++;const raw=reply(request);mutate(raw);raw.private='/private/secret';return raw;
+  },identity),error=>{assert.equal(error.code,code);assert.equal(error.message,code);return true;});assert.equal(reads,1,code);}
+  let reads=0;await assert.rejects(observeProjectTabs(async()=>{reads++;throw Error('/private/secret token pid777');},identity),
+    {code:'inspection-transport-refused'});assert.equal(reads,1);
+  await assert.rejects(observeProjectTabs(async()=>{throw Error('must not read');},identity,{actions:63}),{code:'inspection-budget-refused'});
+  for(const change of [s=>delete s.projectTabs,s=>s.projectTabs.path='1',s=>s.complete=false,
+    s=>s.projectTabs.token='87654321-1234-1234-1234-123456789abc']){
+    let calls=0;await assert.rejects(observeProjectTabs(async request=>{calls++;const raw=reply(request);
+      if(request.projectTabs)change(raw);return raw;},identity,{actions:0,token}),{code:'inspection-region-refused'});
+    assert.equal(calls,2);
+  }
+  const good=await observeProjectTabs(async request=>reply(request),identity);assert.equal(good.projectTabs.unique,true);
+});
 test('pre-ready openPath absence persists one fixed cursor-zero refusal and opens no fixture',async()=>{
   const r=await execute([],{}, {missingOpenPath:true,expireImmediately:true});
   assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);

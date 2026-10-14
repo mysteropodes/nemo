@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { safeWindowEvidence, verifyWindow, cleanupHelper } = require('./p38-installed-driver.cjs');
+const { INSPECTION_CODES } = require('./p38-fixture-open-installed.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const PROBE_FAILURE_CODES = Object.freeze({
@@ -43,7 +44,7 @@ const FAILURE_CODES = Object.freeze({
   'helper-start': ['helper-start-failed', 'helper-executable-refused'],
   'helper-pin': ['helper-window-identity-refused'],
   checkpoint: ['driver-first-failure', 'checkpoint-refused', 'checkpoint-timeout'],
-  inspection: ['helper-input-ended', 'helper-malformed', 'inspection-refused',
+  inspection: ['helper-input-ended', 'helper-malformed', 'inspection-refused', ...INSPECTION_CODES,
     'ready-visible-state-refused', 'ready-window-pin-refused', 'ready-ax-projection-refused',
     'ready-phase-refused', 'ready-visible-unclassified'],
   acknowledgment: ['owner-ack-refused'],
@@ -55,6 +56,13 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 function fail(stage, code) { throw Object.assign(new Error('observer-failed'), { observerStage: stage, observerCode: code }); }
 function check(ok, stage, code) { if (!ok) fail(stage, code); }
 function safeCode(stage, code) { return FAILURE_CODES[stage]?.includes(code) ? code : FAILURE_CODES[stage]?.[0] || 'observer-config-refused'; }
+async function inspectProjectTabs(inspect, identity, state, owner) {
+  try {return await owner.observeProjectTabs(inspect, identity, state);}
+  catch(error) {
+    const code=error?.observerStage==='inspection'?error.observerCode:error?.code;
+    fail('inspection', (error?.observerStage==='inspection'?FAILURE_CODES.inspection:INSPECTION_CODES).includes(code)?code:'inspection-refused');
+  }
+}
 function failedManifestCategory(manifest) {
   if (manifest.waiting !== false || manifest.result !== 'failed') return 'probe-manifest-failure-unknown';
   const phase = PROBE_FAILURE_PHASES.find(item => item.checkpoint === manifest.checkpoint &&
@@ -529,12 +537,7 @@ function defaultServices(config, testServices = {}) {
         }
       },
       async inspect(identity) {
-        try {
-          return await owner.observeProjectTabs(async request=>{send(request);return await waitLine(lines);},identity,regionState);
-        } catch (error) {
-          if (error?.observerStage === 'inspection') throw error;
-          fail('inspection', 'inspection-refused');
-        }
+        return await inspectProjectTabs(async request=>{send(request);return await waitLine(lines);},identity,regionState,owner);
       },
       async capture(identity,index) {
         check(Number.isInteger(index)&&index>=1&&index<=3&&regionState.actions++<63,'capture','capture-refused');
@@ -582,4 +585,4 @@ async function main() {
 }
 if (require.main === module) main();
 module.exports = { PHASES, FAILURE_CODES, PROBE_FAILURE_CODES, captureEvidence, validateConfig, validateDriverReceipt, validateOwner,
-  validateManifest, validateManifestIdentity, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };
+  validateManifest, validateManifestIdentity, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail, inspectProjectTabs };
