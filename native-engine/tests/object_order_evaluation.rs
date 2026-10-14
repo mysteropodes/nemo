@@ -21,7 +21,7 @@ fn record(layer: &str, id: &str, frame: u32, kind: &str) -> Value {
         {"point":{"x":10,"y":10},"handleIn":{"x":0,"y":-1},"handleOut":{"x":0,"y":0}}]},
         "fill":{"kind":"solid","r":1,"g":0,"b":0,"a":0.75}})
 }
-fn document(frames: &[u32]) -> Value {
+pub(super) fn document(frames: &[u32]) -> Value {
     let mut objects = vec![];
     let mut scopes = vec![];
     for frame in frames {
@@ -420,4 +420,84 @@ fn numeric_order_actual_fill_history_retains_old_pinned_sequences_and_source_rec
         serde_json::from_slice::<Value>(&encode_storage_project(zero.document()).unwrap()).unwrap(),
         value
     );
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn real_owner_consumer_receives_frozen_held_and_nonlinear_raw_inputs() {
+    use super::expression_consumer::{consume, fingerprint, owner};
+    let fixed = frozen();
+    for name in ["held", "nonlinear"] {
+        let case = &fixed["animated"][name];
+        for sample in case["samples"].as_array().unwrap() {
+            let Some(frame) = sample["frame"].as_u64().map(|f| f as u32) else {
+                continue;
+            };
+            let mut value = document(&[frame]);
+            value["compositionOrder"]["contexts"][0]["layers"][0]["order"] = json!({
+                "track":case["holder"]["motion"]["order"],
+                "expression":{"enabled":true,"code":"[value]"}});
+            let owner = owner(&value);
+            let before = fingerprint(&owner);
+            let packet = consume(&owner, &owner.acquire_snapshot(0).unwrap(), frame).unwrap();
+            assert_eq!(
+                rank(&packet, "L0"),
+                sample["value"].as_f64().unwrap(),
+                "{name}/{frame}"
+            );
+            assert_eq!(fingerprint(&owner), before);
+        }
+    }
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn real_owner_consumer_rejects_full_selector_foreign_stale_and_reference_pins() {
+    use super::expression_consumer::{consume, document as active_document, fingerprint, owner};
+    use crate::object_expression_runtime::{
+        prepare_expression_order_frame_for_owner, ExpressionLimits, ExpressionRefusal,
+    };
+    let value = active_document("[4]");
+    let mut original = owner(&value);
+    let zero = original.acquire_snapshot(0).unwrap();
+    let before = fingerprint(&original);
+    let limits = ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap();
+    for (field, error) in [
+        ("instance", ObjectFrameError::WrongInstance),
+        ("document", ObjectFrameError::WrongDocument),
+        ("revision", ObjectFrameError::WrongRevision),
+        ("snapshot", ObjectFrameError::WrongSnapshot),
+        ("reference", ObjectFrameError::Unavailable),
+    ] {
+        let mut selected = selector(&zero, 7);
+        match field {
+            "instance" => selected.instance_id = "foreign",
+            "document" => selected.document_id = "foreign",
+            "revision" => selected.content_revision = 1,
+            "snapshot" => selected.document_snapshot_id = "foreign",
+            _ => selected.scope_kind = FrameScopeKind::Reference,
+        }
+        assert_eq!(
+            prepare_expression_order_frame_for_owner(&original, &zero, &selected, limits)
+                .unwrap_err(),
+            ExpressionRefusal::Pin(error)
+        );
+    }
+    assert_eq!(fingerprint(&original), before);
+    let foreign = owner(&value);
+    assert_eq!(
+        consume(&foreign, &zero, 7).unwrap_err(),
+        ExpressionRefusal::Pin(ObjectFrameError::WrongDocument)
+    );
+    let fill = original.prepare_fill_json(&serde_json::to_vec(&json!({"command":"object.fill.set",
+        "stableTarget":value["objects"][0]["target"],"fill":{"kind":"solid","r":0.5,"g":0,"b":0,"a":1}})).unwrap()).unwrap();
+    original.commit_fill(fill).unwrap();
+    let advanced = fingerprint(&original);
+    assert_eq!(
+        consume(&original, &zero, 7).unwrap_err(),
+        ExpressionRefusal::Pin(ObjectFrameError::WrongRevision)
+    );
+    assert_eq!(fingerprint(&original), advanced);
+    assert!(consume(&original, &original.acquire_snapshot(1).unwrap(), 7).is_ok());
+    assert_eq!(fingerprint(&original), advanced);
 }
