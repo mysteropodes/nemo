@@ -49,7 +49,9 @@ function host(){
       copies.push(r);return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,atRevision:r.atRevision,
         documentSnapshotId:r.documentSnapshotId,byteCount:info().byteCount,published:true,cleanupPending:false};
     }
-    if(command==='nemo_native_object_export')return {...info(),requestId:r.requestId,published:true,cleanupComplete:true};
+    if(command==='nemo_native_object_export')return {apiVersion:2,requestId:r.requestId,instanceId:'instance',documentId:'document',
+      contentRevision:revision,documentSnapshotId:'snapshot-'+revision,status:'succeeded',cleanupStatus:'complete',
+      externalEffectDisposition:'committed',errorCode:null,artifactFiles:['frame_0001.png'],published:true,cleanupComplete:true};
     throw Error('Unexpected command: '+command);
   }
   return {invoke,info,calls,copies,preview(value){preview=value;},fail(value){failure=value;}};
@@ -129,6 +131,51 @@ test('single-frame native export uses pinned host route; sequences do not fall b
   const r=h.calls.find(c=>c.command==='nemo_native_object_export').r;
   assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.maximumEncodedBytes,4*1024*1024);
   assert.equal('reference' in r,false);
+});
+test('native export reports no success for contradictory or malformed Rust receipts',async()=>{
+  const negatives={
+    wrongApi:{apiVersion:1},missingApi:{apiVersion:undefined},stringApi:{apiVersion:'2'},
+    failed:{status:'failed'},cancelled:{status:'cancelled'},running:{status:'running'},missingStatus:{status:undefined},
+    cleanupFailed:{cleanupStatus:'failed'},cleanupPending:{cleanupStatus:'pending'},missingCleanup:{cleanupStatus:undefined},
+    indeterminate:{externalEffectDisposition:'indeterminate'},contained:{externalEffectDisposition:'contained'},
+    noPublication:{externalEffectDisposition:'none'},missingDisposition:{externalEffectDisposition:undefined},
+    error:{errorCode:'publish_failed'},missingError:{errorCode:undefined},malformedError:{errorCode:{}},
+    noFiles:{artifactFiles:[]},wrongFile:{artifactFiles:['frame_0002.png']},unsafeFile:{artifactFiles:['../frame_0001.png']},
+    duplicateFiles:{artifactFiles:['frame_0001.png','frame_0001.png']},extraFile:{artifactFiles:['frame_0001.png','other.png']},
+    missingFiles:{artifactFiles:undefined},stringFiles:{artifactFiles:'frame_0001.png'},nullFiles:{artifactFiles:null},
+    wrongRequest:{requestId:'foreign'},wrongInstance:{instanceId:'foreign'},wrongDocument:{documentId:'foreign'},
+    staleRevision:{contentRevision:1},staleSnapshot:{documentSnapshotId:'stale'},
+    unpublished:{published:false},cleanupIncomplete:{cleanupComplete:false}
+  };
+  for(const [label,patch] of Object.entries(negatives)){
+    const h=host(),invoke=h.invoke,progress=[];
+    h.invoke=async(command,args)=>{const value=await invoke(command,args);
+      return command==='nemo_native_object_export'?{...value,...patch}:value;};
+    const s=await presented(h);
+    await assert.rejects(s.exportPng('/new-output',[0],(...args)=>progress.push(args)),/publication is unconfirmed/,label);
+    assert.deepEqual(progress,[],label);assert.equal(s.blocksLegacy(),true,label);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1,label);
+  }
+});
+test('two clean exports serialize through the same session with distinct requests and destinations',async()=>{
+  const h=host(),invoke=h.invoke,first=deferred(),progress=[];let exports=0;
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export'&&++exports===1)await first.promise;return value;};
+  const s=await presented(h),before=JSON.stringify(s.info());
+  const a=s.exportPng('/new-a',[0],(...args)=>progress.push(args));
+  const b=s.exportPng('/new-b',[0],(...args)=>progress.push(args));
+  await turn();assert.equal(exports,1);assert.deepEqual(progress,[]);
+  first.resolve();const [one,two]=await Promise.all([a,b]);
+  const requests=h.calls.filter(c=>c.command==='nemo_native_object_export').map(c=>c.r);
+  assert.equal(requests.length,2);assert.notEqual(one.requestId,two.requestId);
+  assert.deepEqual(requests.map(r=>r.destinationDirectory),['/new-a','/new-b']);
+  for(const r of requests){assert.equal(r.instanceId,'instance');assert.equal(r.documentId,'document');
+    assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.contentRevision,0);assert.equal(r.lifecycleGeneration,1);}
+  assert.deepEqual(progress,[[1,1],[1,1]]);assert.equal(JSON.stringify(s.info()),before);
+  assert.deepEqual(await s.exportPng('/cancelled',[0],()=>assert.fail('cancelled progress'),{aborted:true}),{status:'cancelled'});
+  await assert.rejects(s.exportPng('/range',[0,1]),/sequence export is unavailable/);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,2);
+  assert.equal(s.blocksLegacy(),true);assert.equal(s.isActive(),true);
 });
 function ordinary(h,deferFrames=false){
   const fixture=fs.readFileSync('tests/project-open.test.cjs','utf8');
