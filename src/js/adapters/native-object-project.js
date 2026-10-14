@@ -195,17 +195,22 @@
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
-      var submitted=epoch(info);return enqueue(async function(){
+      var submitted=epoch(info),requested=Array.isArray(frames)?frames.slice():null;return enqueue(async function(){
       guardEpoch(submitted);
-      if(!Array.isArray(frames)||frames.length!==1)throw new Error('Native object sequence export is unavailable');
+      var pin=requireActive();
+      if(!requested||requested.length===0||requested.length>32||!requested.every(function(frame,i){
+        return integer(frame,0)&&frame<pin.totalFrames&&(i===0||requested[i-1]<frame);
+      }))throw new Error('Native object export frame range is invalid');
       if(signal&&signal.aborted)return {status:'cancelled'};
-      var request=frameRequest(frames[0]);request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
+      var request=frameRequest(requested[0]);if(requested.length>1)request.frames=requested;
+      var manifest=requested.map(function(_,i){return 'frame_'+String(i+1).padStart(4,'0')+'.png';});
+      request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
       var receipt=await raw('nemo_native_object_export',request);
       if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
         receipt.contentRevision!==request.contentRevision||receipt.documentSnapshotId!==request.documentSnapshotId||receipt.published!==true||receipt.cleanupComplete!==true||
         receipt.status!=='succeeded'||receipt.cleanupStatus!=='complete'||receipt.externalEffectDisposition!=='committed'||receipt.errorCode!==null||
-        !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==1||receipt.artifactFiles[0]!=='frame_0001.png')throw new Error('Native export publication is unconfirmed');
-      if(onProgress)onProgress(1,1);return receipt;
+        !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
+      if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
     return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,

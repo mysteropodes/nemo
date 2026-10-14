@@ -5,7 +5,9 @@ use crate::native_object_desktop_export::{
     admit_request, export_with_target, port::LazyDesktopArtifactPort, MAX_PNG_BYTES,
 };
 use native_engine::{
-    compositor::Compositor, export_job::StagedArtifactPort, object_codec::decode_storage_project,
+    compositor::Compositor,
+    export_job::{ExportArtifact, StagedArtifactPort},
+    object_codec::decode_storage_project,
 };
 use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
@@ -50,10 +52,13 @@ fn object_document() -> Value {
 }
 
 fn fixture(scratch: &Scratch) -> (ApplicationMcp, Value) {
+    fixture_document(scratch, object_document())
+}
+fn fixture_document(scratch: &Scratch, document: Value) -> (ApplicationMcp, Value) {
     let state = ApplicationMcp::default();
     let (document_id, revision) = state
         .install_native_object(
-            decode_storage_project(&serde_json::to_vec(&object_document()).unwrap()).unwrap(),
+            decode_storage_project(&serde_json::to_vec(&document).unwrap()).unwrap(),
         )
         .unwrap();
     let generation = state.native_state().lock().unwrap().active().unwrap().0;
@@ -297,4 +302,210 @@ fn exact_application_owner_repeats_literal_png_through_real_port() {
         fs::read(scratch.destination().join("frame_0001.png")).unwrap(),
         bytes
     );
+}
+
+fn sequence_document() -> Value {
+    let mut document = object_document();
+    document["totalFrames"] = json!(2);
+    let mut next = document["objects"][0].clone();
+    next["target"]["frameScope"]["frame"] = json!(1);
+    next["fill"] = json!({"kind":"solid","r":0,"g":1,"b":0,"a":1});
+    document["objects"].as_array_mut().unwrap().push(next);
+    let mut scope = document["compositionOrder"]["contexts"][0]["scopes"][0].clone();
+    scope["frameScope"]["frame"] = json!(1);
+    let scopes = document["compositionOrder"]["contexts"][0]["scopes"]
+        .as_array_mut()
+        .unwrap();
+    scopes.push(scope);
+    document
+}
+
+#[test]
+fn malformed_sequences_are_refused_before_private_staging() {
+    let scratch = Scratch::new();
+    let (state, raw) = fixture_document(&scratch, sequence_document());
+    for frames in [
+        json!(null),
+        json!([]),
+        json!([0, 0]),
+        json!([1, 0]),
+        json!([1]),
+        json!([-1]),
+        json!([0, 0.5]),
+        json!("0,1"),
+        json!((0..33).collect::<Vec<_>>()),
+    ] {
+        let mut changed = raw.clone();
+        changed["frames"] = frames;
+        assert!(admit_request(&changed.to_string(), state.instance_id(), |_| true).is_err());
+    }
+    assert!(!scratch.stage().exists());
+    assert!(!scratch.destination().exists());
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn authored_sequence_publishes_two_decoded_frames_once_and_repeats_without_history_change() {
+    let scratch = Scratch::new();
+    let (state, mut raw) = fixture_document(&scratch, sequence_document());
+    raw["frames"] = json!([0, 1]);
+    let query = json!({"apiVersion":2,"requestId":"sequence-invariance","instanceId":state.instance_id(),
+        "documentId":raw["documentId"],"operation":"query.document.object.serialize","payload":{"atRevision":0}});
+    let query = query.to_string();
+    let read = || {
+        let snapshot = state.serialize_object_file_snapshot(&query).unwrap();
+        serde_json::to_value(snapshot).unwrap()
+    };
+    let before = read();
+    let mut gpu = Compositor::new().unwrap();
+    for (index, frames) in [json!([0, 2]), json!([0, 1]), json!([0, 1])]
+        .into_iter()
+        .enumerate()
+    {
+        let output = Scratch::new();
+        let mut next = raw.clone();
+        next["frames"] = frames;
+        next["requestId"] = json!(format!("sequence-{index}"));
+        next["destinationDirectory"] = json!(output.destination());
+        let admitted = admit_request(&next.to_string(), state.instance_id(), |_| true).unwrap();
+        let result = export_with_target(&state, &admitted, output.stage(), |consumer| {
+            consumer
+                .run(&mut gpu)
+                .map_err(|e| host_error("unavailable", e))
+        });
+        if index == 0 {
+            assert!(result.is_err());
+            assert!(!output.stage().exists());
+            assert!(!output.destination().exists());
+            continue;
+        }
+        let receipt = result.unwrap();
+        let live = state
+            .with_object_preview_owner(
+                admitted.request.lifecycle_generation,
+                &admitted.request.selector(),
+                crate::native_dispatch::NativeObjectHost::export_test_state,
+            )
+            .unwrap();
+        assert_eq!(live, (0, (0, 0)));
+        assert_eq!(receipt.artifact_files, ["frame_0001.png", "frame_0002.png"]);
+        assert_eq!(receipt.status, "succeeded");
+        assert_eq!(receipt.external_effect_disposition, "committed");
+        assert!(receipt.published && receipt.cleanup_complete);
+        for (name, expected) in [
+            ("frame_0001.png", [0, 0, 255, 255]),
+            ("frame_0002.png", [0, 255, 0, 255]),
+        ] {
+            let bytes = fs::read(output.destination().join(name)).unwrap();
+            assert_eq!(decoded_pixel(&bytes, 8, 8), expected);
+            assert_eq!(decoded_pixel(&bytes, 40, 40), [255; 4]);
+        }
+        assert_eq!(fs::read_dir(output.destination()).unwrap().count(), 2);
+        assert_eq!(fs::read_dir(output.stage()).unwrap().count(), 0);
+        assert_eq!(
+            receipt.document_snapshot_id,
+            raw["documentSnapshotId"].as_str().unwrap()
+        );
+    }
+    assert_eq!(read(), before);
+}
+
+#[cfg(target_os = "macos")]
+struct SequenceFault {
+    inner: LazyDesktopArtifactPort,
+    mode: u8,
+    writes: usize,
+}
+#[cfg(target_os = "macos")]
+impl StagedArtifactPort for SequenceFault {
+    fn begin_staging(&mut self, job: &str, target: &str) -> Result<(), String> {
+        self.inner.begin_staging(job, target)
+    }
+    fn write_frame(&mut self, job: &str, name: &str, bytes: &[u8]) -> Result<(), String> {
+        self.writes += 1;
+        self.inner.write_frame(job, name, bytes)?;
+        if self.mode == 0 && self.writes == 2 {
+            return Err("second write acknowledgement lost".into());
+        }
+        Ok(())
+    }
+    fn publish(&mut self, job: &str, to: &str, files: &[String]) -> Result<ExportArtifact, String> {
+        self.inner.publish(job, to, files)?;
+        Err("lost publication acknowledgement".into())
+    }
+    fn cleanup(&mut self, job: &str) -> Result<(), String> {
+        if self.mode == 2 {
+            Err("retained private staging".into())
+        } else {
+            self.inner.cleanup(job)
+        }
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn later_sequence_failure_retains_honest_release_and_never_claims_partial_success() {
+    for mode in 0..=2 {
+        let scratch = Scratch::new();
+        let (state, mut raw) = fixture_document(&scratch, sequence_document());
+        raw["frames"] = json!([0, 1]);
+        let admitted = admit_request(&raw.to_string(), state.instance_id(), |_| true).unwrap();
+        let mut gpu = Compositor::new().unwrap();
+        let mut port = SequenceFault {
+            inner: LazyDesktopArtifactPort::new(
+                scratch.stage(),
+                "object-output".into(),
+                scratch.destination(),
+            ),
+            mode,
+            writes: 0,
+        };
+        let result = export_with_target(&state, &admitted, scratch.stage(), |consumer| {
+            let outcome = consumer
+                .owner
+                .export_pinned_object_png_frames(
+                    &consumer.selector,
+                    &consumer.frames,
+                    consumer.request_id,
+                    "object-output".into(),
+                    consumer.output,
+                    consumer.maximum_encoded_bytes,
+                    &mut port,
+                    &mut gpu,
+                )
+                .map_err(|e| host_error("unavailable", e))?;
+            assert_eq!(consumer.owner.export_test_state().unwrap(), (0, (0, 0)));
+            Ok(outcome)
+        })
+        .unwrap();
+        assert!(!result.published);
+        assert_eq!(result.status, "failed");
+        assert_eq!(port.writes, 2);
+        if mode == 0 {
+            assert_eq!(result.external_effect_disposition, "none");
+            assert!(result.cleanup_complete);
+            assert!(!scratch.destination().exists());
+            assert_eq!(fs::read_dir(scratch.stage()).unwrap().count(), 0);
+        } else {
+            assert_eq!(result.external_effect_disposition, "indeterminate");
+            assert!(!result.cleanup_complete);
+            assert_eq!(fs::read_dir(scratch.destination()).unwrap().count(), 2);
+        }
+        if mode == 2 {
+            assert_eq!(result.cleanup_status, "failed");
+        }
+        let next = Scratch::new();
+        let mut retry = raw.clone();
+        retry["requestId"] = json!("fresh-after-failure");
+        retry["destinationDirectory"] = json!(next.destination());
+        let retry = admit_request(&retry.to_string(), state.instance_id(), |_| true).unwrap();
+        assert!(
+            export_with_target(&state, &retry, next.stage(), |consumer| consumer
+                .run(&mut gpu)
+                .map_err(|e| host_error("unavailable", e)))
+            .is_err()
+        );
+        assert!(!next.stage().exists());
+        assert!(!next.destination().exists());
+    }
 }

@@ -125,9 +125,9 @@ test('metadata is detached and immutable; malformed or foreign inspection fences
   const foreign=host(),original=foreign.invoke;foreign.invoke=async(command,args)=>{const v=await original(command,args);if(command==='nemo_native_object_reference')v.instanceId='other';return v;};
   const bad=session(foreign);await assert.rejects(bad.openPath('/project.json'),/uncorrelated/);assert.equal(bad.isActive(),false);
 });
-test('single-frame native export uses pinned host route; sequences do not fall back to Paper',async()=>{
+test('single-frame native export preserves pinned host route; invalid ranges do not dispatch',async()=>{
   const h=host(),s=await presented(h);assert.equal((await s.exportPng('/new-output',[0])).published,true);
-  await assert.rejects(s.exportPng('/new-output',[0,1]),/sequence export is unavailable/);
+  await assert.rejects(s.exportPng('/new-output',[1,0]),/frame range is invalid/);
   const r=h.calls.find(c=>c.command==='nemo_native_object_export').r;
   assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.maximumEncodedBytes,4*1024*1024);
   assert.equal('reference' in r,false);
@@ -173,7 +173,7 @@ test('two clean exports serialize through the same session with distinct request
     assert.equal(r.documentSnapshotId,'snapshot-0');assert.equal(r.contentRevision,0);assert.equal(r.lifecycleGeneration,1);}
   assert.deepEqual(progress,[[1,1],[1,1]]);assert.equal(JSON.stringify(s.info()),before);
   assert.deepEqual(await s.exportPng('/cancelled',[0],()=>assert.fail('cancelled progress'),{aborted:true}),{status:'cancelled'});
-  await assert.rejects(s.exportPng('/range',[0,1]),/sequence export is unavailable/);
+  await assert.rejects(s.exportPng('/range',[0,21]),/frame range is invalid/);
   assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,2);
   assert.equal(s.blocksLegacy(),true);assert.equal(s.isActive(),true);
 });
@@ -502,4 +502,57 @@ test('unavailable dirty-confirm dialog is irrelevant to metadata-only inactive B
   assert.equal(app.element('project-tabs-list').children.length,2);
   assert.equal(app.project.isDirty(),true);
   assert.equal(app.startScreen.classList.contains('hid'),true);
+});
+
+
+test('bounded native sequence submits ordered source frames and confirms the full manifest',async()=>{
+  const h=host(),invoke=h.invoke,progress=[];
+  h.invoke=async(command,args)=>{const value=await invoke(command,args);
+    if(command==='nemo_native_object_export')value.artifactFiles=['frame_0001.png','frame_0002.png'];
+    return value;};
+  const s=await presented(h),before=JSON.stringify(s.info());
+  const result=await s.exportPng('/sequence',[0,10],(...args)=>progress.push(args));
+  const request=h.calls.find(c=>c.command==='nemo_native_object_export').r;
+  assert.deepEqual(request.frames,[0,10]);assert.equal(request.frame,0);
+  assert.deepEqual(result.artifactFiles,['frame_0001.png','frame_0002.png']);
+  assert.deepEqual(progress,[[2,2]]);assert.equal(JSON.stringify(s.info()),before);
+});
+
+for(const frames of [null,[],[0,0],[1,0],[0,21],[-1],[0,0.5],Array.from({length:33},(_,i)=>i)]){
+  test('invalid sequence range '+JSON.stringify(frames)+' never dispatches',async()=>{
+    const h=host(),s=await presented(h),before=JSON.stringify(s.info());
+    await assert.rejects(s.exportPng('/invalid',frames),/frame range is invalid/);
+    assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,0);
+    assert.equal(JSON.stringify(s.info()),before);
+  });
+}
+test('sequence requires exact ordered manifest and retains submitted frame range across queue wait',async()=>{
+  for(const manifest of [[],['frame_0001.png'],['frame_0002.png','frame_0001.png'],['frame_0001.png','frame_0001.png'],['frame_0001.png','other.png']]){
+    const h=host(),invoke=h.invoke,progress=[];
+    h.invoke=async(command,args)=>{const v=await invoke(command,args);if(command==='nemo_native_object_export')v.artifactFiles=manifest;return v;};
+    const s=await presented(h);await assert.rejects(s.exportPng('/bad',[0,10],(...args)=>progress.push(args)),/publication is unconfirmed/);
+    assert.deepEqual(progress,[]);assert.equal(s.blocksLegacy(),true);
+  }
+  const h=host(),invoke=h.invoke,first=deferred();let exports=0;
+  h.invoke=async(command,args)=>{const v=await invoke(command,args);
+    if(command==='nemo_native_object_export'){
+      if(++exports===1)await first.promise;
+      else v.artifactFiles=['frame_0001.png','frame_0002.png'];
+    }return v;};
+  const s=await presented(h),one=s.exportPng('/one',[0]),frames=[0,10],two=s.exportPng('/two',frames);
+  frames[1]=20;await turn();assert.equal(exports,1);first.resolve();await Promise.all([one,two]);
+  assert.deepEqual(h.calls.filter(c=>c.command==='nemo_native_object_export')[1].r.frames,[0,10]);
+});
+
+test('inclusive 32-frame bound is admitted and pre-cancelled sequences never dispatch',async()=>{
+  const h=host(),invoke=h.invoke;
+  h.invoke=async(command,args)=>{const v=await invoke(command,args);
+    if(v&&'totalFrames' in v)v.totalFrames=64;
+    if(command==='nemo_native_object_export')v.artifactFiles=Array.from({length:32},(_,i)=>'frame_'+String(i+1).padStart(4,'0')+'.png');
+    return v;};
+  const s=await presented(h),frames=Array.from({length:32},(_,i)=>i),progress=[];
+  assert.equal((await s.exportPng('/bound',frames,(...v)=>progress.push(v))).artifactFiles.length,32);
+  assert.deepEqual(progress,[[32,32]]);
+  assert.deepEqual(await s.exportPng('/cancel',[0,1],()=>assert.fail('cancelled progress'),{aborted:true}),{status:'cancelled'});
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_export').length,1);
 });
