@@ -25,6 +25,7 @@
     },
     notice:tabAddNotice
   });
+  var nativeInactiveTabs=window.NemoNativeObjectInactiveProjectTabs.create(window,{owner:function(){var s=window.NemoNativeObjectProject&&window.NemoNativeObjectProject.desktop(window);return s&&s.identity();},invoke:function(c,a){return window.__TAURI__.core.invoke(c,a);},requestId:function(){return window.crypto.randomUUID();},baseName:function(p){return window.SMProjectDocument.baseName(p);},commit:function(m){var t=tabs.find(function(x){return x.nativeInactiveProject&&x.nativeInactiveProject.preparationToken===m.preparationToken;});if(t){t.nativeInactiveProject=m;t.name=m.name;t.path=m.path;renderTabBar();return true;}tabs.push({id:makeTabId(),name:m.name,path:m.path,json:null,nativeInactiveProject:m});renderTabBar();return true;},remove:function(m){var i=tabs.findIndex(function(x){return x.nativeInactiveProject&&x.nativeInactiveProject.preparationToken===m.preparationToken;});if(i<0)return false;tabs.splice(i,1);renderTabBar();return true;},notice:tabAddNotice});
   function p39bUseInactiveEntry(){try{var native=window.NemoNativeOpacityCutover;return !!activeTabId&&(native?native.blocksLegacy()!==false:'NemoNativeOpacityProject' in window);}catch(_){return !!activeTabId;}}
 
   function tauriOk(){return typeof window.__TAURI__!=='undefined';}
@@ -188,7 +189,7 @@
   }
   async function openPath(path){
     if(!nativeSavedUI.allowOpen())return false;
-    if(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())return nativeSavedUI.openNative(path);
+    if(nativeSavedUI.nativeObject&&nativeSavedUI.nativeObject.isActive())return nativeInactiveTabs.openPath(path);
     if(p39bUseInactiveEntry())return inactiveEntry.openPath(path);
     if(!tauriOk())return;
     var nativeOpened=await nativeSavedUI.openNative(path);if(nativeOpened!==null)return nativeOpened;
@@ -525,7 +526,7 @@
   }
   function switchToTab(id){
     if(id===activeTabId)return;
-    var target=tabs.find(function(t){return t.id===id;});if(!target)return;
+    var target=tabs.find(function(t){return t.id===id;});if(!target)return;if(target.nativeInactiveProject)return nativeInactiveTabs.activateClick(target.nativeInactiveProject);
     if(target.nativePreparation||target.json&&!populatedTabTransitionAllowed())return tabAddNotice('Switching project tabs is unavailable in this build.');
     var blankAdmission=target.json?null:releaseNative('tab-switch');if(blankAdmission===false)return false;
     snapshotActiveIntoTab();
@@ -562,7 +563,7 @@
     try{var result=releaseNative('tab-add');return result&&typeof result.then==='function'?result.then(admitted,denied):admitted(result);}catch(e){return denied();}
   }
   function closeTab(id){
-    var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;
+    var idx=tabs.findIndex(function(t){return t.id===id;});if(idx<0)return;if(tabs[idx].nativeInactiveProject)return nativeInactiveTabs.close(tabs[idx].nativeInactiveProject);
     if(tabs.length===1){showToast(SM.t('hsCannotCloseLastTab'));return;}
     if(tabs[idx].nativePreparation)return inactiveEntry.close(tabs[idx].nativePreparation);
     var wasActive=id===activeTabId;

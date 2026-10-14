@@ -2065,6 +2065,18 @@
       ]
     },
     {
+      "id": "app.native.object.inactive-project-tabs.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-inactive-project-tabs.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-object-inactive-project-tabs.js"
+      ]
+    },
+    {
       "id": "app.native.object.project.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
