@@ -45,7 +45,8 @@ fn exact_records_survive_persistence_and_disk_reopen_without_id_or_geometry_chan
 fn named_layers() -> Value {
     let baseline: Value = serde_json::from_str(include_str!(
         "../../tests/animation/fixtures/curve-workflow.json"
-    )).unwrap();
+    ))
+    .unwrap();
     assert_eq!(baseline["version"], 13);
     assert_eq!(baseline["layers"][0]["layerUid"], "r08_curve_layer");
     assert_eq!(baseline["layers"][0]["name"], "R08 rectangle");
@@ -67,7 +68,9 @@ fn named_layer_order_plan() -> Value {
 
 #[test]
 fn stored_names_preserve_exact_strings_absence_and_explicit_order_migration() {
-    use crate::object_codec::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
+    use crate::object_codec::{
+        decode_ordered_project, encode_ordered_project, migrate_ordered_project,
+    };
     let plan = named_layer_order_plan();
     for name in ["R08 rectangle", "", "  Calque 雪 🟦\n"] {
         let mut input = named_layers();
@@ -75,44 +78,105 @@ fn stored_names_preserve_exact_strings_absence_and_explicit_order_migration() {
         let document = decode(&input).unwrap();
         assert_eq!(document.layers()[0].name(), Some(name));
         assert_eq!(document.layers()[1].name(), None);
-        assert_eq!(serde_json::from_slice::<Value>(&encode_project(&document).unwrap()).unwrap(), input);
-        let ordered = migrate_ordered_project(&document, &serde_json::to_vec(&plan).unwrap()).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&encode_project(&document).unwrap()).unwrap(),
+            input
+        );
+        let ordered =
+            migrate_ordered_project(&document, &serde_json::to_vec(&plan).unwrap()).unwrap();
         let bytes = encode_ordered_project(&ordered).unwrap();
         let reopened = decode_ordered_project(&bytes).unwrap();
         assert_eq!(reopened.layers()[0].name(), Some(name));
         assert_eq!(reopened.layers()[1].name(), None);
         assert_eq!(reopened.layers()[0].layer_uid(), "r08_curve_layer");
         assert_eq!(encode_ordered_project(&reopened).unwrap(), bytes);
-        assert_eq!(document, decode(&input).unwrap(), "migration must not mutate its source");
+        assert_eq!(
+            document,
+            decode(&input).unwrap(),
+            "migration must not mutate its source"
+        );
     }
 }
 
 #[test]
 fn invalid_names_and_other_unadmitted_layer_fields_refuse_atomically() {
-    use crate::object_codec::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
+    use crate::object_codec::{
+        decode_ordered_project, encode_ordered_project, migrate_ordered_project,
+    };
     let named = decode(&named_layers()).unwrap();
-    let ordered = migrate_ordered_project(&named, &serde_json::to_vec(&named_layer_order_plan()).unwrap()).unwrap();
+    let ordered = migrate_ordered_project(
+        &named,
+        &serde_json::to_vec(&named_layer_order_plan()).unwrap(),
+    )
+    .unwrap();
     let ordered_bytes = encode_ordered_project(&ordered).unwrap();
-    assert!(decode_ordered_project(&ordered_bytes).is_ok(), "v2 negative starts from admitted data");
-    for name in [Value::Null, json!(true), json!(3), json!([]), json!({"name":"nested"})] {
-        let mut input = named_layers();input["layers"][0]["name"] = name.clone();
-        assert_eq!(decode(&input).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
-        let mut input: Value = serde_json::from_slice(&ordered_bytes).unwrap();input["layers"][0]["name"] = name;
-        assert_eq!(decode_ordered_project(&serde_json::to_vec(&input).unwrap()).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
+    assert!(
+        decode_ordered_project(&ordered_bytes).is_ok(),
+        "v2 negative starts from admitted data"
+    );
+    for name in [
+        Value::Null,
+        json!(true),
+        json!(3),
+        json!([]),
+        json!({"name":"nested"}),
+    ] {
+        let mut input = named_layers();
+        input["layers"][0]["name"] = name.clone();
+        assert_eq!(
+            decode(&input).unwrap_err().kind(),
+            ObjectCodecErrorKind::Invalid
+        );
+        let mut input: Value = serde_json::from_slice(&ordered_bytes).unwrap();
+        input["layers"][0]["name"] = name;
+        assert_eq!(
+            decode_ordered_project(&serde_json::to_vec(&input).unwrap())
+                .unwrap_err()
+                .kind(),
+            ObjectCodecErrorKind::Invalid
+        );
     }
     let input = named_layers();
-    let bytes = serde_json::to_string(&input).unwrap().replace("\"name\":\"R08 rectangle\"", "\"name\":\"R08 rectangle\",\"name\":\"forged\"");
-    assert_eq!(decode_project(bytes.as_bytes()).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
-    let duplicate = String::from_utf8(ordered_bytes.clone()).unwrap().replace("\"name\":\"R08 rectangle\"", "\"name\":\"R08 rectangle\",\"name\":\"forged\"");
-    assert_eq!(decode_ordered_project(duplicate.as_bytes()).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
+    let bytes = serde_json::to_string(&input).unwrap().replace(
+        "\"name\":\"R08 rectangle\"",
+        "\"name\":\"R08 rectangle\",\"name\":\"forged\"",
+    );
+    assert_eq!(
+        decode_project(bytes.as_bytes()).unwrap_err().kind(),
+        ObjectCodecErrorKind::Invalid
+    );
+    let duplicate = String::from_utf8(ordered_bytes.clone()).unwrap().replace(
+        "\"name\":\"R08 rectangle\"",
+        "\"name\":\"R08 rectangle\",\"name\":\"forged\"",
+    );
+    assert_eq!(
+        decode_ordered_project(duplicate.as_bytes())
+            .unwrap_err()
+            .kind(),
+        ObjectCodecErrorKind::Invalid
+    );
     for field in ["visible", "locked", "privateExtra"] {
-        let mut input = named_layers();input["layers"][0][field] = json!(true);
-        assert_eq!(decode(&input).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
-        let mut input: Value = serde_json::from_slice(&ordered_bytes).unwrap();input["layers"][0][field] = json!(true);
-        assert_eq!(decode_ordered_project(&serde_json::to_vec(&input).unwrap()).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
+        let mut input = named_layers();
+        input["layers"][0][field] = json!(true);
+        assert_eq!(
+            decode(&input).unwrap_err().kind(),
+            ObjectCodecErrorKind::Unsupported
+        );
+        let mut input: Value = serde_json::from_slice(&ordered_bytes).unwrap();
+        input["layers"][0][field] = json!(true);
+        assert_eq!(
+            decode_ordered_project(&serde_json::to_vec(&input).unwrap())
+                .unwrap_err()
+                .kind(),
+            ObjectCodecErrorKind::Unsupported
+        );
     }
-    let mut input = named_layers();input["layers"][0] = json!(["r08_curve_layer","R08 rectangle"]);
-    assert_eq!(decode(&input).unwrap_err().kind(), ObjectCodecErrorKind::Parse);
+    let mut input = named_layers();
+    input["layers"][0] = json!(["r08_curve_layer", "R08 rectangle"]);
+    assert_eq!(
+        decode(&input).unwrap_err().kind(),
+        ObjectCodecErrorKind::Invalid
+    );
 }
 
 #[test]
