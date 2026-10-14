@@ -8,13 +8,33 @@ const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened']);
+const PROBE_FAILURE_CODES = Object.freeze({
+  ready: Object.freeze(['ready-open-path-unavailable', 'ready-observer-install-failed']),
+  a: Object.freeze(['a-open-threw', 'a-open-false', 'a-open-unaccepted', 'a-pre-native-refusal',
+    'a-native-status-rejected', 'a-native-bootstrap-unsupported-format', 'a-native-bootstrap-rejected',
+    'a-native-bootstrap-resolved-open-refused', 'a-native-status-empty-no-bootstrap',
+    'a-native-status-available-no-bootstrap', 'a-native-status-malformed-no-bootstrap',
+    'a-observer-late-untrusted', 'a-fs-read-rejected', 'a-fs-read-resolved-open-refused']),
+  b: Object.freeze(['b-open-threw', 'b-open-false', 'b-open-unaccepted', 'b-pre-native-refusal',
+    'b-native-status-rejected', 'b-native-bootstrap-unsupported-format', 'b-native-bootstrap-rejected',
+    'b-native-bootstrap-resolved-open-refused', 'b-native-status-empty-no-bootstrap',
+    'b-native-status-available-no-bootstrap', 'b-native-status-malformed-no-bootstrap',
+    'b-observer-late-untrusted', 'b-fs-read-rejected', 'b-fs-read-resolved-open-refused']),
+});
+const PROBE_FAILURE_PHASES = Object.freeze([
+  Object.freeze({ checkpoint: 0, codes: PROBE_FAILURE_CODES.ready }),
+  Object.freeze({ checkpoint: 1, codes: PROBE_FAILURE_CODES.a }),
+  Object.freeze({ checkpoint: 2, codes: PROBE_FAILURE_CODES.b }),
+]);
+const PROBE_FAILURE_CATEGORIES = PROBE_FAILURE_PHASES.flatMap(({ codes }) =>
+  codes.map(code => `probe-manifest-failed-${code}`));
 const FAILURE_CODES = Object.freeze({
   config: ['observer-config-refused'],
   'driver-receipt': ['driver-receipt-refused', 'driver-first-failure', 'driver-receipt-timeout'],
   'task-owner': ['task-owner-unavailable'],
   'probe-manifest': ['probe-temp-identity-refused', 'probe-temp-read-refused',
     'probe-manifest-validation-refused', 'probe-manifest-failure-unknown',
-    'probe-manifest-failed-ready-open-path-unavailable', 'probe-ready-timeout', 'probe-manifest-timeout'],
+    ...PROBE_FAILURE_CATEGORIES, 'probe-ready-timeout', 'probe-manifest-timeout'],
   'helper-start': ['helper-start-failed', 'helper-executable-refused'],
   'helper-pin': ['helper-window-identity-refused'],
   checkpoint: ['driver-first-failure', 'checkpoint-refused', 'checkpoint-timeout'],
@@ -27,6 +47,12 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 function fail(stage, code) { throw Object.assign(new Error('observer-failed'), { observerStage: stage, observerCode: code }); }
 function check(ok, stage, code) { if (!ok) fail(stage, code); }
 function safeCode(stage, code) { return FAILURE_CODES[stage]?.includes(code) ? code : FAILURE_CODES[stage]?.[0] || 'observer-config-refused'; }
+function failedManifestCategory(manifest) {
+  if (manifest.waiting !== false || manifest.result !== 'failed') return 'probe-manifest-failure-unknown';
+  const phase = PROBE_FAILURE_PHASES.find(item => item.checkpoint === manifest.checkpoint &&
+    item.codes.includes(manifest.failureCode));
+  return phase ? `probe-manifest-failed-${manifest.failureCode}` : 'probe-manifest-failure-unknown';
+}
 function validId(value) { return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value); }
 function validateConfig(config) {
   check(config && typeof config === 'object' && validId(config.taskId) && validId(config.grantId) &&
@@ -329,11 +355,7 @@ function defaultServices(config, testServices = {}) {
         try { validateManifestIdentity(root, manifest, expected); }
         catch { fail('probe-manifest', 'probe-manifest-validation-refused'); }
         if (manifest.failed === true) {
-          if (manifest.checkpoint === 0 && manifest.waiting === false &&
-              manifest.failureCode === 'ready-open-path-unavailable') {
-            fail('probe-manifest', 'probe-manifest-failed-ready-open-path-unavailable');
-          }
-          fail('probe-manifest', 'probe-manifest-failure-unknown');
+          fail('probe-manifest', failedManifestCategory(manifest));
         }
         // The native probe first publishes a prepared manifest, then waits at
         // checkpoint zero. Discovery must tolerate that startup interval.
@@ -456,5 +478,5 @@ async function main() {
   }
 }
 if (require.main === module) main();
-module.exports = { PHASES, FAILURE_CODES, validateConfig, validateDriverReceipt, validateOwner,
+module.exports = { PHASES, FAILURE_CODES, PROBE_FAILURE_CODES, validateConfig, validateDriverReceipt, validateOwner,
   validateManifest, validateManifestIdentity, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };
