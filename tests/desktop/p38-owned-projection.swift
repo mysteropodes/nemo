@@ -32,6 +32,29 @@ struct OwnedProjectionCursor<Node> {
 
 struct OwnedProjectRegion<Node> { let token: String; let path: String; let node: Node; let owner: Int }
 
+enum OwnedOwnerQuery: String {
+  case matched, mismatch, failed = "query-failed"
+  init(_ actual: Int?, _ expected: Int) {
+    self = actual == nil ? .failed : actual == expected ? .matched : .mismatch
+  }
+}
+
+enum OwnedChildrenQuery: String {
+  case success, unsupported, noValue = "no-value", failed, wrongType = "wrong-type"
+}
+
+// Only a successful, correctly typed array is readable; absent leaf attributes
+// and service-owned nodes retain exactly the same refusal authority as before.
+struct OwnedChildren<Node> {
+  let query: OwnedChildrenQuery
+  let values: [Node]?
+  init(query: OwnedChildrenQuery, values: [Node]?) {
+    self.query = query == .success && values == nil ? .wrongType : query
+    self.values = self.query == .success ? values : nil
+  }
+  var diagnostic: String { query == .success && values?.isEmpty == true ? "success-empty" : query.rawValue }
+}
+
 // One retained semantic object; a changed route/label/owner is never re-pinned.
 func retainedProjectTabs<Node>(_ current: Node, path: String, owner: Int, control: String?,
   request: [String:Any], projection: [String:Any], cursor: inout OwnedProjectionCursor<Node>?,
@@ -55,7 +78,7 @@ func retainedProjectTabs<Node>(_ current: Node, path: String, owner: Int, contro
 
 func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int,
   expectedOwner: Int, request: [String:Any], cursor: inout OwnedProjectionCursor<Node>?,
-  equal: (Node,Node)->Bool, hashKey: (Node)->UInt, owner: (Node)->Int?, children: (Node)->[Node]?,
+  equal: (Node,Node)->Bool, hashKey: (Node)->UInt, owner: (Node)->Int?, children: (Node)->OwnedChildren<Node>,
   isWindow: (Node)->Bool, fact: (Node,String)->[String:Any],
   phase: (String,String)->Void) throws -> [String:Any] {
   try check(depth >= 1 && depth <= 5 && maxNodes >= 1 && maxNodes <= 128)
@@ -76,13 +99,17 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     if cursor?.region == nil { cursor = nil }
   }
   var nodes = [[String:Any]](), truncated = false, depthClipped = false, unreadable = false, foreign = false
-  func owned(_ node: Node) -> Bool {
+  func ownership(_ node: Node) -> OwnedOwnerQuery {
     phase("ax-owner-query","ownership-refused")
-    return owner(node) == expectedOwner
+    return OwnedOwnerQuery(owner(node),expectedOwner)
   }
-  guard owned(root) else { cursor = nil; throw Refusal(code:"child-owner") }
+  func blocked(_ path: String, _ query: OwnedOwnerQuery) -> [String:Any] {
+    ["path":path,"role":"other","blocked":"child-owner","ownerQuery":query.rawValue]
+  }
+  guard ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
   phase("ax-children-query","attribute-value-unreadable")
-  let rootChildren = children(root)
+  let rootObservation = children(root), rootChildren = rootObservation.values
+  guard ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
   if let list = rootChildren { try check(list.count < 4096) }
   if paged {
     guard let list = rootChildren else { cursor = nil; throw Refusal(code:"children-unavailable") }
@@ -106,25 +133,33 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     }
   }
   func project(_ current: Node, _ path: String, _ level: Int) throws {
-    guard owned(current) else {
-      foreign = true; nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return
+    let before = ownership(current)
+    guard before == .matched else {
+      foreign = true; nodes.append(blocked(path,before)); return
     }
     if level > 0 && isWindow(current) { throw Refusal(code:"standalone-window") }
     phase("ax-attribute-query","attribute-query-failed")
     nodes.append(fact(current,path))
-    guard owned(current) else {
-      foreign = true; nodes[nodes.count-1] = ["path":path,"role":"other","blocked":"child-owner"]; return
+    // The fact adapter rechecks ownership independently. A transient failure
+    // there cannot be erased by a later successful PID query.
+    if nodes.last?["blocked"] as? String == "child-owner" { foreign = true; return }
+    let afterFact = ownership(current)
+    guard afterFact == .matched else {
+      foreign = true; nodes[nodes.count-1] = blocked(path,afterFact); return
     }
     phase("ax-children-query","attribute-value-unreadable")
-    let list = level == 0 ? rootChildren : children(current)
-    guard let list else {
+    let observation = level == 0 ? rootObservation : children(current)
+    let afterChildren = ownership(current)
+    guard afterChildren == .matched else {
+      foreign = true; nodes[nodes.count-1] = blocked(path,afterChildren); return
+    }
+    nodes[nodes.count-1]["ownerQuery"] = afterChildren.rawValue
+    nodes[nodes.count-1]["childrenQuery"] = observation.diagnostic
+    guard let list = observation.values else {
       unreadable = true
       if level < depth { nodes[nodes.count-1]["blocked"] = "children-unavailable" }
       else { depthClipped = true }
       return
-    }
-    guard owned(current) else {
-      foreign = true; nodes[nodes.count-1] = ["path":path,"role":"other","blocked":"child-owner"]; return
     }
     phase("ax-projection","topology-refused")
     try check(list.count < 4096)
@@ -137,11 +172,11 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     }
   }
   try project(root,base,0)
-  guard owned(root) else { cursor = nil; throw Refusal(code:"child-owner") }
+  guard ownership(root) == .matched else { cursor = nil; throw Refusal(code:"child-owner") }
   if paged {
-    guard let pinned = cursor, let now = children(root),
+    guard let pinned = cursor, let now = children(root).values,
       now.count == pinned.children.count,
-      zip(pinned.children,now).allSatisfy({ equal($0.0,$0.1) }) else {
+      zip(pinned.children,now).allSatisfy({ equal($0.0,$0.1) }), ownership(root) == .matched else {
       cursor = nil; throw Refusal(code:"adapter-refused")
     }
   }

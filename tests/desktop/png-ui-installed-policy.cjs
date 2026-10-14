@@ -123,6 +123,22 @@ function sanitizeHelper(r,target='main'){
     const p={path:typeof n.path==='string'&&/^(?:\d+(?:\.\d+)*)?$/.test(n.path)?n.path:'',role:roles.has(n.role)?n.role:'other'};
     if(controls.has(n.control)||target==='sheet'&&n.role==='AXRow'&&['A.json','Saved.json'].includes(n.control))p.control=n.control;
     if(['child-owner','children-unavailable'].includes(n.blocked))p.blocked=n.blocked;
+    for(const [key,allowed] of [['ownerQuery',['matched','mismatch','query-failed']],
+      ['childrenQuery',['success','success-empty','unsupported','no-value','failed','wrong-type']]]){
+      if(n[key]!==undefined){check(typeof n[key]==='string'&&allowed.includes(n[key]),'png-query-refused');p[key]=n[key];}
+    }
+    if(p.ownerQuery!==undefined){
+      check(p.ownerQuery==='matched'||p.blocked==='child-owner'&&result.foreignChildren===true&&result.complete===false,'png-query-refused');
+      if(p.ownerQuery==='matched')check(p.blocked!=='child-owner','png-query-refused');
+      if(p.ownerQuery!=='matched')check(p.role==='other'&&n.control===undefined&&n.childrenQuery===undefined&&
+        ['enabled','press','selected','childCount'].every(k=>n[k]===undefined),'png-query-refused');
+    }
+    if(p.childrenQuery!==undefined){
+      check(p.ownerQuery==='matched'&&p.blocked!=='child-owner','png-query-refused');
+      if(['success','success-empty'].includes(p.childrenQuery))check(Number.isInteger(n.childCount)&&n.childCount>=0&&n.childCount<4096&&
+        (p.childrenQuery==='success-empty')===(n.childCount===0)&&p.blocked!=='children-unavailable','png-query-refused');
+      else check(result.childrenUnreadable===true&&result.complete===false&&n.childCount===undefined,'png-query-refused');
+    }
     for(const key of ['enabled','press','selected'])if(typeof n[key]==='boolean')p[key]=n[key];return p;
     });
   }

@@ -354,7 +354,9 @@ func authenticatedPanelService(_ pid:pid_t) -> Bool {
   return panelServiceIdentityValid(pid,processStart(pid),pid,processStart(pid),identifier,valid)
 }
 func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [String:Any]) -> [String:Any] {
-  guard owner == pid else { return ["path":path,"role":"other","blocked":"child-owner"] }
+  guard owner == pid else {
+    return ["path":path,"role":"other","blocked":"child-owner","ownerQuery":OwnedOwnerQuery(owner.map{Int($0)},Int(pid)).rawValue]
+  }
   return read()
 }
 // A path is diagnostic provenance, never authority to traverse a foreign AX node.
@@ -1631,7 +1633,12 @@ func run() throws {
       let projection = try ownedProjection(selected,base:base,depth:depth,maxNodes:maxNodes,
         expectedOwner:Int(inspectOwner),request:request,cursor:&projectionCursor,equal:{ CFEqual($0,$1) },hashKey:{ CFHash($0) },
         owner:{ value in var actual:pid_t = 0; return AXUIElementGetPid(value,&actual) == .success ? Int(actual) : nil },
-        children:{ attr($0,kAXChildrenAttribute) as? [AXUIElement] },
+        children:{ current in
+          var value: CFTypeRef?
+          let query = AXUIElementCopyAttributeValue(current,kAXChildrenAttribute as CFString,&value)
+          return OwnedChildren(query:query == .success ? .success : query == .attributeUnsupported ? .unsupported : query == .noValue ? .noValue : .failed,
+            values:value as? [AXUIElement])
+        },
         isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },fact:fact,phase:setInspectionContext)
       result.merge(projection) { _,new in new }
       if request["projectTabs"] != nil {
