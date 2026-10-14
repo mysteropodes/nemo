@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
 const hashes = Object.freeze({
-  A:'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180',
-  B:'d30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215'
+  A:'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',
+  B:'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6'
 });
 function check(value, code) { if (!value) throw Object.assign(new Error(code), {code}); }
 function hash(bytes) { return crypto.createHash('sha256').update(bytes).digest('hex'); }

@@ -3,8 +3,8 @@
   const key = '__NEMO_P38_FIXTURE_OPEN__';
   const config = window[key];
   const HASH = Object.freeze({
-    A: 'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180',
-    B: 'd30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215'
+    A: 'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',
+    B: 'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6'
   });
   const ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
   const NATIVE_ROUTE = 'nemo_native_object_dispatch';
