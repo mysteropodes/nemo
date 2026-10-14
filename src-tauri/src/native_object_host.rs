@@ -37,7 +37,7 @@ pub(crate) struct NativeObjectHost {
     inactive_project: Option<(String, InactiveProject)>,
     inactive_requests: BTreeMap<String, InactiveRequest>,
     preview: preview::ObjectPreview,
-    object_export: Option<ExportReleaseReconciliation>,
+    object_export: Option<export::ObjectExportSession>,
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
@@ -325,7 +325,8 @@ impl NativeDispatch for NativeObjectHost {
                 let (undo_depth, redo_depth) = self.history.history_depths();
                 let exports = self
                     .object_export
-                    .clone()
+                    .as_ref()
+                    .map(|session| session.reconciliation.clone())
                     .unwrap_or(ExportReleaseReconciliation {
                         receipts: Vec::new(),
                         cleanup_complete: true,
