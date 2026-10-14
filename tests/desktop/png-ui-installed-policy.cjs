@@ -43,8 +43,19 @@ function prepareWorkspace(c){
   return {fixture,saved,after,output};
 }
 function verifyWorkspace(c){verifyInputs(c);const s=state.get(c);check(s,'png-workspace-required');
-  for(const p of [s.parent,s.root,s.outputPin])verifyDirectory(p);
+  for(const p of [s.parent,s.root,s.outputPin,s.cache?.parent,s.cache?.pin].filter(Boolean))verifyDirectory(p);
   const file=readFile(s.fixture);check(file.dev===s.fixturePin.dev&&file.ino===s.fixturePin.ino&&hash(file.bytes)===FIXTURE,'png-fixture-refused');return s;}
+function bindCache(c,manifest){
+  const s=verifyWorkspace(c),file=manifest?.dirs?.appCache;
+  check(typeof file==='string'&&path.isAbsolute(file)&&path.normalize(file)===file,'png-cache-refused');
+  const parent=directory(path.dirname(file));
+  if(!s.cache)s.cache={file,parent,pin:null};
+  check(s.cache.file===file&&s.cache.parent.dev===parent.dev&&s.cache.parent.ino===parent.ino,'png-cache-changed');
+  let present=false;try{fs.lstatSync(file);present=true;}catch(e){if(e.code!=='ENOENT')throw e;}
+  if(present){const now=directory(file);if(s.cache.pin)check(now.dev===s.cache.pin.dev&&now.ino===s.cache.pin.ino,'png-cache-changed');else s.cache.pin=now;}
+  else check(!s.cache.pin,'png-cache-changed');
+  return file;
+}
 function identity(reply,pid,windowId){check(reply&&reply.pid===pid&&reply.windowId===windowId&&reply.matchedAX===true,'png-window-refused');}
 function verifyAction(c,a,sheet,last){
   const s=verifyWorkspace(c);check(a&&actions.has(a.type),'png-action-refused');
@@ -120,7 +131,7 @@ function observeSheet(a,sheet,r){
   if(a.type==='go-to-folder'){check(r.commandPosted===true&&r.locationReady===true&&/^[a-f0-9-]{36}$/.test(r.locationToken),'png-location-refused');sheet.locationToken=r.locationToken;}
   if(a.type==='location-dismissed'){check(r.locationDismissed===true,'png-location-refused');sheet.locationToken=null;}
 }
-function artifacts(c,phase,app){
+function artifacts(c,phase,manifest){
   const s=verifyWorkspace(c),children=fs.readdirSync(s.output,{withFileTypes:true});
   const order=['baseline','cancelled','exported','after-save'];
   check(phase===order[s.artifactCursor]&&s.ui.step===[2,3,4,5][s.artifactCursor],'png-ui-unwitnessed');
@@ -129,11 +140,14 @@ function artifacts(c,phase,app){
   check(s.before&&children.length===1&&children[0].isDirectory()&&!children[0].isSymbolicLink()&&/^nemo-native-opacity-[0-9]{13}-[0-9]{1,6}$/.test(children[0].name),'png-output-refused');
   const folder=path.join(s.output,children[0].name);directory(folder);
   check(fs.readdirSync(folder).sort().join(',')==='frame_0001.png,frame_0002.png','png-manifest-refused');
-  const stage=path.join(app.dirs.appCache,'native-export-staging');check(!fs.existsSync(stage)||fs.readdirSync(stage).length===0,'png-staging-retained');
+  const cache=bindCache(c,manifest);check(s.cache.pin,'png-cache-refused');
+  const stage=path.join(cache,'native-export-staging');let entries=[];
+  try{directory(stage);entries=fs.readdirSync(stage);}catch(e){if(e.code!=='ENOENT')throw e;}
+  check(entries.length===0,'png-staging-retained');
   const files=['frame_0001.png','frame_0002.png'].map((name,i)=>{const bytes=readFile(path.join(folder,name)).bytes;
     return {name,sha256:hash(bytes),pixels:decode(bytes,{width:320,height:180,pixels:[{x:40,y:40,rgba:i?[0,255,0,255]:[0,0,255,255]},{x:8,y:8,rgba:[255,255,255,255]}]})};});
   const current=hash(readFile(phase==='after-save'?s.after:s.saved).bytes);check(current===s.before,'png-save-changed');
   if(s.published)check(JSON.stringify(files)===JSON.stringify(s.published),'png-output-changed');else s.published=files;
   s.artifactCursor++;return {phase,files,savedSha256:current,stagingEmpty:true};
 }
-module.exports={SOURCE,FIXTURE,controls,actions,check,hash,authorize,readFile,verifyInputs,prepareWorkspace,verifyWorkspace,identity,verifyAction,witnessAction,witnessSummary,sanitizeHelper,observeSheet,artifacts};
+module.exports={SOURCE,FIXTURE,controls,actions,check,hash,authorize,readFile,verifyInputs,prepareWorkspace,verifyWorkspace,bindCache,identity,verifyAction,witnessAction,witnessSummary,sanitizeHelper,observeSheet,artifacts};

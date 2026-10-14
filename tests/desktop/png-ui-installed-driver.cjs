@@ -64,15 +64,16 @@ async function runOperator(c,s){
     await bound(s.workspace());workspaceReady=true;save();s.feedback({schema:'nemo.png-ui-workspace/1',fixture:'A.json',before:'Saved.json',after:'SavedAfter.json',output:'output'});
     controller=s.controller(app);receipt.startAttempts=1;save();instance=await bound(controller.start(c.taskId,['desktop-input','gpu-reference']));
     const snapshot=await bound(controller.status(instance));s.validate(snapshot.value,instance,app);
+    policy.bindCache(c,snapshot.value.app);
     pid=snapshot.value?.app?.pid;check(Number.isInteger(pid)&&pid>0&&snapshot.value.runtime?.childPid===pid,'png-pid-refused');receipt.pid=pid;save();
     helper=await bound(s.helper(pid));const pin=await bound(helper.pin());windowId=pin.windowId;policy.identity(pin,pid,windowId);receipt.windowId=windowId;save();
     for(;;){
       check(receipt.actions.length<64,'png-action-budget');const a=await bound(s.next());policy.verifyAction(c,a,sheet,last);
-      const status=await bound(controller.status(instance));s.validate(status.value,instance,app);check(status.value.app.pid===pid,'png-pid-changed');
+      const status=await bound(controller.status(instance));s.validate(status.value,instance,app);check(status.value.app.pid===pid,'png-pid-changed');policy.bindCache(c,status.value.app);
       const guard=await bound(helper.action(windowId,{type:'check'}));policy.identity(guard,pid,windowId);check(guard.status==='ok','png-window-refused');
       if(a.type==='stop'){completed=true;break;}
       if(a.type==='artifacts'){
-        const result=policy.artifacts(c,a.phase,app);receipt.artifacts.push(result);receipt.actions.push({type:a.type,phase:a.phase});save();s.feedback(result);continue;
+        const result=policy.artifacts(c,a.phase,status.value.app);receipt.artifacts.push(result);receipt.actions.push({type:a.type,phase:a.phase});save();s.feedback(result);continue;
       }
       const selected=last?.nodes?.find(n=>n.path===a.element);
       receipt.inFlight={type:a.type,target:a.target||'main',...(selected?{role:selected.role,control:selected.control,element:selected.path}:{})};save();

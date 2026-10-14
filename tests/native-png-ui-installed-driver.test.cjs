@@ -20,6 +20,7 @@ function fixtureBytes(){
 function setup(t){
   const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'png-ui-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const fixture=path.join(root,'fixed.json');fs.writeFileSync(fixture,fixtureBytes());
+  fs.mkdirSync(path.join(root,'cache'));
   const c={workflow:'PNG_UI',grant:{issue:1959,confirmed:true,id:'png-test-'+path.basename(root)},taskId:'png-owned',sourceHead:P.SOURCE,driverHead:'a'.repeat(40),
     executableSha256:'b'.repeat(64),helperSha256:'c'.repeat(64),timeoutMs:10000,appRoot:root,app:path.join(root,'Nemo.app'),buildProof:path.join(root,'proof.json'),
     windowHelper:path.join(root,'helper'),helperProof:path.join(root,'helper-proof.json'),fixture,reportRoot:path.join(root,'workspace')};
@@ -110,24 +111,42 @@ test('independent CRC/pixel/manifest and separate saved-before/after files prove
   fs.unlinkSync(path.join(folder,'extra.png'));fs.writeFileSync(w.after,'native saved bytes');P.artifacts(f.c,'after-save',app);
 });
 test('changed color/CRC/partial output/staging never passes PNG artifact proof',t=>{
-  for(const fault of ['color','crc','partial','staging']){
+  for(const fault of ['color','crc','partial','staging','staging-symlink','broken-staging-symlink']){
     const f=setup(t),w=f.prepare(),app={dirs:{appCache:path.join(f.root,'cache')}};fs.writeFileSync(w.saved,'saved');beforeUI(f.c,w);P.artifacts(f.c,'baseline',app);cancelUI(f.c);P.artifacts(f.c,'cancelled',app);exportUI(f.c,w);
     const folder=outputs(w),second=path.join(folder,'frame_0002.png');
     if(fault==='color')fs.writeFileSync(second,png([255,0,0,255]));
     if(fault==='crc'){const b=fs.readFileSync(second);b[20]^=1;fs.writeFileSync(second,b);}
     if(fault==='partial')fs.unlinkSync(second);
     if(fault==='staging'){fs.mkdirSync(path.join(app.dirs.appCache,'native-export-staging'),{recursive:true});fs.writeFileSync(path.join(app.dirs.appCache,'native-export-staging','debt'),'pending');}
+    if(fault.includes('symlink'))fs.symlinkSync(fault.startsWith('broken')?path.join(f.root,'missing'):f.root,path.join(app.dirs.appCache,'native-export-staging'));
     assert.throws(()=>P.artifacts(f.c,'exported',app));
   }
+});
+test('live owner cache pins allow initial absence then reject changed directory, inode and symlink',t=>{
+  const f=setup(t);f.prepare();const file=path.join(f.root,'cache'),manifest={dirs:{appCache:file}};
+  fs.rmdirSync(file);P.bindCache(f.c,manifest);assert.equal(fs.existsSync(file),false);
+  fs.mkdirSync(file);P.bindCache(f.c,manifest);P.verifyWorkspace(f.c);
+  const other=path.join(f.root,'other-cache');fs.mkdirSync(other);
+  assert.throws(()=>P.bindCache(f.c,{dirs:{appCache:other}}),/cache-changed/);
+  fs.renameSync(file,file+'-old');fs.mkdirSync(file);assert.throws(()=>P.verifyWorkspace(f.c),/root-refused/);
+  fs.rmdirSync(file);fs.symlinkSync(file+'-old',file);assert.throws(()=>P.verifyWorkspace(f.c),/root-refused/);
+});
+test('validated snapshot cache changes stop before the next helper input; package carries no directories',async t=>{
+  const f=setup(t),s=fakeServices(f),other=path.join(f.root,'other-cache');fs.mkdirSync(other);let calls=0;
+  assert.equal(s.services.package().dirs,undefined);
+  s.services.controller=()=>({async start(){return {};},async status(){return {value:{app:{pid:42,dirs:{appCache:++calls===1?path.join(f.root,'cache'):other}},runtime:{childPid:42}}};},
+    async cleanup(){s.events.push('app-cleanup');}});
+  const r=await D.runOperator(f.c,s.services);assert.equal(r.status,'partial');assert.equal(r.reason,'png-cache-changed');
+  assert.equal(s.events.some(x=>x.startsWith('helper:')),false);assert.ok(s.events.includes('helper-close'));assert.ok(s.events.includes('app-cleanup'));
 });
 function fakeServices(f,options={}){
   const events=[],saved=[],actions=options.actions||[{type:'inspect'},{type:'stop'}];let index=0,timerFn;
   const helper={async pin(){return {status:'pinned',pid:options.foreignPin?71768:42,windowId:3,matchedAX:true};},
     async action(_w,a){events.push('helper:'+a.type);if(options.helperEOF)throw {code:'png-helper-eof'};
       return {status:options.refused?'refused':'ok',type:a.type,pid:options.changedPid?71768:42,windowId:3,matchedAX:true,nodes:[]};},async close(){events.push('helper-close');if(options.cleanupFault)throw Error('cleanup');}};
-  const controller={async start(){events.push('start');return {};},async status(){return {value:{app:{pid:42},runtime:{childPid:42}}};},
+  const controller={async start(){events.push('start');return {};},async status(){return {value:{app:{pid:42,dirs:{appCache:path.join(f.root,'cache')}},runtime:{childPid:42}}};},
     async cleanup(){events.push('app-cleanup');if(options.cleanupFault)throw Error('cleanup');}};
-  return {events,saved,services:{async transport(){if(options.transportFault)throw {code:'png-transport-refused'};},package(){return {dirs:{appCache:path.join(f.root,'cache')}};},
+  return {events,saved,services:{async transport(){if(options.transportFault)throw {code:'png-transport-refused'};},package(){return {bundle:path.join(f.root,'Nemo.app'),executableSha256:f.c.executableSha256};},
     journal(){events.push('journal');},workspace(){return f.prepare();},controller(){return controller;},validate(){},helper(){events.push('helper-start');return helper;},
     async next(){if(options.timeout){timerFn();return new Promise(()=>{});}if(index>=actions.length)throw {code:'png-input-eof'};return actions[index++];},
     feedback(){},save(r){saved.push(JSON.parse(JSON.stringify(r)));},setTimer(fn){timerFn=fn;return 1;},clearTimer(){},async close(){events.push('input-close');}}};
