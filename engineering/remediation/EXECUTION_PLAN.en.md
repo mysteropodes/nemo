@@ -151,21 +151,39 @@ The starting issues below are concrete entry tasks, not a claim that their count
 
 | Slot | Ilya | Cyrill |
 |---|---|---|
-| **O — orchestrator** | `gpt-6-astra`, **high**. Own shared contracts, source/coverage policy, integration order, combined validation and the canonical board. | `opus`, **high**. Review at milestones; own team claims, technical validation, PR merges, board closure, existing Fizz/Honey handoffs, Claude/native acceptance and quota decisions. |
-| **D1 — delegate** | Prefer `gpt-6-sol`, **medium** for bounded implementation; raise effort for authority/history ambiguity. | `sonnet`, **medium**. Focused tests, pure helpers, native parsers/adapters and feature registration. |
-| **D2 — delegate** | Prefer `gpt-6-luna`, **low/medium** for focused review, tests and inventory; use Sol or Astra when complexity warrants it. | `sonnet`, **medium**. Coverage/reporting, isolated browser tests, preferences/Labs and diagnostics UI. |
+| **O — orchestrator** | Prefer `gpt-6.1-sol`, **high**. Own shared contracts, source/coverage policy, integration order, combined validation and the canonical board. | `opus`, **high**. Review at milestones; own team claims, technical validation, PR merges, board closure, existing Fizz/Honey handoffs, Claude/native acceptance and quota decisions. |
+| **D1 — delegate** | Prefer `gpt-6.1-sol`, **medium** for bounded implementation; raise effort for authority/history ambiguity. | `sonnet`, **medium**. Focused tests, pure helpers, native parsers/adapters and feature registration. |
+| **D2 — delegate** | Prefer `gpt-6-luna`, **low/medium** for focused review, tests and inventory; use Sol when complexity warrants it. | `sonnet`, **medium**. Coverage/reporting, isolated browser tests, preferences/Labs and diagnostics UI. |
 
-These are preferred session settings, not quota guarantees or rigid slot capabilities. Use `gpt-6-astra` when the task warrants it. Check the actual model and effort at first claim; choose a capable available model when a preference is unavailable and record the substitution. No model choice creates a fourth slot.
+These are preferred session settings, not quota guarantees or rigid slot capabilities. Reserve `gpt-6-astra` exclusively for unusually complex coding that Sol/Luna cannot reasonably handle, never routine review, board work or coordination; explain an exception before delegation. Check the actual model and effort at first claim; choose a capable available model when a preference is unavailable and record the substitution. No model choice by itself creates another slot.
 
 For every agent spawned inside the current Codex task, include the selected model and reasoning effort in its local task name. Do not rename Buzz agents; Buzz displays their model separately.
 
 Cyrill starts with **one** Sonnet delegate and activates the second only when it has independent work and sufficient allowance. Opus receives a compact issue packet and milestone receipt, not continuous polling or repeated full-repository reads. Avoid automatic maximum effort and extended-context variants. If quotas run low, push the checkpoint and release or retain the claim explicitly; Ilya can take a leaf only after that handoff. Human issue assignees remain the owners even when agents change.
 
+### Conditional four-outcome desktop delivery
+
+The default above remains **one orchestrator and two delegates per human**, with **two writable task worktrees plus the primary checkout per machine**. Ilya approved a corrected four-outcome rollout, not automatic activation of sixteen writers or a 72-hour completion promise. Up to four named outcome sessions may be activated, each with one orchestrator and at most three delegates, only after this amendment is normally integrated on `codex/native-remediation` and the following live admission is recorded and read back in [#1062](https://github.com/mysteropodes/nemo/issues/1062):
+
+1. Name the outcome session, accountable human team, actual session/model/effort and available quota; confirm its operator and independent reviewer, rather than assuming another human or machine is present.
+2. Name its first dependency-Ready issue(s) on Project #2, exact whole-file writer claims and any prior owner's explicit release. An inactive outcome queue has no agent or worktree reservation.
+3. Record each machine's actual available disk/resources, named checkout paths and approved writable-task-worktree allowance. The default remains two plus primary; a verified activation may raise that machine's allowance to **at most four writable task worktrees plus primary**, allocating one at a time and retiring completed checkouts. Never create an integration-only extra worktree.
+4. Book the real heavy/app/GPU slot and reviewer appointment in #1062: machine, operator and required human presence, exact source/product/driver identity, operation, earliest Ready time and release condition. Run at most one heavy job or installed desktop operation per confirmed machine at a time. A second desktop slot exists only after its owner confirms it.
+
+| Outcome queue | Long-horizon responsibility | Exclusive shared applier when active |
+|---|---|---|
+| **A — integration and desktop closure** | Integrate accepted native work, repair bounded integration defects and establish exact-candidate installed acceptance. | A's orchestrator serializes native/Tauri declarations, Cargo/lockfiles, MCP aggregation, Rust profiles, package/CI wiring and the execution-plan copies. |
+| **B — UI boundaries and native callers** | Extract coherent UI responsibilities, wire ordinary native callers and retire obsolete JavaScript writers. | B's orchestrator serializes index/bootstrap, application-JS profiles/coverage and generated surface inventory. Until B is actually activated and each whole-file claim is explicitly handed off, Ilya's current orchestrator retains those shared files. |
+| **C — document and animation authority** | Deliver document, persistence/history and animation family contracts and native behavior through actual consumers. | C owns only its separately claimed native modules and family adapters; shared registrations go through the designated A or B applier. |
+| **D — scene, media and public consumers** | Deliver scene/render/media/drawing/export families and shared application/API/MCP consumers. | D owns only its separately claimed modules and adapters; shared registrations go through the designated A or B applier. |
+
+These are routing queues, not four broad issues or permission to create unstarted branches. Start only a named small leaf whose actual predecessors, whole files, reviewer and resources are Ready; broad tracking-parent closure is not a predecessor. Delegates own implementation and focused validation, not a review-only lane. Rotate bounded independent review within the delivering team under section 7; external-author approval requirements remain unchanged. Silence never approves a handoff, a resource increase, an acceptance shortcut or final promotion. Measure newly accepted desktop consumer cells and the resource-constrained critical path before publishing a remaining **wall-clock** forecast; the former 72-hour target is provisional.
+
 Launch examples from already allocated checkouts; these commands create sessions, not branches:
 
 ```sh
-codex --model gpt-6-astra -c 'model_reasoning_effort="high"'
-codex --model gpt-6-sol -c 'model_reasoning_effort="medium"'
+codex --model gpt-6.1-sol -c 'model_reasoning_effort="high"'
+codex --model gpt-6.1-sol -c 'model_reasoning_effort="medium"'
 codex --model gpt-6-luna -c 'model_reasoning_effort="low"'
 claude --model opus --effort high
 claude --model sonnet --effort medium
@@ -198,9 +216,9 @@ Use native sub-issues under R03/R05/etc to count progress. Those old issues are 
 ### Orchestrator startup and check-ins
 
 - [ ] Read this plan, the team's filtered board view and the latest handoff of each active leaf. Fetch the protected remediation integration branch and check preserved `main`, inspect PRs/worktrees and preserve active ownership. Silence never releases a claim.
-- [ ] Reserve at most two writable task worktrees per machine, plus the primary checkout. Read-only review, board updates and notes create no worktree. The orchestrator serializes integration in a clean, available task checkout; do not add a fourth checkout just for integration.
+- [ ] Reserve at most two writable task worktrees per machine, plus the primary checkout, unless section 2's exact per-machine optional activation is recorded in #1062; even then stay within its named allowance (never above four plus primary). Read-only review, board updates and notes create no worktree. The orchestrator serializes integration in a clean, available task checkout; do not add another checkout just for integration.
 - [ ] Allocate only Ready leaves whose predecessors are integrated/accepted and whose **whole files** do not overlap. A function-level split inside `motion.js`, `timeline.js`, `tweens.js`, `tools.js` or `engine-bridge.js` is not permission for concurrent writers.
-- [ ] Keep shared `package.json`, lockfile, bootstrap/index, profiles, generated manifest and `scripts/nemo/ci.cjs` wiring with Ilya's orchestrator. Delegates supply focused changes in their task branch; the orchestrator integrates these shared hunks serially.
+- [ ] Keep shared `package.json`, lockfile, bootstrap/index, profiles, generated manifest and `scripts/nemo/ci.cjs` wiring with Ilya's current orchestrator until an explicitly recorded whole-file A/B handoff under section 2. Delegates supply focused changes in their task branch; the designated applier integrates them serially, never concurrently by hunk.
 - [ ] At delegate start, blocker, review-ready and sprint end, inspect the changed issue. During active work, an hourly reminder triggers one central report from each orchestrator. Read the latest delta and board state, not the whole history; do not interrupt a delegate's tool call merely to obtain a report. A paused team posts one pause/handoff notice and pauses its timer.
 - [ ] Review a blocker within the current check-in when available: resolve the boundary question, supply a dependency, or split a bounded diagnostic leaf. Do not let a delegate spend a second sprint fixing unrelated product defects.
 - [ ] Before each integration, verify the exact candidate SHA, scoped diff, acceptance checks and relevant runtime evidence. Run the combined candidate checks after actual integration changes; prior isolated green branches do not prove the combined result.
@@ -1185,6 +1203,8 @@ N07–N19A supplied accepted native save/load, identity, command/history, evalua
   Limit: This is a final acceptance task, not a substitute for unfinished migrations. Finishing P04-P32 alone does not establish all-monolith completion.
 
 ## 9. Final acceptance — the finish line
+
+The final order is source integration and review → an exact candidate and package → its applicable installed desktop, API/client and resource/recovery evidence → a reconciled final workflow/field/consumer matrix → the evidence index → P33 and parent closure → Ilya/Cyrill acceptance and an explicitly approved, normally protected promotion to `main`. A post-candidate repair creates a **new** candidate and revalidates every affected consumer; unproven dependency impact cannot be carried forward. Neither source merges nor a 72-hour target advance these gates by themselves.
 
 - [x] N00–N05 have exact accepted receipts: board/plan installation, current-main queue reconciliation, frozen authority/transition contracts, headless-evaluation feasibility, native-viewport feasibility and the admitted bounded production queue. A tracking-parent percentage or feasibility prototype alone is not production completion.
 - [ ] The native Rust engine is the sole writable authority for the agreed document revision, command/history, evaluation/scheduling, media/resource/GPU, viewport-production and export paths. Tauri/HTML/CSS/JavaScript remains the desktop interface; Paper.js is only a justified geometry, hit-testing or presentation edge, not a concurrent authority.
