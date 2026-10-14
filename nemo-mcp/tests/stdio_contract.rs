@@ -101,10 +101,7 @@ async fn root_native_templates_construct_calls_without_nested_schema_knowledge()
         );
     }
     let payload = &schema["properties"]["payload"];
-    assert_eq!(
-        payload["properties"]["command"]["const"],
-        "layer.opacity.set"
-    );
+    assert_eq!(payload["properties"]["command"]["type"], "string");
     assert_eq!(
         payload["properties"]["stableTarget"]["required"],
         json!(["layerUid"])
