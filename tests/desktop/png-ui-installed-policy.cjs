@@ -2,7 +2,7 @@
 // Fixed #1959 UI acceptance policy; never a product grant or document writer.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const decode=require('./reference-installed-policy.cjs').pngPixels;
-const SOURCE='6e4edc21bb92095cc8306183ab049a8f0288dbeb';
+const SOURCE='6d6390cdd4fe692eff80ebec2a7ecfce82a7eb8c';
 const FIXTURE='cfad6f7e5cb1709dcc0ecee84bc29e9703e8ee19442ba10323a2139f0edd6a66';
 const SHA=/^[a-f0-9]{64}$/,HEAD=/^[a-f0-9]{40}$/,ID=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const controls=new Set(['Open','Open Project…','Open…','Cancel','File','Edit','Save','Save As…','Save As','Save as…',

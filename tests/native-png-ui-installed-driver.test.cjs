@@ -57,7 +57,8 @@ test('PNG authorization refuses stale/cross-workflow/unconfirmed and malformed s
   const {c}=setup(t);assert.doesNotThrow(()=>P.authorize(c));
   for(const patch of [{workflow:'P38'},{workflow:'P37_REFERENCE'},{grant:{issue:1645,confirmed:true,id:'old'}},
     {grant:{issue:1864,confirmed:true,id:'reference'}},{grant:{issue:1959,confirmed:false,id:'png'}},{grant:null},
-    {sourceHead:'d'.repeat(40)},{timeoutMs:600001},{driverHead:'bad'},{fixture:'relative'}])assert.throws(()=>P.authorize({...c,...patch}));
+    {sourceHead:'6e4edc21bb92095cc8306183ab049a8f0288dbeb'},{sourceHead:'d'.repeat(40)},
+    {timeoutMs:600001},{driverHead:'bad'},{fixture:'relative'}])assert.throws(()=>P.authorize({...c,...patch}));
 });
 test('fixed fixture/root/inode and path controls refuse changes without admitting a different document',t=>{
   const f=setup(t),w=f.prepare();assert.throws(f.prepare,/workspace-reused/);
