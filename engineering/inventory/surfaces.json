@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "567e08588a2ba3e66c492f537a4381f8602214fb",
-  "describe": "v0.7.0-alpha.4-1752-g567e0858-dirty"
+  "head": "9ce4e7f2b5ac80c0546406c0adcf93da6bf90de3",
+  "describe": "v0.7.0-alpha.4-1754-g9ce4e7f2-dirty"
  },
- "inputsDigest": "15edd99cbfd7b97ad1f5171fbe9ea00e5e0361ee40fc446d46660aec74b8f2da",
+ "inputsDigest": "ffceb04b6e2e53b11594fd5de8001f51a17913867f09e40d6ee2c8b65888df1d",
  "states": [
   "inventoried",
   "characterized",
@@ -15790,7 +15790,7 @@
   {
    "id": "dom:#start-open",
    "kind": "dom",
-   "surface": "start-cards > div#start-open",
+   "surface": "start-cards > button[button]#start-open",
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
