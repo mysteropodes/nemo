@@ -21,7 +21,25 @@ pub(crate) fn owner(instance: &str) -> NativeObjectHistory {
 }
 
 fn owner_with_order(instance: &str, order: Option<serde_json::Value>) -> NativeObjectHistory {
+    owner_with_visibility(instance, order, None)
+}
+fn owner_with_visibility(
+    instance: &str,
+    order: Option<serde_json::Value>,
+    visibility: Option<[bool; 3]>,
+) -> NativeObjectHistory {
     let mut source = paint_test_document(&[0, 7]);
+    if let Some(flags) = visibility {
+        let flags = [flags[2], flags[0], flags[1]]; // Stored L2/L0/L1, not paint order.
+        for (layer, flag) in source["layers"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(flags)
+        {
+            layer["visible"] = json!(flag);
+        }
+    }
     source["objects"]
         .as_array_mut()
         .unwrap()
@@ -53,6 +71,56 @@ fn owner_with_order(instance: &str, order: Option<serde_json::Value>) -> NativeO
         decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap(),
     )
     .unwrap()
+}
+
+#[test]
+fn gpu_layer_visibility_filters_paint_and_real_png_without_deleting_source_data() {
+    let mut gpu = Compositor::new().expect("visibility requires real headless Metal");
+    for (flags, expected, indices) in [
+        (Some([true, false, true]), [128, 64, 191, 255], vec![0, 1]),
+        (Some([false, false, false]), [255, 255, 255, 255], vec![]),
+    ] {
+        let owner = owner_with_visibility("layer-visibility", None, flags);
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let before = crate::object_codec::encode_storage_project(snapshot.document()).unwrap();
+        let input = plan(&snapshot, 7);
+        assert_eq!(
+            input
+                .packet()
+                .records()
+                .map(|r| r.source_layer_index())
+                .collect::<Vec<_>>(),
+            indices
+        );
+        let mut scheduler = FrameScheduler::new();
+        let work = schedule(&mut scheduler, &snapshot, 7);
+        let live = prepare(&scheduler, &work, &input, &selector(&snapshot, 7)).unwrap();
+        let result = gpu.compose_scheduled_object(&live).unwrap();
+        let pixels = gpu.readback_scheduled_object_rgba8(&result, &live).unwrap();
+        assert_pixel(pixels.bytes(&live).unwrap(), 8, 8, expected);
+        assert_pixel(pixels.bytes(&live).unwrap(), 40, 40, [255, 255, 255, 255]);
+        #[cfg(feature = "export_job")]
+        {
+            let png = crate::png_output::encode_scheduled_object_png(&gpu, &result, &live, 65536)
+                .unwrap();
+            let bytes = png.bytes(&live).unwrap();
+            let mut reader = png::Decoder::new(std::io::Cursor::new(&*bytes))
+                .read_info()
+                .unwrap();
+            let mut rgba = vec![0; reader.output_buffer_size().unwrap()];
+            let frame = reader.next_frame(&mut rgba).unwrap();
+            assert_eq!((frame.width, frame.height), (64, 64));
+            assert_pixel(&rgba, 8, 8, expected);
+            assert_pixel(&rgba, 40, 40, [255, 255, 255, 255]);
+        }
+        assert_eq!(
+            crate::object_codec::encode_storage_project(snapshot.document()).unwrap(),
+            before
+        );
+        drop(live);
+        scheduler.succeed(work.work_id()).unwrap();
+        assert_eq!(scheduler.lease_counters().live(), 0);
+    }
 }
 pub(crate) fn selector(snapshot: &ObjectSnapshot, frame: u32) -> ObjectFrameSelector<'_> {
     ObjectFrameSelector {

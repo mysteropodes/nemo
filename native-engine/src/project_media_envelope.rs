@@ -244,14 +244,8 @@ mod tests {
             format_version: version,
             total_frames: 21,
             layers: vec![
-                ObjectLayer {
-                    layer_uid: "legacy layer:alpha".into(),
-                    name: Presence::Missing,
-                },
-                ObjectLayer {
-                    layer_uid: "0".into(),
-                    name: Presence::Missing,
-                },
+                ObjectLayer::identified("legacy layer:alpha".into()),
+                ObjectLayer::identified("0".into()),
             ],
             objects,
             composition_order: if version == 1 {

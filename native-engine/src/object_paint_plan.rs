@@ -71,11 +71,17 @@ pub fn prepare_object_paint_plan(
         .layers()
         .iter()
         .map(|layer| {
+            let visible = scene
+                .packet()
+                .source_layers()
+                .get(layer.source_layer_index())
+                .is_some_and(|source| source.visible());
             (
                 layer.source_layer_index(),
                 layer
                     .elements()
                     .iter()
+                    .filter(|_| visible)
                     .map(|e| e.source_object_index())
                     .collect(),
             )
