@@ -32,8 +32,12 @@ test('Open Project uses a named native button with legal, localized children', (
 });
 
 test('the existing ordinary Open callback remains the sole start-card click binding', () => {
-  assert.equal((project.match(/getElementById\('start-open'\)\.addEventListener\('click',openDialog\)/g) || []).length, 1);
-  assert.doesNotMatch(project, /getElementById\('start-open'\)\.addEventListener\('key(?:down|up|press)'/);
+  assert.match(project, /var startOpen=document\.getElementById\('start-open'\)/);
+  assert.equal((project.match(/startOpen\.addEventListener\('click',openDialog\)/g) || []).length, 1);
+  assert.match(project, /if\(e\.key==='Enter'\|\|e\.key===' '\)e\.stopPropagation\(\)/);
+  assert.match(project, /startOpen\.addEventListener\('keydown',keepStartOpenKeysLocal\)/);
+  assert.match(project, /startOpen\.addEventListener\('keyup',keepStartOpenKeysLocal\)/);
+  assert.doesNotMatch(project, /startOpen\.addEventListener\('key(?:down|up)',[^)]*preventDefault/);
 });
 
 test('the button keeps the card layout and an explicit keyboard focus cue', () => {
