@@ -369,7 +369,8 @@ for(const [label,options,stage,code] of failureCases) test('records sanitized fi
 test('visible refusal is acknowledged once and stops before the next phase',async()=>{
   const f=makeServices({visibleFailure:'a-opened'});
   const result=await runObserver(config,f.services);
-  assert.equal(result.firstFailure,null);
+  assert.equal(result.firstFailure.stage,'inspection');assert.equal(result.firstFailure.code,'inspection-refused');
+  assert.ok(f.events.indexOf('save:inspection')<f.events.indexOf('ack:a-opened'));
   assert.deepEqual(result.observations.map(item=>[item.phase,item.decision]),[
     ['ready','accepted'],['a-opened','refused'],
   ]);
