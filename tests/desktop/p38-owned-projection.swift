@@ -2,9 +2,10 @@
 import Foundation
 import CoreFoundation
 
-// Inspection and fresh input use the same public, ordered control classifier.
-func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?) -> String? {
-  var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Project tabs","Motion","Opacity","R08 rectangle"]
+// Ordered public controls; the semantic region marker is inspection-only.
+func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?, inspection: Bool = false) -> String? {
+  var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+  if inspection { labels.insert("Project tabs") }
   if reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
     "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
     "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",

@@ -300,6 +300,10 @@ async function runObserver(config, services) {
         currentStage = 'receipt';
         services.save(outcome); // Durable safe evidence precedes the unchanged ACK decision.
       }
+      if(decision==='refused'&&!firstFailure) {
+        firstFailure={stage:'inspection',code:'inspection-refused',elapsedMs:elapsed()};outcome.firstFailure=firstFailure;
+        currentStage='receipt';services.save(outcome);
+      }
       currentStage = 'acknowledgment';
       try {
         services.owner.acknowledge(probe.root, { ...manifest, ...expected, phase, regionToken }, ownerToken, decision,

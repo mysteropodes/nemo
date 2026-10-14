@@ -323,6 +323,7 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
   assert.equal(good.result.cleanup,'complete');assert.equal(good.result.installedAcceptance,'not-established');
   for(const fault of ['cursor','reordered','foreign','unreadable','duplicate','missing','clipped','stale','selection']) {
     const bad=await trial(fault);assert.equal(bad.result.status,'partial',fault);assert.equal(bad.result.cleanup,'complete');
+    assert.ok(bad.result.firstFailure,fault);
     assert.equal(bad.acks.filter(x=>x.decision==='accepted').length,['stale','selection'].includes(fault)?1:0,fault);
     assert.equal(bad.events.includes('quit'),false,fault);
   }

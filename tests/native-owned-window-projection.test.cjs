@@ -188,6 +188,12 @@ precondition(effects==2)
 try press([:],"AXButton","","","","--persistent")
 try press([:],"AXButton","","","","--reference-persistent")
 precondition(effects==4)
+for mode in ["--persistent","--reference-persistent","--png-persistent"] {
+  var hit=false;do{try press(["expectedControl":"Project tabs","expectedRole":"AXButton"],"AXButton","Project tabs","","Project tabs",mode)}catch{hit=true}
+  precondition(hit && effects==4)
+}
+precondition(ownedControl(false,"Project tabs","",{nil},inspection:true)=="Project tabs")
+precondition(ownedControl(true,"Project tabs","",{nil})==nil)
 var descriptionReads=0
 precondition(ownedControl(true,"Cancel","Open Project…",{descriptionReads+=1;return "Open Project…"})=="Cancel" && descriptionReads==0)
 precondition(ownedControl(false,"Save","",{nil})==nil && ownedControl(true,"Save","",{nil})=="Save")

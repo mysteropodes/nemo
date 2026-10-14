@@ -1618,7 +1618,7 @@ func run() throws {
           let query = AXUIElementCopyAttributeValue(current,kAXSubroleAttribute as CFString,&subrole)
           facts["textFieldKind"] = textFieldKind(query,subrole as? String)
         }
-        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
+        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String },inspection:true) { facts["control"] = control }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
         if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
         return facts
