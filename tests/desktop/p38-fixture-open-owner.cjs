@@ -6,7 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
-const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
+const { safeWindowEvidence, verifyWindow, cleanupHelper } = require('./p38-installed-driver.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const PROBE_FAILURE_CODES = Object.freeze({
@@ -47,6 +47,7 @@ const FAILURE_CODES = Object.freeze({
     'ready-visible-state-refused', 'ready-window-pin-refused', 'ready-ax-projection-refused',
     'ready-phase-refused', 'ready-visible-unclassified'],
   acknowledgment: ['owner-ack-refused'],
+  capture: ['capture-refused'],
   cleanup: ['helper-cleanup-incomplete'],
   receipt: ['receipt-write-failed'],
 });
@@ -83,6 +84,9 @@ function validateConfig(config) {
     config.timeoutMs <= 540000, 'config', 'observer-config-refused');
 }
 function readJSONNoFollow(file, limit = 16384) {
+  return JSON.parse(readBytesNoFollow(file,limit).toString('utf8'));
+}
+function readBytesNoFollow(file, limit, beforeRead = () => {}) {
   const named = fs.lstatSync(file);
   check(named.isFile() && !named.isSymbolicLink() && named.size <= limit, 'driver-receipt', 'driver-receipt-refused');
   const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
@@ -90,6 +94,7 @@ function readJSONNoFollow(file, limit = 16384) {
     const opened = fs.fstatSync(fd);
     check(opened.isFile() && opened.dev === named.dev && opened.ino === named.ino && opened.size <= limit,
       'driver-receipt', 'driver-receipt-refused');
+    beforeRead(fd);
     const chunks = [], buffer = Buffer.alloc(Math.min(65536, limit + 1));
     let total = 0;
     for (;;) {
@@ -104,7 +109,7 @@ function readJSONNoFollow(file, limit = 16384) {
     const after = fs.lstatSync(file);
     check(after.isFile() && !after.isSymbolicLink() && after.dev === opened.dev && after.ino === opened.ino,
       'driver-receipt', 'driver-receipt-refused');
-    return JSON.parse(bytes.toString('utf8'));
+    return bytes;
   } finally { fs.closeSync(fd); }
 }
 function pinDirectory(directory, stage, code) {
@@ -125,10 +130,41 @@ function writeOutcome(directory, outcome) {
   finally { fs.closeSync(fd); }
   guard.verify(); fs.renameSync(temporary, file); guard.verify();
 }
+function pngChunksComplete(bytes) {
+  let offset=8,data=false,first=true;
+  while(offset+12<=bytes.length) {
+    const size=bytes.readUInt32BE(offset),type=bytes.toString('ascii',offset+4,offset+8);
+    if(size>bytes.length-offset-12||!/^[A-Za-z]{4}$/.test(type)||first&&(type!=='IHDR'||size!==13)||!first&&type==='IHDR')return false;
+    let crc=0xffffffff;
+    for(let i=offset+4;i<offset+8+size;i++) {crc^=bytes[i];for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+    if(((crc^0xffffffff)>>>0)!==bytes.readUInt32BE(offset+8+size))return false;
+    if(type==='IDAT'&&size>0)data=true;
+    if(type==='IEND')return size===0&&data&&offset+12===bytes.length;
+    first=false;offset+=size+12;
+  }
+  return false;
+}
+function captureEvidence(directory,index,identity,reply) {
+  try {
+    const capture='capture-'+(index+1)+'.png';
+    check(Number.isInteger(index)&&index>=1&&index<=3&&Number.isSafeInteger(identity.pid)&&identity.pid>0&&identity.pid<=2147483647&&
+      Number.isSafeInteger(identity.windowId)&&identity.windowId>0&&identity.windowId<=4294967295&&reply?.status==='ok'&&reply.type==='capture'&&
+      reply.matchedAX===true&&reply.pid===identity.pid&&reply.windowId===identity.windowId&&reply.capture===capture,
+      'capture','capture-refused');
+    const guard=pinDirectory(directory,'capture','capture-refused');
+    const bytes=readBytesNoFollow(path.join(directory,capture),64*1024*1024,fd=>fs.fchmodSync(fd,0o600));guard.verify();
+    check(bytes.length>=45&&bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))&&
+      bytes.readUInt32BE(8)===13&&bytes.toString('ascii',12,16)==='IHDR'&&
+      bytes.subarray(-12).equals(Buffer.from('0000000049454e44ae426082','hex'))&&pngChunksComplete(bytes),'capture','capture-refused');
+    const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);
+    check(width>0&&height>0&&width<=16384&&height<=16384,'capture','capture-refused');
+    return {phase:PHASES[index],pid:identity.pid,windowId:identity.windowId,capture,sha256:hash(bytes),width,height};
+  } catch {fail('capture','capture-refused');}
+}
 function outcomeBase(config) {
   return { schema: 'nemo.p38-owner-observation/2', issue: 1645, grant: config.grantId,
     task: config.taskId, source: config.sourceHead, status: 'partial', observations: [],
-    firstFailure: null, cleanup: 'not-required', installedAcceptance: 'not-established' };
+    firstFailure: null, captures:[], cleanup: 'not-required', installedAcceptance: 'not-established' };
 }
 function validateDriverReceipt(receipt, config) {
   if (receipt?.firstFailure) fail('driver-receipt', 'driver-first-failure');
@@ -300,8 +336,22 @@ async function runObserver(config, services) {
         currentStage = 'receipt';
         services.save(outcome); // Durable safe evidence precedes the unchanged ACK decision.
       }
-      if(decision==='refused'&&!firstFailure) {
-        firstFailure={stage:'inspection',code:'inspection-refused',elapsedMs:elapsed()};outcome.firstFailure=firstFailure;
+      if(decision==='accepted'&&index>0) {
+        currentStage='capture';
+        try {
+          const capture=await helper.capture(window,index);
+          check(capture?.phase===phase&&capture.pid===window.pid&&capture.windowId===window.windowId&&
+            capture.capture==='capture-'+(index+1)+'.png'&&/^[a-f0-9]{64}$/.test(capture.sha256)&&
+            ['width','height'].every(k=>Number.isInteger(capture[k])&&capture[k]>0&&capture[k]<=16384),'capture','capture-refused');
+          outcome.captures.push(Object.fromEntries(['phase','pid','windowId','capture','sha256','width','height'].map(k=>[k,capture[k]])));
+          currentStage='receipt';services.save(outcome);
+        } catch {
+          decision='refused';firstFailure={stage:currentStage,code:currentStage==='receipt'?'receipt-write-failed':'capture-refused',elapsedMs:elapsed()};
+          outcome.firstFailure=firstFailure;
+        }
+      }
+      if(decision==='refused') {
+        if(!firstFailure) {firstFailure={stage:'inspection',code:'inspection-refused',elapsedMs:elapsed()};outcome.firstFailure=firstFailure;}
         currentStage='receipt';services.save(outcome);
       }
       currentStage = 'acknowledgment';
@@ -444,6 +494,7 @@ function defaultServices(config, testServices = {}) {
     const pinned = verifyHelperExecutable(config.helperPath, config.helperSha256);
     const child = spawn(pinned.path, ['--persistent', String(window.pid)], { detached: true,
       stdio: ['pipe', 'pipe', 'ignore'], env: helperEnvironment(config.grantId, reportDir) });
+    child.p38DetachedGroup=true;child.p38GroupMayContainDescendants=false;
     child.spawnFailed = false;
     await new Promise((resolve, reject) => {
       child.once('spawn', resolve);
@@ -464,7 +515,7 @@ function defaultServices(config, testServices = {}) {
     }
     const input = readline.createInterface({ input: child.stdout, terminal: false });
     const lines = input[Symbol.asyncIterator]();
-    let closed = false;
+    let closed = false,capturePending=false;
     const regionState={actions:0};
     const send = value => {
       if (!child.stdin.write(JSON.stringify(value) + '\n')) fail('inspection', 'inspection-refused');
@@ -485,6 +536,16 @@ function defaultServices(config, testServices = {}) {
           fail('inspection', 'inspection-refused');
         }
       },
+      async capture(identity,index) {
+        check(Number.isInteger(index)&&index>=1&&index<=3&&regionState.actions++<63,'capture','capture-refused');
+        child.p38GroupMayContainDescendants=true;capturePending=true;
+        send({type:'capture',target:'main',pid:identity.pid,windowId:identity.windowId,capture:'capture-'+(index+1)+'.png'});
+        const reply=await waitLine(lines);
+        check(reply?.status==='ok'&&reply.type==='capture'&&reply.matchedAX===true&&reply.pid===identity.pid&&
+          reply.windowId===identity.windowId&&reply.capture==='capture-'+(index+1)+'.png','capture','capture-refused');
+        capturePending=false; // This matching helper reply follows screencapture waitUntilExit + window revalidation.
+        return captureEvidence(reportDir,index,identity,reply);
+      },
       async quit(identity) {
         send({ type: 'quit', pid: identity.pid, windowId: identity.windowId });
         const value = await waitLine(lines);
@@ -495,20 +556,8 @@ function defaultServices(config, testServices = {}) {
         if (closed) return;
         closed = true; input.close();
         if (child.spawnFailed && !Number.isSafeInteger(child.pid)) return;
-        if (child.exitCode !== null || child.signalCode !== null) return;
-        try { child.kill('SIGTERM'); } catch { fail('cleanup', 'helper-cleanup-incomplete'); }
-        const ended = await Promise.race([
-          new Promise(resolve => child.once('close', () => resolve(true))),
-          new Promise(resolve => setTimeout(() => resolve(false), 500)),
-        ]);
-        if (!ended) {
-          try { child.kill('SIGKILL'); } catch { fail('cleanup', 'helper-cleanup-incomplete'); }
-          const killed = await Promise.race([
-            new Promise(resolve => child.once('close', () => resolve(true))),
-            new Promise(resolve => setTimeout(() => resolve(false), 500)),
-          ]);
-          if (!killed) fail('cleanup', 'helper-cleanup-incomplete');
-        }
+        try {await cleanupHelper(child);}catch {fail('cleanup','helper-cleanup-incomplete');}
+        if(capturePending)fail('cleanup','helper-cleanup-incomplete'); // Helper/group exit alone cannot prove an unanswered capture finished.
       },
     };
   }
@@ -532,5 +581,5 @@ async function main() {
   }
 }
 if (require.main === module) main();
-module.exports = { PHASES, FAILURE_CODES, PROBE_FAILURE_CODES, validateConfig, validateDriverReceipt, validateOwner,
+module.exports = { PHASES, FAILURE_CODES, PROBE_FAILURE_CODES, captureEvidence, validateConfig, validateDriverReceipt, validateOwner,
   validateManifest, validateManifestIdentity, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, runObserver, defaultServices, writeOutcome, safeCode, fail };
