@@ -1459,14 +1459,12 @@ func run() throws {
         let rawRole = attr(selected,kAXRoleAttribute) as? String ?? ""
         var facts: [String:Any] = ["axPressQueryError":Int(query.rawValue),"axPressAdvertised":advertised,
           "role":roles.contains(rawRole) ? rawRole : "other"]
-        let labels = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
         let title = attr(selected,kAXTitleAttribute) as? String ?? "", value = attr(selected,kAXValueAttribute) as? String ?? ""
-        if labels.contains(title) { facts["control"] = title }
-        else if labels.contains(value) { facts["control"] = value }
+        if let control = ownedControl(scope.reference,title,value,{ attr(selected,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
         guard query == .success && advertised else { throw pressFailure("axpress-support",facts) }
         if args[1] == "--png-persistent" || request["expectedControl"] != nil || request["expectedRole"] != nil {
           guard let control = request["expectedControl"] as? String, let role = request["expectedRole"] as? String else { throw Refusal(code:"adapter-refused") }
-          try check(rawRole == role && [title,value,attr(selected,kAXDescriptionAttribute) as? String ?? ""].contains(control))
+          try check(rawRole == role && facts["control"] as? String == control)
         }
         if location != nil {
           do {
@@ -1606,12 +1604,6 @@ func run() throws {
       let selected = locationToken == nil ? try node(base,selectedRoot) : try node(base,selectedRoot,owner:inspectOwner)
       var roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
       if scope.reference { roles.insert(kAXPopUpButtonRole) }
-      var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
-      if scope.reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
-        "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
-        "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
-        "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace",
-        "Go","Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]) }
       func fact(_ current: AXUIElement, _ path: String) -> [String:Any] {
         // No title/value/children reads from a foreign child; expose blocked route only.
         var owner: pid_t = 0
@@ -1626,9 +1618,7 @@ func run() throws {
           let query = AXUIElementCopyAttributeValue(current,kAXSubroleAttribute as CFString,&subrole)
           facts["textFieldKind"] = textFieldKind(query,subrole as? String)
         }
-        if labels.contains(title) { facts["control"] = title }
-        else if labels.contains(value) { facts["control"] = value }
-        else if let description = attr(current,kAXDescriptionAttribute) as? String, labels.contains(description) { facts["control"] = description }
+        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
         if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
         return facts

@@ -2,6 +2,20 @@
 import Foundation
 import CoreFoundation
 
+// Inspection and fresh input use the same public, ordered control classifier.
+func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?) -> String? {
+  var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+  if reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
+    "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
+    "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
+    "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace",
+    "Go","Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]) }
+  if labels.contains(title) { return title }
+  if labels.contains(value) { return value }
+  if let text = description(), labels.contains(text) { return text }
+  return nil
+}
+
 struct OwnedProjectionCursor<Node> {
   let token: String
   let base: String
