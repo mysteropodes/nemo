@@ -2102,6 +2102,8 @@ body.mode-motion .layer-inout-bar .layer-inout-handle{width:4px;border-radius:2p
 #start-cards:not(.has-resume) #start-resume{display:none;}
 .start-card{background:#201f25;border-radius:8px;padding:26px 20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;transition:background .15s;}
 .start-card:hover{background:#26242c;}
+#start-open{-webkit-appearance:none;appearance:none;border:0;box-sizing:border-box;min-width:0;width:100%;font:inherit;color:inherit;}
+#start-open:focus-visible{outline:2px solid #7EA0FA;outline-offset:2px;}
 .start-card-ico{width:34px;height:34px;flex:none;border-radius:8px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:rgba(236,234,231,.75);}
 .start-card-ico-accent{background:rgba(63,107,245,.16);color:#7EA0FA;}
 .start-card-title{font-weight:700;font-size:14.5px;color:#ECEAE7;}

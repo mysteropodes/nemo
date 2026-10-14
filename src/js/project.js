@@ -693,7 +693,16 @@
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
       showStartScreen:showStartScreen,notice:showToast
     });
-    document.getElementById('start-open').addEventListener('click',openDialog);
+    var startOpen=document.getElementById('start-open');
+    // Keep this native button's Enter/Space activation local. The timeline's
+    // document shortcuts otherwise cancel those keys for playback/panning;
+    // do not preventDefault or synthesize a click (the browser owns both).
+    function keepStartOpenKeysLocal(e){
+      if(e.key==='Enter'||e.key===' ')e.stopPropagation();
+    }
+    startOpen.addEventListener('keydown',keepStartOpenKeysLocal);
+    startOpen.addEventListener('keyup',keepStartOpenKeysLocal);
+    startOpen.addEventListener('click',openDialog);
 
     // Project panel buttons (right-hand Project section)
     document.getElementById('btn-save').addEventListener('click',save);

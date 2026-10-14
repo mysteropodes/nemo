@@ -35,11 +35,11 @@
         <div class="start-card-title" data-i18n="startNewTitle">New Project</div>
         <div class="start-card-sub" data-i18n="startNewSub">Choose canvas size &amp; frame rate</div>
       </div>
-      <div class="start-card" id="start-open">
-        <span class="start-card-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 014.5 5H9l2 2h8.5A1.5 1.5 0 0121 8.5V18a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18z"/></svg></span>
-        <div class="start-card-title" data-i18n="startOpenTitle">Open Project…</div>
-        <div class="start-card-sub" data-i18n="startOpenSub">Browse for a .json project file</div>
-      </div>
+      <button type="button" class="start-card" id="start-open" aria-labelledby="start-open-title" aria-describedby="start-open-sub">
+        <span class="start-card-ico" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 014.5 5H9l2 2h8.5A1.5 1.5 0 0121 8.5V18a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18z"/></svg></span>
+        <span class="start-card-title" id="start-open-title" data-i18n="startOpenTitle">Open Project…</span>
+        <span class="start-card-sub" id="start-open-sub" data-i18n="startOpenSub">Browse for a .json project file</span>
+      </button>
       <div class="start-card" id="start-resume" style="display:none">
         <span class="start-card-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 118 8" stroke-dasharray="2.5 3"/><path d="M12 20l-3-2m3 2l-3 2"/></svg></span>
         <div class="start-card-title" data-i18n="startResumeTitle">Resume Last Session</div>
