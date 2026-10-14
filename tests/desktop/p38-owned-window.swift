@@ -1634,6 +1634,11 @@ func run() throws {
         children:{ attr($0,kAXChildrenAttribute) as? [AXUIElement] },
         isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },fact:fact,phase:setInspectionContext)
       result.merge(projection) { _,new in new }
+      if request["projectTabs"] != nil {
+        try check(!scope.reference && target == "main" && locationToken == nil)
+        result["projectTabs"] = try retainedProjectTabs(selected,path:base,owner:Int(inspectOwner),control:fact(selected,base)["control"] as? String,
+          request:request,projection:projection,cursor:&projectionCursor,equal:{ CFEqual($0,$1) })
+      }
       try verify()
       if locationToken != nil { _ = try verifyLocation() } else if target == "sheet" { _ = try verifySheet() }
       activeInspectionContext = nil

@@ -368,17 +368,31 @@ test('A write capability cannot disappear during inactive B preparation',async()
   const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,statusA,statusA,{...statusA,operations:[]}]});
   assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-a-state-changed');
 });
-test('physical owner evidence requires A-only, A+B with alert, then A-only after close',()=>{
+function regionSnapshot(controls=[],alert=false,pid=42) {
+  return {pid,windowId:9,matchedAX:true,truncated:false,depthClipped:false,childrenUnreadable:false,
+    foreignChildren:false,complete:true,projectTabs:{path:'1',token:'12345678-1234-1234-1234-123456789abc',unique:true},nodes:[
+      {path:'0',role:'AXButton',control:'B'}, {path:'1',role:'AXGroup',control:'Project tabs'},
+      ...controls.map((control,index)=>({path:'1.'+index,role:'other',control,selected:index===0})),
+      ...(alert?[{path:'2',role:'AXStaticText',alert:'switch-unavailable'}]:[])]};
+}
+test('physical owner evidence requires the retained semantic region and exact selected rows',()=>{
   const {visibleEvidence}=require('./p38-fixture-open-installed.cjs');
-  const snapshot=(controls,alert)=>({pid:42,windowId:9,matchedAX:true,nodes:[
-    ...controls.map((control,index)=>({path:String(index+1),role:'AXStaticText',control})),
-    ...(alert?[{path:'9',role:'AXStaticText',alert:'switch-unavailable'}]:[])]});
+  const snapshot=regionSnapshot,expected=phase=>({phase,pid:42,windowId:9,regionToken:snapshot().projectTabs.token});
   for(const [phase,controls,alert] of [['ready',[],false],['a-opened',['A.json'],false],
     ['b-opened',['A.json','B.json'],true],['b-closed',['A'],false]])
-    assert.doesNotThrow(()=>visibleEvidence(snapshot(controls,alert),{phase,pid:42,windowId:9}));
+    assert.doesNotThrow(()=>visibleEvidence(snapshot(controls,alert),expected(phase)));
   for(const [phase,controls,alert] of [['a-opened',['A.json','B.json'],true],
     ['b-opened',['B.json'],true],['b-opened',['A.json','B.json'],false],['b-closed',['A.json','B.json'],false]])
-    assert.throws(()=>visibleEvidence(snapshot(controls,alert),{phase,pid:42,windowId:9}),/probe-visible-state-refused/);
+    assert.throws(()=>visibleEvidence(snapshot(controls,alert),expected(phase)),/probe-visible-state-refused/);
+  const good=snapshot(['A.json','B.json'],true),pin=expected('b-opened');
+  for(const change of [s=>delete s.projectTabs,s=>s.projectTabs.unique=false,s=>s.projectTabs.token='bad',
+    s=>s.projectTabs.token='87654321-1234-1234-1234-123456789abc',s=>s.nodes.push({...s.nodes[1],path:'3'}),
+    s=>s.nodes[2].selected=false,s=>s.nodes[3].selected=true,s=>delete s.nodes[2].selected,
+    s=>s.nodes.push({...s.nodes[2],path:'1.8'}),s=>s.nodes[2].blocked='child-owner',
+    ...['truncated','depthClipped','childrenUnreadable','foreignChildren'].map(k=>s=>s[k]=true),
+    s=>s.complete=false,s=>delete s.complete]){
+    const bad=structuredClone(good);change(bad);assert.throws(()=>visibleEvidence(bad,pin));
+  }
 });
 test('status query failure is reduced to a fixed refusal without raw details',async()=>{
   const r=await execute([true],{},{statusResults:[emptyStatus,new Error('private status path') ]});
@@ -426,11 +440,10 @@ test('owner runner requires observed original-window fixture and alert before ac
       buildSha:pins.buildSha,pid:pins.pid,window:pins.window,origin:pins.origin,fixtures:pins.fixtures});
     pins.manifestSha256=crypto.createHash('sha256').update(pinBytes).digest('hex');
     fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(pins));
-    const expected={...pins,phase:'a-opened',windowId:9};
-    const snapshot={pid:process.pid,windowId:9,matchedAX:true,nodes:[
-      {path:'1',role:'AXStaticText',control:'A.json'}, {path:'2',role:'AXStaticText',alert:'switch-unavailable'}]};
+    const snapshot=regionSnapshot(['A.json'],false,process.pid);
+    const expected={...pins,phase:'a-opened',windowId:9,regionToken:snapshot.projectTabs.token};
     assert.throws(()=>acknowledge(root,expected,'a'.repeat(32),'accepted',
-      {...snapshot,nodes:[{path:'1',role:'AXStaticText',control:'B.json'}]}),/probe-visible-state-refused/);
+      {...snapshot,nodes:[snapshot.nodes[1],{path:'1.0',role:'other',control:'B.json',selected:true}]}),/probe-visible-state-refused/);
     for(const windowId of [undefined,0,-1,4294967296])
       assert.throws(()=>visibleEvidence(snapshot,{...expected,windowId}),/probe-window-pin-refused/);
     assert.throws(()=>acknowledge(root,{...expected,windowId:undefined},'a'.repeat(32),'refused'),/probe-window-pin-refused/);

@@ -280,6 +280,7 @@ async function runObserver(config, services) {
     currentStage = 'helper-pin';
     const pinned = await helper.next();
     check(helperWindowIsPinned(pinned, window.pid, window.windowId), 'helper-pin', 'helper-window-identity-refused');
+    let regionToken;
     for (let index = 0; index < PHASES.length; index++) {
       const phase = PHASES[index];
       currentStage = 'checkpoint';
@@ -288,7 +289,7 @@ async function runObserver(config, services) {
       currentStage = 'inspection';
       const snapshot = await helper.inspect(window);
       let decision = 'accepted', visibilityCode;
-      try { services.owner.visibleEvidence(snapshot, { ...manifest, ...expected, phase }); }
+      try { services.owner.visibleEvidence(snapshot, { ...manifest, ...expected, phase, regionToken }); }
       catch (error) { decision = 'refused'; visibilityCode = error?.code; }
       if (phase === 'ready') {
         outcome.readyVisibility = readyVisibility(snapshot,expected,decision,visibilityCode);
@@ -301,10 +302,11 @@ async function runObserver(config, services) {
       }
       currentStage = 'acknowledgment';
       try {
-        services.owner.acknowledge(probe.root, { ...manifest, ...expected, phase }, ownerToken, decision,
+        services.owner.acknowledge(probe.root, { ...manifest, ...expected, phase, regionToken }, ownerToken, decision,
           decision === 'accepted' ? snapshot : undefined);
       } catch { fail('acknowledgment', 'owner-ack-refused'); }
       outcome.observations.push({ phase, decision, pid: window.pid, windowId: window.windowId, checkpoint: index });
+      if(decision==='accepted')regionToken=snapshot.projectTabs?.token;
       if (decision === 'refused') break;
     }
     if (outcome.observations.length === PHASES.length && outcome.observations.every(item => item.decision === 'accepted')) {
@@ -459,6 +461,7 @@ function defaultServices(config, testServices = {}) {
     const input = readline.createInterface({ input: child.stdout, terminal: false });
     const lines = input[Symbol.asyncIterator]();
     let closed = false;
+    const regionState={actions:0};
     const send = value => {
       if (!child.stdin.write(JSON.stringify(value) + '\n')) fail('inspection', 'inspection-refused');
     };
@@ -472,11 +475,7 @@ function defaultServices(config, testServices = {}) {
       },
       async inspect(identity) {
         try {
-          send({ type: 'inspect', target: 'main', pid: identity.pid, windowId: identity.windowId, depth: 5, maxNodes: 128 });
-          const value = await waitLine(lines);
-          check(value?.status === 'ok' && value.type === 'inspect' && value.pid === identity.pid &&
-            value.windowId === identity.windowId, 'inspection', 'inspection-refused');
-          return value;
+          return await owner.observeProjectTabs(async request=>{send(request);return await waitLine(lines);},identity,regionState);
         } catch (error) {
           if (error?.observerStage === 'inspection') throw error;
           fail('inspection', 'inspection-refused');

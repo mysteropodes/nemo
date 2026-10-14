@@ -4,7 +4,7 @@ import CoreFoundation
 
 // Inspection and fresh input use the same public, ordered control classifier.
 func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?) -> String? {
-  var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
+  var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Project tabs","Motion","Opacity","R08 rectangle"]
   if reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
     "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
     "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
@@ -26,6 +26,30 @@ struct OwnedProjectionCursor<Node> {
   var foreign = false
   var unreadable = false
   var depthClipped = false
+  var region: OwnedProjectRegion<Node>? = nil
+}
+
+struct OwnedProjectRegion<Node> { let token: String; let path: String; let node: Node; let owner: Int }
+
+// One retained semantic object; a changed route/label/owner is never re-pinned.
+func retainedProjectTabs<Node>(_ current: Node, path: String, owner: Int, control: String?,
+  request: [String:Any], projection: [String:Any], cursor: inout OwnedProjectionCursor<Node>?,
+  equal: (Node,Node)->Bool) throws -> [String:Any] {
+  try check(request["projectTabs"] as? Bool == true && request["childOffset"] == nil &&
+    control == "Project tabs" && projection["complete"] as? Bool == true)
+  try check(["truncated","depthClipped","childrenUnreadable","foreignChildren"].allSatisfy { projection[$0] as? Bool == false })
+  let retained: OwnedProjectRegion<Node>
+  if let previous = cursor?.region {
+    try check(request["projectTabsToken"] as? String == previous.token && previous.path == path &&
+      previous.owner == owner && equal(previous.node,current))
+    retained = previous
+  } else {
+    try check(request["projectTabsToken"] == nil)
+    retained = OwnedProjectRegion(token:UUID().uuidString.lowercased(),path:path,node:current,owner:owner)
+  }
+  var holder = cursor ?? OwnedProjectionCursor(token:retained.token,base:path,root:current,children:[],owner:owner,next:0)
+  holder.region = retained; cursor = holder
+  return ["path":retained.path,"token":retained.token]
 }
 
 func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int,
@@ -48,7 +72,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     }
   } else {
     try check(request["pageToken"] == nil)
-    cursor = nil
+    if cursor?.region == nil { cursor = nil }
   }
   var nodes = [[String:Any]](), truncated = false, depthClipped = false, unreadable = false, foreign = false
   func owned(_ node: Node) -> Bool {
@@ -70,7 +94,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
         try check(!(seen[key] ?? []).contains { equal($0,child) })
         seen[key,default:[]].append(child)
       }
-      cursor = OwnedProjectionCursor(token:UUID().uuidString.lowercased(),base:base,root:root,children:list,owner:expectedOwner,next:0)
+      cursor = OwnedProjectionCursor(token:UUID().uuidString.lowercased(),base:base,root:root,children:list,owner:expectedOwner,next:0,region:cursor?.region)
     } else {
       guard let pinned = cursor, token == pinned.token, pinned.next == offset,
         pinned.base == base, pinned.owner == expectedOwner, equal(pinned.root,root),
@@ -103,6 +127,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     }
     phase("ax-projection","topology-refused")
     try check(list.count < 4096)
+    nodes[nodes.count-1]["childCount"] = list.count
     guard level < depth else { if !list.isEmpty { depthClipped = true }; return }
     for (index,child) in list.enumerated().dropFirst(level == 0 ? offset : 0) {
       if nodes.count >= maxNodes { truncated = true; return }
@@ -136,7 +161,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     result["childCount"] = pinned.children.count
     result["childrenComplete"] = pinned.next == pinned.children.count && !pinned.foreign
     result["complete"] = pinned.next == pinned.children.count && !pinned.foreign && !pinned.unreadable && !pinned.depthClipped
-    cursor = pinned.next == pinned.children.count ? nil : pinned
+    cursor = pinned.next == pinned.children.count && pinned.region == nil ? nil : pinned
   }
   return result
 }

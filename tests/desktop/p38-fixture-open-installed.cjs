@@ -74,14 +74,74 @@ function visibleEvidence(snapshot, expected) {
     'probe-window-pin-refused');
   const result=safeWindowEvidence(snapshot);
   verifyWindow(snapshot, expected.pid, expected.windowId);
-  const controls=new Set(result.nodes.map(node=>node.control).filter(Boolean));
-  const hasA=controls.has('A')||controls.has('A.json'), hasB=controls.has('B')||controls.has('B.json');
-  const alerts=new Set(result.nodes.map(node=>node.alert).filter(Boolean));
-  if(expected.phase==='ready') check(!hasA&&!hasB,'probe-visible-state-refused');
-  if(expected.phase==='a-opened') check(hasA&&!hasB,'probe-visible-state-refused');
-  if(expected.phase==='b-opened') check(hasA&&hasB&&alerts.has('switch-unavailable'),'probe-visible-state-refused');
-  if(expected.phase==='b-closed') check(hasA&&!hasB,'probe-visible-state-refused');
+  check(result.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>result[k]===false)&&
+    result.nodes.every(n=>n.blocked===undefined)&&new Set(result.nodes.map(n=>n.path)).size===result.nodes.length,'probe-visible-state-refused');
+  const region=result.projectTabs,markers=result.nodes.filter(n=>n.control==='Project tabs');
+  check(region?.unique===true&&markers.length===1&&markers[0].path===region.path&&
+    (expected.phase==='ready'||expected.regionToken===region.token),'probe-visible-state-refused');
+  const inside=result.nodes.filter(n=>n.path.startsWith(region.path+'.'));
+  const rows=inside.filter(n=>typeof n.selected==='boolean');
+  const rowA=rows.filter(n=>['A','A.json'].includes(n.control)),rowB=rows.filter(n=>['B','B.json'].includes(n.control));
+  check(rows.length===rowA.length+rowB.length,'probe-visible-state-refused');
+  check(inside.filter(n=>['A','B','A.json','B.json'].includes(n.control)).every(n=>rows.some(r=>
+    r.control.replace('.json','')===n.control.replace('.json','')&&(n.path===r.path||n.path.startsWith(r.path+'.')))),
+    'probe-visible-state-refused');
+  const alerts=result.nodes.filter(n=>n.alert==='switch-unavailable');
+  if(expected.phase==='ready') check(rows.length===0&&!inside.some(n=>['A','B','A.json','B.json'].includes(n.control)),'probe-visible-state-refused');
+  else check(rowA.length===1&&rowA[0].selected===true&&
+    (expected.phase==='b-opened'?rowB.length===1&&rowB[0].selected===false&&alerts.length===1:rowB.length===0),'probe-visible-state-refused');
   return result;
+}
+
+// Complete bounded discovery establishes uniqueness. Root clipping permits only
+// authenticated read-only pages; a fresh retained region is required for ACK.
+async function observeProjectTabs(inspect,identity,state={actions:0}) {
+  const seen=new Map(),queue=[''];
+  const complete=s=>s.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>s[k]===false);
+  async function read(request) {
+    check(state.actions++<63,'probe-visible-state-refused'); // Leave the existing 64th action for quit.
+    const raw=await inspect({type:'inspect',target:'main',pid:identity.pid,windowId:identity.windowId,maxNodes:128,...request});
+    check(raw?.status==='ok'&&raw.type==='inspect','ax-evidence-refused');
+    const s=safeWindowEvidence(raw);verifyWindow(s,identity.pid,identity.windowId);
+    check(s.nodes.length>0&&s.nodes.length<=128&&s.nodes[0].path===(request.element||'')&&
+      s.foreignChildren===false&&s.childrenUnreadable===false&&
+      s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),'ax-evidence-refused');
+    return s;
+  }
+  function collect(nodes) {
+    for(const n of nodes) {
+      check(!seen.has(n.path)||JSON.stringify(seen.get(n.path))===JSON.stringify(n),'ax-evidence-refused');
+      seen.set(n.path,n);check(seen.size<=4096,'ax-evidence-refused');
+    }
+  }
+  while(queue.length) {
+    const element=queue.shift(),first=await read({element,depth:5});
+    if(complete(first)) {collect(first.nodes);continue;}
+    check(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean','ax-evidence-refused');
+    let offset=0,token,count,root,done=false;
+    while(!done) {
+      const s=await read({element,depth:1,childOffset:offset,...(offset?{pageToken:token}:{})});
+      check(s.childOffset===offset&&s.childCount===s.nodes[0].childCount&&
+        s.nextChildOffset-offset===s.nodes.length-1&&
+        (count===undefined||count===s.childCount&&token===s.pageToken&&JSON.stringify(root)===JSON.stringify(s.nodes[0]))&&
+        s.childrenComplete===(s.nextChildOffset===s.childCount),'ax-evidence-refused');
+      root=s.nodes[0];count=s.childCount;token=s.pageToken;done=s.childrenComplete;
+      check(new Set(s.nodes.map(n=>n.path)).size===s.nodes.length&&s.nodes.slice(1).every((n,i)=>
+        n.path===(element?element+'.':'')+(offset+i)),'ax-evidence-refused');
+      collect(s.nodes);
+      for(const n of s.nodes.slice(1))if(n.childCount>0)queue.push(n.path);
+      offset=s.nextChildOffset;
+    }
+  }
+  const markers=[...seen.values()].filter(n=>n.control==='Project tabs');
+  check(markers.length===1,'probe-visible-state-refused');
+  const region=await read({element:markers[0].path,depth:5,projectTabs:true,...(state.token?{projectTabsToken:state.token}:{})});
+  check(complete(region)&&region.projectTabs?.path===markers[0].path&&
+    (!state.token||state.token===region.projectTabs.token),'probe-visible-state-refused');
+  state.token=region.projectTabs.token;
+  const paths=new Set(region.nodes.map(n=>n.path));
+  return {...region,projectTabs:{...region.projectTabs,unique:true},nodes:[...region.nodes,
+    ...[...seen.values()].filter(n=>n.alert&&!paths.has(n.path))]};
 }
 function acknowledge(root, expected, ownerToken, decision, snapshot) {
   check(typeof ownerToken==='string'&&/^[a-f0-9]{32,128}$/.test(ownerToken),'owner-token-refused');
@@ -99,4 +159,4 @@ function acknowledge(root, expected, ownerToken, decision, snapshot) {
   guard.verify();
   return {phase:expected.phase,decision,windowId:expected.windowId};
 }
-module.exports={receipt,visibleEvidence,acknowledge};
+module.exports={receipt,visibleEvidence,acknowledge,observeProjectTabs};
