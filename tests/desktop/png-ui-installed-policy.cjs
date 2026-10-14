@@ -73,7 +73,12 @@ function verifyAction(c,a,sheet,last){
   if(a.type==='go-to-folder')check(target==='sheet'&&!sheet.locationAttempted&&Object.keys(a).every(k=>['type','target','sheetToken'].includes(k)),'png-location-refused');
   if(['press','set','select'].includes(a.type)){
     check(typeof a.element==='string'&&/^\d+(?:\.\d+)*$/.test(a.element)&&a.element.length<=128,'png-element-refused');
-    const node=last?.target===target&&last.nodes?.find(n=>n.path===a.element);
+    const matches=last?.target===target?last.nodes?.filter(n=>n.path===a.element):[];
+    const node=matches?.length===1?matches[0]:null;
+    // Pages/clipped trees discover candidates only. Reinspect the selected root
+    // completely before input; the helper then resolves ownership and label anew.
+    check(last?.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>last[k]===false),
+      'png-control-refused');
     check(node&&node.blocked===undefined&&node.enabled!==false,'png-control-refused');
     if(a.type==='press')check(controls.has(node.control)&&node.press===true&&['AXButton','AXMenuItem','AXPopUpButton'].includes(node.role),'png-control-refused');
     if(a.type==='press'&&['SVG Sequence','Work area'].includes(node.control))check(node.role==='AXPopUpButton','png-navigation-refused');
@@ -85,6 +90,12 @@ function verifyAction(c,a,sheet,last){
   }
   if(a.type==='set')check(target==='sheet'&&typeof a.value==='string'&&[s.fixture,s.saved,s.after,s.output,s.root.file].includes(a.value),'png-path-refused');
   if(a.type==='inspect'){check(a.element===undefined||typeof a.element==='string'&&a.element.length<=128&&/^(?:\d+(?:\.\d+)*)?$/.test(a.element),'png-element-refused');
+    if(a.childOffset!==undefined)check(Number.isInteger(a.childOffset)&&a.childOffset>=0&&a.childOffset<4096&&a.depth===1&&target==='main'&&
+      (a.childOffset===0?a.pageToken===undefined:typeof a.pageToken==='string'&&/^[a-f0-9-]{36}$/.test(a.pageToken)),'png-page-refused');
+    else check(a.pageToken===undefined,'png-page-refused');
+    if(a.childOffset===0&&a.element)check(last?.target==='main'&&last.nodes?.some(n=>n.path===a.element&&n.blocked===undefined),'png-page-refused');
+    if(a.childOffset>0)check(last?.target==='main'&&last.pageToken===a.pageToken&&last.nextChildOffset===a.childOffset&&
+      last.childrenComplete===false&&last.foreignChildren!==true&&last.nodes?.[0]?.path===(a.element||''),'png-page-refused');
     if(a.depth!==undefined)check(Number.isInteger(a.depth)&&a.depth>=1&&a.depth<=5,'png-inspect-budget');
     if(a.maxNodes!==undefined)check(Number.isInteger(a.maxNodes)&&a.maxNodes>=1&&a.maxNodes<=128,'png-inspect-budget');}
   if(a.type==='capture')check(['before-open','opened','export-dialog','exported','saved'].includes(a.name),'png-capture-refused');
@@ -94,15 +105,27 @@ function verifyAction(c,a,sheet,last){
 function sanitizeHelper(r,target='main'){
   const result={status:['ok','pinned','refused'].includes(r.status)?r.status:'refused',pid:r.pid,windowId:r.windowId,matchedAX:r.matchedAX,type:actions.has(r.type)?r.type:undefined};
   for(const key of ['sheetToken','locationToken'])if(typeof r[key]==='string'&&/^[a-f0-9-]{36}$/.test(r[key]))result[key]=r[key];
+  if(r.pageToken!==undefined){check(typeof r.pageToken==='string'&&/^[a-f0-9-]{36}$/.test(r.pageToken),'png-page-refused');result.pageToken=r.pageToken;}
+  for(const key of ['childOffset','nextChildOffset','childCount'])if(r[key]!==undefined){check(Number.isInteger(r[key])&&r[key]>=0&&r[key]<4096,'png-page-refused');result[key]=r[key];}
+  for(const key of ['truncated','depthClipped','childrenUnreadable','foreignChildren','complete','childrenComplete'])
+    if(r[key]!==undefined){check(typeof r[key]==='boolean','png-page-refused');result[key]=r[key];}
+  if(result.pageToken!==undefined)check(Number.isInteger(result.childOffset)&&Number.isInteger(result.nextChildOffset)&&Number.isInteger(result.childCount)&&
+    result.childOffset<=result.nextChildOffset&&result.nextChildOffset<=result.childCount&&
+    (result.nextChildOffset>result.childOffset||result.childOffset===result.childCount),'png-page-refused');
+  else check(['childOffset','nextChildOffset','childCount','childrenComplete'].every(k=>r[k]===undefined),'png-page-refused');
   for(const key of ['dismissed','locationDismissed','commandPosted','locationReady'])if(typeof r[key]==='boolean')result[key]=r[key];
   if(r.target==='sheet')result.target='sheet';
   const roles=new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXMenu','AXMenuItem','AXRow','AXPopUpButton','AXCheckBox']);
-  if(Array.isArray(r.nodes))result.nodes=r.nodes.slice(0,128).map(n=>{
+  if(r.type==='inspect'||r.nodes!==undefined){
+    check(Array.isArray(r.nodes)&&r.nodes.length<=128&&r.nodes.every(n=>n&&typeof n==='object'&&!Array.isArray(n)&&
+      typeof n.path==='string'&&n.path.length<=128&&/^(?:\d+(?:\.\d+)*)?$/.test(n.path)),'png-projection-refused');
+    result.nodes=r.nodes.map(n=>{
     const p={path:typeof n.path==='string'&&/^(?:\d+(?:\.\d+)*)?$/.test(n.path)?n.path:'',role:roles.has(n.role)?n.role:'other'};
     if(controls.has(n.control)||target==='sheet'&&n.role==='AXRow'&&['A.json','Saved.json'].includes(n.control))p.control=n.control;
     if(['child-owner','children-unavailable'].includes(n.blocked))p.blocked=n.blocked;
     for(const key of ['enabled','press','selected'])if(typeof n[key]==='boolean')p[key]=n[key];return p;
-  });
+    });
+  }
   if(typeof r.capture==='string'&&/^capture-[1-9][0-9]{0,2}\.png$/.test(r.capture))result.capture=r.capture;
   return result;
 }

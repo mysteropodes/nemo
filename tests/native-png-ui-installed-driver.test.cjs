@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {spawnSync}=require('node:child_process');
 const P=require('./desktop/png-ui-installed-policy.cjs'),D=require('./desktop/png-ui-installed-driver.cjs');
 const crc=require('./desktop/reference-installed-policy.cjs').crc32;
+const complete={complete:true,truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false};
 function fixtureBytes(){
   const objects=[],scopes=[];
   for(const [frame,fill] of [[0,{kind:'solid',r:0,g:0,b:1,a:1}],[1,{kind:'solid',r:0,g:1,b:0,a:1}]]){
@@ -60,7 +61,7 @@ test('PNG authorization refuses stale/cross-workflow/unconfirmed and malformed s
 });
 test('fixed fixture/root/inode and path controls refuse changes without admitting a different document',t=>{
   const f=setup(t),w=f.prepare();assert.throws(f.prepare,/workspace-reused/);
-  const sheet={token:'sheet'},last={target:'sheet',nodes:[{path:'0',role:'AXTextField',enabled:true}]};
+  const sheet={token:'sheet'},last={...complete,target:'sheet',nodes:[{path:'0',role:'AXTextField',enabled:true}]};
   P.verifyAction(f.c,{type:'set',target:'sheet',sheetToken:'sheet',element:'0',value:w.fixture},sheet,last);
   for(const value of [f.root,path.join(w.output,'other'),'../A.json','/tmp/foreign.json'])
     assert.throws(()=>P.verifyAction(f.c,{type:'set',target:'sheet',sheetToken:'sheet',element:'0',value},sheet,last));
@@ -74,7 +75,7 @@ test('symlink fixture and replaced workspace are refused',t=>{
 });
 test('only fresh visible enabled allowed controls and current sheet/location tokens can act',t=>{
   const f=setup(t);f.prepare();const a={type:'press',element:'0'};
-  const good={target:'main',nodes:[{path:'0',control:'Export',role:'AXButton',press:true,enabled:true}]};
+  const good={...complete,target:'main',nodes:[{path:'0',control:'Export',role:'AXButton',press:true,enabled:true}]};
   P.verifyAction(f.c,a,{},good);
   for(const node of [{...good.nodes[0],control:'Delete'},{...good.nodes[0],blocked:'child-owner'},
     {...good.nodes[0],enabled:false},{...good.nodes[0],press:false}])assert.throws(()=>P.verifyAction(f.c,a,{}, {...good,nodes:[node]}));
@@ -88,7 +89,7 @@ test('only fresh visible enabled allowed controls and current sheet/location tok
 test('real Save sheet button is admitted only through current owned projection and token',t=>{
   const f=setup(t);f.prepare();const sheet={token:'save-sheet'};
   const a={type:'press',target:'sheet',sheetToken:sheet.token,element:'1'};
-  const node={path:'1',control:'Save',role:'AXButton',enabled:true,press:true},last={target:'sheet',nodes:[node]};
+  const node={path:'1',control:'Save',role:'AXButton',enabled:true,press:true},last={...complete,target:'sheet',nodes:[node]};
   P.verifyAction(f.c,a,sheet,last);assert.equal(P.sanitizeHelper({nodes:[node]},'sheet').nodes[0].control,'Save');
   for(const patch of [{control:'Save All'},{blocked:'child-owner'},{enabled:false},{role:'AXTextField'}])
     assert.throws(()=>P.verifyAction(f.c,a,sheet,{...last,nodes:[{...node,...patch}]}),/control-refused/);
@@ -98,12 +99,12 @@ test('real Save sheet button is admitted only through current owned projection a
 test('frozen SVG/work-area popup defaults are navigable but cannot run or witness PNG export',t=>{
   const f=setup(t),w=f.prepare();fs.writeFileSync(w.saved,'saved');beforeUI(f.c,w);
   const node=(path,control,role='AXPopUpButton')=>({path,control,role,enabled:true,press:true});
-  const run=node('0','Export','AXButton'),defaults={target:'main',nodes:[run,node('1','SVG Sequence'),node('2','Work area'),node('3','1x')]};
+  const run=node('0','Export','AXButton'),defaults={...complete,target:'main',nodes:[run,node('1','SVG Sequence'),node('2','Work area'),node('3','1x')]};
   for(const element of ['1','2'])P.verifyAction(f.c,{type:'press',element},{},defaults);
   for(const element of ['1','2'])for(const role of ['AXMenuItem','AXButton'])
     assert.throws(()=>P.verifyAction(f.c,{type:'press',element},{},{...defaults,nodes:defaults.nodes.map(n=>n.path===element?{...n,role}:n)}),/navigation-refused/);
   assert.deepEqual(P.sanitizeHelper(defaults).nodes.slice(1,3).map(n=>n.control),['SVG Sequence','Work area']);
-  const good={target:'main',nodes:[run,node('1','PNG Sequence'),node('2','Whole timeline'),node('3','1x')]};
+  const good={...complete,target:'main',nodes:[run,node('1','PNG Sequence'),node('2','Whole timeline'),node('3','1x')]};
   P.verifyAction(f.c,{type:'press',element:'0'},{},good);
   const menu=['PNG Sequence','Whole timeline','1x'].map((control,i)=>({...node('4.'+i,control,'AXMenuItem'),selected:false}));
   for(const last of [defaults,{...defaults,nodes:[...defaults.nodes,...menu]},
@@ -123,7 +124,7 @@ test('default export run is refused before a helper press even with desired menu
     ...['SVG Sequence','Work area','1x'].map((control,i)=>({path:String(i+1),role:'AXPopUpButton',control,enabled:true,press:true})),
     ...['PNG Sequence','Whole timeline'].map((control,i)=>({path:'4.'+i,role:'AXMenuItem',control,selected:false,press:true}))];
   s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},async close(){s.events.push('helper-close');},
-    async action(_w,a){s.events.push('helper:'+a.type);return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...(a.type==='inspect'?{nodes}:{})};}});
+    async action(_w,a){s.events.push('helper:'+a.type);return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...(a.type==='inspect'?{...complete,nodes}:{})};}});
   const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-export-options-refused');
   assert.equal(s.events.includes('helper:press'),false);assert.equal(r.installedAcceptance,'not-established');
 });
@@ -255,6 +256,7 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       const r={status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true};
       const node=(path,control,role='AXButton')=>({path,control,role,press:true,enabled:true});
       if(a.type==='inspect'){
+        Object.assign(r,complete);
         if(a.target==='sheet')r.nodes=[node('0',undefined,'AXTextField'),node('1',dialog==='open'?'Open':dialog==='save'?'Save':'Choose')];
         else r.nodes=main==='open'?[node('0','Open Project…')]:main==='save'?[node('0','Save As…')]:main==='cancel'?[node('0','Cancel')]:
           [node('0','Export'),...(cancelled?[node('1','PNG','AXPopUpButton'),node('2','Whole timeline','AXPopUpButton'),node('3','1x','AXPopUpButton')]:[])];
@@ -263,6 +265,7 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       if(a.target==='sheet'){r.target='sheet';r.sheetToken=token;}
       if(a.type==='set')value=a.value;
       if(a.type==='press'&&a.target!=='sheet'){
+        assert.equal(a.expectedRole,'AXButton');assert.ok(P.controls.has(a.expectedControl));
         if(main==='open')dialog='open';else if(main==='save')dialog='save';else if(main==='cancel'){cancelled=true;main='export';}else if(!cancelled)main='cancel';else dialog='export';
       }
       if(a.type==='press'&&a.target==='sheet'){
@@ -321,7 +324,8 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   const gates=slice('    let target = request["target"]','    switch action {');
   const inspect=slice('    case "inspect":','    case "capture":').replace('    case "inspect":','');
   const definitions=slice('struct ProcessStart:','func processStart(')+slice('func localFacts(','// A path is diagnostic')+
-    slice('func boundedOwnedTree<','func guardedElementAction(');
+    slice('func boundedOwnedTree<','func guardedElementAction(')+
+    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'');
   const verify=slice('  func verifyService()','  try emit(["status":"pinned"');
   const node=slice('  func node(_ value:','  func supports(');
   const code=`import Foundation
@@ -338,8 +342,9 @@ func projectionLimit(_ depth:Int,_ nodes:Int)throws{try check(depth>0 && nodes>0
 func requireResolvedSheetMutation(_ target:String,_ action:String,_ service:Bool,_ token:Bool)throws{}
 func setInspectionContext(_ stage:String,_ reason:String){}
 func CFEqual(_ a:Int,_ b:Int)->Bool{a==b}
+func CFHash(_ value:Int)->UInt{UInt(value)}
 func route(_ raw:String)throws->[Int]{raw.isEmpty ? [] : try raw.split(separator:".").map{guard let i=Int($0)else{throw Refusal(code:"route")};return i}}
-let kAXRoleAttribute="role",kAXTitleAttribute="title",kAXValueAttribute="value",kAXChildrenAttribute="children"
+let kAXRoleAttribute="role",kAXTitleAttribute="title",kAXValueAttribute="value",kAXChildrenAttribute="children",kAXDescriptionAttribute="description"
 let kAXSelectedAttribute="selected",kAXEnabledAttribute="enabled",kAXSubroleAttribute="subrole",kAXFocusedAttribute="focused"
 let kAXWindowRole="AXWindow",kAXSheetRole="AXSheet",kAXGroupRole="AXGroup",kAXDialogSubrole="AXDialog"
 let kAXTextFieldRole="AXTextField",kAXPopUpButtonRole="AXPopUpButton",kAXPressAction="press",kAXConfirmAction="confirm"
@@ -351,6 +356,7 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
   let serviceStart:ProcessStart?=ProcessStart(pid:20,seconds:1,microseconds:0),serviceSheetToken:String?="sheet"
   let location:Int?=4,locationField:Int?=5
   var activeInspectionContext:Int?=nil,result=[String:Any](),reads=0,foreignReads=0,locationChecks=0
+  var projectionCursor:OwnedProjectionCursor<Int>?=nil
   var request:[String:Any]=["target":requestTarget,"sheetToken":"sheet","depth":2,"maxNodes":32]
   if let token,locationToken != nil{request["locationToken"]=token}
   if fault == "wrong-sheet-token"{request["sheetToken"]="wrong"}
@@ -362,7 +368,11 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
     if key==kAXChildrenAttribute{return (n==1 ? [7]:n==2 ? [8]:n==3 ? [4]:n==4 ? ([5]+(["ambiguous-modal","foreign-child"].contains(fault) ? [6]:[])):[]) as NSArray}
     if key==kAXRoleAttribute{return (n==1 ? "AXWindow":n==2 || n==4 || n==6 ? "AXSheet":"AXTextField") as NSString}
     if key==kAXFocusedAttribute || key==kAXEnabledAttribute{return NSNumber(value:n==5 || n>=7)}
-    if key==kAXTitleAttribute || key==kAXValueAttribute{return "private-secret-path" as NSString};return nil
+    if key==kAXTitleAttribute || key==kAXValueAttribute{return "private-secret-path" as NSString}
+    if key==kAXDescriptionAttribute{
+      if fault == "nontext-description"{return ["private-secret-description"] as NSArray}
+      return (fault == "public-description" && n>=7 ? "Open Project…":"private-secret-description") as NSString
+    };return nil
   }
   func throwFatal(){preconditionFailure("foreign attribute read")}
   func children(_ n:Int)->[Int]{attr(n,kAXChildrenAttribute) as? [Int] ?? []}
@@ -397,6 +407,11 @@ for (fault,target) in [("none","main"),("ordinary-sheet","sheet"),("foreign-main
   let observation=try exercise(fault,target);let rows=observation.0["nodes"] as! [[String:Any]]
   precondition(rows.contains{fault.hasPrefix("foreign") ? $0["blocked"] as? String=="child-owner":$0["role"] as? String=="AXTextField"},fault)
 }
+for fault in ["public-description","private-description","nontext-description"]{
+  let observation=try exercise(fault,"main"),rows=observation.0["nodes"] as! [[String:Any]]
+  precondition(rows.contains{$0["control"] as? String=="Open Project…"} == (fault == "public-description"))
+  precondition(!String(describing:observation.0).contains("private-secret"))
+}
 print("actual token dispatch, retained verification and inspect projection exercised; runtimeAX=false")`;
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:16384});
   const failedLine=Number(r.stderr.match(/-e:(\d+):/)?.[1]);
@@ -412,4 +427,71 @@ precondition(oldRows.count==1 && oldRows[0]["blocked"] as? String=="child-owner"
 print("baseline refuses authenticated service root before exposing its field; runtimeAX=false")`;
   const red=spawnSync('/usr/bin/swift',['-e',legacy],{encoding:'utf8',timeout:30000,maxBuffer:16384});
   assert.equal(red.status,0,red.stderr);assert.match(red.stdout,/baseline refuses/);
+});
+
+test('PNG input refuses incomplete or ambiguous discovery until a complete selected-root inspection',t=>{
+  const f=setup(t),w=f.prepare();
+  const node={path:'0.9',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  const good={...complete,target:'main',nodes:[node]},press={type:'press',element:node.path};
+  P.verifyAction(f.c,press,{},good);
+  for(const patch of [{complete:false},{complete:undefined},{truncated:true},{depthClipped:true},
+    {childrenUnreadable:true},{foreignChildren:true},{truncated:undefined},{depthClipped:undefined},
+    {childrenUnreadable:undefined},{foreignChildren:undefined},{nodes:[node,node]}])
+    assert.throws(()=>P.verifyAction(f.c,press,{}, {...good,...patch}),/control-refused/);
+  const sheet={token:'sheet'},field={path:'0',role:'AXTextField',enabled:true};
+  const select={path:'1',role:'AXRow',control:'A.json',enabled:true};
+  for(const a of [{type:'set',element:'0',value:w.fixture},{type:'select',element:'1'}]){
+    const request={...a,target:'sheet',sheetToken:'sheet'},last={...complete,target:'sheet',nodes:[field,select]};
+    P.verifyAction(f.c,request,sheet,last);
+    for(const key of ['truncated','depthClipped','childrenUnreadable','foreignChildren'])
+      assert.throws(()=>P.verifyAction(f.c,request,sheet,{...last,[key]:true}),/control-refused/);
+    assert.throws(()=>P.verifyAction(f.c,request,sheet,{...last,complete:false}),/control-refused/);
+  }
+});
+test('incomplete discovery stops the real operator before any press and cleans up',async t=>{
+  for(const patch of [{complete:false},{truncated:true},{depthClipped:true},{childrenUnreadable:true},{foreignChildren:true}]){
+    const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+    s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},
+      async close(){s.events.push('helper-close');},async action(_w,a){s.events.push('helper:'+a.type);
+        return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...complete,...patch,
+          nodes:[{path:'0',role:'AXButton',control:'Open Project…',press:true,enabled:true}]};}});
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-control-refused');
+    assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
+  }
+});
+test('oversized or malformed helper inspections never become complete input routes',async t=>{
+  const node={path:'0',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  for(const nodes of [Array.from({length:129},(_,i)=>({...node,path:String(i)})),undefined,null,{},[null],[[]],[{...node,path:'private'}]]){
+    const reply={status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,...complete,nodes};
+    assert.throws(()=>P.sanitizeHelper(reply),/projection-refused/);
+    const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+    s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},
+      async close(){s.events.push('helper-close');},async action(_w,a){s.events.push('helper:'+a.type);return {...reply,type:a.type};}});
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-projection-refused');
+    assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
+  }
+});
+test('PNG pages require observed roots and exact retained continuation; metadata stays categorical',t=>{
+  const f=setup(t);f.prepare();const token='11111111-1111-4111-8111-111111111111',node={path:'0.0',role:'AXWebArea'};
+  const first={target:'main',nodes:[node]};
+  P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,maxNodes:128,childOffset:0},{},first);
+  assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.9',depth:1,childOffset:0},{},first));
+  const page={target:'main',pageToken:token,childOffset:0,nextChildOffset:127,childCount:300,childrenComplete:false,nodes:[node]};
+  P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token},{},page);
+  for(const edit of [{childOffset:true},{childOffset:-1},{childOffset:4096},{childOffset:1.5},{childOffset:'127'},
+    {childOffset:128},{pageToken:'22222222-2222-4222-8222-222222222222'},{element:'0.8'},{depth:2},{target:'sheet'}])
+    assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token,...edit},{},page));
+  assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token},{},{...page,foreignChildren:true}));
+  const clean=P.sanitizeHelper({status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,...page,
+    complete:false,depthClipped:true,truncated:true,childrenUnreadable:false,foreignChildren:false,private:'/private/secret'});
+  assert.equal(clean.childCount,300);assert.equal(clean.depthClipped,true);assert.equal(clean.pageToken,token);
+  assert.equal(JSON.stringify(clean).includes('private'),false);
+  const candidate={path:'0.0.299',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  assert.throws(()=>P.verifyAction(f.c,{type:'press',element:candidate.path},{},
+    {...complete,...page,nodes:[node,candidate],complete:false,truncated:true}),/control-refused/);
+  // Discovery can continue, but input waits for an unpaged, complete target root.
+  P.verifyAction(f.c,{type:'inspect',element:candidate.path,depth:1},{},clean);
+  P.verifyAction(f.c,{type:'press',element:candidate.path},{}, {...complete,target:'main',nodes:[candidate]});
+  for(const bad of [{childCount:'/private'},{nextChildOffset:4096},{complete:'yes'},{depthClipped:{}},{pageToken:'private-token'}])
+    assert.throws(()=>P.sanitizeHelper({status:'ok',type:'inspect',...bad}));
 });

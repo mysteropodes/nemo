@@ -514,7 +514,7 @@ function defaultServices(config) {
       fs.accessSync(config.windowHelper, fs.constants.X_OK);
       const helperProof = readJSON(config.helperProof, 16384);
       check(helperProof.schema === 'nemo.p38-window-helper/1' && helperProof.sourceHead === config.sourceHead &&
-        helperProof.sourceSha256 === hash(fs.readFileSync(path.join(ROOT, 'tests/desktop/p38-owned-window.swift'))) &&
+        helperProof.sourceSha256 === require('./p38-owned-window-build.cjs').verifySourceProof(helperProof) &&
         helperProof.executableSha256 === config.helperSha256, 'window-helper-refused');
       verifyFixtures(config); return { ...app, source, build: identity.buildIdentity(), proofHash: hash(fs.readFileSync(config.buildProof)) };
     },

@@ -887,6 +887,7 @@ func run() throws {
   if args.count == 4 && args[1] == "--p38-cg-sample" { try cgWindowSampleWorker(args); return }
   try check(args.count == 3)
   let scope = try operatorScope(args[1],ProcessInfo.processInfo.environment)
+  var projectionCursor: OwnedProjectionCursor<AXUIElement>? = nil
   let report = scope.report
   guard let pid = Int32(args[2]), pid > 0 else { throw Refusal(code:"adapter-refused") }
   guard let pinnedProcessStart=processStart(pid) else { throw Refusal(code:"adapter-refused") }
@@ -1458,11 +1459,13 @@ func run() throws {
         let rawRole = attr(selected,kAXRoleAttribute) as? String ?? ""
         var facts: [String:Any] = ["axPressQueryError":Int(query.rawValue),"axPressAdvertised":advertised,
           "role":roles.contains(rawRole) ? rawRole : "other"]
-        let labels = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
         let title = attr(selected,kAXTitleAttribute) as? String ?? "", value = attr(selected,kAXValueAttribute) as? String ?? ""
-        if labels.contains(title) { facts["control"] = title }
-        else if labels.contains(value) { facts["control"] = value }
+        if let control = ownedControl(scope.reference,title,value,{ attr(selected,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
         guard query == .success && advertised else { throw pressFailure("axpress-support",facts) }
+        if args[1] == "--png-persistent" || request["expectedControl"] != nil || request["expectedRole"] != nil {
+          guard let control = request["expectedControl"] as? String, let role = request["expectedRole"] as? String else { throw Refusal(code:"adapter-refused") }
+          try check(rawRole == role && facts["control"] as? String == control)
+        }
         if location != nil {
           do {
             guard let ownerPID=servicePID else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
@@ -1601,12 +1604,6 @@ func run() throws {
       let selected = locationToken == nil ? try node(base,selectedRoot) : try node(base,selectedRoot,owner:inspectOwner)
       var roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
       if scope.reference { roles.insert(kAXPopUpButtonRole) }
-      var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
-      if scope.reference { labels.formUnion(["File","Edit","Save","Save As…","Save As","Save as…","Open…","Undo","Redo",
-        "Reference","Reference…","None","No reference","Visible","Remove","Import Reference Image",
-        "ReferenceA.png","ReferenceB.png","Saved.json","frame_0001.png","Export","Export…","Export PNG","PNG","PNG Sequence",
-        "SVG Sequence","Work area","Whole timeline","1x","Choose","Select","Export Image","Replace",
-        "Go","Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]) }
       func fact(_ current: AXUIElement, _ path: String) -> [String:Any] {
         // No title/value/children reads from a foreign child; expose blocked route only.
         var owner: pid_t = 0
@@ -1621,8 +1618,7 @@ func run() throws {
           let query = AXUIElementCopyAttributeValue(current,kAXSubroleAttribute as CFString,&subrole)
           facts["textFieldKind"] = textFieldKind(query,subrole as? String)
         }
-        if labels.contains(title) { facts["control"] = title }
-        else if labels.contains(value) { facts["control"] = value }
+        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
         if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
         return facts
@@ -1631,32 +1627,14 @@ func run() throws {
       let depth = request["depth"] as? Int ?? 1, maxNodes = request["maxNodes"] as? Int ?? 128
       setInspectionContext("projection-budget","budget-refused")
       try projectionLimit(depth,maxNodes)
-      var nodes = [[String:Any]](), truncated = false
-      func project(_ current: AXUIElement, _ path: String, _ level: Int) throws {
-        setInspectionContext("ax-owner-query","ownership-refused")
-        var owner: pid_t = 0
-        guard AXUIElementGetPid(current,&owner) == .success, owner == inspectOwner else { nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return }
-        if level > 0 && attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
-        setInspectionContext("ax-attribute-query","attribute-query-failed")
-        nodes.append(fact(current,path))
-        guard level < depth else { return }
-        setInspectionContext("ax-children-query","attribute-value-unreadable")
-        let rawChildren = attr(current,kAXChildrenAttribute) as? [AXUIElement]
-        guard let list = rawChildren else { nodes[nodes.count-1]["blocked"] = "children-unavailable"; return }
-        setInspectionContext("ax-projection","topology-refused")
-        try check(list.count < 4096)
-        for (index,child) in list.enumerated() {
-          if nodes.count >= maxNodes { truncated = true; return }
-          let childPath = path.isEmpty ? String(index) : path+"."+String(index)
-          var childOwner: pid_t = 0
-          guard AXUIElementGetPid(child,&childOwner) == .success, childOwner == inspectOwner else { nodes.append(["path":childPath,"role":"other","blocked":"child-owner"]); continue }
-          try project(child,childPath,level+1)
-        }
-      }
-      setInspectionContext("ax-projection","topology-refused")
-      try project(selected,base,0)
-      result["nodes"] = nodes
-      result["truncated"] = truncated
+      if request["childOffset"] != nil { try check(target == "main" && locationToken == nil) }
+      let projection = try ownedProjection(selected,base:base,depth:depth,maxNodes:maxNodes,
+        expectedOwner:Int(inspectOwner),request:request,cursor:&projectionCursor,equal:{ CFEqual($0,$1) },hashKey:{ CFHash($0) },
+        owner:{ value in var actual:pid_t = 0; return AXUIElementGetPid(value,&actual) == .success ? Int(actual) : nil },
+        children:{ attr($0,kAXChildrenAttribute) as? [AXUIElement] },
+        isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },fact:fact,phase:setInspectionContext)
+      result.merge(projection) { _,new in new }
+      try verify()
       if locationToken != nil { _ = try verifyLocation() } else if target == "sheet" { _ = try verifySheet() }
       activeInspectionContext = nil
     case "capture":
@@ -1678,23 +1656,27 @@ func run() throws {
     try emit(result)
   }
 }
-do { try run() }
-catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
-catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
-catch let error as InspectionRefusal {
-  var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
-  if let diagnostic = safeInspectionContext(error.stage,error.queryClass) { result["inspectionDiagnostics"] = diagnostic }
-  try? emit(result); exit(1)
-}
-catch let error as Refusal {
-  let code = allowedReasons.contains(error.code) ? error.code : "adapter-refused"
-  var result: [String:Any] = ["status":"refused","code":code]
-  if let context = activeInspectionContext,
-     let diagnostic = inspectionDiagnosticForRefusal(code,context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
-  try? emit(result); exit(1)
-}
-catch {
-  var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
-  if let context = activeInspectionContext, let diagnostic = safeInspectionContext(context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
-  try? emit(result); exit(1)
+@main struct P38OwnedWindow {
+  static func main() {
+    do { try run() }
+    catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
+    catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
+    catch let error as InspectionRefusal {
+      var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
+      if let diagnostic = safeInspectionContext(error.stage,error.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+      try? emit(result); exit(1)
+    }
+    catch let error as Refusal {
+      let code = allowedReasons.contains(error.code) ? error.code : "adapter-refused"
+      var result: [String:Any] = ["status":"refused","code":code]
+      if let context = activeInspectionContext,
+         let diagnostic = inspectionDiagnosticForRefusal(code,context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+      try? emit(result); exit(1)
+    }
+    catch {
+      var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
+      if let context = activeInspectionContext, let diagnostic = safeInspectionContext(context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+      try? emit(result); exit(1)
+    }
+  }
 }
