@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registered the private object Save As coordinator and N25E4B1A the saved-UI acknowledgement helper; P37C1-DESKTOP stage 2 now loads both with three ordinary native project/reference adapters before their consumers, without claiming installed workflow or visible reference acceptance. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory. N20R-O2B pins the ordinary Play publication observer hooks in Motion, app and timeline source. P39B1 pins a private inactive-project entry helper without a production loader or visible B tab. N20R-O2C pins passive rejected-error correlation in the existing native Play observer without changing product control flow. P39B pins the ordinary desktop Open routing and inactive token-backed B tab row without activating B. N20R-OBS4 pins passive original-failure to restoration receipt, paint and input correlation, including fail-closed work/view and superseding-intent checks, without changing product navigation or recovery control.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registered the private object Save As coordinator and N25E4B1A the saved-UI acknowledgement helper; P37C1-DESKTOP stage 2 now loads both with three ordinary native project/reference adapters before their consumers, without claiming installed workflow or visible reference acceptance. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory. N20R-O2B pins the ordinary Play publication observer hooks in Motion, app and timeline source. P39B1 pins a private inactive-project entry helper without a production loader or visible B tab. N20R-O2C pins passive rejected-error correlation in the existing native Play observer without changing product control flow. P39B pins the ordinary desktop Open routing and inactive token-backed B tab row without activating B. N20R-OBS4 pins passive original-failure to restoration receipt, paint and input correlation, including fail-closed work/view and superseding-intent checks, without changing product navigation or recovery control. P38N5 adds the native inactive-project tab adapter and pins its exact bootstrap order and project/tab request controls.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,31 +19,31 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "f909d423d0e6481f77bf7abd75b5c0529ce5d2a4",
-    "sourceRootTree": "220dfc48daf5080368a2e7c011e2e3b4ee5767c1",
+    "candidateCommit": "1db91dc375b09e0b31cc33bb759eb7be82518e55",
+    "sourceRootTree": "80d8373237634b5442d7891987ba5c68488a518c",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "90402fbb806c537e7aabe040e1d90c171ffc2e65",
-      "lastChangedCommit": "f909d423d0e6481f77bf7abd75b5c0529ce5d2a4"
+      "gitTree": "57a7247ea1d021a9c8e51a0aca109908956526c0",
+      "lastChangedCommit": "1db91dc375b09e0b31cc33bb759eb7be82518e55"
     },
     "bootstrap": {
       "path": "src/index.html",
-      "gitBlob": "a9e0870a1e7a1e413c5fc65f9d32b22dc5124576",
-      "sha256": "057ad190c7fffe7010f72833716f75a4741c850f9100bf4363d330519b39b774",
-      "lastChangedCommit": "9984bf0e82b6495cdf44f925125e4dd69b643147"
+      "gitBlob": "b6d351eccc68231018dca64b44f3d060465f38b5",
+      "sha256": "2975830421b7c6195bf1ef9fa3165dedfd37c314eb3e02f72c120a9e55ebadfd",
+      "lastChangedCommit": "1db91dc375b09e0b31cc33bb759eb7be82518e55"
     },
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "732680d879ebb92e3e79a3449c9ed3431d4c1fa945c4b65fb68f5b1de1cbcfac"
+      "value": "c65a9ff4b5d4aad4632a3a309b56cfe1c46c0b46fa0ec1d91d721271e7b78535"
     },
     "profiles": [
       {
         "path": "engineering/boundaries/profiles/app-js.profile.json",
-        "gitBlob": "994e5ebf28b9854015358938f452fdbe10896e4d",
-        "sha256": "ae4f853caecaefb2b940c3accbd4bd8ef43780566b78f6e82bc1f9fb2e648fea",
-        "moduleCount": 198,
-        "basedOnCommit": "9984bf0e82b6495cdf44f925125e4dd69b643147"
+        "gitBlob": "6865781fe681b434758555cde4aaaa5251294d55",
+        "sha256": "54bc722aa6b5334a31c36d26a3afee1031541d35dd79272a21c53a521d3b8cbf",
+        "moduleCount": 199,
+        "basedOnCommit": "1db91dc375b09e0b31cc33bb759eb7be82518e55"
       },
       {
         "path": "engineering/boundaries/profiles/app-js.baseline.json",
@@ -691,8 +691,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2503,
-          "scriptOrdinal": 157
+          "line": 2504,
+          "scriptOrdinal": 158
         }
       ]
     },
@@ -703,8 +703,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2530,
-          "scriptOrdinal": 182
+          "line": 2531,
+          "scriptOrdinal": 183
         }
       ]
     },
@@ -751,8 +751,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2522,
-          "scriptOrdinal": 174
+          "line": 2523,
+          "scriptOrdinal": 175
         }
       ]
     },
@@ -763,8 +763,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2532,
-          "scriptOrdinal": 184
+          "line": 2533,
+          "scriptOrdinal": 185
         }
       ]
     },
@@ -811,8 +811,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2523,
-          "scriptOrdinal": 175
+          "line": 2524,
+          "scriptOrdinal": 176
         }
       ]
     },
@@ -823,8 +823,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2526,
-          "scriptOrdinal": 178
+          "line": 2527,
+          "scriptOrdinal": 179
         }
       ]
     },
@@ -859,8 +859,20 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2525,
-          "scriptOrdinal": 177
+          "line": 2526,
+          "scriptOrdinal": 178
+        }
+      ]
+    },
+    {
+      "path": "src/js/adapters/native-object-inactive-project-tabs.js",
+      "moduleId": "app.native.object.inactive-project-tabs.adapter",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2471,
+          "scriptOrdinal": 129
         }
       ]
     },
@@ -883,8 +895,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2524,
-          "scriptOrdinal": 176
+          "line": 2525,
+          "scriptOrdinal": 177
         }
       ]
     },
@@ -895,8 +907,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2531,
-          "scriptOrdinal": 183
+          "line": 2532,
+          "scriptOrdinal": 184
         }
       ]
     },
@@ -956,8 +968,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 164
+          "line": 2511,
+          "scriptOrdinal": 165
         }
       ]
     },
@@ -1040,8 +1052,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2527,
-          "scriptOrdinal": 179
+          "line": 2528,
+          "scriptOrdinal": 180
         }
       ]
     },
@@ -1196,8 +1208,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2495,
-          "scriptOrdinal": 149
+          "line": 2496,
+          "scriptOrdinal": 150
         }
       ]
     },
@@ -1233,8 +1245,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2487,
-          "scriptOrdinal": 142
+          "line": 2488,
+          "scriptOrdinal": 143
         }
       ]
     },
@@ -1245,8 +1257,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2491,
-          "scriptOrdinal": 146
+          "line": 2492,
+          "scriptOrdinal": 147
         }
       ]
     },
@@ -1269,8 +1281,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2504,
-          "scriptOrdinal": 158
+          "line": 2505,
+          "scriptOrdinal": 159
         }
       ]
     },
@@ -1281,8 +1293,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2505,
-          "scriptOrdinal": 159
+          "line": 2506,
+          "scriptOrdinal": 160
         }
       ]
     },
@@ -1293,8 +1305,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2529,
-          "scriptOrdinal": 181
+          "line": 2530,
+          "scriptOrdinal": 182
         }
       ]
     },
@@ -1305,8 +1317,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2528,
-          "scriptOrdinal": 180
+          "line": 2529,
+          "scriptOrdinal": 181
         }
       ]
     },
@@ -1341,8 +1353,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 160
+          "line": 2507,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -1528,8 +1540,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 162
+          "line": 2509,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -1576,8 +1588,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2496,
-          "scriptOrdinal": 150
+          "line": 2497,
+          "scriptOrdinal": 151
         }
       ]
     },
@@ -1588,8 +1600,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2514,
-          "scriptOrdinal": 168
+          "line": 2515,
+          "scriptOrdinal": 169
         }
       ]
     },
@@ -1675,8 +1687,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2472,
-          "scriptOrdinal": 130
+          "line": 2473,
+          "scriptOrdinal": 131
         }
       ]
     },
@@ -1687,8 +1699,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2486,
-          "scriptOrdinal": 141
+          "line": 2487,
+          "scriptOrdinal": 142
         }
       ]
     },
@@ -1699,8 +1711,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2516,
-          "scriptOrdinal": 170
+          "line": 2517,
+          "scriptOrdinal": 171
         }
       ]
     },
@@ -1735,8 +1747,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2501,
-          "scriptOrdinal": 155
+          "line": 2502,
+          "scriptOrdinal": 156
         }
       ]
     },
@@ -1747,8 +1759,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 163
+          "line": 2510,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -1759,8 +1771,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2473,
-          "scriptOrdinal": 131
+          "line": 2474,
+          "scriptOrdinal": 132
         }
       ]
     },
@@ -1795,8 +1807,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2482,
-          "scriptOrdinal": 137
+          "line": 2483,
+          "scriptOrdinal": 138
         }
       ]
     },
@@ -1807,8 +1819,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2481,
-          "scriptOrdinal": 136
+          "line": 2482,
+          "scriptOrdinal": 137
         }
       ]
     },
@@ -1819,8 +1831,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2476,
-          "scriptOrdinal": 134
+          "line": 2477,
+          "scriptOrdinal": 135
         }
       ]
     },
@@ -1831,8 +1843,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2475,
-          "scriptOrdinal": 133
+          "line": 2476,
+          "scriptOrdinal": 134
         }
       ]
     },
@@ -2455,8 +2467,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2488,
-          "scriptOrdinal": 143
+          "line": 2489,
+          "scriptOrdinal": 144
         }
       ]
     },
@@ -2479,8 +2491,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2490,
-          "scriptOrdinal": 145
+          "line": 2491,
+          "scriptOrdinal": 146
         }
       ]
     },
@@ -2587,8 +2599,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2517,
-          "scriptOrdinal": 171
+          "line": 2518,
+          "scriptOrdinal": 172
         }
       ]
     },
@@ -2599,8 +2611,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2499,
-          "scriptOrdinal": 153
+          "line": 2500,
+          "scriptOrdinal": 154
         }
       ]
     },
@@ -2611,8 +2623,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2498,
-          "scriptOrdinal": 152
+          "line": 2499,
+          "scriptOrdinal": 153
         }
       ]
     },
@@ -2647,8 +2659,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2471,
-          "scriptOrdinal": 129
+          "line": 2472,
+          "scriptOrdinal": 130
         }
       ]
     },
@@ -2659,8 +2671,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2485,
-          "scriptOrdinal": 140
+          "line": 2486,
+          "scriptOrdinal": 141
         }
       ]
     },
@@ -2695,8 +2707,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2518,
-          "scriptOrdinal": 172
+          "line": 2519,
+          "scriptOrdinal": 173
         }
       ]
     },
@@ -2707,8 +2719,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2483,
-          "scriptOrdinal": 138
+          "line": 2484,
+          "scriptOrdinal": 139
         }
       ]
     },
@@ -2731,8 +2743,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2515,
-          "scriptOrdinal": 169
+          "line": 2516,
+          "scriptOrdinal": 170
         }
       ]
     },
@@ -2743,8 +2755,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2497,
-          "scriptOrdinal": 151
+          "line": 2498,
+          "scriptOrdinal": 152
         }
       ]
     },
@@ -2755,8 +2767,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 165
+          "line": 2512,
+          "scriptOrdinal": 166
         }
       ]
     },
@@ -2779,8 +2791,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 161
+          "line": 2508,
+          "scriptOrdinal": 162
         }
       ]
     },
@@ -2791,8 +2803,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 167
+          "line": 2514,
+          "scriptOrdinal": 168
         }
       ]
     },
@@ -2839,8 +2851,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 166
+          "line": 2513,
+          "scriptOrdinal": 167
         }
       ]
     },
@@ -2863,8 +2875,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2500,
-          "scriptOrdinal": 154
+          "line": 2501,
+          "scriptOrdinal": 155
         }
       ]
     },
@@ -2875,8 +2887,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2484,
-          "scriptOrdinal": 139
+          "line": 2485,
+          "scriptOrdinal": 140
         }
       ]
     },
@@ -2998,8 +3010,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2489,
-          "scriptOrdinal": 144
+          "line": 2490,
+          "scriptOrdinal": 145
         }
       ]
     },
@@ -3010,8 +3022,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2519,
-          "scriptOrdinal": 173
+          "line": 2520,
+          "scriptOrdinal": 174
         }
       ]
     },
@@ -3046,8 +3058,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2474,
-          "scriptOrdinal": 132
+          "line": 2475,
+          "scriptOrdinal": 133
         }
       ]
     },
@@ -3105,8 +3117,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2502,
-          "scriptOrdinal": 156
+          "line": 2503,
+          "scriptOrdinal": 157
         }
       ]
     },
@@ -3142,8 +3154,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2535,
-          "scriptOrdinal": 186
+          "line": 2536,
+          "scriptOrdinal": 187
         }
       ]
     },
@@ -3154,8 +3166,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2533,
-          "scriptOrdinal": 185
+          "line": 2534,
+          "scriptOrdinal": 186
         }
       ]
     }
