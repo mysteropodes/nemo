@@ -459,6 +459,18 @@ test('incomplete discovery stops the real operator before any press and cleans u
     assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
   }
 });
+test('oversized or malformed helper inspections never become complete input routes',async t=>{
+  const node={path:'0',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  for(const nodes of [Array.from({length:129},(_,i)=>({...node,path:String(i)})),undefined,null,{},[null],[[]],[{...node,path:'private'}]]){
+    const reply={status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,...complete,nodes};
+    assert.throws(()=>P.sanitizeHelper(reply),/projection-refused/);
+    const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+    s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},
+      async close(){s.events.push('helper-close');},async action(_w,a){s.events.push('helper:'+a.type);return {...reply,type:a.type};}});
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-projection-refused');
+    assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
+  }
+});
 test('PNG pages require observed roots and exact retained continuation; metadata stays categorical',t=>{
   const f=setup(t);f.prepare();const token='11111111-1111-4111-8111-111111111111',node={path:'0.0',role:'AXWebArea'};
   const first={target:'main',nodes:[node]};

@@ -116,12 +116,16 @@ function sanitizeHelper(r,target='main'){
   for(const key of ['dismissed','locationDismissed','commandPosted','locationReady'])if(typeof r[key]==='boolean')result[key]=r[key];
   if(r.target==='sheet')result.target='sheet';
   const roles=new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXMenu','AXMenuItem','AXRow','AXPopUpButton','AXCheckBox']);
-  if(Array.isArray(r.nodes))result.nodes=r.nodes.slice(0,128).map(n=>{
+  if(r.type==='inspect'||r.nodes!==undefined){
+    check(Array.isArray(r.nodes)&&r.nodes.length<=128&&r.nodes.every(n=>n&&typeof n==='object'&&!Array.isArray(n)&&
+      typeof n.path==='string'&&n.path.length<=128&&/^(?:\d+(?:\.\d+)*)?$/.test(n.path)),'png-projection-refused');
+    result.nodes=r.nodes.map(n=>{
     const p={path:typeof n.path==='string'&&/^(?:\d+(?:\.\d+)*)?$/.test(n.path)?n.path:'',role:roles.has(n.role)?n.role:'other'};
     if(controls.has(n.control)||target==='sheet'&&n.role==='AXRow'&&['A.json','Saved.json'].includes(n.control))p.control=n.control;
     if(['child-owner','children-unavailable'].includes(n.blocked))p.blocked=n.blocked;
     for(const key of ['enabled','press','selected'])if(typeof n[key]==='boolean')p[key]=n[key];return p;
-  });
+    });
+  }
   if(typeof r.capture==='string'&&/^capture-[1-9][0-9]{0,2}\.png$/.test(r.capture))result.capture=r.capture;
   return result;
 }
