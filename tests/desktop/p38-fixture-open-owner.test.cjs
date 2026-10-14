@@ -115,6 +115,7 @@ test('post-wait validation has a distinct fixed category only on the prior curso
   assert.deepEqual(await checkpointFailure({checkpoint:0,failureCode:'post-wait-validation-refused'}),expected);
   assert.equal(safeCode(expected.stage,expected.code),expected.code);
   for(const [overrides,phase,index] of [
+    [{checkpoint:1,failureCode:'a-fs-read-rejected'},'b-opened',1],
     [{checkpoint:1,failureCode:'post-wait-validation-refused'},'a-opened',1],
     [{checkpoint:0,failureCode:'post-wait-validation-refused'},'b-opened',1],
   ]) assert.deepEqual(await checkpointFailure(overrides,phase,index),

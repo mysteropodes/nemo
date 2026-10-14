@@ -62,7 +62,7 @@ function checkpointFailureCategory(root, manifest, expected, phase, index) {
   } catch {
     return 'probe-manifest-failure-unknown';
   }
-  if (manifest.checkpoint === index) return failedManifestCategory(manifest);
+  if (manifest.checkpoint === index) return phase === PHASES[index] ? failedManifestCategory(manifest) : 'probe-manifest-failure-unknown';
   if (phase === PHASES[index] && index > 0 && manifest.checkpoint === index - 1 &&
       manifest.failureCode === 'post-wait-validation-refused')
     return 'probe-manifest-failed-post-wait-validation-refused';
