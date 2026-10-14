@@ -58,6 +58,7 @@ test_modules! {
     "test-evaluation" => expression_noise_tests = "../tests/expression_noise.rs";
     "test-evaluation" => expression_random_tests = "../tests/expression_random.rs";
     "test-evaluation" => expression_math_tests = "../tests/expression_math.rs";
+    "test-evaluation" => expression_time_tests = "../tests/expression_time.rs";
     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
     "test-compositor" => compositor_tests = "../tests/compositor.rs";
     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
