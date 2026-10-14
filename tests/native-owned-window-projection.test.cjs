@@ -242,6 +242,7 @@ func AXUIElementGetAttributeValueCount(_ n:Int,_ key:CFString,_ out:inout CFInde
   if owners[n] != 10 {foreignReads+=1};return .noValue
 }
 func run(_ kind:String,_ depth:Int=2)throws->[String:Any]{
+  let inspectOwner=10
   fault=kind;owners=[1:10,2:10];ownerCalls=[:];attributeReads=[];queryReads=[]
   var cursor:OwnedProjectionCursor<Int>?=nil
   return try ownedProjection(1,base:"",depth:depth,maxNodes:128,expectedOwner:10,request:[:],cursor:&cursor,equal:==,hashKey:{UInt($0)},

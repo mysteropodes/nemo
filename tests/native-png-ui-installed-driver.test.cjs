@@ -324,9 +324,13 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   function slice(begin,end){const a=source.indexOf(begin),b=source.indexOf(end,a);assert.ok(a>=0&&b>a);return source.slice(a,b);}
   const gates=slice('    let target = request["target"]','    switch action {');
   const inspect=slice('    case "inspect":','    case "capture":').replace('    case "inspect":','');
+  const childSource=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-children-query.swift'),'utf8').replace(/^import .*$/gm,'');
+  const childStart=childSource.indexOf('func ownedAXChildren('),childEnd=childSource.indexOf('func ownedChildrenQuerySelfTest()',childStart);
+  assert.ok(childStart>=0&&childEnd>childStart);
+  const childBinding=childSource.slice(childStart,childEnd),childCore=childSource.slice(0,childStart);
   const definitions=slice('struct ProcessStart:','func processStart(')+slice('func localFacts(','// A path is diagnostic')+
     slice('func boundedOwnedTree<','func guardedElementAction(')+
-    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'');
+    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'')+childCore;
   const verify=slice('  func verifyService()','  try emit(["status":"pinned"');
   const node=slice('  func node(_ value:','  func supports(');
   const code=`import Foundation
@@ -389,6 +393,8 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
   func AXUIElementCopyAttributeValue(_ n:Int,_ key:CFString,_ out:inout CFTypeRef?)->AXError{
     if key as String==kAXChildrenAttribute {out=attr(n,kAXChildrenAttribute);return .success};out=nil;return .attributeUnsupported
   }
+  func AXUIElementGetAttributeValueCount(_ n:Int,_ key:CFString,_ out:inout CFIndex)->AXError{.noValue}
+  ${childBinding}
   func AXUIElementIsAttributeSettable(_ n:Int,_ key:CFString,_ out:inout DarwinBoolean)->AXError{out=DarwinBoolean(true);return .success}
   func verify()throws{try check(fault != "stale-nemo")}
   func verifySheet()throws->Int{try check(fault != "detached-sheet");return 2}
