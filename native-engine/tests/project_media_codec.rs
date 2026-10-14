@@ -1,8 +1,5 @@
 use super::{ProjectReferenceState as State, *};
 use serde_json::{json, Value};
-#[path = "p38_native_project_fixtures.rs"]
-mod p38_native_project_fixtures;
-use p38_native_project_fixtures::fixture;
 
 const EMPTY_DRAWING: &str = r#"{"format":"nemo.native-object-document","formatVersion":1,"totalFrames":21,"layers":[{"layerUid":"0"}],"objects":[]}"#;
 const PREFIX: &str = r#"{"format":"nemo.native-project-document","formatVersion":1,"project":{"canvasW":320,"canvasH":180,"fps":24},"drawing":"#;
@@ -16,6 +13,27 @@ fn wire(drawing: &str) -> Vec<u8> {
 fn decode(bytes: &[u8]) -> Result<ProjectEnvelope, ProjectWireError> {
     decode_project(bytes, limits())
 }
+fn fixture(version: u32) -> Value {
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap();
+    let mut drawing = json!({"format":"nemo.native-object-document","formatVersion":version,
+        "totalFrames":21,"layers":[{"layerUid":"legacy layer:alpha"},{"layerUid":"0"}],
+        "objects":cases["records"]});
+    if version == 2 {
+        drawing["compositionOrder"] = json!({
+            "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+            "contexts":[{"contextId":"scene-root","layers":[
+                {"layerUid":"legacy layer:alpha","naturalPosition":0,"order":{"static":[0]}},
+                {"layerUid":"0","naturalPosition":1,"order":{}}],
+            "scopes":[{"frameScope":{"kind":"authored","frame":7},"elements":[
+                {"layerUid":"legacy layer:alpha","strokeId":"ink/path_A","naturalPosition":0,"order":{}}]}]}],
+            "migration":"explicit-plan-required","referencePolicy":"unresolved"});
+    }
+    drawing
+}
+
 #[test]
 fn literal_null_wire_roundtrip_is_the_normative_shape() {
     let bytes = wire(EMPTY_DRAWING);
