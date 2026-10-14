@@ -190,8 +190,8 @@ test('protocol mutation controls separate schema/API/storage versions and requir
   ]) for (const change of changes) assert.notDeepEqual(check(name, changed(cases[kind].request, change)), [], `${kind}: ${change.path}`);
 });
 
-test('active opacity adapter and stored schema reject staged object admission and commands', () => {
-  assert.throws(() => validateRequest(cases.read.request));
+test('shared SDK admits declared object reads while preserving opacity schema and undeclared command denial', () => {
+  assert.strictEqual(validateRequest(cases.read.request), cases.read.request);
   assert.throws(() => validateRequest(cases.command.request));
   const transport = load('engineering/application/native-transport-v2.schema.json');
   const opacitySchema = transport.$defs.NativeOpacityDocument;
@@ -225,7 +225,8 @@ test('registered object read remains staged with pending ports and a complete-re
   assert.match(descriptor.typedValueBoundary, /duplicate raw JSON keys/);
   assert.deepEqual(descriptor.examples[0].request, cases.read.request);
   assert.equal(descriptor.examples[0].error.code, 'unavailable');
-  assert.throws(() => validateRequest(descriptor.examples[0].request), 'browser activation remains a later gate');
+  assert.strictEqual(validateRequest(descriptor.examples[0].request), descriptor.examples[0].request,
+    'pure SDK shape admission leaves public execution and desktop/browser acceptance separate');
   assert.equal(load('engineering/application/capabilities-v2/native-opacity.json').availability.state, 'available');
 });
 
@@ -256,7 +257,7 @@ test('staged visibility command declares a required revision and exact opaque-UI
     { path: ['visible'], delete: true },
   ]) assert.notDeepEqual(validate(payload, changed(request.payload, change), transport.$defs), [], change.path.join('.'));
   assert.notDeepEqual(validate(payload, { ...request.payload, extra: true }, transport.$defs), []);
-  assert.throws(() => validateRequest(request), 'ordinary JS adapter remains closed until the shared-owner UI route is accepted');
+  assert.strictEqual(validateRequest(request), request, 'SDK shape admission does not activate the unavailable catalog');
 });
 
 test('transport object selector carries the frozen closed scope and bounded envelope contract', () => {
