@@ -206,6 +206,53 @@ fn native_layer_names_survive_project_info_fill_history_save_and_fresh_reopen() 
 }
 
 #[test]
+fn native_visibility_command_keeps_project_save_reopen_and_history_on_the_same_owner() {
+    let mut owner = owner("visible-project");
+    let before = save(&owner, 0);
+    let request = |owner: &NativeObjectHistory, id: &str, visible: bool| {
+        serde_json::from_value::<crate::commands::OpacityRequest>(json!({
+        "apiVersion":2,"requestId":id,"instanceId":owner.instance_id(),"documentId":owner.document_id(),
+        "expectedRevision":owner.content_revision(),"operation":"command.document.object.layer.visibility.set",
+        "payload":{"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":visible}})).unwrap()
+    };
+    let hide = request(&owner, "project-hide", false);
+    assert!(
+        owner
+            .try_dispatch_object_command(&hide)
+            .unwrap()
+            .unwrap()
+            .ok
+    );
+    let hidden = save(&owner, 1);
+    assert_ne!(hidden, before);
+    assert_eq!(
+        owner.project_file_info().unwrap()["layers"][0]["visible"],
+        false
+    );
+    let reopened = NativeObjectHistory::from_project_file("reopened", &hidden).unwrap();
+    assert!(!current(&reopened).document().layers()[0].visible());
+    assert_eq!(save(&reopened, 0), hidden);
+    assert_eq!(owner.undo(1), Ok(2));
+    assert_eq!(save(&owner, 2), before);
+    let noop = request(&owner, "project-show-noop", true);
+    assert!(
+        owner
+            .try_dispatch_object_command(&noop)
+            .unwrap()
+            .unwrap()
+            .ok
+    );
+    assert_eq!(owner.history_depths(), (0, 1));
+    assert_eq!(owner.redo(2), Ok(3));
+    assert_eq!(save(&owner, 3), hidden);
+    assert_eq!(
+        save(&owner, 0),
+        before,
+        "retained project bytes cannot be mutated by visibility"
+    );
+}
+
+#[test]
 fn settings_fill_remove_and_attachment_share_one_history_and_preserve_replace_settings() {
     use crate::commands::ReferenceEdit;
     let mut owner = owner("interleaved");

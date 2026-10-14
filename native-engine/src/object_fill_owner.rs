@@ -1,9 +1,12 @@
 //! Private bridge from codec admission and sealed fill origins to revision storage.
 use crate::commands::{prepare_object_fill_json, PreparedObjectFill};
-use crate::object_document::{ObjectDocument, ProjectEnvelope, ProjectReferenceState};
+use crate::object_document::{
+    object_deserialize, ObjectDocument, Presence, ProjectEnvelope, ProjectReferenceState,
+};
 use crate::object_snapshot::ObjectSnapshot;
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
+use serde::Deserialize;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {
@@ -24,11 +27,81 @@ pub(crate) struct PreparedReferenceEdit {
 }
 
 #[derive(Debug)]
+struct LayerVisibilityPayload {
+    command: String,
+    layer_uid: String,
+    visible: bool,
+}
+object_deserialize!(LayerVisibilityPayload {
+    command: String,
+    layer_uid: String,
+    visible: bool
+});
+
+/// A detached value sealed to this owner's original immutable snapshot.
+#[derive(Debug, Clone)]
+pub(crate) struct PreparedLayerVisibility {
+    origin: ObjectSnapshot,
+    document: ObjectDocument,
+    changed: bool,
+}
+
+#[derive(Debug)]
 pub(crate) struct ObjectFillOwner {
     revisions: ObjectRevisionOwner,
 }
 
 impl ObjectFillOwner {
+    pub(crate) fn prepare_layer_visibility_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerVisibility, DispatchErrorCode> {
+        let payload: LayerVisibilityPayload =
+            serde_json::from_slice(bytes).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        if payload.command != "object.layer.visibility.set" || payload.layer_uid.is_empty() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let origin = self.current_snapshot();
+        let index = origin
+            .document()
+            .layers
+            .iter()
+            .position(|layer| layer.layer_uid() == payload.layer_uid)
+            .ok_or(DispatchErrorCode::NotFound)?;
+        let changed = origin.document().layers[index].visible() != payload.visible;
+        let mut document = origin.document().clone();
+        if changed {
+            document.layers[index].visible = Presence::Present(payload.visible);
+        }
+        Ok(PreparedLayerVisibility {
+            origin,
+            document,
+            changed,
+        })
+    }
+    pub(crate) fn commit_layer_visibility(
+        &mut self,
+        candidate: PreparedLayerVisibility,
+    ) -> Result<u64, DispatchErrorCode> {
+        let current = self.current_snapshot();
+        if candidate.origin.instance_id() != current.instance_id() {
+            return Err(DispatchErrorCode::WrongInstance);
+        }
+        if candidate.origin.document_id() != current.document_id() {
+            return Err(DispatchErrorCode::WrongDocument);
+        }
+        if candidate.origin.snapshot_id() != current.snapshot_id()
+            || candidate.origin.content_revision() != current.content_revision()
+        {
+            return Err(DispatchErrorCode::StaleRevision);
+        }
+        if !candidate.changed {
+            return Ok(self.content_revision());
+        }
+        self.revisions
+            .publish(candidate.document)
+            .map_err(|_| DispatchErrorCode::Unavailable)
+    }
     #[cfg(feature = "project_media_codec")]
     pub(crate) fn replace_admitted_snapshot(&mut self, snapshot: ObjectSnapshot) {
         self.revisions = ObjectRevisionOwner::from_admitted(snapshot);
