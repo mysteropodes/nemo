@@ -19,6 +19,93 @@ fn object_request(index: usize) -> NativeApplicationRequest {
     }
 }
 
+fn visibility_request() -> NativeApplicationRequest {
+    NativeApplicationRequest {
+        api_version: 2,
+        request_id: "visibility-7".into(),
+        instance_id: "instance-a".into(),
+        document_id: "native-object-document-1".into(),
+        expected_revision: Some(7),
+        operation: "command.document.object.layer.visibility.set".into(),
+        payload: json!({
+            "command": "object.layer.visibility.set",
+            "layerUid": "legacy layer:alpha",
+            "visible": false
+        }),
+        cancelled_before_dispatch: false,
+    }
+}
+
+#[test]
+fn staged_visibility_is_registered_and_strict_without_authorizing_dispatch() {
+    let base = visibility_request();
+    assert!(base.validate_input().is_ok());
+    let descriptor = crate::capabilities::native_catalog()
+        .capability_for_operation(&base.operation)
+        .unwrap();
+    assert_eq!(descriptor["id"], "native.object");
+    assert_eq!(descriptor["availability"]["state"], "unavailable");
+    let error = base.validate().unwrap_err();
+    assert_eq!(error.code(), "unavailable");
+    assert_eq!(error.message(), descriptor["availability"]["reason"]);
+
+    let mut missing_revision = base.clone();
+    missing_revision.expected_revision = None;
+    same_failure(
+        &missing_revision,
+        "invalid_request",
+        "native object visibility command requires expectedRevision",
+    );
+    let mut unsafe_revision = base.clone();
+    unsafe_revision.expected_revision = Some(9_007_199_254_740_992);
+    same_failure(
+        &unsafe_revision,
+        "invalid_request",
+        "expectedRevision exceeds the transport maximum",
+    );
+    for payload in [
+        json!({}),
+        json!({"command":"object.layer.visibility.set","layerUid":"","visible":false}),
+        json!({"command":"object.layer.visibility.set","layerUid":7,"visible":false}),
+        json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":0}),
+        json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":false,"extra":true}),
+        json!({"command":"object.fill.set","layerUid":"legacy layer:alpha","visible":false}),
+    ] {
+        let mut invalid = base.clone();
+        invalid.payload = payload;
+        same_failure(
+            &invalid,
+            "invalid_request",
+            "native object visibility command does not match its declared contract",
+        );
+    }
+    for good in [
+        json!({"applied":true,"historyEntriesAdded":1}),
+        json!({"applied":false,"historyEntriesAdded":0}),
+    ] {
+        assert!(crate::native_contract::validate_result(
+            &base.operation,
+            &base.document_id,
+            &base.payload,
+            &good
+        ));
+    }
+    for bad in [
+        json!({}),
+        json!({"applied":true,"historyEntriesAdded":0}),
+        json!({"applied":false,"historyEntriesAdded":1}),
+        json!({"applied":true,"historyEntriesAdded":1,"extra":true}),
+        json!({"applied":"yes","historyEntriesAdded":1}),
+    ] {
+        assert!(!crate::native_contract::validate_result(
+            &base.operation,
+            &base.document_id,
+            &base.payload,
+            &bad
+        ));
+    }
+}
+
 #[test]
 fn fixed_authored_and_reference_input_does_not_authorize_object_dispatch() {
     for index in [0, 1] {

@@ -279,6 +279,16 @@
         }
       }
     },
+    "ObjectLayerVisibilityPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "layerUid", "visible"],
+      "properties": {
+        "command": { "const": "object.layer.visibility.set" },
+        "layerUid": { "$ref": "#/$defs/ObjectOpaqueId" },
+        "visible": { "type": "boolean" }
+      }
+    },
     "ObjectQueryResult": {
       "type": "object",
       "additionalProperties": false,
@@ -481,6 +491,9 @@
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "query.document.object" },
             "payload": { "$ref": "#/$defs/ObjectQueryPayload" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
+          { "properties": { "operation": { "const": "command.document.object.layer.visibility.set" },
+            "payload": { "$ref": "#/$defs/ObjectLayerVisibilityPayload" } } }] },
 
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "command.reproduction.opt_in" }, "payload": { "$ref": "#/$defs/EmptyPayload" } } }] },

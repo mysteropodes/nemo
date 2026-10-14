@@ -1,5 +1,5 @@
-//! Staged typed-Value object read contract. Raw duplicate keys require a later
-//! raw-envelope gate before this capability can become available.
+//! Staged typed-Value object read and layer-visibility contracts. Raw duplicate
+//! keys require the shared original-byte admission gate before public availability.
 use super::{exact, frame, revision};
 use serde_json::Value;
 
@@ -31,6 +31,29 @@ fn target(value: &Value) -> bool {
 pub(super) fn request(value: &Value) -> bool {
     exact(value, &["atRevision", "stableTarget"], &[]).is_some_and(|value| {
         revision(value.get("atRevision")).is_some() && value.get("stableTarget").is_some_and(target)
+    })
+}
+
+pub(super) fn visibility_request(value: &Value) -> bool {
+    exact(value, &["command", "layerUid", "visible"], &[]).is_some_and(|value| {
+        value.get("command").and_then(Value::as_str) == Some("object.layer.visibility.set")
+            && value
+                .get("layerUid")
+                .and_then(Value::as_str)
+                .is_some_and(|uid| !uid.is_empty())
+            && value.get("visible").and_then(Value::as_bool).is_some()
+    })
+}
+
+pub(super) fn visibility_result(value: &Value) -> bool {
+    exact(value, &["applied", "historyEntriesAdded"], &[]).is_some_and(|value| {
+        matches!(
+            (
+                value.get("applied").and_then(Value::as_bool),
+                value.get("historyEntriesAdded").and_then(Value::as_u64)
+            ),
+            (Some(true), Some(1)) | (Some(false), Some(0))
+        )
     })
 }
 
