@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const ROOT = path.resolve(__dirname, '../..');
-const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened']);
+const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const PROBE_FAILURE_CODES = Object.freeze({
   ready: Object.freeze(['ready-open-path-unavailable', 'ready-observer-install-failed']),
   a: Object.freeze(['a-open-threw', 'a-open-false', 'a-open-unaccepted', 'a-pre-native-refusal',
@@ -19,12 +19,15 @@ const PROBE_FAILURE_CODES = Object.freeze({
     'b-native-status-rejected', 'b-native-bootstrap-unsupported-format', 'b-native-bootstrap-rejected',
     'b-native-bootstrap-resolved-open-refused', 'b-native-status-empty-no-bootstrap',
     'b-native-status-available-no-bootstrap', 'b-native-status-malformed-no-bootstrap',
-    'b-observer-late-untrusted', 'b-fs-read-rejected', 'b-fs-read-resolved-open-refused']),
+    'b-observer-late-untrusted', 'b-fs-read-rejected', 'b-fs-read-resolved-open-refused',
+    'b-switch-unaccepted', 'b-a-state-changed']),
+  closed: Object.freeze(['b-close-precondition-refused', 'b-close-threw', 'b-close-unaccepted', 'b-close-a-state-changed']),
 });
 const PROBE_FAILURE_PHASES = Object.freeze([
   Object.freeze({ checkpoint: 0, codes: PROBE_FAILURE_CODES.ready }),
   Object.freeze({ checkpoint: 1, codes: PROBE_FAILURE_CODES.a }),
   Object.freeze({ checkpoint: 2, codes: PROBE_FAILURE_CODES.b }),
+  Object.freeze({ checkpoint: 3, codes: PROBE_FAILURE_CODES.closed }),
 ]);
 const PROBE_FAILURE_CATEGORIES = PROBE_FAILURE_PHASES.flatMap(({ codes }) =>
   codes.map(code => `probe-manifest-failed-${code}`));

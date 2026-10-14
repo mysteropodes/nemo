@@ -27,7 +27,7 @@ const FIXTURE_B: &[u8] = include_bytes!("../../../tests/fixtures/p38/native-proj
 const HASH_A: &str = "e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0";
 const HASH_B: &str = "a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6";
 const MAX_PACKET: usize = 2048;
-const PHASES: [&str; 3] = ["ready", "a-opened", "b-opened"];
+const PHASES: [&str; 4] = ["ready", "a-opened", "b-opened", "b-closed"];
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

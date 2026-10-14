@@ -163,36 +163,133 @@
       await fail('a-opened', 'A', 'a-open-unaccepted');
       throw new Error('open-refused');
     }
-    await checkpoint('a-opened', 'returned', 'A');
     return after;
   }
-  async function openB(previous) {
-    let before;
-    try { before = await readNativeStatus(); }
-    catch (_) { before = null; }
-    if (!sameActiveStatus(previous, before)) {
-      await fail('b-opened', 'B', 'b-pre-native-refusal');
-      throw new Error('open-refused');
-    }
+  function validId(value) { return typeof value === 'string' && ID.test(value); }
+  const PIN_FIELDS = ['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId',
+    'lifecycleGeneration','documentDigest','undoDepth','redoDepth'];
+  let serial = 0;
+  function rows() {
+    const bar = window.document.getElementById('project-tabs-bar');
+    if (!bar) throw new Error('tabs-unavailable');
+    const all = Array.from(bar.querySelectorAll('.project-tab'));
+    const named = name => all.filter(row => row.querySelector('.pt-name')?.textContent === name);
+    return {bar,all,A:named('A'),B:named('B')};
+  }
+  function validRows(value, withB, aId, bId) {
+    return value.all.length === (withB ? 2 : 1) && value.A.length === 1 &&
+      value.B.length === (withB ? 1 : 0) && value.A[0].classList.contains('act') &&
+      value.A[0].dataset.tab === aId && (!withB || value.B[0].dataset.tab === bId &&
+      bId !== aId && !value.B[0].classList.contains('act'));
+  }
+  async function aBaseline(status) {
+    const session = window.NemoNativeObjectProject.desktop(window);
+    const info = session.info(), presented = session.readPresentedObjectSession(), current = await readNativeStatus();
+    if (!session.isActive() || !presented || !sameActiveStatus(status,current) ||
+        !Array.isArray(current.operations) || !['fill.set','undo','redo'].every(action =>
+          current.operations.includes('command.document.object.' + action))) throw new Error('A-unavailable');
+    const request = {apiVersion:2,requestId:'p38-inspect-' + (++serial),instanceId:status.instanceId,
+      documentId:status.documentId,action:{kind:'inspect'}};
+    const native = await invoke('nemo_native_object_reference', {requestJson:JSON.stringify(request)});
+    if (!native || native.requestId !== request.requestId || !PIN_FIELDS.every(field => native[field] === info[field]) ||
+        info.instanceId !== status.instanceId || info.documentId !== status.documentId ||
+        info.contentRevision !== status.contentRevision || info.lifecycleGeneration !== status.lifecycleGeneration ||
+        !validId(info.documentSnapshotId) || !/^[a-f0-9]{64}$/.test(info.documentDigest) ||
+        !Number.isSafeInteger(info.undoDepth) || info.undoDepth < 0 ||
+        !Number.isSafeInteger(info.redoDepth) || info.redoDepth < 0 ||
+        presented.presentation?.status !== 'presented' || presented.presentation.frame !== window.state.currentFrame ||
+        !PIN_FIELDS.slice(1,6).every(field => presented[field] === info[field] && presented.presentation[field] === info[field])) throw new Error('A-unaccepted');
+    const pins = Object.fromEntries(PIN_FIELDS.map(field => [field,info[field]]));
+    const label = window.SMProject.getCurrentLabel(), dirty = window.SMProject.isDirty();
+    if (typeof label !== 'string' || !label.endsWith(' — ' + config.fixtures.A) || typeof dirty !== 'boolean')
+      throw new Error('A-ui-unavailable');
+    return JSON.stringify({pins,label,dirty,frame:window.state.currentFrame});
+  }
+  async function sameA(previous, baseline) {
+    await Promise.resolve();
+    try { return await aBaseline(previous) === baseline; }
+    catch (_) { return false; }
+  }
+  async function inactive(previous, token) {
+    const info = window.NemoNativeObjectProject.desktop(window).info();
+    const request = {apiVersion:2,requestId:'p38-inactive-' + (++serial),instanceId:previous.instanceId,
+      documentId:previous.documentId,expectedRevision:previous.contentRevision,
+      documentSnapshotId:info.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration,
+      action:token ? {kind:'inspect',preparationToken:token} : {kind:'inspect'}};
+    const value = await invoke('nemo_native_object_inactive_project', {requestJson:JSON.stringify(request)});
+    if (!value || value.apiVersion !== 2 || value.requestId !== request.requestId ||
+        value.instanceId !== request.instanceId || value.documentId !== request.documentId ||
+        value.contentRevision !== request.expectedRevision || value.documentSnapshotId !== request.documentSnapshotId ||
+        value.lifecycleGeneration !== request.lifecycleGeneration || value.retryExecution !== false)
+      throw new Error('inactive-uncorrelated');
+    return value;
+  }
+  async function waitUntil(check) {
+    const deadline = Date.now() + 5000;
+    do {
+      try { if (await check()) return true; } catch (_) { /* Refuse an uncorrelated observation. */ }
+      await new Promise(resolve => setTimeout(resolve,25));
+    } while (Date.now() < deadline);
+    return false;
+  }
+  function switchAlert(value) {
+    return Array.from(value.bar.querySelectorAll('[role="alert"]')).some(node =>
+      node.textContent === 'Switching project tabs is unavailable in this build.' &&
+      window.getComputedStyle(node).display !== 'none' && window.getComputedStyle(node).visibility !== 'hidden' &&
+      node.getClientRects().length > 0);
+  }
+  async function rejectB(phase, code) {
+    await fail(phase,'B',code);
+    throw new Error('B-refused');
+  }
+  async function openB(previous, baseline, aId) {
+    if (!await sameA(previous,baseline) || !validRows(rows(),false,aId))
+      return rejectB('b-opened','b-pre-native-refusal');
     let result;
     try { result = await window.SMProject.openPath(config.fixtures.B); }
-    catch (_) {
-      await fail('b-opened', 'B', 'b-open-threw');
-      throw new Error('open-refused');
-    }
-    if (result !== true) {
-      await fail('b-opened', 'B', result === false ? 'b-open-false' : 'b-open-unaccepted');
-      throw new Error('open-refused');
-    }
-    let after;
-    try { after = await readNativeStatus(); }
-    catch (_) { after = null; }
-    if (!validActiveStatus(after, previous.instanceId, null, previous.lifecycleGeneration + 1) ||
-        after.documentId === previous.documentId) {
-      await fail('b-opened', 'B', 'b-open-unaccepted');
-      throw new Error('open-refused');
-    }
-    await checkpoint('b-opened', 'returned', 'B');
+    catch (_) { return rejectB('b-opened','b-open-threw'); }
+    const meta = result && result.meta, info = window.NemoNativeObjectProject.desktop(window).info();
+    if (result?.status !== 'prepared' || !meta || meta.kind !== 'native-object-inactive' ||
+        meta.path !== config.fixtures.B || meta.name !== 'B' || !validId(meta.preparationToken) ||
+        !validId(meta.preparationRequestId) || meta.instanceId !== previous.instanceId ||
+        meta.ownerDocumentId !== previous.documentId || meta.lifecycleGeneration !== previous.lifecycleGeneration ||
+        meta.originSnapshotId !== info.documentSnapshotId || meta.originRevision !== previous.contentRevision ||
+        !validId(meta.documentSnapshotId) || meta.documentSnapshotId === info.documentSnapshotId ||
+        meta.contentRevision !== 0 || !/^[a-f0-9]{64}$/.test(meta.digest))
+      return rejectB('b-opened',result === false ? 'b-open-false' : 'b-open-unaccepted');
+    const preparedRows = rows(), bId = preparedRows.B[0]?.dataset.tab;
+    if (!bId || !validRows(preparedRows,true,aId,bId)) return rejectB('b-opened','b-open-unaccepted');
+    try { preparedRows.B[0].click(); }
+    catch (_) { return rejectB('b-opened','b-switch-unaccepted'); }
+    const retained = await waitUntil(async () => {
+      const value = await inactive(previous,meta.preparationToken);
+      return value.state === 'inactive-retained' && value.preparationToken === meta.preparationToken &&
+        value.project?.preparationToken === meta.preparationToken &&
+        value.project.preparationRequestId === meta.preparationRequestId &&
+        value.project.documentSnapshotId === meta.documentSnapshotId && value.project.documentDigest === meta.digest &&
+        value.project.origin?.documentId === previous.documentId &&
+        value.project.origin.documentSnapshotId === info.documentSnapshotId &&
+        value.project.origin.contentRevision === previous.contentRevision &&
+        validRows(rows(),true,aId,bId) && switchAlert(rows());
+    });
+    if (!await sameA(previous,baseline)) return rejectB('b-opened','b-a-state-changed');
+    if (!retained) return rejectB('b-opened','b-switch-unaccepted');
+    await checkpoint('b-opened','returned','B');
+    // The accepted owner ACK is the only admission to the real close control.
+    if (!await sameA(previous,baseline) || !validRows(rows(),true,aId,bId) || !switchAlert(rows()))
+      return rejectB('b-closed','b-close-precondition-refused');
+    const close = rows().B[0].querySelector('.pt-close');
+    if (!close) return rejectB('b-closed','b-close-precondition-refused');
+    try { close.click(); }
+    catch (_) { return rejectB('b-closed','b-close-threw'); }
+    const closed = await waitUntil(async () => {
+      const value = await inactive(previous,null);
+      return value.state === 'inactive-absent' && value.preparationToken === null && value.project === null &&
+        validRows(rows(),false,aId);
+    });
+    if (!closed) return rejectB('b-closed','b-close-unaccepted');
+    if (!await sameA(previous,baseline)) return rejectB('b-closed','b-close-a-state-changed');
+    await checkpoint('b-closed','returned','B');
   }
   window.__NEMO_P38_FIXTURE_OPEN_DONE__ = (async () => {
     try {
@@ -215,7 +312,14 @@
       }
       if (!await preflightARead()) return 'refused';
       const stateA = await openA();
-      await openB(stateA);
+      let baseline, aId;
+      try {
+        baseline = await aBaseline(stateA);
+        aId = rows().A[0]?.dataset.tab;
+        if (!aId || !validRows(rows(),false,aId)) throw new Error('A-row-unavailable');
+      } catch (_) { await fail('a-opened','A','a-open-unaccepted'); return 'refused'; }
+      await checkpoint('a-opened','returned','A');
+      await openB(stateA,baseline,aId);
       return 'complete';
     } catch (_) { return 'refused'; }
   })();

@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const test = require('node:test');
 const crypto = require('node:crypto');
+const ProjectDocument = require('../../src/js/project-document.js');
+const InactiveTabs = require('../../src/js/adapters/native-object-inactive-project-tabs.js');
 const NativeObjectProject = require('../../src/js/adapters/native-object-project.js');
 const script = fs.readFileSync('tests/desktop/p38-fixture-open-bootstrap.js', 'utf8');
 const fixtures = Object.fromEntries(['A', 'B'].map(id => [id,
@@ -13,30 +15,72 @@ const hashes = Object.fromEntries(['A', 'B'].map(id => [id,
 const emptyStatus = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:false,
   route:'nemo_native_object_dispatch',operations:[],documentId:null,contentRevision:null,lifecycleGeneration:null});
 const statusA = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:true,
-  route:'nemo_native_object_dispatch',operations:['query.document.object'],documentId:'native-doc-A',contentRevision:0,lifecycleGeneration:1});
+  route:'nemo_native_object_dispatch',operations:['query.document.object','command.document.object.fill.set','command.document.object.undo','command.document.object.redo'],documentId:'native-doc-A',contentRevision:0,lifecycleGeneration:1});
 const statusB = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:true,
-  route:'nemo_native_object_dispatch',operations:['query.document.object'],documentId:'native-doc-B',contentRevision:0,lifecycleGeneration:2});
+  route:'nemo_native_object_dispatch',operations:['query.document.object','command.document.object.fill.set','command.document.object.undo','command.document.object.redo'],documentId:'native-doc-B',contentRevision:0,lifecycleGeneration:2});
 function execute(openResults, configPatch = {}, runtime = {}) {
   const calls = [], opened = [], statusCalls = [], commands = [], readCalls = [], order = [];
   const config = {schema:'nemo.p38-fixture-open-bootstrap/1',runId:'12345678-1234-1234-1234-123456789abc',
     taskKey:'a'.repeat(64),sourceSha:'b'.repeat(40),buildSha:'b'.repeat(40),manifestSha256:'c'.repeat(64),
     pid:42,fixtures:{...fixtures},...configPatch};
-  const statusResults = runtime.statusResults ? [...runtime.statusResults] : [emptyStatus,statusA,statusA,statusB];
-  let core, fsBridge, project;
+  const statusResults = runtime.statusResults ? [...runtime.statusResults] : [emptyStatus,statusA];
+  let core, fsBridge, project, window, inactiveProject=null, rowB=null, serial=0, closedClicks=0;
+  const pin={apiVersion:2,instanceId:statusA.instanceId,documentId:statusA.documentId,contentRevision:0,
+    lifecycleGeneration:1,documentSnapshotId:'snapshot-A',documentDigest:'d'.repeat(64),undoDepth:0,redoDepth:0};
+  const notices=[], rows=[], actions=[], preparedResults=[];
+  const nameNode=name=>({textContent:name});
+  function makeRow(name,id,active){
+    const row={dataset:{tab:id},classList:{contains:value=>value==='act'&&active},
+      querySelector:selector=>selector==='.pt-name'?nameNode(name):selector==='.pt-close'?{
+        click(){closedClicks++;actions.push('close-B');
+          if(runtime.closeThrows)throw new Error('private close error');
+          if(!runtime.noClose)tabs.close(tabs.held());}}:null,
+      click(){actions.push('switch-B');if(!runtime.noSwitch)tabs.activateClick(tabs.held());}};
+    return row;
+  }
+  const bar={querySelectorAll:selector=>selector==='.project-tab'?rows:selector==='[role="alert"]'?notices:[]};
+  const tabs=InactiveTabs.create({}, {owner:()=>pin,requestId:()=> 'adapter-'+(++serial),
+    invoke:(command,args)=>Reflect.apply(invoke,core,[command,args]),baseName:ProjectDocument.baseName,
+    commit(meta){rowB=makeRow(meta.name,'row-B',false);rows.push(rowB);return true;},
+    remove(){if(!runtime.retainRow)rows.splice(rows.indexOf(rowB),1);return true;},
+    notice(text){notices.length=0;notices.push({textContent:text,getClientRects:()=>runtime.hiddenAlert?[]:[{}]});}});
   const invoke = function(command,args){
     commands.push(command);
     if(command==='nemo_test_p38_fixture_open_probe'){
       const packet=JSON.parse(args.payloadJson); calls.push(packet); order.push(packet.phase);
+      if(runtime.onCheckpoint)runtime.onCheckpoint({packet,rows,notices,pin,window});
       return runtime.rejectCheckpointAt===packet.phase?Promise.reject(new Error('private checkpoint failure')):
         packet.phase==='ready'&&runtime.readyPromise?runtime.readyPromise:
+        packet.phase==='b-opened'&&runtime.bPromise?runtime.bPromise:
         Promise.resolve(packet.phase==='ready'?(runtime.readyDiagnostic===undefined?{ownerAcknowledged:true}:runtime.readyDiagnostic):undefined);
     }
     if(command==='nemo_native_object_client_status'){
       statusCalls.push({receiverMatchesCore:this===core,argumentCount:arguments.length});
-      const result=statusResults.shift();
+      const result=statusResults.length?statusResults.shift():statusA;
       if(result instanceof Error)throw result;
       if(result&&result.reject) return Promise.reject(result.error||new Error('private status failure'));
       return Promise.resolve(result);
+    }
+    if(command==='nemo_native_object_reference'){
+      const request=JSON.parse(args.requestJson);return Promise.resolve({...pin,requestId:request.requestId,
+        ...(runtime.referencePatch||{})});
+    }
+    if(command==='nemo_native_object_inactive_project'){
+      const req=JSON.parse(args.requestJson), action=req.action;
+      if(action.kind==='prepare')inactiveProject={preparationToken:'prepared-B',preparationRequestId:req.requestId,
+        instanceId:pin.instanceId,documentSnapshotId:'snapshot-B',contentRevision:0,documentDigest:'e'.repeat(64),
+        byteCount:1024,canvasW:640,canvasH:360,fps:30,totalFrames:21,layers:[{layerUid:'B'}],
+        origin:{documentId:pin.documentId,documentSnapshotId:pin.documentSnapshotId,contentRevision:0}};
+      const token=inactiveProject?.preparationToken||null;
+      if(action.kind==='close'&&!runtime.retainNative)inactiveProject=null;
+      const value={apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,
+        contentRevision:req.expectedRevision,documentSnapshotId:req.documentSnapshotId,
+        lifecycleGeneration:req.lifecycleGeneration,retryExecution:false,
+        state:action.kind==='prepare'?'inactive-prepared':action.kind==='close'?'inactive-closed':
+          inactiveProject?'inactive-retained':'inactive-absent',
+        preparationToken:action.kind==='close'?token:inactiveProject?.preparationToken||null,project:inactiveProject};
+      if(runtime.onInactive)runtime.onInactive({action,pin,rows,notices,value});
+      return Promise.resolve(value);
     }
     return Promise.reject(new Error('unexpected native command'));
   };
@@ -56,21 +100,32 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   const openPath=runtime.openPath||async function(path){opened.push(path); order.push(path===fixtures.A?'open-A':'open-B');
     const events=runtime.openEvents||[['bootstrap-dispatched'],['bootstrap-resolved']];
     for(const [event,code] of events)window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);
-    return openResults.shift();};
+    const result=openResults.shift();
+    if(path===fixtures.A){if(result===true)rows.push(makeRow(ProjectDocument.baseName(path),'row-A',true));return result;}
+    if(result!==true)return result;
+    const prepared=await tabs.openPath(path);preparedResults.push(prepared);
+    if(runtime.patchPrepared)runtime.patchPrepared(prepared,rows);
+    return runtime.preparedResult?runtime.preparedResult(prepared):prepared;};
   project={};
   if(!runtime.missingOpenPath)Object.defineProperty(project,'openPath',{enumerable:true,configurable:false,get:()=>openPath});
+  project.getCurrentLabel=()=> runtime.label||'A — '+fixtures.A;
+  project.isDirty=()=>runtime.dirty===undefined?false:runtime.dirty;
   Object.freeze(project);
   const coreDescriptor=Object.getOwnPropertyDescriptor(core,'invoke');
   const fsDescriptor=Object.getOwnPropertyDescriptor(fsBridge,'readTextFile');
   const projectDescriptor=Object.getOwnPropertyDescriptor(project,'openPath');
-  const window={__NEMO_P38_FIXTURE_OPEN__:config,__TAURI__:Object.freeze({core,fs:runtime.missingFs?undefined:fsBridge})};
+  window={__NEMO_P38_FIXTURE_OPEN__:config,__TAURI__:Object.freeze({core,fs:runtime.missingFs?undefined:fsBridge})};
+  window.NemoNativeObjectProject={desktop:()=>({isActive:()=>true,info:()=>pin,
+    readPresentedObjectSession:()=>({...pin,presentation:{...pin,status:'presented',frame:0}})})};
+  window.state={currentFrame:0};window.document={getElementById:()=>bar};
+  window.getComputedStyle=()=>({display:'block',visibility:runtime.hiddenAlert?'hidden':'visible'});
   if(!runtime.lateBind)window.SMProject=project;
   let tick=0;
-  const clock=runtime.expireImmediately?{now:()=>tick++===0?0:60001}:Date;
+  const clock=runtime.fastTimeout?{now:()=>Math.floor(tick++/4)*6000}:runtime.expireImmediately?{now:()=>tick++===0?0:60001}:Date;
   vm.runInNewContext(script,{window,Date:clock,setTimeout,Promise,Object,Number,Error,Reflect});
-  if(runtime.bind)runtime.bind({project,core,fs:fsBridge,window,readCalls,opened,calls});
+  if(runtime.bind)runtime.bind({project,core,fs:fsBridge,window,readCalls,opened,calls,rows,actions});
   if(runtime.lateBind)window.SMProject=project;
-  return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,statusCalls,commands,readCalls,order,
+  return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,statusCalls,commands,readCalls,order,closedClicks,actions,preparedResults,
     bridgesPreserved:Object.isFrozen(core)&&Object.isFrozen(fsBridge)&&Object.isFrozen(project)&&
       Object.getOwnPropertyDescriptor(core,'invoke').get===coreDescriptor.get&&
       Object.getOwnPropertyDescriptor(fsBridge,'readTextFile').get===fsDescriptor.get&&
@@ -80,20 +135,27 @@ test('owner ACK permits the real A read before ordinary native opens',async()=>{
   const r=await execute([true,true]);
   assert.equal(r.result,'complete');
   assert.deepEqual(r.readCalls,[{path:fixtures.A,receiverMatchesFs:true,argumentCount:1}]);
-  assert.deepEqual(r.order,['ready','read-A','open-A','a-opened','open-B','b-opened']);
+  assert.deepEqual(r.order,['ready','read-A','open-A','a-opened','open-B','b-opened','b-closed']);
   assert.equal(r.bridgesPreserved,true);
+});
+test('production-shaped inactive B preparation preserves A and is accepted',async()=>{
+  const r=await execute([true,true]);
+  assert.equal(r.result,'complete');
+  assert.equal(r.preparedResults[0].status,'prepared');
+  assert.equal(r.preparedResults[0].meta.ownerDocumentId,statusA.documentId);
+  assert.deepEqual(r.opened,[fixtures.A,fixtures.B]);
+  assert.deepEqual(r.calls.map(x=>x.phase),['ready','a-opened','b-opened','b-closed']);
+  assert.deepEqual(r.actions,['switch-B','close-B']);
 });
 test('exact native A/B opens and correlated status advance fixed checkpoints without bridge mutation', async()=>{
   const r=await execute([true,true]);
   assert.equal(r.result,'complete');
   assert.deepEqual(r.opened,[fixtures.A,fixtures.B]);
-  assert.deepEqual(r.calls.map(x=>x.phase),['ready','a-opened','b-opened']);
-  assert.deepEqual(r.calls.slice(1).map(x=>x.fixtureSha256),[hashes.A,hashes.B]);
-  assert.deepEqual(r.statusCalls.map(x=>x.argumentCount),[1,1,1,1]);
-  assert.equal(r.statusCalls.every(x=>x.receiverMatchesCore),true);
-  assert.deepEqual(r.commands,['nemo_test_p38_fixture_open_probe','nemo_native_object_client_status',
-    'nemo_native_object_client_status','nemo_test_p38_fixture_open_probe','nemo_native_object_client_status',
-    'nemo_native_object_client_status','nemo_test_p38_fixture_open_probe']);
+  assert.deepEqual(r.calls.map(x=>x.phase),['ready','a-opened','b-opened','b-closed']);
+  assert.deepEqual(r.calls.slice(1).map(x=>x.fixtureSha256),[hashes.A,hashes.B,hashes.B]);
+  assert.equal(r.statusCalls.every(x=>x.argumentCount===1&&x.receiverMatchesCore),true);
+  assert.ok(r.commands.includes('nemo_native_object_reference'));
+  assert.ok(r.commands.includes('nemo_native_object_inactive_project'));
   assert.equal(r.bridgesPreserved,true);
   assert.doesNotMatch(JSON.stringify(r.calls),/desktop-instance|native-doc|documentId|lifecycleGeneration/);
 });
@@ -208,25 +270,115 @@ for(const badStatus of [
 });
 test('native state must remain A until the B open starts',async()=>{
   const changed={...statusA,lifecycleGeneration:2};
-  const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,changed,statusB]});
+  const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,statusA,changed]});
   assert.equal(r.result,'refused');
   assert.deepEqual(r.opened,[fixtures.A]);
   assert.deepEqual(r.calls.map(x=>[x.phase,x.status]),[['ready','ready'],['a-opened','returned'],['b-opened','failed']]);
   assert.equal(r.calls.at(-1).failureCode,'b-pre-native-refusal');
 });
-for(const badStatus of [
-  {...statusB,documentId:statusA.documentId},
-  {...statusB,lifecycleGeneration:statusA.lifecycleGeneration},
-  {...statusB,contentRevision:1},
-  {...statusB,instanceId:'other-instance'},
-  {...statusB,route:'legacy'},
-]) test(`B replacement must advance native identity and generation: ${badStatus.documentId}/${badStatus.lifecycleGeneration}`,async()=>{
-  const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,statusA,badStatus]});
-  assert.equal(r.result,'refused');
-  assert.deepEqual(r.opened,[fixtures.A,fixtures.B]);
-  assert.deepEqual(r.calls.map(x=>[x.phase,x.status]),[
-    ['ready','ready'],['a-opened','returned'],['b-opened','failed']]);
-  assert.equal(r.calls.at(-1).failureCode,'b-open-unaccepted');
+for(const badStatus of [statusB,{...statusA,contentRevision:1},{...statusA,instanceId:'other-instance'}])
+  test('B preparation cannot replace or change the A owner',async()=>{
+    const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,statusA,statusA,badStatus]});
+    assert.equal(r.result,'refused');assert.deepEqual(r.opened,[fixtures.A,fixtures.B]);
+    assert.equal(r.calls.at(-1).failureCode,'b-a-state-changed');assert.equal(r.closedClicks,0);
+  });
+test('B remains visible until accepted owner ACK and a refused ACK never closes it',async()=>{
+  let release,observed;
+  const bPromise=new Promise((resolve,reject)=>{release={resolve,reject};});
+  const completion=execute([true,true],{},{bPromise,bind:value=>{observed=value;}});
+  while(!observed.calls.some(value=>value.phase==='b-opened'))await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(observed.actions,['switch-B']);assert.equal(observed.rows.length,2);
+  release.reject(new Error('private refused owner ACK'));
+  const r=await completion;assert.equal(r.result,'refused');assert.equal(r.closedClicks,0);
+  assert.deepEqual(r.calls.map(value=>value.phase),['ready','a-opened','b-opened']);
+});
+for(const [field,value] of [['path',fixtures.A],['ownerDocumentId','wrong-A'],['originSnapshotId','wrong-snapshot'],
+  ['originRevision',1],['preparationToken',null],['documentSnapshotId','snapshot-A'],['digest','bad']])
+  test('prepared B must match its native owner and fixture: '+field,async()=>{
+    const r=await execute([true,true],{},{preparedResult:p=>({...p,meta:{...p.meta,[field]:value}})});
+    assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-open-unaccepted');
+    assert.equal(r.closedClicks,0);
+  });
+for(const [field,value] of [['documentSnapshotId','changed-A'],['documentDigest','f'.repeat(64)],
+  ['undoDepth',1],['redoDepth',1],['contentRevision',1],['lifecycleGeneration',2]])
+  test('B switch preserves every native A pin: '+field,async()=>{
+    const r=await execute([true,true],{},{fastTimeout:true,onInactive({action,pin}){
+      if(action.kind==='inspect'&&action.preparationToken)pin[field]=value;}});
+    assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-a-state-changed');
+    assert.equal(r.closedClicks,0);
+  });
+for(const runtime of [{noSwitch:true},{hiddenAlert:true},{noClose:true},{retainNative:true},{retainRow:true},{closeThrows:true}])
+  test('real switch/close controls and visible native state are required: '+JSON.stringify(runtime),async()=>{
+    const r=await execute([true,true],{},{...runtime,fastTimeout:true});
+    assert.equal(r.result,'refused');
+    assert.equal(r.calls.at(-1).failureCode,runtime.noSwitch||runtime.hiddenAlert?'b-switch-unaccepted':
+      runtime.closeThrows?'b-close-threw':'b-close-unaccepted');
+    assert.equal(r.calls.some(x=>x.phase==='b-closed'&&x.status==='returned'),false);
+    assert.doesNotMatch(JSON.stringify(r.calls),/private|snapshot|native-doc|task\/tmp/);
+  });
+for(const field of ['undoDepth','redoDepth','documentDigest'])test('close cannot change A: '+field,async()=>{
+  const r=await execute([true,true],{},{fastTimeout:true,onInactive({action,pin}){
+    if(action.kind==='close')pin[field]=field==='documentDigest'?'f'.repeat(64):1;}});
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-close-a-state-changed');
+});
+for(const changed of ['requestId','token','snapshot','origin','digest'])test('B native inspect receipt is correlated: '+changed,async()=>{
+  const r=await execute([true,true],{},{fastTimeout:true,onInactive({action,value}){
+    if(action.kind!=='inspect'||!action.preparationToken)return;
+    if(changed==='requestId')value.requestId='foreign-request';
+    else if(changed==='token')value.preparationToken='foreign-token';
+    else value.project={...value.project,[changed==='snapshot'?'documentSnapshotId':
+      changed==='digest'?'documentDigest':'origin']:changed==='origin'?{documentId:'wrong-owner'}:'foreign'};
+  }});
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-switch-unaccepted');
+  assert.equal(r.closedClicks,0);
+});
+for(const changed of ['rowId','duplicate','activeB'])test('two distinct rows must retain active A: '+changed,async()=>{
+  const r=await execute([true,true],{},{patchPrepared(_prepared,rows){
+    if(changed==='rowId')rows[1].dataset.tab=rows[0].dataset.tab;
+    if(changed==='duplicate')rows.push(rows[1]);
+    if(changed==='activeB')rows[1].classList.contains=()=>true;
+  }});
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-open-unaccepted');
+  assert.equal(r.closedClicks,0);
+});
+for(const changed of ['path','dirty','frame'])test('B preparation preserves A UI baseline: '+changed,async()=>{
+  const runtime={onInactive({action}){
+    if(action.kind==='inspect'&&action.preparationToken){
+      if(changed==='path')runtime.label='wrong — '+fixtures.B;
+      if(changed==='dirty')runtime.dirty=true;
+      if(changed==='frame')observed.window.state.currentFrame=1;
+    }
+  },bind:value=>{observed=value;}};
+  let observed;const r=await execute([true,true],{},runtime);
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-a-state-changed');
+  assert.equal(r.closedClicks,0);
+});
+for(const changed of ['row','alert','A'])test('B close rechecks prerequisites after owner ACK: '+changed,async()=>{
+  const r=await execute([true,true],{},{onCheckpoint({packet,rows,notices,pin}){
+    if(packet.phase==='b-opened'){
+      if(changed==='row')rows.splice(1,1);
+      if(changed==='alert')notices.length=0;
+      if(changed==='A')pin.undoDepth=1;
+    }
+  }});
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-close-precondition-refused');
+  assert.equal(r.closedClicks,0);
+});
+test('A write capability cannot disappear during inactive B preparation',async()=>{
+  const r=await execute([true,true],{},{statusResults:[emptyStatus,statusA,statusA,statusA,{...statusA,operations:[]}]});
+  assert.equal(r.result,'refused');assert.equal(r.calls.at(-1).failureCode,'b-a-state-changed');
+});
+test('physical owner evidence requires A-only, A+B with alert, then A-only after close',()=>{
+  const {visibleEvidence}=require('./p38-fixture-open-installed.cjs');
+  const snapshot=(controls,alert)=>({pid:42,windowId:9,matchedAX:true,nodes:[
+    ...controls.map((control,index)=>({path:String(index+1),role:'AXStaticText',control})),
+    ...(alert?[{path:'9',role:'AXStaticText',alert:'switch-unavailable'}]:[])]});
+  for(const [phase,controls,alert] of [['ready',[],false],['a-opened',['A.json'],false],
+    ['b-opened',['A.json','B.json'],true],['b-closed',['A'],false]])
+    assert.doesNotThrow(()=>visibleEvidence(snapshot(controls,alert),{phase,pid:42,windowId:9}));
+  for(const [phase,controls,alert] of [['a-opened',['A.json','B.json'],true],
+    ['b-opened',['B.json'],true],['b-opened',['A.json','B.json'],false],['b-closed',['A.json','B.json'],false]])
+    assert.throws(()=>visibleEvidence(snapshot(controls,alert),{phase,pid:42,windowId:9}),/probe-visible-state-refused/);
 });
 test('status query failure is reduced to a fixed refusal without raw details',async()=>{
   const r=await execute([true],{},{statusResults:[emptyStatus,new Error('private status path') ]});
