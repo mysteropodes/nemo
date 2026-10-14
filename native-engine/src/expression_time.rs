@@ -145,13 +145,12 @@ pub fn loop_plan(
         r = span - r;
     }
     let sample = if forward { seg_start + r } else { seg_end - r };
-    let offset = (mode == LoopMode::Offset).then(|| {
-        if forward {
-            (seg_start, seg_end, cycles)
-        } else {
-            (seg_end, seg_start, cycles)
-        }
-    });
+    let edges = if forward {
+        (seg_start, seg_end, cycles)
+    } else {
+        (seg_end, seg_start, cycles)
+    };
+    let offset = (mode == LoopMode::Offset).then_some(edges);
     LoopPlan::Repeat { sample, offset }
 }
 

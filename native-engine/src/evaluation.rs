@@ -22,6 +22,10 @@ pub(crate) mod expression_random;
 #[path = "expression_math.rs"]
 #[allow(dead_code)]
 pub(crate) mod expression_math;
+// N22F: private time/loop-timing expression helpers (stepTime, loops).
+#[path = "expression_time.rs"]
+#[allow(dead_code)]
+pub(crate) mod expression_time;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
