@@ -1,7 +1,14 @@
 //! Real native project files bypass the small command-response byte envelope.
 use crate::application_mcp::ApplicationMcp;
+use crate::native_dispatch::NativeObjectHost;
 use crate::native_object_bootstrap::{
     bootstrap_raw, reopen::bootstrap_request, save::save_request,
+};
+use native_engine::{
+    history::NativeObjectHistory,
+    object_document::FrameScopeKind,
+    object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
+    object_render_scene::{prepare_object_paint_plan, prepare_object_render_scene},
 };
 use serde_json::{json, Value};
 use std::{
@@ -49,6 +56,92 @@ fn request(state: &ApplicationMcp, document: &str, path: &Path) -> Value {
     json!({"apiVersion":2,"requestId":"save","instanceId":state.instance_id(),"documentId":document,
         "atRevision":info["contentRevision"],"documentSnapshotId":info["documentSnapshotId"],
         "destinationPath":path})
+}
+
+fn p38_drawing(variant: bool) -> Value {
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap();
+    let mut at_open = cases["records"][0].clone();
+    at_open["target"]["frameScope"]["frame"] = json!(0);
+    at_open["target"]["strokeId"] = json!("ink/path_A");
+    let mut authored = cases["records"][0].clone();
+    authored["target"]["frameScope"]["frame"] = json!(7);
+    authored["target"]["strokeId"] = json!("ink/path_B");
+    if variant {
+        at_open["fill"]["r"] = json!(0.8);
+        authored["geometry"]["segments"][0]["point"]["x"] = json!(15.125);
+    }
+    let reference = cases["records"][1].clone();
+    json!({
+        "format": "nemo.native-object-document",
+        "formatVersion": 2,
+        "totalFrames": 21,
+        "layers": [{"layerUid": "legacy layer:alpha"}, {"layerUid": "0"}],
+        "objects": [at_open, authored, reference],
+        "compositionOrder": {
+            "format": "nemo.native-object-order-plan",
+            "formatVersion": 1,
+            "documentFormatVersion": 2,
+            "contexts": [{
+                "contextId": "scene-root",
+                "layers": [
+                    {"layerUid": "legacy layer:alpha", "naturalPosition": 0, "order": {"static": [0]}},
+                    {"layerUid": "0", "naturalPosition": 1, "order": {}}
+                ],
+                "scopes": [
+                    {"frameScope": {"kind": "authored", "frame": 0}, "elements": [
+                        {"layerUid": "legacy layer:alpha", "strokeId": "ink/path_A", "naturalPosition": 0, "order": {}}
+                    ]},
+                    {"frameScope": {"kind": "authored", "frame": 7}, "elements": [
+                        {"layerUid": "legacy layer:alpha", "strokeId": "ink/path_B", "naturalPosition": 0, "order": {}}
+                    ]}
+                ]
+            }],
+            "migration": "explicit-plan-required",
+            "referencePolicy": "unresolved"
+        }
+    })
+}
+
+fn p38_project_bytes(width: u32, height: u32, fps: u32, variant: bool) -> Vec<u8> {
+    let input = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":width,"canvasH":height,"fps":fps},
+        "drawing":p38_drawing(variant),"viewportReference":null,"assets":[]});
+    let input = serde_json::to_vec(&input).unwrap();
+    let owner =
+        NativeObjectHost::from_project_file("p38-fixture-producer".to_owned(), &input).unwrap();
+    let info = owner.project_file_info().unwrap();
+    owner
+        .project_file_snapshot(
+            info["contentRevision"].as_u64().unwrap(),
+            info["documentSnapshotId"].as_str().unwrap(),
+        )
+        .unwrap()
+        .unwrap()
+}
+
+fn assert_p38_cpu_paint(bytes: &[u8]) {
+    let history = NativeObjectHistory::from_project_file("p38-fixture-paint", bytes).unwrap();
+    let snapshot = history.acquire_snapshot(0).unwrap();
+    assert_eq!(snapshot.document().objects().len(), 3);
+    for frame in [0, 7] {
+        let selector = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame,
+        };
+        let packet = prepare_object_frame(&snapshot, &selector).unwrap();
+        let scene = prepare_object_render_scene(&packet, &selector).unwrap();
+        let plan = prepare_object_paint_plan(&scene, &selector).unwrap();
+        assert_eq!(plan.packet().frame(), frame);
+        assert_eq!(plan.commands().len(), 1);
+    }
 }
 
 #[test]
@@ -205,16 +298,36 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
 
 #[test]
 fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
-    for (name, bytes) in [
+    let fixtures = [
         (
             "A.json",
             include_bytes!("../../tests/fixtures/p38/native-project/A.json").as_slice(),
+            320,
+            180,
+            24,
+            false,
         ),
         (
             "B.json",
             include_bytes!("../../tests/fixtures/p38/native-project/B.json").as_slice(),
+            640,
+            360,
+            30,
+            true,
         ),
-    ] {
+    ];
+    let mut digests = Vec::new();
+    for (name, bytes, width, height, fps, variant) in fixtures {
+        assert_eq!(
+            bytes,
+            p38_project_bytes(width, height, fps, variant).as_slice(),
+            "{name} must be a canonical production project encoder output"
+        );
+        let drawing: Value = serde_json::from_slice(bytes).unwrap();
+        assert_eq!(drawing["drawing"]["formatVersion"], 2);
+        assert_eq!(drawing["drawing"]["objects"].as_array().unwrap().len(), 3);
+        assert_p38_cpu_paint(bytes);
+
         let scratch = Scratch::new();
         let path = scratch.0.join(name);
         fs::write(&path, bytes).unwrap();
@@ -227,16 +340,22 @@ fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
         let opened = serde_json::to_value(opened).unwrap();
         let document = opened["documentId"].as_str().unwrap();
         let info = state.native_project_info(document).unwrap();
-        let (width, height, fps) = if name == "A.json" {
-            (320, 180, 24.0)
-        } else {
-            (640, 360, 30.0)
-        };
         assert_eq!(info["canvasW"], width);
         assert_eq!(info["canvasH"], height);
-        assert_eq!(info["fps"], fps);
+        assert_eq!(info["fps"], f64::from(fps));
         assert_eq!(info["totalFrames"], 21);
         assert_eq!(info["layers"].as_array().unwrap().len(), 2);
         assert_ne!(info["documentDigest"], "");
+        digests.push(info["documentDigest"].clone());
     }
+    assert_ne!(digests[0], digests[1]);
+}
+
+#[test]
+#[ignore = "manual deterministic regeneration of the pinned P38 native fixtures"]
+fn regenerate_p38_native_project_fixtures() {
+    let root =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures/p38/native-project");
+    fs::write(root.join("A.json"), p38_project_bytes(320, 180, 24, false)).unwrap();
+    fs::write(root.join("B.json"), p38_project_bytes(640, 360, 30, true)).unwrap();
 }

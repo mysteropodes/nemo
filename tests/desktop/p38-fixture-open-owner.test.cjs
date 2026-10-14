@@ -18,8 +18,8 @@ const baseManifest = Object.freeze({ schema:'nemo.p38-fixture-open/1',
   waiting:true, failed:false, checkpoint:0 });
 function probeManifest(root, overrides = {}) {
   const fixtures = [
-    {id:'A',file:path.join(root,'A.json'),sha256:'c5a3ec61decf27755b3a66a4ef47844660ac465196d7c3aa81856472bbaabbf1',device:1,inode:2},
-    {id:'B',file:path.join(root,'B.json'),sha256:'75ab937f96de3d1865690e2b475d3968ed2eabfdfc57b8d73c7732aeffd3813b',device:1,inode:3},
+    {id:'A',file:path.join(root,'A.json'),sha256:'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',device:1,inode:2},
+    {id:'B',file:path.join(root,'B.json'),sha256:'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6',device:1,inode:3},
   ];
   const value={...baseManifest,fixtures,result:overrides.result ||
     (overrides.failed ? 'failed' : overrides.waiting === false ? 'prepared' : 'waiting'),...overrides};
