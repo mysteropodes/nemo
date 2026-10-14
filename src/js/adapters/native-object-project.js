@@ -60,32 +60,38 @@
       if(typeof ports.subscribeRevisions!=='function'||typeof ports.publishRevision!=='function'||
         typeof ports.projectionReady!=='function'||!ports.projectionReady(info))return;
       var pin=epoch(info),ticket=++subscriptionTicket;
-      var value=await ports.subscribeRevisions(function(event){return synchronizeRevision(event,pin,ticket);});
+      var value=await ports.subscribeRevisions(function(event,binding){return synchronizeRevision(event,pin,ticket,binding);},function(error){
+        if(ticket===subscriptionTicket&&sameEpoch(pin,epoch(info)))fence(error);
+      });
       if(value===null)return;
       if(ticket!==subscriptionTicket||!active()||!sameEpoch(pin,epoch(info))||
         !sameEpoch(value,pin)||value.contentRevision!==info.contentRevision||!id(value.subscriptionId))
         throw new Error('Native object revision subscription is uncorrelated');
       subscription=freeze(Object.assign({},value));
     }
-    function synchronizeRevision(event,pin,ticket){
+    function synchronizeRevision(event,pin,ticket,binding){
       if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))
         return Promise.reject(new Error('Native object revision subscription was replaced'));
-      if(!active()||synchronizing||
+      if(!active()||synchronizing||!sameEpoch(binding,pin)||!id(binding.subscriptionId)||
         !sameEpoch(event,pin)||!id(event.requestId)||!integer(event.fromRevision,0)||
         !integer(event.toRevision,event.fromRevision+1)||
         info.contentRevision>event.toRevision)return Promise.reject(fence(new Error('Native object revision event is stale')));
       synchronizing=true;presentation=null;wantedFrame=null;
       return enqueue(async function(){
+        if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw new Error('Native object revision subscription was replaced');
         guardEpoch(pin);
         var next=await inspect();
         if(ticket!==subscriptionTicket||next.contentRevision!==event.toRevision)
           throw new Error('Native object revision inspection is uncorrelated');
         if(await ports.publishRevision(next)!==true)throw new Error('Native object UI publication is unconfirmed');
-        await present(ports.frame?ports.frame():0,next);
+        await present(ports.frame?ports.frame():0,next,{subscriptionId:binding.subscriptionId,event:event});
         if(ticket!==subscriptionTicket||!same(info,next)||!ports.projectionReady(next))
           throw new Error('Native object revision changed before acknowledgment');
         return freeze(Object.assign({},event));
-      }).catch(function(error){throw fence(error);}).finally(function(){if(ticket===subscriptionTicket)synchronizing=false;});
+      }).catch(function(error){
+        if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw error;
+        throw fence(error);
+      }).finally(function(){if(ticket===subscriptionTicket)synchronizing=false;});
     }
     function disposition(error){return error&&error.details&&error.details.disposition;}
     function localRefusal(message){return {code:'replacement_refused',message:message,details:{disposition:'notDispatched',retryExecution:false}};}
@@ -181,8 +187,9 @@
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
-    async function present(frame,pin){
-      var request=frameRequest(frame,pin),receipt=await raw('nemo_native_object_preview',request);
+    async function present(frame,pin,revisionSync){
+      var request=frameRequest(frame,pin);if(revisionSync)request.revisionSync=revisionSync;
+      var receipt=await raw('nemo_native_object_preview',request);
       if(!same(info,request)||!receipt||receipt.status!=='presented'||!id(receipt.workId)||!integer(receipt.viewGeneration,1)){
         presentation=null;throw new Error('Native project frame was not presented');
       }
@@ -263,7 +270,7 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&!synchronizing&&presentation&&same(info,presentation)&&pending===0?
+    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
@@ -309,11 +316,11 @@
       return true;
     }
     var session=create({invoke:invoke,projectionReady:projectionReady,publishRevision:publishRevision,
-      subscribeRevisions:async function(synchronize){
+      subscribeRevisions:async function(synchronize,disconnected){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
         transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(invoke);
-        await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize);
+        await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
       },
       unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
       subscriptionActive:function(){return !!transport&&!!transport.status()&&!transport.isSynchronizing();},

@@ -52,7 +52,7 @@
       return Object.freeze(Object.assign({}, value));
     }
 
-    async function subscribeRevisions(listen, synchronize) {
+    async function subscribeRevisions(listen, synchronize, disconnected) {
       if (!binding || subscription) throw new Error('Native revision subscription requires one connected transport');
       if (typeof listen !== 'function' || typeof synchronize !== 'function') throw new TypeError('Native revision listener and synchronization callback are required');
       var ticket = epoch;
@@ -80,7 +80,7 @@
           if (subscription !== current || ticket !== epoch) return;
           if (event.fromRevision !== current.revision) throw new Error('Out-of-order native revision event');
           // The consumer fences stale reads before its first await and resolves only after exact synchronization.
-          var synchronized = exactEvent(await synchronize(event));
+          var synchronized = exactEvent(await synchronize(event,current.identity));
           if (subscription !== current || ticket !== epoch) return;
           if (Object.keys(event).some(function (key) { return event[key] !== synchronized[key]; })) throw new Error('Native revision synchronization identity mismatch');
           binding = Object.freeze({ instanceId: identity.instanceId, documentId: identity.documentId, contentRevision: event.toRevision });
@@ -90,13 +90,19 @@
           } });
           current.inFlight = false;
         } catch (error) {
-          if (subscription === current) await invalidate();
+          if (subscription === current) {
+            if(typeof disconnected==='function')disconnected(error);
+            await invalidate();
+          }
         }
       }
       try {
         for (var name of ['nemo-native-revision', 'nemo-native-revision-disconnected']) {
           var callback = name === 'nemo-native-revision' ? receive : function (event) {
-            if (subscription === current && event.payload.subscriptionId === identity.subscriptionId) return invalidate();
+            if (subscription === current && event.payload.subscriptionId === identity.subscriptionId) {
+              if(typeof disconnected==='function')disconnected(new Error('Native revision subscription was retired'));
+              return invalidate();
+            }
           };
           var stop = await listen(name, callback);
           if (subscription !== current) { stop(); throw new Error('Native subscription was disconnected'); }

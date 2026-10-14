@@ -7,7 +7,8 @@ const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function scenario(){
   let active=false,revision=0,generation=0,visible,previewGate=null,replyGate=null,ackGate=null,failure=null;
-  const log=[],listeners=new Map(),oldListeners=[],commands=[];
+  let nativePending=null,registered=null;
+  const log=[],listeners=new Map(),oldListeners=[],commands=[],consumers=[];
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document-'+generation,lifecycleGeneration:generation,
     contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,documentDigest:String(revision%10).repeat(64),
     byteCount:1000,canvasW:320,canvasH:180,fps:24,totalFrames:21,undoDepth:revision,redoDepth:0,reference:null,
@@ -22,10 +23,11 @@ function scenario(){
     if(command==='nemo_native_revision_sync'){
       log.push(r.action);
       if(r.action==='binding')return {...info(),subscriptionId:'subscription-'+generation};
-      if(r.action==='subscribe')return r.binding;
+      if(r.action==='subscribe'){registered=r.binding;return r.binding;}
       if(r.action==='acknowledge'){
         assert.equal(r.event.toRevision,revision);assert.equal(root.state.layers[0].visible,visible!==false);
         if(ackGate){const gate=ackGate;ackGate=null;await gate.promise;}
+        nativePending=null;
         return null;
       }
       if(r.action==='disconnect')return null;
@@ -36,6 +38,11 @@ function scenario(){
       return next;
     }
     if(command==='nemo_native_object_preview'){
+      if(nativePending){
+        if(!r.revisionSync||r.revisionSync.subscriptionId!==registered.subscriptionId||
+          JSON.stringify(r.revisionSync.event)!==JSON.stringify(nativePending)||r.contentRevision!==nativePending.toRevision)
+          throw Error('Native revision synchronization is pending; untagged preview refused');
+      }
       if(previewGate){const gate=previewGate;previewGate=null;await gate.promise;}
       log.push('present-'+r.contentRevision);
       return {status:failure==='preview'?'refused':'presented',workId:'work-'+r.contentRevision,viewGeneration:1};
@@ -50,7 +57,12 @@ function scenario(){
     return response;
   }
   const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,
-    NemoApplicationMcpTransport:Transport,__TAURI__:{core:{invoke},event:{listen:async(name,callback)=>{
+    NemoApplicationMcpTransport:{createNativeTauriTransport:invoke=>{
+      const transport=Transport.createNativeTauriTransport(invoke);
+      return {...transport,subscribeRevisions:(listen,synchronize,disconnected)=>{
+        consumers.push(synchronize);return transport.subscribeRevisions(listen,synchronize,disconnected);
+      }};
+    }},__TAURI__:{core:{invoke},event:{listen:async(name,callback)=>{
       listeners.set(name,callback);oldListeners.push(callback);return ()=>{if(listeners.get(name)===callback)listeners.delete(name);};
     }}},document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,width:320,height:180})})},
     updateUI:()=>log.push('publish-'+revision)};
@@ -58,8 +70,9 @@ function scenario(){
   async function open(){return session.openPath('/native.json',{commit:meta=>Files.projectView(root,meta)});}
   function event(from,to){return {instanceId:'instance',documentId:info().documentId,lifecycleGeneration:generation,
     requestId:'external-'+to,fromRevision:from,toRevision:to};}
-  async function external(value){const from=revision;visible=value;revision++;return listeners.get('nemo-native-revision')({payload:event(from,revision)});}
-  return {root,session,log,commands,open,external,listeners,oldListeners,
+  async function external(value){const from=revision;visible=value;revision++;nativePending=event(from,revision);
+    return listeners.get('nemo-native-revision')({payload:nativePending});}
+  return {root,session,log,commands,open,external,listeners,oldListeners,consumers,
     holdPreview:gate=>{previewGate=gate;},holdReply:gate=>{replyGate=gate;},holdAck:gate=>{ackGate=gate;},fail:value=>{failure=value;},
     current:info};
 }
@@ -104,11 +117,25 @@ test('two queued ordinary toggle intents derive successive native booleans rathe
 test('external event waits for the actual object UI reply and tolerates the still-pending metadata refresh',async()=>{
   const h=scenario();await h.open();const gate=deferred();h.holdReply(gate);
   const ui=h.session.setLayerVisibility('legacy layer:alpha',false);
+  const uiResult=ui.then(()=>{throw Error('A pending untagged UI preview cannot succeed');},error=>error);
   for(let i=0;i<10&&!h.commands.length;i++)await turn();
   const external=h.external(true);await turn();assert.equal(h.log.includes('acknowledge'),false);
-  gate.resolve();await ui;await external;
+  gate.resolve();assert.match((await uiResult).message,/pending/);await external;
   assert.equal(h.commands.length,1);assert.equal(h.log.includes('acknowledge'),true);
   assert.equal(h.session.info().contentRevision,2);assert.equal(h.root.state.layers[0].visible,true);
+});
+
+test('transport retirement or malformed event immediately fences stale session presentation',async()=>{
+  for(const kind of ['retired','malformed']){
+    const h=scenario();await h.open();
+    if(kind==='retired')await h.listeners.get('nemo-native-revision-disconnected')({payload:{subscriptionId:'subscription-1'}});
+    else await h.listeners.get('nemo-native-revision')({payload:{unexpected:true}});
+    assert.equal(h.session.isActive(),false);assert.equal(h.session.blocksLegacy(),true);
+    assert.equal(h.session.readPresentedObjectSession(),null);assert.equal(typeof h.session.toggleLayerVisibility,'undefined');
+    await assert.rejects(h.session.presentPreview(0),/in progress/);
+    await assert.rejects(h.session.setLayerVisibility('legacy layer:alpha',false),/in progress/);
+    assert.equal(h.commands.length,0);
+  }
 });
 
 test('replacement disconnects the old binding and reconnects only the adopted new projection',async()=>{
@@ -119,6 +146,19 @@ test('replacement disconnects the old binding and reconnects only the adopted ne
   assert.equal(h.session.info().contentRevision,0);assert.equal(h.log.includes('acknowledge'),false);
   await h.external(false);assert.equal(h.session.info().contentRevision,1);
   assert.equal(h.root.state.layers[0].visible,false);assert.equal(h.log.includes('acknowledge'),true);
+});
+
+test('an old consumer queued behind Open cannot fence the newly adopted owner',async()=>{
+  const h=scenario();await h.open();const old=h.consumers[0];
+  const replacement=h.open();
+  const stale=old({instanceId:'instance',documentId:'document-1',lifecycleGeneration:1,
+    requestId:'queued-old',fromRevision:0,toRevision:1},
+    {instanceId:'instance',documentId:'document-1',lifecycleGeneration:1,subscriptionId:'subscription-1'});
+  const rejected=assert.rejects(stale,/replaced/);
+  await replacement;await rejected;
+  assert.equal(h.session.isActive(),true);assert.equal(h.session.info().documentId,'document-2');
+  assert.notEqual(h.session.readPresentedObjectSession(),null);assert.equal(typeof h.session.toggleLayerVisibility,'function');
+  await h.external(false);assert.equal(h.log.includes('acknowledge'),true);
 });
 
 test('unpublished projection keeps the ordinary toggle ABI absent',async()=>{
