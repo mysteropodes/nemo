@@ -146,9 +146,9 @@ function rustAllowedFailures(phase) {
   return [...match[1].matchAll(/"([^"]+)"/g)].map(item=>item[1]);
 }
 test('owner allowlists and classifies every fixed Rust failure by matching phase cursor',async()=>{
-  for(const phase of ['ready','a','b'])
+  for(const phase of ['ready','a','b','closed'])
     assert.deepEqual(PROBE_FAILURE_CODES[phase],rustAllowedFailures(phase),`${phase} owner/Rust failure allowlists match`);
-  const cases=[['ready',0],['a',1],['b',2]].flatMap(([phase,checkpoint])=>
+  const cases=[['ready',0],['a',1],['b',2],['closed',3]].flatMap(([phase,checkpoint])=>
     PROBE_FAILURE_CODES[phase].map(failureCode=>({checkpoint,failureCode})));
   for(const {checkpoint,failureCode} of cases){
     const category=`probe-manifest-failed-${failureCode}`;
@@ -271,7 +271,7 @@ function makeServices(overrides = {}) {
   return { services, events, saved, acks };
 }
 
-test('successful owner observation acknowledges ready, A, B once and in order', async()=>{
+test('successful owner observation acknowledges ready, A, prepared B and closed B once in order', async()=>{
   const f=makeServices();
   const result=await runObserver(config,f.services);
   assert.equal(result.status,'observed');
@@ -279,7 +279,8 @@ test('successful owner observation acknowledges ready, A, B once and in order', 
   assert.deepEqual(result.observations.map(item=>item.phase),PHASES);
   assert.deepEqual(f.acks.map(item=>item.phase),PHASES);
   assert.ok(f.acks.every(item=>item.token==='d'.repeat(32)&&item.decision==='accepted'));
-  assert.ok(f.events.indexOf('save:observed') > f.events.indexOf('ack:b-opened'));
+  assert.ok(f.events.indexOf('quit') > f.events.indexOf('ack:b-closed'));
+  assert.ok(f.events.indexOf('save:observed') > f.events.indexOf('ack:b-closed'));
   assert.ok(f.events.indexOf('cleanup') < f.events.indexOf('save:observed'));
   assert.equal(result.firstFailure,null);
 });
@@ -319,6 +320,20 @@ test('visible refusal is acknowledged once and stops before the next phase',asyn
   assert.equal(f.events.some(event=>event==='checkpoint:b-opened'),false);
 });
 
+for(const phase of ['b-opened','b-closed'])test('refused owner phase prevents quit and any later checkpoint: '+phase,async()=>{
+  const f=makeServices({visibleFailure:phase}), result=await runObserver(config,f.services);
+  assert.equal(result.status,'partial');assert.equal(f.acks.at(-1).decision,'refused');
+  assert.equal(f.events.includes('quit'),false);
+  assert.equal(f.acks.at(-1).phase,phase);
+  if(phase==='b-opened')assert.equal(f.events.includes('checkpoint:b-closed'),false);
+});
+test('closed failure is accepted only at its own cursor and never leaks unknown details',async()=>{
+  assert.deepEqual(await checkpointFailure({checkpoint:3,failureCode:'b-close-unaccepted'},'b-closed',3),
+    {stage:'probe-manifest',code:'probe-manifest-failed-b-close-unaccepted'});
+  for(const [checkpoint,failureCode] of [[2,'b-close-unaccepted'],[3,'b-open-unaccepted'],[3,'private B close path']])
+    assert.deepEqual(await checkpointFailure({checkpoint,failureCode},'b-closed',3),
+      {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
+});
 test('helper cleanup failure is preserved after a successful observation',async()=>{
   const f=makeServices({cleanupFailure:true});
   const result=await runObserver(config,f.services);

@@ -28,7 +28,7 @@ fn ready_result_is_fixed_and_serializes_only_owner_acknowledgment() {
         serde_json::to_value(accepted_checkpoint_result("ready")).unwrap(),
         json!({"ownerAcknowledged":true})
     );
-    for phase in ["a-opened", "b-opened", "private-unknown"] {
+    for phase in ["a-opened", "b-opened", "b-closed", "private-unknown"] {
         assert!(accepted_checkpoint_result(phase).is_none());
     }
 }
@@ -498,4 +498,12 @@ fn main_window_origin_refuses_other_labels_and_url_components() {
     assert!(!control::origin("child", &main));
     assert!(!control::origin("main", &query));
     assert!(!control::origin("main", &foreign));
+}
+
+#[cfg(unix)]
+#[test]
+fn inactive_b_checkpoints_reject_skips_replays_wrong_fixture_and_closed_failure_phase() {
+    let (_root, mut session) = fixture_session();
+    session.pins.build_sha = BUILD_SHA.into();
+    super::control::assert_inactive_checkpoint_contract(&mut session);
 }

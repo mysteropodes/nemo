@@ -132,7 +132,7 @@ fn accept_packet(session: &Session, packet: &Packet) -> Result<(), &'static str>
     let (status, fixture, hash) = match session.cursor {
         0 => ("ready", None, None),
         1 => ("returned", Some("A"), Some(HASH_A)),
-        2 => ("returned", Some("B"), Some(HASH_B)),
+        2 | 3 => ("returned", Some("B"), Some(HASH_B)),
         _ => return Err("P38 checkpoint refused"),
     };
     if packet.status == "failed" {
@@ -166,6 +166,7 @@ pub(super) fn valid_failure_packet(
         (0, None, None, Some(code)) => allowed_ready_failure(code),
         (1, Some("A"), Some(HASH_A), Some(code)) => allowed_a_failure(code),
         (2, Some("B"), Some(HASH_B), Some(code)) => allowed_b_failure(code),
+        (3, Some("B"), Some(HASH_B), Some(code)) => allowed_closed_failure(code),
         _ => false,
     }
 }
@@ -214,6 +215,18 @@ pub(super) fn allowed_b_failure(code: &str) -> bool {
             | "b-observer-late-untrusted"
             | "b-fs-read-rejected"
             | "b-fs-read-resolved-open-refused"
+            | "b-switch-unaccepted"
+            | "b-a-state-changed"
+    )
+}
+
+pub(super) fn allowed_closed_failure(code: &str) -> bool {
+    matches!(
+        code,
+        "b-close-precondition-refused"
+            | "b-close-threw"
+            | "b-close-unaccepted"
+            | "b-close-a-state-changed"
     )
 }
 
@@ -413,4 +426,76 @@ pub(super) fn origin(label: &str, url: &tauri::Url) -> bool {
         && ["", "/", "/index.html"].contains(&url.path())
         && url.query().is_none()
         && url.fragment().is_none()
+}
+
+#[cfg(test)]
+pub(super) fn assert_inactive_checkpoint_contract(session: &mut Session) {
+    let mut packet = Packet {
+        run_id: session.pins.run_id.clone(),
+        task_key: session.pins.task_key.clone(),
+        source_sha: session.pins.source_sha.clone(),
+        build_sha: BUILD_SHA.into(),
+        manifest_sha256: session.pins_sha256.clone(),
+        phase: "b-closed".into(),
+        status: "returned".into(),
+        fixture_id: Some("B".into()),
+        fixture_sha256: Some(HASH_B.into()),
+        failure_code: None,
+    };
+    for cursor in [0, 1, 2, 4] {
+        session.cursor = cursor;
+        assert!(accept_packet(session, &packet).is_err());
+    }
+    session.cursor = 3;
+    assert!(accept_packet(session, &packet).is_ok());
+    for phase in ["ready", "a-opened", "b-opened"] {
+        packet.phase = phase.into();
+        assert!(accept_packet(session, &packet).is_err());
+    }
+    packet.phase = "b-closed".into();
+    session.waiting = true;
+    assert!(accept_packet(session, &packet).is_err());
+    session.waiting = false;
+    session.failed = true;
+    assert!(accept_packet(session, &packet).is_err());
+    session.failed = false;
+    packet.fixture_id = Some("A".into());
+    assert!(accept_packet(session, &packet).is_err());
+    packet.fixture_id = Some("B".into());
+    packet.fixture_sha256 = Some(HASH_A.into());
+    assert!(accept_packet(session, &packet).is_err());
+    for code in [
+        "b-close-precondition-refused",
+        "b-close-threw",
+        "b-close-unaccepted",
+        "b-close-a-state-changed",
+    ] {
+        assert!(valid_failure_packet(3, Some("B"), Some(HASH_B), Some(code)));
+        for cursor in [0, 1, 2, 4] {
+            assert!(!valid_failure_packet(
+                cursor,
+                Some("B"),
+                Some(HASH_B),
+                Some(code)
+            ));
+        }
+    }
+    assert!(!valid_failure_packet(
+        3,
+        Some("A"),
+        Some(HASH_B),
+        Some("b-close-unaccepted")
+    ));
+    assert!(!valid_failure_packet(
+        3,
+        Some("B"),
+        Some(HASH_A),
+        Some("b-close-unaccepted")
+    ));
+    assert!(!valid_failure_packet(
+        3,
+        Some("B"),
+        Some(HASH_B),
+        Some("private close error")
+    ));
 }

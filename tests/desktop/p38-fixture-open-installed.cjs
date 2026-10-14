@@ -53,7 +53,7 @@ function receipt(root, expected) {
   check(value.schema==='nemo.p38-fixture-open/1'&&value.runId===expected.runId&&
     value.taskKey===expected.taskKey&&value.sourceSha===expected.sourceSha&&value.buildSha===expected.buildSha&&
     value.pid===expected.pid&&value.window==='main'&&value.waiting===true&&value.failed===false&&
-    ['ready','a-opened','b-opened'][value.checkpoint]===expected.phase,'probe-checkpoint-refused');
+    ['ready','a-opened','b-opened','b-closed'][value.checkpoint]===expected.phase,'probe-checkpoint-refused');
   check(value.origin==='tauri://localhost/index.html'&&Array.isArray(value.fixtures)&&value.fixtures.length===2,
     'probe-receipt-refused');
   for(const [index,id] of ['A','B'].entries()) {
@@ -68,23 +68,25 @@ function receipt(root, expected) {
   return {guard,value};
 }
 function visibleEvidence(snapshot, expected) {
-  check(expected&&['ready','a-opened','b-opened'].includes(expected.phase),'probe-phase-refused');
+  check(expected&&['ready','a-opened','b-opened','b-closed'].includes(expected.phase),'probe-phase-refused');
   check(Number.isSafeInteger(expected.pid)&&expected.pid>0&&expected.pid<=2147483647&&
     Number.isSafeInteger(expected.windowId)&&expected.windowId>0&&expected.windowId<=4294967295,
     'probe-window-pin-refused');
   const result=safeWindowEvidence(snapshot);
   verifyWindow(snapshot, expected.pid, expected.windowId);
   const controls=new Set(result.nodes.map(node=>node.control).filter(Boolean));
+  const hasA=controls.has('A')||controls.has('A.json'), hasB=controls.has('B')||controls.has('B.json');
   const alerts=new Set(result.nodes.map(node=>node.alert).filter(Boolean));
-  if(expected.phase==='ready') check(!controls.has('A.json')&&!controls.has('B.json'),'probe-visible-state-refused');
-  if(expected.phase==='a-opened') check(controls.has('A.json')&&alerts.has('switch-unavailable'),'probe-visible-state-refused');
-  if(expected.phase==='b-opened') check(controls.has('B.json')&&alerts.has('switch-unavailable'),'probe-visible-state-refused');
+  if(expected.phase==='ready') check(!hasA&&!hasB,'probe-visible-state-refused');
+  if(expected.phase==='a-opened') check(hasA&&!hasB,'probe-visible-state-refused');
+  if(expected.phase==='b-opened') check(hasA&&hasB&&alerts.has('switch-unavailable'),'probe-visible-state-refused');
+  if(expected.phase==='b-closed') check(hasA&&!hasB,'probe-visible-state-refused');
   return result;
 }
 function acknowledge(root, expected, ownerToken, decision, snapshot) {
   check(typeof ownerToken==='string'&&/^[a-f0-9]{32,128}$/.test(ownerToken),'owner-token-refused');
   check(['accepted','refused'].includes(decision),'decision-refused');
-  check(expected&&['ready','a-opened','b-opened'].includes(expected.phase),'probe-phase-refused');
+  check(expected&&['ready','a-opened','b-opened','b-closed'].includes(expected.phase),'probe-phase-refused');
   check(Number.isSafeInteger(expected.pid)&&expected.pid>0&&expected.pid<=2147483647&&
     Number.isSafeInteger(expected.windowId)&&expected.windowId>0&&expected.windowId<=4294967295,
     'probe-window-pin-refused');
