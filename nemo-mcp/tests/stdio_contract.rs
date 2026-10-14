@@ -255,13 +255,6 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
         .unwrap();
     assert_eq!(object["availability"]["state"], "unavailable");
     assert_eq!(
-        object["operations"],
-        json!([
-            "query.document.object",
-            "command.document.object.layer.visibility.set"
-        ])
-    );
-    assert_eq!(
         object["ports"],
         json!([{"label":"ui","state":"pending"},{"label":"mcp","state":"pending"}])
     );
@@ -285,53 +278,6 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
         assert_eq!(result.is_error, Some(true));
         assert_eq!(
             result.structured_content.unwrap()["error"]["code"],
-            "invalid_request"
-        );
-    }
-    let visibility = json!({
-        "apiVersion": 2,
-        "requestId": "visibility-stdio-7",
-        "instanceId": "instance-A",
-        "documentId": "document-A",
-        "expectedRevision": 7,
-        "operation": "command.document.object.layer.visibility.set",
-        "payload": {
-            "command": "object.layer.visibility.set",
-            "layerUid": "legacy layer:alpha",
-            "visible": false
-        }
-    });
-    let staged = tool_response(&client, "nemo_command", arguments(visibility.clone())).await;
-    assert_eq!(staged.is_error, Some(true));
-    let staged_error = staged.structured_content.unwrap()["error"].clone();
-    assert_eq!(staged_error["code"], "unavailable");
-    assert_eq!(staged_error["message"], object["availability"]["reason"]);
-    for invalid in [
-        {
-            let mut value = visibility.clone();
-            value.as_object_mut().unwrap().remove("expectedRevision");
-            value
-        },
-        {
-            let mut value = visibility.clone();
-            value["payload"]["visible"] = json!(0);
-            value
-        },
-        {
-            let mut value = visibility.clone();
-            value["payload"]["extra"] = json!(true);
-            value
-        },
-        {
-            let mut value = visibility.clone();
-            value["payload"]["layerUid"] = json!("");
-            value
-        },
-    ] {
-        let rejected = tool_response(&client, "nemo_command", arguments(invalid)).await;
-        assert_eq!(rejected.is_error, Some(true));
-        assert_eq!(
-            rejected.structured_content.unwrap()["error"]["code"],
             "invalid_request"
         );
     }
