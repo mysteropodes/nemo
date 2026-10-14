@@ -689,30 +689,11 @@
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
       else applyAuto(null);
     });
-    var newPanel=document.getElementById('start-newpanel'),admissionMessage=document.createElement('div');
-    admissionMessage.setAttribute('role','alert');admissionMessage.style.display='none';admissionMessage.style.color='#ffb5a8';admissionMessage.style.fontSize='12px';admissionMessage.style.marginTop='8px';newPanel.appendChild(admissionMessage);
-    var createGeneration=0,createInFlight=false;
-    document.getElementById('start-new').addEventListener('click',function(){admissionMessage.style.display='none';newPanel.style.display='block';});
+    SMProjectEntry.bindNewProjectForm(document,{
+      createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
+      showStartScreen:showStartScreen,notice:showToast
+    });
     document.getElementById('start-open').addEventListener('click',openDialog);
-    document.getElementById('np-cancel').addEventListener('click',function(){++createGeneration;createInFlight=false;admissionMessage.style.display='none';newPanel.style.display='none';});
-    document.getElementById('np-preset').addEventListener('change',function(){
-      document.getElementById('np-custom-row').style.display=this.value==='custom'?'flex':'none';
-    });
-    document.getElementById('np-create').addEventListener('click',function(){
-      if(createInFlight)return false;
-      var preset=document.getElementById('np-preset').value;
-      var w,h;
-      if(preset==='custom'){w=parseInt(document.getElementById('np-w').value)||1920;h=parseInt(document.getElementById('np-h').value)||1080;}
-      else{var parts=preset.split('x');w=parseInt(parts[0]);h=parseInt(parts[1]);}
-      var fps=parseInt(document.getElementById('np-fps').value)||24;
-      var name=document.getElementById('np-name').value.trim()||'Untitled';
-      var generation=++createGeneration,creationFailed=false;createInFlight=true;admissionMessage.style.display='none';
-      function current(){return generation===createGeneration&&newPanel.style.display!=='none'&&!document.getElementById('start-screen').classList.contains('hid');}
-      function unavailable(){if(!current())return false;admissionMessage.textContent=creationFailed?'New project creation failed after admission; the document may have changed. Reopen a project before editing.':'New project unavailable — native admission was denied.';admissionMessage.style.display='block';showToast(admissionMessage.textContent);return false;}
-      function completed(admitted){if(generation!==createGeneration)return false;createInFlight=false;if(admitted===false)return unavailable();newPanel.style.display='none';return admitted;}function failed(){if(generation!==createGeneration)return false;createInFlight=false;return unavailable();}
-      try{var result=window.SMProject.newProject({w:w,h:h,fps:fps,name:name},current,function(){if(generation!==createGeneration)return;creationFailed=true;showStartScreen();newPanel.style.display='block';});return result&&typeof result.then==='function'?result.then(completed,failed):completed(result);}
-      catch(e){return failed();}
-    });
 
     // Project panel buttons (right-hand Project section)
     document.getElementById('btn-save').addEventListener('click',save);
