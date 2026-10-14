@@ -332,7 +332,7 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   const code=`import Foundation
 import CoreFoundation
 typealias AXUIElement = Int
-enum AXError: Int32 { case success = 0, attributeUnsupported = -1 }
+enum AXError: Int32 { case success = 0, attributeUnsupported = -1, noValue = -2, cannotComplete = -3 }
 struct DarwinBoolean { var boolValue: Bool; init(_ value:Bool){boolValue=value} }
 struct Refusal: Error { let code:String }
 struct ActionRefusal: Error { let diagnostics:[String:Any] }
@@ -352,18 +352,24 @@ let kAXTextFieldRole="AXTextField",kAXPopUpButtonRole="AXPopUpButton",kAXPressAc
 ${definitions}
 func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="location")throws->([String:Any],Int){
   let pid:pid_t=10,main=1,action="inspect",scope=(reference:true,report:"owned")
-  let sheetToken:String?="sheet",locationToken:String?=requestTarget == "main" || ["ordinary-sheet","foreign-sheet-child"].contains(fault) ? nil:"location"
+  let sheetToken:String?="sheet",locationToken:String?=requestTarget == "main" || ["ordinary-sheet","foreign-sheet-child"].contains(fault) || fault.hasPrefix("fact-owner-") ? nil:"location"
   let serviceRoot:Int?=3,serviceParent:Int?=2,servicePID:pid_t?=fault == "missing-service" ? nil:20
   let serviceStart:ProcessStart?=ProcessStart(pid:20,seconds:1,microseconds:0),serviceSheetToken:String?="sheet"
   let location:Int?=4,locationField:Int?=5
   var activeInspectionContext:Int?=nil,result=[String:Any](),reads=0,foreignReads=0,locationChecks=0
   var projectionCursor:OwnedProjectionCursor<Int>?=nil
+  var ownerCalls=[Int:Int]()
   var request:[String:Any]=["target":requestTarget,"sheetToken":"sheet","depth":2,"maxNodes":32]
   if let token,locationToken != nil{request["locationToken"]=token}
   if fault == "wrong-sheet-token"{request["sheetToken"]="wrong"}
   let owners:[Int:pid_t]=[1:10,2:10,3:20,4:20,5:fault == "foreign-field" ? 99:20,6:fault == "foreign-child" ? 99:20,
     7:fault == "foreign-main-child" ? 20:10,8:fault == "foreign-sheet-child" ? 20:10]
-  func AXUIElementGetPid(_ n:Int,_ out:inout pid_t)->AXError{out=owners[n] ?? 0;return .success}
+  func AXUIElementGetPid(_ n:Int,_ out:inout pid_t)->AXError{
+    ownerCalls[n,default:0]+=1
+    if n==8 && ownerCalls[n]==2 && fault.hasPrefix("fact-owner-") {
+      if fault=="fact-owner-failed"{return .cannotComplete};out=99;return .success
+    };out=owners[n] ?? 0;return .success
+  }
   func attr(_ n:Int,_ key:String)->AnyObject?{
     if owners[n] != (n<=2 || n>=7 ? pid:20){foreignReads+=1;throwFatal()};reads+=1
     if key==kAXChildrenAttribute{return (n==1 ? [7]:n==2 ? [8]:n==3 ? [4]:n==4 ? ([5]+(["ambiguous-modal","foreign-child"].contains(fault) ? [6]:[])):[]) as NSArray}
@@ -380,7 +386,9 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
   func owns(_ n:Int,_ expected:pid_t)->Bool{owners[n]==expected}
   func supports(_ n:Int,_ action:String)->Bool{true}
   func textFieldKind(_ error:AXError,_ role:String?)->String{"plain"}
-  func AXUIElementCopyAttributeValue(_ n:Int,_ key:CFString,_ out:inout CFTypeRef?)->AXError{out=nil;return .attributeUnsupported}
+  func AXUIElementCopyAttributeValue(_ n:Int,_ key:CFString,_ out:inout CFTypeRef?)->AXError{
+    if key as String==kAXChildrenAttribute {out=attr(n,kAXChildrenAttribute);return .success};out=nil;return .attributeUnsupported
+  }
   func AXUIElementIsAttributeSettable(_ n:Int,_ key:CFString,_ out:inout DarwinBoolean)->AXError{out=DarwinBoolean(true);return .success}
   func verify()throws{try check(fault != "stale-nemo")}
   func verifySheet()throws->Int{try check(fault != "detached-sheet");return 2}
@@ -412,6 +420,12 @@ for fault in ["public-description","private-description","nontext-description"]{
   let observation=try exercise(fault,"main"),rows=observation.0["nodes"] as! [[String:Any]]
   precondition(rows.contains{$0["control"] as? String=="Open Project…"} == (fault == "public-description"))
   precondition(!String(describing:observation.0).contains("private-secret"))
+}
+for fault in ["fact-owner-failed","fact-owner-mismatch"]{
+  let result=try exercise(fault,"sheet").0,row=(result["nodes"] as! [[String:Any]]).last!
+  precondition(result["foreignChildren"] as? Bool==true && result["complete"] as? Bool==false)
+  precondition(row["ownerQuery"] as? String==(fault=="fact-owner-failed" ? "query-failed":"mismatch"))
+  precondition(row["blocked"] as? String=="child-owner" && row["control"]==nil && row["childrenQuery"]==nil)
 }
 print("actual token dispatch, retained verification and inspect projection exercised; runtimeAX=false")`;
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:16384});
@@ -471,6 +485,39 @@ test('oversized or malformed helper inspections never become complete input rout
     const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-projection-refused');
     assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
   }
+});
+test('query diagnostics stay categorical, reject contradictory metadata and never authorize blocked input',async t=>{
+  const observation=node=>({status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,...complete,complete:false,
+    foreignChildren:node.blocked==='child-owner',childrenUnreadable:node.childrenQuery!==undefined,nodes:[node]});
+  const foreign=query=>({path:'0',role:'other',blocked:'child-owner',ownerQuery:query});
+  const unreadable=query=>({path:'0',role:'AXButton',control:'Open Project…',enabled:true,press:true,
+    ownerQuery:'matched',childrenQuery:query,blocked:'children-unavailable'});
+  const samples=[...['mismatch','query-failed'].map(foreign),...['unsupported','no-value','failed','wrong-type'].map(unreadable)];
+  for(const node of samples){
+    const clean=P.sanitizeHelper({...observation(node),privatePath:'/private/secret',nodes:[{...node,title:'private-secret',ownerPid:999,rawQuery:-99}]});
+    assert.equal(clean.nodes[0].ownerQuery,node.ownerQuery);assert.equal(clean.nodes[0].childrenQuery,node.childrenQuery);
+    assert.equal(JSON.stringify(clean).includes('private'),false);assert.equal(JSON.stringify(clean).includes('999'),false);
+    const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+    s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},
+      async close(){s.events.push('helper-close');},async action(_w,a){s.events.push('helper:'+a.type);return observation(node);}});
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-control-refused');
+    assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
+  }
+  for(const [query,count] of [['success-empty',0],['success',1]]){
+    const row={path:'0',role:'AXButton',control:'Open Project…',press:true,ownerQuery:'matched',childrenQuery:query,childCount:count};
+    assert.equal(P.sanitizeHelper({...complete,type:'inspect',nodes:[row]}).nodes[0].childrenQuery,query);
+    for(const bad of [-1,4096,0.5,'0',null])assert.throws(()=>P.sanitizeHelper({...complete,type:'inspect',nodes:[{...row,childCount:bad}]}),/png-query-refused/);
+    assert.throws(()=>P.sanitizeHelper({...complete,type:'inspect',nodes:[{...row,childCount:count===0?1:0}]}),/png-query-refused/);
+  }
+  for(const key of ['ownerQuery','childrenQuery'])for(const value of ['private-secret',true,1,null,{},[]]){
+    assert.throws(()=>P.sanitizeHelper(observation({...unreadable('failed'),[key]:value})),/png-query-refused/);
+  }
+  for(const node of [{...foreign('mismatch'),control:'Open'}, {...foreign('query-failed'),press:true},
+    {...foreign('mismatch'),childrenQuery:'failed'}, {...foreign('mismatch'),ownerQuery:'matched'},
+    {...unreadable('unsupported'),childCount:0}, {...unreadable('failed'),ownerQuery:undefined}]){
+    assert.throws(()=>P.sanitizeHelper(observation(node)),/png-query-refused/);
+  }
+  for(const node of samples)assert.throws(()=>P.sanitizeHelper({...observation(node),...complete}),/png-query-refused/);
 });
 test('PNG pages require observed roots and exact retained continuation; metadata stays categorical',t=>{
   const f=setup(t);f.prepare();const token='11111111-1111-4111-8111-111111111111',node={path:'0.0',role:'AXWebArea'};

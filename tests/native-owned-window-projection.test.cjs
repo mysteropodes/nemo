@@ -38,10 +38,10 @@ func execute(_ request:[String:Any],_ depth:Int=1,_ cap:Int=128,_ root:Int=1,_ b
   return try ownedProjection(root,base:base,depth:depth,maxNodes:cap,expectedOwner:10,
     request:request,cursor:&cursor,equal:==,hashKey:{UInt($0)},owner:{owners[$0]},
     children:{ n in
-      if owners[n] != 10 {foreignReads+=1;return nil}
-      if failRead.contains(n){return nil}
-      if n==1 {rootQueries+=1;if mutateAfterQuery && rootQueries>1{return Array((childrenByNode[1] ?? []).reversed())}}
-      return childrenByNode[n] ?? []
+      if owners[n] != 10 {foreignReads+=1;return OwnedChildren(query:.failed,values:nil)}
+      if failRead.contains(n){return OwnedChildren(query:.failed,values:nil)}
+      if n==1 {rootQueries+=1;if mutateAfterQuery && rootQueries>1{return OwnedChildren(query:.success,values:Array((childrenByNode[1] ?? []).reversed()))}}
+      return OwnedChildren(query:.success,values:childrenByNode[n] ?? [])
     },isWindow:{_ in false},fact:{ n,p in
       if owners[n] != 10 {foreignReads+=1}
       if makeForeign==n {owners[n]=99}
@@ -127,11 +127,11 @@ var clipped=full;clipped["depthClipped"]=true;refuses{_=try pin(7,"0.4",10,"Proj
 let first=try pin(),token=first["token"] as! String
 precondition(UUID(uuidString:token) != nil && first["path"] as? String=="0.4")
 let page=try ownedProjection(1,base:"",depth:1,maxNodes:2,expectedOwner:10,request:["childOffset":0],
-  cursor:&cursor,equal:==,hashKey:{UInt($0)},owner:{_ in 10},children:{$0==1 ? [2]:[]},isWindow:{_ in false},
+  cursor:&cursor,equal:==,hashKey:{UInt($0)},owner:{_ in 10},children:{OwnedChildren(query:.success,values:$0==1 ? [2]:[])},isWindow:{_ in false},
   fact:{n,p in ["path":p,"role":"AXGroup"]},phase:{_,_ in})
 precondition(page["complete"] as? Bool==true && cursor?.region?.token==token)
 _=try ownedProjection(1,base:"",depth:1,maxNodes:2,expectedOwner:10,request:[:],cursor:&cursor,equal:==,
-  hashKey:{UInt($0)},owner:{_ in 10},children:{_ in []},isWindow:{_ in false},fact:{_,p in ["path":p]},phase:{_,_ in})
+  hashKey:{UInt($0)},owner:{_ in 10},children:{_ in OwnedChildren(query:.success,values:[])},isWindow:{_ in false},fact:{_,p in ["path":p]},phase:{_,_ in})
 let refreshed=try pin(7,"0.4",10,"Project tabs",token)
 precondition(refreshed["token"] as? String==token)
 refuses{_=try pin(8,"0.4",10,"Project tabs",token)}
@@ -201,4 +201,84 @@ print("actual semantic guard, no refused effects; runtimeAX=false")
 `;
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:8192});assert.equal(r.status,0,r.stderr);
   assert.match(r.stdout,/no refused effects/);
+});
+test('compiled actual owner and children adapters keep typed failures blocked without foreign reads',()=>{
+  if(process.platform!=='darwin')return;
+  const source=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-window.swift'),'utf8');
+  const start=source.indexOf('        owner:{ value in var actual:pid_t'),end=source.indexOf('        isWindow:',start);
+  assert.ok(start>=0&&end>start);const adapters=source.slice(start,end);
+  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const code=`import Foundation
+import CoreFoundation
+typealias AXUIElement=Int
+enum AXError {case success,attributeUnsupported,noValue,cannotComplete}
+let kAXChildrenAttribute="children"
+struct Refusal:Error{let code:String}
+func check(_ ok:Bool)throws{if !ok{throw Refusal(code:"adapter-refused")}}
+`+module+`
+var fault="",foreignReads=0,attributeReads=[Int](),queryReads=[Int](),owners=[1:10,2:10],ownerCalls=[Int:Int]()
+func AXUIElementGetPid(_ n:Int,_ out:inout pid_t)->AXError{
+  ownerCalls[n,default:0]+=1
+  if n==1 && fault=="root-owner-failed" {return .cannotComplete}
+  if n==1 && fault=="root-owner-mismatch" {out=99;return .success}
+  if n==2 && fault=="owner-failed" {return .cannotComplete}
+  if n==2 && fault=="owner-mismatch" {out=99;return .success}
+  if n==2 && fault=="owner-lost-after-fact" && ownerCalls[n,default:0]>=2 {return .cannotComplete}
+  out=pid_t(owners[n]!);return .success
+}
+func AXUIElementCopyAttributeValue(_ n:Int,_ key:CFString,_ out:inout CFTypeRef?)->AXError{
+  if owners[n] != 10 {foreignReads+=1};queryReads.append(n)
+  if n==1 {if fault=="root-owner-lost-after-children"{owners[n]=99};out=[2] as NSArray;return .success}
+  if fault=="owner-lost-after-children" {owners[n]=99;out=nil;return .noValue}
+  if fault=="unsupported" {out=[3] as NSArray;return .attributeUnsupported}
+  if fault=="no-value" {return .noValue}
+  if fault=="failed" {return .cannotComplete}
+  if fault=="wrong-type" {out="private-secret" as NSString;return .success}
+  if fault=="success-nil" {return .success}
+  out=[] as NSArray;return .success
+}
+func run(_ kind:String,_ depth:Int=2)throws->[String:Any]{
+  fault=kind;owners=[1:10,2:10];ownerCalls=[:];attributeReads=[];queryReads=[]
+  var cursor:OwnedProjectionCursor<Int>?=nil
+  return try ownedProjection(1,base:"",depth:depth,maxNodes:128,expectedOwner:10,request:[:],cursor:&cursor,equal:==,hashKey:{UInt($0)},
+`+adapters+`
+    isWindow:{ n in if owners[n] != 10 {foreignReads+=1};attributeReads.append(n);return false},
+    fact:{n,p in
+      if n==2 && fault.hasPrefix("fact-owner-"){return ["path":p,"role":"other","blocked":"child-owner","ownerQuery":fault=="fact-owner-failed" ? "query-failed":"mismatch"]}
+      if owners[n] != 10 {foreignReads+=1};attributeReads.append(n);return ["path":p,"role":"AXButton","control":"Open","press":true]
+    },phase:{_,_ in})
+}
+let empty=try run("none")
+precondition(empty["complete"] as? Bool==true)
+precondition((empty["nodes"] as! [[String:Any]]).last?["childrenQuery"] as? String=="success-empty")
+for kind in ["unsupported","no-value","failed","wrong-type","success-nil"] {
+  for depth in [1,2] {
+    let result=try run(kind,depth),row=(result["nodes"] as! [[String:Any]]).last!
+    precondition(row["childrenQuery"] as? String==(["wrong-type","success-nil"].contains(kind) ? "wrong-type":kind))
+    precondition(row["ownerQuery"] as? String=="matched" && row["childCount"]==nil)
+    precondition(result["childrenUnreadable"] as? Bool==true && result["complete"] as? Bool==false)
+    precondition(!String(describing:result).contains("private-secret"))
+  }
+}
+for kind in ["owner-failed","owner-mismatch","owner-lost-after-fact","owner-lost-after-children","fact-owner-failed","fact-owner-mismatch"] {
+  let result=try run(kind),row=(result["nodes"] as! [[String:Any]]).last!
+  precondition(result["foreignChildren"] as? Bool==true && result["complete"] as? Bool==false)
+  precondition(row["blocked"] as? String=="child-owner" && row["role"] as? String=="other")
+  precondition(row["ownerQuery"] as? String==(["owner-failed","owner-lost-after-fact","fact-owner-failed"].contains(kind) ? "query-failed":"mismatch"))
+  precondition(row["control"]==nil && row["childrenQuery"]==nil && row["press"]==nil)
+  if ["owner-failed","owner-mismatch"].contains(kind){precondition(!attributeReads.contains(2) && !queryReads.contains(2))}
+  if kind=="owner-lost-after-fact"{precondition(!queryReads.contains(2))}
+  if kind.hasPrefix("fact-owner-"){precondition(!queryReads.contains(2))}
+}
+precondition(foreignReads==0)
+// Preserve the existing fatal root refusal; descendant categories cannot be
+// substituted for the driver's separately scoped refused-root receipt path.
+for kind in ["root-owner-failed","root-owner-mismatch","root-owner-lost-after-children"] {
+  var refused=false;do{_=try run(kind)}catch let error as Refusal{refused=error.code=="child-owner"}
+  precondition(refused && attributeReads.isEmpty)
+  precondition(queryReads==(kind=="root-owner-lost-after-children" ? [1]:[]))
+}
+print("actual typed query adapters; foreignReads=0; runtimeAX=false")`;
+  const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:16384});
+  assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/actual typed query adapters/);
 });
