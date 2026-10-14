@@ -151,6 +151,169 @@ fn foreign_or_changed_witness_refuses_while_original_revision_remains_pinned() {
     assert_eq!(scheduler.lease_counters().live(), 0);
 }
 
+#[cfg(feature = "object_expression_runtime")]
+mod expression_witness {
+    use super::*;
+    use crate::history::NativeObjectHistory;
+    use crate::object_codec::{decode_storage_project, encode_storage_project};
+    use crate::object_expression_runtime::{
+        prepare_expression_object_composition_for_owner as compose, ExpressionCompositionRefusal,
+        ExpressionLimits, ExpressionRefusal,
+    };
+    use crate::object_frame_packet::ObjectFrameError;
+    use serde_json::Value;
+
+    fn expression_owner(code: &str, overflow: bool) -> NativeObjectHistory {
+        // Reuse the accepted real rectangle input, never a rendered expectation.
+        let source = super::owner("expression-input")
+            .acquire_snapshot(0)
+            .unwrap();
+        let mut value: Value =
+            serde_json::from_slice(&encode_storage_project(source.document()).unwrap()).unwrap();
+        value["compositionOrder"]["contexts"][0]["layers"][0]["order"] = json!({
+            "static":[0],"expression":{"enabled":true,"code":code}});
+        if overflow {
+            value["objects"][0]["geometry"]["segments"][0]["point"]["x"] = json!(1e308);
+            value["objects"][0]["geometry"]["segments"][0]["handleOut"]["x"] = json!(1e308);
+        }
+        NativeObjectHistory::new(
+            "expression-witness",
+            decode_storage_project(&serde_json::to_vec(&value).unwrap()).unwrap(),
+        )
+        .unwrap()
+    }
+    fn limits() -> ExpressionLimits {
+        ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap()
+    }
+    fn fingerprint(owner: &NativeObjectHistory) -> (Vec<u8>, u64, (usize, usize)) {
+        (
+            encode_storage_project(
+                owner
+                    .acquire_snapshot(owner.content_revision())
+                    .unwrap()
+                    .document(),
+            )
+            .unwrap(),
+            owner.content_revision(),
+            owner.history_depths(),
+        )
+    }
+
+    #[test]
+    fn cpu_expression_witness_retains_original_source_and_live_scheduler_identity() {
+        let owner = expression_owner("[value]", false);
+        let source = owner.acquire_snapshot(0).unwrap();
+        let before = fingerprint(&owner);
+        let produced = compose(&owner, &source, &selector(&source, 7), limits()).unwrap();
+        assert_eq!(
+            produced
+                .plan()
+                .commands()
+                .map(|c| c.source().record().target().layer_uid())
+                .collect::<Vec<_>>(),
+            vec!["L1", "L2", "L0"]
+        );
+        assert!(std::ptr::eq(
+            produced.plan().packet().snapshot().document(),
+            source.document()
+        ));
+        let mut original = FrameScheduler::new();
+        let work = schedule(&mut original, &source, 7);
+        let acquired = original.lease_counters().acquired();
+        let live = super::prepare(&original, &work, &produced).unwrap();
+        assert_eq!(
+            live.identity(),
+            &crate::render_scene::ScheduledFrameIdentity::from_scheduled(&work)
+        );
+        assert_eq!(produced.document_id(), source.document_id());
+        assert_eq!(produced.content_revision(), 0);
+        let mut foreign = FrameScheduler::new();
+        let _foreign_work = schedule(&mut foreign, &source, 7);
+        assert!(matches!(
+            super::prepare(&foreign, &work, &produced),
+            Err(ScheduledObjectSceneError::Inactive)
+        ));
+        assert_eq!(original.lease_counters().acquired(), acquired);
+        assert_eq!(fingerprint(&owner), before);
+        drop(live);
+        original.succeed(work.work_id()).unwrap();
+        assert_eq!(original.lease_counters().live(), 0);
+    }
+
+    #[test]
+    fn cpu_expression_and_scene_failures_refuse_without_witness_or_owner_changes() {
+        for (code, expected) in [
+            ("[NaN]", ExpressionRefusal::NonPrimitive),
+            ("value+time", ExpressionRefusal::Guest),
+        ] {
+            let owner = expression_owner(code, false);
+            let source = owner.acquire_snapshot(0).unwrap();
+            let before = fingerprint(&owner);
+            assert_eq!(
+                compose(&owner, &source, &selector(&source, 7), limits()).unwrap_err(),
+                ExpressionCompositionRefusal::Expression(expected)
+            );
+            assert_eq!(fingerprint(&owner), before);
+        }
+        let owner = expression_owner("[0]", true);
+        let source = owner.acquire_snapshot(0).unwrap();
+        let before = fingerprint(&owner);
+        assert!(matches!(
+            compose(&owner, &source, &selector(&source, 7), limits()),
+            Err(ExpressionCompositionRefusal::Scene(
+                ObjectSceneError::UnsupportedGeometry { .. }
+            ))
+        ));
+        assert_eq!(fingerprint(&owner), before);
+        let recovery = expression_owner("[0]", false);
+        assert!(compose(
+            &recovery,
+            &recovery.acquire_snapshot(0).unwrap(),
+            &selector(&recovery.acquire_snapshot(0).unwrap(), 7),
+            limits()
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn cpu_composition_rechecks_foreign_wrong_and_advanced_owner_pins() {
+        let mut owner = expression_owner("[0]", false);
+        let zero = owner.acquire_snapshot(0).unwrap();
+        let before = fingerprint(&owner);
+        let mut wrong = selector(&zero, 7);
+        wrong.document_snapshot_id = "fabricated";
+        let pin = |error| ExpressionCompositionRefusal::Expression(ExpressionRefusal::Pin(error));
+        assert_eq!(
+            compose(&owner, &zero, &wrong, limits()).unwrap_err(),
+            pin(ObjectFrameError::WrongSnapshot)
+        );
+        let foreign = expression_owner("[0]", false);
+        assert_eq!(
+            compose(&foreign, &zero, &selector(&zero, 7), limits()).unwrap_err(),
+            pin(ObjectFrameError::WrongDocument)
+        );
+        assert_eq!(fingerprint(&owner), before);
+        let target = zero.document().objects()[0].target();
+        let fill = owner
+            .prepare_fill_json(
+                &serde_json::to_vec(&json!({"command":"object.fill.set","stableTarget":target,
+            "fill":{"kind":"solid","r":0.5,"g":0,"b":0,"a":1}}))
+                .unwrap(),
+            )
+            .unwrap();
+        owner.commit_fill(fill).unwrap();
+        let after = fingerprint(&owner);
+        assert_eq!(
+            compose(&owner, &zero, &selector(&zero, 7), limits()).unwrap_err(),
+            pin(ObjectFrameError::WrongRevision)
+        );
+        assert_eq!(fingerprint(&owner), after);
+        let current = owner.acquire_snapshot(1).unwrap();
+        assert!(compose(&owner, &current, &selector(&current, 7), limits()).is_ok());
+        assert_eq!(fingerprint(&owner), after);
+    }
+}
+
 #[test]
 fn selector_identity_errors_and_precedence_remain_compatible() {
     let snapshot = owner("witness-selector").acquire_snapshot(0).unwrap();

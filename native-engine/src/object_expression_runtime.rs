@@ -408,3 +408,42 @@ pub(crate) fn prepare_expression_order_frame_for_owner(
     verify()?;
     packet
 }
+
+#[cfg(feature = "compositor")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExpressionCompositionRefusal {
+    Expression(ExpressionRefusal),
+    Scene(crate::object_render_scene::ObjectSceneError),
+    Paint(crate::object_render_scene::ObjectPaintPlanError),
+}
+
+/// Opted-in composition uses the existing retained scene/paint/witness ports.
+/// Only its caller can supply a live scheduler and the original compositor.
+#[cfg(feature = "compositor")]
+pub(crate) fn prepare_expression_object_composition_for_owner(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    limits: ExpressionLimits,
+) -> Result<crate::object_render_scene::ObjectCompositionWitness, ExpressionCompositionRefusal> {
+    use crate::object_render_scene::{
+        prepare_object_composition, prepare_object_paint_plan, prepare_object_render_scene,
+    };
+    let prepared = (|| {
+        let packet = prepare_expression_order_frame_for_owner(owner, snapshot, selector, limits)
+            .map_err(ExpressionCompositionRefusal::Expression)?;
+        let scene = prepare_object_render_scene(&packet, selector)
+            .map_err(ExpressionCompositionRefusal::Scene)?;
+        let paint = prepare_object_paint_plan(&scene, selector)
+            .map_err(ExpressionCompositionRefusal::Paint)?;
+        prepare_object_composition(&paint, selector).map_err(ExpressionCompositionRefusal::Scene)
+    })();
+    let current = owner
+        .acquire_snapshot(owner.content_revision())
+        .ok_or_else(|| {
+            ExpressionCompositionRefusal::Expression(ObjectFrameError::Unavailable.into())
+        })?;
+    verify_owner_snapshot(owner, &current, snapshot)
+        .map_err(|error| ExpressionCompositionRefusal::Expression(error.into()))?;
+    prepared
+}
