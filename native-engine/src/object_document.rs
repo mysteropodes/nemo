@@ -32,6 +32,8 @@ pub struct ObjectDocument {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectLayer {
     pub(crate) layer_uid: String,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) name: Presence<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -148,7 +150,7 @@ pub(crate) use object_deserialize;
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
-object_deserialize!(ObjectLayer { layer_uid: String });
+object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -228,6 +230,10 @@ impl SolidFill {
 impl ObjectLayer {
     pub fn layer_uid(&self) -> &str {
         &self.layer_uid
+    }
+    /// Native stored name, without inventing one for earlier unnamed files.
+    pub fn name(&self) -> Option<&str> {
+        self.name.value().map(String::as_str)
     }
 }
 impl ObjectTarget {
