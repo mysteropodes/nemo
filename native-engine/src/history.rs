@@ -4,7 +4,7 @@
 mod object_history;
 pub use object_history::NativeObjectHistory;
 #[cfg(feature = "project_media_codec")]
-pub use object_history::PreparedProjectReplacement;
+pub use object_history::{InactiveProject, PreparedProjectReplacement};
 
 use crate::commands::{
     DispatchError, DispatchErrorCode, NativeOpacityApplication, OpacityRequest, ResponseEnvelope,
