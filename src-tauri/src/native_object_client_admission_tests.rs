@@ -201,7 +201,8 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         "command.document.object.fill.set",
         "command.document.object.undo",
         "command.document.object.redo",
-        "query.document.object.serialize"
+        "query.document.object.serialize",
+        "command.document.object.layer.visibility.set"
     ]);
     assert_eq!(status["operations"], operations);
     for flag in [

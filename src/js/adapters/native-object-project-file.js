@@ -60,11 +60,13 @@
     // all legacy writes, and no Paper object or serializable document is built.
     if(!info.layers.every(function(l){return !Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string';}))
       throw new Error('Native layer name is invalid');
+    if(!info.layers.every(function(l){return !Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean';}))
+      throw new Error('Native layer visibility is invalid');
     var s=root.state;
     s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
     s.canvasBg='#ffffff';s.waIn=0;s.waOut=info.totalFrames-1;s.currentFrame=0;s.activeLayerIdx=0;
     s.layers=info.layers.map(function(l,i){return {layerUid:l.layerUid,
-      name:Object.prototype.hasOwnProperty.call(l,'name')?l.name:'Layer '+(i+1),visible:true,locked:false,
+      name:Object.prototype.hasOwnProperty.call(l,'name')?l.name:'Layer '+(i+1),visible:l.visible!==false,locked:false,
       frames:[],color:'#5FA875',motion:{},parentLayerUid:null};});
     s.symbols={};s.cameraKeys=[];s.activeSymbolId=null;s.refMedia=null;
     root._curFrame=0;root._totalF=info.totalFrames;root._waIn=0;root._waOut=info.totalFrames-1;
