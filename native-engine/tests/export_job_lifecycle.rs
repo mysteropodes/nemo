@@ -178,6 +178,76 @@ fn pending_cleanup_never_authorizes_release() {
     assert!(!cleanup_allows_release(&running()));
 }
 
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[test]
+fn cpu_pending_png_resource_survives_terminal_clone_and_manager_drop() {
+    const KEY: &str = "NEMO_PENDING_PNG_RESOURCE_TEST";
+    let name = concat!(
+        module_path!(),
+        "::cpu_pending_png_resource_survives_terminal_clone_and_manager_drop"
+    )
+    .split_once("::")
+    .unwrap()
+    .1;
+    if std::env::var(KEY).as_deref() != Ok(name) {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env(KEY, name)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    let budget = crate::revision::shared_image_resource_budget();
+    for finish in [false, true] {
+        assert_eq!(budget.used().unwrap(), 0);
+        let (history, mut request) = manager_fixture();
+        request.frames.truncate(1);
+        let mut manager = ExportJobManager::new(Port::default(), Compositor);
+        let begun = manager.begin(&history, request).unwrap();
+        let pending = manager.start_next_frame(&begun.job_id).unwrap().unwrap();
+        let retained = budget.used().unwrap();
+        assert!(
+            retained > 0,
+            "pending real PNG output must retain its charge"
+        );
+        let clone = pending.clone();
+        assert_eq!(budget.used().unwrap(), retained);
+        let terminal = if finish {
+            manager.finish_frame(pending.clone()).unwrap()
+        } else {
+            let released = manager.reconcile_release();
+            assert!(released.cleanup_complete);
+            released.receipts[0].clone()
+        };
+        assert_eq!(
+            terminal.status,
+            if finish {
+                JobStatus::Succeeded
+            } else {
+                JobStatus::Cancelled
+            }
+        );
+        assert_eq!(manager.finish_frame(pending.clone()).unwrap(), terminal);
+        let effects = if finish { (1, 1) } else { (0, 0) };
+        assert_eq!((manager.port().writes, manager.port().publishes), effects);
+        assert_eq!(manager.lease_counters().live(), 0);
+        assert_eq!(budget.used().unwrap(), retained);
+        drop(manager);
+        drop(history);
+        drop(pending);
+        assert_eq!(budget.used().unwrap(), retained);
+        drop(clone);
+        assert_eq!(budget.used().unwrap(), 0);
+    }
+}
+
 #[test]
 fn manager_release_fences_a_captured_frame_and_cleans_exactly_once() {
     let (history, request) = manager_fixture();
@@ -253,4 +323,77 @@ fn scheduler_cancel_failure_keeps_release_indeterminate_with_a_live_lease() {
         released.receipts[0].external_effect_disposition,
         ExternalEffectDisposition::Indeterminate
     );
+}
+
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+#[test]
+fn cpu_public_png_resource_retains_shared_output_and_cleans_partial_refusals() {
+    const KEY: &str = "NEMO_PUBLIC_PNG_RESOURCE_TEST";
+    let name = concat!(
+        module_path!(),
+        "::cpu_public_png_resource_retains_shared_output_and_cleans_partial_refusals"
+    )
+    .split_once("::")
+    .unwrap()
+    .1;
+    if std::env::var(KEY).as_deref() != Ok(name) {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env(KEY, name)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    let budget = crate::revision::shared_image_resource_budget();
+    use crate::export_job_tests::decode;
+    use crate::png_output::encode_rgba8;
+    let mut seed = 0x1234_5678u32;
+    let mut pixels = vec![0; 256 * 64 * 4];
+    for pixel in pixels.chunks_exact_mut(4) {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        pixel.copy_from_slice(&seed.to_le_bytes());
+    }
+    pixels[..12].copy_from_slice(&[17, 34, 51, 0, 17, 34, 51, 127, 99, 88, 77, 255]);
+    assert_eq!(budget.used().unwrap(), 0);
+    let encoded = encode_rgba8(256, 64, &pixels).unwrap();
+    let retained = budget.used().unwrap();
+    assert!(
+        retained > encoded.len(),
+        "actual encoded storage, including spare capacity, must stay charged"
+    );
+    assert_eq!(decode(&encoded), (256, 64, pixels.clone()));
+    let clone = encoded.clone();
+    assert_eq!(encoded.as_ptr(), clone.as_ptr());
+    assert_eq!(budget.used().unwrap(), retained);
+    drop(encoded);
+    assert_eq!(budget.used().unwrap(), retained);
+    // Reserve scalars, never a hundreds-of-MiB test allocation.
+    let maximum = 384 * 1024 * 1024;
+    let pressure = budget.reserve(maximum - retained).unwrap();
+    assert!(encode_rgba8(1, 1, &[1, 2, 3, 4]).is_err());
+    assert_eq!(budget.used().unwrap(), maximum);
+    drop(pressure);
+    assert_eq!(decode(&clone), (256, 64, pixels.clone()));
+    drop(clone);
+    assert_eq!(budget.used().unwrap(), 0);
+    for available in [7, 40, 4096] {
+        let pressure = budget.reserve(maximum - available).unwrap();
+        assert!(encode_rgba8(256, 64, &pixels).is_err());
+        assert_eq!(budget.used().unwrap(), maximum - available);
+        drop(pressure);
+        assert_eq!(budget.used().unwrap(), 0);
+    }
+    let recovered = encode_rgba8(256, 64, &pixels).unwrap();
+    assert_eq!(decode(&recovered), (256, 64, pixels));
+    drop(recovered);
+    assert_eq!(budget.used().unwrap(), 0);
 }

@@ -3,7 +3,11 @@ use crate::compositor::{Compositor, ScheduledObjectCompositionResult};
 use crate::object_render_scene::{LiveObjectComposition, ScheduledObjectComposition};
 use crate::png_output::{encode_rgba8_into, PngOutputError};
 use crate::render_scene::ScheduledFrameIdentity;
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    ops::Deref,
+    sync::Arc,
+};
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
 use crate::render_scene::{reserve_readback_bytes, ReadbackReservation};
@@ -11,6 +15,7 @@ use crate::render_scene::{reserve_readback_bytes, ReadbackReservation};
 // Preserve the separately compiled pre-media targets. The desktop application
 // enables both features and always uses the existing shared resource domain.
 #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+#[derive(Debug)]
 struct ReadbackReservation(usize);
 #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
 fn reserve_readback_bytes(bytes: usize) -> Result<ReadbackReservation, &'static str> {
@@ -30,13 +35,14 @@ impl ReadbackReservation {
 
 /// The per-call limit and shared charge have distinct jobs. Field order destroys
 /// actual bytes before releasing their capacity charge, including retained output.
-struct BoundedPngBytes {
+#[derive(Debug)]
+pub(super) struct BoundedPngBytes {
     bytes: Vec<u8>,
     reservation: Option<ReadbackReservation>,
     maximum: usize,
 }
 impl BoundedPngBytes {
-    fn new(maximum: usize) -> Result<Self, PngOutputError> {
+    pub(super) fn new(maximum: usize) -> Result<Self, PngOutputError> {
         if maximum == 0 {
             return Err(PngOutputError::new("PNG byte budget must be positive"));
         }
@@ -45,6 +51,10 @@ impl BoundedPngBytes {
             reservation: None,
             maximum,
         })
+    }
+
+    pub(super) fn into_shared(self) -> EncodedPngBytes {
+        EncodedPngBytes(Arc::new(self))
     }
 
     fn write_using(
@@ -90,6 +100,23 @@ impl Write for BoundedPngBytes {
         Ok(())
     }
 }
+
+/// Immutable encoded output. Clones retain the same allocation and charge until
+/// the last owner drops, including escaped pending frames after job termination.
+#[derive(Debug, Clone)]
+pub struct EncodedPngBytes(Arc<BoundedPngBytes>);
+impl Deref for EncodedPngBytes {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        &self.0.bytes
+    }
+}
+impl PartialEq for EncodedPngBytes {
+    fn eq(&self, other: &Self) -> bool {
+        self.deref() == other.deref()
+    }
+}
+impl Eq for EncodedPngBytes {}
 
 pub(crate) fn encode_scheduled_object_png(
     compositor: &Compositor,
