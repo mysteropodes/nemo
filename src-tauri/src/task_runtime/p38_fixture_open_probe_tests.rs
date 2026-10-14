@@ -190,8 +190,11 @@ impl Drop for TempProbeRoot {
 #[cfg(unix)]
 fn fixture_session() -> (TempProbeRoot, Session) {
     use std::os::unix::fs::MetadataExt;
-    let root = std::env::temp_dir().join(format!("p38-fixture-test-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir(&root).unwrap();
+    let base = std::env::temp_dir().join(format!("p38-fixture-test-{}", uuid::Uuid::new_v4()));
+    let temp = base.join("tmp");
+    let run = uuid::Uuid::new_v4().to_string();
+    let root = temp.join(format!("p38-fixture-open-{run}"));
+    std::fs::create_dir_all(&root).unwrap();
     let root = std::fs::canonicalize(root).unwrap();
     let files = [root.join("A.json"), root.join("B.json")];
     write_new(&files[0], FIXTURE_A).unwrap();
@@ -211,7 +214,7 @@ fn fixture_session() -> (TempProbeRoot, Session) {
     let session = Session {
         pins: Pins {
             schema: "nemo.p38-fixture-open/1",
-            run_id: uuid::Uuid::new_v4().to_string(),
+            run_id: run,
             task_key: "a".repeat(64),
             source_sha: "b".repeat(40),
             build_sha: "b".repeat(40),
@@ -232,7 +235,234 @@ fn fixture_session() -> (TempProbeRoot, Session) {
         failed: false,
         failure_code: None,
     };
-    (TempProbeRoot(root), session)
+    (TempProbeRoot(base), session)
+}
+
+#[cfg(unix)]
+#[derive(Default)]
+struct FixtureScope {
+    grants: std::cell::RefCell<std::collections::HashSet<PathBuf>>,
+    denies: std::cell::RefCell<std::collections::HashSet<PathBuf>>,
+    calls: std::cell::RefCell<Vec<PathBuf>>,
+}
+
+#[cfg(unix)]
+impl FixtureScope {
+    fn allowed(&self, path: &Path) -> bool {
+        self.grants.borrow().contains(path) && !self.denies.borrow().contains(path)
+    }
+    fn grant(&self, path: &Path) -> Result<(), ()> {
+        self.calls.borrow_mut().push(path.to_path_buf());
+        self.grants.borrow_mut().insert(path.to_path_buf());
+        Ok(())
+    }
+    fn forbid(&self, path: &Path) -> Result<(), ()> {
+        self.denies.borrow_mut().insert(path.to_path_buf());
+        Ok(())
+    }
+    fn bind(&self, session: &Session, temp: &Path) -> Result<(), &'static str> {
+        bind_fixture_scope(
+            session,
+            temp,
+            |p| self.allowed(p),
+            |p| self.grant(p),
+            |p| self.forbid(p),
+        )
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn fixture_scope_grants_only_exact_verified_a_and_b() {
+    let (_root, session) = fixture_session();
+    let temp = session.root.parent().unwrap();
+    let scope = FixtureScope::default();
+    scope.bind(&session, temp).unwrap();
+    assert_eq!(*scope.calls.borrow(), session.files);
+    assert_eq!(scope.grants.borrow().len(), 2);
+    assert!(scope.denies.borrow().is_empty());
+    assert!(session.files.iter().all(|p| scope.allowed(p)));
+    for excluded in [
+        temp.to_path_buf(),
+        session.root.clone(),
+        temp.join("foreign.json"),
+        session.root.join("C.json"),
+        session.files[0].join("child"),
+        session.files[1].join("child"),
+    ] {
+        assert!(!scope.allowed(&excluded));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn changed_or_foreign_fixture_identity_refuses_before_any_grant() {
+    use std::os::unix::fs::symlink;
+    for case in [
+        "bytes",
+        "missing",
+        "symlink",
+        "inode",
+        "root",
+        "run",
+        "pin-id",
+        "pin-hash",
+        "pin-path",
+        "pin-inode",
+        "foreign",
+        "temp",
+    ] {
+        let (base, mut session) = fixture_session();
+        let temp = session.root.parent().unwrap().to_path_buf();
+        match case {
+            "bytes" => fs::write(&session.files[1], b"changed").unwrap(),
+            "missing" => fs::remove_file(&session.files[1]).unwrap(),
+            "symlink" | "inode" => {
+                let replacement = base.0.join("replacement.json");
+                write_new(&replacement, FIXTURE_A).unwrap();
+                if case == "symlink" {
+                    fs::remove_file(&session.files[0]).unwrap();
+                    symlink(replacement, &session.files[0]).unwrap();
+                } else {
+                    fs::rename(replacement, &session.files[0]).unwrap();
+                }
+            }
+            "root" => session.root_ino ^= 1,
+            "run" => session.pins.run_id = uuid::Uuid::new_v4().to_string(),
+            "pin-id" => session.pins.fixtures[0].id = "foreign".into(),
+            "pin-hash" => session.pins.fixtures[0].sha256 = HASH_B.into(),
+            "pin-path" => session.pins.fixtures[0].file.push_str("-foreign"),
+            "pin-inode" => session.pins.fixtures[0].inode ^= 1,
+            "foreign" => {
+                session.files[0] = base.0.join("foreign.json");
+                write_new(&session.files[0], FIXTURE_A).unwrap();
+                session.file_ids[0] = fs::symlink_metadata(&session.files[0]).unwrap().identity();
+                let pin = &mut session.pins.fixtures[0];
+                pin.file = session.files[0].to_str().unwrap().into();
+                (pin.device, pin.inode) = session.file_ids[0];
+            }
+            _ => {}
+        }
+        let scope = FixtureScope::default();
+        let expected_temp = if case == "temp" {
+            base.0.as_path()
+        } else {
+            &temp
+        };
+        assert!(scope.bind(&session, expected_temp).is_err(), "{case}");
+        assert!(scope.calls.borrow().is_empty(), "{case}");
+        assert!(scope.grants.borrow().is_empty(), "{case}");
+        assert!(scope.denies.borrow().is_empty(), "{case}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn preexisting_parent_sibling_descendant_or_file_scope_refuses_without_mutation() {
+    let (_root, session) = fixture_session();
+    let temp = session.root.parent().unwrap();
+    for prior in [
+        temp.to_path_buf(),
+        session.root.clone(),
+        temp.join("p38-scope-other.json"),
+        session.root.join("C.json"),
+        session.files[0].join("child"),
+        session.files[1].clone(),
+    ] {
+        let scope = FixtureScope::default();
+        scope.grants.borrow_mut().insert(prior.clone());
+        assert!(scope.bind(&session, temp).is_err());
+        assert!(scope.calls.borrow().is_empty());
+        assert_eq!(
+            *scope.grants.borrow(),
+            std::collections::HashSet::from([prior])
+        );
+        assert!(scope.denies.borrow().is_empty());
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn callback_failure_revokes_both_fixtures_even_after_partial_effect() {
+    let (_root, session) = fixture_session();
+    let temp = session.root.parent().unwrap();
+    for failure_index in [0, 1] {
+        let scope = FixtureScope::default();
+        let result = bind_fixture_scope(
+            &session,
+            temp,
+            |p| scope.allowed(p),
+            |p| {
+                scope.grant(p)?;
+                if p == session.files[failure_index] {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            },
+            |p| scope.forbid(p),
+        );
+        assert_eq!(result, Err("P38 fixture scope binding refused"));
+        assert!(session.files.iter().all(|p| !scope.allowed(p)));
+        assert_eq!(scope.denies.borrow().len(), 2);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn ineffective_or_broad_binding_refuses_and_revokes_fixture_access() {
+    let (_root, session) = fixture_session();
+    let temp = session.root.parent().unwrap();
+    for broad in [false, true] {
+        let scope = FixtureScope::default();
+        let result = bind_fixture_scope(
+            &session,
+            temp,
+            |p| scope.allowed(p),
+            |p| {
+                if broad {
+                    scope.grant(p)?;
+                    scope.grants.borrow_mut().insert(session.root.clone());
+                }
+                Ok(())
+            },
+            |p| scope.forbid(p),
+        );
+        assert_eq!(result, Err("P38 fixture scope not exact"));
+        assert!(session.files.iter().all(|p| !scope.allowed(p)));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn fixture_change_during_binding_and_rollback_error_refuse_initialization() {
+    for rollback_error in [false, true] {
+        let (_root, session) = fixture_session();
+        let scope = FixtureScope::default();
+        let result = bind_fixture_scope(
+            &session,
+            session.root.parent().unwrap(),
+            |p| scope.allowed(p),
+            |p| {
+                scope.grant(p)?;
+                fs::write(&session.files[1], b"changed during binding").unwrap();
+                Ok(())
+            },
+            |p| {
+                scope.forbid(p)?;
+                if rollback_error {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert!(result.is_err());
+        if rollback_error {
+            assert_eq!(result, Err("P38 fixture scope rollback refused"));
+        }
+        assert!(session.files.iter().all(|p| !scope.allowed(p)));
+    }
 }
 
 #[cfg(unix)]
