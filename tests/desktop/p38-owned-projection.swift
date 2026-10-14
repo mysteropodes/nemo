@@ -26,7 +26,7 @@ func ownedProjection<Node>(_ root: Node, base: String, depth: Int, maxNodes: Int
     guard let raw = request["childOffset"] as? NSNumber,
       CFGetTypeID(raw) != CFBooleanGetTypeID(),
       let value = request["childOffset"] as? Int else { throw Refusal(code:"adapter-refused") }
-    try check(value >= 0 && value < 4096 && depth == 1 && maxNodes >= 2)
+    try check(raw.doubleValue == Double(value) && value >= 0 && value < 4096 && depth == 1 && maxNodes >= 2)
     offset = value
     if let rawToken = request["pageToken"] {
       guard let supplied = rawToken as? String, UUID(uuidString:supplied) != nil else { throw Refusal(code:"adapter-refused") }

@@ -66,7 +66,7 @@ owners[2]=99;_=try execute(["childOffset":0]);let foreignToken=cursor!.token;own
 _=try execute(["childOffset":127,"pageToken":foreignToken])
 let foreignEnd=try execute(["childOffset":254,"pageToken":foreignToken])
 precondition(foreignEnd["foreignChildren"] as? Bool==true && foreignEnd["complete"] as? Bool==false && foreignEnd["childrenComplete"] as? Bool==false)
-for request:[String:Any] in [["childOffset":true],["childOffset":"0"],["childOffset":-1],["childOffset":4096],
+for request:[String:Any] in [["childOffset":true],["childOffset":"0"],["childOffset":1.5],["childOffset":-1],["childOffset":4096],
   ["childOffset":0,"pageToken":token],["pageToken":token]]{refuses{_=try execute(request)}}
 refuses{_=try execute(["childOffset":0],2)}
 refuses{_=try execute(["childOffset":0],1,1)}

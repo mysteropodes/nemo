@@ -365,7 +365,11 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
     if key==kAXChildrenAttribute{return (n==1 ? [7]:n==2 ? [8]:n==3 ? [4]:n==4 ? ([5]+(["ambiguous-modal","foreign-child"].contains(fault) ? [6]:[])):[]) as NSArray}
     if key==kAXRoleAttribute{return (n==1 ? "AXWindow":n==2 || n==4 || n==6 ? "AXSheet":"AXTextField") as NSString}
     if key==kAXFocusedAttribute || key==kAXEnabledAttribute{return NSNumber(value:n==5 || n>=7)}
-    if key==kAXTitleAttribute || key==kAXValueAttribute{return "private-secret-path" as NSString};return nil
+    if key==kAXTitleAttribute || key==kAXValueAttribute{return "private-secret-path" as NSString}
+    if key==kAXDescriptionAttribute{
+      if fault == "nontext-description"{return ["private-secret-description"] as NSArray}
+      return (fault == "public-description" && n>=7 ? "Open Project…":"private-secret-description") as NSString
+    };return nil
   }
   func throwFatal(){preconditionFailure("foreign attribute read")}
   func children(_ n:Int)->[Int]{attr(n,kAXChildrenAttribute) as? [Int] ?? []}
@@ -399,6 +403,11 @@ for token in [nil,"wrong"] as [String?]{var refused=false;do{_=try exercise("non
 for (fault,target) in [("none","main"),("ordinary-sheet","sheet"),("foreign-main-child","main"),("foreign-sheet-child","sheet")]{
   let observation=try exercise(fault,target);let rows=observation.0["nodes"] as! [[String:Any]]
   precondition(rows.contains{fault.hasPrefix("foreign") ? $0["blocked"] as? String=="child-owner":$0["role"] as? String=="AXTextField"},fault)
+}
+for fault in ["public-description","private-description","nontext-description"]{
+  let observation=try exercise(fault,"main"),rows=observation.0["nodes"] as! [[String:Any]]
+  precondition(rows.contains{$0["control"] as? String=="Open Project…"} == (fault == "public-description"))
+  precondition(!String(describing:observation.0).contains("private-secret"))
 }
 print("actual token dispatch, retained verification and inspect projection exercised; runtimeAX=false")`;
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:16384});
