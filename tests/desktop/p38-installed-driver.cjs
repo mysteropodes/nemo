@@ -60,7 +60,7 @@ function atomicJSON(guard, name, value) {
   guard.verify(); fs.renameSync(temporary, destination); guard.verify();
 }
 
-function safeWindowEvidence(result, reference = false) {
+function safeWindowEvidence(result, reference = false, completenessDiagnostics = false) {
   check(result && Number.isSafeInteger(result.pid) && result.pid > 0 && result.pid <= 2147483647, 'ax-evidence-refused');
   verifyWindow(result, result.pid);
   const roles = new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXCheckBox','AXMenu','AXMenuItem','AXRow','AXOutline','AXScrollArea','other']);
@@ -103,6 +103,8 @@ function safeWindowEvidence(result, reference = false) {
     clean.projectTabs={path:region.path,token:region.token};
     if(region.unique!==undefined) {check(typeof region.unique==='boolean','ax-evidence-refused');clean.projectTabs.unique=region.unique;}
   }
+  if (completenessDiagnostics === true && !reference)
+    clean.completenessSummary = require('./p38-inspection-diagnostics.cjs').summarizeCompleteness(result);
   return clean;
 }
 function safeSelectionDiagnostics(value) {

@@ -5,10 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
-const INSPECTION_CODES = Object.freeze(['inspection-budget-refused', 'inspection-transport-refused',
-  'inspection-status-refused', 'inspection-identity-refused', 'inspection-projection-refused',
-  'inspection-root-refused', 'inspection-completeness-refused', 'inspection-page-refused',
-  'inspection-marker-refused', 'inspection-region-refused']);
+const { INSPECTION_CODES, requireCompleteness } = require('./p38-inspection-diagnostics.cjs');
 const hashes = Object.freeze({
   A:'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',
   B:'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6'
@@ -109,10 +106,10 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
     catch(error) {if(error?.observerStage==='inspection')throw error;check(false,'inspection-transport-refused');}
     check(raw?.status==='ok'&&raw.type==='inspect','inspection-status-refused');
     try {verifyWindow(raw,identity.pid,identity.windowId);} catch {check(false,'inspection-identity-refused');}
-    try {s=safeWindowEvidence(raw);} catch {check(false,'inspection-projection-refused');}
+    try {s=safeWindowEvidence(raw,false,true);} catch {check(false,'inspection-projection-refused');}
     check(s.nodes.length>0&&s.nodes.length<=128&&s.nodes[0].path===(request.element||''),'inspection-root-refused');
-    check(s.foreignChildren===false&&s.childrenUnreadable===false&&
-      s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),'inspection-completeness-refused');
+    requireCompleteness(s.foreignChildren===false&&s.childrenUnreadable===false&&
+      s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),s,'projected-nodes');
     return s;
   }
   function collect(nodes) {
@@ -124,7 +121,7 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
   while(queue.length) {
     const element=queue.shift(),first=await read({element,depth:5});
     if(complete(first)) {collect(first.nodes);continue;}
-    check(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean','inspection-completeness-refused');
+    requireCompleteness(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean',first,'paging-flags');
     let offset=0,token,count,root,done=false;
     while(!done) {
       const s=await read({element,depth:1,childOffset:offset,...(offset?{pageToken:token}:{})});
