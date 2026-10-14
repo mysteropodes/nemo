@@ -275,3 +275,170 @@ fn gpu_readback_actual_copy_failure_cleans_up_without_publishing() {
     assert_eq!(budget.used(), 0);
     assert_eq!(buffers(&gpu), baseline);
 }
+
+#[test]
+fn gpu_public_export_retains_one_pixel_owner_through_last_clone() {
+    // Global-domain accounting needs a fresh process, including parallel libtest.
+    const KEY: &str = "NEMO_EXPORT_PIXEL_OWNER_TEST";
+    let name = concat!(
+        module_path!(),
+        "::gpu_public_export_retains_one_pixel_owner_through_last_clone"
+    )
+    .split_once("::")
+    .unwrap()
+    .1;
+    if std::env::var(KEY).as_deref() != Ok(name) {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env(KEY, name)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    use crate::codec::decode_project;
+    use crate::commands::NativeOpacityApplication;
+    use crate::png_output::{validate_readback, ExportCompositor};
+    use crate::render_scene::{prepare, GeometryPaintInput, LayerGeometry, OpaqueSrgbPaint};
+    use crate::revision::shared_image_resource_budget;
+    use crate::scheduler::{EvaluationKey, FrameScheduler, OutputSpec};
+
+    let app = NativeOpacityApplication::new(
+        "export-pixel-owner",
+        decode_project(include_bytes!("fixtures/opacity-v2/project.json")).unwrap(),
+    )
+    .unwrap();
+    let snapshot = app.acquire_snapshot(0).unwrap();
+    let key = EvaluationKey::new(
+        snapshot.id(),
+        "scene-root",
+        10,
+        "final",
+        OutputSpec::new("frame", "rgba8", 320, 180, "srgb", "straight").unwrap(),
+        [("geometry/r08".to_owned(), "v1".to_owned())],
+    )
+    .unwrap();
+    let mut scheduler = FrameScheduler::new();
+    let frame = scheduler.schedule(snapshot, key).unwrap();
+    let geometry = GeometryPaintInput::new(
+        "geometry/r08",
+        "v1",
+        vec![LayerGeometry::new(
+            "r08_curve_layer",
+            [20., 60., 40., 80.],
+            [1., 0., 0., 1., 0., 0.],
+            OpaqueSrgbPaint::new(255, 0, 0),
+        )
+        .unwrap()],
+    )
+    .unwrap();
+    let scene = prepare(&scheduler, &frame, &geometry).unwrap();
+    let budget = shared_image_resource_budget();
+    let mut gpu = Compositor::new().unwrap();
+    let cost = 320 * 180 * 4;
+    assert_eq!(budget.used().unwrap(), 0);
+    let mut injected = Vec::with_capacity(9);
+    injected.extend_from_slice(&[1, 2, 3]);
+    let capacity = injected.capacity();
+    let pointer = injected.as_ptr();
+    let admitted = ReadbackBytes::try_from(injected).unwrap();
+    assert_eq!(admitted.as_ptr(), pointer);
+    assert_eq!(budget.used().unwrap(), capacity);
+    drop(admitted);
+    assert_eq!(budget.used().unwrap(), 0);
+    let composed = ExportCompositor::compose(&mut gpu, &scene).unwrap();
+    assert_eq!(budget.used().unwrap(), cost);
+    let exported = ExportCompositor::readback_rgba8(&gpu, &composed).unwrap();
+    assert_eq!(budget.used().unwrap(), 2 * cost);
+    validate_readback(&exported, &scene).unwrap();
+    assert_eq!(&exported.bytes[..4], &[255; 4]);
+    let clone = exported.clone();
+    assert_eq!(exported.bytes.as_ptr(), clone.bytes.as_ptr());
+    assert_eq!(budget.used().unwrap(), 2 * cost);
+    // Scalar pressure only; no large fixture allocation. A refused second
+    // readback must preserve the first export and undo its partial reservation.
+    let pressure = budget.reserve(384 * 1024 * 1024 - 4 * cost + 1).unwrap();
+    let held = budget.used().unwrap();
+    assert!(ExportCompositor::readback_rgba8(&gpu, &composed).is_err());
+    assert_eq!(budget.used().unwrap(), held);
+    drop(pressure);
+    drop(composed);
+    complete(&gpu);
+    assert_eq!(budget.used().unwrap(), cost);
+    drop(exported);
+    assert_eq!(budget.used().unwrap(), cost);
+    drop(gpu);
+    validate_readback(&clone, &scene).unwrap();
+    assert_eq!(&clone.bytes[..4], &[255; 4]);
+    drop(clone);
+    assert_eq!(budget.used().unwrap(), 0);
+}
+
+#[test]
+fn adopted_pixels_charge_capacity_share_storage_and_release_after_last_owner() {
+    let mut bytes = Vec::with_capacity(11);
+    bytes.extend_from_slice(&[3, 5, 7]);
+    let capacity = bytes.capacity();
+    let pointer = bytes.as_ptr();
+    let budget = ReadbackBudget::new(capacity);
+    let pixels = ReadbackBytes::admit_with(bytes, |n| budget.reserve(n)).unwrap();
+    assert_eq!(pixels.as_ptr(), pointer);
+    assert_eq!(&*pixels, &[3, 5, 7]);
+    assert_eq!(budget.used(), capacity);
+    let clone = pixels.clone();
+    assert_eq!(clone.as_ptr(), pointer);
+    drop(pixels);
+    assert_eq!(budget.used(), capacity);
+    assert_eq!(&*clone, &[3, 5, 7]);
+    drop(clone);
+    assert_eq!(budget.used(), 0);
+}
+
+#[test]
+fn adopted_pixels_refuse_capacity_pressure_without_publishing_or_leaking() {
+    let mut bytes = Vec::with_capacity(11);
+    bytes.push(3);
+    let capacity = bytes.capacity();
+    let budget = ReadbackBudget::new(capacity - 1);
+    let result = ReadbackBytes::admit_with(bytes, |n| {
+        assert_eq!(n, capacity, "spare capacity is retained payload");
+        budget.reserve(n)
+    });
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "readback payload budget refused"
+    );
+    assert_eq!(budget.used(), 0);
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        ReadbackBytes::admit_with(vec![1], |n| {
+            let _held = budget.reserve(n).unwrap();
+            panic!("injected admission unwind");
+        })
+    }));
+    assert!(result.is_err());
+    assert_eq!(budget.used(), 0);
+}
+
+#[test]
+fn adopted_empty_pixels_skip_only_zero_capacity_admission() {
+    let empty = ReadbackBytes::admit_with(Vec::new(), |_| {
+        panic!("zero-capacity input has no payload allocation")
+    })
+    .unwrap();
+    assert!(empty.is_empty());
+    let bytes = Vec::with_capacity(9);
+    let capacity = bytes.capacity();
+    let budget = ReadbackBudget::new(capacity);
+    let empty_with_storage = ReadbackBytes::admit_with(bytes, |n| budget.reserve(n)).unwrap();
+    assert!(empty_with_storage.is_empty());
+    assert_eq!(empty, empty_with_storage);
+    assert_eq!(budget.used(), capacity);
+    drop(empty_with_storage);
+    assert_eq!(budget.used(), 0);
+}

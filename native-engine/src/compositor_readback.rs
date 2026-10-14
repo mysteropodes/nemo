@@ -34,10 +34,38 @@ impl ReadbackReservation {
 #[derive(Debug)]
 struct PackedPixels {
     bytes: Vec<u8>,
-    _reservation: ReadbackReservation,
+    _reservation: Option<ReadbackReservation>,
 }
+/// Read-only pixel storage. Clones share its allocation and retain its charge
+/// through the last owner; borrowing bytes cannot detach the owned storage.
 #[derive(Debug, Clone)]
-pub(super) struct ReadbackBytes(Arc<PackedPixels>);
+pub struct ReadbackBytes(Arc<PackedPixels>);
+impl TryFrom<Vec<u8>> for ReadbackBytes {
+    type Error = CompositorError;
+
+    /// Admit already allocated caller storage by its actual retained capacity.
+    /// This does not pre-admit the caller's earlier allocation. Feature-off engine
+    /// targets preserve their existing unmetered readback domain.
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::admit_with(bytes, reserve_readback_bytes)
+    }
+}
+impl ReadbackBytes {
+    fn admit_with(
+        bytes: Vec<u8>,
+        reserve: impl FnOnce(usize) -> Result<ReadbackReservation, &'static str>,
+    ) -> Result<Self, CompositorError> {
+        let reservation = if bytes.capacity() == 0 {
+            None
+        } else {
+            Some(reserve(bytes.capacity()).map_err(CompositorError::new)?)
+        };
+        Ok(Self(Arc::new(PackedPixels {
+            bytes,
+            _reservation: reservation,
+        })))
+    }
+}
 impl Deref for ReadbackBytes {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
@@ -228,7 +256,7 @@ impl Compositor {
         checkpoint("packed-copied", Some(gpu.buffer()))?;
         Ok(ReadbackBytes(Arc::new(PackedPixels {
             bytes,
-            _reservation: packed_reservation,
+            _reservation: Some(packed_reservation),
         })))
     }
 }

@@ -1,6 +1,6 @@
 //! Deterministic PNG encoding for the staged native export job.
 
-use crate::compositor::{CompositionResult, Compositor};
+use crate::compositor::{CompositionResult, Compositor, ReadbackBytes};
 use crate::render_scene::{GeometryPaintInput, RenderScene};
 use png::{BitDepth, ColorType, Compression, Encoder, Filter};
 use std::fmt::{Display, Formatter};
@@ -96,7 +96,7 @@ pub trait StagedArtifactPort {
 pub struct ExportReadback {
     pub width: u32,
     pub height: u32,
-    pub bytes: Vec<u8>,
+    pub bytes: ReadbackBytes,
     pub document_snapshot_id: String,
     pub document_id: String,
     pub content_revision: u64,
@@ -124,7 +124,7 @@ impl ExportCompositor for Compositor {
         Ok(ExportReadback {
             width,
             height,
-            bytes: pixels.bytes().to_vec(),
+            bytes: pixels.retained_bytes(),
             document_snapshot_id: pixels.document_snapshot_id().to_owned(),
             document_id: pixels.document_id().to_owned(),
             content_revision: pixels.content_revision(),

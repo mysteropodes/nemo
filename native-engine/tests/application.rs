@@ -1,6 +1,5 @@
 use crate::application::{
-    ExportResourceResolver, NativeApplication, ResourceResolutionError,
-    ResourceResolutionErrorKind,
+    ExportResourceResolver, NativeApplication, ResourceResolutionError, ResourceResolutionErrorKind,
 };
 use crate::codec::decode_project;
 use crate::commands::{
@@ -78,7 +77,10 @@ impl ExportCompositor for Compositor {
         Ok(ExportReadback {
             width: 320,
             height: 180,
-            bytes: [scene.content_revision() as u8, 20, 30, 255].repeat(320 * 180),
+            bytes: [scene.content_revision() as u8, 20, 30, 255]
+                .repeat(320 * 180)
+                .try_into()
+                .unwrap(),
             document_snapshot_id: scene.document_snapshot_id().into(),
             document_id: scene.document_id().into(),
             content_revision: scene.content_revision(),
@@ -246,7 +248,10 @@ fn common_dispatch_reuses_history_for_commands_queries_transactions_and_undo() {
         .as_str()
         .unwrap()
         .to_owned();
-    assert_error(&app.dispatch(set(&app, "busy", 60)), DispatchErrorCode::BusyConflict);
+    assert_error(
+        &app.dispatch(set(&app, "busy", 60)),
+        DispatchErrorCode::BusyConflict,
+    );
     assert!(app
         .dispatch(stage(
             &app,
@@ -302,7 +307,9 @@ fn common_dispatch_reuses_history_for_commands_queries_transactions_and_undo() {
         OP_TRANSACTION_BEGIN,
         json!({ "stableTarget": { "layerUid": LAYER } }),
     ));
-    let cancelled_id = cancelled.result().unwrap()["transactionId"].as_str().unwrap();
+    let cancelled_id = cancelled.result().unwrap()["transactionId"]
+        .as_str()
+        .unwrap();
     assert_eq!(
         app.dispatch(stage(
             &app,
@@ -329,7 +336,11 @@ fn retries_are_global_changed_body_rejected_and_first_cancellation_unretained() 
     let id = job_id(&begun);
     let terminal = app.run_export_to_completion(&id).unwrap();
     assert_eq!(terminal.status, JobStatus::Succeeded);
-    assert_eq!(app.dispatch(set(&app, "retry-advance", 40)).content_revision(), 1);
+    assert_eq!(
+        app.dispatch(set(&app, "retry-advance", 40))
+            .content_revision(),
+        1
+    );
     let retried = app.dispatch(request.clone());
     assert_eq!(retried, begun, "begin retry replays its original receipt");
     assert_eq!(retried.result().unwrap()["status"], "running");
@@ -416,7 +427,10 @@ fn jobs_pin_r_while_commands_advance_to_r_plus_one_and_terminal_receipts_replay(
     assert_eq!(app.finish_export_frame(first_frame).unwrap().progress, 0.5);
     assert_eq!(app.dispatch(running_status), retained_running);
     let terminal = app.run_export_to_completion(&id).unwrap();
-    assert_eq!((terminal.status, terminal.pinned_revision), (JobStatus::Succeeded, 0));
+    assert_eq!(
+        (terminal.status, terminal.pinned_revision),
+        (JobStatus::Succeeded, 0)
+    );
     let status = query(
         &app,
         "terminal-status",

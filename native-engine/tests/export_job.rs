@@ -135,7 +135,7 @@ impl ExportCompositor for FakeCompositor {
         Ok(ExportReadback {
             width: 320,
             height: 180,
-            bytes: [value, 20, 30, 255].repeat(320 * 180),
+            bytes: [value, 20, 30, 255].repeat(320 * 180).try_into().unwrap(),
             document_snapshot_id: scene.document_snapshot_id().into(),
             document_id: scene.document_id().into(),
             content_revision: scene.content_revision(),
@@ -161,7 +161,7 @@ impl ExportCompositor for ExtremeReadbackCompositor {
         Ok(ExportReadback {
             width: u32::MAX,
             height: u32::MAX,
-            bytes: Vec::new(),
+            bytes: Vec::new().try_into().unwrap(),
             document_snapshot_id: scene.document_snapshot_id().into(),
             document_id: scene.document_id().into(),
             content_revision: scene.content_revision(),
