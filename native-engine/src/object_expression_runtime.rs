@@ -170,10 +170,43 @@ fn guest_result(value: Value<'_>) -> Result<f64, ExpressionRefusal> {
     Err(ExpressionRefusal::NonPrimitive)
 }
 
+#[derive(Clone, Copy)]
+enum ResultReading {
+    Primitive,
+    ScalarOrder,
+}
+
+// The existing motion.js dim=1 slice/allFinite reading, followed by scalar
+// extraction. Keep guest slice/getters inside the same interrupted runtime;
+// Rust must not coerce objects or read a JS property after retirement.
+const NORMALIZE_ORDER: &str = r#"(function(result) {
+'use strict';
+if (!Array.isArray(result) || result.length < 1) return undefined;
+var cut = result.slice(0, 1);
+for (var i = 0; i < cut.length; i++)
+ if (typeof cut[i] !== 'number' || !isFinite(cut[i])) return undefined;
+return cut[0];
+})"#;
+
+fn read_guest_result<'js>(
+    ctx: &Ctx<'js>,
+    value: Value<'js>,
+    reading: ResultReading,
+) -> rquickjs::Result<Value<'js>> {
+    match reading {
+        ResultReading::Primitive => Ok(value),
+        ResultReading::ScalarOrder if value.as_number().is_some() => Ok(value),
+        ResultReading::ScalarOrder => ctx
+            .eval::<Function, _>(NORMALIZE_ORDER)
+            .and_then(|normalize| normalize.call((value,))),
+    }
+}
+
 fn evaluate_in_context(
     rt: &Runtime,
     request: &ExpressionRequest,
     limits: ExpressionLimits,
+    reading: ResultReading,
 ) -> Result<f64, ExpressionRefusal> {
     let context = Context::custom::<(
         intrinsic::Eval,
@@ -238,6 +271,14 @@ fn evaluate_in_context(
                     limits.interrupt_polls,
                 )
             })?;
+        let value = read_guest_result(&ctx, value, reading).map_err(|error| {
+            guest_error(
+                &ctx,
+                error,
+                polls.load(Ordering::SeqCst),
+                limits.interrupt_polls,
+            )
+        })?;
         guest_result(value)
     });
     rt.set_interrupt_handler(None);
@@ -251,6 +292,22 @@ pub(crate) fn evaluate_detached(
     request: &ExpressionRequest,
     limits: ExpressionLimits,
 ) -> Result<DetachedCandidate, ExpressionRefusal> {
+    evaluate_detached_with_reading(request, limits, ResultReading::Primitive)
+}
+
+/// Opt-in scalar Order reading; the original primitive entry remains strict.
+pub(crate) fn evaluate_order_detached(
+    request: &ExpressionRequest,
+    limits: ExpressionLimits,
+) -> Result<DetachedCandidate, ExpressionRefusal> {
+    evaluate_detached_with_reading(request, limits, ResultReading::ScalarOrder)
+}
+
+fn evaluate_detached_with_reading(
+    request: &ExpressionRequest,
+    limits: ExpressionLimits,
+    reading: ResultReading,
+) -> Result<DetachedCandidate, ExpressionRefusal> {
     if request.code().len() > limits.input_bytes {
         return Err(ExpressionRefusal::InputLimit);
     }
@@ -262,7 +319,7 @@ pub(crate) fn evaluate_detached(
     let mut outcome = if initial_queue {
         Err(ExpressionRefusal::InitialQueue)
     } else {
-        evaluate_in_context(&rt, request, limits)
+        evaluate_in_context(&rt, request, limits, reading)
     };
     let pending = rt.is_job_pending();
     if pending {
@@ -290,6 +347,24 @@ pub(crate) fn evaluate_for_owner(
         Err(refusal) => {
             // Even an early bounded refusal must not escape with an obsolete
             // owner pin; only detached Rust data may cross this boundary.
+            request.revalidate(owner)?;
+            return Err(refusal);
+        }
+    };
+    request.finalize(owner, candidate)
+}
+
+/// Private Order normalization also publishes only through the real pin check.
+pub(crate) fn evaluate_order_for_owner(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    selector: &ExpressionSelector<'_>,
+    limits: ExpressionLimits,
+) -> Result<f64, ExpressionRefusal> {
+    let request = prepare_expression_request(owner, snapshot, selector)?;
+    let candidate = match evaluate_order_detached(&request, limits) {
+        Ok(candidate) => candidate,
+        Err(refusal) => {
             request.revalidate(owner)?;
             return Err(refusal);
         }

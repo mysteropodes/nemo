@@ -210,11 +210,19 @@ fn original39_child() {
 }
 
 fn supervised_child(name: &str) {
+    supervised_test(
+        "object_expression_runtime_tests::original39_child",
+        "NEMO_ORIGINAL39_CASE",
+        name,
+    );
+}
+
+fn supervised_test(test: &str, env: &str, name: &str) {
     let executable = std::env::current_exe().unwrap();
     let mut child = Command::new(&executable)
         .arg("--exact")
-        .arg("object_expression_runtime_tests::original39_child")
-        .env("NEMO_ORIGINAL39_CASE", name)
+        .arg(test)
+        .env(env, name)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -279,4 +287,213 @@ fn private_limits_refuse_zero_or_exceeding_accepted_stage_ceiling() {
         ExpressionLimits::new(4096, 8_388_608, 262_144, 33),
         Err(ExpressionRefusal::InvalidLimits)
     ));
+}
+
+fn order_case(code: &str) -> Case {
+    Case {
+        name: "normalized-order",
+        code: code.into(),
+        value: 2.0,
+        frame: 10,
+        expected: "number",
+        result: None,
+    }
+}
+
+fn order_selector(snapshot: &crate::revision::ObjectSnapshot) -> ExpressionSelector<'_> {
+    ExpressionSelector {
+        frame: ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame: 10,
+        },
+        source_frame: 7,
+        layer_uid: "L0",
+        stroke_id: Some("s0"),
+    }
+}
+
+fn normalized_order(code: &str) -> Result<f64, ExpressionRefusal> {
+    let owner = owner(&order_case(code)).unwrap();
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let before = (
+        encode_storage_project(snapshot.document()).unwrap(),
+        owner.content_revision(),
+        owner.history_depths(),
+    );
+    let result = crate::object_expression_runtime::evaluate_order_for_owner(
+        &owner,
+        &snapshot,
+        &order_selector(&snapshot),
+        ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap(),
+    );
+    assert_eq!(
+        (
+            encode_storage_project(owner.acquire_snapshot(0).unwrap().document()).unwrap(),
+            owner.content_revision(),
+            owner.history_depths(),
+        ),
+        before
+    );
+    result
+}
+
+#[test]
+fn order_array_normalization_matches_finite_first_component_and_signed_zero() {
+    for code in ["4", "[4]", "[4,99]", "[4,Infinity]", "[4,NaN]"] {
+        assert_eq!(normalized_order(code), Ok(4.0), "{code}");
+    }
+    for code in ["-0", "[-0]"] {
+        assert_eq!(
+            normalized_order(code).unwrap().to_bits(),
+            (-0.0f64).to_bits()
+        );
+    }
+    assert_eq!(
+        evaluate(&order_case("[4]")),
+        Err(ExpressionRefusal::NonPrimitive)
+    );
+    assert_eq!(evaluate(&order_case("4")), Ok(4.0));
+}
+
+#[test]
+fn order_normalization_rejects_invalid_shapes_without_coercion() {
+    for code in [
+        "[]",
+        "new Array(1)",
+        "[undefined]",
+        "[null]",
+        "['4']",
+        "[true]",
+        "[{}]",
+        "[NaN]",
+        "[Infinity]",
+        "[-Infinity]",
+        "[1n]",
+        "[Symbol('x')]",
+        "'4'",
+        "true",
+        "({0:4,length:1})",
+        "new Number(4)",
+    ] {
+        assert_eq!(
+            normalized_order(code),
+            Err(ExpressionRefusal::NonPrimitive),
+            "{code}"
+        );
+    }
+    for code in ["NaN", "Infinity", "-Infinity"] {
+        assert_eq!(normalized_order(code), Err(ExpressionRefusal::NonFinite));
+    }
+    // Typed-array intrinsics remain unavailable in this accepted runtime.
+    assert_eq!(
+        normalized_order("new Float64Array([4])"),
+        Err(ExpressionRefusal::Guest)
+    );
+    assert_eq!(normalized_order("[value+frame/5]"), Ok(4.0));
+}
+
+#[test]
+fn order_normalization_preserves_slice_and_getter_behavior() {
+    let getter = "let n=0;let a=[];Object.defineProperty(a,'0',{get:()=>++n});return a;";
+    assert_eq!(normalized_order(getter), Ok(1.0)); // slice reads the original getter once
+    let slice = "let a=[99];Object.defineProperty(a,'slice',{value:()=>[5]});return a;";
+    assert_eq!(normalized_order(slice), Ok(5.0));
+    for code in [
+        "let a=[];Object.defineProperty(a,'0',{get:()=>{throw new Error('getter');}});return a;",
+        "let a=[4];Object.defineProperty(a,'slice',{get:()=>{throw new Error('slice');}});return a;",
+    ] {
+        assert_eq!(normalized_order(code), Err(ExpressionRefusal::Guest));
+        assert_eq!(normalized_order("[value+frame/5]"), Ok(4.0));
+    }
+    let bad_slice = "let a=[4];Object.defineProperty(a,'slice',{value:()=>[5,Infinity]});return a;";
+    assert_eq!(
+        normalized_order(bad_slice),
+        Err(ExpressionRefusal::NonPrimitive)
+    );
+}
+
+#[test]
+fn order_normalization_bounded_child() {
+    let Ok(case) = std::env::var("NEMO_NORMALIZED_ORDER_CASE") else {
+        return;
+    };
+    let (code, refusal) = match case.as_str() {
+        "loop" => (
+            "let a=[];Object.defineProperty(a,'0',{get:()=>{while(true){}}});return a;",
+            ExpressionRefusal::Interrupted,
+        ),
+        "stack" => (
+            "let a=[];Object.defineProperty(a,'0',{get:function f(){return f();}});return a;",
+            ExpressionRefusal::Stack,
+        ),
+        "memory" => (
+            "let a=[];Object.defineProperty(a,'0',{get:()=> 'a'.repeat(16*1024*1024)});return a;",
+            ExpressionRefusal::Memory,
+        ),
+        "queue" => (
+            "(async()=>0)().then(()=>{while(true){}});return [4];",
+            ExpressionRefusal::QueuedAsyncWork,
+        ),
+        "import" => (
+            "import('file:///tmp/normalized-order-no-loader');return [4];",
+            ExpressionRefusal::QueuedAsyncWork,
+        ),
+        other => panic!("unknown bounded control {other}"),
+    };
+    assert_eq!(normalized_order(code), Err(refusal));
+    assert_eq!(normalized_order("[value+frame/5]"), Ok(4.0));
+}
+
+#[test]
+fn order_normalization_limits_and_queue_have_independent_watchdogs() {
+    for case in ["loop", "stack", "memory", "queue", "import"] {
+        supervised_test(
+            "object_expression_runtime_tests::order_normalization_bounded_child",
+            "NEMO_NORMALIZED_ORDER_CASE",
+            case,
+        );
+    }
+}
+
+#[test]
+fn normalized_detached_candidate_rechecks_real_owner_after_runtime_retirement() {
+    use crate::object_expression_pin::prepare_expression_request;
+    use crate::object_expression_runtime::evaluate_order_detached;
+    use crate::object_frame_packet::ObjectFrameError;
+    let mut owner = owner(&order_case("[4]")).unwrap();
+    let snapshot = owner.acquire_snapshot(0).unwrap();
+    let limits = ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap();
+    let request =
+        prepare_expression_request(&owner, &snapshot, &order_selector(&snapshot)).unwrap();
+    let candidate = evaluate_order_detached(&request, limits).unwrap();
+    let payload = json!({"command":"object.fill.set", "stableTarget":{
+        "contextId":"scene-root", "frameScope":{"kind":"authored","frame":7},
+        "layerUid":"L0", "strokeId":"s0"}, "fill":{"kind":"solid","r":0.5,"g":0.1,"b":0.3,"a":0.5}});
+    let fill = owner
+        .prepare_fill_json(&serde_json::to_vec(&payload).unwrap())
+        .unwrap();
+    assert_eq!(owner.commit_fill(fill), Ok(1));
+    let after = encode_storage_project(owner.acquire_snapshot(1).unwrap().document()).unwrap();
+    assert_eq!(
+        request.finalize(&owner, candidate),
+        Err(ExpressionRefusal::Pin(ObjectFrameError::WrongRevision))
+    );
+    assert_eq!(owner.content_revision(), 1);
+    assert_eq!(owner.history_depths(), (1, 0));
+    let current = owner.acquire_snapshot(1).unwrap();
+    assert_eq!(encode_storage_project(current.document()).unwrap(), after);
+    assert_eq!(
+        crate::object_expression_runtime::evaluate_order_for_owner(
+            &owner,
+            &current,
+            &order_selector(&current),
+            limits
+        ),
+        Ok(4.0)
+    );
 }
