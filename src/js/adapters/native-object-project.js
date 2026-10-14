@@ -15,12 +15,14 @@
       !/^[a-f0-9]{64}$/.test(v.documentDigest)||!integer(v.byteCount,1)||v.byteCount>32*1024*1024||
       !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!(v.fps>0)||
       !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string'&&
-        (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string');}))throw new Error('Native project metadata is uncorrelated');
+        (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string')&&
+        (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean');}))throw new Error('Native project metadata is uncorrelated');
     // Copy only admitted UI fields; embedded files/objects never become JS state.
     var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
       'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});
     result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
-      if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;return row;});
+      if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;
+      if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;return row;});
     var r=v.reference;
     if(r!==null&&(!r||!id(r.id)||typeof r.name!=='string'||typeof r.visible!=='boolean'||!Number.isFinite(r.opacity)||
       r.opacity<0||r.opacity>1||!Number.isSafeInteger(r.offsetFrames)))throw new Error('Native reference metadata is invalid');
@@ -187,6 +189,16 @@
     function history(action){if(action!=='undo'&&action!=='redo')return Promise.reject(new Error('Unsupported history action'));
       return mutation(function(pin){return {apiVersion:2,requestId:requestId(action),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.'+action,expectedRevision:pin.contentRevision,payload:{command:'object.'+action}};},'nemo_native_object_dispatch');}
+    function setLayerVisibility(layerUid,visible){
+      return mutation(function(pin){
+        if(typeof layerUid!=='string'||!layerUid||typeof visible!=='boolean'||
+          pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length!==1)
+          throw new Error('Native layer visibility target or value is invalid');
+        return {apiVersion:2,requestId:requestId('visibility'),instanceId:pin.instanceId,documentId:pin.documentId,
+          operation:'command.document.object.layer.visibility.set',expectedRevision:pin.contentRevision,
+          payload:{command:'object.layer.visibility.set',layerUid:layerUid,visible:visible}};
+      },'nemo_native_object_dispatch');
+    }
     async function acquirePin(request){
       requireActive();var value=await inspect(request.requestId);
       if(request.operation!=='query.document.project.info'||request.instanceId!==value.instanceId||request.documentId!==value.documentId||request.payload.atRevision!==value.contentRevision)throw new Error('Native save pin changed');
@@ -215,7 +227,7 @@
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
     return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
-      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,
+      info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},

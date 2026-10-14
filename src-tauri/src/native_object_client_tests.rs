@@ -67,6 +67,85 @@ pub(super) fn dispatch(state: &ApplicationMcp, request: &Value) -> Value {
 }
 
 #[test]
+fn raw_visibility_uses_real_owner_history_replay_and_strict_original_bytes() {
+    let state = ApplicationMcp::default();
+    let receipt = install(&state);
+    let visibility = |id: &str, revision, visible| {
+        request(
+            &receipt,
+            id,
+            revision,
+            "command.document.object.layer.visibility.set",
+            json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":visible}),
+        )
+    };
+    let serialize = |revision| {
+        let query = json!({"apiVersion":2,"requestId":format!("visible-read-{revision}"),
+            "instanceId":receipt["instanceId"],"documentId":receipt["documentId"],
+            "operation":"query.document.object.serialize","payload":{"atRevision":revision}});
+        dispatch(&state, &query)["result"]["documentJson"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let before = serialize(0);
+    let hide = visibility("visible-hide", 0, false);
+    let applied = dispatch(&state, &hide);
+    assert_eq!(applied["ok"], true);
+    assert_eq!(applied["contentRevision"], 1);
+    let hidden = serialize(1);
+    assert_eq!(
+        serde_json::from_str::<Value>(&hidden).unwrap()["layers"][0]["visible"],
+        false
+    );
+    let noop = dispatch(&state, &visibility("visible-noop", 1, false));
+    assert_eq!(noop["result"]["applied"], false);
+    assert_eq!(noop["contentRevision"], 1);
+    assert_eq!(
+        dispatch(&state, &history(&receipt, "visible-undo", 1, "undo"))["ok"],
+        true
+    );
+    assert_eq!(serialize(2), before);
+    let unchanged = dispatch(&state, &visibility("visible-redo-noop", 2, true));
+    assert_eq!(unchanged["result"]["applied"], false);
+    assert_eq!(
+        dispatch(&state, &history(&receipt, "visible-redo", 2, "redo"))["ok"],
+        true
+    );
+    assert_eq!(serialize(3), hidden);
+    assert_eq!(dispatch(&state, &hide), applied);
+    let mut changed = hide.clone();
+    changed["payload"]["visible"] = json!(true);
+    assert_eq!(
+        dispatch(&state, &changed)["error"]["code"],
+        "invalid_request"
+    );
+    let mut cancelled = visibility("visible-cancel", 3, true);
+    cancelled["cancelledBeforeDispatch"] = json!(true);
+    assert_eq!(
+        dispatch(&state, &cancelled)["error"]["code"],
+        "cancelled_before_dispatch"
+    );
+    assert_eq!(
+        dispatch(&state, &visibility("visible-stale", 0, true))["error"]["code"],
+        "stale_revision"
+    );
+    let duplicate = visibility("visible-duplicate", 3, false)
+        .to_string()
+        .replace("\"visible\":false", "\"visible\":false,\"visible\":true");
+    assert!(crate::application_mcp::object_client::dispatch_raw(&state, &duplicate).is_err());
+    assert_eq!(serialize(3), hidden);
+    let status = crate::application_mcp::object_client::client_status(&state).unwrap();
+    assert_eq!(status["contentRevision"], 3);
+    assert!(status["operations"]
+        .as_array()
+        .unwrap()
+        .contains(&json!("command.document.object.layer.visibility.set")));
+    assert_eq!(status["publicCapabilityAvailable"], false);
+    assert_eq!(status["mcpAvailable"], false);
+}
+
+#[test]
 fn common_application_fill_undo_redo_preserves_full_objects_and_correlated_revisions() {
     let state = ApplicationMcp::default();
     let receipt = install(&state);
