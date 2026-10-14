@@ -31,9 +31,12 @@ in its issue, pull request, or lead-designated queue; do not create a competing 
   pushes and issue handoffs. Use [testing and debugging](engineering/remediation/reference/03_TESTING_AND_DEBUGGING.md)
   and [modularity policy](engineering/remediation/reference/04_MODULARITY_POLICY.md) as supporting
   references; planned tooling is not implemented merely because a document names it.
-- Work through Ilya's or Cyrill's local team, at most one orchestrator and two delegates
-  each. Reuse one branch per outcome across sprints; keep at most two writable task
-  worktrees plus the primary checkout per machine. Progress and handoffs belong in the
+- Work through Ilya's or Cyrill's named local team. By default, use at most one
+  orchestrator and two delegates per human and two writable task worktrees plus the
+  primary checkout per machine. The execution checklist's conditional four-outcome
+  expansion applies only after its protected amendment and a live, capacity-verified
+  activation in #1062; a plan, model choice or idle session does not activate a slot.
+  Reuse one branch per outcome across sprints. Progress and handoffs belong in the
   existing issue, not new report PRs or additional ledgers.
 - Keep operational `main` unchanged by interim remediation. Target remediation task PRs
   to the shared protected `codex/native-remediation` integration branch; unrelated product
