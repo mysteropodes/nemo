@@ -56,6 +56,7 @@ impl NativeObjectHost {
         id: &str,
         fingerprint: &[u8],
         prepares: bool,
+        close_token: Option<&str>,
     ) -> Result<(), String> {
         if id.is_empty() || id.len() > 128 || fingerprint.len() > 4096 {
             return Err("invalid_request:inactive request exceeds limits".into());
@@ -63,7 +64,15 @@ impl NativeObjectHost {
         if self.inactive_requests.contains_key(id) {
             return Err("request_conflict:inactive request already admitted".into());
         }
-        if self.inactive_requests.len() >= 16 {
+        let closes_current = self
+            .inactive_project
+            .as_ref()
+            .is_some_and(|(token, _)| Some(token.as_str()) == close_token);
+        // Preserve one receipt for closing B, including after a lost prepare reply.
+        let needs_close_reserve = prepares || (self.inactive_project.is_some() && !closes_current);
+        if self.inactive_requests.len() >= 16
+            || (needs_close_reserve && self.inactive_requests.len() >= 15)
+        {
             return Err("unavailable:inactive request receipt capacity exhausted".into());
         }
         if self.inactive_requests.values().any(|r| r.outcome.is_none()) {

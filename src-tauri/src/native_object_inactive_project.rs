@@ -229,10 +229,17 @@ fn request_with(
             }
             return Ok(Admission::Reply(encode(Ok(value))));
         }
+        let close_token = match &request.action {
+            Action::Close { preparation_token } if !request.cancelled_before_dispatch => {
+                Some(preparation_token.as_str())
+            }
+            _ => None,
+        };
         owner.begin_inactive_request(
             &request.request_id,
             &fingerprint,
             matches!(&request.action, Action::Prepare { .. }) && !request.cancelled_before_dispatch,
+            close_token,
         )?;
         if request.cancelled_before_dispatch {
             let reply = encode(Err(error(

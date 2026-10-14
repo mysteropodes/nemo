@@ -50,6 +50,16 @@ impl Fixture {
             || {},
         )
     }
+    fn without_io(&self, request: &Value) -> HostResult<Value> {
+        request_with(
+            &self.state,
+            &request.to_string(),
+            "main",
+            |_| panic!("request must not reach file I/O"),
+            || {},
+            || {},
+        )
+    }
     fn inspect(&self, id: &str) -> Value {
         self.run(&self.request("inspect", json!({"kind":"inspect","recoverRequestId":id})))
             .unwrap()
@@ -325,20 +335,12 @@ fn cancelled_capacity_and_file_refusals_are_retained_without_eviction() {
     let f = Fixture::new();
     let mut cancelled = f.prepare("cancelled");
     cancelled["cancelledBeforeDispatch"] = true.into();
-    let first = request_with(
-        &f.state,
-        &cancelled.to_string(),
-        "main",
-        |_| panic!("cancelled I/O"),
-        || {},
-        || {},
-    )
-    .unwrap_err();
+    let first = f.without_io(&cancelled).unwrap_err();
     assert_eq!(first.code, "cancelled_before_dispatch");
     assert_eq!(f.run(&cancelled).unwrap_err(), first);
     cancelled["cancelledBeforeDispatch"] = false.into();
     assert_eq!(f.run(&cancelled).unwrap_err().code, "request_conflict");
-    for i in 0..15 {
+    for i in 0..13 {
         let request = f.prepare(&format!("denied-{i}"));
         let failure = request_with(
             &f.state,
@@ -351,15 +353,24 @@ fn cancelled_capacity_and_file_refusals_are_retained_without_eviction() {
         .unwrap_err();
         assert_eq!(f.run(&request).unwrap_err(), failure);
     }
-    let exhausted = request_with(
-        &f.state,
-        &f.prepare("exhausted").to_string(),
-        "main",
-        |_| panic!("capacity must refuse before I/O"),
-        || {},
-        || {},
-    )
-    .unwrap_err();
+    let prepared = f.run(&f.prepare("last-prepare")).unwrap();
+    let close = f.request(
+        "last-close",
+        json!({"kind":"close","preparationToken":prepared["preparationToken"]}),
+    );
+    let mut cancelled_close = close.clone();
+    cancelled_close["cancelledBeforeDispatch"] = true.into();
+    let mut wrong_close = close.clone();
+    wrong_close["action"]["preparationToken"] = "foreign".into();
+    for blocked in [cancelled_close, wrong_close, f.prepare("busy")] {
+        assert!(f
+            .without_io(&blocked)
+            .unwrap_err()
+            .message
+            .contains("capacity"));
+    }
+    assert_eq!(f.without_io(&close).unwrap()["state"], "inactive-closed");
+    let exhausted = f.without_io(&f.prepare("exhausted")).unwrap_err();
     assert!(exhausted.message.contains("capacity"));
     assert_eq!(
         f.inspect("cancelled")["recoveredRequest"]["outcome"]["error"]["code"],
