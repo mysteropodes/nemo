@@ -367,7 +367,6 @@
       "export_job::ReconciliationStage",
       "export_job::StagedArtifactPort",
       "export_job::export_object_frames",
-      "export_job::export_one_object_frame",
       "history::InactiveProject",
       "history::NativeObjectHistory",
       "history::PreparedProjectReplacement",
