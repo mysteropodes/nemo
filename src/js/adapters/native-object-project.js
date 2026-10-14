@@ -14,11 +14,13 @@
       !id(v.documentSnapshotId)||!integer(v.contentRevision,0)||!integer(v.lifecycleGeneration,1)||
       !/^[a-f0-9]{64}$/.test(v.documentDigest)||!integer(v.byteCount,1)||v.byteCount>32*1024*1024||
       !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!(v.fps>0)||
-      !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string';}))throw new Error('Native project metadata is uncorrelated');
+      !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string'&&
+        (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string');}))throw new Error('Native project metadata is uncorrelated');
     // Copy only admitted UI fields; embedded files/objects never become JS state.
     var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
       'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});
-    result.layers=v.layers.map(function(l){return {layerUid:l.layerUid};});
+    result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
+      if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;return row;});
     var r=v.reference;
     if(r!==null&&(!r||!id(r.id)||typeof r.name!=='string'||typeof r.visible!=='boolean'||!Number.isFinite(r.opacity)||
       r.opacity<0||r.opacity>1||!Number.isSafeInteger(r.offsetFrames)))throw new Error('Native reference metadata is invalid');

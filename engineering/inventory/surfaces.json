@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ba837d750ecef23fb97f15360e8b854cf8b5bf8a",
-  "describe": "v0.7.0-alpha.4-1756-gba837d75-dirty"
+  "head": "7bfb6400df97149c0374c42695b8cce90c4b7a0d",
+  "describe": "v0.7.0-alpha.4-1774-g7bfb6400"
  },
- "inputsDigest": "a097ae725045b8edb880babb20958f3a7dd1c9b02bcf5d106a8dfcb8869ba9ff",
+ "inputsDigest": "1c3b7a41fb8db518619080d202e5466d097920db4b74e87b15c015129fca16e0",
  "states": [
   "inventoried",
   "characterized",
@@ -2497,7 +2497,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 97,
+    "functionsVisited": 99,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9131 action()"
@@ -10263,7 +10263,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 71,
+    "functionsVisited": 73,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2898 updateCornersPanel()",
