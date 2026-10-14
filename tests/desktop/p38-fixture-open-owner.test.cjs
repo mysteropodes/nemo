@@ -231,6 +231,11 @@ function makeServices(overrides = {}) {
         nodes:[{path:'0',role:'AXWindow'}], ...(name==='ready'?overrides.readySnapshot:{}) };
     },
     async quit() { events.push('quit'); if (overrides.quitFailure) fail('inspection','inspection-refused'); },
+    async capture(window,index) {
+      const phase=PHASES[index];events.push('capture:'+phase);
+      if(overrides.captureFailure===phase)fail('capture','capture-refused');
+      return {phase,pid:window.pid,windowId:window.windowId,capture:'capture-'+(index+1)+'.png',sha256:'e'.repeat(64),width:800,height:600};
+    },
     async close() {
       events.push('cleanup');
       if (overrides.cleanupFailure) fail('cleanup','helper-cleanup-incomplete');
@@ -310,7 +315,8 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
       return raw;
     }
     f.services.startHelper=async()=>({next:async()=>({status:'pinned',pid:42,windowId:6068,matchedAX:true}),
-      inspect:async identity=>actual.observeProjectTabs(wire,identity,state),quit:async()=>f.events.push('quit'),
+      inspect:async identity=>actual.observeProjectTabs(wire,identity,state),capture:async(window,index)=>({phase:PHASES[index],
+        pid:window.pid,windowId:window.windowId,capture:'capture-'+(index+1)+'.png',sha256:'e'.repeat(64),width:800,height:600}),quit:async()=>f.events.push('quit'),
       close:async()=>f.events.push('cleanup')});
     const result=await runObserver(config,f.services);return {...f,result,requests};
   }
@@ -337,6 +343,8 @@ test('successful owner observation acknowledges ready, A, prepared B and closed 
   assert.deepEqual(result.observations.map(item=>item.phase),PHASES);
   assert.deepEqual(f.acks.map(item=>item.phase),PHASES);
   assert.ok(f.acks.every(item=>item.token==='d'.repeat(32)&&item.decision==='accepted'));
+  assert.deepEqual(f.events.filter(x=>x.startsWith('capture:')),['capture:a-opened','capture:b-opened','capture:b-closed']);
+  for(const phase of PHASES.slice(1))assert.ok(f.events.indexOf('capture:'+phase)<f.events.indexOf('ack:'+phase));
   assert.ok(f.events.indexOf('quit') > f.events.indexOf('ack:b-closed'));
   assert.ok(f.events.indexOf('save:observed') > f.events.indexOf('ack:b-closed'));
   assert.ok(f.events.indexOf('cleanup') < f.events.indexOf('save:observed'));
