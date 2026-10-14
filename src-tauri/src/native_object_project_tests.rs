@@ -127,6 +127,8 @@ fn assert_p38_cpu_paint(bytes: &[u8]) {
     let document_id = owner.document_id().to_owned();
     let snapshot_id = info["documentSnapshotId"].as_str().unwrap().to_owned();
     let revision = owner.content_revision();
+    let width = info["canvasW"].as_u64().unwrap() as u32;
+    let height = info["canvasH"].as_u64().unwrap() as u32;
     for frame in [0, 7] {
         let selector = ObjectFrameSelector {
             instance_id: &instance_id,
@@ -137,7 +139,7 @@ fn assert_p38_cpu_paint(bytes: &[u8]) {
             scope_kind: FrameScopeKind::Authored,
             frame,
         };
-        let output = OutputSpec::new("frame", "rgba8", 64, 64, "srgb", "straight").unwrap();
+        let output = OutputSpec::new("frame", "rgba8", width, height, "srgb", "straight").unwrap();
         owner
             .with_prepared_object_preview(&selector, output, |_| Ok(()))
             .unwrap();
