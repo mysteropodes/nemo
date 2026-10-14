@@ -81,7 +81,7 @@ impl ExpressionRequest {
     }
 }
 
-fn verify_owner_snapshot(
+pub(super) fn verify_owner_snapshot(
     owner: &NativeObjectHistory,
     current: &ObjectSnapshot,
     supplied: &ObjectSnapshot,

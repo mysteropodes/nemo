@@ -342,3 +342,168 @@ fn actual_history_fill_undo_redo_and_reopen_leave_retained_packets_unchanged() {
     detached["records"][0]["record"]["fill"]["a"] = json!(0);
     assert_eq!(contents(&retained), original_packet);
 }
+
+#[cfg(feature = "object_expression_runtime")]
+mod expression_consumer {
+    use super::*;
+    use crate::history::NativeObjectHistory;
+    use crate::object_codec::{decode_storage_project, encode_storage_project};
+    use crate::object_expression_runtime::{ExpressionLimits, ExpressionRefusal};
+
+    pub(super) fn document(code: &str) -> Value {
+        let mut value = numeric_order_tests::document(&[7]);
+        value["compositionOrder"]["contexts"][0]["layers"][0]["order"] =
+            json!({"static":[0],"expression":{"enabled":true,"code":code}});
+        value
+    }
+    pub(super) fn owner(value: &Value) -> NativeObjectHistory {
+        NativeObjectHistory::new(
+            "C1-expression-consumer",
+            decode_storage_project(&serde_json::to_vec(value).unwrap()).unwrap(),
+        )
+        .unwrap()
+    }
+    pub(super) fn fingerprint(owner: &NativeObjectHistory) -> (Vec<u8>, u64, (usize, usize)) {
+        (
+            encode_storage_project(
+                owner
+                    .acquire_snapshot(owner.content_revision())
+                    .unwrap()
+                    .document(),
+            )
+            .unwrap(),
+            owner.content_revision(),
+            owner.history_depths(),
+        )
+    }
+    pub(super) fn consume(
+        owner: &NativeObjectHistory,
+        snapshot: &ObjectSnapshot,
+        frame: u32,
+    ) -> Result<ObjectFramePacket, ExpressionRefusal> {
+        let limits = ExpressionLimits::new(4096, 8_388_608, 262_144, 32).unwrap();
+        crate::object_expression_runtime::prepare_expression_order_frame_for_owner(
+            owner,
+            snapshot,
+            &selector(snapshot, FrameScopeKind::Authored, frame),
+            limits,
+        )
+    }
+
+    #[test]
+    fn real_owner_expression_values_route_into_manual_layer_and_element_order() {
+        let mut value = document("[value+3]");
+        let elements = &mut value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"];
+        elements[0]["order"] =
+            json!({"static":[2],"expression":{"enabled":true,"code":"[value+frame/5]"}});
+        elements[1]["order"] = json!({"static":[4]});
+        elements[2]["order"] =
+            json!({"static":[0],"expression":{"enabled":true,"code":"[4,Infinity]"}});
+        let owner = owner(&value);
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let before = fingerprint(&owner);
+        let packet = consume(&owner, &snapshot, 7).unwrap();
+        let layers = packet.numeric_order().unwrap().layers();
+        assert_eq!(
+            layers
+                .iter()
+                .map(|l| (l.source_layer_index(), l.value()))
+                .collect::<Vec<_>>(),
+            vec![(1, 3.0), (2, 2.0), (0, 1.0)]
+        );
+        assert_eq!(
+            layers[0]
+                .elements()
+                .iter()
+                .map(|e| (e.source_object_index(), e.value()))
+                .collect::<Vec<_>>(),
+            vec![(1, 4.0), (2, 4.0), (0, 3.4)]
+        );
+        assert_eq!(packet.document_snapshot_id(), snapshot.snapshot_id());
+        assert!(std::ptr::eq(
+            packet.snapshot().document(),
+            snapshot.document()
+        ));
+        assert_eq!(
+            packet
+                .records()
+                .map(|r| r.source_object_index())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4]
+        );
+        assert_eq!(fingerprint(&owner), before);
+        assert_eq!(
+            prepare_object_frame(&snapshot, &selector(&snapshot, FrameScopeKind::Authored, 7))
+                .unwrap_err(),
+            ObjectFrameError::Unavailable
+        );
+    }
+
+    #[test]
+    fn dormant_natural_and_refused_expressions_never_publish_partial_changes() {
+        for (code, refusal) in [
+            ("[NaN]", ExpressionRefusal::NonPrimitive),
+            ("Infinity", ExpressionRefusal::NonFinite),
+            ("value+time", ExpressionRefusal::Guest),
+            ("throw new Error('C1-guest');", ExpressionRefusal::Guest),
+            ("while(true){}", ExpressionRefusal::Interrupted),
+        ] {
+            let owner = owner(&document(code));
+            let before = fingerprint(&owner);
+            assert_eq!(
+                consume(&owner, &owner.acquire_snapshot(0).unwrap(), 7).unwrap_err(),
+                refusal
+            );
+            assert_eq!(fingerprint(&owner), before);
+        }
+        for order in [
+            json!({"static":[0],"expression":{"enabled":false,"code":"while(true){}"}}),
+            json!({"expression":{"enabled":true,"code":"while(true){}"}}),
+            json!({"static":[0],"expression":{"enabled":true,"code":""}}),
+        ] {
+            let mut value = document("[4]");
+            value["compositionOrder"]["contexts"][0]["layers"][0]["order"] = order;
+            let owner = owner(&value);
+            let before = fingerprint(&owner);
+            assert!(consume(&owner, &owner.acquire_snapshot(0).unwrap(), 7).is_ok());
+            assert_eq!(fingerprint(&owner), before);
+        }
+        let recovery = owner(&document("[4]"));
+        assert!(consume(&recovery, &recovery.acquire_snapshot(0).unwrap(), 7).is_ok());
+    }
+
+    #[test]
+    fn native_resolver_refuses_nonfinite_layer_and_element_results() {
+        for element in [false, true] {
+            let mut value = document("[4]");
+            if element {
+                value["compositionOrder"]["contexts"][0]["layers"][0]["order"] = json!({});
+                value["compositionOrder"]["contexts"][0]["scopes"][0]["elements"][0]["order"] =
+                    json!({"static":[0],"expression":{"enabled":true,"code":"[4]"}});
+            }
+            let owner = owner(&value);
+            let snapshot = owner.acquire_snapshot(0).unwrap();
+            let before = fingerprint(&owner);
+            for result in [f64::NAN, f64::INFINITY] {
+                let rejected = crate::object_frame_packet::prepare_object_frame_with_resolver(
+                    &snapshot,
+                    &selector(&snapshot, FrameScopeKind::Authored, 7),
+                    |_, _| Ok::<_, ObjectFrameError>(result),
+                )
+                .unwrap_err();
+                assert_eq!(rejected, ObjectFrameError::Unavailable);
+            }
+            let limits = ExpressionLimits::new(1, 8_388_608, 262_144, 32).unwrap();
+            let refusal =
+                crate::object_expression_runtime::prepare_expression_order_frame_for_owner(
+                    &owner,
+                    &snapshot,
+                    &selector(&snapshot, FrameScopeKind::Authored, 7),
+                    limits,
+                )
+                .unwrap_err();
+            assert_eq!(refusal, ExpressionRefusal::InputLimit);
+            assert_eq!(fingerprint(&owner), before);
+        }
+    }
+}

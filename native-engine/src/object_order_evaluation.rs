@@ -146,12 +146,17 @@ pub(super) fn numeric(order: &AuthoredOrder, frame: u32) -> Result<f64, ObjectFr
 }
 type SourceIndices<'a> = HashMap<(&'a str, &'a FrameScope, &'a str, &'a str), usize>;
 
-fn elements(
+fn elements<E, F>(
     sources: &SourceIndices<'_>,
     context: &OrderContext,
     frame: u32,
     layer: &str,
-) -> Result<Vec<NumericElementOrder>, ObjectFrameError> {
+    resolver: &mut F,
+) -> Result<Vec<NumericElementOrder>, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+{
     let scope = context
         .scopes
         .iter()
@@ -166,14 +171,16 @@ fn elements(
     let routed = entries.iter().any(|e| routing_presence(&e.order));
     let mut result = Vec::new();
     for entry in entries {
-        if routed && active_expression(&entry.order) {
-            return Err(ObjectFrameError::Unavailable);
-        }
-        let value = if routed {
+        let value = if routed && active_expression(&entry.order) {
+            resolver(layer, Some(&entry.stroke_id))?
+        } else if routed {
             numeric(&entry.order, frame)?
         } else {
             0.0
         };
+        if !value.is_finite() {
+            return Err(ObjectFrameError::Unavailable.into());
+        }
         let index = sources
             .get(&(
                 context.context_id.as_str(),
@@ -198,6 +205,20 @@ pub(crate) fn prepare(
     snapshot: &ObjectSnapshot,
     frame: u32,
 ) -> Result<NumericOrderPlan, ObjectFrameError> {
+    prepare_with_resolver(snapshot, frame, |_, _| Err(ObjectFrameError::Unavailable))
+}
+
+/// Private native application seam; evaluation never imports a runtime/owner.
+/// A resolver may only supply a finite scalar for an already routed holder.
+pub(super) fn prepare_with_resolver<E, F>(
+    snapshot: &ObjectSnapshot,
+    frame: u32,
+    mut resolver: F,
+) -> Result<NumericOrderPlan, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+{
     let doc = snapshot.document();
     let plan = doc
         .composition_order
@@ -226,7 +247,7 @@ pub(crate) fn prepare(
             target.stroke_id.as_str(),
         );
         if sources.insert(key, index).is_some() {
-            return Err(ObjectFrameError::InvalidSource);
+            return Err(ObjectFrameError::InvalidSource.into());
         }
     }
     let mut entries: Vec<_> = context.layers.iter().collect();
@@ -234,14 +255,16 @@ pub(crate) fn prepare(
     let mut layers = Vec::new();
     for layer in entries {
         let explicit = has_keys(&layer.order) || !layer.order.static_value.missing();
-        if explicit && active_expression(&layer.order) {
-            return Err(ObjectFrameError::Unavailable);
-        }
-        let value = if explicit {
+        let value = if explicit && active_expression(&layer.order) {
+            resolver(&layer.layer_uid, None)?
+        } else if explicit {
             numeric(&layer.order, frame)?
         } else {
             (context.layers.len() - layer.natural_position as usize) as f64
         };
+        if !value.is_finite() {
+            return Err(ObjectFrameError::Unavailable.into());
+        }
         layers.push(NumericLayerOrder {
             source_layer_index: *source
                 .get(layer.layer_uid.as_str())
@@ -249,7 +272,7 @@ pub(crate) fn prepare(
             natural_position: layer.natural_position,
             value,
             explicit,
-            elements: elements(&sources, context, frame, &layer.layer_uid)?,
+            elements: elements(&sources, context, frame, &layer.layer_uid, &mut resolver)?,
         });
     }
     let mut front: Vec<_> = layers

@@ -210,33 +210,60 @@ pub fn prepare_object_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
+    prepare_frame_with_order(snapshot, selector, order::prepare)
+}
+
+/// Private resolver seam; all packet pins, records and sorting stay native.
+pub(crate) fn prepare_object_frame_with_resolver<E, F>(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    resolver: F,
+) -> Result<ObjectFramePacket, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+{
+    prepare_frame_with_order(snapshot, selector, |snapshot, frame| {
+        order::prepare_with_resolver(snapshot, frame, resolver)
+    })
+}
+
+fn prepare_frame_with_order<E, F>(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    prepare_order: F,
+) -> Result<ObjectFramePacket, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnOnce(&ObjectSnapshot, u32) -> Result<NumericOrderPlan, E>,
+{
     if selector.instance_id != snapshot.instance_id() {
-        return Err(ObjectFrameError::WrongInstance);
+        return Err(ObjectFrameError::WrongInstance.into());
     }
     if selector.document_id != snapshot.document_id() {
-        return Err(ObjectFrameError::WrongDocument);
+        return Err(ObjectFrameError::WrongDocument.into());
     }
     if selector.content_revision != snapshot.content_revision() {
-        return Err(ObjectFrameError::WrongRevision);
+        return Err(ObjectFrameError::WrongRevision.into());
     }
     if selector.document_snapshot_id != snapshot.snapshot_id() {
-        return Err(ObjectFrameError::WrongSnapshot);
+        return Err(ObjectFrameError::WrongSnapshot.into());
     }
     let v2 = snapshot.document().format_version() == 2;
     if v2
         && (selector.context_id != "scene-root" || selector.scope_kind != FrameScopeKind::Authored)
     {
-        return Err(ObjectFrameError::Unavailable);
+        return Err(ObjectFrameError::Unavailable.into());
     }
     if selector.context_id != "scene-root" {
-        return Err(ObjectFrameError::InvalidContext);
+        return Err(ObjectFrameError::InvalidContext.into());
     }
     let document = snapshot.document();
     if selector.frame >= document.total_frames() {
-        return Err(ObjectFrameError::FrameOutOfRange);
+        return Err(ObjectFrameError::FrameOutOfRange.into());
     }
     let numeric_order = if v2 {
-        Some(order::prepare(snapshot, selector.frame)?)
+        Some(prepare_order(snapshot, selector.frame)?)
     } else {
         None
     };

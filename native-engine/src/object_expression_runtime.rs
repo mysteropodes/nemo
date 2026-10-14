@@ -2,9 +2,11 @@
 //! A returned candidate owns only Rust data; every JS handle is retired first.
 use crate::history::NativeObjectHistory;
 use crate::object_expression_pin::{
-    prepare_expression_request, ExpressionRequest, ExpressionSelector,
+    prepare_expression_request, verify_owner_snapshot, ExpressionRequest, ExpressionSelector,
 };
-use crate::object_frame_packet::ObjectFrameError;
+use crate::object_frame_packet::{
+    prepare_object_frame_with_resolver, ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
+};
 use crate::revision::ObjectSnapshot;
 use rquickjs::{context::intrinsic, Context, Ctx, Error, Function, Runtime, Value};
 use std::sync::{
@@ -370,4 +372,39 @@ pub(crate) fn evaluate_order_for_owner(
         }
     };
     request.finalize(owner, candidate)
+}
+
+/// First private C1 consumer: resolve routed expressions in an immutable plan.
+/// Every result is detached and owner-checked; errors refuse the whole packet.
+pub(crate) fn prepare_expression_order_frame_for_owner(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    limits: ExpressionLimits,
+) -> Result<ObjectFramePacket, ExpressionRefusal> {
+    let verify = || {
+        let current = owner
+            .acquire_snapshot(owner.content_revision())
+            .ok_or(ObjectFrameError::Unavailable)?;
+        verify_owner_snapshot(owner, &current, snapshot)
+    };
+    verify()?;
+    if snapshot.document().format_version() != 2 {
+        return Err(ObjectFrameError::Unavailable.into());
+    }
+    let packet = prepare_object_frame_with_resolver(snapshot, selector, |layer_uid, stroke_id| {
+        evaluate_order_for_owner(
+            owner,
+            snapshot,
+            &ExpressionSelector {
+                frame: selector.clone(),
+                source_frame: selector.frame,
+                layer_uid,
+                stroke_id,
+            },
+            limits,
+        )
+    });
+    verify()?;
+    packet
 }
