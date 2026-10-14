@@ -171,6 +171,18 @@ fn javascript_signed_zero_coercions_are_kept() {
         &s(0.0),
         "two-entry bound is 0",
     );
+    // `Math.min(0, -0)` is -0, so a -0 upper bound wins over a +0 value.
+    assert_same(
+        &clamp(&s(0.0), &s(-1.0), &s(-0.0)),
+        &s(-0.0),
+        "min prefers -0",
+    );
+    // `Number([-0])` goes through a string and comes back as +0.
+    assert_same(
+        &clamp(&s(-5.0), &v(&[-0.0]), &s(1.0)),
+        &s(0.0),
+        "one-entry -0 bound reads +0",
+    );
 }
 
 #[test]
@@ -189,7 +201,7 @@ fn non_finite_inputs_read_as_zero() {
 }
 
 #[test]
-fn negative_controls_are_caught_by_the_oracle() {
+fn javascript_evaluation_order_and_step_rules_hold() {
     // `d * (PI / 180)` rounds differently from `(d * PI) / 180` for d = 1.5.
     let folded = 1.5 * (std::f64::consts::PI / 180.0);
     assert_ne!(
