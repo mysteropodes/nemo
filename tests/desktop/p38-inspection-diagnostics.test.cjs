@@ -250,3 +250,96 @@ test('P38 and Reference preserve raw no-value only with the exact same owned zer
   assert.equal(summary.missingChildCount, 0);
   assert.equal(diagnostics.validateCompletenessSummary({ ...summary, schema: 'nemo.p38-inspection-completeness/1' }), undefined);
 });
+
+// Independent bounded wire models exercise the real discovery producer. The
+// wide tree plus one grandchild reaches node4097 in35 reads; the branching tree reaches read64
+// with162 collected nodes. Repeated root nodes must not inflate either count.
+function budgetWire(boundary) {
+  const children = boundary === 'read-action-cap' ? 100 : 4095;
+  return request => {
+    const element = request.element || '', offset = request.childOffset || 0;
+    const page = request.childOffset !== undefined, branching = children === 100;
+    const end = Math.min(children, offset + 127);
+    const root = { path: element, role: element ? 'AXGroup' : 'AXWindow', childCount: element ? 1 : children };
+    const nodes = element ? [root, { path: element + '.0', role: 'AXButton', childCount: 0 }] :
+      [root, ...Array.from({ length: end - offset }, (_, i) => ({ path: String(offset + i),
+        role: 'AXGroup', childCount: branching || offset + i === 0 ? 1 : 0 }))];
+    return { status: 'ok', type: 'inspect', pid: 42, windowId: 9, matchedAX: true,
+      complete: !!element || end === children && !branching,
+      truncated: !element && end < children, depthClipped: !element && branching,
+      childrenUnreadable: false, foreignChildren: false, private: 'PRIVATE-RAW-SENTINEL', nodes,
+      ...(page ? { childOffset: offset, nextChildOffset: end, childCount: children,
+        pageToken: '12345678-1234-1234-1234-123456789abc', childrenComplete: end === children } : {}) };
+  };
+}
+
+test('actual budget producer, adapter and persisted owner distinguish both unchanged caps without a later effect', async () => {
+  for (const [boundary, reads, collectedNodes, priorActions] of [
+    ['read-action-cap', 63, 162, 0], ['collected-node-cap', 35, 4097, 0], ['collected-node-cap', 35, 4097, 2],
+  ]) {
+    for (const cleanupFails of [false, true]) {
+      const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'p38-budget-receipt-')));
+      try {
+        const f = observerServices(directory, cleanupFails), state = { actions: priorActions }, wire = budgetWire(boundary);
+        f.services.startHelper = async () => ({
+          next: async () => ({ status: 'pinned', pid: 42, windowId: 9, matchedAX: true }),
+          inspect: identity => diagnostics.inspectProjectTabs(request => { f.calls.reads++; return wire(request); }, identity, state, semantic),
+          capture: async () => { f.calls.captures++; assert.fail('capture after budget refusal'); },
+          quit: async () => assert.fail('quit after budget refusal'),
+          close: async () => { f.calls.closes++; if (cleanupFails) throw Error('PRIVATE-CLEANUP'); },
+        });
+        const outcome = await runObserver(f.config, f.services);
+        const saved = JSON.parse(fs.readFileSync(path.join(directory, 'owner-observation.json')));
+        assert.equal(saved.firstFailure.code, 'inspection-budget-refused');
+        assert.deepEqual(saved.firstFailure.budget, { schema: 'nemo.p38-inspection-budget/1', boundary,
+          sharedActionsUsed: reads + priorActions, collectedNodes });
+        assert.deepEqual(f.saved[0].firstFailure, saved.firstFailure);
+        assert.deepEqual(f.calls, { reads, checkpoints: 1, acknowledgments: 0, captures: 0, closes: 1 });
+        assert.equal(outcome.cleanup, cleanupFails ? 'incomplete' : 'complete');
+        assert.deepEqual(outcome.observations, []); assert.deepEqual(outcome.captures, []);
+        assert.equal(outcome.installedAcceptance, 'not-established');
+        assert.doesNotMatch(JSON.stringify(saved), /PRIVATE/);
+      } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+    }
+  }
+});
+
+test('the pre-existing shared cap refuses before another read and reports the pre-increment count', async () => {
+  let reads = 0;
+  const state = { actions: 63 };
+  await assert.rejects(diagnostics.inspectProjectTabs(() => { reads++; }, { pid: 42, windowId: 9 }, state, semantic), error => {
+    assert.deepEqual(error.budget, { schema: 'nemo.p38-inspection-budget/1', boundary: 'read-action-cap',
+      sharedActionsUsed: 63, collectedNodes: 0 });
+    return true;
+  });
+  assert.equal(reads, 0); assert.equal(state.actions, 64, 'existing post-increment semantics remain unchanged');
+  assert.doesNotThrow(() => diagnostics.requireBudget(true, 'PRIVATE', -1, Infinity));
+});
+
+test('budget metadata stays finite, branch-consistent and inspection-code scoped through every adapter', async () => {
+  const good = { schema: 'nemo.p38-inspection-budget/1', boundary: 'read-action-cap', sharedActionsUsed: 63, collectedNodes: 4096 };
+  for (const bad of [null, {}, { ...good, schema: 'future' }, { ...good, boundary: 'PRIVATE' },
+    { ...good, sharedActionsUsed: 62 }, { ...good, sharedActionsUsed: 64 }, { ...good, collectedNodes: 4097 },
+    ...[-1, 0.5, Infinity, NaN, '63', 1e20].map(value => ({ ...good, sharedActionsUsed: value })),
+    ...[-1, 0.5, Infinity, NaN, '4096', 4098].map(value => ({ ...good, collectedNodes: value })),
+    { ...good, boundary: 'collected-node-cap', collectedNodes: 4096 }]) {
+    assert.equal(diagnostics.validateBudget(bad), undefined);
+    const original = { code: 'inspection-budget-refused', budget: bad, private: 'PRIVATE' };
+    assert.deepEqual(diagnostics.failureBudget(original), {});
+    await assert.rejects(diagnostics.inspectProjectTabs(() => {}, {}, {}, {
+      observeProjectTabs: async () => { throw original; },
+    }), error => error.observerCode === 'inspection-budget-refused' && !Object.hasOwn(error, 'budget'));
+  }
+  for (const budget of [good, { ...good, boundary: 'collected-node-cap', sharedActionsUsed: 0, collectedNodes: 4097 },
+    { ...good, boundary: 'collected-node-cap', collectedNodes: 4097 }]) {
+    const original = { code: 'inspection-budget-refused', budget: { ...budget, token: 'PRIVATE' }, message: 'PRIVATE' };
+    assert.deepEqual(diagnostics.failureBudget(original), { budget });
+    await assert.rejects(diagnostics.inspectProjectTabs(() => {}, {}, {}, { observeProjectTabs: async () => { throw original; } }), error => {
+      assert.deepEqual(error.budget, budget); assert.deepEqual(diagnostics.failureBudget(error), { budget });
+      assert.doesNotMatch(JSON.stringify(error), /PRIVATE/); return true;
+    });
+    for (const other of [{ ...original, code: 'inspection-refused' },
+      { ...original, observerStage: 'capture', observerCode: 'inspection-budget-refused' }])
+      assert.deepEqual(diagnostics.failureBudget(other), {});
+  }
+});
