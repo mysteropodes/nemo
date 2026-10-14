@@ -5,7 +5,7 @@ use native_engine::{
     commands::{OpacityRequest, ResponseEnvelope},
     document::OpacityDocument,
     export_job::{ExportReleaseReconciliation, JobReceipt, PendingFrame, ReconciliationStage},
-    history::{NativeObjectHistory, PreparedProjectReplacement},
+    history::{InactiveProject, NativeObjectHistory, PreparedProjectReplacement},
     object_document::ObjectDocument,
     object_snapshot::ObjectSnapshot,
 };
@@ -29,11 +29,113 @@ fn envelope_identity(value: &str) -> bool {
 /// Exactly one admitted engine owner; no cloned authority or writable host mirror.
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
+    inactive_project: Option<(String, InactiveProject)>,
     preview: preview::ObjectPreview,
     object_export: Option<ExportReleaseReconciliation>,
     released: Option<ApplicationReleaseReceipt>,
 }
 impl NativeObjectHost {
+    // These internal operations also require the authority caller to retain its
+    // active lifecycle/revision admission guard for the entire host borrow.
+    fn require_inactive_owner(
+        &self,
+        instance: &str,
+        document: &str,
+        revision: u64,
+        snapshot: &str,
+    ) -> Result<(), String> {
+        if self.released.is_some() {
+            return Err("native project owner was released".into());
+        }
+        if self.instance_id() != instance || self.document_id() != document {
+            return Err("native inactive project owner changed".into());
+        }
+        if self.content_revision() != revision || !self.matches_project_snapshot(snapshot) {
+            return Err("native inactive project snapshot is stale".into());
+        }
+        Ok(())
+    }
+
+    /// Only detached metadata escapes; the actual charged B remains in this host.
+    pub(crate) fn prepare_inactive_project(
+        &mut self,
+        instance: &str,
+        document: &str,
+        revision: u64,
+        snapshot: &str,
+        bytes: &[u8],
+    ) -> Result<serde_json::Value, String> {
+        self.require_inactive_owner(instance, document, revision, snapshot)?;
+        if self.inactive_project.is_some() {
+            return Err("one inactive native project is already retained".into());
+        }
+        let project = self
+            .history
+            .prepare_inactive_project(snapshot, bytes)
+            .map_err(|error| format!("native inactive project admission: {error:?}"))?;
+        let info = Self::inactive_metadata(&project)?;
+        let token = info["preparationToken"]
+            .as_str()
+            .ok_or("native inactive project token unavailable")?
+            .to_owned();
+        self.inactive_project = Some((token, project));
+        Ok(info)
+    }
+
+    fn inactive_metadata(project: &InactiveProject) -> Result<serde_json::Value, String> {
+        let mut info = project
+            .metadata()
+            .map_err(|_| "native inactive project metadata unavailable")?;
+        // The fresh immutable B snapshot identity is an opaque retention token,
+        // never permission to activate or dispatch into B.
+        info["preparationToken"] = info["documentSnapshotId"].clone();
+        if serde_json::to_vec(&info).map_or(true, |bytes| bytes.len() > 65536) {
+            return Err("native inactive project metadata exceeds UI limit".into());
+        }
+        Ok(info)
+    }
+
+    pub(crate) fn inactive_project_info(
+        &self,
+        instance: &str,
+        document: &str,
+        revision: u64,
+        snapshot: &str,
+        token: &str,
+    ) -> Result<serde_json::Value, String> {
+        self.require_inactive_owner(instance, document, revision, snapshot)?;
+        let (retained, project) = self
+            .inactive_project
+            .as_ref()
+            .filter(|(retained, _)| retained == token)
+            .ok_or("native inactive project token is unavailable")?;
+        let info = Self::inactive_metadata(project)?;
+        if info["preparationToken"] != *retained {
+            return Err("native inactive project identity changed".into());
+        }
+        Ok(info)
+    }
+
+    pub(crate) fn close_inactive_project(
+        &mut self,
+        instance: &str,
+        document: &str,
+        revision: u64,
+        snapshot: &str,
+        token: &str,
+    ) -> Result<(), String> {
+        self.require_inactive_owner(instance, document, revision, snapshot)?;
+        if !self
+            .inactive_project
+            .as_ref()
+            .is_some_and(|(retained, _)| retained == token)
+        {
+            return Err("native inactive project token is unavailable".into());
+        }
+        self.inactive_project = None;
+        Ok(())
+    }
+
     pub(crate) fn matches_project_snapshot(&self, snapshot: &str) -> bool {
         self.released.is_none()
             && self
@@ -78,6 +180,7 @@ impl NativeObjectHost {
             .commit_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".to_string())?;
         self.preview = preview::ObjectPreview::default();
+        self.inactive_project = None;
         self.object_export = None;
         self.released = None;
         Ok(())
@@ -129,6 +232,7 @@ impl NativeObjectHost {
             .map_err(|_| "native project file admission failed")?;
         Ok(Self {
             history,
+            inactive_project: None,
             preview: preview::ObjectPreview::default(),
             object_export: None,
             released: None,
@@ -144,6 +248,7 @@ impl NativeObjectHost {
         }
         Ok(Self {
             history,
+            inactive_project: None,
             preview: preview::ObjectPreview::default(),
             object_export: None,
             released: None,
@@ -227,6 +332,7 @@ impl NativeDispatch for NativeObjectHost {
             }
         };
         self.released = Some(application.clone());
+        self.inactive_project = None;
         self.preview.release();
         Ok(self.preview.progress(application))
     }

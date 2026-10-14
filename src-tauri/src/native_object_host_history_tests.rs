@@ -260,3 +260,253 @@ fn actual_history_receipt_cannot_cross_terminal_release_and_new_incarnation() {
     );
     assert_eq!(content(&state)["document"], document());
 }
+
+mod inactive {
+    use super::*;
+    use crate::native_dispatch::NativeDispatch;
+    use native_engine::{
+        object_document::FrameScopeKind, object_frame_packet::ObjectFrameSelector,
+        scheduler::OutputSpec,
+    };
+
+    fn file(version: u32, width: u32) -> Vec<u8> {
+        const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGklEQVR4nGMQVDL+7xKa1sBQ3jGTYdXuM/8BN4oHrU/zhk0AAAAASUVORK5CYII=";
+        let mut drawing = document();
+        drawing["formatVersion"] = json!(version);
+        if version == 2 {
+            drawing["compositionOrder"] = json!({
+                "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                "contexts":[{"contextId":"scene-root","layers":[
+                    {"layerUid":"legacy layer:alpha","naturalPosition":0,"order":{}},
+                    {"layerUid":"0","naturalPosition":1,"order":{}}],
+                    "scopes":[{"frameScope":{"kind":"authored","frame":7},"elements":[
+                        {"layerUid":"legacy layer:alpha","strokeId":"ink/path_A","naturalPosition":0,"order":{}}]}]}],
+                "migration":"explicit-plan-required","referencePolicy":"unresolved"});
+        }
+        serde_json::to_vec(
+            &json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":width,"canvasH":180,"fps":24},"drawing":drawing,
+            "viewportReference":{"kind":"still-image","assetId":"media-1","name":"plate.png",
+                "visible":false,"opacity":0.5,"offsetFrames":-7},
+            "assets":[{"id":"media-1","mediaType":"image/png","encoding":"base64","data":PNG}]}),
+        )
+        .unwrap()
+    }
+
+    #[derive(Clone)]
+    struct Pins(String, String, u64, String);
+    impl Pins {
+        fn current(host: &NativeObjectHost) -> Self {
+            Self(
+                host.instance_id().into(),
+                host.document_id().into(),
+                host.content_revision(),
+                host.project_file_info().unwrap()["documentSnapshotId"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+            )
+        }
+        fn prepare(&self, host: &mut NativeObjectHost, bytes: &[u8]) -> Result<Value, String> {
+            host.prepare_inactive_project(&self.0, &self.1, self.2, &self.3, bytes)
+        }
+        fn inspect(&self, host: &NativeObjectHost, token: &str) -> Result<Value, String> {
+            host.inactive_project_info(&self.0, &self.1, self.2, &self.3, token)
+        }
+        fn close(&self, host: &mut NativeObjectHost, token: &str) -> Result<(), String> {
+            host.close_inactive_project(&self.0, &self.1, self.2, &self.3, token)
+        }
+    }
+    fn state(host: &NativeObjectHost) -> (String, String, Value, Vec<u8>) {
+        let pins = Pins::current(host);
+        let bytes = host
+            .project_file_snapshot(pins.2, &pins.3)
+            .unwrap()
+            .unwrap();
+        (pins.0, pins.1, host.project_file_info().unwrap(), bytes)
+    }
+    fn edit(host: &mut NativeObjectHost, action: &str, red: f64) {
+        let mut payload = cases()["command"]["request"]["payload"].clone();
+        if action == "fill.set" {
+            payload["fill"]["r"] = json!(red);
+        } else {
+            payload = json!({"command":format!("object.{action}")});
+        }
+        let request = json!({"apiVersion":2,"requestId":format!("edit-{}",host.content_revision()),
+            "instanceId":host.instance_id(),"documentId":host.document_id(),
+            "expectedRevision":host.content_revision(),"operation":format!("command.document.object.{action}"),"payload":payload});
+        let response = serde_json::to_value(
+            host.dispatch(serde_json::from_value(request).unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(response["ok"], true);
+    }
+
+    #[test]
+    fn cpu_inactive_host_keeps_dirty_a_and_one_b_under_current_pins() {
+        for version in [1, 2] {
+            let mut a =
+                NativeObjectHost::from_project_file("inactive-host".into(), &file(version, 320))
+                    .unwrap();
+            let clean = state(&a);
+            edit(&mut a, "fill.set", 0.8);
+            edit(&mut a, "fill.set", 0.2);
+            edit(&mut a, "undo", 0.0);
+            let before = state(&a);
+            assert_ne!(before.3, clean.3);
+            assert_eq!(a.history.history_depths(), (1, 1));
+            let pins = Pins::current(&a);
+            let bytes = file(version, 640);
+            for part in 0..4 {
+                let mut bad = pins.clone();
+                match part {
+                    0 => bad.0.push('x'),
+                    1 => bad.1.push('x'),
+                    2 => bad.2 += 1,
+                    _ => bad.3.push('x'),
+                }
+                assert!(bad.prepare(&mut a, &bytes).is_err());
+                assert_eq!(state(&a), before);
+                assert!(a.inactive_project.is_none());
+            }
+            for invalid in [
+                b"invalid".to_vec(),
+                serde_json::to_vec(&document()).unwrap(),
+            ] {
+                assert!(pins.prepare(&mut a, &invalid).is_err());
+                assert_eq!(state(&a), before);
+                assert!(a.inactive_project.is_none());
+            }
+            let info = pins.prepare(&mut a, &bytes).unwrap();
+            let token = info["preparationToken"].as_str().unwrap();
+            assert_eq!(info["canvasW"], 640);
+            assert_eq!(info["reference"]["name"], "plate.png");
+            assert_ne!(info["documentId"], a.document_id());
+            assert_eq!(info["origin"]["documentSnapshotId"], pins.3);
+            assert_eq!(state(&a), before);
+            let mut detached = pins.inspect(&a, token).unwrap();
+            detached["canvasW"] = json!(1);
+            assert_eq!(pins.inspect(&a, token).unwrap(), info);
+            assert!(pins
+                .prepare(&mut a, b"invalid")
+                .unwrap_err()
+                .contains("already retained"));
+            assert!(pins.close(&mut a, "wrong-token").is_err());
+            assert!(pins.inspect(&a, "wrong-token").is_err());
+            assert_eq!(state(&a), before);
+            edit(&mut a, "redo", 0.0);
+            let changed = state(&a);
+            assert!(pins.inspect(&a, token).is_err());
+            assert!(pins.close(&mut a, token).is_err());
+            let fresh = Pins::current(&a);
+            assert_eq!(fresh.inspect(&a, token).unwrap(), info);
+            fresh.close(&mut a, token).unwrap();
+            assert_eq!(state(&a), changed);
+            assert!(a.inactive_project.is_none());
+            assert!(fresh.close(&mut a, token).is_err());
+            let next = fresh.prepare(&mut a, &bytes).unwrap();
+            assert_ne!(next["preparationToken"], token);
+            assert!(fresh.close(&mut a, token).is_err());
+            assert_eq!(
+                fresh
+                    .inspect(&a, next["preparationToken"].as_str().unwrap())
+                    .unwrap(),
+                next
+            );
+        }
+    }
+
+    #[test]
+    fn cpu_inactive_host_refuses_file_and_metadata_limits_before_publication() {
+        let mut a =
+            NativeObjectHost::from_project_file("inactive-bounds".into(), &file(1, 320)).unwrap();
+        let before = state(&a);
+        let pins = Pins::current(&a);
+        // The real strict engine admission ceiling, without allocating decoded media.
+        assert!(pins
+            .prepare(&mut a, &vec![b' '; 32 * 1024 * 1024 + 1])
+            .unwrap_err()
+            .contains("Unavailable"));
+        let mut large: Value = serde_json::from_slice(&file(1, 640)).unwrap();
+        let layers = large["drawing"]["layers"].as_array_mut().unwrap();
+        layers.extend(
+            (0..2000).map(|i| json!({"layerUid":format!("extra-layer-{i:04}-{}","x".repeat(40))})),
+        );
+        assert!(pins
+            .prepare(&mut a, &serde_json::to_vec(&large).unwrap())
+            .unwrap_err()
+            .contains("metadata exceeds UI limit"));
+        assert!(a.inactive_project.is_none());
+        assert_eq!(state(&a), before);
+        assert!(pins.prepare(&mut a, &file(1, 640)).is_ok());
+    }
+
+    #[test]
+    fn cpu_inactive_host_release_and_replacement_drop_b_without_stale_success() {
+        let mut a =
+            NativeObjectHost::from_project_file("inactive-release".into(), &file(1, 320)).unwrap();
+        edit(&mut a, "fill.set", 0.8);
+        let before = state(&a);
+        let pins = Pins::current(&a);
+        let info = pins.prepare(&mut a, &file(2, 640)).unwrap();
+        let token = info["preparationToken"].as_str().unwrap();
+        let denied = a
+            .prepare_project_replacement(&pins.3, &file(1, 800))
+            .unwrap();
+        assert!(a.commit_project_replacement(denied).is_err());
+        assert_eq!(pins.inspect(&a, token).unwrap(), info);
+        assert_eq!(state(&a), before);
+        let replacement = a
+            .prepare_project_replacement(&pins.3, &file(1, 800))
+            .unwrap();
+        assert!(a.release_project().unwrap().reconciliation_complete());
+        assert!(a.inactive_project.is_none());
+        assert!(pins.prepare(&mut a, &file(1, 640)).is_err());
+        assert!(pins.inspect(&a, token).is_err());
+        assert!(pins.close(&mut a, token).is_err());
+        assert_eq!(state(&a), before);
+        assert!(a.release_project().unwrap().reconciliation_complete());
+        a.commit_project_replacement(replacement).unwrap();
+        assert!(a.inactive_project.is_none());
+        assert_ne!(a.document_id(), pins.1);
+        assert!(pins.prepare(&mut a, &file(1, 640)).is_err());
+        let fresh = Pins::current(&a);
+        assert!(fresh.prepare(&mut a, &file(1, 640)).is_ok());
+        assert!(fresh.close(&mut a, token).is_err());
+    }
+
+    #[test]
+    fn cpu_inactive_prepare_and_close_preserve_borrowed_preview_preparation() {
+        let mut a =
+            NativeObjectHost::from_project_file("inactive-preview".into(), &file(2, 320)).unwrap();
+        let pins = Pins::current(&a);
+        let selector = ObjectFrameSelector {
+            instance_id: &pins.0,
+            document_id: &pins.1,
+            content_revision: pins.2,
+            document_snapshot_id: &pins.3,
+            context_id: "scene-root",
+            scope_kind: FrameScopeKind::Authored,
+            frame: 7,
+        };
+        let output = OutputSpec::new("frame", "rgba8", 320, 180, "srgb", "straight").unwrap();
+        a.with_prepared_object_preview(&selector, output.clone(), |a| {
+            let info = pins.prepare(a, &file(1, 640))?;
+            assert!(a
+                .with_prepared_object_preview(&selector, output.clone(), |_| Ok(()))
+                .unwrap_err()
+                .contains("already borrowed"));
+            pins.close(a, info["preparationToken"].as_str().unwrap())?;
+            assert!(a
+                .with_prepared_object_preview(&selector, output.clone(), |_| Ok(()))
+                .unwrap_err()
+                .contains("already borrowed"));
+            Ok(())
+        })
+        .unwrap();
+        assert!(a
+            .with_prepared_object_preview(&selector, output, |_| Ok(()))
+            .is_ok());
+    }
+}
