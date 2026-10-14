@@ -1,6 +1,7 @@
 //! Private synchronous application route; no transport or capability activation.
 use crate::application_mcp::ApplicationMcp;
 use crate::native_dispatch::NativeObjectHost;
+use crate::native_object_desktop_preview::PreviewRevisionProof;
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort},
@@ -33,6 +34,18 @@ impl ApplicationMcp {
         expected: &ObjectFrameSelector<'_>,
         operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
     ) -> Result<T, String> {
+        self.with_object_preview_owner_for_preview(lifecycle_generation, expected, None, operation)
+    }
+
+    /// Only the private desktop preview route supplies this exact pending-event
+    /// proof. All other owner consumers use the strict ordinary route above.
+    pub(crate) fn with_object_preview_owner_for_preview<T>(
+        &self,
+        lifecycle_generation: u64,
+        expected: &ObjectFrameSelector<'_>,
+        revision_sync: Option<&PreviewRevisionProof>,
+        operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
+    ) -> Result<T, String> {
         if expected.instance_id != self.instance_id() {
             return Err("object preview application instance is stale".into());
         }
@@ -59,8 +72,31 @@ impl ApplicationMcp {
             .lock()
             .map_err(|_| "native revision lock unavailable")?;
         revisions.reconcile(lifecycle_generation, application.document_id());
-        if revisions.pending.is_some() {
-            return Err("native revision synchronization is pending or indeterminate; preview was not dispatched".into());
+        if let Some(pending) = revisions.pending.as_ref() {
+            let exact_subscriber_preview = revision_sync.is_some_and(|proof| {
+                let event = &proof.event;
+                !pending.failed
+                    && !pending.acknowledged
+                    && pending.sender.is_some()
+                    && revisions.subscriber.as_ref().is_some_and(|subscriber| {
+                        subscriber.subscription_id == proof.subscription_id
+                            && subscriber.instance_id == expected.instance_id
+                            && subscriber.document_id == expected.document_id
+                            && subscriber.lifecycle_generation == lifecycle_generation
+                    })
+                    && pending.event.instance_id == event.instance_id
+                    && pending.event.document_id == event.document_id
+                    && pending.event.lifecycle_generation == event.lifecycle_generation
+                    && pending.event.request_id == event.request_id
+                    && pending.event.from_revision == event.from_revision
+                    && pending.event.to_revision == event.to_revision
+                    && pending.event.to_revision == expected.content_revision
+            });
+            if !exact_subscriber_preview {
+                return Err("native revision synchronization is pending or indeterminate; preview was not dispatched".into());
+            }
+        } else if revision_sync.is_some() {
+            return Err("native revision preview proof has no pending event".into());
         }
         let owner = application
             .as_any_mut()
