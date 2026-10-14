@@ -352,6 +352,74 @@ test('unrecognized refusal and cleanup messages cannot enter the first-failure r
   assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
   for(const value of [r,...f.receipts])assert.equal(JSON.stringify(value).includes('/private/'),false);
 });
+test('main-inspect refusal preserves only finite diagnostic enums and never retries',async()=>{
+  const {safeInspectionDiagnostics}=require('./desktop/p38-installed-driver.cjs');
+  const diagnostics=[
+    {stage:'identity-precondition',queryClass:'identity-check-failed'},
+    {stage:'request-precondition',queryClass:'request-refused'},
+    {stage:'main-children-query',queryClass:'attribute-query-failed'},
+    {stage:'main-children-value',queryClass:'attribute-value-unreadable'},
+    {stage:'application-windows-query',queryClass:'attribute-query-failed'},
+    {stage:'application-windows-value',queryClass:'attribute-value-unreadable'},
+    {stage:'main-sheet-state',queryClass:'attached-sheet-present'},
+    {stage:'root-resolution',queryClass:'route-refused'},
+    {stage:'projection-budget',queryClass:'budget-refused'},
+    {stage:'ax-owner-query',queryClass:'ownership-refused'},
+    {stage:'ax-attribute-query',queryClass:'attribute-query-failed'},
+    {stage:'ax-children-query',queryClass:'attribute-value-unreadable'},
+    {stage:'ax-projection',queryClass:'topology-refused'},
+  ];
+  for(const diagnostic of diagnostics)assert.deepEqual(safeInspectionDiagnostics(diagnostic),diagnostic);
+  for(const diagnostic of [null,[],{stage:'main-children-query',queryClass:'attribute-query-failed',title:'private'},
+    {stage:'/private/path',queryClass:'secret'}, {stage:'main-children-query',queryClass:'attached-sheet-present'},
+    {stage:'main-sheet-state',queryClass:'attribute-query-failed'}])assert.equal(safeInspectionDiagnostics(diagnostic),undefined);
+  for(const diagnostic of [...diagnostics,{stage:'/private/path',queryClass:'secret',title:'private',value:'/private/file'}]){
+    const f=fixture({window(mode,pid,wid,action){return mode==='discover'?{pid,windowId:45,matchedAX:true}:
+      mode==='check'?{pid,windowId:45,matchedAX:true}:
+      {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,inspectionDiagnostics:diagnostic};}});
+    const result=await runOperator(f.cfg,f.services);
+    assert.equal(result.status,'partial');assert.equal(result.reason,'adapter-refused');
+    assert.equal(f.attempts,1);assert.equal(f.cleaned,1);
+    assert.equal(JSON.stringify(result).includes('/private/'),false);
+    if(diagnostics.includes(diagnostic))assert.deepEqual(result.firstFailure.inspectionDiagnostics,diagnostic);
+    else assert.equal(result.firstFailure.inspectionDiagnostics,undefined);
+  }
+  const sheet=fixture();let step=0;
+  sheet.services.next=async()=>step++===0?{type:'pin-sheet'}:{type:'inspect',target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa'};
+  sheet.services.window=async(mode,pid)=>mode==='discover'?{pid,windowId:45,matchedAX:true}:
+    mode==='pin-sheet'?{pid,windowId:45,matchedAX:true,target:'sheet',sheetToken:'da5f47f9-5681-4e71-a0b6-aa7578b6b5fa'}:
+      {status:'refused',code:'adapter-refused',pid,windowId:45,matchedAX:true,inspectionDiagnostics:diagnostics[2]};
+  const sheetResult=await runOperator(sheet.cfg,sheet.services);
+  assert.equal(sheetResult.reason,'adapter-refused');assert.equal(sheetResult.firstFailure.inspectionDiagnostics,undefined);
+});
+test('helper transport preserves bounded main-inspect diagnostic through its safe pipe boundary',async()=>{
+  const {createWindowTransport,cleanupHelper,safeDirectory}=require('./desktop/p38-installed-driver.cjs');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-inspect-diagnostic-')),helpers=new Set();
+  try{
+    const fixtures=['A','B'].map(label=>{const file=path.join(dir,label+'.json');fs.writeFileSync(file,JSON.stringify({label}));
+      return{label,path:file,sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')};});
+    const diagnostic={stage:'application-windows-query',queryClass:'attribute-query-failed'};
+    const helper=path.join(dir,'owned-window-helper');
+    const refused=JSON.stringify({status:'refused',code:'adapter-refused',pid:'__PID__',windowId:45,
+      matchedAX:true,inspectionDiagnostics:diagnostic}).replace('"__PID__"','r.pid');
+    const helperSource=['#!/usr/bin/env node',
+      'console.log(JSON.stringify({status:"pinned",pid:Number(process.argv[3]),windowId:45,matchedAX:true}));',
+      'require("node:readline").createInterface({input:process.stdin}).on("line",line=>{const r=JSON.parse(line);',
+      'const result=r.type==="check"?{status:"ok",type:r.type,pid:r.pid,windowId:45,matchedAX:true}: '+refused+';',
+      'console.log(JSON.stringify(result));});',''].join('\n');
+    fs.writeFileSync(helper,helperSource,{mode:0o700});
+    const guard=safeDirectory(dir,['reports']),window=createWindowTransport({workflow:'P38',windowHelper:helper,
+      grant:{id:'modeled-inspect'},fixtures},guard.directory,()=>guard,helpers);
+    const pinned=await window('discover',123);assert.equal(pinned.windowId,45);
+    await window('check',123,45);
+    await assert.rejects(window('inspect',123,45,{type:'inspect',target:'main'}),error=>{
+      assert.deepEqual(error.inspectionDiagnostics,diagnostic);assert.equal(error.code,'adapter-refused');return true;
+    });
+  }finally{
+    for(const child of [...helpers])await cleanupHelper(child);
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
 test('blocked local child metadata persists without foreign values or arbitrary reasons',()=>{
   const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
   const r=safeWindowEvidence({pid:123,windowId:45,matchedAX:true,nodes:[{path:'0',role:'other',blocked:'child-owner',value:'private',title:'secret'},
