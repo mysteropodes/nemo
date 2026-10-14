@@ -10,6 +10,11 @@ use native_engine::{
     object_snapshot::ObjectSnapshot,
 };
 use std::any::Any;
+use std::collections::BTreeMap;
+
+#[path = "native_object_inactive_requests.rs"]
+mod inactive_requests;
+use inactive_requests::InactiveRequest;
 
 #[path = "native_object_export.rs"]
 mod export;
@@ -30,6 +35,7 @@ fn envelope_identity(value: &str) -> bool {
 pub(crate) struct NativeObjectHost {
     history: NativeObjectHistory,
     inactive_project: Option<(String, InactiveProject)>,
+    inactive_requests: BTreeMap<String, InactiveRequest>,
     preview: preview::ObjectPreview,
     object_export: Option<ExportReleaseReconciliation>,
     released: Option<ApplicationReleaseReceipt>,
@@ -73,11 +79,18 @@ impl NativeObjectHost {
             .history
             .prepare_inactive_project(snapshot, bytes)
             .map_err(|error| format!("native inactive project admission: {error:?}"))?;
-        let info = Self::inactive_metadata(&project)?;
+        let mut info = Self::inactive_metadata(&project)?;
+        if let Some(id) = self.pending_inactive_request_id() {
+            info["preparationRequestId"] = serde_json::json!(id);
+        }
+        if serde_json::to_vec(&info).map_or(true, |v| v.len() > 65536) {
+            return Err("native inactive project metadata exceeds UI limit".into());
+        }
         let token = info["preparationToken"]
             .as_str()
             .ok_or("native inactive project token unavailable")?
             .to_owned();
+        self.record_inactive_prepared(&token);
         self.inactive_project = Some((token, project));
         Ok(info)
     }
@@ -133,6 +146,7 @@ impl NativeObjectHost {
             return Err("native inactive project token is unavailable".into());
         }
         self.inactive_project = None;
+        self.record_inactive_closed(token);
         Ok(())
     }
 
@@ -181,6 +195,7 @@ impl NativeObjectHost {
             .map_err(|_| "native project replacement origin changed".to_string())?;
         self.preview = preview::ObjectPreview::default();
         self.inactive_project = None;
+        self.inactive_requests.clear();
         self.object_export = None;
         self.released = None;
         Ok(())
@@ -233,6 +248,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             inactive_project: None,
+            inactive_requests: BTreeMap::new(),
             preview: preview::ObjectPreview::default(),
             object_export: None,
             released: None,
@@ -249,6 +265,7 @@ impl NativeObjectHost {
         Ok(Self {
             history,
             inactive_project: None,
+            inactive_requests: BTreeMap::new(),
             preview: preview::ObjectPreview::default(),
             object_export: None,
             released: None,
@@ -333,6 +350,7 @@ impl NativeDispatch for NativeObjectHost {
         };
         self.released = Some(application.clone());
         self.inactive_project = None;
+        self.inactive_requests.clear();
         self.preview.release();
         Ok(self.preview.progress(application))
     }
