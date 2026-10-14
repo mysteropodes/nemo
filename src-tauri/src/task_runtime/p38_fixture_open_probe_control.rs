@@ -9,6 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::Manager;
+use tauri_plugin_fs::FsExt;
 
 #[cfg(target_os = "linux")]
 pub(super) const NOFOLLOW_FLAG: i32 = 0x20000;
