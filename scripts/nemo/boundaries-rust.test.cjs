@@ -641,13 +641,4 @@ test('N25C2g input child registration keeps full validation at every production 
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8')).availability.state, 'unavailable');
 });
 
-test('N25D3/D4 command producer and independent consumers cannot lose source registration', () => {
-  const profile = structuredClone(read('rust.profile.json'));
-  const files = ['native-engine/src/object_command_dispatch.rs', 'native-engine/tests/object_command_dispatch.rs', 'src-tauri/src/native_object_host_command_tests.rs', 'native-engine/tests/object_history_dispatch.rs', 'src-tauri/src/native_object_host_history_tests.rs'];
-  for (const module of profile.modules) module.files = module.files.filter(file => !files.includes(`${module.dir}/${file}`));
-  const result = require('./lib/boundaries-coverage.cjs').checkSourceCoverage(profile, { root: ROOT, sourcePaths: files });
-  assert.ok(files.every(file => result.violations.some(v => v.rule === 'coverage-unprofiled-source' && v.file === file)));
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8')).operations, ['query.document.object']);
-});
-
 require('./boundaries-native-object-client.test.cjs');

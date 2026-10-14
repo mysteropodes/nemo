@@ -33,3 +33,12 @@ test('production raw entry stays behind main-window and common authority while t
   assert.match(shell, /application_mcp::nemo_native_object_client_status,/);
   for (const file of ['nemo-mcp/src/server.rs', 'nemo-mcp/src/wire.rs']) assert.match(read(file), /request\.validate\(\)/);
 });
+
+test('N25D3/D4 command producer and independent consumers cannot lose source registration', () => {
+  const without = structuredClone(profile);
+  const sources = ['native-engine/src/object_command_dispatch.rs', 'native-engine/tests/object_command_dispatch.rs', 'src-tauri/src/native_object_host_command_tests.rs', 'native-engine/tests/object_history_dispatch.rs', 'src-tauri/src/native_object_host_history_tests.rs'];
+  for (const module of without.modules) module.files = module.files.filter(file => !sources.includes(`${module.dir}/${file}`));
+  const result = coverage.checkSourceCoverage(without, { root, sourcePaths: sources });
+  assert.ok(sources.every(file => result.violations.some(v => v.rule === 'coverage-unprofiled-source' && v.file === file)));
+  assert.deepEqual(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).operations, ['query.document.object']);
+});
