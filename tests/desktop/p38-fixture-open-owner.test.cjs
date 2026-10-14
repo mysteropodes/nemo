@@ -206,7 +206,7 @@ function makeServices(overrides = {}) {
     },
     visibleEvidence(snapshot, expected) {
       events.push('visible:' + expected.phase);
-      if (snapshot.visible !== true) throw Object.assign(new Error('private native text'), { code:'probe-visible-state-refused' });
+      if (snapshot.visible !== true) throw Object.assign(new Error('private native text'), { code:overrides.visibleErrorCode || 'probe-visible-state-refused' });
       return { nodes:[] };
     },
     acknowledge(root, expected, token, decision) {
@@ -227,7 +227,8 @@ function makeServices(overrides = {}) {
       const name = phase[index];
       events.push('inspect:' + name);
       if (overrides.inspectFailure === name) fail('inspection','inspection-refused');
-      return { visible: overrides.visibleFailure !== name, pid:42, windowId:6068 };
+      return { visible: overrides.visibleFailure !== name, pid:42, windowId:6068, matchedAX:true,
+        nodes:[{path:'0',role:'AXWindow'}], ...(name==='ready'?overrides.readySnapshot:{}) };
     },
     async quit() { events.push('quit'); if (overrides.quitFailure) fail('inspection','inspection-refused'); },
     async close() {
@@ -300,8 +301,9 @@ for(const [label,options,stage,code] of failureCases) test('records sanitized fi
   const f=makeServices(options), candidate=options.invalidConfig?{...config,sourceHead:'invalid'}:config;
   const result=await runObserver(candidate,f.services);
   assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},{stage,code});
-  assert.equal(f.saved[0].firstFailure.stage,stage);
-  assert.equal(f.saved[0].firstFailure.code,code);
+  const failureReceipt=f.saved.find(value=>value.firstFailure);
+  assert.equal(failureReceipt.firstFailure.stage,stage);
+  assert.equal(failureReceipt.firstFailure.code,code);
   assert.doesNotMatch(JSON.stringify(f.saved),/private native text|helperPath|ownerToken|token/);
   const cleanAt=f.events.indexOf('cleanup');
   if(cleanAt>=0) assert.ok(f.events.findIndex(event=>event.startsWith('save:')) < cleanAt);
@@ -433,4 +435,71 @@ test('helper executable is accepted only at its pinned path and digest',()=>{
 test('helper receives only the two P38-scoped environment values',()=>{
   assert.deepEqual(helperEnvironment(config.grantId,'/private/report-root'),{
     NEMO_P38_GRANT:config.grantId,NEMO_P38_REPORT_ROOT:'/private/report-root'});
+});
+
+test('READY refusal retains safe exact-window evidence before refused ACK without A/B or quit',async()=>{
+  const f=makeServices({visibleFailure:'ready',readySnapshot:{private:'secret private path',nodes:[
+    {path:'0',role:'AXWindow',title:'private window title'},
+    {path:'0.1',role:'AXButton',control:'B',value:'private input value',enabled:true}]}});
+  const result=await runObserver(config,f.services);
+  assert.equal(result.readyVisibility.category,'ready-visible-state-refused');
+  assert.equal(result.readyVisibility.decision,'refused');
+  assert.deepEqual(result.readyVisibility.projection,{pid:42,windowId:6068,matchedAX:true,nodes:[
+    {path:'0',role:'AXWindow'},{path:'0.1',role:'AXButton',control:'B',enabled:true}]});
+  assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},
+    {stage:'inspection',code:'ready-visible-state-refused'});
+  assert.deepEqual(f.acks.map(x=>[x.phase,x.decision]),[['ready','refused']]);
+  assert.equal(f.events.includes('checkpoint:a-opened'),false);assert.equal(f.events.includes('quit'),false);
+  assert.ok(f.events.indexOf('save:inspection')<f.events.indexOf('ack:ready'));
+  assert.doesNotMatch(JSON.stringify(f.saved),/private|secret|title|value|ownerToken|token/);
+  assert.equal(result.installedAcceptance,'not-established');assert.equal(result.cleanup,'complete');
+});
+
+test('accepted READY projection is copied once before accepted ACK; later phases stay unchanged',async()=>{
+  const f=makeServices(), result=await runObserver(config,f.services);
+  assert.equal(result.readyVisibility.category,'ready-visible-accepted');
+  assert.equal(result.readyVisibility.projection.nodes.length,1);
+  assert.ok(f.events.indexOf('save:partial')<f.events.indexOf('ack:ready'));
+  assert.deepEqual(f.acks.map(x=>[x.phase,x.decision]),PHASES.map(phase=>[phase,'accepted']));
+  assert.equal(result.firstFailure,null);assert.ok(f.events.indexOf('quit')>f.events.indexOf('ack:b-closed'));
+});
+for(const [code,category] of [['probe-visible-state-refused','ready-visible-state-refused'],
+  ['probe-window-pin-refused','ready-window-pin-refused'],['owned-window-refused','ready-window-pin-refused'],
+  ['ax-evidence-refused','ready-ax-projection-refused'],['probe-phase-refused','ready-phase-refused'],
+  ['private /Users/secret/A.json exception','ready-visible-unclassified'],['constructor','ready-visible-unclassified'],
+  [{private:'secret'},'ready-visible-unclassified']])test('READY records only allowlisted category: '+category,async()=>{
+  const f=makeServices({visibleFailure:'ready',visibleErrorCode:code}),result=await runObserver(config,f.services);
+  assert.equal(result.readyVisibility.category,category);assert.equal(safeCode('inspection',category),category);
+  assert.equal(result.firstFailure.code,category);assert.equal(f.acks[0].decision,'refused');
+  assert.doesNotMatch(JSON.stringify(f.saved),/private|secret|exception|constructor|Users/);
+});
+for(const snapshot of [{pid:43},{windowId:999},{matchedAX:false},
+  {nodes:[{path:'private path',role:'AXStaticText'}]}, {nodes:Array.from({length:129},(_,index)=>({path:String(index),role:'AXStaticText'}))},
+  {nodes:'private raw snapshot'}])test('unsafe READY projection is absent while refused ACK is preserved',async()=>{
+  const f=makeServices({visibleFailure:'ready',readySnapshot:snapshot}),result=await runObserver(config,f.services);
+  assert.equal(result.readyVisibility.projection,null);assert.equal(result.readyVisibility.projectionStatus,'refused');
+  assert.equal(f.acks[0].decision,'refused');assert.equal(f.acks.length,1);assert.equal(result.cleanup,'complete');
+  assert.doesNotMatch(JSON.stringify(f.saved),/private|raw snapshot/);
+});
+test('READY projection discards unknown controls/roles/values and retains bounded blocked routes only',async()=>{
+  const f=makeServices({visibleFailure:'ready',readySnapshot:{nodes:[
+    {path:'0.1',role:'private-role',control:'private title',value:'secret',blocked:'child-owner',press:false},
+    {path:'0.2',role:'AXStaticText',control:'A',private:'secret',alert:'unknown-private-alert'}]}});
+  const result=await runObserver(config,f.services);
+  assert.deepEqual(result.readyVisibility.projection.nodes,[{path:'0.1',role:'other',blocked:'child-owner',press:false},
+    {path:'0.2',role:'AXStaticText',control:'A'}]);
+  assert.doesNotMatch(JSON.stringify(f.saved),/private|secret|value|title/);
+});
+test('failed READY evidence persistence writes no ACK and preserves owned cleanup',async()=>{
+  const f=makeServices();f.services.save=()=>{throw new Error('private receipt write');};
+  const result=await runObserver(config,f.services);
+  assert.equal(result.firstFailure.stage,'receipt');assert.equal(result.firstFailure.code,'receipt-write-failed');
+  assert.equal(f.acks.length,0);assert.equal(f.events.includes('quit'),false);assert.equal(result.cleanup,'complete');
+});
+test('READY first refusal survives later ACK or cleanup failure',async()=>{
+  for(const options of [{ackFailure:'ready'},{cleanupFailure:true}]){
+    const f=makeServices({visibleFailure:'ready',...options}),result=await runObserver(config,f.services);
+    assert.equal(result.firstFailure.code,'ready-visible-state-refused');
+    assert.equal(result.readyVisibility.decision,'refused');assert.equal(f.events.includes('quit'),false);
+  }
 });

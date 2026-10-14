@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
+const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const PROBE_FAILURE_CODES = Object.freeze({
@@ -42,7 +43,9 @@ const FAILURE_CODES = Object.freeze({
   'helper-start': ['helper-start-failed', 'helper-executable-refused'],
   'helper-pin': ['helper-window-identity-refused'],
   checkpoint: ['driver-first-failure', 'checkpoint-refused', 'checkpoint-timeout'],
-  inspection: ['helper-input-ended', 'helper-malformed', 'inspection-refused'],
+  inspection: ['helper-input-ended', 'helper-malformed', 'inspection-refused',
+    'ready-visible-state-refused', 'ready-window-pin-refused', 'ready-ax-projection-refused',
+    'ready-phase-refused', 'ready-visible-unclassified'],
   acknowledgment: ['owner-ack-refused'],
   cleanup: ['helper-cleanup-incomplete'],
   receipt: ['receipt-write-failed'],
@@ -232,6 +235,24 @@ async function stopSpawnedHelper(child) {
   try { child.kill('SIGKILL'); } catch { fail('helper-start', 'helper-cleanup-incomplete'); }
   if (!await waitForClose(500)) fail('helper-start', 'helper-cleanup-incomplete');
 }
+const READY_REFUSALS = Object.freeze({
+  'probe-visible-state-refused':'ready-visible-state-refused',
+  'probe-window-pin-refused':'ready-window-pin-refused', 'owned-window-refused':'ready-window-pin-refused',
+  'ax-evidence-refused':'ready-ax-projection-refused', 'probe-phase-refused':'ready-phase-refused',
+});
+function readyVisibility(snapshot, expected, decision, errorCode) {
+  let projection = null;
+  try {
+    const safe = safeWindowEvidence(snapshot);
+    verifyWindow(safe, expected.pid, expected.windowId);
+    if (safe.nodes.length > 128) throw new Error('projection-bound');
+    projection = safe;
+  } catch { /* Never persist the raw snapshot or exception, even for diagnostics. */ }
+  const category = decision === 'accepted' ? 'ready-visible-accepted' :
+    typeof errorCode === 'string' && Object.hasOwn(READY_REFUSALS,errorCode) ?
+      READY_REFUSALS[errorCode] : 'ready-visible-unclassified';
+  return { phase:'ready', decision, category, projectionStatus:projection ? 'retained' : 'refused', projection };
+}
 async function runObserver(config, services) {
   const outcome = outcomeBase(config);
   let helper = null, firstFailure = null, currentStage = 'config';
@@ -266,9 +287,18 @@ async function runObserver(config, services) {
       validateManifest(probe.root, manifest, expected, services.owner);
       currentStage = 'inspection';
       const snapshot = await helper.inspect(window);
-      let decision = 'accepted';
+      let decision = 'accepted', visibilityCode;
       try { services.owner.visibleEvidence(snapshot, { ...manifest, ...expected, phase }); }
-      catch { decision = 'refused'; }
+      catch (error) { decision = 'refused'; visibilityCode = error?.code; }
+      if (phase === 'ready') {
+        outcome.readyVisibility = readyVisibility(snapshot,expected,decision,visibilityCode);
+        if (decision === 'refused') {
+          firstFailure = { stage:'inspection',code:outcome.readyVisibility.category,elapsedMs:elapsed() };
+          outcome.firstFailure = firstFailure;
+        }
+        currentStage = 'receipt';
+        services.save(outcome); // Durable safe evidence precedes the unchanged ACK decision.
+      }
       currentStage = 'acknowledgment';
       try {
         services.owner.acknowledge(probe.root, { ...manifest, ...expected, phase }, ownerToken, decision,
@@ -284,7 +314,7 @@ async function runObserver(config, services) {
     }
   } catch (error) {
     const stage = FAILURE_CODES[error?.observerStage] ? error.observerStage : currentStage;
-    firstFailure = { stage, code: safeCode(stage, error?.observerCode || error?.code), elapsedMs: elapsed() };
+    if (!firstFailure) firstFailure = { stage, code: safeCode(stage, error?.observerCode || error?.code), elapsedMs: elapsed() };
     outcome.firstFailure = firstFailure;
     if (error?.helperCleanupIncomplete) outcome.cleanup = 'incomplete';
     try { services.save(outcome); } catch { /* Keep the primary failure; no raw error is recorded. */ }
