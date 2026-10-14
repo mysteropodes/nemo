@@ -284,10 +284,26 @@ test('modeled helper transport preserves sanitized press diagnostics in the firs
 test('main inspection refuses an unpinned attached sheet BEFORE any route/attribute traversal',()=>{
   const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
   const start=source.indexOf('    case "inspect":'),end=source.indexOf('    case "capture":',start),body=source.slice(start,end);
-  const guard=body.indexOf('if target == "main" { try noSheet() }'),traversal=body.indexOf('try node(base,selectedRoot)');
-  assert.ok(start>=0&&end>start&&guard>=0&&traversal>guard);
-  const noSheet=source.slice(source.indexOf('  func noSheet()'),source.indexOf('  func verify()',source.indexOf('  func noSheet()')));
-  assert.match(noSheet,/sheet == nil/);assert.match(noSheet,/members\(\)\)\.isEmpty/);
+  const sheetStage=body.indexOf('setInspectionContext("main-sheet-state"'),guard=body.indexOf('try noSheet(inspectMain:true)'),traversal=body.indexOf('try node(base,selectedRoot)');
+  assert.ok(start>=0&&end>start&&sheetStage>=0&&guard>sheetStage&&traversal>guard);
+  const noSheet=source.slice(source.indexOf('  func noSheet('),source.indexOf('  func retainedMainChildrenDiagnostic()',source.indexOf('  func noSheet(')));
+  assert.match(noSheet,/sheet == nil/);assert.match(noSheet,/members\(inspectMain:inspectMain\)/);
+});
+test('main inspect helper reports only finite query stage and class enums',()=>{
+  const source=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
+  assert.match(source,/struct InspectionRefusal: Error \{ let stage: String; let queryClass: String \}/);
+  assert.match(source,/catch let error as InspectionRefusal \{/);
+  for(const stage of ['identity-precondition','request-precondition','main-children-query','main-children-value',
+    'application-windows-query','application-windows-value','main-sheet-state','root-resolution','projection-budget',
+    'ax-owner-query','ax-attribute-query','ax-children-query','ax-projection'])
+    assert.ok(source.includes(`"${stage}"`),`missing bounded inspect stage ${stage}`);
+  assert.match(source,/func safeInspectionContext\(_ stage: String, _ queryClass: String\)/);
+  assert.match(source,/func inspectionDiagnosticForRefusal\(_ code: String, _ stage: String, _ queryClass: String\)/);
+  assert.match(source,/guard code == "adapter-refused" else \{ return nil \}/);
+  assert.match(source,/if let diagnostic = safeInspectionContext\(error\.stage,error\.queryClass\)/);
+  assert.match(source,/activeInspectionContext = action == "inspect"/);
+  assert.match(source,/inspectionDiagnosticForRefusal\(code,context\.stage,context\.queryClass\)/);
+  assert.doesNotMatch(source,/inspectionDiagnostics[^\n]*(rawValue|title|value|path|ownerPid)/);
 });
 test('A/B fixture proof uses exact same-descriptor bytes and rejects swap/hash/name/symlink',()=>{
   const {verifyFixtures}=require('./desktop/p38-installed-driver.cjs'),crypto=require('node:crypto'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'p38-v2-fixtures-'));

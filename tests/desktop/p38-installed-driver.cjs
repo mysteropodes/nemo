@@ -98,6 +98,27 @@ function safeSelectionDiagnostics(value) {
     if (value[key] !== undefined) { check(typeof value[key] === 'boolean', 'ax-evidence-refused'); clean[key]=value[key]; }
   return clean;
 }
+function safeInspectionDiagnostics(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const keys = Object.keys(value).sort();
+  if (keys.length !== 2 || keys[0] !== 'queryClass' || keys[1] !== 'stage') return undefined;
+  const stages = new Set(['identity-precondition','request-precondition','main-children-query','main-children-value',
+    'application-windows-query','application-windows-value','main-sheet-state','root-resolution','projection-budget',
+    'ax-owner-query','ax-attribute-query','ax-children-query','ax-projection']);
+  const queryClasses = new Set(['identity-check-failed','request-refused','attribute-query-failed','attribute-value-unreadable',
+    'retained-sheet-present','attached-sheet-present','route-refused','budget-refused','ownership-refused','topology-refused']);
+  const permitted = {
+    'identity-precondition':['identity-check-failed'],'request-precondition':['request-refused'],
+    'main-children-query':['attribute-query-failed'],'main-children-value':['attribute-value-unreadable'],
+    'application-windows-query':['attribute-query-failed'],'application-windows-value':['attribute-value-unreadable'],
+    'main-sheet-state':['retained-sheet-present','attached-sheet-present'],'root-resolution':['route-refused'],
+    'projection-budget':['budget-refused'],'ax-owner-query':['ownership-refused'],
+    'ax-attribute-query':['attribute-query-failed'],'ax-children-query':['attribute-query-failed','attribute-value-unreadable'],
+    'ax-projection':['topology-refused']
+  };
+  if (!stages.has(value.stage) || !queryClasses.has(value.queryClass) || !permitted[value.stage].includes(value.queryClass)) return undefined;
+  return {stage:value.stage,queryClass:value.queryClass};
+}
 const {safeActionDiagnostics,safeCleanupDiagnostics,cleanupFailureDiagnostics,closeOwnedHelpers,cleanupHelper}=require('./p38-helper-protocol.cjs');
 const REFUSALS = new Set(['adapter-refused','sheet-owner','sheet-parent','sheet-replaced','child-owner','confirm-unsupported','children-unavailable','sheet-ambiguous','sheet-active','standalone-window']);
 const STARTUP_DIAGNOSTIC_LIMIT = 16 * 1024;
@@ -239,10 +260,12 @@ function verifyWindow(info, pid, expected) {
     (!expected || info.windowId === expected), 'owned-window-refused');
   return info.windowId;
 }
-function windowResult(info,pid,expected) {
+function windowResult(info,pid,expected,allowInspectionDiagnostics=false) {
   if(info?.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(info.code)?info.code:'adapter-refused',
     ...(info.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(info.selectionDiagnostics)} : {}),
-    ...(info.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(info.actionDiagnostics)} : {})});
+    ...(info.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(info.actionDiagnostics)} : {}),
+    ...(allowInspectionDiagnostics && safeInspectionDiagnostics(info.inspectionDiagnostics) ?
+      {inspectionDiagnostics:safeInspectionDiagnostics(info.inspectionDiagnostics)} : {})});
   check(info?.status===undefined||['ok','pinned'].includes(info.status),'owned-window-refused');
   return verifyWindow(info,pid,expected);
 }
@@ -315,7 +338,7 @@ async function runScopedOperator(config, services, reference) {
         delete receipt.inFlightAction; actionStartedAt=null; save(); continue;
       }
       const result = await bounded(services.window(action.type, receipt.appPid, receipt.windowId, action));
-      windowResult(result, receipt.appPid, receipt.windowId);
+      windowResult(result, receipt.appPid, receipt.windowId, action.type==='inspect' && (action.target||'main')==='main');
       if(action.type==='set'){
         check(result.actionDiagnostics,'value-refused'); const text=safeActionDiagnostics(result.actionDiagnostics);
         check(text.stage==='axtext-confirm' && text.role==='AXTextField' && text.textFieldKind==='plain' && text.enabled===true &&
@@ -353,6 +376,7 @@ async function runScopedOperator(config, services, reference) {
       ...(safeStartupDiagnostics(error.startupDiagnostics) ? { startupDiagnostics: safeStartupDiagnostics(error.startupDiagnostics) } : {}),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
       ...(error.actionDiagnostics ? { actionDiagnostics:safeActionDiagnostics(error.actionDiagnostics) } : {}),
+      ...(safeInspectionDiagnostics(error.inspectionDiagnostics) ? {inspectionDiagnostics:safeInspectionDiagnostics(error.inspectionDiagnostics)} : {}),
       ...(actionStartedAt !== null ? { action:{...receipt.inFlightAction,durationMs:Math.max(0,Math.round(performance.now()-actionStartedAt))} } : {}) });
     receipt.status = 'partial'; save(); // Persist the first safe refusal before cleanup can fail.
   }
@@ -437,14 +461,14 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       else check(config.fixtures.some(f=>request.value===f.path),'fixture-refused');
     }
     channel.child.stdin.write(JSON.stringify(request)+'\n');
-    const result = await reply();
+    const result = await reply(mode==='inspect' && (action.target||'main')==='main');
     reportGuard.verify(); verifyWindow(result,pid,windowId);
     check(result.type===mode && result.status==='ok','owned-window-refused');
     if(mode==='capture'){check(result.capture===name,'capture-proof-refused');result.captureSha256=hash(fs.readFileSync(output));}
     if(mode==='inspect')atomicJSON(reportGuard,'ax-'+ordinal+'.json',safeWindowEvidence(result,!!reference));
     return result;
   }
-  async function reply() {
+  async function reply(allowInspectionDiagnostics=false) {
     let timer;
     try {
       const line = await Promise.race([channel.lines.next(),new Promise((_,reject)=>{
@@ -454,7 +478,9 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       check(value&&typeof value==='object'&&!Array.isArray(value),'helper-malformed');
       if(value.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(value.code)?value.code:'adapter-refused',
         ...(value.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(value.selectionDiagnostics)} : {}),
-        ...(value.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(value.actionDiagnostics)} : {})});
+        ...(value.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(value.actionDiagnostics)} : {}),
+        ...(allowInspectionDiagnostics && safeInspectionDiagnostics(value.inspectionDiagnostics) ?
+          {inspectionDiagnostics:safeInspectionDiagnostics(value.inspectionDiagnostics)} : {})});
       return value;
     } finally {clearTimeout(timer);}
   }
@@ -529,4 +555,4 @@ async function main() {
   process.exitCode = result.cleanup === 'incomplete' || result.status === 'partial' ? 1 : 0;
 }
 if (require.main === module) main().catch(() => { process.stderr.write('P38 operator refused; no installed acceptance.\n'); process.exitCode = 1; });
-module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, runReferenceOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };
+module.exports = { authorize, verifyIdentity, verifyWindow, runOperator, runReferenceOperator, safeDirectory, atomicJSON, safeWindowEvidence, safeSelectionDiagnostics, safeInspectionDiagnostics, safeActionDiagnostics, safeCleanupDiagnostics, safeStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome, captureStartupDiagnostics, cleanupFailureDiagnostics, closeOwnedHelpers, transportReady, actionTarget, sheetResult, verifyFixtures, cleanupHelper, createWindowTransport };

@@ -166,6 +166,35 @@ func enterSheetText(_ facts: [String:Any], identity: () throws -> Void,
   d["stage"] = "axtext-confirm"; return d
 }
 struct IdentityRefusal: Error { let stage: String; let facts: [String:Any] }
+struct InspectionRefusal: Error { let stage: String; let queryClass: String }
+struct InspectionContext { var stage: String; var queryClass: String }
+var activeInspectionContext: InspectionContext? = nil
+let inspectionQueryClasses: [String:Set<String>] = [
+  "identity-precondition":["identity-check-failed"],
+  "request-precondition":["request-refused"],
+  "main-children-query":["attribute-query-failed"],
+  "main-children-value":["attribute-value-unreadable"],
+  "application-windows-query":["attribute-query-failed"],
+  "application-windows-value":["attribute-value-unreadable"],
+  "main-sheet-state":["retained-sheet-present","attached-sheet-present"],
+  "root-resolution":["route-refused"],
+  "projection-budget":["budget-refused"],
+  "ax-owner-query":["ownership-refused"],
+  "ax-attribute-query":["attribute-query-failed"],
+  "ax-children-query":["attribute-query-failed","attribute-value-unreadable"],
+  "ax-projection":["topology-refused"]
+]
+func safeInspectionContext(_ stage: String, _ queryClass: String) -> [String:String]? {
+  guard inspectionQueryClasses[stage]?.contains(queryClass) == true else { return nil }
+  return ["stage":stage,"queryClass":queryClass]
+}
+func inspectionDiagnosticForRefusal(_ code: String, _ stage: String, _ queryClass: String) -> [String:String]? {
+  guard code == "adapter-refused" else { return nil }
+  return safeInspectionContext(stage,queryClass)
+}
+func setInspectionContext(_ stage: String, _ queryClass: String) {
+  if activeInspectionContext != nil { activeInspectionContext = InspectionContext(stage:stage,queryClass:queryClass) }
+}
 let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent","sheet-replaced","child-owner","confirm-unsupported","children-unavailable","sheet-ambiguous","sheet-active","standalone-window"]
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "go-to-folder", "location-dismissed", "quit"]
@@ -654,6 +683,13 @@ func selfTest() throws {
   try projectionLimit(5,128)
   var refusedProjection = false; do { try projectionLimit(6,128) } catch { refusedProjection = true }; try check(refusedProjection)
   refusedProjection = false; do { try projectionLimit(1,129) } catch { refusedProjection = true }; try check(refusedProjection)
+  for (stage,classes) in inspectionQueryClasses { for queryClass in classes {
+    try check(safeInspectionContext(stage,queryClass) != nil)
+  } }
+  try check(safeInspectionContext("private-path","private-value") == nil)
+  try check(inspectionDiagnosticForRefusal("adapter-refused","main-children-query","attribute-query-failed") != nil)
+  try check(inspectionDiagnosticForRefusal("sheet-owner","main-children-query","attribute-query-failed") == nil)
+  try check(inspectionDiagnosticForRefusal("adapter-refused","private-path","private-value") == nil)
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
     "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,
@@ -708,9 +744,27 @@ func run() throws {
   }
   // Public SDK defines AXSheet + AXParent/AXChildren, not an AXSheets constant.
   // Derive attachment from that documented relationship, never same-PID alone.
-  func members() throws -> [AXUIElement] {
-    guard let childRows = attr(main,kAXChildrenAttribute) as? [AXUIElement],
-          let appRows = attr(application,kAXWindowsAttribute) as? [AXUIElement] else { throw Refusal(code:"adapter-refused") }
+  func members(inspectMain: Bool = false) throws -> [AXUIElement] {
+    var rawChildren: CFTypeRef?
+    let childrenQuery = AXUIElementCopyAttributeValue(main,kAXChildrenAttribute as CFString,&rawChildren)
+    guard childrenQuery == .success else {
+      if inspectMain { throw InspectionRefusal(stage:"main-children-query",queryClass:"attribute-query-failed") }
+      throw Refusal(code:"adapter-refused")
+    }
+    guard let childRows = rawChildren as? [AXUIElement] else {
+      if inspectMain { throw InspectionRefusal(stage:"main-children-value",queryClass:"attribute-value-unreadable") }
+      throw Refusal(code:"adapter-refused")
+    }
+    var rawWindows: CFTypeRef?
+    let windowsQuery = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&rawWindows)
+    guard windowsQuery == .success else {
+      if inspectMain { throw InspectionRefusal(stage:"application-windows-query",queryClass:"attribute-query-failed") }
+      throw Refusal(code:"adapter-refused")
+    }
+    guard let appRows = rawWindows as? [AXUIElement] else {
+      if inspectMain { throw InspectionRefusal(stage:"application-windows-value",queryClass:"attribute-value-unreadable") }
+      throw Refusal(code:"adapter-refused")
+    }
     var attached = [AXUIElement]()
     for candidate in childRows + appRows {
       if !owns(candidate,pid) { throw Refusal(code:"sheet-owner") }
@@ -729,7 +783,14 @@ func run() throws {
     if actual.count != 1 || !owns(actual[0],pid) || !owns(retained,pid) || !CFEqual(actual[0],retained) { throw Refusal(code:"sheet-replaced") }
     return retained
   }
-  func noSheet() throws { try check(sheet == nil && (try members()).isEmpty) }
+  func noSheet(inspectMain: Bool = false) throws {
+    if inspectMain && sheet != nil { throw InspectionRefusal(stage:"main-sheet-state",queryClass:"retained-sheet-present") }
+    try check(sheet == nil)
+    setInspectionContext("main-children-query","attribute-query-failed")
+    let actual = try members(inspectMain:inspectMain)
+    if inspectMain && !actual.isEmpty { throw InspectionRefusal(stage:"main-sheet-state",queryClass:"attached-sheet-present") }
+    try check(actual.isEmpty)
+  }
   func retainedMainChildrenDiagnostic() -> [String:Any] {
     // Separate, count-bounded detail phase outside the transition-sample budget.
     let limit = 64
@@ -995,9 +1056,12 @@ func run() throws {
       diagnostics.merge(extra) { _, new in new }
       return ActionRefusal(diagnostics:diagnostics)
     }
+    activeInspectionContext = action == "inspect" && (request["target"] as? String ?? "main") == "main" ?
+      InspectionContext(stage:"identity-precondition",queryClass:"identity-check-failed") : nil
     do { try verify() }
     catch let error as IdentityRefusal { if action == "press" || action == "set" { throw pressFailure("window-identity-"+error.stage,error.facts) }; throw error }
     catch { if action == "press" || action == "set" { throw pressFailure("window-identity") }; throw error }
+    if activeInspectionContext != nil { setInspectionContext("request-precondition","request-refused") }
     var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
     let target = request["target"] as? String ?? "main"
     try check(target == "main" || target == "sheet")
@@ -1244,8 +1308,12 @@ func run() throws {
         else { _ = try verifySheet() }
       }
     case "inspect":
-      if target == "main" { try noSheet() }
+      if target == "main" {
+        setInspectionContext("main-sheet-state","retained-sheet-present")
+        try noSheet(inspectMain:true)
+      }
       let base = request["element"] as? String ?? ""
+      setInspectionContext("root-resolution","route-refused")
       let selected = try node(base,selectedRoot)
       var roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
       if scope.reference { roles.insert(kAXPopUpButtonRole) }
@@ -1277,17 +1345,22 @@ func run() throws {
         }
       }
       let depth = request["depth"] as? Int ?? 1, maxNodes = request["maxNodes"] as? Int ?? 128
+      setInspectionContext("projection-budget","budget-refused")
       try projectionLimit(depth,maxNodes)
       var nodes = [[String:Any]]()
       var truncated = false
       func project(_ current: AXUIElement, _ path: String, _ level: Int) throws {
+        setInspectionContext("ax-owner-query","ownership-refused")
         var owner: pid_t = 0
         guard AXUIElementGetPid(current,&owner) == .success, owner == pid else { nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return }
         if level > 0 && attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
+        setInspectionContext("ax-attribute-query","attribute-query-failed")
         nodes.append(fact(current,path))
         guard level < depth else { return }
+        setInspectionContext("ax-children-query","attribute-value-unreadable")
         let rawChildren = attr(current,kAXChildrenAttribute) as? [AXUIElement]
         guard let list = rawChildren else { nodes[nodes.count-1]["blocked"] = "children-unavailable"; return }
+        setInspectionContext("ax-projection","topology-refused")
         try check(list.count < 4096)
         for (index,child) in list.enumerated() {
           if nodes.count >= maxNodes { truncated = true; return }
@@ -1297,10 +1370,12 @@ func run() throws {
           try project(child,childPath,level+1)
         }
       }
+      setInspectionContext("ax-projection","topology-refused")
       try project(selected,base,0)
       result["nodes"] = nodes
       result["truncated"] = truncated
       if target == "sheet" { _ = try verifySheet() }
+      activeInspectionContext = nil
     case "capture":
       try check(target == "main")
       if sheet != nil { _ = try verifySheet() } else { try noSheet() }
@@ -1323,5 +1398,20 @@ func run() throws {
 do { try run() }
 catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
 catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
-catch let error as Refusal { try? emit(["status":"refused","code":allowedReasons.contains(error.code) ? error.code : "adapter-refused"]); exit(1) }
-catch { try? emit(["status":"refused","code":"adapter-refused"]); exit(1) }
+catch let error as InspectionRefusal {
+  var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
+  if let diagnostic = safeInspectionContext(error.stage,error.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+  try? emit(result); exit(1)
+}
+catch let error as Refusal {
+  let code = allowedReasons.contains(error.code) ? error.code : "adapter-refused"
+  var result: [String:Any] = ["status":"refused","code":code]
+  if let context = activeInspectionContext,
+     let diagnostic = inspectionDiagnosticForRefusal(code,context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+  try? emit(result); exit(1)
+}
+catch {
+  var result: [String:Any] = ["status":"refused","code":"adapter-refused"]
+  if let context = activeInspectionContext, let diagnostic = safeInspectionContext(context.stage,context.queryClass) { result["inspectionDiagnostics"] = diagnostic }
+  try? emit(result); exit(1)
+}
