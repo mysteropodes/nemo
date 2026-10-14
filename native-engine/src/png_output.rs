@@ -9,6 +9,7 @@ use std::io::Write;
 #[path = "object_png_output.rs"]
 mod object;
 use crate::object_render_scene::LiveObjectComposition;
+pub use object::EncodedPngBytes;
 pub(crate) use object::{encode_scheduled_object_png, ScheduledObjectPng};
 
 /// Borrow the caller's original compositor; no GPU or publication owner is made.
@@ -161,10 +162,16 @@ pub(crate) fn validate_readback(
 ///
 /// Determinism is guaranteed only for this locked encoder/configuration. It is
 /// not a promise of byte equality with the legacy JavaScript encoder.
-pub fn encode_rgba8(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, PngOutputError> {
-    let mut output = Vec::new();
+pub fn encode_rgba8(
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+) -> Result<EncodedPngBytes, PngOutputError> {
+    // Keep the existing shared allocation quota rather than adding an image-size
+    // policy. Feature-off targets retain their explicitly unmetered domain.
+    let mut output = object::BoundedPngBytes::new(isize::MAX as usize)?;
     encode_rgba8_into(width, height, rgba, &mut output)?;
-    Ok(output)
+    Ok(output.into_shared())
 }
 
 /// One encoder/profile for existing opacity output and bounded object output.
@@ -287,8 +294,8 @@ mod streaming_tests {
             "fixture must exercise many chunks"
         );
         assert_pixels(&sink.bytes, 256, 64, &pixels);
-        assert_eq!(encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
-        assert_eq!(encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
+        assert_eq!(&*encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
+        assert_eq!(&*encode_rgba8(256, 64, &pixels).unwrap(), sink.bytes);
     }
 
     #[test]

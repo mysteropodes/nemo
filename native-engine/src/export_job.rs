@@ -37,7 +37,7 @@ pub struct PendingFrame {
     work_id: WorkId,
     ordinal: usize,
     name: String,
-    png: Vec<u8>,
+    png: png_output::EncodedPngBytes,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -234,7 +234,7 @@ impl<P: StagedArtifactPort, C: ExportCompositor> ExportJobManager<P, C> {
             png_output::validate_readback(&pixels, &scene)?;
             let png = png_output::encode_rgba8(pixels.width, pixels.height, &pixels.bytes)
                 .map_err(|error| error.to_string())?;
-            Ok::<Vec<u8>, String>(png)
+            Ok::<png_output::EncodedPngBytes, String>(png)
         })();
         match result {
             Ok(png) => Ok(Some(PendingFrame {

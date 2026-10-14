@@ -48,7 +48,7 @@ fn cpu_shared_profile_preserves_straight_and_zero_alpha_rgba_without_partial_sha
     let original = encode_rgba8(2, 1, &rgba).unwrap();
     let mut sink = BoundedPngBytes::new(original.len()).unwrap();
     encode_rgba8_into(2, 1, &rgba, &mut sink).unwrap();
-    assert_eq!(sink.bytes, original);
+    assert_eq!(sink.bytes, &*original);
     assert_eq!(decode(&sink.bytes), (2, 1, rgba.to_vec()));
     let mut short = BoundedPngBytes::new(original.len() - 1).unwrap();
     assert!(encode_rgba8_into(2, 1, &rgba, &mut short).is_err());
@@ -119,7 +119,7 @@ fn gpu_live_png_is_deterministic_bounded_and_retains_real_edit_undo_drop_pixels(
     assert_eq!(rgba, raw.bytes(&live).unwrap());
     assert_eq!(
         exact.bytes(&live).unwrap(),
-        encode_rgba8(64, 64, &rgba).unwrap()
+        &*encode_rgba8(64, 64, &rgba).unwrap()
     );
     assert_eq!(scheduler.lease_counters().acquired(), 1);
     drop(live);
@@ -408,7 +408,7 @@ mod accounting {
         let budget = ReadbackBudget::new(expected.len() * 3);
         let mut sink = BoundedPngBytes::new(expected.len()).unwrap();
         encode_rgba8_into(64, 64, &rgba, Sink(&mut sink, &budget)).unwrap();
-        assert_eq!(sink.bytes, expected);
+        assert_eq!(sink.bytes, &*expected);
         let retained = sink.bytes.capacity();
         assert_eq!(budget.used(), retained);
         let snapshot = object_test_owner("png-charge").acquire_snapshot(0).unwrap();
@@ -420,7 +420,7 @@ mod accounting {
             bytes: sink,
             prepared: live.prepared().clone(),
         };
-        assert_eq!(png.bytes(&live).unwrap(), expected);
+        assert_eq!(png.bytes(&live).unwrap(), &*expected);
         assert_eq!(png.dimensions(), (64, 64));
         assert_eq!(budget.used(), retained);
         drop(live);
