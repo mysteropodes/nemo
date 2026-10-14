@@ -140,6 +140,8 @@ function ordinary(h,deferFrames=false){
   vm.runInContext(code+'\nthis.makeHarness=harness;',context);
   return context.makeHarness({dirtyDot:true,deferFrames,configureWindow(root){
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
+    root.NemoNativeObjectInactiveProjectTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
+    let id=0;root.crypto={randomUUID:()=>`inactive-ui-${++id}`};
     root.__TAURI__={core:{invoke:h.invoke},dialog:{save:async()=>'/ordinary-save.json'},fs:{readTextFile:()=>{throw Error('Project bytes crossed JS');}}};
   }});
 }
@@ -155,7 +157,7 @@ test('complete production Project Open/Save As updates tab, recents and dirty st
 });
 
 function replacementHost(){
-  const calls=[],copies=[],previews=[],seen=new Map();let owner=null,generation=0,viewGeneration=0,failure=null;
+  const calls=[],copies=[],previews=[],seen=new Map();let owner=null,generation=0,viewGeneration=0,failure=null,inactive=null;
   const size=path=>path==='/b.json'?{canvasW:640,canvasH:360}:{canvasW:320,canvasH:180};
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:owner.documentId,
     lifecycleGeneration:owner.generation,documentSnapshotId:'snapshot-'+owner.generation+'-'+owner.revision,
@@ -167,6 +169,24 @@ function replacementHost(){
   async function invoke(command,args){
     const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
     if(command==='nemo_native_object_client_status')return status();
+    if(command==='nemo_native_object_inactive_project'){
+      const base={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
+        contentRevision:r.expectedRevision,documentSnapshotId:r.documentSnapshotId,lifecycleGeneration:r.lifecycleGeneration,retryExecution:false};
+      if(r.action.kind==='inspect')return {...base,state:inactive?'inactive-retained':'inactive-absent',
+        preparationToken:inactive&&inactive.preparationToken||null,project:inactive};
+      if(r.action.kind==='prepare'){
+        inactive={instanceId:r.instanceId,contentRevision:0,documentSnapshotId:'inactive-snapshot-1',documentDigest:'d'.repeat(64),
+          byteCount:10000,canvasW:640,canvasH:360,fps:24,totalFrames:21,layers:[{layerUid:'inactive-layer'}],
+          origin:{documentId:r.documentId,documentSnapshotId:r.documentSnapshotId,contentRevision:r.expectedRevision},
+          preparationToken:'inactive-token-1',preparationRequestId:r.requestId};
+        return {...base,state:'inactive-prepared',preparationToken:inactive.preparationToken,project:inactive};
+      }
+      if(r.action.kind==='close'){
+        if(!inactive||inactive.preparationToken!==r.action.preparationToken)throw Error('unknown inactive token');
+        inactive=null;return {...base,state:'inactive-closed',preparationToken:r.action.preparationToken,project:null};
+      }
+      throw Error('unexpected inactive action');
+    }
     if(command==='nemo_native_object_bootstrap'){
       assert.equal(r.projectOnly,true);assert.equal('documentJson' in r,false);
       if(seen.has(r.requestId)){
@@ -276,34 +296,30 @@ test('replacement pending and deferred frame cannot restore A or publish B',asyn
   assert.deepEqual(g.effects,[['open','/a.json']]);
 });
 
-test('production Project Open replaces A in the same tab without Paper or JS project bytes',async()=>{
+test('production Project Open retains inactive B metadata while native A stays active',async()=>{
   const h=replacementHost(),app=ordinary(h);
   assert.equal(await app.project.openPath('/a.json'),true);
-  const tab=app.element('project-tabs-list').children[0];
-  assert.equal(await app.project.openPath('/b.json'),true);
-  assert.equal(app.element('project-tabs-list').children.length,1);
+  const tab=app.element('project-tabs-list').children[0],before=h.previews.length;
+  assert.equal((await app.project.openPath('/b.json')).status,'prepared');
+  assert.equal(app.element('project-tabs-list').children.length,2);
   assert.equal(app.element('project-tabs-list').children[0].dataset.tab,tab.dataset.tab);
-  assert.equal(app.project.getCurrentLabel(),'b — /b.json');assert.equal(app.project.isDirty(),false);
-  assert.equal(h.previews.length,4);assert.equal(h.previews[2].documentId,'document-2');
-  assert.equal(h.previews[3].documentId,'document-2');
-  const s=Project.desktop(app.window);await s.reference({kind:'remove'});assert.equal(app.project.isDirty(),true);
-  assert.equal((await app.project.saveAs()).acknowledged,true);assert.equal(app.project.isDirty(),false);
-  assert.equal(h.copies.at(-1).documentId,'document-2');assert.equal(app.mutations,0);
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');assert.equal(app.project.isDirty(),false);
+  assert.equal(h.previews.length,before,'inactive B is metadata-only and never presented');
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_inactive_project'&&c.r.action.kind==='prepare').length,1);
+  assert.equal(app.mutations,0);
   assert.ok(app.writes.every(([key])=>key==='nemo-recents'),'no byte autosave or JS project authority');
 });
 
-test('ordinary replacement waits for both post-reveal animation frames before the final B receipt',async()=>{
+test('ordinary second Open prepares inactive B without presenting or waiting for replacement frames',async()=>{
   const h=replacementHost(),app=ordinary(h,true);
   const first=app.project.openPath('/a.json');await turn();
   assert.equal(app.pendingFrames,1);app.flushFrame();await turn();
   assert.equal(app.pendingFrames,1);app.flushFrame();assert.equal(await first,true);
-  const opening=app.project.openPath('/b.json');await turn();
-  assert.equal(h.previews.length,3,'only the pre-reveal B frame has presented');
-  assert.equal(app.project.getCurrentLabel(),'a — /a.json');
-  assert.equal(app.pendingFrames,1);app.flushFrame();await turn();
-  assert.equal(h.previews.length,3,'one layout frame cannot publish B');
-  assert.equal(app.pendingFrames,1);app.flushFrame();assert.equal(await opening,true);
-  assert.equal(h.previews.length,4);assert.equal(app.project.getCurrentLabel(),'b — /b.json');
+  const before=h.previews.length;
+  assert.equal((await app.project.openPath('/b.json')).status,'prepared');
+  assert.equal(h.previews.length,before,'inactive B does not request a preview frame');
+  assert.equal(app.pendingFrames,0);assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.element('project-tabs-list').children.length,2);
 });
 
 test('a second same-tick initial Open is denied before inactive or legacy routing',async()=>{
@@ -344,29 +360,30 @@ test('actions submitted after Open begins cannot mutate B through a queued A req
   assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_reference'&&c.r.action.kind==='remove').length,0);
 });
 
-test('ordinary picker and recents replace the active native row without P39B or legacy reads',async()=>{
+test('ordinary picker adds inactive B; recents never activate it or replace A',async()=>{
   const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
   const tab=app.element('project-tabs-list').children[0].dataset.tab;
   app.window.__TAURI__.dialog.open=async()=>'/b.json';
   app.window.__TAURI__.window={getCurrentWindow:()=>({setFocus:async()=>{}})};
-  await app.project.open();assert.equal(app.project.getCurrentLabel(),'b — /b.json');
-  assert.equal(app.element('project-tabs-list').children.length,1);
-  const rows=app.element('start-recent-list').children;assert.equal(rows.length,2);
-  rows[1].listeners.click();await turn();
+  await app.project.open();assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.element('project-tabs-list').children.length,2);
+  const rows=app.element('start-recent-list').children;assert.equal(rows.length,1,'inactive B is not promoted into active-project recents');
+  rows[0].listeners.click();await turn();
   assert.equal(app.project.getCurrentLabel(),'a — /a.json');
   assert.equal(app.element('project-tabs-list').children[0].dataset.tab,tab);
-  assert.equal(app.mutations,0);assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,3);
+  assert.equal(app.element('project-tabs-list').children.length,2);
+  assert.equal(app.mutations,0);assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,1);
 });
 
-test('ordinary dirty Open cancel preserves A with zero new native calls',async()=>{
+test('ordinary dirty Open prepares inactive B without replacing or confirming dirty A',async()=>{
   const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
   await Project.desktop(app.window).reference({kind:'remove'});
-  app.window.__TAURI__.dialog.ask=async()=>false;
-  const before=h.calls.length;assert.equal(await app.project.openPath('/b.json'),false);
-  assert.equal(h.calls.length,before);assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  app.window.__TAURI__.dialog.ask=async()=>{throw Error('dirty A must not be replaced');};
+  assert.equal((await app.project.openPath('/b.json')).status,'prepared');
+  assert.equal(app.project.getCurrentLabel(),'a — /a.json');
   assert.equal(app.project.isDirty(),true);
-  app.window.__TAURI__.dialog.ask=async()=>true;
-  assert.equal(await app.project.openPath('/b.json'),true);assert.equal(app.project.isDirty(),false);
+  assert.equal(app.element('project-tabs-list').children.length,2);
+  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_inactive_project'&&c.r.action.kind==='prepare').length,1);
 });
 
 test('preflight refusal with foreign owner drift fences instead of restoring A',async()=>{
@@ -426,14 +443,16 @@ test('a deferred final B frame after transient reveal cannot publish B',async()=
   assert.deepEqual(f.effects,[['open','/a.json']]);
 });
 
-test('unavailable dirty-confirm dialog preserves A and its visible path',async()=>{
+test('unavailable dirty-confirm dialog is irrelevant to metadata-only inactive B preparation',async()=>{
   const h=replacementHost(),app=ordinary(h);await app.project.openPath('/a.json');
   await Project.desktop(app.window).reference({kind:'remove'});
   app.window.__TAURI__.dialog.ask=async()=>{throw Error('Dialog unavailable');};
-  const count=h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length;
-  assert.equal(await app.project.openPath('/b.json'),false);
-  assert.equal(h.calls.filter(c=>c.command==='nemo_native_object_bootstrap').length,count);
+  let asked=false;app.window.__TAURI__.dialog.ask=async()=>{asked=true;throw Error('Dialog unavailable');};
+  assert.equal((await app.project.openPath('/b.json')).status,'prepared');
+  assert.equal(asked,false);
   assert.equal(Project.desktop(app.window).isActive(),true);
   assert.equal(app.project.getCurrentLabel(),'a — /a.json');
+  assert.equal(app.element('project-tabs-list').children.length,2);
+  assert.equal(app.project.isDirty(),true);
   assert.equal(app.startScreen.classList.contains('hid'),true);
 });

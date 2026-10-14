@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f909d423d0e6481f77bf7abd75b5c0529ce5d2a4",
-  "describe": "v0.7.0-alpha.4-1609-gf909d423"
+  "head": "f65be5f509fec63138b780110a3c9e7474d61f82",
+  "describe": "v0.7.0-alpha.4-1699-gf65be5f5-dirty"
  },
- "inputsDigest": "9dd608f71bb00603884712fa4a5147537738208cde7cfebc2c7c50e5662d8c9d",
+ "inputsDigest": "f7a4d45ae974ed619bce9d982e5a46f22d8ce4c8e662040adc006506a0187aac",
  "states": [
   "inventoried",
   "characterized",
@@ -276,7 +276,7 @@
   },
   "SMProject": {
    "file": "src/js/project.js",
-   "line": 377,
+   "line": 378,
    "members": 2
   },
   "SMPsdImport": {
@@ -1084,7 +1084,7 @@
     "container": "camera-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 41,
+    "functionsVisited": 43,
     "via": "variable editEase",
     "references": [
      "src/js/camera.js:604 updateCameraPanel()"
@@ -1698,7 +1698,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 95,
+    "functionsVisited": 98,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -1875,7 +1875,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 159,
+    "functionsVisited": 161,
     "via": "chain",
     "references": []
    },
@@ -2141,7 +2141,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 14,
+    "functionsVisited": 15,
     "via": "chain",
     "references": [
      "src/js/timeline.js:9160 action()"
@@ -2232,7 +2232,7 @@
     "container": "p-fillpropagate-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 447,
+    "functionsVisited": 448,
     "via": "variable propBtn",
     "references": []
    },
@@ -2316,7 +2316,7 @@
     "container": "footage-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 135,
+    "functionsVisited": 139,
     "via": "chain",
     "references": [
      "src/js/images.js:759",
@@ -2408,7 +2408,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 91,
+    "functionsVisited": 92,
     "via": "chain",
     "references": []
    },
@@ -2471,7 +2471,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:733 initStartScreen()"
+    "src/js/project.js:734 initStartScreen()"
    ],
    "events": [
     "click"
@@ -2678,7 +2678,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 206,
+    "functionsVisited": 208,
     "via": "chain",
     "references": [
      "src/js/images.js:706",
@@ -2760,7 +2760,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 62,
+    "functionsVisited": 63,
     "via": "helper el()",
     "references": [
      "src/js/timeline.js:9182 action()"
@@ -2850,7 +2850,7 @@
     "container": "comp-instance-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 453,
+    "functionsVisited": 454,
     "via": "variable btn",
     "references": []
    },
@@ -2982,7 +2982,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 139,
+    "functionsVisited": 141,
     "via": "variable b",
     "references": [
      "src/js/motion.js:13133 setAppMode()",
@@ -3026,7 +3026,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 28,
+    "functionsVisited": 30,
     "via": "variable bClean",
     "references": [
      "src/js/media-library.js:691 render()"
@@ -3200,7 +3200,7 @@
     "container": "media-mode-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 18,
+    "functionsVisited": 19,
     "via": "variable bL",
     "references": [
      "src/js/linked-media.js:687 setMediaMode()",
@@ -3334,7 +3334,7 @@
     "container": "assets-view-presets",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 38,
     "via": "chain",
     "references": []
    },
@@ -3354,7 +3354,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:730 initStartScreen()"
+    "src/js/project.js:731 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3435,7 +3435,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:729 initStartScreen()"
+    "src/js/project.js:730 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3458,7 +3458,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 47,
+    "functionsVisited": 65,
     "via": "chain",
     "references": []
    },
@@ -3495,7 +3495,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 106,
+    "functionsVisited": 111,
     "via": "callback id",
     "references": []
    },
@@ -4311,7 +4311,7 @@
     "container": "rig-assign-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 215,
+    "functionsVisited": 216,
     "via": "chain",
     "references": []
    },
@@ -4553,7 +4553,7 @@
     "container": "rig-opts-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 216,
+    "functionsVisited": 217,
     "via": "chain",
     "references": []
    },
@@ -4655,7 +4655,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:727 initStartScreen()"
+    "src/js/project.js:728 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4695,7 +4695,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:728 initStartScreen()"
+    "src/js/project.js:729 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4760,7 +4760,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 144,
+    "functionsVisited": 146,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:9147 action()",
@@ -5017,7 +5017,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 48,
+    "functionsVisited": 60,
     "via": "variable trigger",
     "references": []
    },
@@ -5058,7 +5058,7 @@
     "container": "p-toolpreset-row",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 36,
+    "functionsVisited": 37,
     "via": "variable saveBtn",
     "references": []
    },
@@ -5232,7 +5232,7 @@
     "container": "media-statusbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 40,
+    "functionsVisited": 47,
     "via": "chain",
     "references": []
    },
@@ -5786,7 +5786,7 @@
     "container": "comment-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 69,
+    "functionsVisited": 70,
     "via": "variable saveFbBtn",
     "references": []
    },
@@ -7678,7 +7678,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 39,
+    "functionsVisited": 40,
     "via": "variable pullBtn",
     "references": []
    },
@@ -7715,7 +7715,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 82,
+    "functionsVisited": 83,
     "via": "variable importBtn",
     "references": []
    },
@@ -7789,7 +7789,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 9,
+    "functionsVisited": 10,
     "via": "variable tokenSave",
     "references": []
    },
@@ -7842,7 +7842,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:734 initStartScreen()"
+    "src/js/project.js:735 initStartScreen()"
    ],
    "events": [
     "change"
@@ -7866,7 +7866,7 @@
     "functionsVisited": 46,
     "via": "chain",
     "references": [
-     "src/js/project.js:213 openDialog()"
+     "src/js/project.js:214 openDialog()"
     ]
    },
    "fixtures": [
@@ -8235,7 +8235,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 13,
+    "functionsVisited": 14,
     "via": "variable saveBtn",
     "references": []
    },
@@ -8271,7 +8271,7 @@
     "container": "app-topbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 23,
+    "functionsVisited": 24,
     "via": "variable btn",
     "references": [
      "src/js/history-panel.js:125 toggleHistoryPopover()"
@@ -9192,7 +9192,7 @@
    "capability": "Cancel",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:706 initStartScreen()"
+    "src/js/project.js:707 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9229,7 +9229,7 @@
    "capability": "Create",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:710 initStartScreen()"
+    "src/js/project.js:711 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9254,7 +9254,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 62,
+    "functionsVisited": 64,
     "via": "chain",
     "references": []
    },
@@ -9279,7 +9279,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:716 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:717 initStartScreen())",
    "source": "src/index.html:80",
    "meta": {
     "data": {},
@@ -9289,7 +9289,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:716 initStartScreen()"
+     "src/js/project.js:717 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9313,7 +9313,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:714 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:715 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9325,7 +9325,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:714 initStartScreen()"
+     "src/js/project.js:715 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9351,7 +9351,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:717 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:718 initStartScreen())",
    "source": "src/index.html:71",
    "meta": {
     "data": {},
@@ -9361,7 +9361,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:717 initStartScreen()"
+     "src/js/project.js:718 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9376,7 +9376,7 @@
    "capability": "np preset",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:707 initStartScreen()"
+    "src/js/project.js:708 initStartScreen()"
    ],
    "events": [
     "change"
@@ -9400,7 +9400,7 @@
     "functionsVisited": 1,
     "via": "chain",
     "references": [
-     "src/js/project.js:712 initStartScreen()"
+     "src/js/project.js:713 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9424,7 +9424,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:714 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:715 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9436,7 +9436,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:714 initStartScreen()"
+     "src/js/project.js:715 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9814,7 +9814,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 47,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3336 updatePropsContext()"
@@ -10527,7 +10527,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 17,
+    "functionsVisited": 18,
     "via": "variable btn",
     "references": [
      "src/js/timeline.js:8931 syncFillGradientButton()"
@@ -11401,7 +11401,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 35,
+    "functionsVisited": 47,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3342 updatePropsContext()",
@@ -11994,7 +11994,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 12,
+    "functionsVisited": 11,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6316 paintFillSwatches()"
@@ -14026,7 +14026,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 30,
+    "functionsVisited": 31,
     "via": "variable addBtn",
     "references": []
    },
@@ -14724,7 +14724,7 @@
    "capability": "New project (new tab)",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:634"
+    "src/js/project.js:635"
    ],
    "events": [
     "click"
@@ -14751,10 +14751,10 @@
     "container": "project-tabs-bar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 187,
+    "functionsVisited": 188,
     "via": "chain",
     "references": [
-     "src/js/project.js:634",
+     "src/js/project.js:635",
      "src/js/timeline.js:9116 action()"
     ]
    },
@@ -14865,7 +14865,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 44,
+    "functionsVisited": 45,
     "via": "variable input",
     "references": []
    },
@@ -15447,7 +15447,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 75,
+    "functionsVisited": 77,
     "via": "variable resetBtn",
     "references": []
    },
@@ -15761,7 +15761,7 @@
    "capability": "start new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:704 initStartScreen()"
+    "src/js/project.js:705 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15798,7 +15798,7 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:705 initStartScreen()"
+    "src/js/project.js:706 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15821,7 +15821,7 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 47,
+    "functionsVisited": 65,
     "via": "chain",
     "references": []
    },
@@ -15837,7 +15837,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:677 initStartScreen()"
+    "src/js/project.js:678 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15863,7 +15863,7 @@
     "functionsVisited": 63,
     "via": "chain",
     "references": [
-     "src/js/project.js:665 initStartScreen()"
+     "src/js/project.js:666 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -16184,7 +16184,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 495,
+    "functionsVisited": 499,
     "via": "variable save",
     "references": []
    },
@@ -16665,7 +16665,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8725 updateTextPropsPanel()",
@@ -16714,7 +16714,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "variable contentEl",
     "references": [
      "src/js/timeline.js:8714 updateTextPropsPanel()",
@@ -16765,7 +16765,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8738 updateTextPropsPanel()",
@@ -16815,7 +16815,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8721 updateTextPropsPanel()",
@@ -16996,7 +16996,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8730 updateTextPropsPanel()",
@@ -17047,7 +17047,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8732 updateTextPropsPanel()",
@@ -17098,7 +17098,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8723 updateTextPropsPanel()",
@@ -17149,7 +17149,7 @@
     "container": "text-props-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 459,
+    "functionsVisited": 460,
     "via": "callback id",
     "references": [
      "src/js/timeline.js:8734 updateTextPropsPanel()",
@@ -18885,7 +18885,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -18921,7 +18921,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -18957,7 +18957,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -18993,7 +18993,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -19029,7 +19029,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -19065,7 +19065,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -19101,7 +19101,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -19137,7 +19137,7 @@
     "container": "settings-tabs",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 6,
+    "functionsVisited": 12,
     "via": "callback tab",
     "references": []
    },
@@ -19173,7 +19173,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 13,
     "via": "callback btn",
     "references": []
    },
@@ -19212,7 +19212,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 13,
     "via": "callback btn",
     "references": []
    },
@@ -19251,7 +19251,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 13,
     "via": "callback btn",
     "references": []
    },
@@ -19290,7 +19290,7 @@
     "container": "comment-fb-tags",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 7,
+    "functionsVisited": 13,
     "via": "callback btn",
     "references": []
    },
@@ -19335,7 +19335,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19382,7 +19382,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19429,7 +19429,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19476,7 +19476,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19523,7 +19523,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19570,7 +19570,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19617,7 +19617,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -19664,7 +19664,7 @@
     "container": "align-toolbar",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 92,
+    "functionsVisited": 93,
     "via": "callback btn",
     "references": []
    },
@@ -23069,7 +23069,7 @@
    "source": "src/js/labs/command-palette.js:35",
    "meta": {
     "i18n": "labsCmdUndo",
-    "functionsVisited": 5
+    "functionsVisited": 3
    },
    "fixtures": []
   },
@@ -23099,7 +23099,7 @@
    "source": "src/js/labs/command-palette.js:36",
    "meta": {
     "i18n": "labsCmdRedo",
-    "functionsVisited": 5
+    "functionsVisited": 3
    },
    "fixtures": []
   },
@@ -23162,7 +23162,7 @@
    "source": "src/js/layer-inout.js:1557",
    "meta": {
     "i18n": null,
-    "functionsVisited": 305
+    "functionsVisited": 306
    },
    "fixtures": [
     "static-props",
@@ -24002,7 +24002,7 @@
    "source": "src/js/media-library.js:543",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 92
+    "functionsVisited": 96
    },
    "fixtures": [
     "mesh",
@@ -24262,7 +24262,7 @@
    "source": "src/js/motion.js:10889",
    "meta": {
     "i18n": "ctxDeleteThisKey",
-    "functionsVisited": 266
+    "functionsVisited": 267
    },
    "fixtures": [
     "static-props",
@@ -24538,7 +24538,7 @@
    "source": "src/js/motion.js:10925",
    "meta": {
     "i18n": "ctxDistributeEvenly",
-    "functionsVisited": 271
+    "functionsVisited": 272
    },
    "fixtures": [
     "static-props",
@@ -24580,7 +24580,7 @@
    "source": "src/js/motion.js:10926",
    "meta": {
     "i18n": "ctxFlipOrder",
-    "functionsVisited": 271
+    "functionsVisited": 272
    },
    "fixtures": [
     "static-props",
@@ -24853,7 +24853,7 @@
    "source": "src/js/motion.js:10945",
    "meta": {
     "i18n": "ctxInvertSelection",
-    "functionsVisited": 102
+    "functionsVisited": 104
    },
    "fixtures": [
     "static-props",
@@ -25013,7 +25013,7 @@
    "source": "src/js/motion.js:362",
    "meta": {
     "i18n": "ctrlMenuAddEllipsis",
-    "functionsVisited": 158
+    "functionsVisited": 159
    },
    "fixtures": [
     "static-props",
@@ -25208,7 +25208,7 @@
    "source": "src/js/motion.js:393",
    "meta": {
     "i18n": "ctrlMenuDelete",
-    "functionsVisited": 158
+    "functionsVisited": 159
    },
    "fixtures": [
     "static-props",
@@ -27332,7 +27332,7 @@
    "source": "src/js/palette-panel.js:186",
    "meta": {
     "i18n": null,
-    "functionsVisited": 23
+    "functionsVisited": 25
    },
    "fixtures": [
     "static-props",
@@ -28284,7 +28284,7 @@
    "source": "src/js/select-bridge.js:3262",
    "meta": {
     "i18n": null,
-    "functionsVisited": 31
+    "functionsVisited": 32
    },
    "fixtures": [
     "static-props",
@@ -29957,7 +29957,7 @@
    "source": "src/js/timeline.js:5344",
    "meta": {
     "i18n": null,
-    "functionsVisited": 444
+    "functionsVisited": 445
    },
    "fixtures": [
     "keyed-props",
@@ -31934,7 +31934,7 @@
    "source": "src/js/timeline.js:6817",
    "meta": {
     "i18n": "ctxMenuAppearance",
-    "functionsVisited": 165
+    "functionsVisited": 167
    },
    "fixtures": [
     "keyed-props",
@@ -31972,7 +31972,7 @@
    "source": "src/js/timeline.js:6831",
    "meta": {
     "i18n": "ctxLayerBlend",
-    "functionsVisited": 164
+    "functionsVisited": 166
    },
    "fixtures": [
     "keyed-props",
@@ -32631,7 +32631,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 400
+    "functionsVisited": 404
    },
    "fixtures": [
     "media",
@@ -33385,7 +33385,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:284",
    "meta": {
-    "functionsVisited": 135
+    "functionsVisited": 137
    },
    "fixtures": [
     "media",
@@ -33644,7 +33644,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:283",
    "meta": {
-    "functionsVisited": 125
+    "functionsVisited": 127
    },
    "fixtures": [
     "media",
@@ -34238,7 +34238,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:459",
    "meta": {
-    "functionsVisited": 10
+    "functionsVisited": 11
    },
    "fixtures": [
     "media",
