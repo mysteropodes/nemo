@@ -1,5 +1,8 @@
 //! Staged object fill/history authority; no transport, retries or replacement port.
-use crate::commands::{ObjectFillOwner, PreparedObjectFill, PreparedReferenceEdit, ReferenceEdit};
+use crate::commands::{
+    ObjectFillOwner, PreparedLayerVisibility, PreparedObjectFill, PreparedReferenceEdit,
+    ReferenceEdit,
+};
 use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectSnapshot;
@@ -93,6 +96,27 @@ impl NativeObjectHistory {
     }
     pub fn history_depths(&self) -> (usize, usize) {
         (self.undo.len(), self.redo.len())
+    }
+    pub(crate) fn prepare_layer_visibility_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerVisibility, DispatchErrorCode> {
+        self.owner.prepare_layer_visibility_json(bytes)
+    }
+    pub(crate) fn commit_layer_visibility(
+        &mut self,
+        candidate: PreparedLayerVisibility,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before_revision = self.content_revision();
+        let after_revision = self.owner.commit_layer_visibility(candidate)?;
+        if after_revision != before_revision {
+            self.undo.push(ObjectHistoryEntry {
+                before_revision,
+                after_revision,
+            });
+            self.redo.clear();
+        }
+        Ok(after_revision)
     }
     /// Strict D1 payload preparation from this owner's current immutable snapshot.
     pub fn prepare_fill_json(&self, bytes: &[u8]) -> Result<PreparedObjectFill, DispatchErrorCode> {

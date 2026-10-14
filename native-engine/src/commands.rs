@@ -7,7 +7,9 @@ pub use object_fill::{prepare_object_fill_json, PreparedObjectFill};
 #[cfg(feature = "history")]
 mod object_fill_owner;
 #[cfg(feature = "history")]
-pub(crate) use object_fill_owner::{ObjectFillOwner, PreparedReferenceEdit, ReferenceEdit};
+pub(crate) use object_fill_owner::{
+    ObjectFillOwner, PreparedLayerVisibility, PreparedReferenceEdit, ReferenceEdit,
+};
 
 use crate::document::OpacityDocument;
 use crate::request_receipts::{

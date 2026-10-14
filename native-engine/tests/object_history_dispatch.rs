@@ -45,6 +45,155 @@ fn dispatch(owner: &mut NativeObjectHistory, request: &Value) -> Value {
     )
     .unwrap()
 }
+fn visibility_request(
+    owner: &NativeObjectHistory,
+    id: &str,
+    revision: u64,
+    visible: bool,
+) -> Value {
+    let mut value = request(owner, id, revision, "layer.visibility.set");
+    value["payload"] = json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":visible});
+    value
+}
+
+#[test]
+fn layer_visibility_uses_actual_owner_history_noop_replay_and_retained_snapshots() {
+    let mut owner = owner();
+    let zero = owner.acquire_snapshot(0).unwrap();
+    let noop = visibility_request(&owner, "visible-noop", 0, true);
+    assert_eq!(
+        dispatch(&mut owner, &noop)["result"],
+        json!({"applied":false,"historyEntriesAdded":0})
+    );
+    assert_eq!(serde_json::to_value(zero.document()).unwrap(), document());
+    let hide = visibility_request(&owner, "hide", 0, false);
+    let hidden = dispatch(&mut owner, &hide);
+    assert_eq!(hidden["ok"], true);
+    assert_eq!(
+        hidden["result"],
+        json!({"applied":true,"historyEntriesAdded":1})
+    );
+    assert!(!owner.acquire_snapshot(1).unwrap().document().layers()[0].visible());
+    assert_eq!(owner.history_depths(), (1, 0));
+    let undo = request(&owner, "undo-visible", 1, "undo");
+    assert_eq!(dispatch(&mut owner, &undo)["ok"], true);
+    let noop = visibility_request(&owner, "visible-redo-noop", 2, true);
+    assert_eq!(dispatch(&mut owner, &noop)["result"]["applied"], false);
+    assert_eq!(owner.history_depths(), (0, 1));
+    let redo = request(&owner, "redo-visible", 2, "redo");
+    assert_eq!(dispatch(&mut owner, &redo)["ok"], true);
+    let before = state(&owner);
+    assert_eq!(dispatch(&mut owner, &hide), hidden);
+    assert_eq!(state(&owner), before);
+    let mut changed = hide.clone();
+    changed["payload"]["visible"] = json!(true);
+    assert_eq!(dispatch(&mut owner, &changed)["ok"], false);
+    assert_eq!(state(&owner), before);
+    assert_eq!(serde_json::to_value(zero.document()).unwrap(), document());
+    let visible = visibility_request(&owner, "show", 3, true);
+    assert_eq!(dispatch(&mut owner, &visible)["ok"], true);
+    assert!(owner.acquire_snapshot(4).unwrap().document().layers()[0].visible());
+}
+
+#[test]
+fn layer_visibility_refusals_and_sealed_origins_never_publish_or_change_history() {
+    let mut owner = owner();
+    let before = state(&owner);
+    for (id, patch) in [
+        ("cancel-visible", json!({"cancelledBeforeDispatch":true})),
+        (
+            "wrong-visible-document",
+            json!({"documentId":"other-document"}),
+        ),
+    ] {
+        let mut value = visibility_request(&owner, id, 0, false);
+        for (key, item) in patch.as_object().unwrap() {
+            value[key] = item.clone();
+        }
+        assert_eq!(dispatch(&mut owner, &value)["ok"], false);
+        assert_eq!(state(&owner), before);
+    }
+    let mut missing = visibility_request(&owner, "missing-visible-revision", 0, false);
+    missing.as_object_mut().unwrap().remove("expectedRevision");
+    assert_eq!(dispatch(&mut owner, &missing)["ok"], false);
+    assert_eq!(state(&owner), before);
+    for (index, payload) in [
+        json!({"command":"object.layer.visibility.set","layerUid":"missing","visible":false}),
+        json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":null}),
+        json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":"false"}),
+        json!({"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":false,"extra":1}),
+    ].into_iter().enumerate() {
+        let mut value = visibility_request(&owner, &format!("bad-{index}"), 0, false);
+        value["payload"] = payload;
+        assert_eq!(dispatch(&mut owner, &value)["ok"], false);
+        assert_eq!(state(&owner), before);
+    }
+    let mut stale = visibility_request(&owner, "stale-visible", 9, false);
+    assert_eq!(dispatch(&mut owner, &stale)["ok"], false);
+    assert_eq!(state(&owner), before);
+    stale["requestId"] = json!("wrong-instance");
+    stale["expectedRevision"] = json!(0);
+    stale["instanceId"] = json!("other");
+    assert_eq!(dispatch(&mut owner, &stale)["ok"], false);
+    assert_eq!(state(&owner), before);
+    let bytes =
+        serde_json::to_vec(&visibility_request(&owner, "prepared", 0, false)["payload"]).unwrap();
+    let prepared = owner.prepare_layer_visibility_json(&bytes).unwrap();
+    let mut other = self::owner();
+    assert!(other.commit_layer_visibility(prepared.clone()).is_err());
+    assert_eq!(other.content_revision(), 0);
+    let changed = visibility_request(&owner, "changed-visible", 0, false);
+    assert_eq!(dispatch(&mut owner, &changed)["ok"], true);
+    let after = state(&owner);
+    assert!(owner.commit_layer_visibility(prepared).is_err());
+    assert_eq!(state(&owner), after);
+    let duplicate = br#"{"command":"object.layer.visibility.set","layerUid":"legacy layer:alpha","visible":false,"visible":true}"#;
+    assert!(owner.prepare_layer_visibility_json(duplicate).is_err());
+    assert_eq!(state(&owner), after);
+}
+
+#[cfg(feature = "compositor")]
+#[test]
+fn actual_visibility_dispatch_changes_frame_paint_and_undo_restores_original_indices() {
+    use crate::object_frame_packet::{prepare_object_frame, ObjectFrameSelector};
+    use crate::object_render_scene::{prepare_object_paint_plan, prepare_object_render_scene};
+    let source = crate::object_render_scene::paint_test_document(&[7]);
+    let mut owner = NativeObjectHistory::new(
+        "visible-paint",
+        object_codec::decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap(),
+    )
+    .unwrap();
+    let render = |owner: &NativeObjectHistory| {
+        let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
+        let pins = ObjectFrameSelector {
+            instance_id: snapshot.instance_id(),
+            document_id: snapshot.document_id(),
+            content_revision: snapshot.content_revision(),
+            document_snapshot_id: snapshot.snapshot_id(),
+            context_id: "scene-root",
+            scope_kind: crate::object_document::FrameScopeKind::Authored,
+            frame: 7,
+        };
+        let packet = prepare_object_frame(&snapshot, &pins).unwrap();
+        let scene = prepare_object_render_scene(&packet, &pins).unwrap();
+        prepare_object_paint_plan(&scene, &pins)
+            .unwrap()
+            .commands()
+            .map(|c| c.source().source_layer_index())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(render(&owner), vec![1, 1, 1, 2, 0]);
+    let mut hide = visibility_request(&owner, "paint-hide", 0, false);
+    hide["payload"]["layerUid"] = json!("L1");
+    assert_eq!(dispatch(&mut owner, &hide)["ok"], true);
+    assert_eq!(render(&owner), vec![1, 1, 1, 0]);
+    let undo = request(&owner, "paint-undo", 1, "undo");
+    assert_eq!(dispatch(&mut owner, &undo)["ok"], true);
+    assert_eq!(render(&owner), vec![1, 1, 1, 2, 0]);
+    let redo = request(&owner, "paint-redo", 2, "redo");
+    assert_eq!(dispatch(&mut owner, &redo)["ok"], true);
+    assert_eq!(render(&owner), vec![1, 1, 1, 0]);
+}
 fn state(owner: &NativeObjectHistory) -> Value {
     let snapshot = owner.acquire_snapshot(owner.content_revision()).unwrap();
     json!({"revision":owner.content_revision(),"depths":owner.history_depths(),
