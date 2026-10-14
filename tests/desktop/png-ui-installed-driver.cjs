@@ -17,9 +17,10 @@ function packageProof(c){
   check(app.executableSha256===c.executableSha256&&proof.status==='pass'&&proof.details.source.head===c.sourceHead&&
     proof.details.source.dirty===false&&proof.details.cleanup.stopped&&proof.details.cleanup.released&&
     proof.artifacts.some(x=>x.sha256===c.executableSha256&&x.path.endsWith('/Contents/MacOS/nemo')),'png-build-refused');
-  const sourceBytes=fs.readFileSync(path.join(__dirname,'p38-owned-window.swift')),helper=policy.readFile(c.windowHelper),hp=json(c.helperProof);
+  const helper=policy.readFile(c.windowHelper),hp=json(c.helperProof);
+  const sourceSha256=require('./p38-owned-window-build.cjs').verifySourceProof(hp);
   check(hash(helper.bytes)===c.helperSha256&&hp.schema==='nemo.png-ui-window-helper/1'&&hp.sourceHead===c.driverHead&&
-    hp.sourceSha256===hash(sourceBytes)&&hp.executableSha256===c.helperSha256,'png-helper-refused');
+    hp.sourceSha256===sourceSha256&&hp.executableSha256===c.helperSha256,'png-helper-refused');
   fs.accessSync(c.windowHelper,fs.constants.X_OK);
   return {...app,source,build:modules.identity.buildIdentity(),modules,helperProof:hp,buildProofSha256:hash(policy.readFile(c.buildProof).bytes)};
 }
@@ -78,6 +79,7 @@ async function runOperator(c,s){
       const selected=last?.nodes?.find(n=>n.path===a.element);
       receipt.inFlight={type:a.type,target:a.target||'main',...(selected?{role:selected.role,control:selected.control,element:selected.path}:{})};save();
       const request={...a};if(a.type==='capture'){request.capture='capture-'+(receipt.actions.length+1)+'.png';delete request.name;check(!fs.existsSync(path.join(c.reportRoot,request.capture)),'png-capture-reused');}
+      if(a.type==='press'){request.expectedRole=selected.role;request.expectedControl=selected.control;}
       if(a.type==='go-to-folder')sheet.locationAttempted=true;
       const result=await bound(helper.action(windowId,request));policy.identity(result,pid,windowId);check(result.status==='ok'&&result.type===a.type,'png-action-refused');
       policy.observeSheet(a,sheet,result);policy.witnessAction(c,a,last);const clean=policy.sanitizeHelper(result,a.target||'main');last=a.type==='inspect'?{...clean,target:a.target||'main'}:null;

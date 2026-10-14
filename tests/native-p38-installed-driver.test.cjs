@@ -244,7 +244,7 @@ test('atomic receipt updates do not follow a malicious receipt symlink',()=>{
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 test('static persisted AX evidence is restricted to known control/alert facts',()=>{
-  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');assert.ok(s.includes('try project(child,childPath,level+1)'));
+  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8')+fs.readFileSync('tests/desktop/p38-owned-projection.swift','utf8');assert.ok(s.includes('try project(child,childPath,level+1)'));
   assert.equal(/facts\["(?:title|value)"\]/.test(s),false);assert.ok(s.includes('switch-unavailable'));
   assert.ok(s.includes('projectionLimit(depth,maxNodes)'));assert.ok(s.includes('rowSelectedAfter'));
   const d=fs.readFileSync('tests/desktop/p38-installed-driver.cjs','utf8');assert.ok(d.includes('OPERATOR ASSERTION'));

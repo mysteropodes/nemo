@@ -321,7 +321,8 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   const gates=slice('    let target = request["target"]','    switch action {');
   const inspect=slice('    case "inspect":','    case "capture":').replace('    case "inspect":','');
   const definitions=slice('struct ProcessStart:','func processStart(')+slice('func localFacts(','// A path is diagnostic')+
-    slice('func boundedOwnedTree<','func guardedElementAction(');
+    slice('func boundedOwnedTree<','func guardedElementAction(')+
+    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'');
   const verify=slice('  func verifyService()','  try emit(["status":"pinned"');
   const node=slice('  func node(_ value:','  func supports(');
   const code=`import Foundation
@@ -338,8 +339,9 @@ func projectionLimit(_ depth:Int,_ nodes:Int)throws{try check(depth>0 && nodes>0
 func requireResolvedSheetMutation(_ target:String,_ action:String,_ service:Bool,_ token:Bool)throws{}
 func setInspectionContext(_ stage:String,_ reason:String){}
 func CFEqual(_ a:Int,_ b:Int)->Bool{a==b}
+func CFHash(_ value:Int)->UInt{UInt(value)}
 func route(_ raw:String)throws->[Int]{raw.isEmpty ? [] : try raw.split(separator:".").map{guard let i=Int($0)else{throw Refusal(code:"route")};return i}}
-let kAXRoleAttribute="role",kAXTitleAttribute="title",kAXValueAttribute="value",kAXChildrenAttribute="children"
+let kAXRoleAttribute="role",kAXTitleAttribute="title",kAXValueAttribute="value",kAXChildrenAttribute="children",kAXDescriptionAttribute="description"
 let kAXSelectedAttribute="selected",kAXEnabledAttribute="enabled",kAXSubroleAttribute="subrole",kAXFocusedAttribute="focused"
 let kAXWindowRole="AXWindow",kAXSheetRole="AXSheet",kAXGroupRole="AXGroup",kAXDialogSubrole="AXDialog"
 let kAXTextFieldRole="AXTextField",kAXPopUpButtonRole="AXPopUpButton",kAXPressAction="press",kAXConfirmAction="confirm"
@@ -351,6 +353,7 @@ func exercise(_ fault:String,_ requestTarget:String="sheet",_ token:String?="loc
   let serviceStart:ProcessStart?=ProcessStart(pid:20,seconds:1,microseconds:0),serviceSheetToken:String?="sheet"
   let location:Int?=4,locationField:Int?=5
   var activeInspectionContext:Int?=nil,result=[String:Any](),reads=0,foreignReads=0,locationChecks=0
+  var projectionCursor:OwnedProjectionCursor<Int>?=nil
   var request:[String:Any]=["target":requestTarget,"sheetToken":"sheet","depth":2,"maxNodes":32]
   if let token,locationToken != nil{request["locationToken"]=token}
   if fault == "wrong-sheet-token"{request["sheetToken"]="wrong"}
@@ -412,4 +415,23 @@ precondition(oldRows.count==1 && oldRows[0]["blocked"] as? String=="child-owner"
 print("baseline refuses authenticated service root before exposing its field; runtimeAX=false")`;
   const red=spawnSync('/usr/bin/swift',['-e',legacy],{encoding:'utf8',timeout:30000,maxBuffer:16384});
   assert.equal(red.status,0,red.stderr);assert.match(red.stdout,/baseline refuses/);
+});
+
+test('PNG pages require observed roots and exact retained continuation; metadata stays categorical',t=>{
+  const f=setup(t);f.prepare();const token='11111111-1111-4111-8111-111111111111',node={path:'0.0',role:'AXWebArea'};
+  const first={target:'main',nodes:[node]};
+  P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,maxNodes:128,childOffset:0},{},first);
+  assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.9',depth:1,childOffset:0},{},first));
+  const page={target:'main',pageToken:token,childOffset:0,nextChildOffset:127,childCount:300,childrenComplete:false,nodes:[node]};
+  P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token},{},page);
+  for(const edit of [{childOffset:true},{childOffset:-1},{childOffset:4096},{childOffset:1.5},{childOffset:'127'},
+    {childOffset:128},{pageToken:'22222222-2222-4222-8222-222222222222'},{element:'0.8'},{depth:2},{target:'sheet'}])
+    assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token,...edit},{},page));
+  assert.throws(()=>P.verifyAction(f.c,{type:'inspect',element:'0.0',depth:1,childOffset:127,pageToken:token},{},{...page,foreignChildren:true}));
+  const clean=P.sanitizeHelper({status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,...page,
+    complete:false,depthClipped:true,truncated:true,childrenUnreadable:false,foreignChildren:false,private:'/private/secret'});
+  assert.equal(clean.childCount,300);assert.equal(clean.depthClipped,true);assert.equal(clean.pageToken,token);
+  assert.equal(JSON.stringify(clean).includes('private'),false);
+  for(const bad of [{childCount:'/private'},{nextChildOffset:4096},{complete:'yes'},{depthClipped:{}},{pageToken:'private-token'}])
+    assert.throws(()=>P.sanitizeHelper({status:'ok',type:'inspect',...bad}));
 });

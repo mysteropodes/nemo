@@ -50,7 +50,7 @@ function packageProof(config) {
   const proof = readJSON(config.buildProof);
   const helper = policy.readFile(config.windowHelper), helperProof = readJSON(config.helperProof);
   fs.accessSync(config.windowHelper,fs.constants.X_OK);
-  const helperSourceSha256 = hash(fs.readFileSync(path.join(__dirname,'p38-owned-window.swift')));
+  const helperSourceSha256 = require('./p38-owned-window-build.cjs').verifySourceProof(helperProof);
   verifyProvenance(config,{driver,source,app,proof,helperProof,helperSourceSha256,helperSha256:hash(helper.bytes)});
   const driverProof = {sourceHead:config.driverHead,helperSourceSha256,helperSha256:config.helperSha256,
     driverSha256:hash(fs.readFileSync(__filename)),policySha256:hash(fs.readFileSync(path.join(__dirname,'reference-installed-policy.cjs'))),
