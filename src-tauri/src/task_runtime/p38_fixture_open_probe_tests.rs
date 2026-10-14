@@ -20,6 +20,23 @@ fn sha256_matches_standard_empty_and_abc_vectors() {
 }
 
 #[test]
+fn a_scope_diagnostic_is_fixed_and_serializes_only_its_allowlisted_state() {
+    use super::control::{a_fixture_scope_status, AOpenScopeDiagnostic};
+    use serde_json::json;
+
+    assert_eq!(a_fixture_scope_status(Some(true)), "allowed");
+    assert_eq!(a_fixture_scope_status(Some(false)), "refused");
+    assert_eq!(a_fixture_scope_status(None), "unavailable");
+    let packet = AOpenScopeDiagnostic {
+        a_fixture_scope: a_fixture_scope_status(Some(false)),
+    };
+    assert_eq!(
+        serde_json::to_value(packet).unwrap(),
+        json!({"aFixtureScope":"refused"})
+    );
+}
+
+#[test]
 fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
     for code in [
         "a-open-false",

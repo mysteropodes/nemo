@@ -35,6 +35,29 @@
       ? Reflect.apply(original, core, [command, args])
       : Reflect.apply(original, core, [command]);
   }
+  let activeOpen = null;
+  function diagnostic(event, code) {
+    if (!activeOpen) return;
+    if (event === 'allow-open-refused') activeOpen.gateRefused = true;
+    else if (event === 'bootstrap-dispatched') activeOpen.dispatches++;
+    else if (event === 'bootstrap-resolved') activeOpen.resolved++;
+    else if (event === 'bootstrap-rejected' && (code === 'unsupported-format' || code === 'other'))
+      activeOpen.rejected = code;
+  }
+  window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__ = diagnostic;
+  function openFailureCode(state, fixtureId, threw) {
+    const prefix = fixtureId.toLowerCase();
+    if (state && state.dispatches === 1 && state.rejected === 'unsupported-format')
+      return prefix + '-native-bootstrap-unsupported-format';
+    if (state && state.dispatches === 1 && state.rejected === 'other')
+      return prefix + '-native-bootstrap-rejected';
+    if (state && state.dispatches === 1 && state.resolved === 1)
+      return prefix + '-native-bootstrap-resolved-open-refused';
+    if (state && state.dispatches === 0)
+      return state.gateRefused ? prefix + '-pre-native-refusal' :
+        threw ? prefix + '-open-threw' : prefix + '-native-status-empty-no-bootstrap';
+    return prefix + (threw ? '-open-threw' : '-open-false');
+  }
   async function fail(phase, fixtureId, code) {
     const core = window.__TAURI__ && window.__TAURI__.core;
     if (!core || typeof core.invoke !== 'function') return;
@@ -101,14 +124,14 @@
       await fail('a-opened', 'A', 'a-pre-native-refusal');
       throw new Error('open-refused');
     }
-    let result;
+    let result, openState = {gateRefused:false,dispatches:0,resolved:0,rejected:null};
+    activeOpen = openState;
     try { result = await window.SMProject.openPath(config.fixtures.A); }
-    catch (_) {
-      await fail('a-opened', 'A', 'a-open-threw');
-      throw new Error('open-refused');
-    }
+    catch (_) { activeOpen = null; await fail('a-opened', 'A', openFailureCode(openState,'A',true)); throw new Error('open-refused'); }
+    activeOpen = null;
     if (result !== true) {
-      await fail('a-opened', 'A', result === false ? 'a-open-false' : 'a-open-unaccepted');
+      const failure = openState.dispatches > 0 || result === false ? openFailureCode(openState,'A',false) : 'a-open-unaccepted';
+      await fail('a-opened', 'A', failure);
       throw new Error('open-refused');
     }
     let after;
@@ -162,7 +185,11 @@
         }
         return 'refused';
       }
-      await checkpoint('ready', 'ready');
+      const ready = await checkpoint('ready', 'ready');
+      if (!ready || ready.aFixtureScope !== 'allowed') {
+        await fail('a-opened', 'A', ready && ready.aFixtureScope === 'refused' ? 'a-fs-read-rejected' : 'a-pre-native-refusal');
+        return 'refused';
+      }
       const stateA = await openA();
       await openB(stateA);
       return 'complete';
