@@ -34,10 +34,10 @@ test('numeric order private children have exact census without another API file 
   assert.equal(profile.sizeProfiles['Rust production module'].hardMax, 500);
 });
 
-test('numeric order uses actual eighteen-module forty-four-edge engine policy', () => {
+test('numeric order uses the adopted eighteen-module forty-nine-edge engine policy', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 44);
+  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 49);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
 });
 

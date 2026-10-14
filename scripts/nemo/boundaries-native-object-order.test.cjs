@@ -34,11 +34,11 @@ test('strict v2 children retain existing facades, graph and exact file census', 
   assert.deepEqual(owner.publicApi, ['boundaries-rust.test.cjs']);
 });
 
-test('actual native graph stays unchanged and codec cannot import application authority', () => {
+test('adopted native graph stays exact and codec cannot import application authority', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 44);
+  assert.equal(result.edges.length, 49);
   assert.deepEqual(result.unsupported, []);
   assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-order-boundary-'));

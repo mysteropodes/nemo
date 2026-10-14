@@ -15,7 +15,19 @@ const command = 'rust.desktop.native.application.commands';
 const flow = 'src-tauri/src/native_object_v2_persistence_tests.rs';
 const failure = 'src-tauri/src/native_object_v2_refusal_tests.rs';
 
-test('v2 host/file controls have exact census and production still uses same admission/file paths', () => {
+function admissionRoutes(bootstrap, reopen) {
+  const raw = bootstrap.slice(bootstrap.indexOf('pub(crate) fn bootstrap_raw('),
+    bootstrap.indexOf('pub(super) fn bootstrap_file_bytes('));
+  assert.match(raw, /bootstrap_file_bytes\(state, request.request_id, request.document_json.as_bytes\(\)\)/);
+  const file = bootstrap.slice(bootstrap.indexOf('pub(super) fn bootstrap_file_bytes('),
+    bootstrap.indexOf('#[tauri::command]'));
+  assert.match(file, /if format.format == "nemo.native-project-document"\s*\{\s*state\s*\.install_native_project_file\(bytes\)/);
+  assert.match(file, /else\s*\{[\s\S]*let document = decode_storage_project\(bytes\)[\s\S]*\.install_native_object\(document\)/);
+  assert.match(reopen, /let bytes = read_file\(state, &request, allowed\)\?;\s*return bootstrap_file_bytes\(state, request.request_id, &bytes\);/);
+  assert.match(reopen, /\}\s*bootstrap_raw\(state, raw\)/);
+}
+
+test('v2 host/file controls have exact census and preserve original-byte admission routes', () => {
   for (const file of [flow, failure]) {
     assert.equal(profile.modules.flatMap(m => m.files.map(f => `${m.dir}/${f}`)).filter(f => f === file).length, 1);
     const omitted = structuredClone(profile);
@@ -24,10 +36,16 @@ test('v2 host/file controls have exact census and production still uses same adm
       .some(v => v.rule === 'coverage-unprofiled-source' && v.file === file));
   }
   const bootstrap = read('src-tauri/src/native_object_bootstrap.rs');
-  assert.match(bootstrap, /decode_storage_project\(request.document_json.as_bytes\(\)\)/);
-  assert.match(bootstrap, /install_native_object\(document\)/);
+  const reopen = read('src-tauri/src/native_object_reopen.rs');
+  admissionRoutes(bootstrap, reopen);
+  assert.throws(() => admissionRoutes(bootstrap.replace('decode_storage_project(bytes)',
+    'decode_project(bytes)'), reopen), assert.AssertionError);
+  assert.throws(() => admissionRoutes(bootstrap.replace('.install_native_object(document)',
+    '.install_native_object(unvalidated)'), reopen), assert.AssertionError);
+  assert.throws(() => admissionRoutes(bootstrap, reopen.replace(
+    'bootstrap_file_bytes(state, request.request_id, &bytes)', 'bootstrap_raw(state, raw)')),
+  assert.AssertionError);
   assert.match(bootstrap, /require_main\(&window\)\?/);
-  assert.match(read('src-tauri/src/native_object_reopen.rs'), /return bootstrap_raw\(state, &wrapper\)/);
   assert.match(read('src-tauri/src/native_object_save.rs'), /serialize_object_file_snapshot\(&query.to_string\(\)\)/);
   assert.match(read('src-tauri/src/native_object_client.rs'), /"saveAvailable":false/);
   const owner = JSON.parse(read('engineering/boundaries/profiles/scripts-nemo.profile.json')).modules
@@ -54,7 +72,7 @@ test('storage decoder remains confined to command and actual host-release tests'
 test('actual desktop graph admits new command port, denies old command and cross-adapter decoders', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 39);
+  assert.equal(result.moduleCount, 17); assert.equal(result.edges.length, 43);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-v2-host-port-'));
   try {
