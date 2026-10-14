@@ -193,7 +193,7 @@ fn decoded_pixel(bytes: &[u8], x: usize, y: usize) -> [u8; 4] {
 
 #[test]
 #[cfg(target_os = "macos")]
-fn exact_application_owner_publishes_literal_png_through_real_port() {
+fn exact_application_owner_repeats_literal_png_through_real_port() {
     let scratch = Scratch::new();
     let (state, raw) = fixture(&scratch);
     let mut gpu = Compositor::new().unwrap();
@@ -234,5 +234,67 @@ fn exact_application_owner_publishes_literal_png_through_real_port() {
                 .map_err(|message| host_error("unavailable", message))
         })
         .is_err()
+    );
+    let second = Scratch::new();
+    let mut next = raw.clone();
+    next["destinationDirectory"] = json!(second.destination());
+    // The same ID cannot acquire a new destination after its committed job.
+    let replay = admit_request(&next.to_string(), state.instance_id(), |_| true).unwrap();
+    assert!(
+        export_with_target(&state, &replay, second.stage(), |consumer| {
+            consumer
+                .run(&mut gpu)
+                .map_err(|message| host_error("unavailable", message))
+        })
+        .is_err()
+    );
+    assert!(!second.stage().exists());
+    assert!(!second.destination().exists());
+    next["requestId"] = json!("second-png-export");
+    let invoked = Cell::new(0);
+    for (field, value) in [
+        ("documentId", json!("foreign")),
+        ("contentRevision", json!(1)),
+        ("lifecycleGeneration", json!(999)),
+    ] {
+        let mut changed = next.clone();
+        changed[field] = value;
+        let bad = admit_request(&changed.to_string(), state.instance_id(), |_| true).unwrap();
+        assert!(export_with_target(&state, &bad, second.stage(), |_| {
+            invoked.set(invoked.get() + 1);
+            Err(host_error("internal", "unexpected target"))
+        })
+        .is_err());
+    }
+    assert_eq!(invoked.get(), 0);
+    assert!(!second.stage().exists());
+    let mut cancelled = next.clone();
+    cancelled["cancelledBeforeDispatch"] = json!(true);
+    assert!(admit_request(&cancelled.to_string(), state.instance_id(), |_| true).is_err());
+    assert!(admit_request(&raw.to_string(), state.instance_id(), |_| true).is_err());
+    assert!(!second.stage().exists());
+    let admitted = admit_request(&next.to_string(), state.instance_id(), |_| true).unwrap();
+    let repeated = export_with_target(&state, &admitted, second.stage(), |consumer| {
+        consumer
+            .run(&mut gpu)
+            .map_err(|message| host_error("unavailable", message))
+    })
+    .unwrap();
+    assert_eq!(repeated.request_id, "second-png-export");
+    assert_eq!(repeated.document_id, result.document_id);
+    assert_eq!(repeated.document_snapshot_id, result.document_snapshot_id);
+    assert_eq!(repeated.content_revision, result.content_revision);
+    assert_eq!(repeated.status, "succeeded");
+    assert_eq!(repeated.external_effect_disposition, "committed");
+    assert!(repeated.published && repeated.cleanup_complete);
+    assert_eq!(repeated.artifact_files, ["frame_0001.png"]);
+    let second_bytes = fs::read(second.destination().join("frame_0001.png")).unwrap();
+    assert_eq!(decoded_pixel(&second_bytes, 8, 8), [0, 0, 255, 255]);
+    assert_eq!(decoded_pixel(&second_bytes, 40, 40), [255; 4]);
+    assert_eq!(fs::read_dir(second.stage()).unwrap().count(), 0);
+    assert_eq!(fs::read_dir(second.destination()).unwrap().count(), 1);
+    assert_eq!(
+        fs::read(scratch.destination().join("frame_0001.png")).unwrap(),
+        bytes
     );
 }

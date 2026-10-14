@@ -3,7 +3,8 @@ use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor,
     export_job::{
-        export_one_object_frame, ObjectHostExportOutcome, ObjectHostExportRequest,
+        export_one_object_frame, CleanupStatus, ExportReleaseReconciliation,
+        ExternalEffectDisposition, JobStatus, ObjectHostExportOutcome, ObjectHostExportRequest,
         StagedArtifactPort,
     },
     object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
@@ -12,6 +13,26 @@ use native_engine::{
     },
     scheduler::{ObjectSchedulePins, ObjectScheduleScope, OutputSpec},
 };
+
+/// Keep the last session's identity and actual reconciliation, including debt.
+/// This is an immediate replay barrier, not a historical request-ID registry.
+pub(super) struct ObjectExportSession {
+    request_id: String,
+    pub(super) reconciliation: ExportReleaseReconciliation,
+}
+impl ObjectExportSession {
+    fn permits_next(&self, request_id: &str) -> bool {
+        self.request_id != request_id
+            && self.reconciliation.cleanup_complete
+            && matches!(self.reconciliation.receipts.as_slice(), [receipt]
+                if receipt.status == JobStatus::Succeeded
+                && receipt.external_effect_disposition == ExternalEffectDisposition::Committed
+                && receipt.cleanup.status == CleanupStatus::Complete
+                && receipt.cleanup.error.is_none()
+                && receipt.error.is_none()
+                && receipt.artifact.is_some())
+    }
+}
 
 impl NativeObjectHost {
     /// A synchronous private source consumer. The later application route must
@@ -26,7 +47,12 @@ impl NativeObjectHost {
         port: &mut P,
         compositor: &mut Compositor,
     ) -> Result<ObjectHostExportOutcome, String> {
-        if self.released.is_some() || self.object_export.is_some() {
+        if self.released.is_some()
+            || self
+                .object_export
+                .as_ref()
+                .is_some_and(|session| !session.permits_next(&request_id))
+        {
             return Err("native object export session is unavailable".into());
         }
         if expected.instance_id != self.history.instance_id()
@@ -48,6 +74,7 @@ impl NativeObjectHost {
         let witness = prepare_object_composition(&plan, expected)
             .map_err(|error| format!("object export witness: {error:?}"))?;
         let scheduler = self.preview.scheduler_for_export()?;
+        let session_request_id = request_id.clone();
         let outcome = export_one_object_frame(
             &self.history,
             scheduler,
@@ -71,7 +98,10 @@ impl NativeObjectHost {
             witness,
         );
         if !outcome.release.receipts.is_empty() || !outcome.release.cleanup_complete {
-            self.object_export = Some(outcome.release.clone());
+            self.object_export = Some(ObjectExportSession {
+                request_id: session_request_id,
+                reconciliation: outcome.release.clone(),
+            });
         }
         Ok(outcome)
     }
