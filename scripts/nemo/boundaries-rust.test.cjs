@@ -504,7 +504,7 @@ test('N25F3D3C2B object artifact bridge has exact private ports and test-only fi
   assert.ok(module('rust.native.engine.export-job').files.includes('object_export_host.rs'));
   assert.ok(module(seam).files.includes('native_object_export.rs'));
   assert.ok(module(tests).files.includes('native_object_export_tests.rs'));
-  for (const item of ['export_job::export_one_object_frame', 'export_job::ObjectHostExportOutcome',
+  for (const item of ['export_job::export_object_frames', 'export_job::ObjectHostExportOutcome',
     'export_job::ObjectHostExportRequest', 'object_render_scene::prepare_object_composition']) {
     assert.ok(desktop.externalCratePorts.native_engine.moduleItems[seam].includes(item));
     const denied = structuredClone(desktop);
