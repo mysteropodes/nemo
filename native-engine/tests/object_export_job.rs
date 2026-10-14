@@ -303,3 +303,131 @@ fn cpu_existing_scheduler_work_is_never_stolen_or_cancelled_by_begin() {
         ExportJobErrorKind::Released
     );
 }
+
+#[cfg(feature = "object_expression_runtime")]
+pub(super) fn expression_owner(code: &str) -> NativeObjectHistory {
+    let template = owner("expression-export-input")
+        .acquire_snapshot(0)
+        .unwrap();
+    let mut source: serde_json::Value = serde_json::from_slice(
+        &crate::object_codec::encode_storage_project(template.document()).unwrap(),
+    )
+    .unwrap();
+    source["compositionOrder"]["contexts"][0]["layers"][0]["order"] = json!({
+        "static":[0],"expression":{"enabled":true,"code":code}});
+    NativeObjectHistory::new(
+        "expression-export",
+        crate::object_codec::decode_storage_project(&serde_json::to_vec(&source).unwrap()).unwrap(),
+    )
+    .unwrap()
+}
+
+#[cfg(feature = "object_expression_runtime")]
+pub(super) fn expression_witness(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+) -> Result<ObjectCompositionWitness, crate::object_expression_runtime::ExpressionCompositionRefusal>
+{
+    crate::object_expression_runtime::prepare_expression_object_composition_for_owner(
+        owner,
+        snapshot,
+        &selector(snapshot, 7),
+        crate::object_expression_runtime::ExpressionLimits::new(4096, 8_388_608, 262_144, 32)
+            .unwrap(),
+    )
+}
+
+#[cfg(feature = "object_expression_runtime")]
+pub(super) fn expression_request(
+    snapshot: &ObjectSnapshot,
+    budget: usize,
+) -> crate::export_job::ObjectHostExportRequest {
+    let input = request(snapshot, budget);
+    crate::export_job::ObjectHostExportRequest {
+        request_id: input.request_id,
+        target: input.target,
+        pins: input.pins,
+        output: input.output,
+        maximum_encoded_bytes: input.maximum_encoded_bytes,
+    }
+}
+
+#[cfg(feature = "object_expression_runtime")]
+pub(super) fn export_expression_fixture(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    port: &mut Port,
+    scheduler: &mut FrameScheduler,
+    gpu: &mut Compositor,
+    input: crate::export_job::ObjectHostExportRequest,
+) -> Result<
+    crate::export_job::ObjectHostExportOutcome,
+    crate::object_expression_runtime::ExpressionCompositionRefusal,
+> {
+    let witness = expression_witness(owner, snapshot)?;
+    Ok(crate::export_job::export_one_object_frame(
+        owner, scheduler, port, gpu, input, witness,
+    ))
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn gpu_expression_witness_exports_real_png_and_exact_memory_artifact_receipt() {
+    for (code, expected) in [
+        ("value", [159u8, 64, 96, 255]),
+        ("[value,Infinity]", [159, 64, 96, 255]),
+        ("[3]", [64, 96, 159, 255]),
+    ] {
+        let original = expression_owner(code);
+        let snapshot = original.acquire_snapshot(0).unwrap();
+        let before = crate::object_codec::encode_storage_project(snapshot.document()).unwrap();
+        let witness = expression_witness(&original, &snapshot).unwrap();
+        let input = expression_request(&snapshot, 65536);
+        let mut port = Port::default();
+        let mut scheduler = FrameScheduler::new();
+        let mut gpu = Compositor::new().expect("expression PNG needs real headless Metal");
+        let result = crate::export_job::export_one_object_frame(
+            &original,
+            &mut scheduler,
+            &mut port,
+            &mut gpu,
+            input.clone(),
+            witness,
+        );
+        let receipt = result.receipt.unwrap();
+        assert_eq!(receipt.status, JobStatus::Succeeded);
+        assert_eq!(receipt.pinned_revision, 0);
+        assert_eq!(receipt.document_snapshot_id, snapshot.snapshot_id());
+        assert_eq!(
+            receipt.external_effect_disposition,
+            ExternalEffectDisposition::Committed
+        );
+        assert_eq!(
+            receipt.artifact.unwrap(),
+            ExportArtifact {
+                target: input.target,
+                files: vec![FRAME.into()]
+            }
+        );
+        assert!(result.release.cleanup_complete);
+        assert_eq!(port.events, ["begin", "write", "publish"]);
+        let rgba = decode(&port.bytes);
+        for (x, y, color) in [(8, 8, expected), (40, 40, [255, 255, 255, 255])] {
+            let actual = &rgba[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4];
+            assert!(
+                actual.iter().zip(color).all(|(&a, b)| a.abs_diff(b) <= 1),
+                "{actual:?}"
+            );
+        }
+        assert_eq!(scheduler.lease_counters().live(), 0);
+        assert_eq!(scheduler.lease_counters().acquired(), 1);
+        assert_eq!(original.history_depths(), (0, 0));
+        assert_eq!(
+            crate::object_codec::encode_storage_project(
+                original.acquire_snapshot(0).unwrap().document()
+            )
+            .unwrap(),
+            before
+        );
+    }
+}
