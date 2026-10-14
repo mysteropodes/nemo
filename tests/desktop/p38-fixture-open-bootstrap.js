@@ -113,6 +113,28 @@
     throw typeof (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) === 'function'
       ? readinessFailure.openPathUnavailable : readinessFailure.invokeUnavailable;
   }
+  async function preflightARead() {
+    let fsBridge, read;
+    try {
+      fsBridge = window.__TAURI__ && window.__TAURI__.fs;
+      read = fsBridge && fsBridge.readTextFile;
+    } catch (_) { /* An unreadable API is a fixed pre-native refusal. */ }
+    if (typeof read !== 'function') {
+      await fail('a-opened', 'A', 'a-pre-native-refusal');
+      return false;
+    }
+    let text;
+    try { text = await Reflect.apply(read, fsBridge, [config.fixtures.A]); }
+    catch (_) {
+      await fail('a-opened', 'A', 'a-fs-read-rejected');
+      return false;
+    }
+    if (typeof text !== 'string' || text.length === 0 || text.length > 1048576) {
+      await fail('a-opened', 'A', 'a-fs-read-rejected');
+      return false;
+    }
+    return true;
+  }
   async function openA() {
     let before;
     try { before = await readNativeStatus(); }
@@ -186,10 +208,12 @@
         return 'refused';
       }
       const ready = await checkpoint('ready', 'ready');
-      if (!ready || ready.aFixtureScope !== 'allowed') {
-        await fail('a-opened', 'A', ready && ready.aFixtureScope === 'refused' ? 'a-fs-read-rejected' : 'a-pre-native-refusal');
+      if (!ready || typeof ready !== 'object' || Object.keys(ready).join(',') !== 'ownerAcknowledged' ||
+          ready.ownerAcknowledged !== true) {
+        await fail('a-opened', 'A', 'a-pre-native-refusal');
         return 'refused';
       }
+      if (!await preflightARead()) return 'refused';
       const stateA = await openA();
       await openB(stateA);
       return 'complete';

@@ -17,7 +17,7 @@ const statusA = Object.freeze({apiVersion:2,instanceId:'desktop-instance',availa
 const statusB = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:true,
   route:'nemo_native_object_dispatch',operations:['query.document.object'],documentId:'native-doc-B',contentRevision:0,lifecycleGeneration:2});
 function execute(openResults, configPatch = {}, runtime = {}) {
-  const calls = [], opened = [], statusCalls = [], commands = [];
+  const calls = [], opened = [], statusCalls = [], commands = [], readCalls = [], order = [];
   const config = {schema:'nemo.p38-fixture-open-bootstrap/1',runId:'12345678-1234-1234-1234-123456789abc',
     taskKey:'a'.repeat(64),sourceSha:'b'.repeat(40),buildSha:'b'.repeat(40),manifestSha256:'c'.repeat(64),
     pid:42,fixtures:{...fixtures},...configPatch};
@@ -26,9 +26,10 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   const invoke = function(command,args){
     commands.push(command);
     if(command==='nemo_test_p38_fixture_open_probe'){
-      const packet=JSON.parse(args.payloadJson); calls.push(packet);
+      const packet=JSON.parse(args.payloadJson); calls.push(packet); order.push(packet.phase);
       return runtime.rejectCheckpointAt===packet.phase?Promise.reject(new Error('private checkpoint failure')):
-        Promise.resolve(packet.phase==='ready'?(runtime.readyDiagnostic===undefined?{aFixtureScope:'allowed'}:runtime.readyDiagnostic):undefined);
+        packet.phase==='ready'&&runtime.readyPromise?runtime.readyPromise:
+        Promise.resolve(packet.phase==='ready'?(runtime.readyDiagnostic===undefined?{ownerAcknowledged:true}:runtime.readyDiagnostic):undefined);
     }
     if(command==='nemo_native_object_client_status'){
       statusCalls.push({receiverMatchesCore:this===core,argumentCount:arguments.length});
@@ -42,11 +43,17 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   core={};
   Object.defineProperty(core,'invoke',{enumerable:true,configurable:false,get:()=>runtime.missingInvoke?undefined:invoke});
   Object.freeze(core);
-  const readTextFile=function(){throw new Error('legacy file read must not be used by the probe');};
+  const readTextFile=function(path){
+    readCalls.push({path,receiverMatchesFs:this===fsBridge,argumentCount:arguments.length}); order.push('read-A');
+    return runtime.readTextFile?Reflect.apply(runtime.readTextFile,this,[path]):Promise.resolve(fs.readFileSync('tests/fixtures/p38/native-project/A.json','utf8'));
+  };
   fsBridge={};
-  Object.defineProperty(fsBridge,'readTextFile',{enumerable:true,configurable:false,get:()=>readTextFile});
+  Object.defineProperty(fsBridge,'readTextFile',{enumerable:true,configurable:false,get:()=>{
+    if(runtime.throwReadGetter)throw new Error('private fs API path');
+    return runtime.missingRead?undefined:runtime.malformedRead?42:readTextFile;
+  }});
   Object.freeze(fsBridge);
-  const openPath=runtime.openPath||async function(path){opened.push(path);
+  const openPath=runtime.openPath||async function(path){opened.push(path); order.push(path===fixtures.A?'open-A':'open-B');
     const events=runtime.openEvents||[['bootstrap-dispatched'],['bootstrap-resolved']];
     for(const [event,code] of events)window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);
     return openResults.shift();};
@@ -56,19 +63,26 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   const coreDescriptor=Object.getOwnPropertyDescriptor(core,'invoke');
   const fsDescriptor=Object.getOwnPropertyDescriptor(fsBridge,'readTextFile');
   const projectDescriptor=Object.getOwnPropertyDescriptor(project,'openPath');
-  const window={__NEMO_P38_FIXTURE_OPEN__:config,__TAURI__:Object.freeze({core,fs:fsBridge})};
+  const window={__NEMO_P38_FIXTURE_OPEN__:config,__TAURI__:Object.freeze({core,fs:runtime.missingFs?undefined:fsBridge})};
   if(!runtime.lateBind)window.SMProject=project;
   let tick=0;
   const clock=runtime.expireImmediately?{now:()=>tick++===0?0:60001}:Date;
   vm.runInNewContext(script,{window,Date:clock,setTimeout,Promise,Object,Number,Error,Reflect});
-  if(runtime.bind)runtime.bind({project,core,fs:fsBridge,window});
+  if(runtime.bind)runtime.bind({project,core,fs:fsBridge,window,readCalls,opened,calls});
   if(runtime.lateBind)window.SMProject=project;
-  return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,statusCalls,commands,
+  return Promise.resolve(window.__NEMO_P38_FIXTURE_OPEN_DONE__).then(result=>({result,calls,opened,statusCalls,commands,readCalls,order,
     bridgesPreserved:Object.isFrozen(core)&&Object.isFrozen(fsBridge)&&Object.isFrozen(project)&&
       Object.getOwnPropertyDescriptor(core,'invoke').get===coreDescriptor.get&&
       Object.getOwnPropertyDescriptor(fsBridge,'readTextFile').get===fsDescriptor.get&&
       Object.getOwnPropertyDescriptor(project,'openPath')?.get===projectDescriptor?.get}));
 }
+test('owner ACK permits the real A read before ordinary native opens',async()=>{
+  const r=await execute([true,true]);
+  assert.equal(r.result,'complete');
+  assert.deepEqual(r.readCalls,[{path:fixtures.A,receiverMatchesFs:true,argumentCount:1}]);
+  assert.deepEqual(r.order,['ready','read-A','open-A','a-opened','open-B','b-opened']);
+  assert.equal(r.bridgesPreserved,true);
+});
 test('exact native A/B opens and correlated status advance fixed checkpoints without bridge mutation', async()=>{
   const r=await execute([true,true]);
   assert.equal(r.result,'complete');
@@ -99,17 +113,50 @@ test('native open throw records only the fixed refusal and does not continue',as
   assert.equal(r.calls.at(-1).failureCode,'a-open-threw');
   assert.doesNotMatch(JSON.stringify(r.calls),/private|task\/tmp/);
 });
-test('a denied exact staged-file scope stops before calling production Open',async()=>{
-  const r=await execute([true],{},{readyDiagnostic:{aFixtureScope:'refused'}});
+test('a real exact staged-file read rejection stops before production Open',async()=>{
+  const r=await execute([true],{},{readTextFile(){return Promise.reject(new Error('private A read path'));}});
   assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.deepEqual(r.readCalls,[{path:fixtures.A,receiverMatchesFs:true,argumentCount:1}]);
   assert.deepEqual(r.calls.map(x=>[x.phase,x.status,x.failureCode]),[
     ['ready','ready',undefined],['a-opened','failed','a-fs-read-rejected']]);
+  assert.deepEqual(r.statusCalls,[]);
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|task\/tmp/);
 });
-test('unknown scope diagnostic fails closed before fixture Open',async()=>{
-  const r=await execute([true],{},{readyDiagnostic:{aFixtureScope:'private-error'}});
+for(const readyDiagnostic of [null,false,{}, {ownerAcknowledged:false}, {ownerAcknowledged:'true'},
+  {aFixtureScope:'allowed'}, {ownerAcknowledged:true,private:'path'}]) test('malformed owner ACK fails before any A read or Open: '+JSON.stringify(readyDiagnostic),async()=>{
+  const r=await execute([true],{},{readyDiagnostic});
   assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.deepEqual(r.readCalls,[]);
   assert.equal(r.calls.at(-1).failureCode,'a-pre-native-refusal');
-  assert.doesNotMatch(JSON.stringify(r.calls),/private-error/);
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|path|aFixtureScope|ownerAcknowledged/);
+});
+for(const runtime of [{missingFs:true},{missingRead:true},{malformedRead:true},{throwReadGetter:true}]) test('missing or malformed fs API fails before Open: '+JSON.stringify(runtime),async()=>{
+  const r=await execute([true],{},runtime);
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]); assert.deepEqual(r.readCalls,[]);
+  assert.equal(r.calls.at(-1).failureCode,'a-pre-native-refusal');
+  assert.equal(r.bridgesPreserved,true);
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|task\/tmp/);
+});
+test('synchronous fs read throw remains sanitized and stops before Open',async()=>{
+  const r=await execute([true],{},{readTextFile(){throw new Error('private A bytes/path');}});
+  assert.equal(r.result,'refused');assert.deepEqual(r.opened,[]);assert.equal(r.readCalls.length,1);
+  assert.equal(r.calls.at(-1).failureCode,'a-fs-read-rejected');
+  assert.doesNotMatch(JSON.stringify(r.calls),/private|bytes|path|task\/tmp/);
+});
+for(const value of [undefined,null,true,42,{},'', 'x'.repeat(1048577)]) test('malformed read result stops before Open: '+(typeof value),async()=>{
+  const r=await execute([true],{},{readTextFile:()=>Promise.resolve(value)});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]); assert.equal(r.readCalls.length,1);
+  assert.equal(r.calls.at(-1).failureCode,'a-fs-read-rejected');
+});
+test('no A read or Open occurs while owner ready ACK is pending',async()=>{
+  let release,observed;
+  const readyPromise=new Promise(resolve=>{release=resolve;});
+  const completion=execute([true,true],{},{readyPromise,bind:value=>{observed=value;}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(observed.calls.map(x=>x.phase),['ready']);
+  assert.deepEqual(observed.readCalls,[]); assert.deepEqual(observed.opened,[]);
+  release({ownerAcknowledged:true});
+  const r=await completion;assert.equal(r.result,'complete');assert.equal(r.readCalls.length,1);
 });
 test('allowOpen gate refusal and bootstrap failures retain distinct fixed stages',async()=>{
   const gated=await execute([false],{},{openEvents:[['allow-open-refused']]});
