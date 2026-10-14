@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "1cca5f643a95a58f7f77c2d76ab4395eceff3e17",
-  "describe": "v0.7.0-alpha.4-1793-g1cca5f64"
+  "head": "243f013965dc8d8a2301463aaa0480dfa96a9462",
+  "describe": "v0.7.0-alpha.4-1796-g243f0139"
  },
- "inputsDigest": "9cb28c7d72d16d6aa17506938a1849d03fcd64dbf80cf2abb8b17fbf2899d4b9",
+ "inputsDigest": "6ebf9e1322bfec231e50282c56044ebcc3f1bcb5f44b767ee2ad9cc86f62b31a",
  "states": [
   "inventoried",
   "characterized",
@@ -57,7 +57,7 @@
    "animation": 468,
    "history": 358,
    "selection": 384,
-   "render": 489,
+   "render": 491,
    "persist": 416
   }
  },
@@ -2485,7 +2485,8 @@
     "native": 1,
     "persist": 3,
     "selection": 3,
-    "animation": 3
+    "animation": 3,
+    "render": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -2497,7 +2498,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 111,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9131 action()"
@@ -10251,7 +10252,8 @@
     "native": 2,
     "persist": 3,
     "selection": 3,
-    "animation": 3
+    "animation": 3,
+    "render": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -10263,7 +10265,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 73,
+    "functionsVisited": 85,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2898 updateCornersPanel()",
@@ -16184,7 +16186,7 @@
     "container": "text-popover",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 499,
+    "functionsVisited": 509,
     "via": "variable save",
     "references": []
    },

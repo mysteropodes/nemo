@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "policyId": "nemo.app-js.coverage",
   "status": "adopted",
-  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registered the private object Save As coordinator and N25E4B1A the saved-UI acknowledgement helper; P37C1-DESKTOP stage 2 now loads both with three ordinary native project/reference adapters before their consumers, without claiming installed workflow or visible reference acceptance. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory. N20R-O2B pins the ordinary Play publication observer hooks in Motion, app and timeline source. P39B1 pins a private inactive-project entry helper without a production loader or visible B tab. N20R-O2C pins passive rejected-error correlation in the existing native Play observer without changing product control flow. P39B pins the ordinary desktop Open routing and inactive token-backed B tab row without activating B. N20R-OBS4 pins passive original-failure to restoration receipt, paint and input correlation, including fail-closed work/view and superseding-intent checks, without changing product navigation or recovery control. P38N5 adds the native inactive-project tab adapter and pins its exact bootstrap order and project/tab request controls. W02-VIS-BRIDGE pins native-owned layer visibility metadata and queued UID-targeted intent in the existing project adapters without claiming an ordinary eye caller, public API/MCP availability or installed acceptance.",
+  "purpose": "Adopted committed-source coverage, execution provenance and no-growth size enforcement for 140 legacy application files, the extracted curve kernel, project-document/project-entry integration, the opacity application MCP slice, the staged N13 native viewport metadata adapter, the active N15 native application v2 adapter, the N16 Tauri/MCP v2 host transport, the active N17 native opacity editor/selection intent adapters, the active N18 native opacity preview/export consumers, the active N19C native edit guard, and the bounded N20 native opacity contract/lifecycle/operations/bootstrap cutover. Complete architecture boundaries remain a separate gate. N19G adds pure Motion hit and native-only Select canvas intent adapters. T08B adds the native diagnostics panel query adapter. T10 adds explicit native catalog reproduction UI binding. P37B adds native-safe tutorial UI placement without a document writer. P37A adds an uncovered native History UI column. N25E4A registered the private object Save As coordinator and N25E4B1A the saved-UI acknowledgement helper; P37C1-DESKTOP stage 2 now loads both with three ordinary native project/reference adapters before their consumers, without claiming installed workflow or visible reference acceptance. N25E4B0D fences direct desktop autosave admission through the existing native-opacity project entry. N20R-O2A pins the existing native-opacity lifecycle, preview and viewport receipt-correlation source against the committed inventory. N20R-O2B pins the ordinary Play publication observer hooks in Motion, app and timeline source. P39B1 pins a private inactive-project entry helper without a production loader or visible B tab. N20R-O2C pins passive rejected-error correlation in the existing native Play observer without changing product control flow. P39B pins the ordinary desktop Open routing and inactive token-backed B tab row without activating B. N20R-OBS4 pins passive original-failure to restoration receipt, paint and input correlation, including fail-closed work/view and superseding-intent checks, without changing product navigation or recovery control. P38N5 adds the native inactive-project tab adapter and pins its exact bootstrap order and project/tab request controls. W02-VIS-BRIDGE pins native-owned layer visibility metadata and queued UID-targeted intent in the existing project adapters without claiming an ordinary eye caller, public API/MCP availability or installed acceptance. W02-OBJ-SUB pins common object revision subscription, exact UI/preview before ACK, and queued stable-UID toggle intents; public SDK/catalog activation and installed acceptance remain separate.",
   "scope": {
     "sourceRoot": "src",
     "profileSourceRoot": "src/js",
@@ -19,12 +19,12 @@
   },
   "provenance": {
     "repository": "https://github.com/mysteropodes/nemo",
-    "candidateCommit": "04547637ea6de5c60427e2b2469d2674ee13ab77",
-    "sourceRootTree": "6da76a03406d4c058fde50ff5ed5cf3fc3b8d09a",
+    "candidateCommit": "243f013965dc8d8a2301463aaa0480dfa96a9462",
+    "sourceRootTree": "e762f73fc0a034c3d3fc3abade73b63ff939c915",
     "applicationTree": {
       "path": "src/js",
-      "gitTree": "6b89704fbc2fa17c0668a97702e9d5d27ae61840",
-      "lastChangedCommit": "8cba828529ed66a9286353d710e0af90af8ce567"
+      "gitTree": "c2c46ddd73525ea52281f6f884fea2721a4766e9",
+      "lastChangedCommit": "243f013965dc8d8a2301463aaa0480dfa96a9462"
     },
     "bootstrap": {
       "path": "src/index.html",
@@ -35,7 +35,7 @@
     "inventoryDigest": {
       "algorithm": "sha256",
       "serialization": "Ascending POSIX path order; UTF-8 path + NUL + Git blob SHA-1 + LF for each selected path, including final LF; hash the concatenated bytes.",
-      "value": "d07ef9306c3ca824f21822c3960b1e6d8f692d89fa73911b08932f994a2188aa"
+      "value": "c2640c10b1bece9926566b9b1ed4468623deaab86889fa0f02036a76cbc7a62a"
     },
     "profiles": [
       {
