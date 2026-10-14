@@ -236,6 +236,7 @@ test('sanitized feedback drops private titles, values, filenames, paths and gene
   assert.equal(P.sanitizeHelper(r,'sheet').nodes[2].control,'A.json');
 });
 test('complete witnessed controller protocol still leaves installed acceptance for independent owner review',async t=>{
+  for(const terminalSaveFault of [false,true]){
   const f=setup(t),w={fixture:path.join(f.c.reportRoot,'A.json'),saved:path.join(f.c.reportRoot,'Saved.json'),
     after:path.join(f.c.reportRoot,'SavedAfter.json'),output:path.join(f.c.reportRoot,'output')};
   const token='11111111-1111-4111-8111-111111111111';let main='open',dialog=null,value=null,cancelled=false;
@@ -271,11 +272,28 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       if(a.type==='sheet-dismissed'){r.dismissed=true;main=dialog==='open'?'save':dialog==='save'?'export':'save';dialog=null;}
       return r;
     }});
-  const r=await D.runOperator(f.c,s.services);assert.equal(r.status,'operator-complete',r.reason);
+  const originalSave=s.services.save;
+  s.services.save=r=>{if(terminalSaveFault&&s.events.includes('app-cleanup')){s.events.push('terminal-save-failed');throw Error('/private/evidence-write-failed');}originalSave(r);};
+  const r=await D.runOperator(f.c,s.services);assert.equal(r.status,terminalSaveFault?'partial':'operator-complete',r.reason);
+  assert.equal(r.inputCleanup,'complete');assert.ok(s.events.includes('input-close'));
+  if(terminalSaveFault){assert.equal(r.reason,'png-terminal-save-refused');assert.equal(r.evidenceSave,'incomplete');
+    assert.ok(s.events.indexOf('input-close')<s.events.indexOf('terminal-save-failed'));}
   assert.equal(r.installedAcceptance,'not-established');assert.equal(r.ownerReview,'required');
   assert.equal(r.orderedUiWitnesses.step,5);assert.ok(r.actions.some(x=>x.control==='Open Project…'));
   assert.ok(r.actions.some(x=>x.control==='Choose'&&x.target==='sheet'));
   assert.equal(JSON.stringify(r).includes(f.root),false);assert.ok(s.events.includes('app-cleanup'));
+  }
+});
+test('terminal save and input close failures retain the first refusal and truthful owned cleanup',async t=>{
+  for(const fault of ['save','close']){
+    const f=setup(t),s=fakeServices(f,{foreignPin:true}),originalSave=s.services.save;
+    s.services.save=r=>{if(fault==='save'&&s.events.includes('app-cleanup'))throw Error('private-save-failed');originalSave(r);};
+    s.services.close=async()=>{s.events.push('input-close');if(fault==='close')throw Error('private-close-failed');};
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.status,'partial');assert.equal(r.reason,'png-window-refused');
+    assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');assert.ok(s.events.includes('input-close'));
+    assert.equal(r.inputCleanup,fault==='close'?'incomplete':'complete');assert.equal(JSON.stringify(r).includes('private-'),false);
+    if(fault==='save')assert.equal(r.evidenceSave,'incomplete');else assert.equal(s.saved.at(-1).inputCleanup,'incomplete');
+  }
 });
 test('actual Swift scope mapping preserves legacy gates and requires a distinct PNG prefix',()=>{
   if(process.platform!=='darwin')return;

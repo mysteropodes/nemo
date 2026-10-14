@@ -94,7 +94,10 @@ async function runOperator(c,s){
     if(helper){try{await helper.close();receipt.helperCleanup='complete';}catch{receipt.helperCleanup='incomplete';}}
     if(controller){try{await controller.cleanup();receipt.cleanup='complete';}catch{receipt.cleanup='incomplete';}}
     if(!completed||receipt.cleanup==='incomplete'||receipt.helperCleanup==='incomplete'){receipt.status='partial';receipt.installedAcceptance='not-established';}
-    save();await s.close();
+    try{await s.close();receipt.inputCleanup='complete';}
+    catch{receipt.inputCleanup='incomplete';receipt.status='partial';receipt.reason||='png-input-close-refused';}
+    try{save();}
+    catch{receipt.evidenceSave='incomplete';receipt.status='partial';receipt.reason||='png-terminal-save-refused';}
   }
   return receipt;
 }
