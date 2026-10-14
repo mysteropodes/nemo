@@ -281,9 +281,9 @@ let allowedReasons: Set<String> = ["adapter-refused","sheet-owner","sheet-parent
 func check(_ ok: Bool) throws { if !ok { throw Refusal(code:"adapter-refused") } }
 let actions: Set<String> = ["inspect", "press", "set", "select", "raise", "capture", "check", "pin-sheet", "sheet-dismissed", "go-to-folder", "location-dismissed", "quit"]
 func operatorScope(_ mode: String, _ environment: [String:String]) throws -> (reference:Bool, report:String) {
-  try check(mode == "--persistent" || mode == "--reference-persistent")
-  let reference = mode == "--reference-persistent"
-  let prefix = reference ? "NEMO_REFERENCE_" : "NEMO_P38_"
+  try check(["--persistent","--reference-persistent","--png-persistent"].contains(mode))
+  let reference = mode != "--persistent"
+  let prefix = mode == "--png-persistent" ? "NEMO_PNG_UI_" : (reference ? "NEMO_REFERENCE_" : "NEMO_P38_")
   try check(environment[prefix+"GRANT"]?.isEmpty == false)
   guard let report = environment[prefix+"REPORT_ROOT"], !report.isEmpty else { throw Refusal(code:"adapter-refused") }
   return (reference,report)
@@ -1597,7 +1597,8 @@ func run() throws {
       }
       let base = request["element"] as? String ?? ""
       setInspectionContext("root-resolution","route-refused")
-      let selected = try node(base,selectedRoot)
+      let inspectOwner = locationToken == nil ? pid : (servicePID ?? 0); if locationToken != nil { _ = try verifyLocation() }
+      let selected = locationToken == nil ? try node(base,selectedRoot) : try node(base,selectedRoot,owner:inspectOwner)
       var roles: Set<String> = ["AXWindow","AXSheet","AXButton","AXTextField","AXStaticText","AXGroup","AXWebArea","AXCheckBox","AXMenu","AXMenuItem","AXRow","AXOutline","AXScrollArea"]
       if scope.reference { roles.insert(kAXPopUpButtonRole) }
       var labels: Set<String> = ["Open","Open Project…","Cancel","A","B","A.json","B.json","Motion","Opacity","R08 rectangle"]
@@ -1610,7 +1611,7 @@ func run() throws {
         // No title/value/children reads from a foreign child; expose blocked route only.
         var owner: pid_t = 0
         let resolved: pid_t? = AXUIElementGetPid(current,&owner) == .success ? owner : nil
-        return localFacts(path,resolved,pid) {
+        return localFacts(path,resolved,inspectOwner) {
         let role = attr(current,kAXRoleAttribute) as? String ?? ""
         let title = attr(current,kAXTitleAttribute) as? String ?? "", value = attr(current,kAXValueAttribute) as? String ?? ""
         var facts: [String:Any] = ["path":path,"role":roles.contains(role) ? role : "other","press":supports(current,kAXPressAction),"confirm":supports(current,kAXConfirmAction)]
@@ -1630,12 +1631,11 @@ func run() throws {
       let depth = request["depth"] as? Int ?? 1, maxNodes = request["maxNodes"] as? Int ?? 128
       setInspectionContext("projection-budget","budget-refused")
       try projectionLimit(depth,maxNodes)
-      var nodes = [[String:Any]]()
-      var truncated = false
+      var nodes = [[String:Any]](), truncated = false
       func project(_ current: AXUIElement, _ path: String, _ level: Int) throws {
         setInspectionContext("ax-owner-query","ownership-refused")
         var owner: pid_t = 0
-        guard AXUIElementGetPid(current,&owner) == .success, owner == pid else { nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return }
+        guard AXUIElementGetPid(current,&owner) == .success, owner == inspectOwner else { nodes.append(["path":path,"role":"other","blocked":"child-owner"]); return }
         if level > 0 && attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
         setInspectionContext("ax-attribute-query","attribute-query-failed")
         nodes.append(fact(current,path))
@@ -1649,7 +1649,7 @@ func run() throws {
           if nodes.count >= maxNodes { truncated = true; return }
           let childPath = path.isEmpty ? String(index) : path+"."+String(index)
           var childOwner: pid_t = 0
-          guard AXUIElementGetPid(child,&childOwner) == .success, childOwner == pid else { nodes.append(["path":childPath,"role":"other","blocked":"child-owner"]); continue }
+          guard AXUIElementGetPid(child,&childOwner) == .success, childOwner == inspectOwner else { nodes.append(["path":childPath,"role":"other","blocked":"child-owner"]); continue }
           try project(child,childPath,level+1)
         }
       }
@@ -1657,7 +1657,7 @@ func run() throws {
       try project(selected,base,0)
       result["nodes"] = nodes
       result["truncated"] = truncated
-      if target == "sheet" { _ = try verifySheet() }
+      if locationToken != nil { _ = try verifyLocation() } else if target == "sheet" { _ = try verifySheet() }
       activeInspectionContext = nil
     case "capture":
       try check(target == "main")
