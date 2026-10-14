@@ -125,6 +125,36 @@ test('metadata is detached and immutable; malformed or foreign inspection fences
   const foreign=host(),original=foreign.invoke;foreign.invoke=async(command,args)=>{const v=await original(command,args);if(command==='nemo_native_object_reference')v.instanceId='other';return v;};
   const bad=session(foreign);await assert.rejects(bad.openPath('/project.json'),/uncorrelated/);assert.equal(bad.isActive(),false);
 });
+test('actual native metadata and read-side adoption retain named layers without changing UID selection',async()=>{
+  const h=host(),invoke=h.invoke;
+  const layers=[{layerUid:'r08_curve_layer',name:'R08 rectangle'},{layerUid:'empty',name:''},
+    {layerUid:'unicode',name:' Calque 雪 🟦\n'},{layerUid:'unnamed'}];
+  h.invoke=async(command,args)=>{const v=await invoke(command,args);if(v.layers)v.layers=layers;return v;};
+  const s=await presented(h),meta=s.info();
+  assert.deepEqual(meta.layers,layers);assert.equal(Object.hasOwn(meta.layers[3],'name'),false);
+  assert.throws(()=>{meta.layers[0].name='forged';},TypeError);
+  const root={state:{},selectedPaths:['stale'],userLayers:[{visible:true}]};
+  Files.projectView(root,meta);
+  assert.deepEqual(root.state.layers.map(l=>[l.layerUid,l.name]),[
+    ['r08_curve_layer','R08 rectangle'],['empty',''],['unicode',' Calque 雪 🟦\n'],['unnamed','Layer 4']]);
+  assert.deepEqual(root._layerSel,[0]);assert.deepEqual(root.selectedPaths,[]);
+  assert.equal(root.userLayers[0].visible,false);assert.equal(root.state.activeLayerIdx,0);
+  assert.equal(h.calls.some(c=>c.command==='nemo_native_object_dispatch'),false);
+  assert.equal(h.copies.length,0);assert.deepEqual(meta.layers,layers);
+});
+test('malformed supplied layer names fence native admission and do not mutate the presentation',async()=>{
+  for(const name of [null,undefined,false,3,[],{}]){
+    const h=host(),invoke=h.invoke;
+    h.invoke=async(command,args)=>{const v=await invoke(command,args);if(v.layers)v.layers=[{layerUid:'drawing',name}];return v;};
+    const s=session(h);await assert.rejects(s.openPath('/project.json'),/uncorrelated/);
+    assert.equal(s.isActive(),false);assert.equal(s.blocksLegacy(),true);
+    assert.equal(s.readPresentedObjectSession(),null);assert.equal(h.copies.length,0);
+    const root={state:{canvasW:9,layers:[{layerUid:'original',name:'Original'}]},selectedPaths:['selected']};
+    const before=JSON.stringify(root);
+    assert.throws(()=>Files.projectView(root,{canvasW:320,layers:[{layerUid:'drawing',name}]}),/layer name is invalid/);
+    assert.equal(JSON.stringify(root),before);
+  }
+});
 test('single-frame native export preserves pinned host route; invalid ranges do not dispatch',async()=>{
   const h=host(),s=await presented(h);assert.equal((await s.exportPng('/new-output',[0])).published,true);
   await assert.rejects(s.exportPng('/new-output',[1,0]),/frame range is invalid/);
