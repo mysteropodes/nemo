@@ -107,6 +107,47 @@ print("actual owned projection pages and refusal controls; runtimeAX=false")
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:16384});
   assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/actual owned projection/);
 });
+test('actual Swift retains semantic region identity through generic pages and refuses changed proofs',()=>{
+  if(process.platform!=='darwin')return;
+  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const code=`import Foundation
+import CoreFoundation
+struct Refusal:Error {let code:String};func check(_ ok:Bool)throws{if !ok{throw Refusal(code:"adapter-refused")}}
+`+module+`
+var cursor:OwnedProjectionCursor<Int>?=nil
+let full:[String:Any]=["complete":true,"truncated":false,"depthClipped":false,"childrenUnreadable":false,"foreignChildren":false]
+func pin(_ node:Int=7,_ path:String="0.4",_ owner:Int=10,_ control:String?="Project tabs",_ token:String?=nil,
+  _ proof:[String:Any]=full)throws->[String:Any]{
+  var request:[String:Any]=["projectTabs":true];if let token{request["projectTabsToken"]=token}
+  return try retainedProjectTabs(node,path:path,owner:owner,control:control,request:request,projection:proof,cursor:&cursor,equal:==)
+}
+func refuses(_ f:()throws->Void){var hit=false;do{try f()}catch{hit=true};precondition(hit)}
+refuses{_=try pin(7,"0.4",10,nil)}
+var clipped=full;clipped["depthClipped"]=true;refuses{_=try pin(7,"0.4",10,"Project tabs",nil,clipped)}
+let first=try pin(),token=first["token"] as! String
+precondition(UUID(uuidString:token) != nil && first["path"] as? String=="0.4")
+let page=try ownedProjection(1,base:"",depth:1,maxNodes:2,expectedOwner:10,request:["childOffset":0],
+  cursor:&cursor,equal:==,hashKey:{UInt($0)},owner:{_ in 10},children:{$0==1 ? [2]:[]},isWindow:{_ in false},
+  fact:{n,p in ["path":p,"role":"AXGroup"]},phase:{_,_ in})
+precondition(page["complete"] as? Bool==true && cursor?.region?.token==token)
+_=try ownedProjection(1,base:"",depth:1,maxNodes:2,expectedOwner:10,request:[:],cursor:&cursor,equal:==,
+  hashKey:{UInt($0)},owner:{_ in 10},children:{_ in []},isWindow:{_ in false},fact:{_,p in ["path":p]},phase:{_,_ in})
+let refreshed=try pin(7,"0.4",10,"Project tabs",token)
+precondition(refreshed["token"] as? String==token)
+refuses{_=try pin(8,"0.4",10,"Project tabs",token)}
+refuses{_=try pin(7,"0.5",10,"Project tabs",token)}
+refuses{_=try pin(7,"0.4",99,"Project tabs",token)}
+refuses{_=try pin(7,"0.4",10,"Cancel",token)}
+refuses{_=try pin(7,"0.4",10,"Project tabs","wrong")}
+refuses{_=try pin()}
+for key in ["complete","truncated","depthClipped","childrenUnreadable","foreignChildren"]{
+  var proof=full;proof[key]=nil;refuses{_=try pin(7,"0.4",10,"Project tabs",token,proof)}
+}
+print("actual retained semantic region; runtimeAX=false")
+`;
+  const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:8192});
+  assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/actual retained semantic region/);
+});
 test('actual fresh Swift role/control guard refuses stale, forged and malformed targets before effect',()=>{
   if(process.platform!=='darwin')return;
   const source=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-window.swift'),'utf8');
@@ -147,6 +188,12 @@ precondition(effects==2)
 try press([:],"AXButton","","","","--persistent")
 try press([:],"AXButton","","","","--reference-persistent")
 precondition(effects==4)
+for mode in ["--persistent","--reference-persistent","--png-persistent"] {
+  var hit=false;do{try press(["expectedControl":"Project tabs","expectedRole":"AXButton"],"AXButton","Project tabs","","Project tabs",mode)}catch{hit=true}
+  precondition(hit && effects==4)
+}
+precondition(ownedControl(false,"Project tabs","",{nil},inspection:true)=="Project tabs")
+precondition(ownedControl(true,"Project tabs","",{nil})==nil)
 var descriptionReads=0
 precondition(ownedControl(true,"Cancel","Open Project…",{descriptionReads+=1;return "Open Project…"})=="Cancel" && descriptionReads==0)
 precondition(ownedControl(false,"Save","",{nil})==nil && ownedControl(true,"Save","",{nil})=="Save")

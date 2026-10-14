@@ -65,7 +65,7 @@ function safeWindowEvidence(result, reference = false) {
   verifyWindow(result, result.pid);
   const roles = new Set(['AXWindow','AXSheet','AXButton','AXTextField','AXStaticText','AXGroup','AXWebArea','AXCheckBox','AXMenu','AXMenuItem','AXRow','AXOutline','AXScrollArea','other']);
   if(reference)roles.add('AXPopUpButton');
-  const controls = new Set(['Open','Open Project…','Cancel','A','B','A.json','B.json','Motion','Opacity','R08 rectangle']);
+  const controls = new Set(['Open','Open Project…','Cancel','A','B','A.json','B.json','Project tabs','Motion','Opacity','R08 rectangle']);
   if (reference) for (const label of require('./reference-installed-policy.cjs').labels) controls.add(label);
   if (reference) for (const label of ['Go','Go to the folder:','Go to folder:','Go to Folder','Go to the folder']) controls.add(label);
   const alerts = new Set(['switch-unavailable','active-close-unavailable']);
@@ -78,10 +78,31 @@ function safeWindowEvidence(result, reference = false) {
       if (alerts.has(node.alert)) clean.alert = node.alert;
       if (['child-owner','children-unavailable'].includes(node.blocked)) clean.blocked = node.blocked;
       for (const key of ['press','confirm','selected','enabled']) if (typeof node[key] === 'boolean') clean[key] = node[key];
+      if(node.childCount!==undefined) {
+        check(Number.isInteger(node.childCount)&&node.childCount>=0&&node.childCount<4096,'ax-evidence-refused');
+        clean.childCount=node.childCount;
+      }
       if(node.role==='AXTextField' && ['plain','search','other','unreadable'].includes(node.textFieldKind)) clean.textFieldKind=node.textFieldKind;
       return clean;
     }) };
-  if (typeof result.truncated === 'boolean') clean.truncated = result.truncated;
+  for(const key of ['truncated','depthClipped','childrenUnreadable','foreignChildren','complete','childrenComplete'])
+    if(result[key]!==undefined) { check(typeof result[key]==='boolean','ax-evidence-refused');clean[key]=result[key]; }
+  if(result.pageToken!==undefined) {
+    check(typeof result.pageToken==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(result.pageToken),'ax-evidence-refused');
+    clean.pageToken=result.pageToken;
+    for(const key of ['childOffset','nextChildOffset','childCount']) {
+      check(Number.isInteger(result[key])&&result[key]>=0&&result[key]<4096,'ax-evidence-refused');clean[key]=result[key];
+    }
+    check(clean.childOffset<=clean.nextChildOffset&&clean.nextChildOffset<=clean.childCount&&
+      (clean.nextChildOffset>clean.childOffset||clean.childOffset===clean.childCount)&&typeof clean.childrenComplete==='boolean','ax-evidence-refused');
+  } else check(['childOffset','nextChildOffset','childCount','childrenComplete'].every(k=>result[k]===undefined),'ax-evidence-refused');
+  if(result.projectTabs!==undefined) {
+    const region=result.projectTabs;
+    check(region&&typeof region.path==='string'&&/^(?:\d+(?:\.\d+)*)?$/.test(region.path)&&region.path.length<=128&&
+      typeof region.token==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(region.token),'ax-evidence-refused');
+    clean.projectTabs={path:region.path,token:region.token};
+    if(region.unique!==undefined) {check(typeof region.unique==='boolean','ax-evidence-refused');clean.projectTabs.unique=region.unique;}
+  }
   return clean;
 }
 function safeSelectionDiagnostics(value) {

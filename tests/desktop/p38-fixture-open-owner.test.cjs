@@ -272,6 +272,63 @@ function makeServices(overrides = {}) {
   return { services, events, saved, acks };
 }
 
+test('actual owner discovery pages beyond 128, retains the region through all ACKs and refuses unsafe proofs',async()=>{
+  const actual=require('./p38-fixture-open-installed.cjs'),token='12345678-1234-1234-1234-123456789abc';
+  async function trial(fault) {
+    const f=makeServices(),state={actions:0};let phase='ready';const requests=[];
+    const wait=f.services.waitForCheckpoint;
+    f.services.waitForCheckpoint=async(...args)=>{phase=args[3];return await wait(...args);};
+    f.services.owner.visibleEvidence=actual.visibleEvidence;
+    async function wire(request) {
+      requests.push({...request});const rows=phase==='ready'?[]:phase==='b-opened'?['A','B']:['A'];
+      const marker={path:'129',role:'other',control:'Project tabs',childCount:rows.length};
+      let raw={status:'ok',type:'inspect',pid:42,windowId:6068,matchedAX:true,
+        truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false,complete:true,nodes:[]};
+      if(request.element==='129') {
+        raw.nodes=[marker,...rows.map((control,i)=>({path:'129.'+i,role:'other',control,selected:i===0,childCount:0}))];
+        if(request.projectTabs)raw.projectTabs={path:'129',token};
+      } else {
+        assert.equal(request.element,'');const offset=request.childOffset||0,end=Math.min(130,offset+127);
+        raw.nodes=[{path:'',role:'AXWindow',childCount:130},...Array.from({length:end-offset},(_,i)=>{
+          const index=offset+i;
+          return index===129?marker:{path:String(index),role:'AXButton',control:'B',childCount:0,
+            ...(index===2&&phase==='b-opened'?{alert:'switch-unavailable'}:{})};
+        })];
+        raw.truncated=end<130;raw.depthClipped=phase!=='ready';raw.complete=!raw.truncated&&!raw.depthClipped;
+        if(request.childOffset!==undefined)Object.assign(raw,{childOffset:offset,nextChildOffset:end,
+          childCount:130,pageToken:'87654321-1234-1234-1234-123456789abc',childrenComplete:end===130});
+      }
+      if(fault==='cursor'&&request.childOffset>0)raw.pageToken=token;
+      if(fault==='reordered'&&request.childOffset>0)raw.nodes[1].path='999';
+      if(fault==='foreign'&&request.childOffset===0)raw.foreignChildren=true;
+      if(fault==='unreadable'&&request.childOffset===0)raw.childrenUnreadable=true;
+      if(fault==='duplicate'&&request.childOffset===0)raw.nodes[1].control='Project tabs';
+      if(fault==='missing')for(const n of raw.nodes)if(n.control==='Project tabs')delete n.control;
+      if(fault==='clipped'&&request.projectTabs) {raw.depthClipped=true;raw.complete=false;}
+      if(fault==='stale'&&request.projectTabs&&phase==='a-opened')raw.projectTabs.token='87654321-1234-1234-1234-123456789abc';
+      if(fault==='selection'&&request.projectTabs&&phase==='a-opened')raw.nodes[1].selected=false;
+      return raw;
+    }
+    f.services.startHelper=async()=>({next:async()=>({status:'pinned',pid:42,windowId:6068,matchedAX:true}),
+      inspect:async identity=>actual.observeProjectTabs(wire,identity,state),quit:async()=>f.events.push('quit'),
+      close:async()=>f.events.push('cleanup')});
+    const result=await runObserver(config,f.services);return {...f,result,requests};
+  }
+  const good=await trial();assert.equal(good.result.status,'observed');
+  assert.deepEqual(good.acks.map(x=>[x.phase,x.decision]),PHASES.map(p=>[p,'accepted']));
+  assert.equal(good.requests.filter(r=>r.projectTabs).length,4);
+  assert.ok(good.requests.some(r=>r.childOffset===127&&r.pageToken));
+  assert.ok(good.requests.every(r=>r.type==='inspect'&&r.maxNodes===128&&r.depth<=5));
+  assert.ok(good.requests.filter(r=>r.projectTabsToken).every(r=>r.projectTabsToken===token));
+  assert.equal(good.result.cleanup,'complete');assert.equal(good.result.installedAcceptance,'not-established');
+  for(const fault of ['cursor','reordered','foreign','unreadable','duplicate','missing','clipped','stale','selection']) {
+    const bad=await trial(fault);assert.equal(bad.result.status,'partial',fault);assert.equal(bad.result.cleanup,'complete');
+    assert.ok(bad.result.firstFailure,fault);
+    assert.equal(bad.acks.filter(x=>x.decision==='accepted').length,['stale','selection'].includes(fault)?1:0,fault);
+    assert.equal(bad.events.includes('quit'),false,fault);
+  }
+});
+
 test('successful owner observation acknowledges ready, A, prepared B and closed B once in order', async()=>{
   const f=makeServices();
   const result=await runObserver(config,f.services);
@@ -312,7 +369,8 @@ for(const [label,options,stage,code] of failureCases) test('records sanitized fi
 test('visible refusal is acknowledged once and stops before the next phase',async()=>{
   const f=makeServices({visibleFailure:'a-opened'});
   const result=await runObserver(config,f.services);
-  assert.equal(result.firstFailure,null);
+  assert.equal(result.firstFailure.stage,'inspection');assert.equal(result.firstFailure.code,'inspection-refused');
+  assert.ok(f.events.indexOf('save:inspection')<f.events.indexOf('ack:a-opened'));
   assert.deepEqual(result.observations.map(item=>[item.phase,item.decision]),[
     ['ready','accepted'],['a-opened','refused'],
   ]);

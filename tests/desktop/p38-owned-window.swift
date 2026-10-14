@@ -1618,7 +1618,7 @@ func run() throws {
           let query = AXUIElementCopyAttributeValue(current,kAXSubroleAttribute as CFString,&subrole)
           facts["textFieldKind"] = textFieldKind(query,subrole as? String)
         }
-        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String }) { facts["control"] = control }
+        if let control = ownedControl(scope.reference,title,value,{ attr(current,kAXDescriptionAttribute) as? String },inspection:true) { facts["control"] = control }
         let alerts = ["Switching project tabs is unavailable in this build.":"switch-unavailable","Closing the active project tab is unavailable in this build.":"active-close-unavailable"]
         if let alert = alerts[value] ?? alerts[title] { facts["alert"] = alert }
         return facts
@@ -1634,6 +1634,11 @@ func run() throws {
         children:{ attr($0,kAXChildrenAttribute) as? [AXUIElement] },
         isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },fact:fact,phase:setInspectionContext)
       result.merge(projection) { _,new in new }
+      if request["projectTabs"] != nil {
+        try check(!scope.reference && target == "main" && locationToken == nil)
+        result["projectTabs"] = try retainedProjectTabs(selected,path:base,owner:Int(inspectOwner),control:fact(selected,base)["control"] as? String,
+          request:request,projection:projection,cursor:&projectionCursor,equal:{ CFEqual($0,$1) })
+      }
       try verify()
       if locationToken != nil { _ = try verifyLocation() } else if target == "sheet" { _ = try verifySheet() }
       activeInspectionContext = nil

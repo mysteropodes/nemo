@@ -8,6 +8,23 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { runOperator, verifyIdentity, verifyWindow, captureStartupDiagnostics, classifyStartupStderr, classifyManifestOutcome } = require('./desktop/p38-installed-driver.cjs');
 const {HEAD,HASH,config,fixture}=require('./desktop/p38-operator-model.cjs');
+test('P38 safe projection retains typed paging and semantic provenance while refusing malformed fields',()=>{
+  const {safeWindowEvidence}=require('./desktop/p38-installed-driver.cjs');
+  const raw={pid:42,windowId:9,matchedAX:true,truncated:true,depthClipped:true,childrenUnreadable:false,
+    foreignChildren:false,complete:false,childrenComplete:false,childOffset:0,nextChildOffset:1,childCount:2,
+    pageToken:'12345678-1234-1234-1234-123456789abc',projectTabs:{path:'1',token:'87654321-1234-1234-1234-123456789abc',unique:true,private:'secret'},
+    nodes:[{path:'',role:'AXWindow',childCount:2},{path:'0',role:'other',control:'Project tabs',childCount:0,title:'secret'}]};
+  const safe=safeWindowEvidence(raw);
+  assert.equal(safe.depthClipped,true);assert.equal(safe.childrenComplete,false);assert.equal(safe.childCount,2);
+  assert.equal(safe.nodes[1].control,'Project tabs');assert.equal(safe.nodes[1].childCount,0);
+  assert.deepEqual(safe.projectTabs,{path:'1',token:raw.projectTabs.token,unique:true});
+  assert.doesNotMatch(JSON.stringify(safe),/private|secret|title/);
+  for(const change of [s=>s.pageToken='private',s=>s.nextChildOffset=0,s=>s.childOffset=true,
+    s=>s.childrenComplete='true',s=>s.depthClipped=1,s=>s.nodes[1].childCount=-1,
+    s=>s.projectTabs.token='private',s=>s.projectTabs.unique=1,s=>delete s.pageToken]){
+    const bad=structuredClone(raw);change(bad);assert.throws(()=>safeWindowEvidence(bad),/ax-evidence-refused/);
+  }
+});
 test('synthetic one-run persists flat PID before discovery/UI and always uses exact window',async()=>{
   const f=fixture(),result=await runOperator(f.cfg,f.services);
   assert.equal(result.status,'operator-complete');assert.equal(result.installedAcceptance,'not-established');
