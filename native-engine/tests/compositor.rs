@@ -9,6 +9,168 @@ use crate::scheduler::{
     EvaluationKey, FrameFailure, FrameFailureKind, FrameScheduler, OutputSpec, ScheduledFrame,
 };
 
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+mod public_target_budget {
+    use super::*;
+    use crate::revision::shared_image_resource_budget;
+
+    // Each real shared-domain oracle runs alone even under parallel libtest.
+    fn isolated(name: &str) -> bool {
+        const KEY: &str = "NEMO_PUBLIC_TARGET_BUDGET_TEST";
+        let name = name.split_once("::").unwrap().1;
+        if std::env::var(KEY).as_deref() == Ok(name) {
+            return true;
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env(KEY, name)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        false
+    }
+
+    fn complete(gpu: &Compositor) {
+        gpu.device()
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
+    }
+
+    #[test]
+    fn gpu_public_target_quota_overlap_and_escaped_handle_retirement() {
+        if !isolated(concat!(
+            module_path!(),
+            "::gpu_public_target_quota_overlap_and_escaped_handle_retirement"
+        )) {
+            return;
+        }
+        let mut gpu = Compositor::new().unwrap();
+        let (scheduler, frame) = scheduled(10);
+        let scene = prepare(&scheduler, &frame, &input(0.0)).unwrap();
+        let budget = shared_image_resource_budget();
+        assert_eq!(budget.used().unwrap(), 0);
+        let cost = 320 * 180 * 4;
+        let maximum = 384 * 1024 * 1024;
+        let textures = gpu
+            .instance()
+            .generate_report()
+            .unwrap()
+            .hub
+            .textures
+            .num_allocated;
+        // Scalar reservation only: do not allocate a nearly 384 MiB fixture.
+        let fill = budget.reserve(maximum - cost + 1).unwrap();
+        assert!(
+            gpu.compose(&scene).is_err(),
+            "public target must reserve before GPU creation"
+        );
+        assert_eq!(
+            gpu.instance()
+                .generate_report()
+                .unwrap()
+                .hub
+                .textures
+                .num_allocated,
+            textures
+        );
+        assert_eq!(budget.used().unwrap(), maximum - cost + 1);
+        drop(fill);
+
+        let output = gpu.compose(&scene).unwrap();
+        assert_eq!(budget.used().unwrap(), cost);
+        assert_eq!(output.dimensions(), (320, 180));
+        assert_eq!(output.scheduled_identity(), scene.scheduled_identity());
+        let escaped = output.texture().clone();
+        let view = output.texture_view().clone();
+        complete(&gpu);
+        let buffers = gpu
+            .instance()
+            .generate_report()
+            .unwrap()
+            .hub
+            .buffers
+            .num_allocated;
+        // At width 320 the padded GPU stride equals the packed CPU stride.
+        let fill = budget.reserve(maximum - 3 * cost + 1).unwrap();
+        assert!(gpu.readback_rgba8(&output).is_err());
+        assert_eq!(
+            gpu.instance()
+                .generate_report()
+                .unwrap()
+                .hub
+                .buffers
+                .num_allocated,
+            buffers
+        );
+        assert_eq!(budget.used().unwrap(), maximum - 2 * cost + 1);
+        drop(fill);
+        let pixels = gpu.readback_rgba8(&output).unwrap();
+        assert_eq!(pixels.bytes().len(), cost);
+        assert_eq!(&pixels.bytes()[..4], &[255; 4]);
+        assert_eq!(budget.used().unwrap(), 2 * cost);
+        let retained = pixels.clone();
+        drop(pixels);
+        assert_eq!(budget.used().unwrap(), 2 * cost);
+        drop(output);
+        assert_eq!(
+            budget.used().unwrap(),
+            2 * cost,
+            "queue retirement still owns target charge"
+        );
+
+        // An escaped public handle cannot enqueue new work after owner drop,
+        // even before the original target's retirement callback is serviced.
+        let buffer = gpu.device().create_buffer(&wgpu::BufferDescriptor {
+            label: Some("retired-public-target-control"),
+            size: cost as u64,
+            usage: wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let scope = gpu.device().push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut encoder = gpu
+            .device()
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &escaped,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(1280),
+                    rows_per_image: Some(180),
+                },
+            },
+            wgpu::Extent3d {
+                width: 320,
+                height: 180,
+                depth_or_array_layers: 1,
+            },
+        );
+        gpu.queue().submit([encoder.finish()]);
+        complete(&gpu);
+        let error =
+            pollster::block_on(scope.pop()).expect("escaped public target must be destroyed");
+        assert!(error.to_string().contains("destroyed"), "{error}");
+        drop(view);
+        drop(escaped);
+        assert_eq!(budget.used().unwrap(), cost);
+        assert_eq!(&retained.bytes()[..4], &[255; 4]);
+        drop(retained);
+        assert_eq!(budget.used().unwrap(), 0);
+    }
+}
+
 const PROJECT: &[u8] = include_bytes!("fixtures/opacity-v2/project.json");
 
 fn output() -> OutputSpec {
