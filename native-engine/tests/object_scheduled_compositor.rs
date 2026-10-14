@@ -17,6 +17,10 @@ use crate::scheduler::{
 use serde_json::json;
 
 pub(crate) fn owner(instance: &str) -> NativeObjectHistory {
+    owner_with_order(instance, None)
+}
+
+fn owner_with_order(instance: &str, order: Option<serde_json::Value>) -> NativeObjectHistory {
     let mut source = paint_test_document(&[0, 7]);
     source["objects"]
         .as_array_mut()
@@ -40,6 +44,9 @@ pub(crate) fn owner(instance: &str) -> NativeObjectHistory {
             _ => [0, 0, 1],
         };
         record["fill"] = json!({"kind":"solid","r":color[0],"g":color[1],"b":color[2],"a":0.5});
+    }
+    if let Some(order) = order {
+        source["compositionOrder"]["contexts"][0]["layers"][0]["order"] = order;
     }
     NativeObjectHistory::new(
         instance,
@@ -369,5 +376,68 @@ fn gpu_stale_cancel_fail_replace_and_success_refuse_old_texture_and_bytes() {
         assert_eq!(scheduler.lease_counters().live(), 0);
         assert_eq!(scheduler.lease_counters().acquired(), 2);
         assert_eq!(scheduler.lease_counters().released(), 2);
+    }
+}
+
+#[cfg(feature = "object_expression_runtime")]
+fn expression_composition(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+) -> Result<
+    crate::object_render_scene::ObjectCompositionWitness,
+    crate::object_expression_runtime::ExpressionCompositionRefusal,
+> {
+    crate::object_expression_runtime::prepare_expression_object_composition_for_owner(
+        owner,
+        snapshot,
+        &selector(snapshot, 7),
+        crate::object_expression_runtime::ExpressionLimits::new(4096, 8_388_608, 262_144, 32)
+            .unwrap(),
+    )
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn gpu_expression_composition_uses_original_scheduler_and_literal_source_over_pixels() {
+    for (code, expected) in [
+        ("value", [159, 64, 96, 255]),
+        ("[value,Infinity]", [159, 64, 96, 255]),
+        ("[3]", [64, 96, 159, 255]),
+    ] {
+        let owner = owner_with_order(
+            "expression-composition",
+            Some(json!({"static":[0],
+            "expression":{"enabled":true,"code":code}})),
+        );
+        let snapshot = owner.acquire_snapshot(0).unwrap();
+        let before = crate::object_codec::encode_storage_project(snapshot.document()).unwrap();
+        let witness = expression_composition(&owner, &snapshot).unwrap();
+        let mut scheduler = FrameScheduler::new();
+        let work = schedule(&mut scheduler, &snapshot, 7);
+        let mut gpu = Compositor::new().expect("expression consumer needs real headless Metal");
+        let live = crate::object_render_scene::prepare_scheduled_object_composition_from_witness(
+            &scheduler, &work, &witness,
+        )
+        .unwrap();
+        let result = gpu.compose_scheduled_object(&live).unwrap();
+        let pixels = gpu.readback_scheduled_object_rgba8(&result, &live).unwrap();
+        assert_pixel(pixels.bytes(&live).unwrap(), 8, 8, expected);
+        assert_pixel(pixels.bytes(&live).unwrap(), 40, 40, [255, 255, 255, 255]);
+        assert_eq!(
+            result.identity(),
+            &ScheduledFrameIdentity::from_scheduled(&work)
+        );
+        assert_eq!(scheduler.lease_counters().acquired(), 1);
+        assert_eq!(owner.history_depths(), (0, 0));
+        assert_eq!(
+            crate::object_codec::encode_storage_project(
+                owner.acquire_snapshot(0).unwrap().document()
+            )
+            .unwrap(),
+            before
+        );
+        drop(live);
+        scheduler.succeed(work.work_id()).unwrap();
+        assert_eq!(scheduler.lease_counters().live(), 0);
     }
 }
