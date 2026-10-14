@@ -306,10 +306,13 @@ test('scoped inactive close refusal keeps B visible and leaves A untouched',asyn
 });
 
 async function nativeInactiveTabDesktop(options={}) {
-  const owner={active:false,apiVersion:2,instanceId:'native-i',documentId:'native-A',contentRevision:9,
-    documentSnapshotId:'snapshot-A',lifecycleGeneration:23};
+  // Model a native A that has already been admitted and edited; these tests
+  // exercise the later Open/tab callbacks, not first-open desktop acceptance.
+  const owner={admitted:true,active:false,apiVersion:2,instanceId:'native-i',documentId:'native-A',contentRevision:9,
+    documentSnapshotId:'snapshot-A',lifecycleGeneration:23,savedDigest:'a'.repeat(64),documentDigest:'b'.repeat(64),
+    snapshotBytes:'native-A-bytes-at-revision-9',undo:['open-A','edit-A'],redo:['redo-A']};
   const calls=[];let sequence=0,retained=null;
-  const projectFileAdapter={bind(root){const session={isActive:()=>owner.active,isDirty:()=>false,canOpen:()=>true,
+  const projectFileAdapter={bind(root){const session={isActive:()=>owner.active,isDirty:()=>owner.documentDigest!==owner.savedDigest,canOpen:()=>true,
     identity:()=>({apiVersion:2,instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.contentRevision,
       documentSnapshotId:owner.documentSnapshotId,lifecycleGeneration:owner.lifecycleGeneration}),
     info(){return this.identity();},openPath(){throw Error('same-document replacement must not run for inactive B');},saveAs(){throw Error('unexpected Save As');}};
@@ -339,14 +342,20 @@ async function nativeInactiveTabDesktop(options={}) {
     throw Error('unexpected inactive action');
   }}};
   owner.active=true;
+  f.root.SMProject.refreshActiveTabDirtyDot();
   f.effects.length=0;f.notices.length=0;
   return Object.assign(f,{owner,calls,retained:()=>retained,
     activeSnapshot(){return JSON.stringify({label:f.root.SMProject.getCurrentLabel(),active:f.state().rows.find(r=>r.active),
-      bytes:f.state().bytes,dirty:f.root.SMProject.isDirty(),frame:f.sandbox.state.currentFrame,open:f.root.SMProject.getOpenTabs()});}});
+      bytes:f.state().bytes,dirty:f.root.SMProject.isDirty(),owner:{admitted:owner.admitted,active:owner.active,apiVersion:owner.apiVersion,
+        instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.contentRevision,documentSnapshotId:owner.documentSnapshotId,
+        lifecycleGeneration:owner.lifecycleGeneration,documentDigest:owner.documentDigest,savedDigest:owner.savedDigest,snapshotBytes:owner.snapshotBytes,
+        undo:owner.undo,redo:owner.redo},frame:f.sandbox.state.currentFrame,open:f.root.SMProject.getOpenTabs()});}});
 }
 
-test('real Open callback prepares a metadata-only B while the active native A is unchanged',async()=>{
+test('real Open callback prepares metadata-only B while pre-admitted dirty native A is unchanged',async()=>{
   const f=await nativeInactiveTabDesktop();const before=f.activeSnapshot();
+  assert.equal(f.owner.admitted,true);assert.equal(f.root.SMProject.isDirty(),true);
+  assert.equal(f.state().rows.find(row=>row.active).dirty,true,'active native A begins dirty');
   await f.document.getElementById('start-open').listeners.click();
   assert.equal(f.calls.filter(call=>call.req.action.kind==='prepare').length,1);assert.equal(f.activeSnapshot(),before);
   assert.equal(f.state().rows.length,2,JSON.stringify(f.state()));const b=f.state().rows.find(row=>!row.active);
@@ -356,8 +365,9 @@ test('real Open callback prepares a metadata-only B while the active native A is
   assert.equal(f.effects.some(effect=>/import|release|frame save|Paper/.test(effect)),false);
 });
 
-test('real B tab click inspects and refuses activation; close removes it only after exact close receipt',async()=>{
+test('real B tab click refuses activation and close removes it only after exact receipt beside dirty A',async()=>{
   const f=await nativeInactiveTabDesktop();await f.root.SMProject.openPath('/Projects/B.json');
+  assert.equal(f.owner.admitted,true);assert.equal(f.root.SMProject.isDirty(),true);
   const before=f.activeSnapshot(),b=f.state().rows.find(row=>!row.active);
   f.switch(b.id);await settleUntil(()=>f.calls.filter(call=>call.req.action.kind==='inspect'&&call.req.action.preparationToken).length===1);
   assert.equal(f.activeSnapshot(),before);assert.equal(f.state().rows.length,2);

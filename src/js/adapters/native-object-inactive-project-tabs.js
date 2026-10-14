@@ -73,9 +73,10 @@
       if(!object(recovered.outcome)||recovered.outcome.ok!==false||!object(recovered.outcome.error))return null;
       return recovered.outcome.error;
     }
-    function recoveredClose(value,id,token){var recovered=value.recoveredRequest,outcome=recovered&&recovered.outcome;
-      return !!(object(recovered)&&recovered.requestId===id&&object(outcome)&&outcome.ok===true&&object(outcome.value)&&
-        outcome.value.state==='inactive-closed'&&outcome.value.preparationToken===token&&outcome.value.project===null);
+    function recoveredClose(value,id,token){var recovered=value.recoveredRequest,outcome=recovered&&recovered.outcome,result=outcome&&outcome.value;
+      return !!(value.state==='inactive-absent'&&value.project===null&&exact(recovered,['requestId','outcome'])&&recovered.requestId===id&&
+        exact(outcome,['ok','value'])&&outcome.ok===true&&exact(result,['state','preparationToken'])&&
+        result.state==='inactive-closed'&&result.preparationToken===token);
     }
     function recover(pending,p){
       if(!sameEpoch(pending.pins,p))throw new Error('Active native project owner changed during inactive request');

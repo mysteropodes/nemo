@@ -26,7 +26,7 @@ function fixture(custom={}) {
     remove(meta){const at=rows.findIndex(row=>row.preparationToken===meta.preparationToken);if(at<0)return false;rows.splice(at,1);return true;},
     notice:text=>notices.push(text),
     async invoke(command,args){assert.equal(command,'nemo_native_object_inactive_project');const req=JSON.parse(args.requestJson);calls.push(req);
-      if(custom.invoke)return custom.invoke({req,calls,owner,rows,notices,get retained(){return retained;},set retained(v){retained=v;}});
+      if(custom.invoke){const result=await custom.invoke({req,calls,owner,rows,notices,get retained(){return retained;},set retained(v){retained=v;}});if(result!==undefined)return result;}
       if(req.action.kind==='inspect')return receipt(req,retained?'inactive-retained':'inactive-absent',retained,retained&&retained.preparationToken);
       if(req.action.kind==='prepare'){retained=project(req);return receipt(req,'inactive-prepared',retained);}
       if(req.action.kind==='close'){retained=null;return receipt(req,'inactive-closed',null,req.action.preparationToken);}
@@ -108,7 +108,7 @@ test('lost close receipt removes the row only after inspect recovers the exact c
   const f=fixture({invoke({req}){
     if(req.action.kind==='inspect'){
       const v=receipt(req,retained?'inactive-retained':'inactive-absent',retained,retained&&retained.preparationToken);
-      if(req.action.recoverRequestId===closeId)v.recoveredRequest={requestId:closeId,outcome:{ok:true,value:{state:'inactive-closed',preparationToken:token,project:null}}};
+      if(req.action.recoverRequestId===closeId)v.recoveredRequest={requestId:closeId,outcome:{ok:true,value:{state:'inactive-closed',preparationToken:token}}};
       return v;
     }
     if(req.action.kind==='prepare'){retained=project(req);return receipt(req,'inactive-prepared',retained);}
@@ -117,6 +117,42 @@ test('lost close receipt removes the row only after inspect recovers the exact c
   await f.tabs.openPath('/B.json');assert.equal(f.rows.length,1);
   assert.equal((await f.tabs.close(f.rows[0])).status,'closed');assert.equal(f.rows.length,0);
   assert.equal(Object.hasOwn(f.calls.at(-1).action,'preparationToken'),false,'closed-state recovery must inspect without a token');
+});
+
+test('cancelled-before-dispatch prepare makes no row and a later explicit Open gets a new request',async()=>{
+  let cancelled=true;const f=fixture({invoke({req}){if(req.action.kind==='prepare'&&cancelled){cancelled=false;throw {code:'cancelled_before_dispatch',message:'cancelled',details:{disposition:'notDispatched',retryExecution:false}};}}});
+  assert.equal((await f.tabs.openPath('/B.json')).status,'refused');assert.equal(f.rows.length,0);
+  const first=f.calls.find(call=>call.action.kind==='prepare').requestId;
+  assert.equal((await f.tabs.openPath('/B.json')).status,'prepared');
+  const attempts=f.calls.filter(call=>call.action.kind==='prepare');assert.equal(attempts.length,2);
+  assert.notEqual(attempts[1].requestId,first);assert.equal(f.rows.length,1);
+});
+
+test('wrong-token inspect refusal leaves B visible and never activates it',async()=>{
+  let refuse=false;const f=fixture({invoke({req}){
+    if(refuse&&req.action.kind==='inspect'&&req.action.preparationToken)
+      throw {code:'preparation_expired',message:'unknown token',details:{disposition:'notDispatched',retryExecution:false}};
+  }});
+  await f.tabs.openPath('/B.json');refuse=true;
+  assert.equal((await f.tabs.activateClick(f.rows[0])).status,'indeterminate');
+  assert.equal(f.rows.length,1);assert.equal(f.rows[0].preparationToken,token);
+  assert.equal(f.calls.at(-1).action.preparationToken,token);
+});
+
+test('a contradictory retained project cannot be removed by a forged recovered-close outcome',async()=>{
+  let retained,closeId;
+  const f=fixture({invoke({req}){
+    if(req.action.kind==='inspect'){
+      const v=receipt(req,'inactive-absent',retained, null);
+      if(req.action.recoverRequestId===closeId)v.recoveredRequest={requestId:closeId,outcome:{ok:true,value:{state:'inactive-closed',preparationToken:token}}};
+      return v;
+    }
+    if(req.action.kind==='prepare'){retained=project(req);return receipt(req,'inactive-prepared',retained);}
+    if(req.action.kind==='close'){closeId=req.requestId;throw Error('close reply lost');}
+  }});
+  await f.tabs.openPath('/B.json');
+  assert.equal((await f.tabs.close(f.rows[0])).status,'indeterminate');
+  assert.equal(f.rows.length,1);assert.equal(f.rows[0].preparationToken,token);
 });
 
 test('refused close preserves B and does not fabricate a terminal removal',async()=>{
