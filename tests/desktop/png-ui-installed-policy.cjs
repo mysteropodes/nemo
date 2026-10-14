@@ -6,7 +6,7 @@ const SOURCE='6e4edc21bb92095cc8306183ab049a8f0288dbeb';
 const FIXTURE='cfad6f7e5cb1709dcc0ecee84bc29e9703e8ee19442ba10323a2139f0edd6a66';
 const SHA=/^[a-f0-9]{64}$/,HEAD=/^[a-f0-9]{40}$/,ID=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const controls=new Set(['Open','Open Project…','Open…','Cancel','File','Edit','Save','Save As…','Save As','Save as…',
-  'Undo','Redo','Export','Export…','Export PNG','PNG','PNG Sequence','Whole timeline','1x','Choose','Select',
+  'Undo','Redo','Export','Export…','Export PNG','PNG','PNG Sequence','SVG Sequence','Work area','Whole timeline','1x','Choose','Select',
   'Go','Go to the folder:','Go to folder:','Go to Folder','Go to the folder']);
 const actions=new Set(['inspect','press','set','select','raise','capture','check','pin-sheet','sheet-dismissed','go-to-folder','location-dismissed','stop','artifacts']);
 const state=new WeakMap();
@@ -57,6 +57,11 @@ function bindCache(c,manifest){
   return file;
 }
 function identity(reply,pid,windowId){check(reply&&reply.pid===pid&&reply.windowId===windowId&&reply.matchedAX===true,'png-window-refused');}
+function exportOptions(last){
+  const popups=(last?.nodes||[]).filter(n=>n.role==='AXPopUpButton'&&n.blocked===undefined&&n.enabled!==false);
+  const one=(labels,allowed)=>{const hits=popups.filter(n=>labels.includes(n.control));return hits.length===1&&allowed.includes(hits[0].control);};
+  return one(['SVG Sequence','PNG','PNG Sequence'],['PNG','PNG Sequence'])&&one(['Work area','Whole timeline'],['Whole timeline'])&&one(['1x'],['1x']);
+}
 function verifyAction(c,a,sheet,last){
   const s=verifyWorkspace(c);check(a&&actions.has(a.type),'png-action-refused');
   const target=a.target||'main';check(target==='main'||target==='sheet','png-action-refused');
@@ -71,6 +76,10 @@ function verifyAction(c,a,sheet,last){
     const node=last?.target===target&&last.nodes?.find(n=>n.path===a.element);
     check(node&&node.blocked===undefined&&node.enabled!==false,'png-control-refused');
     if(a.type==='press')check(controls.has(node.control)&&node.press===true&&['AXButton','AXMenuItem','AXPopUpButton'].includes(node.role),'png-control-refused');
+    if(a.type==='press'&&['SVG Sequence','Work area'].includes(node.control))check(node.role==='AXPopUpButton','png-navigation-refused');
+    if(a.type==='press'&&target==='main'&&['Export','Export…','Export PNG'].includes(node.control)&&
+      last.nodes.some(n=>['SVG Sequence','PNG','PNG Sequence','Work area','Whole timeline','1x'].includes(n.control)))
+      check(exportOptions(last),'png-export-options-refused');
     if(a.type==='select')check(target==='sheet'&&node.role==='AXRow'&&['A.json','Saved.json'].includes(node.control),'png-control-refused');
     if(a.type==='set')check(node.role==='AXTextField','png-control-refused');
   }
@@ -109,8 +118,7 @@ function witnessAction(c,a,last){
       if(['Save As…','Save As','Save as…'].includes(label)){check([1,4].includes(ui.step),'png-ui-order');ui.intent='save';}
       if(['Export','Export…','Export PNG'].includes(label)){
         check([2,3].includes(ui.step),'png-ui-order');
-        const labels=new Set(last.nodes.map(n=>n.control));
-        ui.intent=(labels.has('PNG')||labels.has('PNG Sequence'))&&labels.has('Whole timeline')&&labels.has('1x')?'export':'export-options';
+        ui.intent=exportOptions(last)?'export':'export-options';
       }
       if(label==='Cancel'&&ui.intent==='export-options'){check(ui.step===2,'png-ui-order');ui.cancelled=true;ui.step=3;ui.intent=null;}
     }else{

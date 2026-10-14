@@ -47,7 +47,7 @@ function witness(c,label,target='main',value){
 }
 function beforeUI(c,w){witness(c,'Open Project…');witness(c,'Open','sheet',w.fixture);witness(c,'Save As…');witness(c,'Save','sheet',w.saved);}
 function cancelUI(c){witness(c,'Export');witness(c,'Cancel');}
-function exportUI(c,w){P.witnessAction(c,{type:'press',element:'0'},{nodes:[{path:'0',control:'Export'},{control:'PNG'},{control:'Whole timeline'},{control:'1x'}]});witness(c,'Choose','sheet',w.output);}
+function exportUI(c,w){P.witnessAction(c,{type:'press',element:'0'},{nodes:[{path:'0',control:'Export'},...['PNG','Whole timeline','1x'].map(control=>({role:'AXPopUpButton',control}))]});witness(c,'Choose','sheet',w.output);}
 test('fixed independently authored two-frame project exactly matches admitted byte hash',()=>{
   const bytes=fixtureBytes();assert.equal(bytes.length,2103);assert.equal(P.hash(bytes),P.FIXTURE);
   const data=JSON.parse(bytes);assert.equal(data.drawing.totalFrames,2);assert.deepEqual(data.drawing.objects.map(x=>x.fill),[{kind:'solid',r:0,g:0,b:1,a:1},{kind:'solid',r:0,g:1,b:0,a:1}]);
@@ -94,6 +94,38 @@ test('real Save sheet button is admitted only through current owned projection a
     assert.throws(()=>P.verifyAction(f.c,a,sheet,{...last,nodes:[{...node,...patch}]}),/control-refused/);
   assert.throws(()=>P.verifyAction(f.c,{...a,sheetToken:'old'},sheet,last),/sheet-refused/);
   assert.throws(()=>P.verifyAction(f.c,a,sheet,null),/control-refused/);
+});
+test('frozen SVG/work-area popup defaults are navigable but cannot run or witness PNG export',t=>{
+  const f=setup(t),w=f.prepare();fs.writeFileSync(w.saved,'saved');beforeUI(f.c,w);
+  const node=(path,control,role='AXPopUpButton')=>({path,control,role,enabled:true,press:true});
+  const run=node('0','Export','AXButton'),defaults={target:'main',nodes:[run,node('1','SVG Sequence'),node('2','Work area'),node('3','1x')]};
+  for(const element of ['1','2'])P.verifyAction(f.c,{type:'press',element},{},defaults);
+  for(const element of ['1','2'])for(const role of ['AXMenuItem','AXButton'])
+    assert.throws(()=>P.verifyAction(f.c,{type:'press',element},{},{...defaults,nodes:defaults.nodes.map(n=>n.path===element?{...n,role}:n)}),/navigation-refused/);
+  assert.deepEqual(P.sanitizeHelper(defaults).nodes.slice(1,3).map(n=>n.control),['SVG Sequence','Work area']);
+  const good={target:'main',nodes:[run,node('1','PNG Sequence'),node('2','Whole timeline'),node('3','1x')]};
+  P.verifyAction(f.c,{type:'press',element:'0'},{},good);
+  const menu=['PNG Sequence','Whole timeline','1x'].map((control,i)=>({...node('4.'+i,control,'AXMenuItem'),selected:false}));
+  for(const last of [defaults,{...defaults,nodes:[...defaults.nodes,...menu]},
+    {...defaults,nodes:[run,...menu.map(n=>({...n,role:'AXStaticText'}))]},
+    {...good,nodes:[...good.nodes,node('4','SVG Sequence')]},
+    {...good,nodes:good.nodes.map(n=>n.control==='PNG Sequence'?{...n,blocked:'child-owner'}:n)}])
+    assert.throws(()=>P.verifyAction(f.c,{type:'press',element:'0'},{},last),/export-options-refused/);
+  const app={dirs:{appCache:path.join(f.root,'cache')}};P.artifacts(f.c,'baseline',app);cancelUI(f.c);P.artifacts(f.c,'cancelled',app);
+  P.witnessAction(f.c,{type:'press',element:'0'},{...defaults,nodes:[...defaults.nodes,...menu]});
+  witness(f.c,'Choose','sheet',w.output);outputs(w);
+  assert.equal(P.witnessSummary(f.c).exportPickerObserved,false);
+  assert.throws(()=>P.artifacts(f.c,'exported',app),/ui-unwitnessed/);
+});
+test('default export run is refused before a helper press even with desired menu labels present',async t=>{
+  const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+  const nodes=[{path:'0',role:'AXButton',control:'Export',enabled:true,press:true},
+    ...['SVG Sequence','Work area','1x'].map((control,i)=>({path:String(i+1),role:'AXPopUpButton',control,enabled:true,press:true})),
+    ...['PNG Sequence','Whole timeline'].map((control,i)=>({path:'4.'+i,role:'AXMenuItem',control,selected:false,press:true}))];
+  s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},async close(){s.events.push('helper-close');},
+    async action(_w,a){s.events.push('helper:'+a.type);return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...(a.type==='inspect'?{nodes}:{})};}});
+  const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-export-options-refused');
+  assert.equal(s.events.includes('helper:press'),false);assert.equal(r.installedAcceptance,'not-established');
 });
 test('PID/window mismatches cannot become ownership proof',()=>{
   for(const patch of [{pid:71768},{windowId:99},{matchedAX:false},{}]){
@@ -212,7 +244,7 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       if(a.type==='inspect'){
         if(a.target==='sheet')r.nodes=[node('0',undefined,'AXTextField'),node('1',dialog==='open'?'Open':dialog==='save'?'Save':'Choose')];
         else r.nodes=main==='open'?[node('0','Open Project…')]:main==='save'?[node('0','Save As…')]:main==='cancel'?[node('0','Cancel')]:
-          [node('0','Export'),...(cancelled?[node('1','PNG'),node('2','Whole timeline'),node('3','1x')]:[])];
+          [node('0','Export'),...(cancelled?[node('1','PNG','AXPopUpButton'),node('2','Whole timeline','AXPopUpButton'),node('3','1x','AXPopUpButton')]:[])];
       }
       if(a.type==='pin-sheet'){r.target='sheet';r.sheetToken=token;}
       if(a.target==='sheet'){r.target='sheet';r.sheetToken=token;}
