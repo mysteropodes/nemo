@@ -85,10 +85,10 @@
           if (Object.keys(event).some(function (key) { return event[key] !== synchronized[key]; })) throw new Error('Native revision synchronization identity mismatch');
           binding = Object.freeze({ instanceId: identity.instanceId, documentId: identity.documentId, contentRevision: event.toRevision });
           current.revision = event.toRevision;
-          current.inFlight = false;
           await invoke('nemo_native_revision_sync', { request: {
             action: 'acknowledge', subscriptionId: identity.subscriptionId, event: event,
           } });
+          current.inFlight = false;
         } catch (error) {
           if (subscription === current) await invalidate();
         }
@@ -123,6 +123,36 @@
       }
     }
 
+    async function dispatchTracked(request, send, advances) {
+      requireBinding(request);
+      var ticket = epoch;
+      if (subscription && subscription.inFlight && advances) throw new Error('Native revision synchronization is pending');
+      var local = subscription, complete, completion;
+      if (local && advances) {
+        completion = new Promise(function (resolve) { complete = resolve; });
+        local.localAdvances.add(completion);
+      }
+      try {
+        var response = await send();
+        if (ticket !== epoch || !binding) throw new Error('Native response belongs to a disconnected transport');
+        if (!response || response.apiVersion !== 2 || response.requestId !== request.requestId ||
+            response.instanceId !== binding.instanceId) throw new Error('Native application response identity mismatch');
+        if (response.documentId !== binding.documentId ||
+            (response.ok === false && response.error && response.error.code === 'wrong_document')) {
+          invalidate();
+        } else {
+          binding = Object.freeze({ instanceId: binding.instanceId, documentId: binding.documentId,
+            contentRevision: Math.max(binding.contentRevision, boundedRevision(response.contentRevision, 'contentRevision')) });
+          if (subscription && advances && response.ok) subscription.revision = Math.max(subscription.revision, response.contentRevision);
+        }
+        return response;
+      } catch (error) {
+        if (ticket === epoch) await invalidate();
+        throw error;
+      } finally {
+        if (complete) { local.localAdvances.delete(completion); complete(); }
+      }
+    }
     return Object.freeze({
       async connect() {
         var disposal = invalidate();
@@ -143,41 +173,17 @@
       disconnect: invalidate,
       subscribeRevisions: subscribeRevisions,
       status() { return binding; },
+      isSynchronizing() { return !!(subscription && subscription.inFlight); },
       async dispatch(request) {
         requireBinding(request);
-        var ticket = epoch;
         var advances = request.operation.startsWith('command.') || request.operation.startsWith('history.') || request.operation === 'transaction.commit';
-        if (subscription && subscription.inFlight && advances) throw new Error('Native revision synchronization is pending');
-        var local = subscription, complete, completion;
-        if (local && advances) {
-          completion = new Promise(function (resolve) { complete = resolve; });
-          local.localAdvances.add(completion);
-        }
-        try {
-          var response = await invoke('nemo_native_dispatch', { request: request });
-          if (ticket !== epoch || !binding) throw new Error('Native response belongs to a disconnected transport');
-          if (!response || response.apiVersion !== 2 || response.requestId !== request.requestId ||
-              response.instanceId !== binding.instanceId) {
-            throw new Error('Native application response identity mismatch');
-          }
-          if (response.documentId !== binding.documentId ||
-              (response.ok === false && response.error && response.error.code === 'wrong_document')) {
-            invalidate();
-          } else {
-            binding = Object.freeze({
-              instanceId: binding.instanceId,
-              documentId: binding.documentId,
-              contentRevision: Math.max(binding.contentRevision, boundedRevision(response.contentRevision, 'contentRevision')),
-            });
-            if (subscription && advances && response.ok) subscription.revision = Math.max(subscription.revision, response.contentRevision);
-          }
-          return response;
-        } catch (error) {
-          if (ticket === epoch) await invalidate();
-          throw error;
-        } finally {
-          if (complete) { local.localAdvances.delete(completion); complete(); }
-        }
+        return dispatchTracked(request, function () { return invoke('nemo_native_dispatch', { request: request }); }, advances);
+      },
+      async dispatchObject(command, request) {
+        if (command !== 'nemo_native_object_dispatch' && command !== 'nemo_native_object_reference' ||
+            command === 'nemo_native_object_reference' && (!request.action || request.action.kind === 'inspect'))
+          return Promise.reject(new Error('Unsupported bounded object mutation endpoint'));
+        return dispatchTracked(request, function () { return invoke(command, { requestJson: JSON.stringify(request) }); }, true);
       },
     });
   }

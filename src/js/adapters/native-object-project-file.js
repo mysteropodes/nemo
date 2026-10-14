@@ -5,6 +5,23 @@
   else root.NemoNativeObjectProjectFile=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
+  var projections=new WeakMap();
+  function projectionMatches(root,info){
+    var pin=projections.get(root),rows=root.state&&root.state.layers;
+    return !!pin&&!!info&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})&&
+      Array.isArray(rows)&&Array.isArray(info.layers)&&rows.length===info.layers.length&&
+      rows.every(function(row,i){return row.layerUid===info.layers[i].layerUid;});
+  }
+  function refreshVisibility(root,info){
+    if(!projectionMatches(root,info))return false;
+    var values=info.layers.map(function(layer){
+      if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')
+        throw new Error('Native layer visibility is invalid');
+      return layer.visible!==false;
+    });
+    root.state.layers.forEach(function(row,i){row.visible=values[i];});
+    return true;
+  }
   function create(session,ports,workflow,acknowledgement){
     var baseline=null,saving=false,opening=false;
     var saved=acknowledgement.create({
@@ -73,6 +90,7 @@
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
+    projections.set(root,{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration});
   }
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
@@ -109,5 +127,6 @@
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
     return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath});
   }
-  return Object.freeze({create:create,projectView:projectView,bind:bind});
+  return Object.freeze({create:create,projectView:projectView,bind:bind,
+    projectionMatches:projectionMatches,refreshVisibility:refreshVisibility});
 }));
