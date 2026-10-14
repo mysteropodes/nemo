@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "d35fe01e2b04719c5d4cd9b3dff72ff0e3806c2f",
-  "describe": "v0.7.0-alpha.4-1749-gd35fe01e-dirty"
+  "head": "a0e3721a42eee245e25d9012151e542bc6fe4cb6",
+  "describe": "v0.7.0-alpha.4-1751-ga0e3721a-dirty"
  },
- "inputsDigest": "00d09d9dcdf89818dbd4e6c7ae5d06557f1ec6e2c3eeac3966b0fa972243e8e1",
+ "inputsDigest": "8379c44abcaeddb2a13a24e5f9826cfefa9c7a22b04400d549fafa615bbb2c73",
  "states": [
   "inventoried",
   "characterized",
@@ -271,7 +271,7 @@
   },
   "SMProjectEntry": {
    "file": "src/js/project-entry.js",
-   "line": 60,
+   "line": 98,
    "members": 0
   },
   "SMProject": {
@@ -2471,7 +2471,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:730 initStartScreen()"
+    "src/js/project.js:724 initStartScreen()"
    ],
    "events": [
     "click"
@@ -2497,7 +2497,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 103,
+    "functionsVisited": 97,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9131 action()"
@@ -3354,7 +3354,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:727 initStartScreen()"
+    "src/js/project.js:721 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3435,7 +3435,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:726 initStartScreen()"
+    "src/js/project.js:720 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4655,7 +4655,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:724 initStartScreen()"
+    "src/js/project.js:718 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4695,7 +4695,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:725 initStartScreen()"
+    "src/js/project.js:719 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7842,7 +7842,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:731 initStartScreen()"
+    "src/js/project.js:725 initStartScreen()"
    ],
    "events": [
     "change"
@@ -9192,7 +9192,7 @@
    "capability": "Cancel",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:703 initStartScreen()"
+    "src/js/project.js:697 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9229,7 +9229,7 @@
    "capability": "Create",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:707 initStartScreen()"
+    "src/js/project.js:701 initStartScreen()"
    ],
    "events": [
     "click"
@@ -9279,7 +9279,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:713 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:707 initStartScreen())",
    "source": "src/index.html:80",
    "meta": {
     "data": {},
@@ -9289,7 +9289,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:713 initStartScreen()"
+     "src/js/project.js:707 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9313,7 +9313,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:711 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:705 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9325,7 +9325,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:711 initStartScreen()"
+     "src/js/project.js:705 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9351,7 +9351,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:714 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:708 initStartScreen())",
    "source": "src/index.html:71",
    "meta": {
     "data": {},
@@ -9361,7 +9361,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:714 initStartScreen()"
+     "src/js/project.js:708 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9376,7 +9376,7 @@
    "capability": "np preset",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:704 initStartScreen()"
+    "src/js/project.js:698 initStartScreen()"
    ],
    "events": [
     "change"
@@ -9400,7 +9400,7 @@
     "functionsVisited": 1,
     "via": "chain",
     "references": [
-     "src/js/project.js:709 initStartScreen()"
+     "src/js/project.js:703 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -9424,7 +9424,7 @@
    "consumers": {},
    "platforms": "browser and desktop",
    "status": "unmapped",
-   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:711 initStartScreen())",
+   "nextGate": "R03 follow-up: bind a handler or record unavailable-with-reason (referenced without an event registration at src/js/project.js:705 initStartScreen())",
    "source": "src/index.html:79",
    "meta": {
     "data": {
@@ -9436,7 +9436,7 @@
     "hiddenAtLoad": true,
     "functionsVisited": 0,
     "references": [
-     "src/js/project.js:711 initStartScreen()"
+     "src/js/project.js:705 initStartScreen()"
     ]
    },
    "fixtures": [
@@ -10267,7 +10267,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 77,
+    "functionsVisited": 71,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2898 updateCornersPanel()",
@@ -11914,7 +11914,7 @@
     "container": "onion-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 233,
+    "functionsVisited": 234,
     "via": "variable tr",
     "references": []
    },
@@ -15761,7 +15761,7 @@
    "capability": "start new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:701 initStartScreen()"
+    "src/js/project.js:695 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15798,7 +15798,7 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:702 initStartScreen()"
+    "src/js/project.js:696 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15837,7 +15837,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:674 initStartScreen()"
+    "src/js/project.js:668 initStartScreen()"
    ],
    "events": [
     "click"
@@ -15863,7 +15863,7 @@
     "functionsVisited": 58,
     "via": "chain",
     "references": [
-     "src/js/project.js:662 initStartScreen()"
+     "src/js/project.js:656 initStartScreen()"
     ]
    },
    "fixtures": [

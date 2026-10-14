@@ -1,4 +1,4 @@
-// Presentation adapter for real project tabs and Open/Resume canvas repaint.
+// Project entry presentation: tabs, recent rows and Open/Resume canvas repaint.
 (function(){
   function initializeProjectTabs(document){
     var list=document.getElementById('project-tabs-list');
@@ -43,6 +43,44 @@
       list.appendChild(el);
     });
   }
+  // Paths, recent storage and document operations stay in the caller. This view
+  // only formats display rows and delegates the two ordinary user actions.
+  function renderRecentProjects(document,ports){
+    var wrap=document.getElementById('start-recent-list');
+    if(!wrap)return;
+    var list=ports.readRows();
+    wrap.innerHTML='';
+    if(!list.length){
+      wrap.innerHTML='<div class="start-empty">'+ports.translate('startNoRecents')+'</div>';
+      return;
+    }
+    list.forEach(function(r){
+      var row=document.createElement('div');
+      row.className='start-recent-row';
+      var icon=document.createElement('span');
+      icon.className='start-recent-dot';
+      var info=document.createElement('div');
+      var nm=document.createElement('div');
+      nm.className='start-recent-name';
+      nm.textContent=r.name;
+      var meta=document.createElement('div');
+      meta.className='start-recent-meta';
+      var dims=r.canvasW?(r.canvasW+'×'+r.canvasH+' · '+r.fps+'fps · '):'';
+      meta.textContent=dims+new Date(r.lastOpened).toLocaleDateString();
+      info.appendChild(nm);
+      info.appendChild(meta);
+      var x=document.createElement('div');
+      x.className='start-recent-x';
+      x.textContent='×';
+      x.title=ports.translate('startRemoveFromList');
+      x.addEventListener('click',function(e){e.stopPropagation();ports.removeRow(r.key);});
+      row.appendChild(icon);
+      row.appendChild(info);
+      row.appendChild(x);
+      row.addEventListener('click',function(){ports.openRow(r.key);});
+      wrap.appendChild(row);
+    });
+  }
   function repaintProjectEntry(){
     // Native Open/Resume can restore live paths while the canvas stays blank
     // until an explicit render. Cross one complete presentation boundary
@@ -57,5 +95,6 @@
       });
     });
   }
-  window.SMProjectEntry={repaint:repaintProjectEntry,initializeTabs:initializeProjectTabs,renderTabs:renderProjectTabs};
+  window.SMProjectEntry={repaint:repaintProjectEntry,initializeTabs:initializeProjectTabs,
+    renderTabs:renderProjectTabs,renderRecents:renderRecentProjects};
 })();
