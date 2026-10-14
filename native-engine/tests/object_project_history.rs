@@ -357,3 +357,151 @@ fn drawing_only_serialize_refuses_projects_and_bare_compatibility_stays() {
     .unwrap();
     assert!(snapshot.dispatch(request).unwrap().ok);
 }
+
+#[cfg(feature = "project_media_codec")]
+mod inactive {
+    use super::*;
+
+    fn state(owner: &NativeObjectHistory) -> (String, Vec<u8>, Value, (usize, usize)) {
+        let pin = current(owner);
+        (
+            pin.snapshot_id().into(),
+            owner
+                .serialize_project_file(owner.content_revision(), pin.snapshot_id())
+                .unwrap(),
+            owner.project_file_info().unwrap(),
+            owner.history_depths(),
+        )
+    }
+
+    #[test]
+    fn inactive_admission_preserves_dirty_owner_and_retains_one_actual_charge() {
+        // Exercise the real shared domain alone, even under parallel libtest.
+        const KEY: &str = "NEMO_INACTIVE_PROJECT_TEST";
+        let full_name = concat!(
+            module_path!(),
+            "::inactive_admission_preserves_dirty_owner_and_retains_one_actual_charge"
+        );
+        let name = full_name.split_once("::").unwrap().1;
+        if std::env::var(KEY).as_deref() != Ok(name) {
+            let result = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", name, "--nocapture", "--test-threads=1"])
+                .env(KEY, name)
+                .output()
+                .unwrap();
+            assert!(
+                result.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&result.stdout),
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert!(String::from_utf8_lossy(&result.stdout).contains("1 passed"));
+            return;
+        }
+        const FULL: usize = 128 * 1024 * 1024;
+        for version in [1, 2] {
+            let (bytes, expected_b, cost) = {
+                let seed =
+                    NativeObjectHistory::from_admitted_project("seed", project(version, true))
+                        .unwrap();
+                let (_, bytes, info, _) = state(&seed);
+                let cost = match current(&seed).project().unwrap().reference_state() {
+                    ProjectReferenceState::StillImage(image) => image.encoded_png().len(),
+                    _ => unreachable!(),
+                };
+                (bytes, info, cost)
+            };
+            let mut a =
+                NativeObjectHistory::from_admitted_project("inactive", project(version, false))
+                    .unwrap();
+            let initial = state(&a);
+            let mut payload = cases()["command"]["request"]["payload"].clone();
+            for red in [0.8, 0.2] {
+                payload["fill"]["r"] = json!(red);
+                let fill = a
+                    .prepare_fill_json(&serde_json::to_vec(&payload).unwrap())
+                    .unwrap();
+                a.commit_fill(fill).unwrap();
+            }
+            a.undo(2).unwrap();
+            let before = state(&a);
+            assert_eq!(before.3, (1, 1));
+            assert_ne!(before.1, initial.1, "A is actually dirty");
+            let bare = NativeObjectHistory::new("other", project(version, false).drawing().clone())
+                .unwrap();
+            for stale in [&initial.0, current(&bare).snapshot_id()] {
+                assert_eq!(
+                    a.prepare_inactive_project(stale, b"invalid").err(),
+                    Some(DispatchErrorCode::StaleRevision)
+                );
+                assert_eq!(state(&a), before);
+            }
+            assert_eq!(
+                bare.prepare_inactive_project(current(&bare).snapshot_id(), &bytes)
+                    .err(),
+                Some(DispatchErrorCode::Unavailable)
+            );
+            drop(bare);
+            let mut invalid_png: Value = serde_json::from_slice(&bytes).unwrap();
+            invalid_png["assets"][0]["data"] = json!("AAAA");
+            for rejected in [
+                b"invalid".to_vec(),
+                serde_json::to_vec(&drawing(version)).unwrap(),
+                serde_json::to_vec(&invalid_png).unwrap(),
+            ] {
+                assert!(a.prepare_inactive_project(&before.0, &rejected).is_err());
+                assert_eq!(state(&a), before);
+            }
+            // Scalar permit: no 128 MiB test allocation. B must use the real quota.
+            let full = ObjectSnapshot::reserve_encoded(FULL).unwrap();
+            assert_eq!(
+                a.prepare_inactive_project(&before.0, &bytes).err(),
+                Some(DispatchErrorCode::Unavailable)
+            );
+            assert_eq!(state(&a), before);
+            drop(full);
+            let b: crate::history::InactiveProject =
+                a.prepare_inactive_project(&before.0, &bytes).unwrap();
+            assert_eq!(state(&a), before);
+            let info = b.metadata().unwrap();
+            assert_eq!(info["instanceId"], a.instance_id());
+            assert_ne!(info["documentId"], a.document_id());
+            assert_ne!(info["documentSnapshotId"], before.0);
+            assert_eq!(info["contentRevision"], 0);
+            assert_eq!(
+                info["origin"],
+                json!({"documentId":a.document_id(), "documentSnapshotId":before.0, "contentRevision":3})
+            );
+            for key in [
+                "documentDigest",
+                "byteCount",
+                "canvasW",
+                "canvasH",
+                "fps",
+                "totalFrames",
+                "layers",
+                "reference",
+            ] {
+                assert_eq!(info[key], expected_b[key], "{key}");
+            }
+            assert!(info.get("assets").is_none() && info.get("undoDepth").is_none());
+            let mut detached = b.metadata().unwrap();
+            detached["reference"]["name"] = json!("changed");
+            assert_eq!(b.metadata().unwrap(), info);
+            let retained = b.clone();
+            let remaining = ObjectSnapshot::reserve_encoded(FULL - cost).unwrap();
+            drop(remaining);
+            assert!(ObjectSnapshot::reserve_encoded(FULL).is_err());
+            drop(b);
+            assert!(ObjectSnapshot::reserve_encoded(FULL).is_err());
+            assert_eq!(a.redo(3), Ok(4));
+            assert_eq!(a.history_depths(), (2, 0));
+            assert_eq!(retained.metadata().unwrap(), info);
+            drop(a);
+            assert_eq!(retained.metadata().unwrap(), info);
+            assert!(ObjectSnapshot::reserve_encoded(FULL).is_err());
+            drop(retained);
+            assert!(ObjectSnapshot::reserve_encoded(FULL).is_ok());
+        }
+    }
+}
