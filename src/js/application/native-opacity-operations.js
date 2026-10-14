@@ -230,7 +230,7 @@
         'addFolderLayer', 'deleteLayer', 'trimToWorkArea', 'setLayerKeyLock',
         'toggleLayerMotionBlur', 'toggleMotionBlurComp', 'setMotionBlurSettings',
         'toggleLayerShy', 'toggleShyMode', 'splitLayerAtPlayhead', 'duplicateLayer',
-        'toggleLayerVis', 'toggleLayerLock', 'toggleLayerSolo', 'renameLayer',
+        'toggleLayerLock', 'toggleLayerSolo', 'renameLayer',
         'reorderLayer', 'reorderLayersAtGap', 'reorderLayersBatch',
         'applyStrokeProfile', 'convertActiveLayerToComponent', 'convertComponentToLayer',
         'convertActiveLayerToLFSGroup', 'convertActiveLayerToStrokeFillShadow',
@@ -242,6 +242,12 @@
         'extendExposure', 'flipHorizontal', 'flipVertical', 'enterSymbol', 'exitToScene',
         'closeSymbolTab', 'enterMontageView', 'exitMontageView'
       ], 'timeline-');
+      // The ordinary timeline and Motion eyes share this SM entry. Keep the
+      // generic fail-closed writer guard when an older surface has no native
+      // route; only the desktop surface may provide the bounded object intent.
+      if (typeof surface.wrapObjectVisibility === 'function') {
+        disposers.push(surface.wrapObjectVisibility(objectProject, allowLegacy));
+      } else wrap('timeline', ['toggleLayerVis'], 'timeline-');
       wrap('motion', [
         'toggleAnimated', 'setValue', 'setKeyAtCurrentFrame', 'setKeyAtFrame',
         'removeKeyAtCurrentFrame', 'applyCurveToSelection', 'nudgeSelectedKeys',

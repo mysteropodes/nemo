@@ -78,6 +78,41 @@
     target[name] = wrapped;
     return function () { if (target[name] === wrapped) target[name] = original; };
   }
+  function wrapObjectVisibility(root, objectProject, allow) {
+    var target = root && root.SM, original = target && target.toggleLayerVis;
+    if (typeof original !== 'function') return function () {};
+    function wrapped(index) {
+      var project;
+      try { project = objectProject(); } catch (_) { return false; }
+      if (project) {
+        try {
+          // A native object session without the revision-synchronized eye ABI
+          // stays unavailable. Never fall through to the old timeline writer.
+          if (typeof project.isActive !== 'function' || !project.isActive() ||
+              typeof project.toggleLayerVisibility !== 'function') return false;
+          var rows = root.state && root.state.layers, info = project.info && project.info();
+          if (!Number.isSafeInteger(index) || index < 0 || !Array.isArray(rows) ||
+              !info || !Array.isArray(info.layers) || index >= rows.length || index >= info.layers.length ||
+              !rows[index] || rows[index].layerUid !== info.layers[index].layerUid) return false;
+          var uid = rows[index].layerUid;
+          if (typeof uid !== 'string' || !uid ||
+              info.layers.filter(function (layer) { return layer.layerUid === uid; }).length !== 1) return false;
+          var pending = project.toggleLayerVisibility(uid);
+          if (!pending || typeof pending.then !== 'function') return false;
+          Promise.resolve(pending).catch(function () {
+            try { if (root.showToast) root.showToast('Native layer visibility was not confirmed.'); }
+            catch (_) { /* A notice failure must not create a second writer or unhandled rejection. */ }
+          });
+          return pending;
+        } catch (_) { return false; }
+      }
+      try { if (allow('timeline-toggleLayerVis') !== true) return false; }
+      catch (_) { return false; }
+      return original.apply(this, arguments);
+    }
+    target.toggleLayerVis = wrapped;
+    return function () { if (target.toggleLayerVis === wrapped) target.toggleLayerVis = original; };
+  }
   function mapping(root) {
     var bounds = root.document.getElementById('drawing-canvas').getBoundingClientRect();
     var dpr = root.devicePixelRatio || 1;
@@ -298,6 +333,9 @@
           }));
           return function () { receipts.forEach(function (dispose) { dispose(); }); };
         },
+        wrapObjectVisibility: function (objectProject, allow) {
+          return wrapObjectVisibility(root, objectProject, allow);
+        },
         extensionOpen: function () {
           return !!(root.SMPlugin && typeof root.SMPlugin.openCount === 'function' && root.SMPlugin.openCount() > 0) ||
             !!(root.SMPanelUI && typeof root.SMPanelUI.openCount === 'function' && root.SMPanelUI.openCount() > 0);
@@ -317,5 +355,6 @@
     allowProjectTransition: allowProjectTransition,
     releaseProjectTransition: releaseProjectTransition,
     wrapWriter: wrapWriter,
+    wrapObjectVisibility: wrapObjectVisibility,
     desktopPorts: desktopPorts, defer: function (root, callback) { return root.setTimeout(callback, 0); } });
 }));
