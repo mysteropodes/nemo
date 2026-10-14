@@ -404,10 +404,9 @@ mod tests {
             format: "nemo.native-object-document".into(),
             format_version: 1,
             total_frames: 1,
-            layers: vec![crate::object_document::ObjectLayer {
-                layer_uid: "limit-layer".into(),
-                name: Default::default(),
-            }],
+            layers: vec![crate::object_document::ObjectLayer::identified(
+                "limit-layer".into(),
+            )],
             objects: vec![],
             composition_order: Default::default(),
         };

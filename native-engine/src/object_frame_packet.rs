@@ -283,6 +283,9 @@ where
             let source_layer_index = *layers
                 .get(target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
+            if !document.layers()[source_layer_index].visible() {
+                continue;
+            }
             records.push(ObjectFrameIndices {
                 source_layer_index,
                 source_object_index,

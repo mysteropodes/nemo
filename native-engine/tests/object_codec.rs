@@ -155,7 +155,7 @@ fn invalid_names_and_other_unadmitted_layer_fields_refuse_atomically() {
             .kind(),
         ObjectCodecErrorKind::Invalid
     );
-    for field in ["visible", "locked", "privateExtra"] {
+    for field in ["locked", "privateExtra"] {
         let mut input = named_layers();
         input["layers"][0][field] = json!(true);
         assert_eq!(
@@ -177,6 +177,101 @@ fn invalid_names_and_other_unadmitted_layer_fields_refuse_atomically() {
         decode(&input).unwrap_err().kind(),
         ObjectCodecErrorKind::Invalid
     );
+}
+
+#[test]
+fn layer_visibility_is_strict_lossless_and_keeps_all_stored_records() {
+    use crate::object_codec::{
+        decode_ordered_project, encode_ordered_project, migrate_ordered_project,
+    };
+    for visible in [None, Some(true), Some(false)] {
+        let mut input = named_layers();
+        if let Some(value) = visible {
+            input["layers"][0]["visible"] = json!(value);
+        }
+        let document = decode(&input).unwrap();
+        assert_eq!(document.layers()[0].visible(), visible.unwrap_or(true));
+        assert_eq!(document.layers()[1].visible(), true);
+        assert_eq!(document.objects().len(), 2);
+        assert_eq!(
+            serde_json::from_slice::<Value>(&encode_project(&document).unwrap()).unwrap(),
+            input
+        );
+        let ordered = migrate_ordered_project(
+            &document,
+            &serde_json::to_vec(&named_layer_order_plan()).unwrap(),
+        )
+        .unwrap();
+        let bytes = encode_ordered_project(&ordered).unwrap();
+        let reopened = decode_ordered_project(&bytes).unwrap();
+        assert_eq!(reopened.layers()[0].visible(), visible.unwrap_or(true));
+        assert_eq!(reopened.objects().len(), 2);
+        assert_eq!(encode_ordered_project(&reopened).unwrap(), bytes);
+    }
+    for value in [Value::Null, json!(0), json!("false"), json!([]), json!({})] {
+        let mut input = named_layers();
+        input["layers"][0]["visible"] = value;
+        assert_eq!(
+            decode(&input).unwrap_err().kind(),
+            ObjectCodecErrorKind::Invalid
+        );
+    }
+    let mut input = named_layers();
+    input["layers"][0]["visible"] = json!(false);
+    let bytes = serde_json::to_string(&input)
+        .unwrap()
+        .replace("\"visible\":false", "\"visible\":false,\"visible\":true");
+    assert_eq!(
+        decode_project(bytes.as_bytes()).unwrap_err().kind(),
+        ObjectCodecErrorKind::Invalid
+    );
+}
+
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+#[test]
+fn hidden_layer_project_revisions_save_reload_and_fill_history_keep_visibility() {
+    use crate::history::NativeObjectHistory;
+    let mut drawing = named_layers();
+    drawing["layers"][0]["visible"] = json!(false);
+    let input = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":320,"canvasH":180,"fps":24.0},"drawing":drawing,"viewportReference":null,"assets":[]});
+    let mut owner =
+        NativeObjectHistory::from_project_file("visibility", &serde_json::to_vec(&input).unwrap())
+            .unwrap();
+    let zero = owner.acquire_snapshot(0).unwrap();
+    let before = owner.serialize_project_file(0, zero.snapshot_id()).unwrap();
+    let mut payload = cases_for_visibility()["command"]["request"]["payload"].clone();
+    payload["stableTarget"]["layerUid"] = json!("r08_curve_layer");
+    let prepared = owner
+        .prepare_fill_json(&serde_json::to_vec(&payload).unwrap())
+        .unwrap();
+    assert_eq!(owner.commit_fill(prepared), Ok(1));
+    assert_eq!(owner.undo(1), Ok(2));
+    assert_eq!(owner.redo(2), Ok(3));
+    for revision in [0, 1, 2, 3] {
+        let snapshot = owner.acquire_snapshot(revision).unwrap();
+        assert!(!snapshot.document().layers()[0].visible());
+        let bytes = owner
+            .serialize_project_file(revision, snapshot.snapshot_id())
+            .unwrap();
+        let reopened = NativeObjectHistory::from_project_file("reopened", &bytes).unwrap();
+        assert!(!reopened.acquire_snapshot(0).unwrap().document().layers()[0].visible());
+        assert_eq!(
+            reopened.project_file_info().unwrap()["layers"][0]["visible"],
+            false
+        );
+    }
+    assert_eq!(
+        owner.serialize_project_file(0, zero.snapshot_id()).unwrap(),
+        before
+    );
+}
+#[cfg(all(feature = "history", feature = "project_media_codec"))]
+fn cases_for_visibility() -> Value {
+    serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap()
 }
 
 #[test]
