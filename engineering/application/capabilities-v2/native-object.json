@@ -6,11 +6,12 @@
   "status": "staged",
   "availability": {
     "state": "unavailable",
-    "reason": "Object reads are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+    "reason": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
-    "query.document.object"
+    "query.document.object",
+    "command.document.object.layer.visibility.set"
   ],
   "commonErrorCodes": [
     "invalid_request",
@@ -68,7 +69,27 @@
       },
       "error": {
         "code": "unavailable",
-        "message": "Object reads are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+        "message": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+      }
+    },
+    {
+      "label": "Staged visibility command; a strict current-revision input remains unavailable before endpoint lookup",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "object-visibility-8",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.visibility.set",
+        "payload": {
+          "command": "object.layer.visibility.set",
+          "layerUid": "legacy layer:alpha",
+          "visible": false
+        }
+      },
+      "error": {
+        "code": "unavailable",
+        "message": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
       }
     }
   ]

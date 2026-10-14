@@ -110,7 +110,7 @@ impl JsonSchema for CommandRequest {
         // and select the exact version branch with JSON Schema conditionals.
         let mut properties = legacy["properties"].clone();
         properties["apiVersion"] = json!({"type": "integer", "enum": [1, 2]});
-        properties["operation"] = json!({"type": "string", "description": "Native v2: command.document.apply, history.undo or history.redo. Legacy v1 operations use their payload templates below."});
+        properties["operation"] = json!({"type": "string", "description": "Native v2 operation shapes are selected by the versioned native request schema. Legacy v1 operations use their payload templates below."});
         properties["cancelledBeforeDispatch"] = json!({"type": "boolean"});
         let mut payload = legacy["properties"]["payload"].clone();
         let payload_object = payload
@@ -127,10 +127,9 @@ impl JsonSchema for CommandRequest {
                 }
             }
         }
-        payload_properties.insert(
-            "command".into(),
-            json!({"type": "string", "const": "layer.opacity.set"}),
-        );
+        // This root is a transport-friendly projection. The selected native
+        // branch, not a second root-level feature switch, constrains commands.
+        payload_properties.insert("command".into(), json!({"type": "string"}));
         payload_properties.insert(
             "stableTarget".into(),
             json!({
@@ -157,7 +156,7 @@ impl JsonSchema for CommandRequest {
             "type": "object",
             "properties": properties,
             "required": ["apiVersion", "requestId", "operation", "payload"],
-            "description": "Use apiVersion 2 for native writes. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
+            "description": "Use apiVersion 2 for native operations. The versioned native request schema and registered feature declarations constrain each operation; a declared staged capability can still refuse execution. Copy a root example, replace instanceId from discovery and documentId, expectedRevision and layerUid from the native snapshot when that operation requires them. command.document.apply changes static base opacity (0..100), not evaluated keyed frame opacity. Undo/redo require payload {} and the latest revision. Use a unique requestId for each new command; reuse the identical body only for retries. Legacy apiVersion 1 payload templates remain available below.",
             "examples": examples,
             "$defs": {"legacy": legacy, "native": native},
             "if": {"required": ["apiVersion"], "properties": {"apiVersion": {"const": 1}}},

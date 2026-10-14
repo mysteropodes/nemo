@@ -308,5 +308,81 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         unavailable.structured_content.unwrap()["error"]["code"],
         "unavailable"
     );
+    let native = registered_native_capabilities();
+    let object = native
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|descriptor| descriptor["id"] == "native.object")
+        .unwrap();
+    assert_eq!(
+        object["operations"],
+        json!([
+            "query.document.object",
+            "command.document.object.layer.visibility.set"
+        ])
+    );
+    let visibility = json!({
+        "apiVersion": 2, "requestId": "visibility-stdio-7",
+        "instanceId": "instance-A", "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.visibility.set",
+        "payload": {
+            "command": "object.layer.visibility.set",
+            "layerUid": "legacy layer:alpha",
+            "visible": false
+        }
+    });
+    assert!(
+        validator.is_valid(&visibility),
+        "the advertised v2 schema accepts its declared staged command"
+    );
+    let staged = client
+        .call_tool(
+            CallToolRequestParams::new("nemo_command")
+                .with_arguments(visibility.as_object().unwrap().clone()),
+        )
+        .await
+        .unwrap();
+    assert_eq!(staged.is_error, Some(true));
+    let error = staged.structured_content.unwrap()["error"].clone();
+    assert_eq!(error["code"], "unavailable");
+    assert_eq!(error["message"], object["availability"]["reason"]);
+    for invalid in [
+        {
+            let mut value = visibility.clone();
+            value.as_object_mut().unwrap().remove("expectedRevision");
+            value
+        },
+        {
+            let mut value = visibility.clone();
+            value["payload"]["visible"] = json!(0);
+            value
+        },
+        {
+            let mut value = visibility.clone();
+            value["payload"]["extra"] = json!(true);
+            value
+        },
+        {
+            let mut value = visibility.clone();
+            value["payload"]["layerUid"] = json!("");
+            value
+        },
+    ] {
+        assert!(!validator.is_valid(&invalid));
+        let rejected = client
+            .call_tool(
+                CallToolRequestParams::new("nemo_command")
+                    .with_arguments(invalid.as_object().unwrap().clone()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rejected.is_error, Some(true));
+        assert_eq!(
+            rejected.structured_content.unwrap()["error"]["code"],
+            "invalid_request"
+        );
+    }
     client.cancel().await.unwrap();
 }

@@ -214,7 +214,9 @@ const transport = load('engineering/application/native-transport-v2.schema.json'
 test('registered object read remains staged with pending ports and a complete-result byte policy', () => {
   assert.equal(descriptor.id, 'native.object');
   assert.equal(descriptor.status, 'staged');
-  assert.deepEqual(descriptor.operations, ['query.document.object']);
+  assert.deepEqual(descriptor.operations, [
+    'query.document.object', 'command.document.object.layer.visibility.set',
+  ]);
   assert.equal(descriptor.availability.state, 'unavailable');
   assert.match(descriptor.availability.reason, /raw-envelope.*host installation.*UI\/MCP/);
   assert.deepEqual(descriptor.ports, [{ label: 'ui', state: 'pending' }, { label: 'mcp', state: 'pending' }]);
@@ -225,6 +227,36 @@ test('registered object read remains staged with pending ports and a complete-re
   assert.equal(descriptor.examples[0].error.code, 'unavailable');
   assert.throws(() => validateRequest(descriptor.examples[0].request), 'browser activation remains a later gate');
   assert.equal(load('engineering/application/capabilities-v2/native-opacity.json').availability.state, 'available');
+});
+
+test('staged visibility command declares a required revision and exact opaque-UID boolean payload', () => {
+  const request = {
+    apiVersion: 2, requestId: 'visibility-contract-7', instanceId: 'instance-A',
+    documentId: 'document-A', expectedRevision: 7,
+    operation: 'command.document.object.layer.visibility.set',
+    payload: { command: 'object.layer.visibility.set', layerUid: 'legacy layer:alpha', visible: false },
+  };
+  assert.deepEqual(descriptor.examples[1].request.operation, request.operation);
+  assert.equal(descriptor.examples[1].error.code, 'unavailable');
+  const branch = transport.$defs.Request.oneOf.find((entry) =>
+    entry.allOf?.some((part) => part.properties?.operation?.const === request.operation));
+  assert.ok(branch);
+  assert.equal(branch.allOf[0].$ref, '#/$defs/RequiredRevisionRequest');
+  assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectLayerVisibilityPayload');
+  const payload = transport.$defs.ObjectLayerVisibilityPayload;
+  assert.equal(payload.additionalProperties, false);
+  assert.deepEqual(payload.required, ['command', 'layerUid', 'visible']);
+  assert.equal(payload.properties.layerUid.$ref, '#/$defs/ObjectOpaqueId');
+  assert.deepEqual(validate(payload, request.payload, transport.$defs), []);
+  for (const change of [
+    { path: ['command'], value: 'object.fill.set' },
+    { path: ['layerUid'], value: '' },
+    { path: ['layerUid'], value: 9 },
+    { path: ['visible'], value: 0 },
+    { path: ['visible'], delete: true },
+  ]) assert.notDeepEqual(validate(payload, changed(request.payload, change), transport.$defs), [], change.path.join('.'));
+  assert.notDeepEqual(validate(payload, { ...request.payload, extra: true }, transport.$defs), []);
+  assert.throws(() => validateRequest(request), 'ordinary JS adapter remains closed until the shared-owner UI route is accepted');
 });
 
 test('transport object selector carries the frozen closed scope and bounded envelope contract', () => {

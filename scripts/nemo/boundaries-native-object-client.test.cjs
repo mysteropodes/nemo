@@ -40,5 +40,6 @@ test('N25D3/D4 command producer and independent consumers cannot lose source reg
   for (const module of without.modules) module.files = module.files.filter(file => !sources.includes(`${module.dir}/${file}`));
   const result = coverage.checkSourceCoverage(without, { root, sourcePaths: sources });
   assert.ok(sources.every(file => result.violations.some(v => v.rule === 'coverage-unprofiled-source' && v.file === file)));
-  assert.deepEqual(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).operations, ['query.document.object']);
+  assert.deepEqual(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).operations,
+    ['query.document.object', 'command.document.object.layer.visibility.set']);
 });

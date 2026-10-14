@@ -1,4 +1,4 @@
-//! Closed request and result validation for descriptor-declared native reads.
+//! Closed request and result validation for descriptor-declared native operations.
 
 use crate::contract::bounded_identifier;
 use serde_json::{Map, Value};
@@ -68,6 +68,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
         "query.document.object" => object::request(payload),
+        "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
         | "query.reproduction.status"
@@ -209,6 +210,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object" {
         return object::result(request_document_id, payload, result);
+    }
+    if operation == "command.document.object.layer.visibility.set" {
+        return object::visibility_result(result);
     }
     if operation == "query.diagnostics.recent" {
         return diagnostics_result(result);
