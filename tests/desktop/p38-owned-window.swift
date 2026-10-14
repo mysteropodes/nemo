@@ -1464,7 +1464,7 @@ func run() throws {
         if labels.contains(title) { facts["control"] = title }
         else if labels.contains(value) { facts["control"] = value }
         guard query == .success && advertised else { throw pressFailure("axpress-support",facts) }
-        if request["expectedControl"] != nil || request["expectedRole"] != nil {
+        if args[1] == "--png-persistent" || request["expectedControl"] != nil || request["expectedRole"] != nil {
           guard let control = request["expectedControl"] as? String, let role = request["expectedRole"] as? String else { throw Refusal(code:"adapter-refused") }
           try check(rawRole == role && [title,value,attr(selected,kAXDescriptionAttribute) as? String ?? ""].contains(control))
         }

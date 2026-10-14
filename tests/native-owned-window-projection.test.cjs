@@ -110,26 +110,30 @@ print("actual owned projection pages and refusal controls; runtimeAX=false")
 test('actual fresh Swift role/control guard refuses stale, forged and malformed targets before effect',()=>{
   if(process.platform!=='darwin')return;
   const source=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-window.swift'),'utf8');
-  const start=source.indexOf('        if request["expectedControl"] != nil'),end=source.indexOf('        if location != nil {',start);
+  const start=source.indexOf('        if args[1] == "--png-persistent" || request["expectedControl"] != nil'),end=source.indexOf('        if location != nil {',start);
   assert.ok(start>=0&&end>start);const guard=source.slice(start,end);
   const code=`import Foundation
 struct Refusal:Error{let code:String};func check(_ ok:Bool)throws{if !ok{throw Refusal(code:"adapter-refused")}}
 let kAXDescriptionAttribute="description"
 var effects=0
-func press(_ request:[String:Any],_ rawRole:String="AXButton",_ title:String="",_ value:String="",_ description:String="Open Project…")throws{
+func press(_ request:[String:Any],_ rawRole:String="AXButton",_ title:String="",_ value:String="",_ description:String="Open Project…",_ mode:String="--png-persistent")throws{
+  let args=["helper",mode]
   let selected=1;func attr(_ n:Int,_ key:String)->Any?{description}
 `+guard+`
   effects+=1
 }
 try press(["expectedControl":"Open Project…","expectedRole":"AXButton"])
 precondition(effects==1)
-for request:[String:Any] in [["expectedControl":"Open Project…","expectedRole":"AXGroup"],
+for request:[String:Any] in [[:],["expectedControl":"Open Project…","expectedRole":"AXGroup"],
   ["expectedControl":"private-secret","expectedRole":"AXButton"],["expectedControl":3,"expectedRole":"AXButton"],
   ["expectedControl":"Open Project…"],["expectedRole":"AXButton"]]{
   var hit=false;do{try press(request)}catch{hit=true};precondition(hit && effects==1)
 }
 var changed=false;do{try press(["expectedControl":"Open Project…","expectedRole":"AXButton"],"AXButton","","","Cancel")}catch{changed=true}
 precondition(changed && effects==1)
+try press([:],"AXButton","","","","--persistent")
+try press([:],"AXButton","","","","--reference-persistent")
+precondition(effects==3)
 print("actual semantic guard, no refused effects; runtimeAX=false")
 `;
   const r=spawnSync('/usr/bin/swift',['-e',code],{encoding:'utf8',timeout:30000,maxBuffer:8192});assert.equal(r.status,0,r.stderr);

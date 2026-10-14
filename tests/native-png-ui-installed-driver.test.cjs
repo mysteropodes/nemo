@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {spawnSync}=require('node:child_process');
 const P=require('./desktop/png-ui-installed-policy.cjs'),D=require('./desktop/png-ui-installed-driver.cjs');
 const crc=require('./desktop/reference-installed-policy.cjs').crc32;
+const complete={complete:true,truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false};
 function fixtureBytes(){
   const objects=[],scopes=[];
   for(const [frame,fill] of [[0,{kind:'solid',r:0,g:0,b:1,a:1}],[1,{kind:'solid',r:0,g:1,b:0,a:1}]]){
@@ -60,7 +61,7 @@ test('PNG authorization refuses stale/cross-workflow/unconfirmed and malformed s
 });
 test('fixed fixture/root/inode and path controls refuse changes without admitting a different document',t=>{
   const f=setup(t),w=f.prepare();assert.throws(f.prepare,/workspace-reused/);
-  const sheet={token:'sheet'},last={target:'sheet',nodes:[{path:'0',role:'AXTextField',enabled:true}]};
+  const sheet={token:'sheet'},last={...complete,target:'sheet',nodes:[{path:'0',role:'AXTextField',enabled:true}]};
   P.verifyAction(f.c,{type:'set',target:'sheet',sheetToken:'sheet',element:'0',value:w.fixture},sheet,last);
   for(const value of [f.root,path.join(w.output,'other'),'../A.json','/tmp/foreign.json'])
     assert.throws(()=>P.verifyAction(f.c,{type:'set',target:'sheet',sheetToken:'sheet',element:'0',value},sheet,last));
@@ -74,7 +75,7 @@ test('symlink fixture and replaced workspace are refused',t=>{
 });
 test('only fresh visible enabled allowed controls and current sheet/location tokens can act',t=>{
   const f=setup(t);f.prepare();const a={type:'press',element:'0'};
-  const good={target:'main',nodes:[{path:'0',control:'Export',role:'AXButton',press:true,enabled:true}]};
+  const good={...complete,target:'main',nodes:[{path:'0',control:'Export',role:'AXButton',press:true,enabled:true}]};
   P.verifyAction(f.c,a,{},good);
   for(const node of [{...good.nodes[0],control:'Delete'},{...good.nodes[0],blocked:'child-owner'},
     {...good.nodes[0],enabled:false},{...good.nodes[0],press:false}])assert.throws(()=>P.verifyAction(f.c,a,{}, {...good,nodes:[node]}));
@@ -88,7 +89,7 @@ test('only fresh visible enabled allowed controls and current sheet/location tok
 test('real Save sheet button is admitted only through current owned projection and token',t=>{
   const f=setup(t);f.prepare();const sheet={token:'save-sheet'};
   const a={type:'press',target:'sheet',sheetToken:sheet.token,element:'1'};
-  const node={path:'1',control:'Save',role:'AXButton',enabled:true,press:true},last={target:'sheet',nodes:[node]};
+  const node={path:'1',control:'Save',role:'AXButton',enabled:true,press:true},last={...complete,target:'sheet',nodes:[node]};
   P.verifyAction(f.c,a,sheet,last);assert.equal(P.sanitizeHelper({nodes:[node]},'sheet').nodes[0].control,'Save');
   for(const patch of [{control:'Save All'},{blocked:'child-owner'},{enabled:false},{role:'AXTextField'}])
     assert.throws(()=>P.verifyAction(f.c,a,sheet,{...last,nodes:[{...node,...patch}]}),/control-refused/);
@@ -98,12 +99,12 @@ test('real Save sheet button is admitted only through current owned projection a
 test('frozen SVG/work-area popup defaults are navigable but cannot run or witness PNG export',t=>{
   const f=setup(t),w=f.prepare();fs.writeFileSync(w.saved,'saved');beforeUI(f.c,w);
   const node=(path,control,role='AXPopUpButton')=>({path,control,role,enabled:true,press:true});
-  const run=node('0','Export','AXButton'),defaults={target:'main',nodes:[run,node('1','SVG Sequence'),node('2','Work area'),node('3','1x')]};
+  const run=node('0','Export','AXButton'),defaults={...complete,target:'main',nodes:[run,node('1','SVG Sequence'),node('2','Work area'),node('3','1x')]};
   for(const element of ['1','2'])P.verifyAction(f.c,{type:'press',element},{},defaults);
   for(const element of ['1','2'])for(const role of ['AXMenuItem','AXButton'])
     assert.throws(()=>P.verifyAction(f.c,{type:'press',element},{},{...defaults,nodes:defaults.nodes.map(n=>n.path===element?{...n,role}:n)}),/navigation-refused/);
   assert.deepEqual(P.sanitizeHelper(defaults).nodes.slice(1,3).map(n=>n.control),['SVG Sequence','Work area']);
-  const good={target:'main',nodes:[run,node('1','PNG Sequence'),node('2','Whole timeline'),node('3','1x')]};
+  const good={...complete,target:'main',nodes:[run,node('1','PNG Sequence'),node('2','Whole timeline'),node('3','1x')]};
   P.verifyAction(f.c,{type:'press',element:'0'},{},good);
   const menu=['PNG Sequence','Whole timeline','1x'].map((control,i)=>({...node('4.'+i,control,'AXMenuItem'),selected:false}));
   for(const last of [defaults,{...defaults,nodes:[...defaults.nodes,...menu]},
@@ -123,7 +124,7 @@ test('default export run is refused before a helper press even with desired menu
     ...['SVG Sequence','Work area','1x'].map((control,i)=>({path:String(i+1),role:'AXPopUpButton',control,enabled:true,press:true})),
     ...['PNG Sequence','Whole timeline'].map((control,i)=>({path:'4.'+i,role:'AXMenuItem',control,selected:false,press:true}))];
   s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},async close(){s.events.push('helper-close');},
-    async action(_w,a){s.events.push('helper:'+a.type);return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...(a.type==='inspect'?{nodes}:{})};}});
+    async action(_w,a){s.events.push('helper:'+a.type);return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...(a.type==='inspect'?{...complete,nodes}:{})};}});
   const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-export-options-refused');
   assert.equal(s.events.includes('helper:press'),false);assert.equal(r.installedAcceptance,'not-established');
 });
@@ -255,6 +256,7 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       const r={status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true};
       const node=(path,control,role='AXButton')=>({path,control,role,press:true,enabled:true});
       if(a.type==='inspect'){
+        Object.assign(r,complete);
         if(a.target==='sheet')r.nodes=[node('0',undefined,'AXTextField'),node('1',dialog==='open'?'Open':dialog==='save'?'Save':'Choose')];
         else r.nodes=main==='open'?[node('0','Open Project…')]:main==='save'?[node('0','Save As…')]:main==='cancel'?[node('0','Cancel')]:
           [node('0','Export'),...(cancelled?[node('1','PNG','AXPopUpButton'),node('2','Whole timeline','AXPopUpButton'),node('3','1x','AXPopUpButton')]:[])];
@@ -263,6 +265,7 @@ test('complete witnessed controller protocol still leaves installed acceptance f
       if(a.target==='sheet'){r.target='sheet';r.sheetToken=token;}
       if(a.type==='set')value=a.value;
       if(a.type==='press'&&a.target!=='sheet'){
+        assert.equal(a.expectedRole,'AXButton');assert.ok(P.controls.has(a.expectedControl));
         if(main==='open')dialog='open';else if(main==='save')dialog='save';else if(main==='cancel'){cancelled=true;main='export';}else if(!cancelled)main='cancel';else dialog='export';
       }
       if(a.type==='press'&&a.target==='sheet'){
@@ -426,6 +429,36 @@ print("baseline refuses authenticated service root before exposing its field; ru
   assert.equal(red.status,0,red.stderr);assert.match(red.stdout,/baseline refuses/);
 });
 
+test('PNG input refuses incomplete or ambiguous discovery until a complete selected-root inspection',t=>{
+  const f=setup(t),w=f.prepare();
+  const node={path:'0.9',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  const good={...complete,target:'main',nodes:[node]},press={type:'press',element:node.path};
+  P.verifyAction(f.c,press,{},good);
+  for(const patch of [{complete:false},{complete:undefined},{truncated:true},{depthClipped:true},
+    {childrenUnreadable:true},{foreignChildren:true},{truncated:undefined},{depthClipped:undefined},
+    {childrenUnreadable:undefined},{foreignChildren:undefined},{nodes:[node,node]}])
+    assert.throws(()=>P.verifyAction(f.c,press,{}, {...good,...patch}),/control-refused/);
+  const sheet={token:'sheet'},field={path:'0',role:'AXTextField',enabled:true};
+  const select={path:'1',role:'AXRow',control:'A.json',enabled:true};
+  for(const a of [{type:'set',element:'0',value:w.fixture},{type:'select',element:'1'}]){
+    const request={...a,target:'sheet',sheetToken:'sheet'},last={...complete,target:'sheet',nodes:[field,select]};
+    P.verifyAction(f.c,request,sheet,last);
+    for(const key of ['truncated','depthClipped','childrenUnreadable','foreignChildren'])
+      assert.throws(()=>P.verifyAction(f.c,request,sheet,{...last,[key]:true}),/control-refused/);
+    assert.throws(()=>P.verifyAction(f.c,request,sheet,{...last,complete:false}),/control-refused/);
+  }
+});
+test('incomplete discovery stops the real operator before any press and cleans up',async t=>{
+  for(const patch of [{complete:false},{truncated:true},{depthClipped:true},{childrenUnreadable:true},{foreignChildren:true}]){
+    const f=setup(t),s=fakeServices(f,{actions:[{type:'inspect'},{type:'press',element:'0'}]});
+    s.services.helper=()=>({async pin(){return {status:'pinned',pid:42,windowId:3,matchedAX:true};},
+      async close(){s.events.push('helper-close');},async action(_w,a){s.events.push('helper:'+a.type);
+        return {status:'ok',type:a.type,pid:42,windowId:3,matchedAX:true,...complete,...patch,
+          nodes:[{path:'0',role:'AXButton',control:'Open Project…',press:true,enabled:true}]};}});
+    const r=await D.runOperator(f.c,s.services);assert.equal(r.reason,'png-control-refused');
+    assert.equal(s.events.includes('helper:press'),false);assert.equal(r.cleanup,'complete');assert.equal(r.helperCleanup,'complete');
+  }
+});
 test('PNG pages require observed roots and exact retained continuation; metadata stays categorical',t=>{
   const f=setup(t);f.prepare();const token='11111111-1111-4111-8111-111111111111',node={path:'0.0',role:'AXWebArea'};
   const first={target:'main',nodes:[node]};
@@ -441,6 +474,12 @@ test('PNG pages require observed roots and exact retained continuation; metadata
     complete:false,depthClipped:true,truncated:true,childrenUnreadable:false,foreignChildren:false,private:'/private/secret'});
   assert.equal(clean.childCount,300);assert.equal(clean.depthClipped,true);assert.equal(clean.pageToken,token);
   assert.equal(JSON.stringify(clean).includes('private'),false);
+  const candidate={path:'0.0.299',role:'AXButton',control:'Open Project…',press:true,enabled:true};
+  assert.throws(()=>P.verifyAction(f.c,{type:'press',element:candidate.path},{},
+    {...complete,...page,nodes:[node,candidate],complete:false,truncated:true}),/control-refused/);
+  // Discovery can continue, but input waits for an unpaged, complete target root.
+  P.verifyAction(f.c,{type:'inspect',element:candidate.path,depth:1},{},clean);
+  P.verifyAction(f.c,{type:'press',element:candidate.path},{}, {...complete,target:'main',nodes:[candidate]});
   for(const bad of [{childCount:'/private'},{nextChildOffset:4096},{complete:'yes'},{depthClipped:{}},{pageToken:'private-token'}])
     assert.throws(()=>P.sanitizeHelper({status:'ok',type:'inspect',...bad}));
 });

@@ -73,8 +73,12 @@ function verifyAction(c,a,sheet,last){
   if(a.type==='go-to-folder')check(target==='sheet'&&!sheet.locationAttempted&&Object.keys(a).every(k=>['type','target','sheetToken'].includes(k)),'png-location-refused');
   if(['press','set','select'].includes(a.type)){
     check(typeof a.element==='string'&&/^\d+(?:\.\d+)*$/.test(a.element)&&a.element.length<=128,'png-element-refused');
-    const node=last?.target===target&&last.nodes?.find(n=>n.path===a.element);
-    check(last?.foreignChildren!==true,'png-control-refused');
+    const matches=last?.target===target?last.nodes?.filter(n=>n.path===a.element):[];
+    const node=matches?.length===1?matches[0]:null;
+    // Pages/clipped trees discover candidates only. Reinspect the selected root
+    // completely before input; the helper then resolves ownership and label anew.
+    check(last?.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>last[k]===false),
+      'png-control-refused');
     check(node&&node.blocked===undefined&&node.enabled!==false,'png-control-refused');
     if(a.type==='press')check(controls.has(node.control)&&node.press===true&&['AXButton','AXMenuItem','AXPopUpButton'].includes(node.role),'png-control-refused');
     if(a.type==='press'&&['SVG Sequence','Work area'].includes(node.control))check(node.role==='AXPopUpButton','png-navigation-refused');
