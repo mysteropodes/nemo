@@ -107,6 +107,73 @@ fn real_project_attach_replace_history_save_and_fresh_reimport_preserve_all_cons
 }
 
 #[test]
+fn native_layer_names_survive_project_info_fill_history_save_and_fresh_reopen() {
+    let baseline: Value = serde_json::from_str(include_str!(
+        "../../tests/animation/fixtures/curve-workflow.json"
+    )).unwrap();
+    assert_eq!(baseline["layers"][0]["layerUid"], "r08_curve_layer");
+    assert_eq!(baseline["layers"][0]["name"], "R08 rectangle");
+    for version in [1, 2] {
+        for name in [None, Some("R08 rectangle"), Some(""), Some(" Calque 雪 🟦\n")] {
+            let mut input = wire();
+            let drawing = &mut input["drawing"];
+            drawing["formatVersion"] = json!(version);
+            drawing["layers"][0]["layerUid"] = json!("r08_curve_layer");
+            if let Some(name) = name { drawing["layers"][0]["name"] = json!(name); }
+            drawing["objects"][0]["target"]["layerUid"] = json!("r08_curve_layer");
+            if version == 2 {
+                drawing["compositionOrder"] = json!({
+                    "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
+                    "contexts":[{"contextId":"scene-root","layers":[
+                        {"layerUid":"r08_curve_layer","naturalPosition":0,"order":{}},
+                        {"layerUid":"0","naturalPosition":1,"order":{}}],
+                    "scopes":[{"frameScope":{"kind":"authored","frame":7},"elements":[
+                        {"layerUid":"r08_curve_layer","strokeId":"ink/path_A","naturalPosition":0,"order":{}}]}]}],
+                    "migration":"explicit-plan-required","referencePolicy":"unresolved"});
+            }
+            let mut owner = NativeObjectHistory::from_project_file("layer-name", &serde_json::to_vec(&input).unwrap()).unwrap();
+            let zero = current(&owner);
+            let before = save(&owner, 0);
+            assert_eq!(serde_json::from_slice::<Value>(&before).unwrap(), input);
+            let check_name = |snapshot: &ObjectSnapshot| {
+                assert_eq!(snapshot.document().layers()[0].layer_uid(), "r08_curve_layer");
+                assert_eq!(snapshot.document().layers()[0].name(), name);
+                assert_eq!(snapshot.document().layers()[1].name(), None);
+            };
+            let info = owner.project_file_info().unwrap();
+            assert_eq!(info["layers"][0]["layerUid"], "r08_curve_layer");
+            assert_eq!(info["layers"][0].get("name").and_then(Value::as_str), name);
+            let mut payload = cases()["command"]["request"]["payload"].clone();
+            payload["stableTarget"]["layerUid"] = json!("r08_curve_layer");
+            let prepared = owner.prepare_fill_json(&serde_json::to_vec(&payload).unwrap()).unwrap();
+            let stale = prepared.clone();
+            assert_eq!(owner.commit_fill(prepared), Ok(1));
+            assert_eq!(owner.commit_fill(stale), Err(DispatchErrorCode::StaleRevision));
+            let one = current(&owner);
+            let after = save(&owner, 1);
+            assert_ne!(after, before);
+            assert_eq!(owner.undo(1), Ok(2));
+            assert_eq!(save(&owner, 2), before);
+            let mut noop = payload.clone();
+            noop["fill"] = input["drawing"]["objects"][0]["fill"].clone();
+            let prepared = owner.prepare_fill_json(&serde_json::to_vec(&noop).unwrap()).unwrap();
+            assert_eq!(owner.commit_fill(prepared), Ok(2));
+            assert_eq!(owner.history_depths(), (0, 1));
+            assert_eq!(owner.redo(2), Ok(3));
+            assert_eq!(save(&owner, 3), after);
+            assert_eq!(save(&owner, 0), before, "retained revision remains immutable");
+            for snapshot in [&zero, &one, &current(&owner)] { check_name(snapshot); }
+            for bytes in [&before, &after] {
+                let reopened = NativeObjectHistory::from_project_file("layer-name-reopened", bytes).unwrap();
+                check_name(&current(&reopened));
+                assert_eq!(save(&reopened, 0), *bytes);
+                assert_eq!(reopened.project_file_info().unwrap()["layers"], info["layers"]);
+            }
+        }
+    }
+}
+
+#[test]
 fn settings_fill_remove_and_attachment_share_one_history_and_preserve_replace_settings() {
     use crate::commands::ReferenceEdit;
     let mut owner = owner("interleaved");

@@ -246,9 +246,11 @@ mod tests {
             layers: vec![
                 ObjectLayer {
                     layer_uid: "legacy layer:alpha".into(),
+                    name: Presence::Missing,
                 },
                 ObjectLayer {
                     layer_uid: "0".into(),
+                    name: Presence::Missing,
                 },
             ],
             objects,

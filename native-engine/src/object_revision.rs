@@ -406,6 +406,7 @@ mod tests {
             total_frames: 1,
             layers: vec![crate::object_document::ObjectLayer {
                 layer_uid: "limit-layer".into(),
+                name: Default::default(),
             }],
             objects: vec![],
             composition_order: Default::default(),
