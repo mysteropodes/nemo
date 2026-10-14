@@ -206,6 +206,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/application/opacity-application.js',
     'src/js/adapters/native-opacity-legacy-surface.js',
     'src/js/adapters/native-opacity-motion-surface.js',
+    'src/js/adapters/native-object-inactive-project-tabs.js',
     'src/js/adapters/native-application.js',
     'src/js/adapters/native-opacity-editor.js',
     'src/js/adapters/native-opacity-selection.js',
@@ -223,7 +224,9 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
     [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-      174, 175, 176, 177, 178, 179, 180, 181, 182]);
+      129, 175, 176, 177, 178, 179, 180, 181, 182, 183]);
+  assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
+    < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
   const entry = policy.retainedSources.find((record) => record.path === projectEntry);
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
@@ -232,7 +235,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 126);
   assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 127);
   assert.equal(actual.get(projectEntry).scriptOrdinal, 128);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 129);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 130);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {

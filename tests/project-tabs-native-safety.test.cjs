@@ -10,7 +10,7 @@ const EDITED_A = '{"project":"A","paint":[25,85],"edited":true}';
 // Runs the complete shipped project entry and its real tab DOM listeners.
 // Native modes are introduced only after disposable browser A/B setup;
 // this is a source fixture, never a production native-tab setup mechanism.
-function fixture({ populated = true, nativePorts = null } = {}) {
+function fixture({ populated = true, nativePorts = null, nativeFileAdapter = null } = {}) {
   const effects = [], notices = [], elements = new Map();
   let bytes = A;
   function element() {
@@ -34,6 +34,7 @@ function fixture({ populated = true, nativePorts = null } = {}) {
     } };
   const root = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     addEventListener() {}, requestAnimationFrame(callback) { callback(); },
+    NemoNativeObjectInactiveProjectTabs: require('../src/js/adapters/native-object-inactive-project-tabs.js'),
     NemoNativeOpacityProjectEntry: require('../src/js/adapters/native-opacity-project-entry.js'),
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
     NemoProjectNativeSave: require('../src/js/adapters/project-native-save.js'),
@@ -41,6 +42,7 @@ function fixture({ populated = true, nativePorts = null } = {}) {
     NemoProjectNativeVersionRestore: require('../src/js/adapters/project-native-version-restore.js'),
     SM: { t: key => key, fitCanvas() {}, exportJSON() { effects.push('Paper export'); return bytes; },
       importJSON(json) { effects.push('browser import'); bytes = JSON.stringify({ ...JSON.parse(json), normalized: true }); return true; } } };
+  if(nativeFileAdapter)root.NemoNativeObjectProjectFile=nativeFileAdapter;
   const noop = () => {};
   const sandbox = { window: root, document, SM: root.SM, state: {}, userLayers: [], _symbolPaperLayers: {},
     localStorage: { getItem: () => null, setItem() { effects.push('storage'); }, removeItem() {} },
@@ -301,4 +303,78 @@ test('scoped inactive close refusal keeps B visible and leaves A untouched',asyn
   await f.root.SMProject.openPath('/B.json');const before=f.snapshot(),b=f.state().rows.find(r=>!r.active);
   f.close(b.id);await settleUntil(()=>f.document.getElementById('project-tabs-bar').children.some(e=>/indeterminate/.test(e.textContent||'')));
   assert.equal(f.state().rows.length,2);assert.equal(f.snapshot(),before);assert.equal(f.effects.length,0);
+});
+
+async function nativeInactiveTabDesktop(options={}) {
+  // Model a native A that has already been admitted and edited; these tests
+  // exercise the later Open/tab callbacks, not first-open desktop acceptance.
+  const owner={admitted:true,active:false,apiVersion:2,instanceId:'native-i',documentId:'native-A',contentRevision:9,
+    documentSnapshotId:'snapshot-A',lifecycleGeneration:23,savedDigest:'a'.repeat(64),documentDigest:'b'.repeat(64),
+    snapshotBytes:'native-A-bytes-at-revision-9',undo:['open-A','edit-A'],redo:['redo-A']};
+  const calls=[];let sequence=0,retained=null;
+  const projectFileAdapter={bind(root){const session={isActive:()=>owner.active,isDirty:()=>owner.documentDigest!==owner.savedDigest,canOpen:()=>true,
+    identity:()=>({apiVersion:2,instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.contentRevision,
+      documentSnapshotId:owner.documentSnapshotId,lifecycleGeneration:owner.lifecycleGeneration}),
+    info(){return this.identity();},openPath(){throw Error('same-document replacement must not run for inactive B');},saveAs(){throw Error('unexpected Save As');}};
+    root.NemoNativeObjectProject={desktop:()=>session};return session;}};
+  const f=fixture({populated:false,nativeFileAdapter:projectFileAdapter});
+  f.switch(f.a);f.close(f.b);
+  f.root.crypto={randomUUID:()=>`ui-${++sequence}`};
+  f.root.__TAURI__={dialog:{async open(){return '/Projects/B.json';}},window:{getCurrentWindow:()=>({async setFocus(){}})},core:{async invoke(name,args){
+    const req=JSON.parse(args.requestJson);calls.push({name,req});
+    if(options.invoke)return options.invoke({name,req,owner,get retained(){return retained;},set retained(v){retained=v;}});
+    assert.equal(name,'nemo_native_object_inactive_project');
+    const base={apiVersion:2,requestId:req.requestId,instanceId:req.instanceId,documentId:req.documentId,
+      contentRevision:req.expectedRevision,documentSnapshotId:req.documentSnapshotId,lifecycleGeneration:req.lifecycleGeneration,retryExecution:false};
+    if(req.action.kind==='inspect')return {...base,state:retained?'inactive-retained':'inactive-absent',
+      preparationToken:retained&&retained.preparationToken||null,project:retained};
+    if(req.action.kind==='prepare'){
+      retained={instanceId:req.instanceId,contentRevision:0,documentSnapshotId:'snapshot-B',
+        documentDigest:'b'.repeat(64),byteCount:256,canvasW:640,canvasH:360,fps:24,totalFrames:12,layers:[{layerUid:'b-layer'}],reference:null,
+        origin:{documentId:req.documentId,documentSnapshotId:req.documentSnapshotId,contentRevision:req.expectedRevision},
+        preparationToken:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',preparationRequestId:req.requestId};
+      return {...base,state:'inactive-prepared',preparationToken:retained.preparationToken,project:retained};
+    }
+    if(req.action.kind==='close'){
+      if(!retained||retained.preparationToken!==req.action.preparationToken)throw {code:'preparation_expired',message:'unknown token',details:{disposition:'notDispatched',retryExecution:false}};
+      retained=null;return {...base,state:'inactive-closed',preparationToken:req.action.preparationToken,project:null};
+    }
+    throw Error('unexpected inactive action');
+  }}};
+  owner.active=true;
+  f.root.SMProject.refreshActiveTabDirtyDot();
+  f.effects.length=0;f.notices.length=0;
+  return Object.assign(f,{owner,calls,retained:()=>retained,
+    activeSnapshot(){return JSON.stringify({label:f.root.SMProject.getCurrentLabel(),active:f.state().rows.find(r=>r.active),
+      bytes:f.state().bytes,dirty:f.root.SMProject.isDirty(),owner:{admitted:owner.admitted,active:owner.active,apiVersion:owner.apiVersion,
+        instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.contentRevision,documentSnapshotId:owner.documentSnapshotId,
+        lifecycleGeneration:owner.lifecycleGeneration,documentDigest:owner.documentDigest,savedDigest:owner.savedDigest,snapshotBytes:owner.snapshotBytes,
+        undo:owner.undo,redo:owner.redo},frame:f.sandbox.state.currentFrame,open:f.root.SMProject.getOpenTabs()});}});
+}
+
+test('real Open callback prepares metadata-only B while pre-admitted dirty native A is unchanged',async()=>{
+  const f=await nativeInactiveTabDesktop();const before=f.activeSnapshot();
+  assert.equal(f.owner.admitted,true);assert.equal(f.root.SMProject.isDirty(),true);
+  assert.equal(f.state().rows.find(row=>row.active).dirty,true,'active native A begins dirty');
+  await f.document.getElementById('start-open').listeners.click();
+  assert.equal(f.calls.filter(call=>call.req.action.kind==='prepare').length,1);assert.equal(f.activeSnapshot(),before);
+  assert.equal(f.state().rows.length,2,JSON.stringify(f.state()));const b=f.state().rows.find(row=>!row.active);
+  assert.equal(b.name,'B');assert.equal(b.dirty,false);assert.equal(f.root.SMProject.getOpenTabs().length,0);
+  assert.equal(f.calls.at(-1).name,'nemo_native_object_inactive_project');
+  assert.deepEqual(f.calls.find(call=>call.req.action.kind==='prepare').req.action,{kind:'prepare',sourcePath:'/Projects/B.json'});
+  assert.equal(f.effects.some(effect=>/import|release|frame save|Paper/.test(effect)),false);
+});
+
+test('real B tab click refuses activation and close removes it only after exact receipt beside dirty A',async()=>{
+  const f=await nativeInactiveTabDesktop();await f.root.SMProject.openPath('/Projects/B.json');
+  assert.equal(f.owner.admitted,true);assert.equal(f.root.SMProject.isDirty(),true);
+  const before=f.activeSnapshot(),b=f.state().rows.find(row=>!row.active);
+  f.switch(b.id);await settleUntil(()=>f.calls.filter(call=>call.req.action.kind==='inspect'&&call.req.action.preparationToken).length===1);
+  assert.equal(f.activeSnapshot(),before);assert.equal(f.state().rows.length,2);
+  const alert=f.document.getElementById('project-tabs-bar').children.find(node=>node.getAttribute('role')==='alert');
+  assert.match(alert.textContent,/Switching project tabs is unavailable/);
+  f.close(b.id);await settleUntil(()=>f.state().rows.length===1);
+  assert.equal(f.activeSnapshot(),before);assert.equal(f.calls.at(-1).req.action.kind,'close');
+  assert.equal(f.calls.at(-1).req.action.preparationToken,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  assert.equal(f.effects.some(effect=>/import|release|frame save|Paper/.test(effect)),false);
 });

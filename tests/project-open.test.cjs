@@ -59,6 +59,7 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
   let rejectNextImport = false;
   const window = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     NemoNativeOpacityLegacySurface: require('../src/js/adapters/native-opacity-legacy-surface.js'),
+    NemoNativeObjectInactiveProjectTabs: require('../src/js/adapters/native-object-inactive-project-tabs.js'),
     addEventListener(type, callback) { windowEvents[type] = callback; }, SM: { t(key) { return key; }, fitCanvas() {}, exportJSON() { return json; }, importJSON(raw) {
     if (rejectNextImport) { rejectNextImport = false; return false; }
     try { const parsed = JSON.parse(raw); if (parsed.fail) return false; json = JSON.stringify({ ...parsed, normalized: true }); return true; } catch (_) { return false; }
@@ -107,11 +108,12 @@ function newProjectForm(app) {
 function admissionMessage(form) {
   return form.children.find(child => child.getAttribute && child.getAttribute('role') === 'alert');
 }
-test('production loads the native project-entry adapter before its project consumer', () => {
+test('production loads native project-entry and inactive-tab adapters before the project consumer', () => {
   const html = fs.readFileSync('src/index.html', 'utf8');
   const adapter = html.indexOf('js/adapters/native-opacity-project-entry.js');
+  const inactive = html.indexOf('js/adapters/native-object-inactive-project-tabs.js');
   const project = html.indexOf('js/project.js', adapter);
-  assert.ok(adapter >= 0 && project > adapter);
+  assert.ok(adapter >= 0 && inactive > adapter && project > inactive);
   const dirty = html.indexOf('js/adapters/project-dirty-baseline.js');
   assert.ok(dirty >= 0 && dirty < project, 'dirty baseline is loaded before its real consumer');
 });
