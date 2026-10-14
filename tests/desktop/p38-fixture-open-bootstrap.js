@@ -6,6 +6,8 @@
     A: 'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180',
     B: 'd30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215'
   });
+  const ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+  const NATIVE_ROUTE = 'nemo_native_object_dispatch';
   function valid() {
     return config && Object.keys(config).sort().join(',') ===
       'buildSha,fixtures,manifestSha256,pid,runId,schema,sourceSha,taskKey' &&
@@ -21,178 +23,149 @@
   Object.freeze(config.fixtures);
   Object.freeze(config);
   window.__NEMO_P38_FIXTURE_OPEN_STARTED__ = true;
-  let activeOpen = null;
-  let restoreNative = null;
-  let nativeObserverEarly = false;
-  let nativeObserverInstallFailed = false;
   const readinessFailure = Object.freeze({
     openPathUnavailable: Symbol('open-path-unavailable'),
     invokeUnavailable: Symbol('tauri-invoke-unavailable'),
-    observerInstallFailed: Symbol('native-observer-install-failed'),
   });
-  function observePromise(value, fulfilled, rejected) {
+  function invoke(command, args) {
+    const core = window.__TAURI__ && window.__TAURI__.core;
+    const original = core && core.invoke;
+    if (typeof original !== 'function') throw new Error('invoke-unavailable');
+    return arguments.length > 1
+      ? Reflect.apply(original, core, [command, args])
+      : Reflect.apply(original, core, [command]);
+  }
+  async function fail(phase, fixtureId, code) {
+    const core = window.__TAURI__ && window.__TAURI__.core;
+    if (!core || typeof core.invoke !== 'function') return;
+    const payload = {runId:config.runId,taskKey:config.taskKey,sourceSha:config.sourceSha,
+      buildSha:config.buildSha,manifestSha256:config.manifestSha256,phase,status:'failed',
+      fixtureId,fixtureSha256:fixtureId?HASH[fixtureId]:undefined,failureCode:code};
+    await invoke('nemo_test_p38_fixture_open_probe', {payloadJson:JSON.stringify(payload)});
+  }
+  function checkpoint(phase, status, fixtureId) {
+    const payload = {runId:config.runId,taskKey:config.taskKey,sourceSha:config.sourceSha,
+      buildSha:config.buildSha,manifestSha256:config.manifestSha256,phase,status,
+      fixtureId,fixtureSha256:fixtureId?HASH[fixtureId]:undefined};
+    return invoke('nemo_test_p38_fixture_open_probe', {payloadJson:JSON.stringify(payload)});
+  }
+  async function readNativeStatus() {
+    return await invoke('nemo_native_object_client_status');
+  }
+  function validStatusBase(value) {
     try {
-      if (value && typeof value.then === 'function') value.then(
-        result => { try { fulfilled(result); } catch (_) {} },
-        error => { try { rejected(error); } catch (_) {} });
-    } catch (_) { /* Observation must never replace the operation's result. */ }
+      return !!value && typeof value === 'object' && value.apiVersion === 2 &&
+        typeof value.instanceId === 'string' && ID.test(value.instanceId) &&
+        value.route === NATIVE_ROUTE && typeof value.available === 'boolean';
+    } catch (_) { return false; }
   }
-  function installNativeObserver() {
-    const tauri = window.__TAURI__;
-    const core = tauri.core;
-    const fs = tauri.fs;
-    const originalInvoke = core.invoke;
-    const originalRead = fs && fs.readTextFile;
-    const wrappedInvoke = function (command) {
-      const trace = activeOpen;
-      const kind = command === 'nemo_native_object_bootstrap' ? 'bootstrap' :
-        command === 'nemo_native_object_client_status' ? 'status' : null;
-      let result;
-      try { result = Reflect.apply(originalInvoke, this, arguments); }
-      catch (error) { if (trace && kind) trace[kind] = 'rejected'; throw error; }
-      if (trace && kind) observePromise(result, value => {
-        trace[kind] = kind === 'status' && value && typeof value.available === 'boolean'
-          ? (value.available ? 'available' : 'empty') : 'resolved';
-      }, error => {
-        trace[kind] = kind === 'bootstrap' && error && error.code === 'unsupported_format'
-          ? 'unsupported-format' : 'rejected';
-      });
-      return result;
-    };
-    const wrappedRead = originalRead && function () {
-      const trace = activeOpen;
-      let result;
-      try { result = Reflect.apply(originalRead, this, arguments); }
-      catch (error) { if (trace) trace.fsRead = 'rejected'; throw error; }
-      if (trace) observePromise(result, () => { trace.fsRead = 'resolved'; }, () => { trace.fsRead = 'rejected'; });
-      return result;
-    };
-    const restore = function () {
-      if (core.invoke === wrappedInvoke) core.invoke = originalInvoke;
-      if (originalRead && fs.readTextFile === wrappedRead) fs.readTextFile = originalRead;
-    };
+  function validEmptyStatus(value) {
     try {
-      core.invoke = wrappedInvoke;
-      if (originalRead) fs.readTextFile = wrappedRead;
-      if (core.invoke !== wrappedInvoke || (originalRead && fs.readTextFile !== wrappedRead)) {
-        restore();
-        throw new Error('observer-install-refused');
-      }
-    } catch (error) {
-      restore();
-      throw error;
-    }
-    return restore;
+      return validStatusBase(value) && value.available === false && value.documentId === null &&
+        value.contentRevision === null && value.lifecycleGeneration === null;
+    } catch (_) { return false; }
   }
-  function installOpenPathObserver() {
-    const project = window.SMProject;
-    const originalOpen = project.openPath;
-    const wrappedOpen = function () {
-      if (activeOpen) activeOpen.openCalled = true;
-      return Reflect.apply(originalOpen, this, arguments);
-    };
-    project.openPath = wrappedOpen;
-    return function restore() {
-      if (project.openPath === wrappedOpen) project.openPath = originalOpen;
-    };
+  function validActiveStatus(value, instanceId, documentId, generation) {
+    try {
+      return validStatusBase(value) && value.available === true && value.instanceId === instanceId &&
+        typeof value.documentId === 'string' && ID.test(value.documentId) && (!documentId || value.documentId === documentId) &&
+        value.contentRevision === 0 && Number.isSafeInteger(value.lifecycleGeneration) &&
+        value.lifecycleGeneration >= 1 && (!generation || value.lifecycleGeneration === generation);
+    } catch (_) { return false; }
   }
-  function categoricalFailure(id, trace, fallback) {
-    const prefix = id === 'A' ? 'a' : 'b';
-    if (trace.fsRead === 'rejected') return prefix + '-fs-read-rejected';
-    if (trace.fsRead === 'resolved') return prefix + '-fs-read-resolved-open-refused';
-    if (trace.bootstrap === 'unsupported-format') return prefix + '-native-bootstrap-unsupported-format';
-    if (trace.bootstrap === 'rejected') return prefix + '-native-bootstrap-rejected';
-    if (trace.bootstrap === 'resolved') return prefix + '-native-bootstrap-resolved-open-refused';
-    if (trace.status === 'rejected') return prefix + '-native-status-rejected';
-    if (trace.status === 'empty') return prefix + '-native-status-empty-no-bootstrap';
-    if (trace.status === 'available') return prefix + '-native-status-available-no-bootstrap';
-    if (trace.status === 'resolved') return prefix + '-native-status-malformed-no-bootstrap';
-    if (!nativeObserverEarly) return prefix + '-observer-late-untrusted';
-    if (!trace.status && !trace.bootstrap && !trace.fsRead) return prefix + '-pre-native-refusal';
-    return fallback;
+  function sameActiveStatus(left, right) {
+    try {
+      return validActiveStatus(left, left.instanceId, left.documentId, left.lifecycleGeneration) &&
+        validActiveStatus(right, left.instanceId, left.documentId, left.lifecycleGeneration);
+    } catch (_) { return false; }
   }
-  const fail = async (phase, fixtureId, code) => {
-    const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-    if (typeof invoke !== 'function') return;
-    const payload = { runId: config.runId, taskKey: config.taskKey, sourceSha: config.sourceSha,
-      buildSha: config.buildSha, manifestSha256: config.manifestSha256, phase, status: 'failed',
-      fixtureId, fixtureSha256: fixtureId ? HASH[fixtureId] : undefined, failureCode: code };
-    await invoke('nemo_test_p38_fixture_open_probe', { payloadJson: JSON.stringify(payload) });
-  };
-  const checkpoint = (phase, status, fixtureId) => {
-    const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-    if (typeof invoke !== 'function') throw new Error('checkpoint-unavailable');
-    const payload = { runId: config.runId, taskKey: config.taskKey, sourceSha: config.sourceSha,
-      buildSha: config.buildSha, manifestSha256: config.manifestSha256, phase, status,
-      fixtureId, fixtureSha256: fixtureId ? HASH[fixtureId] : undefined };
-    return invoke('nemo_test_p38_fixture_open_probe', { payloadJson: JSON.stringify(payload) });
-  };
   async function waitForOpenPath() {
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
-      if (!restoreNative && window.__TAURI__ && window.__TAURI__.core &&
-          typeof window.__TAURI__.core.invoke === 'function') {
-        if (nativeObserverInstallFailed) throw readinessFailure.observerInstallFailed;
-        try { restoreNative = installNativeObserver(); }
-        catch (_) { nativeObserverInstallFailed = true; throw readinessFailure.observerInstallFailed; }
-      }
+      const core = window.__TAURI__ && window.__TAURI__.core;
       if (window.SMProject && typeof window.SMProject.openPath === 'function' &&
-          window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') return;
+          core && typeof core.invoke === 'function') return;
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    if (nativeObserverInstallFailed) throw readinessFailure.observerInstallFailed;
     throw typeof (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) === 'function'
       ? readinessFailure.openPathUnavailable : readinessFailure.invokeUnavailable;
   }
-  if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
-    try { restoreNative = installNativeObserver(); nativeObserverEarly = !!restoreNative; }
-    catch (_) { restoreNative = null; nativeObserverInstallFailed = true; }
-  }
-  async function open(phase, id) {
-    const trace = {};
-    activeOpen = trace;
-    let result;
-    try { result = await window.SMProject.openPath(config.fixtures[id]); }
-    catch (_) { await fail(phase, id, id === 'A' ? 'a-open-threw' : 'b-open-threw'); throw new Error('open-refused'); }
-    finally { activeOpen = null; }
-    const accepted = result === undefined || (result && typeof result === 'object' &&
-      Object.getPrototypeOf(result) === Object.prototype &&
-      Object.keys(result).length === 1 && result.status === 'prepared');
-    if (!accepted) {
-      const prefix = id === 'A' ? 'a' : 'b';
-      const code = result === false ? categoricalFailure(id, trace, prefix + '-open-false') : prefix + '-open-unaccepted';
-      await fail(phase, id, code);
+  async function openA() {
+    let before;
+    try { before = await readNativeStatus(); }
+    catch (_) {
+      await fail('a-opened', 'A', 'a-pre-native-refusal');
       throw new Error('open-refused');
     }
-    await checkpoint(phase, 'returned', id);
+    if (!validEmptyStatus(before)) {
+      await fail('a-opened', 'A', 'a-pre-native-refusal');
+      throw new Error('open-refused');
+    }
+    let result;
+    try { result = await window.SMProject.openPath(config.fixtures.A); }
+    catch (_) {
+      await fail('a-opened', 'A', 'a-open-threw');
+      throw new Error('open-refused');
+    }
+    if (result !== true) {
+      await fail('a-opened', 'A', result === false ? 'a-open-false' : 'a-open-unaccepted');
+      throw new Error('open-refused');
+    }
+    let after;
+    try { after = await readNativeStatus(); }
+    catch (_) { after = null; }
+    if (!validActiveStatus(after, before.instanceId, null, 1)) {
+      await fail('a-opened', 'A', 'a-open-unaccepted');
+      throw new Error('open-refused');
+    }
+    await checkpoint('a-opened', 'returned', 'A');
+    return after;
+  }
+  async function openB(previous) {
+    let before;
+    try { before = await readNativeStatus(); }
+    catch (_) { before = null; }
+    if (!sameActiveStatus(previous, before)) {
+      await fail('b-opened', 'B', 'b-pre-native-refusal');
+      throw new Error('open-refused');
+    }
+    let result;
+    try { result = await window.SMProject.openPath(config.fixtures.B); }
+    catch (_) {
+      await fail('b-opened', 'B', 'b-open-threw');
+      throw new Error('open-refused');
+    }
+    if (result !== true) {
+      await fail('b-opened', 'B', result === false ? 'b-open-false' : 'b-open-unaccepted');
+      throw new Error('open-refused');
+    }
+    let after;
+    try { after = await readNativeStatus(); }
+    catch (_) { after = null; }
+    if (!validActiveStatus(after, previous.instanceId, null, previous.lifecycleGeneration + 1) ||
+        after.documentId === previous.documentId) {
+      await fail('b-opened', 'B', 'b-open-unaccepted');
+      throw new Error('open-refused');
+    }
+    await checkpoint('b-opened', 'returned', 'B');
   }
   window.__NEMO_P38_FIXTURE_OPEN_DONE__ = (async () => {
-    let restoreOpenPath = null;
     try {
       try { await waitForOpenPath(); }
       catch (cause) {
         // Cursor zero is the only place a pre-ready refusal can be recorded.
-        // If invoke itself is absent there is no trusted channel to persist it;
-        // the external owner reports the prepared-only ready timeout instead.
-        const invoke = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
-        const failureCode = cause === readinessFailure.openPathUnavailable
-          ? 'ready-open-path-unavailable'
-          : cause === readinessFailure.observerInstallFailed
-            ? 'ready-observer-install-failed' : null;
-        if (failureCode && typeof invoke === 'function') {
+        // If invoke itself is absent there is no trusted channel to persist it.
+        const core = window.__TAURI__ && window.__TAURI__.core;
+        const failureCode = cause === readinessFailure.openPathUnavailable ? 'ready-open-path-unavailable' : null;
+        if (failureCode && core && typeof core.invoke === 'function') {
           try { await fail('ready', undefined, failureCode); } catch (_) {}
         }
         return 'refused';
       }
       await checkpoint('ready', 'ready');
-      restoreOpenPath = installOpenPathObserver();
-      await open('a-opened', 'A');
-      await open('b-opened', 'B');
+      const stateA = await openA();
+      await openB(stateA);
       return 'complete';
     } catch (_) { return 'refused'; }
-    finally {
-      if (restoreOpenPath) restoreOpenPath();
-      if (restoreNative) restoreNative();
-    }
   })();
 })();
