@@ -201,8 +201,10 @@
       if(signal&&signal.aborted)return {status:'cancelled'};
       var request=frameRequest(frames[0]);request.destinationDirectory=destination;request.maximumEncodedBytes=4*1024*1024;
       var receipt=await raw('nemo_native_object_export',request);
-      if(!receipt||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
-        receipt.contentRevision!==request.contentRevision||receipt.documentSnapshotId!==request.documentSnapshotId||receipt.published!==true||receipt.cleanupComplete!==true)throw new Error('Native export publication is unconfirmed');
+      if(!receipt||receipt.apiVersion!==2||receipt.requestId!==request.requestId||receipt.instanceId!==request.instanceId||receipt.documentId!==request.documentId||
+        receipt.contentRevision!==request.contentRevision||receipt.documentSnapshotId!==request.documentSnapshotId||receipt.published!==true||receipt.cleanupComplete!==true||
+        receipt.status!=='succeeded'||receipt.cleanupStatus!=='complete'||receipt.externalEffectDisposition!=='committed'||receipt.errorCode!==null||
+        !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==1||receipt.artifactFiles[0]!=='frame_0001.png')throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(1,1);return receipt;
     });}
     return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
