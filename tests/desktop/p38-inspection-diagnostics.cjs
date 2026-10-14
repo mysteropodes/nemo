@@ -4,6 +4,7 @@
 // and counts. No filesystem, native/UI authority, persistent state or new reads.
 // inspectProjectTabs wraps the existing observer port once; it never retries it.
 const SCHEMA = 'nemo.p38-inspection-completeness/2';
+const BUDGET_SCHEMA = 'nemo.p38-inspection-budget/1';
 const LIMIT = 4096;
 const FLAGS = Object.freeze(['complete', 'truncated', 'depthClipped', 'childrenUnreadable', 'foreignChildren']);
 const FLAG_STATES = Object.freeze(['absent', 'true', 'false', 'invalid']);
@@ -114,6 +115,31 @@ function failureCompleteness(error) {
   return summary?.boundary ? { completeness: summary } : {};
 }
 
+function validateBudget(value) {
+  if (!record(value) || value.schema !== BUDGET_SCHEMA || !count(value.sharedActionsUsed, 63) ||
+    !count(value.collectedNodes, 4097)) return undefined;
+  if (value.boundary === 'read-action-cap' ? value.sharedActionsUsed !== 63 || value.collectedNodes > 4096 :
+    value.boundary !== 'collected-node-cap' || value.collectedNodes !== 4097) return undefined;
+  return { schema: BUDGET_SCHEMA, boundary: value.boundary,
+    sharedActionsUsed: value.sharedActionsUsed, collectedNodes: value.collectedNodes };
+}
+
+function requireBudget(ok, boundary, sharedActionsUsed, collectedNodes) {
+  if (ok) return;
+  const error = Object.assign(new Error('inspection-budget-refused'), { code: 'inspection-budget-refused' });
+  const budget = validateBudget({ schema: BUDGET_SCHEMA, boundary, sharedActionsUsed, collectedNodes });
+  if (budget) error.budget = budget;
+  throw error;
+}
+
+function failureBudget(error) {
+  if (error?.observerStage !== undefined && error.observerStage !== 'inspection') return {};
+  const code = error?.observerStage === 'inspection' ? error.observerCode : error?.code;
+  if (code !== 'inspection-budget-refused') return {};
+  const budget = validateBudget(error.budget);
+  return budget ? { budget } : {};
+}
+
 async function inspectProjectTabs(inspect, identity, state, owner) {
   try { return await owner.observeProjectTabs(inspect, identity, state); }
   catch (error) {
@@ -121,9 +147,10 @@ async function inspectProjectTabs(inspect, identity, state, owner) {
     const allowed = error?.observerStage === 'inspection' ? INSPECTION_FAILURE_CODES : INSPECTION_CODES;
     const code = allowed.includes(candidate) ? candidate : 'inspection-refused';
     throw Object.assign(new Error('observer-failed'), { observerStage: 'inspection', observerCode: code,
-      ...(code === 'inspection-completeness-refused' ? failureCompleteness(error) : {}) });
+      ...(code === 'inspection-completeness-refused' ? failureCompleteness(error) : {}), ...failureBudget(error) });
   }
 }
 
 module.exports = { SCHEMA, INSPECTION_CODES, INSPECTION_FAILURE_CODES, summarizeCompleteness, childrenWitnessFacts,
-  validateCompletenessSummary, requireCompleteness, failureCompleteness, inspectProjectTabs };
+  validateCompletenessSummary, requireCompleteness, failureCompleteness, BUDGET_SCHEMA, validateBudget,
+  requireBudget, failureBudget, inspectProjectTabs };

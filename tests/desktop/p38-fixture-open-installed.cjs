@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { safeWindowEvidence, verifyWindow } = require('./p38-installed-driver.cjs');
-const { INSPECTION_CODES, requireCompleteness } = require('./p38-inspection-diagnostics.cjs');
+const { INSPECTION_CODES, requireCompleteness, requireBudget } = require('./p38-inspection-diagnostics.cjs');
 const hashes = Object.freeze({
   A:'e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0',
   B:'a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6'
@@ -100,7 +100,8 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
   const seen=new Map(),queue=[''];
   const complete=s=>s.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>s[k]===false);
   async function read(request) {
-    check(state.actions++<63,'inspection-budget-refused'); // Leave the existing 64th action for quit.
+    const used=state.actions++; // Shared with captures across phases; leave the 64th action for quit.
+    requireBudget(used<63,'read-action-cap',used,seen.size);
     let raw,s;
     try {raw=await inspect({type:'inspect',target:'main',pid:identity.pid,windowId:identity.windowId,maxNodes:128,...request});}
     catch(error) {if(error?.observerStage==='inspection')throw error;check(false,'inspection-transport-refused');}
@@ -115,7 +116,7 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
   function collect(nodes) {
     for(const n of nodes) {
       check(!seen.has(n.path)||JSON.stringify(seen.get(n.path))===JSON.stringify(n),'inspection-page-refused');
-      seen.set(n.path,n);check(seen.size<=4096,'inspection-budget-refused');
+      seen.set(n.path,n);requireBudget(seen.size<=4096,'collected-node-cap',state.actions,seen.size);
     }
   }
   while(queue.length) {

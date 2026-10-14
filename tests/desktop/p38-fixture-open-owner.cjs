@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { safeWindowEvidence, verifyWindow, cleanupHelper } = require('./p38-installed-driver.cjs');
-const { INSPECTION_FAILURE_CODES, inspectProjectTabs, failureCompleteness } = require('./p38-inspection-diagnostics.cjs');
+const { INSPECTION_FAILURE_CODES, inspectProjectTabs, failureCompleteness, failureBudget } = require('./p38-inspection-diagnostics.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const PROBE_FAILURE_CODES = Object.freeze({
@@ -370,7 +370,7 @@ async function runObserver(config, services) {
   } catch (error) {
     const stage = FAILURE_CODES[error?.observerStage] ? error.observerStage : currentStage;
     if (!firstFailure) firstFailure = { stage, code: safeCode(stage, error?.observerCode || error?.code),
-      elapsedMs: elapsed(), ...(stage === 'inspection' ? failureCompleteness(error) : {}) };
+      elapsedMs: elapsed(), ...(stage === 'inspection' ? { ...failureCompleteness(error), ...failureBudget(error) } : {}) };
     outcome.firstFailure = firstFailure;
     if (error?.helperCleanupIncomplete) outcome.cleanup = 'incomplete';
     try { services.save(outcome); } catch { /* Keep the primary failure; no raw error is recorded. */ }
