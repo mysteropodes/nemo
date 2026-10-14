@@ -13,11 +13,31 @@ use native_engine::{
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
 const MAX_BYTES: usize = 8192;
 const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+/// Exact read-side preview admission for the current external revision. This
+/// is not an acknowledgment and never authorizes a document command.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PreviewRevisionProof {
+    pub(crate) subscription_id: String,
+    pub(crate) event: PreviewRevisionEvent,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PreviewRevisionEvent {
+    pub(crate) instance_id: String,
+    pub(crate) document_id: String,
+    pub(crate) lifecycle_generation: u64,
+    pub(crate) request_id: String,
+    pub(crate) from_revision: u64,
+    pub(crate) to_revision: u64,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ObjectPreviewRequest {
@@ -33,6 +53,7 @@ pub(crate) struct ObjectPreviewRequest {
     pub(crate) frame: u32,
     pub(crate) output_spec: OutputSpecInput,
     pub(crate) viewport: ViewportInput,
+    pub(crate) revision_sync: Option<PreviewRevisionProof>,
     #[serde(default)]
     pub(crate) cancelled_before_dispatch: bool,
 }
@@ -55,6 +76,16 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             "invalid_request",
             "object preview requires bounded original JSON bytes",
         ));
+    }
+    let shape: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|_| host_error("invalid_request", "invalid raw object preview request"))?;
+    if let Some(proof) = shape.get("revisionSync") {
+        if !proof.is_object() || !proof.get("event").is_some_and(serde_json::Value::is_object) {
+            return Err(host_error(
+                "invalid_request",
+                "revision preview proof must be objects",
+            ));
+        }
     }
     let request: ObjectPreviewRequest = serde_json::from_str(raw)
         .map_err(|_| host_error("invalid_request", "invalid raw object preview request"))?;
@@ -79,6 +110,24 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             "cancelled_before_dispatch",
             "object preview was cancelled",
         ));
+    }
+    if let Some(proof) = &request.revision_sync {
+        let event = &proof.event;
+        if !bounded_id(&proof.subscription_id)
+            || !bounded_id(&event.instance_id)
+            || !bounded_id(&event.document_id)
+            || !bounded_id(&event.request_id)
+            || event.lifecycle_generation == 0
+            || event.lifecycle_generation > MAX_SAFE_INTEGER
+            || event.from_revision > MAX_SAFE_INTEGER
+            || event.to_revision > MAX_SAFE_INTEGER
+            || event.to_revision <= event.from_revision
+        {
+            return Err(host_error(
+                "invalid_request",
+                "invalid revision preview proof",
+            ));
+        }
     }
     request.output_spec.admit()?;
     request.viewport.admit()?;
@@ -118,15 +167,31 @@ pub(crate) fn preview_with_target(
 ) -> HostResult<NativePreviewReceipt> {
     let selector = request.selector();
     let output: OutputSpec = request.output_spec.admit()?;
+    let revision_event = request
+        .revision_sync
+        .as_ref()
+        .map(|proof| serde_json::to_value(&proof.event))
+        .transpose()
+        .map_err(|_| host_error("invalid_request", "invalid revision preview proof"))?;
+    let revision_sync = request
+        .revision_sync
+        .as_ref()
+        .zip(revision_event.as_ref())
+        .map(|(proof, event)| (proof.subscription_id.as_str(), event));
     let receipt = state
-        .with_object_preview_owner(request.lifecycle_generation, &selector, |owner| {
-            owner.with_prepared_object_preview(&selector, output, |owner| {
-                Ok(target(ObjectPreviewConsumer {
-                    owner,
-                    selector: selector.clone(),
-                }))
-            })
-        })
+        .with_object_preview_owner_for_preview(
+            request.lifecycle_generation,
+            &selector,
+            revision_sync,
+            |owner| {
+                owner.with_prepared_object_preview(&selector, output, |owner| {
+                    Ok(target(ObjectPreviewConsumer {
+                        owner,
+                        selector: selector.clone(),
+                    }))
+                })
+            },
+        )
         .map_err(|message| host_error("unavailable", message))??;
     Ok(NativePreviewReceipt {
         work_id: work_label(receipt.identity().work_id()),
