@@ -8,7 +8,7 @@ const script = fs.readFileSync('tests/desktop/p38-fixture-open-bootstrap.js', 'u
 const fixtures = Object.fromEntries(['A', 'B'].map(id => [id,
   `/task/tmp/p38-fixture-open-12345678-1234-1234-1234-123456789abc/${id}.json`]));
 const hashes = Object.fromEntries(['A', 'B'].map(id => [id,
-  crypto.createHash('sha256').update(fs.readFileSync(`tests/fixtures/p38/open/${id}.json`)).digest('hex')]));
+  crypto.createHash('sha256').update(fs.readFileSync(`tests/fixtures/p38/native-project/${id}.json`)).digest('hex')]));
 const emptyStatus = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:false,
   route:'nemo_native_object_dispatch',operations:[],documentId:null,contentRevision:null,lifecycleGeneration:null});
 const statusA = Object.freeze({apiVersion:2,instanceId:'desktop-instance',available:true,
@@ -177,7 +177,7 @@ test('owner runner requires observed original-window fixture and alert before ac
   const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'p38-installed-'))), tmp=path.join(base,'tmp');
   fs.mkdirSync(tmp); const root=path.join(tmp,'p38-fixture-open-test'); fs.mkdirSync(root);
   try {
-    for (const id of ['A','B']) fs.copyFileSync(`tests/fixtures/p38/open/${id}.json`,path.join(root,`${id}.json`));
+    for (const id of ['A','B']) fs.copyFileSync(`tests/fixtures/p38/native-project/${id}.json`,path.join(root,`${id}.json`));
     const fixturePins=['A','B'].map(id=>{const file=path.join(root,`${id}.json`),stat=fs.statSync(file);
       return {id,file,sha256:hashes[id],device:stat.dev,inode:stat.ino};});
     const pins={schema:'nemo.p38-fixture-open/1',runId:'12345678-1234-1234-1234-123456789abc',

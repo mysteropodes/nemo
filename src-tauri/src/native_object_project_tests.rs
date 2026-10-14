@@ -202,3 +202,41 @@ fn project_only_file_selection_refuses_other_formats_before_owner_installation()
     fs::write(&path, file()).unwrap();
     assert!(bootstrap_request(&state, &raw, |_| true).is_ok());
 }
+
+#[test]
+fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
+    for (name, bytes) in [
+        (
+            "A.json",
+            include_bytes!("../../tests/fixtures/p38/native-project/A.json").as_slice(),
+        ),
+        (
+            "B.json",
+            include_bytes!("../../tests/fixtures/p38/native-project/B.json").as_slice(),
+        ),
+    ] {
+        let scratch = Scratch::new();
+        let path = scratch.0.join(name);
+        fs::write(&path, bytes).unwrap();
+        let state = ApplicationMcp::default();
+        let raw = json!({"apiVersion":2,"requestId":"p38-fixture-open",
+            "instanceId":state.instance_id(),"sourcePath":path,"projectOnly":true})
+        .to_string();
+        let opened =
+            bootstrap_request(&state, &raw, |candidate| candidate == path.as_path()).unwrap();
+        let opened = serde_json::to_value(opened).unwrap();
+        let document = opened["documentId"].as_str().unwrap();
+        let info = state.native_project_info(document).unwrap();
+        let (width, height, fps) = if name == "A.json" {
+            (320, 180, 24.0)
+        } else {
+            (640, 360, 30.0)
+        };
+        assert_eq!(info["canvasW"], width);
+        assert_eq!(info["canvasH"], height);
+        assert_eq!(info["fps"], fps);
+        assert_eq!(info["totalFrames"], 21);
+        assert_eq!(info["layers"].as_array().unwrap().len(), 2);
+        assert_ne!(info["documentDigest"], "");
+    }
+}

@@ -137,8 +137,8 @@ function validateManifestIdentity(root, manifest, expected) {
   for (const [index, id] of ['A', 'B'].entries()) {
     const fixture = manifest.fixtures[index];
     const expectedHash = id === 'A'
-      ? 'f54c0228634f2c8cd53515d3df9d884464697e62c5837011de35704a67bb5180'
-      : 'd30d31a5524ed5b7bfa7cfbcae5b186cbde7b3ed269ba579c5125cb52806c215';
+      ? 'c5a3ec61decf27755b3a66a4ef47844660ac465196d7c3aa81856472bbaabbf1'
+      : '75ab937f96de3d1865690e2b475d3968ed2eabfdfc57b8d73c7732aeffd3813b';
     check(fixture && fixture.id === id && fixture.file === path.join(root, `${id}.json`) &&
       fixture.sha256 === expectedHash && Number.isSafeInteger(fixture.device) && Number.isSafeInteger(fixture.inode),
     'probe-manifest', 'probe-manifest-validation-refused');
