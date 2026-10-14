@@ -150,7 +150,16 @@ test('static owned-window adapter excludes global input and requires exact PID/w
   const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8');
   assert.ok(s.includes('initialRows.count == 1'));assert.ok(s.includes('AXUIElementGetPid'));assert.ok(s.includes('CFEqual(parent,main)'));
   assert.ok(s.includes('"-l"+String(number)'));assert.equal(/\.post\s*\(|CGEventPost\s*\(|SystemWide|osascript/.test(s),false);
-  assert.deepEqual(s.match(/\w+\.postToPid\([^)]*\)/g),['down.postToPid(pid)','up.postToPid(pid)']);
+  assert.equal(/\w+\.postToPid\([^)]*\)|CGEvent|kAXFocusedUIElementAttribute/.test(s),false);
+  assert.ok(s.includes('func attachedForeignRoot<'));assert.ok(s.includes('func boundedOwnedTree<'));
+  assert.ok(s.includes('SecCodeCopyGuestWithAttributes'));assert.ok(s.includes('SecCodeCheckValidity'));
+  assert.ok(s.includes('com.apple.appkit.xpc.openAndSavePanelService'));
+  assert.ok(s.includes('AXUIElementPerformAction(opener,kAXPressAction as CFString)'));
+  assert.ok(s.includes('AXUIElementSetAttributeValue(selected,kAXValueAttribute as CFString,text as CFString)'));
+  assert.ok(s.includes('try requireResolvedSheetMutation(target,action,serviceRoot != nil,locationToken != nil)'));
+  assert.ok(s.includes('func requireResolvedSheetMutation('));
+  assert.ok(s.includes('"unresolvedTransitionCases":3'));
+  assert.ok(s.includes('"serviceIdentityCases":5'));assert.ok(s.includes('"serviceAttachmentCases":5'));
   assert.ok(s.includes('confirm-unsupported'));assert.ok(s.includes('No title/value/children reads from a foreign child'));
 });
 for(const type of ['go-to-folder','location-dismissed']) {

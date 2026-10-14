@@ -3,7 +3,7 @@ import Foundation
 import ApplicationServices
 import CoreGraphics
 import Darwin
-import Carbon
+import Security
 
 struct Refusal: Error { let code: String }
 struct SelectionRefusal: Error { let diagnostics: [String:Any] }
@@ -15,14 +15,14 @@ func locationCheck(_ ok: Bool, _ stage: String, _ reason: String? = nil) throws 
     throw ActionRefusal(diagnostics:facts)
   }
 }
-// This records calls to postToPid, never key delivery or native UI acceptance.
+// This records execution of one retained AX action, never native UI acceptance.
 final class LocationTrace {
   var phase = "request"
-  private(set) var pairPosted = false
-  func postedPair() { pairPosted = true; phase = "posted-pair" }
+  private(set) var actionPerformed = false
+  func actionCompleted() { actionPerformed = true; phase = "posted-pair" }
   func facts(_ original: [String:Any]) -> [String:Any] {
     var result = original
-    result["gotoPhase"] = phase; result["commandPosted"] = pairPosted
+    result["gotoPhase"] = phase; result["commandPosted"] = actionPerformed
     return result
   }
   func observe<T>(_ body: () throws -> T) throws -> T {
@@ -93,19 +93,101 @@ func locationWalk<Node>(_ root: Node, deadline: UInt64, now: () -> UInt64,
   if now() >= deadline { throw ActionRefusal(diagnostics:["stage":"goto-deadline","gotoReason":"walk-deadline","gotoRoute":"","gotoDepth":0,"gotoNodeCount":found.count]) }
   return found
 }
-// Production and fault controls share the one-shot event ordering. A posted
-// process event is not proof that the original sheet received the command.
+// Production and fault controls share the one-shot exact-element ordering.
+// No process-targeted or global keyboard event is part of this transition.
 func goToFolder(_ reference: Bool, attempted: Bool, trace: LocationTrace, consume: () -> Void, context: () throws -> Void,
-  down: () -> Void, up: () -> Void, discover: () throws -> Void) throws {
+  perform: () throws -> Void, discover: () throws -> Void) throws {
   try locationCheck(reference && !attempted,"goto-state"); consume()
   trace.phase = "pre-context"
   try context()
-  // No fallible AX query or waiting between the exact-PID down/up pair.
-  down(); up(); trace.postedPair()
+  try perform(); trace.actionCompleted()
   trace.phase = "post-context"
   try context()
   trace.phase = "discovery"
   try discover()
+}
+func attachedForeignRoot<Node>(_ root: Node, owner expectedOwner: Int, deadline: UInt64,
+  now: () -> UInt64, equal: (Node,Node)->Bool,
+  owner: (Node)->(Int,Bool,Int), children: (Node)->(Int,[Node]?),
+  parent: (Node)->(Int,Node?), foreignChild: (String,Int)->Void = { _,_ in }) throws -> (root:Node,parent:Node,pid:Int,route:String) {
+  var visited = [Node](), foreign = [(Node,Node,Int,String)]()
+  func walk(_ current: Node, _ route:String, _ depth: Int) throws {
+    try locationCheck(now() < deadline,"walk-deadline")
+    try locationCheck(depth <= 12,"depth-limit")
+    try locationCheck(visited.count < 512,"node-limit")
+    let (ownerError,owned,actual)=owner(current)
+    try locationCheck(ownerError == 0,"node-owner-query")
+    try locationCheck(owned && actual == expectedOwner,"node-owner-mismatch")
+    try locationCheck(!visited.contains { equal($0,current) },"cycle")
+    visited.append(current)
+    let (query,rows)=children(current)
+    try locationCheck(query == 0 && rows != nil,"children-query")
+    guard let rows else { throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"children-shape"]) }
+    try locationCheck(rows.count <= 512,"children-limit")
+    for (index,child) in rows.enumerated() {
+      try locationCheck(now() < deadline,"walk-deadline")
+      let (childError,childOwned,childPid)=owner(child)
+      try locationCheck(childError == 0,"child-owner-query")
+      if !childOwned || childPid != expectedOwner {
+        // Do not read any foreign child's role, parent, children, or value
+        // until its PID has been authenticated by the caller.
+        let childRoute=route.isEmpty ? String(index) : route+"."+String(index)
+        foreignChild(childRoute,childPid); foreign.append((child,current,childPid,childRoute)); continue
+      }
+      let (parentError,ancestor)=parent(child)
+      try locationCheck(parentError == 0 && ancestor != nil,"parent-query")
+      try locationCheck(equal(ancestor!,current),"parent-edge")
+      let childRoute=route.isEmpty ? String(index) : route+"."+String(index)
+      try walk(child,childRoute,depth+1)
+    }
+  }
+  try walk(root,"",0)
+  try locationCheck(foreign.count == 1,"candidate-count")
+  let (candidate,ancestor,pid,route)=foreign[0]
+  try locationCheck(pid > 0 && !equal(candidate,ancestor),"context-identity")
+  return (candidate,ancestor,pid,route)
+}
+func boundedOwnedTree<Node>(_ root: Node, owner expectedOwner: Int, deadline: UInt64,
+  now: () -> UInt64, equal: (Node,Node)->Bool,
+  owner: (Node)->(Int,Bool,Int), children: (Node)->(Int,[Node]?),
+  parent: (Node)->(Int,Node?)) throws -> [Node] {
+  var visited = [Node]()
+  func walk(_ current: Node, _ depth: Int) throws {
+    try locationCheck(now() < deadline,"walk-deadline")
+    try locationCheck(depth <= 12 && visited.count < 512,"node-limit")
+    let (ownerError,owned,actual)=owner(current)
+    try locationCheck(ownerError == 0 && owned && actual == expectedOwner,"node-owner-mismatch")
+    try locationCheck(!visited.contains { equal($0,current) },"cycle")
+    visited.append(current)
+    let (query,rows)=children(current)
+    try locationCheck(query == 0 && rows != nil,"children-query")
+    guard let rows else { throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"children-shape"]) }
+    try locationCheck(rows.count <= 512,"children-limit")
+    for child in rows {
+      try locationCheck(now() < deadline,"walk-deadline")
+      let (childError,childOwned,childPid)=owner(child)
+      try locationCheck(childError == 0 && childOwned && childPid == expectedOwner,"child-owner-mismatch")
+      let (parentError,ancestor)=parent(child)
+      try locationCheck(parentError == 0 && ancestor != nil,"parent-query")
+      try locationCheck(equal(ancestor!,current),"parent-edge")
+      try walk(child,depth+1)
+    }
+  }
+  try walk(root,0)
+  return visited
+}
+func guardedElementAction(_ identity:() throws->Bool, _ action:() throws->Void) throws {
+  guard try identity() else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
+  try action()
+}
+func unresolvedServiceBlocksSheetMutation(_ target:String, _ action:String, _ serviceRootPresent:Bool,
+  _ locationTokenPresent:Bool) -> Bool {
+  target == "sheet" && ["press","set","select"].contains(action) && serviceRootPresent && !locationTokenPresent
+}
+func requireResolvedSheetMutation(_ target:String, _ action:String, _ serviceRootPresent:Bool,
+  _ locationTokenPresent:Bool) throws {
+  try locationCheck(!unresolvedServiceBlocksSheetMutation(target,action,serviceRootPresent,locationTokenPresent),
+    "goto-state","unresolved-transition")
 }
 func locationCandidateValid(_ fresh: Bool, _ owned: Bool, _ modal: Bool, _ semantic: Bool,
   _ fields: Int, _ kind: String, _ enabled: Bool, _ writable: Bool, _ confirm: Bool) -> Bool {
@@ -151,7 +233,7 @@ func enterSheetText(_ facts: [String:Any], identity: () throws -> Void,
   }
   try pinned()
   try require(d["role"] as? String == "AXTextField" && d["textFieldKind"] as? String == "plain" &&
-    d["enabled"] as? Bool == true, "axtext-role")
+    d["enabled"] as? Bool == true && d["focusedMatches"] as? Bool == true, "axtext-role")
   try require(d["confirmQueryError"] as? Int == 0 && d["confirmAdvertised"] as? Bool == true, "axtext-confirm-support")
   try require(d["valueSettableQueryError"] as? Int == 0 && d["valueSettable"] as? Bool == true, "axtext-value-settable")
   try pinned()
@@ -231,6 +313,45 @@ func axElement(_ value: CFTypeRef?) -> AXUIElement? {
 func children(_ node: AXUIElement) -> [AXUIElement] { attr(node, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
 func owns(_ node: AXUIElement, _ pid: pid_t) -> Bool {
   var actual: pid_t = 0; return AXUIElementGetPid(node, &actual) == .success && actual == pid
+}
+struct ProcessStart: Equatable { let pid:pid_t; let seconds:UInt64; let microseconds:UInt64 }
+func panelServiceIdentityValid(_ pid:pid_t, _ start:ProcessStart?, _ expectedPID:pid_t,
+  _ expectedStart:ProcessStart?, _ identifier:String?, _ signatureValid:Bool) -> Bool {
+  pid > 0 && pid == expectedPID && start != nil && start == expectedStart &&
+    identifier == "com.apple.appkit.xpc.openAndSavePanelService" && signatureValid
+}
+func attachedServiceParentValid(_ sameParent:Bool, _ observedParentPID:pid_t, _ nemoPID:pid_t,
+  _ reachesPinnedSheet:Bool) -> Bool {
+  sameParent && observedParentPID == nemoPID && nemoPID > 0 && reachesPinnedSheet
+}
+func uniqueFocusedField(_ count:Int, _ retainedMatches:Bool) -> Bool { count == 1 && retainedMatches }
+func processStart(_ pid:pid_t) -> ProcessStart? {
+  guard pid > 0 else { return nil }
+  var mib=[CTL_KERN,KERN_PROC,KERN_PROC_PID,pid]
+  var info=kinfo_proc(),size=MemoryLayout<kinfo_proc>.size
+  let result=mib.withUnsafeMutableBufferPointer { buffer in
+    sysctl(buffer.baseAddress,u_int(buffer.count),&info,&size,nil,0)
+  }
+  guard result == 0,size == MemoryLayout<kinfo_proc>.size,
+    info.kp_proc.p_pid == pid,info.kp_proc.p_starttime.tv_sec >= 0,info.kp_proc.p_starttime.tv_usec >= 0 else { return nil }
+  return ProcessStart(pid:pid,seconds:UInt64(info.kp_proc.p_starttime.tv_sec),microseconds:UInt64(info.kp_proc.p_starttime.tv_usec))
+}
+func authenticatedPanelService(_ pid:pid_t) -> Bool {
+  guard pid > 0 else { return false }
+  let attributes=[kSecGuestAttributePid as String:NSNumber(value:pid)] as CFDictionary
+  var code:SecCode?
+  guard SecCodeCopyGuestWithAttributes(nil,attributes,[],&code) == errSecSuccess,let code else { return false }
+  var requirement:SecRequirement?
+  let text="anchor apple and identifier \"com.apple.appkit.xpc.openAndSavePanelService\""
+  guard SecRequirementCreateWithString(text as CFString,[],&requirement) == errSecSuccess,
+        let requirement else { return false }
+  let valid=SecCodeCheckValidity(code,[],requirement) == errSecSuccess
+  var staticCode:SecStaticCode?
+  guard SecCodeCopyStaticCode(code,[],&staticCode) == errSecSuccess,let staticCode else { return false }
+  var information:CFDictionary?
+  guard SecCodeCopySigningInformation(staticCode,[],&information) == errSecSuccess,
+    let identifier=(information as? [CFString:Any])?[kSecCodeInfoIdentifier] as? String else { return false }
+  return panelServiceIdentityValid(pid,processStart(pid),pid,processStart(pid),identifier,valid)
 }
 func localFacts(_ path: String, _ owner: pid_t?, _ pid: pid_t, _ read: () -> [String:Any]) -> [String:Any] {
   guard owner == pid else { return ["path":path,"role":"other","blocked":"child-owner"] }
@@ -425,27 +546,90 @@ func selfTest() throws {
   try check(locationContextValid(1,true,true,true))
   try check(!locationContextValid(2,true,true,true) && !locationContextValid(1,false,true,true) &&
     !locationContextValid(1,true,false,true) && !locationContextValid(1,true,true,false))
-  for fault in ["none","p38","repeat","pid","window","focus","ancestor","layout","after-down","duplicate","search","absent","timeout"] {
+  var foreignAXReads=0,serviceOwnerObservations=[Int]()
+  let processA=ProcessStart(pid:77,seconds:100,microseconds:20),processB=ProcessStart(pid:77,seconds:101,microseconds:20)
+  try check(panelServiceIdentityValid(77,processA,77,processA,"com.apple.appkit.xpc.openAndSavePanelService",true))
+  try check(!panelServiceIdentityValid(78,processA,77,processA,"com.apple.appkit.xpc.openAndSavePanelService",true) &&
+    !panelServiceIdentityValid(77,processB,77,processA,"com.apple.appkit.xpc.openAndSavePanelService",true) &&
+    !panelServiceIdentityValid(77,processA,77,processA,"com.apple.other",true) &&
+    !panelServiceIdentityValid(77,processA,77,processA,"com.apple.appkit.xpc.openAndSavePanelService",false))
+  try check(attachedServiceParentValid(true,10,10,true))
+  for facts in [(false,10,true),(true,11,true),(true,10,false),(true,0,true)] as [(Bool,pid_t,Bool)] {
+    try check(!attachedServiceParentValid(facts.0,facts.1,10,facts.2))
+  }
+  try check(uniqueFocusedField(1,true) && !uniqueFocusedField(0,false) &&
+    !uniqueFocusedField(2,true) && !uniqueFocusedField(1,false))
+  let parentMap=[2:1,3:2,4:1,5:3]
+  let ownerMap=[1:10,2:10,3:20,4:21,5:20]
+  func ownerFor(_ node:Int)->(Int,Bool,Int) { let p=ownerMap[node] ?? 0;serviceOwnerObservations.append(node);return (p == 0 ? -25204:0,p == 10,p) }
+  func serviceOwnerFor(_ node:Int)->(Int,Bool,Int) { let p=ownerMap[node] ?? 0;return (p == 0 ? -25204:0,p == 20,p) }
+  func childrenFor(_ node:Int)->(Int,[Int]?) { if node == 3 || node == 4 { foreignAXReads += 1 };return (0,node == 1 ? [2] : node == 2 ? [3] : node == 3 ? [5] : []) }
+  func parentFor(_ node:Int)->(Int,Int?) { (parentMap[node] == nil ? -25204:0,parentMap[node]) }
+  let attached=try attachedForeignRoot(1,owner:10,deadline:10,now:{ 1 },equal:==,owner:ownerFor,children:childrenFor,parent:parentFor)
+  try check(attached.root == 3 && attached.parent == 2 && attached.pid == 20 && attached.route == "0.0" && foreignAXReads == 0)
+  let serviceTree=try boundedOwnedTree(3,owner:20,deadline:10,now:{ 1 },equal:==,owner:serviceOwnerFor,children:childrenFor,parent:parentFor)
+  try check(serviceTree == [3,5] && foreignAXReads == 1)
+  for fault in ["multiple","broken-edge","unknown-owner","foreign-descendant"] {
+    var acted=false,refused=false
+    let badOwner:(Int)->(Int,Bool,Int)={ node in
+      if fault == "unknown-owner" && node == 3 { return (-25204,false,0) }
+      if fault == "foreign-descendant" && node == 5 { return (0,false,99) }
+      return (0,ownerMap[node] == 10,ownerMap[node] ?? 0)
+    }
+    let badServiceOwner:(Int)->(Int,Bool,Int)={ node in
+      if fault == "foreign-descendant" && node == 5 { return (0,false,99) }
+      return (0,ownerMap[node] == 20,ownerMap[node] ?? 0)
+    }
+    let badChildren:(Int)->(Int,[Int]?)={ node in
+      if fault == "multiple" && node == 1 { return (0,[2,4]) }
+      return childrenFor(node)
+    }
+    let badParent:(Int)->(Int,Int?)={ node in fault == "broken-edge" && node == 2 ? (0,9):parentFor(node) }
+    do {
+      let root=try attachedForeignRoot(1,owner:10,deadline:10,now:{ 1 },equal:==,owner:badOwner,children:badChildren,parent:badParent)
+      if fault == "foreign-descendant" { _ = try boundedOwnedTree(root.root,owner:20,deadline:10,now:{ 1 },equal:==,owner:badServiceOwner,children:childrenFor,parent:parentFor) }
+      try guardedElementAction({ root.pid == 20 },{ acted=true })
+    } catch { refused=true }
+    try check(refused && !acted)
+  }
+  var staleAction=false,staleRefused=false
+  do { try guardedElementAction({ false },{ staleAction=true }) } catch { staleRefused=true }
+  try check(staleRefused && !staleAction)
+  for action in ["press","set","select"] {
+    var actionsPerformed=0,refused=false
+    do {
+      try requireResolvedSheetMutation("sheet",action,true,false)
+      actionsPerformed += 1
+    } catch let error as ActionRefusal {
+      refused = error.diagnostics["gotoReason"] as? String == "unresolved-transition"
+    }
+    try check(refused && actionsPerformed == 0)
+  }
+  try check(!unresolvedServiceBlocksSheetMutation("sheet","press",false,false) &&
+    !unresolvedServiceBlocksSheetMutation("sheet","press",true,true) &&
+    !unresolvedServiceBlocksSheetMutation("sheet","inspect",true,false) &&
+    !unresolvedServiceBlocksSheetMutation("main","press",true,false))
+  for fault in ["none","p38","repeat","pid","window","focus","ancestor","layout","after-action","duplicate","search","absent","timeout"] {
     var attempted = fault == "repeat", events = [String](), contexts = 0, refused = false
     let trace = LocationTrace()
     do {
       try trace.observe { try goToFolder(fault != "p38",attempted:attempted,trace:trace,consume:{ attempted = true },context:{
         contexts += 1; events.append("context")
-        try locationCheck(!["pid","window","focus","ancestor","layout"].contains(fault) && !(fault == "after-down" && contexts == 2),"goto-context")
-      },down:{ events.append("down") },up:{ events.append("up") },discover:{
+        try locationCheck(!["pid","window","focus","ancestor","layout"].contains(fault) && !(fault == "after-action" && contexts == 2),"goto-context")
+      },perform:{ events.append("ax-press") },discover:{
         events.append("discover"); try locationCheck(!["duplicate","search","absent","timeout"].contains(fault),"goto-discovery")
       }) }
     } catch let error as ActionRefusal {
       refused = true
-      try check(error.diagnostics["commandPosted"] as? Bool == events.contains("down"))
-      if fault == "after-down" { try check(error.diagnostics["gotoPhase"] as? String == "post-context") }
+      try check(error.diagnostics["commandPosted"] as? Bool == events.contains("ax-press"))
+      if fault == "after-action" { try check(error.diagnostics["gotoPhase"] as? String == "post-context") }
     }
     try check(refused == (fault != "none"))
-    try check(trace.pairPosted == events.contains("down"))
-    if events.contains("down") { try check(events.filter { $0 == "up" }.count == 1 && events.firstIndex(of:"up")! == events.firstIndex(of:"down")!+1) }
-    else { try check(!events.contains("up") && !events.contains("discover")) }
-    if fault == "after-down" { try check(events == ["context","down","up","context"]) }
-    if fault == "none" { try check(events == ["context","down","up","context","discover"]) }
+    try check(trace.actionPerformed == events.contains("ax-press"))
+    if events.contains("ax-press") { try check(events.filter { $0 == "ax-press" }.count == 1) }
+    else { try check(!events.contains("discover")) }
+    if fault == "after-action" { try check(events == ["context","ax-press","context"]) }
+    if fault == "none" { try check(events == ["context","ax-press","context","discover"]) }
     if fault != "p38" { try check(attempted) }
   }
   let walkCases = ["none","unsupported-leaf","novalue-leaf","node-owner-query","node-owner-mismatch","child-owner-query","child-owner-mismatch",
@@ -503,13 +687,13 @@ func selfTest() throws {
     do { try trace.observe {
       trace.phase = "pre-tree"
       if !posted { try failingWalk() }
-      try goToFolder(true,attempted:false,trace:trace,consume:{},context:{},down:{ events.append("down") },up:{ events.append("up") },discover:failingWalk)
+      try goToFolder(true,attempted:false,trace:trace,consume:{},context:{},perform:{ events.append("ax-press") },discover:failingWalk)
     } } catch let error as ActionRefusal {
       refused = true
       try check(error.diagnostics["gotoReason"] as? String == "child-owner-mismatch" && error.diagnostics["gotoRoute"] as? String == "0")
       try check(error.diagnostics["commandPosted"] as? Bool == posted && error.diagnostics["gotoPhase"] as? String == (posted ? "discovery" : "pre-tree"))
     }
-    try check(refused && events == (posted ? ["down","up"] : []))
+    try check(refused && events == (posted ? ["ax-press"] : []))
   }
   // The old walk had no private owner observation at all: this oracle is RED
   // there, while preserving the same public refusal and zero foreign AX reads.
@@ -559,13 +743,13 @@ func selfTest() throws {
   try check(textFieldKind(.attributeUnsupported,nil) == "plain")
   try check(textFieldKind(.cannotComplete,nil) == "unreadable")
   try check(textFieldKind(.success,"AXSecureTextField") == "other")
-  for fault in ["none","search","disabled","confirm-support","value-settable","write","read","mismatch","confirm",
+  for fault in ["none","search","disabled","stale-focus","confirm-support","value-settable","write","read","mismatch","confirm",
     "identity-1","identity-2","identity-3","identity-4"] {
     var events = [String](), pins = 0
     let facts: [String:Any] = ["role":"AXTextField","textFieldKind":fault == "search" ? "search" : "plain",
       "enabled":fault != "disabled","confirmQueryError":0,"confirmAdvertised":fault != "confirm-support",
       "valueSettableQueryError":0,"valueSettable":fault != "value-settable",
-      "focusSettableQueryError":-25205,"focusSettable":false,"focusedQueryError":0,"focusedMatches":false]
+      "focusSettableQueryError":-25205,"focusSettable":false,"focusedQueryError":0,"focusedMatches":fault != "stale-focus"]
     var result: [String:Any]?, failure: String?
     do { result = try enterSheetText(facts,identity:{ pins += 1; events.append("identity")
       try check(fault != "identity-\(pins)") },
@@ -578,7 +762,7 @@ func selfTest() throws {
       try check(events == ["identity","identity","write","identity","read","identity","confirm"])
     } else {
       let expected = fault.hasPrefix("identity") ? "axtext-identity" :
-        ["search":"axtext-role","disabled":"axtext-role","confirm-support":"axtext-confirm-support",
+      ["search":"axtext-role","disabled":"axtext-role","stale-focus":"axtext-role","confirm-support":"axtext-confirm-support",
          "value-settable":"axtext-value-settable","write":"axtext-write","read":"axtext-readback",
          "mismatch":"axtext-readback","confirm":"axtext-confirm"][fault]
       try check(failure == expected && result == nil)
@@ -693,7 +877,9 @@ func selfTest() throws {
   try emit(["status":"static-model-pass", "routeNegatives":8, "sheetNegatives":7, "identityPredicateNegatives":9,
     "retainedMainProbeCases":15,"transitionObservationCases":6,"workerDeadlineCases":3,"textEntryCases":13,"textFieldKindCases":4,
     "goToFolderSequenceCases":13,"locationWalkCases":walkCases.count,"locationPhaseWalkCases":2,
-    "privateOwnerCases":5,"privatePathClassCases":4,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,"foreignReads":0, "runtimeAX":false])
+    "privateOwnerCases":5,"privatePathClassCases":4,"locationCandidateCases":10,"locationAncestryCases":8,"locationContextCases":5,
+    "serviceIdentityCases":5,"serviceAttachmentCases":5,"focusedFieldCases":4,"unresolvedTransitionCases":3,
+    "foreignReads":0,"runtimeAX":false])
 }
 func run() throws {
   let args = CommandLine.arguments
@@ -703,6 +889,7 @@ func run() throws {
   let scope = try operatorScope(args[1],ProcessInfo.processInfo.environment)
   let report = scope.report
   guard let pid = Int32(args[2]), pid > 0 else { throw Refusal(code:"adapter-refused") }
+  guard let pinnedProcessStart=processStart(pid) else { throw Refusal(code:"adapter-refused") }
   let initialRows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []).filter {
     ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
   }
@@ -736,6 +923,8 @@ func run() throws {
   var ordinal = 0
   var sheet: AXUIElement? = nil, sheetToken: String? = nil
   var location: AXUIElement? = nil, locationField: AXUIElement? = nil, locationToken: String? = nil
+  var serviceRoot:AXUIElement? = nil, serviceParent:AXUIElement? = nil, servicePID:pid_t? = nil
+  var serviceStart:ProcessStart? = nil, serviceSheetToken:String? = nil
   var locationAttempted = false
   func descendant(_ candidate: AXUIElement, _ ancestor: AXUIElement) -> Bool {
     ownedAncestor(candidate,ancestor,equal:{ CFEqual($0,$1) },owned:{ owns($0,pid) },
@@ -958,6 +1147,9 @@ func run() throws {
     return result(status,samples)
   }
   func verify() throws {
+    guard processStart(pid) == pinnedProcessStart else {
+      throw IdentityRefusal(stage:"process-start",facts:["processStartMatches":false])
+    }
     var actualPID: pid_t = 0
     let ownerError = AXUIElementGetPid(main,&actualPID)
     var rawWindows: CFTypeRef?
@@ -980,11 +1172,11 @@ func run() throws {
     if cgRows != nil { facts["pinnedCGWindowCount"] = identities.count }
     throw IdentityRefusal(stage:stage,facts:facts)
   }
-  func node(_ value: String, _ root: AXUIElement) throws -> AXUIElement {
+  func node(_ value: String, _ root: AXUIElement, owner expectedPID:pid_t? = nil) throws -> AXUIElement {
     var current = root
     for index in try route(value) {
       let list = children(current); try check(list.indices.contains(index)); current = list[index]
-      if !owns(current,pid) { throw Refusal(code:"child-owner") }
+      if !owns(current,expectedPID ?? pid) { throw Refusal(code:"child-owner") }
       // Routes begin at pinned main; standalone AX windows/panels cannot enter the route.
       if attr(current,kAXRoleAttribute) as? String == kAXWindowRole { throw Refusal(code:"standalone-window") }
     }
@@ -1009,31 +1201,93 @@ func run() throws {
       return (Int(error.rawValue),axElement(raw))
     })
   }
+  func serviceOwnerTree(_ root:AXUIElement, _ ownerPID:pid_t) throws -> [AXUIElement] {
+    try boundedOwnedTree(root,owner:Int(ownerPID),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
+      now:{ DispatchTime.now().uptimeNanoseconds },equal:{ CFEqual($0,$1) },owner:{ node in
+        var actual:pid_t=0; let error=AXUIElementGetPid(node,&actual)
+        return (Int(error.rawValue),error == .success && actual == ownerPID,Int(actual))
+      },children:{ node in
+        let timeout=AXUIElementSetMessagingTimeout(node,0.03)
+        guard timeout == .success else { return (Int(timeout.rawValue),nil) }
+        var raw:CFTypeRef?;let error=AXUIElementCopyAttributeValue(node,kAXChildrenAttribute as CFString,&raw)
+        if error == .attributeUnsupported || error == .noValue { return (0,[]) }
+        return (Int(error.rawValue),raw as? [AXUIElement])
+      },parent:{ node in
+        let timeout=AXUIElementSetMessagingTimeout(node,0.03)
+        guard timeout == .success else { return (Int(timeout.rawValue),nil) }
+        var raw:CFTypeRef?;let error=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
+        return (Int(error.rawValue),axElement(raw))
+      })
+  }
+  func discoverServiceRoot(_ outer:AXUIElement) throws -> (AXUIElement,AXUIElement,pid_t,ProcessStart) {
+    let found=try attachedForeignRoot(outer,owner:Int(pid),deadline:DispatchTime.now().uptimeNanoseconds+1_000_000_000,
+      now:{ DispatchTime.now().uptimeNanoseconds },equal:{ CFEqual($0,$1) },owner:{ node in
+        var actual:pid_t=0;let error=AXUIElementGetPid(node,&actual)
+        return (Int(error.rawValue),error == .success && actual == pid,Int(actual))
+      },children:{ node in
+        let timeout=AXUIElementSetMessagingTimeout(node,0.03)
+        guard timeout == .success else { return (Int(timeout.rawValue),nil) }
+        var raw:CFTypeRef?;let error=AXUIElementCopyAttributeValue(node,kAXChildrenAttribute as CFString,&raw)
+        if error == .attributeUnsupported || error == .noValue { return (0,[]) }
+        return (Int(error.rawValue),raw as? [AXUIElement])
+      },parent:{ node in
+        let timeout=AXUIElementSetMessagingTimeout(node,0.03)
+        guard timeout == .success else { return (Int(timeout.rawValue),nil) }
+        var raw:CFTypeRef?;let error=AXUIElementCopyAttributeValue(node,kAXParentAttribute as CFString,&raw)
+        return (Int(error.rawValue),axElement(raw))
+      },foreignChild:{ route,observed in recordForeignOwner(observed,route:route,report:physical,identity:reportIdentity) })
+    guard found.pid > 0,let start=processStart(pid_t(found.pid)),authenticatedPanelService(pid_t(found.pid)),
+      processStart(pid_t(found.pid)) == start else { throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"context-identity"]) }
+    guard AXUIElementSetMessagingTimeout(found.root,0.03) == .success else {
+      throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"timeout-config"])
+    }
+    var rawParent:CFTypeRef?
+    let parentError=AXUIElementCopyAttributeValue(found.root,kAXParentAttribute as CFString,&rawParent)
+    guard parentError == .success,let actualParent=axElement(rawParent),
+      attachedServiceParentValid(CFEqual(actualParent,found.parent),owns(actualParent,pid) ? pid : -1,pid,descendant(actualParent,outer)) else {
+      throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"retained-ancestry"])
+    }
+    return (found.root,actualParent,pid_t(found.pid),start)
+  }
+  func verifyService() throws -> [AXUIElement] {
+    try verify()
+    let outer=try verifySheet()
+    guard let expectedRoot=serviceRoot,let expectedParent=serviceParent,
+      let expectedPID=servicePID,let expectedStart=serviceStart,let expectedSheetToken=serviceSheetToken,
+      sheetToken == expectedSheetToken else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
+    let current=try discoverServiceRoot(outer)
+    guard CFEqual(current.0,expectedRoot),CFEqual(current.1,expectedParent),current.2 == expectedPID,
+      current.3 == expectedStart,authenticatedPanelService(expectedPID),processStart(expectedPID) == expectedStart else {
+      throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"])
+    }
+    let tree=try serviceOwnerTree(expectedRoot,expectedPID)
+    try verify(); _ = try verifySheet()
+    guard processStart(expectedPID) == expectedStart,authenticatedPanelService(expectedPID) else {
+      throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"])
+    }
+    return tree
+  }
   func modal(_ candidate: AXUIElement) -> Bool {
     let role = attr(candidate,kAXRoleAttribute) as? String
     return role == kAXSheetRole || (role == kAXGroupRole && attr(candidate,kAXSubroleAttribute) as? String == kAXDialogSubrole)
   }
   func locationContext(_ focusRoot: AXUIElement? = nil) throws {
-    do { try verify(); _ = try verifySheet() } catch { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
-    guard let outer = sheet, let rows = attr(application,kAXWindowsAttribute) as? [AXUIElement],
-      let focusedWindow = axElement(attr(application,kAXFocusedWindowAttribute)),
-      let focused = axElement(attr(application,kAXFocusedUIElementAttribute)) else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-shape"]) }
-    let reason = locationContextFailure(rows.filter { CFEqual($0,main) }.count,
-      rows.allSatisfy { owns($0,pid) && (CFEqual($0,main) || descendant($0,outer)) },
-      owns(focusedWindow,pid) && (CFEqual(focusedWindow,main) || descendant(focusedWindow,outer)),
-      descendant(focused,focusRoot ?? location ?? outer))
-    try locationCheck(reason == nil,"goto-context",reason)
+    let tree=try verifyService()
+    if let focusRoot { try locationCheck(tree.contains { CFEqual($0,focusRoot) },"context-identity") }
   }
   func verifyLocation() throws -> AXUIElement {
-    try locationContext()
-    guard let retained = location, let field = locationField, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
-    let tree = try locationTree(outer), modals = tree.filter { !CFEqual($0,outer) && modal($0) }
+    let tree=try verifyService()
+    guard let retained = location, let field = locationField,let root=serviceRoot,let ownerPID=servicePID else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
+    let modals = tree.filter { !CFEqual($0,root) && modal($0) }
     try locationPredicate(modals.count == 1,"retained-modal-count",["gotoCandidateCount":modals.count])
     try locationPredicate(CFEqual(modals[0],retained),"retained-modal-identity")
-    try locationPredicate(descendant(retained,outer) && descendant(field,retained),"retained-ancestry")
+    let focusedFields=tree.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole && attr($0,kAXFocusedAttribute) as? Bool == true }
+    try locationPredicate(uniqueFocusedField(focusedFields.count,focusedFields.first.map { CFEqual($0,field) } ?? false),"retained-field")
+    let modalTree=try serviceOwnerTree(retained,ownerPID)
+    try locationPredicate(modalTree.contains { CFEqual($0,field) },"retained-ancestry")
     var subrole: CFTypeRef?, writable = DarwinBoolean(false)
     let query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
-    try locationPredicate(attr(field,kAXRoleAttribute) as? String == kAXTextFieldRole && textFieldKind(query,subrole as? String) == "plain" &&
+    try locationPredicate(attr(field,kAXFocusedAttribute) as? Bool == true && attr(field,kAXRoleAttribute) as? String == kAXTextFieldRole && textFieldKind(query,subrole as? String) == "plain" &&
       attr(field,kAXEnabledAttribute) as? Bool == true && AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable) == .success &&
       writable.boolValue && supports(field,kAXConfirmAction),"retained-field")
     return retained
@@ -1059,7 +1313,12 @@ func run() throws {
     activeInspectionContext = action == "inspect" && (request["target"] as? String ?? "main") == "main" ?
       InspectionContext(stage:"identity-precondition",queryClass:"identity-check-failed") : nil
     do { try verify() }
-    catch let error as IdentityRefusal { if action == "press" || action == "set" { throw pressFailure("window-identity-"+error.stage,error.facts) }; throw error }
+    catch let error as IdentityRefusal {
+      if action == "press" || action == "set" {
+        throw pressFailure(error.stage == "process-start" ? "window-identity" : "window-identity-"+error.stage,error.facts)
+      }
+      throw error
+    }
     catch { if action == "press" || action == "set" { throw pressFailure("window-identity") }; throw error }
     if activeInspectionContext != nil { setInspectionContext("request-precondition","request-refused") }
     var result: [String:Any] = ["status":"ok", "pid":pid,"windowId":number,"type":action,"ordinal":ordinal,"matchedAX":true]
@@ -1076,6 +1335,7 @@ func run() throws {
       if action != "location-dismissed" { selectedRoot = try verifyLocation() }
       result["locationToken"] = token
     } else { try locationCheck(request["locationToken"] == nil,"goto-state") }
+    try requireResolvedSheetMutation(target,action,serviceRoot != nil,locationToken != nil)
     switch action {
     case "go-to-folder":
       let trace = LocationTrace()
@@ -1083,36 +1343,50 @@ func run() throws {
         try locationCheck(scope.reference && target == "sheet" && !locationAttempted && location == nil,"goto-state")
         try locationCheck(Set(request.keys).isSubset(of:["type","target","pid","windowId","sheetToken"]) &&
           AXUIElementSetMessagingTimeout(application,0.03) == .success && AXUIElementSetMessagingTimeout(main,0.03) == .success,"goto-state")
-        trace.phase = "pre-tree"
-        let before = try locationTree(selectedRoot,foreignChild:{ route, observed in
-          recordForeignOwner(observed,route:route,report:physical,identity:reportIdentity)
-        })
-        let priorModals = before.filter { !CFEqual($0,selectedRoot) && modal($0) }
-        try locationPredicate(priorModals.isEmpty,"preexisting-modal",["gotoCandidateCount":priorModals.count])
-        try locationCheck(before.contains { attr($0,kAXRoleAttribute) as? String == kAXButtonRole &&
-          attr($0,kAXTitleAttribute) as? String == "Open" && supports($0,kAXPressAction) },"goto-context","outer-open-control")
-        let source = CGEventSource(stateID:.privateState)
-        guard let down = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:true),
-          let up = CGEvent(keyboardEventSource:source,virtualKey:5,keyDown:false) else { throw ActionRefusal(diagnostics:["stage":"goto-state","gotoReason":"event-allocation"]) }
-        down.flags = [.maskCommand,.maskShift]; up.flags = [.maskCommand,.maskShift]
+        trace.phase = "pre-context"
+        let attached = try discoverServiceRoot(selectedRoot)
+        serviceRoot=attached.0;serviceParent=attached.1;servicePID=attached.2
+        serviceStart=attached.3;serviceSheetToken=sheetToken
+        let before = try verifyService()
+        let labels:Set<String>=["Go to Folder…","Go to Folder...","Go to Folder","Go to the Folder…","Go to the folder…","Go to the folder:"]
+        let openers=before.filter { item in
+          let role=attr(item,kAXRoleAttribute) as? String
+          let title=attr(item,kAXTitleAttribute) as? String ?? ""
+          let description=attr(item,kAXDescriptionAttribute) as? String ?? ""
+          return [kAXButtonRole,kAXMenuItemRole].contains(role ?? "") && labels.contains(title.isEmpty ? description:title) &&
+            attr(item,kAXEnabledAttribute) as? Bool == true && supports(item,kAXPressAction)
+        }
+        try locationPredicate(openers.count == 1,"candidate-count",["gotoCandidateCount":openers.count])
+        let opener=openers[0]
         try goToFolder(scope.reference,attempted:locationAttempted,trace:trace,consume:{ locationAttempted = true },context:{
           try locationContext()
-          // The fixed physical G key is admitted only for these known layouts.
-          guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-            let rawID = TISGetInputSourceProperty(input,kTISPropertyInputSourceID) else { throw ActionRefusal(diagnostics:["stage":"goto-layout","gotoReason":"layout-query"]) }
-          let inputID = Unmanaged<CFString>.fromOpaque(rawID).takeUnretainedValue() as String
-          try locationCheck(["com.apple.keylayout.US","com.apple.keylayout.ABC"].contains(inputID),"goto-layout","layout-unsupported")
-        },down:{ down.postToPid(pid) },up:{ up.postToPid(pid) },discover:{
+        },perform:{
+          try guardedElementAction({
+            let current=try verifyService()
+            let role=attr(opener,kAXRoleAttribute) as? String
+            let title=attr(opener,kAXTitleAttribute) as? String ?? ""
+            let description=attr(opener,kAXDescriptionAttribute) as? String ?? ""
+            return current.contains { CFEqual($0,opener) } && [kAXButtonRole,kAXMenuItemRole].contains(role ?? "") &&
+              labels.contains(title.isEmpty ? description:title) && attr(opener,kAXEnabledAttribute) as? Bool == true && supports(opener,kAXPressAction)
+          },{
+            guard AXUIElementPerformAction(opener,kAXPressAction as CFString) == .success else {
+              throw ActionRefusal(diagnostics:["stage":"goto-discovery","gotoReason":"candidate-proof"])
+            }
+          })
+        },discover:{
           let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
           while DispatchTime.now().uptimeNanoseconds < deadline {
-            try locationContext()
-            let tree = try locationTree(selectedRoot,deadline)
-            let candidates = tree.filter { !CFEqual($0,selectedRoot) && modal($0) }
+            let tree=try verifyService()
+            guard let root=serviceRoot,let ownerPID=servicePID else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
+            let candidates = tree.filter { !CFEqual($0,root) && modal($0) }
             if candidates.isEmpty { Thread.sleep(forTimeInterval:0.05); continue }
             try locationPredicate(candidates.count == 1,"candidate-count",["gotoCandidateCount":candidates.count])
-            let candidate = candidates[0], contents = try locationTree(candidate,deadline)
-            let fields = contents.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole }
-            let labels: Set<String> = ["Go to the folder:","Go to folder:","Go to Folder","Go to the folder"]
+            let candidate=candidates[0],contents=try serviceOwnerTree(candidate,ownerPID)
+            let fields = contents.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole && attr($0,kAXFocusedAttribute) as? Bool == true }
+            let allFocused=tree.filter { attr($0,kAXRoleAttribute) as? String == kAXTextFieldRole && attr($0,kAXFocusedAttribute) as? Bool == true }
+            let focusedMatches=allFocused.count == 1 && fields.count == 1 && CFEqual(allFocused[0],fields[0])
+            try locationPredicate(uniqueFocusedField(allFocused.count,focusedMatches),"field-count",["gotoFieldCount":allFocused.count])
+            let labels: Set<String> = ["Go to the folder:","Go to folder:","Go to Folder","Go to the folder","Go to Folder…"]
             let semantic = contents.contains { item in
               [kAXTitleAttribute,kAXDescriptionAttribute,kAXValueAttribute].contains { labels.contains(attr(item,$0) as? String ?? "") }
             }
@@ -1120,16 +1394,16 @@ func run() throws {
             try locationPredicate(fields.count == 1,"field-count",["gotoFieldCount":fields.count])
             let field = fields[0], query = AXUIElementCopyAttributeValue(field,kAXSubroleAttribute as CFString,&subrole)
             let writeQuery = AXUIElementIsAttributeSettable(field,kAXValueAttribute as CFString,&writable)
-            let fresh = !before.contains { CFEqual($0,candidate) || CFEqual($0,field) }, owned = descendant(candidate,selectedRoot)
+            let fresh = !before.contains { CFEqual($0,candidate) || CFEqual($0,field) }, owned = tree.contains { CFEqual($0,candidate) }
             let kind = textFieldKind(query,subrole as? String), enabled = attr(field,kAXEnabledAttribute) as? Bool == true
             let settable = writeQuery == .success && writable.boolValue, confirm = supports(field,kAXConfirmAction)
             try locationPredicate(locationCandidateValid(fresh,owned,modal(candidate),semantic,fields.count,kind,enabled,settable,confirm),
               "candidate-proof",["candidateFresh":fresh,"candidateOwned":owned,"semanticMatched":semantic,
               "gotoFieldCount":fields.count,"textFieldKind":kind,"enabled":enabled,"valueSettable":settable,"confirmAdvertised":confirm,
-              "subroleQueryError":Int(query.rawValue),"valueSettableQueryError":Int(writeQuery.rawValue)])
+              "subroleQueryError":Int(query.rawValue),"valueSettableQueryError":Int(writeQuery.rawValue),"focused":attr(field,kAXFocusedAttribute) as? Bool == true])
             location = candidate; locationField = field; locationToken = UUID().uuidString.lowercased()
             trace.phase = "retained-verification"
-            _ = try verifyLocation(); result["locationToken"] = locationToken; result["locationReady"] = true; result["commandPosted"] = trace.pairPosted
+            _ = try verifyLocation(); result["locationToken"] = locationToken; result["locationReady"] = true; result["commandPosted"] = trace.actionPerformed
             trace.phase = "complete"; result["actionDiagnostics"] = trace.facts(["stage":"goto-ready"])
             return
           }
@@ -1137,11 +1411,11 @@ func run() throws {
         })
       }
     case "location-dismissed":
-      guard let retained = location, let outer = sheet else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
-      try locationContext(outer)
-      let tree = try locationTree(outer)
-      try locationCheck(!tree.contains { CFEqual($0,retained) || !CFEqual($0,outer) && modal($0) },"goto-dismissal")
-      location = nil; locationField = nil; locationToken = nil; result["locationDismissed"] = true
+      guard let retained=location,let root=serviceRoot else { throw ActionRefusal(diagnostics:["stage":"goto-state"]) }
+      let tree=try verifyService()
+      try locationCheck(!tree.contains { CFEqual($0,retained) || !CFEqual($0,root) && modal($0) },"goto-dismissal")
+      location = nil; locationField = nil; locationToken = nil; serviceRoot=nil;serviceParent=nil;servicePID=nil
+      serviceStart=nil;serviceSheetToken=nil;result["locationDismissed"] = true
     case "pin-sheet":
       try check(target == "main")
       let actual = try members(); try check(actual.count == 1 && owns(actual[0],pid))
@@ -1164,7 +1438,8 @@ func run() throws {
         catch { if action == "press" || action == "set" { throw pressFailure("sheet-state") }; throw error }
       }
       let selected: AXUIElement
-      do { selected = try node(value,selectedRoot) }
+      let selectedOwner=location == nil ? pid : (servicePID ?? -1)
+      do { selected = try node(value,selectedRoot,owner:selectedOwner) }
       catch {
         if action == "press" || action == "set" {
           let code = (error as? Refusal)?.code ?? "adapter-refused"
@@ -1188,6 +1463,14 @@ func run() throws {
         if labels.contains(title) { facts["control"] = title }
         else if labels.contains(value) { facts["control"] = value }
         guard query == .success && advertised else { throw pressFailure("axpress-support",facts) }
+        if location != nil {
+          do {
+            guard let ownerPID=servicePID else { throw ActionRefusal(diagnostics:["stage":"goto-context","gotoReason":"context-identity"]) }
+            let exactModal=try verifyLocation(), descendants=try serviceOwnerTree(exactModal,ownerPID)
+            try locationCheck(descendants.contains { CFEqual($0,selected) },"retained-ancestry")
+            try locationCheck(attr(selected,kAXEnabledAttribute) as? Bool == true,"candidate-proof")
+          } catch { throw pressFailure("goto-context") }
+        }
         let perform = AXUIElementPerformAction(selected,kAXPressAction as CFString)
         facts["performActionError"] = Int(perform.rawValue)
         guard perform == .success else { throw pressFailure("axpress-perform",facts) }
@@ -1198,7 +1481,7 @@ func run() throws {
         func pinnedField() throws {
           try verify(); let retained = try verifySheet()
           let root = location == nil ? retained : try verifyLocation()
-          try check(owns(selected,pid) && CFEqual(try node(value,root),selected))
+          try check(owns(selected,selectedOwner) && CFEqual(try node(value,root,owner:selectedOwner),selected))
           if let field = locationField { try check(CFEqual(selected,field)) }
         }
         do { try pinnedField() } catch { throw pressFailure("axtext-identity") }
@@ -1206,14 +1489,14 @@ func run() throws {
         let subroleQuery = AXUIElementCopyAttributeValue(selected,kAXSubroleAttribute as CFString,&subrole)
         var focusable = DarwinBoolean(false), writable = DarwinBoolean(false)
         let focusQuery = AXUIElementIsAttributeSettable(selected,kAXFocusedAttribute as CFString,&focusable)
-        let focusedQuery = AXUIElementCopyAttributeValue(application,kAXFocusedUIElementAttribute as CFString,&focused)
+        let focusedQuery = AXUIElementCopyAttributeValue(selected,kAXFocusedAttribute as CFString,&focused)
         let valueQuery = AXUIElementIsAttributeSettable(selected,kAXValueAttribute as CFString,&writable)
         let confirmQuery = AXUIElementCopyActionNames(selected,&actionNames)
         let facts: [String:Any] = ["role":attr(selected,kAXRoleAttribute) as? String == kAXTextFieldRole ? "AXTextField" : "other",
           "enabled":attr(selected,kAXEnabledAttribute) as? Bool == true,
           "textFieldKind":textFieldKind(subroleQuery,subrole as? String),"subroleQueryError":Int(subroleQuery.rawValue),
           "focusSettableQueryError":Int(focusQuery.rawValue),"focusSettable":focusQuery == .success && focusable.boolValue,
-          "focusedQueryError":Int(focusedQuery.rawValue),"focusedMatches":focusedQuery == .success && focused.map { CFEqual($0,selected) } == true,
+          "focusedQueryError":Int(focusedQuery.rawValue),"focusedMatches":focusedQuery == .success && (focused as? Bool) == true,
           "valueSettableQueryError":Int(valueQuery.rawValue),"valueSettable":valueQuery == .success && writable.boolValue,
           "confirmQueryError":Int(confirmQuery.rawValue),"confirmAdvertised":confirmQuery == .success && (actionNames as? [String] ?? []).contains(kAXConfirmAction as String)]
         do {
