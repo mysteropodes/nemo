@@ -46,7 +46,7 @@ struct Ack {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct AOpenScopeDiagnostic {
+pub(crate) struct AOpenScopeDiagnostic {
     pub(super) a_fixture_scope: &'static str,
 }
 
