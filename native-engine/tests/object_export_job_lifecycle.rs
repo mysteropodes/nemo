@@ -324,3 +324,180 @@ fn cpu_encoder_and_cleanup_unwind_retain_failure_until_real_cleanup_succeeds() {
     assert_eq!(job.status().unwrap().status, JobStatus::Failed);
     assert!(!job.port.published);
 }
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn gpu_expression_and_host_refusals_precede_staging_without_owner_changes() {
+    use super::tests::{export_expression_fixture as export, expression_owner, expression_request};
+    use crate::object_expression_runtime::{ExpressionCompositionRefusal, ExpressionRefusal};
+    use crate::object_frame_packet::ObjectFrameError;
+    let mut gpu = Compositor::new().expect("expression export needs real Metal");
+    for (code, error) in [
+        ("[NaN]", ExpressionRefusal::NonPrimitive),
+        ("value+time", ExpressionRefusal::Guest),
+    ] {
+        let original = expression_owner(code);
+        let snapshot = original.acquire_snapshot(0).unwrap();
+        let before = crate::object_codec::encode_storage_project(snapshot.document()).unwrap();
+        let mut port = Port::default();
+        let mut scheduler = FrameScheduler::new();
+        assert_eq!(
+            export(
+                &original,
+                &snapshot,
+                &mut port,
+                &mut scheduler,
+                &mut gpu,
+                expression_request(&snapshot, 65536)
+            )
+            .unwrap_err(),
+            ExpressionCompositionRefusal::Expression(error)
+        );
+        assert!(port.events.is_empty() && port.bytes.is_empty() && !port.published);
+        assert_eq!(scheduler.lease_counters().acquired(), 0);
+        assert_eq!(original.history_depths(), (0, 0));
+        assert_eq!(
+            crate::object_codec::encode_storage_project(
+                original.acquire_snapshot(0).unwrap().document()
+            )
+            .unwrap(),
+            before
+        );
+    }
+    let mut original = expression_owner("[0]");
+    let zero = original.acquire_snapshot(0).unwrap();
+    let before = crate::object_codec::encode_storage_project(zero.document()).unwrap();
+    let mut reference = crate::compositor::object_test_selector(&zero, 7);
+    reference.scope_kind = crate::object_document::FrameScopeKind::Reference;
+    let refused =
+        crate::object_expression_runtime::prepare_expression_object_composition_for_owner(
+            &original,
+            &zero,
+            &reference,
+            crate::object_expression_runtime::ExpressionLimits::new(4096, 8_388_608, 262_144, 32)
+                .unwrap(),
+        )
+        .unwrap_err();
+    assert_eq!(
+        refused,
+        ExpressionCompositionRefusal::Expression(ExpressionRefusal::Pin(
+            ObjectFrameError::Unavailable
+        ))
+    );
+    for case in 0..4 {
+        let mut input = expression_request(&zero, 65536);
+        match case {
+            0 => input.pins.document_id = "foreign".into(),
+            1 => input.pins.content_revision = 1,
+            2 => input.pins.scope = ObjectScheduleScope::Unsupported,
+            _ => input.maximum_encoded_bytes = 0,
+        }
+        let mut port = Port::default();
+        let mut scheduler = FrameScheduler::new();
+        let outcome = export(&original, &zero, &mut port, &mut scheduler, &mut gpu, input).unwrap();
+        assert_eq!(
+            outcome.receipt.unwrap_err().kind,
+            ExportJobErrorKind::InvalidRequest
+        );
+        assert!(port.events.is_empty() && port.bytes.is_empty() && !port.published);
+        assert_eq!(scheduler.lease_counters().acquired(), 0);
+    }
+    assert_eq!(
+        crate::object_codec::encode_storage_project(
+            original.acquire_snapshot(0).unwrap().document()
+        )
+        .unwrap(),
+        before
+    );
+    assert_eq!(original.history_depths(), (0, 0));
+    let fill=original.prepare_fill_json(&serde_json::to_vec(&serde_json::json!({"command":"object.fill.set",
+        "stableTarget":zero.document().objects()[0].target(),"fill":{"kind":"solid","r":0.5,"g":0,"b":0,"a":1}})).unwrap()).unwrap();
+    original.commit_fill(fill).unwrap();
+    let current = original.acquire_snapshot(1).unwrap();
+    let after = crate::object_codec::encode_storage_project(current.document()).unwrap();
+    let mut port = Port::default();
+    let mut scheduler = FrameScheduler::new();
+    assert_eq!(
+        export(
+            &original,
+            &zero,
+            &mut port,
+            &mut scheduler,
+            &mut gpu,
+            expression_request(&zero, 65536)
+        )
+        .unwrap_err(),
+        ExpressionCompositionRefusal::Expression(ExpressionRefusal::Pin(
+            ObjectFrameError::WrongRevision
+        ))
+    );
+    assert!(port.events.is_empty());
+    assert_eq!(
+        crate::object_codec::encode_storage_project(
+            original.acquire_snapshot(1).unwrap().document()
+        )
+        .unwrap(),
+        after
+    );
+    let recovered = export(
+        &original,
+        &current,
+        &mut port,
+        &mut scheduler,
+        &mut gpu,
+        expression_request(&current, 65536),
+    )
+    .unwrap();
+    assert_eq!(recovered.receipt.unwrap().status, JobStatus::Succeeded);
+}
+
+#[cfg(feature = "object_expression_runtime")]
+#[test]
+fn gpu_expression_export_keeps_publication_and_cleanup_debt_in_complete_outcome() {
+    use super::tests::{export_expression_fixture as export, expression_owner, expression_request};
+    let original = expression_owner("[value,Infinity]");
+    let snapshot = original.acquire_snapshot(0).unwrap();
+    let mut gpu = Compositor::new().expect("expression debt controls need real Metal");
+    for case in 0..3 {
+        let mut port = Port::default();
+        let mut scheduler = FrameScheduler::new();
+        match case {
+            0 => port.fail = Some("publish"),
+            1 => port.bad_manifest = true,
+            _ => {
+                port.fail = Some("write");
+                port.fail_cleanup = true;
+            }
+        }
+        let outcome = export(
+            &original,
+            &snapshot,
+            &mut port,
+            &mut scheduler,
+            &mut gpu,
+            expression_request(&snapshot, 65536),
+        )
+        .unwrap();
+        let receipt = outcome.receipt.unwrap();
+        assert_eq!(receipt.status, JobStatus::Failed);
+        assert!(receipt.artifact.is_none());
+        assert!(!outcome.release.cleanup_complete);
+        assert_eq!(outcome.release.receipts.len(), 1);
+        assert_eq!(scheduler.lease_counters().live(), 0);
+        if case < 2 {
+            assert!(port.published);
+            assert_eq!(
+                receipt.external_effect_disposition,
+                ExternalEffectDisposition::Indeterminate
+            );
+        } else {
+            assert!(!port.published);
+            assert_eq!(receipt.cleanup.status, CleanupStatus::Failed);
+            assert_ne!(
+                receipt.external_effect_disposition,
+                ExternalEffectDisposition::None
+            );
+        }
+        assert_eq!(original.history_depths(), (0, 0));
+    }
+}
