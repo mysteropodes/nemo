@@ -1,14 +1,12 @@
 //! Real native project files bypass the small command-response byte envelope.
 use crate::application_mcp::ApplicationMcp;
-use crate::native_dispatch::NativeObjectHost;
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use crate::native_object_bootstrap::{
     bootstrap_raw, reopen::bootstrap_request, save::save_request,
 };
 use native_engine::{
-    history::NativeObjectHistory,
-    object_document::FrameScopeKind,
-    object_frame_packet::{prepare_object_frame, ObjectFrameSelector},
-    object_render_scene::{prepare_object_paint_plan, prepare_object_render_scene},
+    object_document::FrameScopeKind, object_frame_packet::ObjectFrameSelector,
+    scheduler::OutputSpec,
 };
 use serde_json::{json, Value};
 use std::{
@@ -123,24 +121,26 @@ fn p38_project_bytes(width: u32, height: u32, fps: u32, variant: bool) -> Vec<u8
 }
 
 fn assert_p38_cpu_paint(bytes: &[u8]) {
-    let history = NativeObjectHistory::from_project_file("p38-fixture-paint", bytes).unwrap();
-    let snapshot = history.acquire_snapshot(0).unwrap();
-    assert_eq!(snapshot.document().objects().len(), 3);
+    let mut owner = NativeObjectHost::from_project_file("p38-fixture-paint".into(), bytes).unwrap();
+    let info = owner.project_file_info().unwrap();
+    let instance_id = owner.instance_id().to_owned();
+    let document_id = owner.document_id().to_owned();
+    let snapshot_id = info["documentSnapshotId"].as_str().unwrap().to_owned();
+    let revision = owner.content_revision();
     for frame in [0, 7] {
         let selector = ObjectFrameSelector {
-            instance_id: snapshot.instance_id(),
-            document_id: snapshot.document_id(),
-            content_revision: snapshot.content_revision(),
-            document_snapshot_id: snapshot.snapshot_id(),
+            instance_id: &instance_id,
+            document_id: &document_id,
+            content_revision: revision,
+            document_snapshot_id: &snapshot_id,
             context_id: "scene-root",
             scope_kind: FrameScopeKind::Authored,
             frame,
         };
-        let packet = prepare_object_frame(&snapshot, &selector).unwrap();
-        let scene = prepare_object_render_scene(&packet, &selector).unwrap();
-        let plan = prepare_object_paint_plan(&scene, &selector).unwrap();
-        assert_eq!(plan.packet().frame(), frame);
-        assert_eq!(plan.commands().len(), 1);
+        let output = OutputSpec::new("frame", "rgba8", 64, 64, "srgb", "straight").unwrap();
+        owner
+            .with_prepared_object_preview(&selector, output, |_| Ok(()))
+            .unwrap();
     }
 }
 
@@ -326,6 +326,25 @@ fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
         let drawing: Value = serde_json::from_slice(bytes).unwrap();
         assert_eq!(drawing["drawing"]["formatVersion"], 2);
         assert_eq!(drawing["drawing"]["objects"].as_array().unwrap().len(), 3);
+        for frame in [0, 7] {
+            let authored = drawing["drawing"]["objects"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|object| {
+                    object["target"]["frameScope"]["kind"] == "authored"
+                        && object["target"]["frameScope"]["frame"] == frame
+                })
+                .count();
+            assert_eq!(authored, 1, "frame {frame} must contain authored content");
+            let scope = drawing["drawing"]["compositionOrder"]["contexts"][0]["scopes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|scope| scope["frameScope"]["frame"] == frame)
+                .unwrap();
+            assert_eq!(scope["elements"].as_array().unwrap().len(), 1);
+        }
         assert_p38_cpu_paint(bytes);
 
         let scratch = Scratch::new();
