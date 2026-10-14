@@ -11,6 +11,7 @@ use std::{
     sync::Mutex,
 };
 use tauri::{Manager, Runtime, WebviewWindowBuilder};
+use tauri_plugin_fs::FsExt;
 
 const ENABLE_ENV: &str = "NEMO_TEST_P38_FIXTURE_OPEN_PROBE";
 const EXPECTED_SOURCE_ENV: &str = "NEMO_P38_FIXTURE_OPEN_EXPECTED_SOURCE";
@@ -130,6 +131,74 @@ fn verify_fixtures(session: &Session) -> Result<(), &'static str> {
         {
             return Err("P38 fixture hash refused");
         }
+    }
+    Ok(())
+}
+
+fn bind_fixture_scope(
+    session: &Session,
+    temp: &Path,
+    is_allowed: impl Fn(&Path) -> bool,
+    allow_file: impl Fn(&Path) -> Result<(), ()>,
+    forbid_file: impl Fn(&Path) -> Result<(), ()>,
+) -> Result<(), &'static str> {
+    let temp_meta = fs::symlink_metadata(temp).map_err(|_| "P38 fixture temp unavailable")?;
+    let expected_root = temp.join(format!("p38-fixture-open-{}", session.pins.run_id));
+    if !temp_meta.is_dir()
+        || temp_meta.file_type().is_symlink()
+        || fs::canonicalize(temp).ok().as_deref() != Some(temp)
+        || session.root != expected_root
+        || session.files != [expected_root.join("A.json"), expected_root.join("B.json")]
+    {
+        return Err("P38 fixture scope path refused");
+    }
+    for (index, (id, hash)) in [("A", HASH_A), ("B", HASH_B)].into_iter().enumerate() {
+        let pin = &session.pins.fixtures[index];
+        if pin.id != id
+            || pin.sha256 != hash
+            || session.files[index].to_str() != Some(pin.file.as_str())
+            || (pin.device, pin.inode) != session.file_ids[index]
+        {
+            return Err("P38 fixture scope pin refused");
+        }
+    }
+    verify_fixtures(session)?; // Validate BOTH files before granting either.
+    let excluded = [
+        temp.to_path_buf(),
+        session.root.clone(),
+        temp.join("p38-scope-other.json"),
+        session.root.join("C.json"),
+        session.files[0].join("child"),
+        session.files[1].join("child"),
+    ];
+    if excluded.iter().any(|path| is_allowed(path))
+        || session.files.iter().any(|path| is_allowed(path))
+    {
+        return Err("P38 fixture scope already broad or granted");
+    }
+    let binding = (|| {
+        for file in &session.files {
+            allow_file(file).map_err(|_| "P38 fixture scope binding refused")?;
+        }
+        verify_fixtures(session)?;
+        if !session.files.iter().all(|path| is_allowed(path))
+            || excluded.iter().any(|path| is_allowed(path))
+        {
+            return Err("P38 fixture scope not exact");
+        }
+        Ok(())
+    })();
+    if let Err(reason) = binding {
+        // These fresh, previously ungranted paths belong only to this initializer.
+        // Revoke both even when a callback failed after changing its scope.
+        let mut rollback_failed = false;
+        for file in &session.files {
+            rollback_failed |= forbid_file(file).is_err();
+        }
+        if rollback_failed || session.files.iter().any(|path| is_allowed(path)) {
+            return Err("P38 fixture scope rollback refused");
+        }
+        return Err(reason);
     }
     Ok(())
 }
@@ -332,6 +401,14 @@ pub(crate) fn initialize<R: Runtime>(
             failed: false,
             failure_code: None,
         };
+        let scope = app.try_fs_scope().ok_or("P38 fixture scope unavailable")?;
+        bind_fixture_scope(
+            &session,
+            &temp,
+            |path| scope.is_allowed(path),
+            |path| scope.allow_file(path).map_err(|_| ()),
+            |path| scope.forbid_file(path).map_err(|_| ()),
+        )?;
         session.persist("prepared")?;
         Some(session)
     } else {

@@ -356,6 +356,13 @@ fn checked_in_p38_native_fixtures_open_through_project_only_file_route() {
         let raw = json!({"apiVersion":2,"requestId":"p38-fixture-open",
             "instanceId":state.instance_id(),"sourcePath":path,"projectOnly":true})
         .to_string();
+        let refused = bootstrap_request(&state, &raw, |_| false).unwrap_err();
+        assert_eq!(refused.code, "unavailable");
+        assert_eq!(
+            refused.message,
+            "object file is outside the existing filesystem scope"
+        );
+        assert!(state.native_state().lock().unwrap().active().is_none());
         let opened =
             bootstrap_request(&state, &raw, |candidate| candidate == path.as_path()).unwrap();
         let opened = serde_json::to_value(opened).unwrap();
