@@ -6,7 +6,8 @@ const path = require('node:path');
 const test = require('node:test');
 const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
-const { PHASES, runObserver, fail, writeOutcome, verifyHelperExecutable, helperEnvironment, stopSpawnedHelper, defaultServices } = require('./p38-fixture-open-owner.cjs');
+const { PHASES, PROBE_FAILURE_CODES, runObserver, fail, writeOutcome, verifyHelperExecutable,
+  helperEnvironment, stopSpawnedHelper, defaultServices, safeCode } = require('./p38-fixture-open-owner.cjs');
 
 const config = Object.freeze({ taskId:'p38-task-test', grantId:'p38-grant-test',
   helperPath:'/tmp/p38-window-helper', helperSha256:'e'.repeat(64), sourceHead:'b'.repeat(40), timeoutMs:10000 });
@@ -34,7 +35,18 @@ async function probeFailure(manifest, useSymlink = false, receiptMismatch = fals
   if(useSymlink)fs.symlinkSync(realTemp,temp); else fs.mkdirSync(temp);
   if(manifest){
     const root=path.join(temp,'p38-fixture-open-12345678-1234-1234-1234-123456789abc');
-    fs.mkdirSync(root); fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(probeManifest(root,manifest)));
+    fs.mkdirSync(root);
+    const {fixtureMutation,...overrides}=manifest;
+    const value=probeManifest(root,overrides);
+    if(fixtureMutation){
+      const fixture=value.fixtures[fixtureMutation.index];
+      if(fixtureMutation.value===undefined)delete fixture[fixtureMutation.field];
+      else fixture[fixtureMutation.field]=fixtureMutation.value;
+      const pins={schema:value.schema,runId:value.runId,taskKey:value.taskKey,sourceSha:value.sourceSha,
+        buildSha:value.buildSha,pid:value.pid,window:value.window,origin:value.origin,fixtures:value.fixtures};
+      value.manifestSha256=crypto.createHash('sha256').update(JSON.stringify(pins)).digest('hex');
+    }
+    fs.writeFileSync(path.join(root,'manifest.json'),JSON.stringify(value));
   }
   let tick=0;
   const services=defaultServices(config,{roots:{temp},isolation:{taskRoots:()=>({temp})},owner:{receipt(){
@@ -49,9 +61,34 @@ async function probeFailure(manifest, useSymlink = false, receiptMismatch = fals
 test('owner classifies an unsafe temporary-root identity separately',async()=>{
   assert.deepEqual(await probeFailure(null,true),{stage:'probe-manifest',code:'probe-temp-identity-refused'});
 });
-test('owner preserves only the fixed pre-ready manifest failure code',async()=>{
+function rustAllowedFailures(phase) {
+  const source=fs.readFileSync(path.join(__dirname,'../../src-tauri/src/task_runtime/p38_fixture_open_probe_control.rs'),'utf8');
+  const match=source.match(new RegExp(`pub\\(super\\) fn allowed_${phase}_failure\\(code: &str\\) -> bool \\{([\\s\\S]*?)\\n\\}`));
+  assert.ok(match,`Rust ${phase} failure allowlist exists`);
+  return [...match[1].matchAll(/"([^"]+)"/g)].map(item=>item[1]);
+}
+test('owner allowlists and classifies every fixed Rust failure by matching phase cursor',async()=>{
+  for(const phase of ['ready','a','b'])
+    assert.deepEqual(PROBE_FAILURE_CODES[phase],rustAllowedFailures(phase),`${phase} owner/Rust failure allowlists match`);
+  const cases=[['ready',0],['a',1],['b',2]].flatMap(([phase,checkpoint])=>
+    PROBE_FAILURE_CODES[phase].map(failureCode=>({checkpoint,failureCode})));
+  for(const {checkpoint,failureCode} of cases){
+    const category=`probe-manifest-failed-${failureCode}`;
+    assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint,failureCode,result:'failed'}),
+      {stage:'probe-manifest',code:category});
+    assert.equal(safeCode('probe-manifest',category),category);
+  }
+});
+test('owner keeps mismatched, malformed, and private manifest failures sanitized',async()=>{
   assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'ready-open-path-unavailable',result:'failed'}),
     {stage:'probe-manifest',code:'probe-manifest-failed-ready-open-path-unavailable'});
+  for(const manifest of [
+    {failed:true,waiting:false,checkpoint:1,failureCode:'ready-observer-install-failed',result:'failed'},
+    {failed:true,waiting:false,checkpoint:1,failureCode:'b-open-threw',result:'failed'},
+    {failed:true,waiting:true,checkpoint:1,failureCode:'a-open-threw',result:'failed'},
+    {failed:true,waiting:false,checkpoint:1,failureCode:'private path or exception',result:'failed'},
+  ]) assert.deepEqual(await probeFailure(manifest),
+    {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
   assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:0,failureCode:'private path or exception',result:'failed'}),
     {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
 });
@@ -62,6 +99,19 @@ test('owner rejects manifest identity and pin-shape mismatches with one sanitize
     {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
   assert.deepEqual(await probeFailure({},false,true),
     {stage:'probe-manifest',code:'probe-manifest-validation-refused'});
+});
+test('owner refuses wrong A and B fixture IDs and hashes before classifying a fixed failure',async()=>{
+  const mutations=[
+    {label:'A ID',index:0,field:'id',value:'unexpected-a'},
+    {label:'A digest',index:0,field:'sha256',value:'f'.repeat(64)},
+    {label:'B ID',index:1,field:'id',value:'unexpected-b'},
+    {label:'B digest',index:1,field:'sha256',value:'e'.repeat(64)},
+  ];
+  for(const mutation of mutations){
+    const result=await probeFailure({failed:true,waiting:false,checkpoint:0,
+      failureCode:'ready-open-path-unavailable',result:'failed',fixtureMutation:mutation});
+    assert.deepEqual(result,{stage:'probe-manifest',code:'probe-manifest-validation-refused'},mutation.label);
+  }
 });
 test('owner distinguishes a prepared-only ready timeout from missing manifest timeout',async()=>{
   assert.deepEqual(await probeFailure({waiting:false,failed:false,checkpoint:0}),
