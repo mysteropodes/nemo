@@ -31,9 +31,13 @@
   }
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
+    var subscription=null,subscriptionTicket=0,synchronizing=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
     function raw(command,request){
+      if(subscription&&typeof ports.dispatchMutation==='function'&&
+        (command==='nemo_native_object_dispatch'||command==='nemo_native_object_reference'&&request.action.kind!=='inspect'))
+        return ports.dispatchMutation(command,request);
       if(command!=='nemo_native_object_bootstrap'||typeof ports.openDiagnostic!=='function')return ports.invoke(command,{requestJson:JSON.stringify(request)});
       openDiagnostic('bootstrap-dispatched');
       var result;try{result=ports.invoke(command,{requestJson:JSON.stringify(request)});}catch(error){openDiagnostic('bootstrap-rejected',error&&error.code==='unsupported_format'?'unsupported-format':'other');throw error;}
@@ -44,10 +48,51 @@
     function active(){return phase==='native';}
     function requireActive(){if(!active()||!info)throw new Error('Native project is unavailable; reopen Nemo');return info;}
     function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;});}
-    function fence(error){phase='indeterminate';presentation=null;if(ports.failed)ports.failed(error);return error;}
+    function fence(error){phase='indeterminate';presentation=null;retireSubscription().catch(function(){});if(ports.failed)ports.failed(error);return error;}
     function epoch(value){return value&&{instanceId:value.instanceId,documentId:value.documentId,lifecycleGeneration:value.lifecycleGeneration};}
     function sameEpoch(a,b){return !!a&&!!b&&a.instanceId===b.instanceId&&a.documentId===b.documentId&&a.lifecycleGeneration===b.lifecycleGeneration;}
     function guardEpoch(value){if(!active()||!sameEpoch(value,epoch(info)))throw new Error('Native project owner changed before queued action');}
+    async function retireSubscription(){
+      subscriptionTicket++;subscription=null;synchronizing=false;
+      if(typeof ports.unsubscribeRevisions==='function')await ports.unsubscribeRevisions();
+    }
+    async function attachSubscription(){
+      if(typeof ports.subscribeRevisions!=='function'||typeof ports.publishRevision!=='function'||
+        typeof ports.projectionReady!=='function'||!ports.projectionReady(info))return;
+      var pin=epoch(info),ticket=++subscriptionTicket;
+      var value=await ports.subscribeRevisions(function(event,binding){return synchronizeRevision(event,pin,ticket,binding);},function(error){
+        if(ticket===subscriptionTicket&&sameEpoch(pin,epoch(info)))fence(error);
+      });
+      if(value===null)return;
+      if(ticket!==subscriptionTicket||!active()||!sameEpoch(pin,epoch(info))||
+        !sameEpoch(value,pin)||value.contentRevision!==info.contentRevision||!id(value.subscriptionId))
+        throw new Error('Native object revision subscription is uncorrelated');
+      subscription=freeze(Object.assign({},value));
+    }
+    function synchronizeRevision(event,pin,ticket,binding){
+      if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))
+        return Promise.reject(new Error('Native object revision subscription was replaced'));
+      if(!active()||synchronizing||!sameEpoch(binding,pin)||!id(binding.subscriptionId)||
+        !sameEpoch(event,pin)||!id(event.requestId)||!integer(event.fromRevision,0)||
+        !integer(event.toRevision,event.fromRevision+1)||
+        info.contentRevision>event.toRevision)return Promise.reject(fence(new Error('Native object revision event is stale')));
+      synchronizing=true;presentation=null;wantedFrame=null;
+      return enqueue(async function(){
+        if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw new Error('Native object revision subscription was replaced');
+        guardEpoch(pin);
+        var next=await inspect();
+        if(ticket!==subscriptionTicket||next.contentRevision!==event.toRevision)
+          throw new Error('Native object revision inspection is uncorrelated');
+        if(await ports.publishRevision(next)!==true)throw new Error('Native object UI publication is unconfirmed');
+        await present(ports.frame?ports.frame():0,next,{subscriptionId:binding.subscriptionId,event:event});
+        if(ticket!==subscriptionTicket||!same(info,next)||!ports.projectionReady(next))
+          throw new Error('Native object revision changed before acknowledgment');
+        return freeze(Object.assign({},event));
+      }).catch(function(error){
+        if(ticket!==subscriptionTicket||!sameEpoch(pin,epoch(info)))throw error;
+        throw fence(error);
+      }).finally(function(){if(ticket===subscriptionTicket)synchronizing=false;});
+    }
     function disposition(error){return error&&error.details&&error.details.disposition;}
     function localRefusal(message){return {code:'replacement_refused',message:message,details:{disposition:'notDispatched',retryExecution:false}};}
     async function status(){return ports.invoke('nemo_native_object_client_status');}
@@ -81,7 +126,9 @@
         var previous=info,priorPresentation=presentation,priorPhase=phase,dispatched=false,inBootstrap=false;
         phase='opening';presentation=null;
         try{
-          if(transition&&transition.confirm&&await transition.confirm(previous)!==true){phase=priorPhase;presentation=priorPresentation;return false;}
+          await retireSubscription();
+          if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
+            phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();return false;}
           if(transition&&transition.occlude)await transition.occlude();
           var before=await status();
           if(!before||before.apiVersion!==2||!id(before.instanceId)||
@@ -108,8 +155,9 @@
           await present(0,candidate);await verifyOwner(candidate);
           if(transition&&transition.reveal){await transition.reveal(candidate);
             await present(0,candidate);await verifyOwner(candidate);}
-          phase='native';changed();
+          phase='native';
           if(transition&&transition.commit)await transition.commit(candidate);
+          changed();await attachSubscription();
           return candidate;
         }catch(error){
           if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!previous&&error&&error.code==='unsupported_format')){
@@ -118,6 +166,7 @@
               else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
               info=previous;phase=priorPhase;presentation=priorPresentation;
               if(transition&&transition.restore)await transition.restore(previous);
+              if(previous)await attachSubscription();
             }catch(unknown){throw fence(unknown);}
             if(!previous&&error&&error.code==='unsupported_format')return null;
             throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
@@ -138,8 +187,9 @@
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
-    async function present(frame,pin){
-      var request=frameRequest(frame,pin),receipt=await raw('nemo_native_object_preview',request);
+    async function present(frame,pin,revisionSync){
+      var request=frameRequest(frame,pin);if(revisionSync)request.revisionSync=revisionSync;
+      var receipt=await raw('nemo_native_object_preview',request);
       if(!same(info,request)||!receipt||receipt.status!=='presented'||!id(receipt.workId)||!integer(receipt.viewGeneration,1)){
         presentation=null;throw new Error('Native project frame was not presented');
       }
@@ -149,7 +199,7 @@
       return presentation;
     }
     function presentPreview(frame){
-      if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      if(openingRequested||synchronizing||!active())return Promise.reject(new Error('Native project Open or synchronization is in progress'));
       var submitted=epoch(info);return enqueue(function(){guardEpoch(submitted);return present(frame);});
     }
     function renderPreview(frame){
@@ -165,6 +215,7 @@
     function changed(){if(ports.changed)ports.changed(info);}
     function mutation(makeRequest,command){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
+      if(synchronizing)return Promise.reject(new Error('Native object revision synchronization is in progress'));
       var submitted=epoch(info);return enqueue(async function(){
       guardEpoch(submitted);var pin=requireActive(),request=makeRequest(pin);presentation=null;
       var receipt;
@@ -189,15 +240,29 @@
     function history(action){if(action!=='undo'&&action!=='redo')return Promise.reject(new Error('Unsupported history action'));
       return mutation(function(pin){return {apiVersion:2,requestId:requestId(action),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.'+action,expectedRevision:pin.contentRevision,payload:{command:'object.'+action}};},'nemo_native_object_dispatch');}
-    function setLayerVisibility(layerUid,visible){
+    function visibilityIntent(layerUid,value){
       return mutation(function(pin){
+        var matches=pin.layers.filter(function(layer){return layer.layerUid===layerUid;});
+        var visible=typeof value==='function'&&matches.length===1?value(matches[0]):value;
         if(typeof layerUid!=='string'||!layerUid||typeof visible!=='boolean'||
-          pin.layers.filter(function(layer){return layer.layerUid===layerUid;}).length!==1)
+          matches.length!==1)
           throw new Error('Native layer visibility target or value is invalid');
         return {apiVersion:2,requestId:requestId('visibility'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:'command.document.object.layer.visibility.set',expectedRevision:pin.contentRevision,
           payload:{command:'object.layer.visibility.set',layerUid:layerUid,visible:visible}};
       },'nemo_native_object_dispatch');
+    }
+    function setLayerVisibility(layerUid,visible){
+      if(typeof visible!=='boolean')return Promise.reject(new Error('Native layer visibility target or value is invalid'));
+      return visibilityIntent(layerUid,visible);
+    }
+    function toggleLayerVisibility(layerUid){
+      return visibilityIntent(layerUid,function(layer){
+        if(!subscription||synchronizing||typeof ports.subscriptionActive==='function'&&!ports.subscriptionActive()||
+          !ports.projectionReady(info)||!presentation||!same(info,presentation))
+          throw new Error('Native layer visibility synchronization is unavailable');
+        return layer.visible===false;
+      });
     }
     async function acquirePin(request){
       requireActive();var value=await inspect(request.requestId);
@@ -205,7 +270,7 @@
       return {apiVersion:2,requestId:request.requestId,instanceId:value.instanceId,documentId:value.documentId,contentRevision:value.contentRevision,ok:true,
         result:{atRevision:value.contentRevision,documentSnapshotId:value.documentSnapshotId,documentDigest:value.documentDigest,byteCount:value.byteCount}};
     }
-    function presentedSession(){return active()&&presentation&&same(info,presentation)&&pending===0?
+    function presentedSession(){return active()&&!synchronizing&&(!subscription||typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())&&presentation&&same(info,presentation)&&pending===0?
       Object.assign({available:true,kind:'native-object',presentation:presentation},info):null;}
     function exportPng(destination,frames,onProgress,signal){
       if(openingRequested||!active())return Promise.reject(new Error('Native project Open is in progress'));
@@ -228,6 +293,8 @@
     });}
     return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
+      get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,
       acquirePin:acquirePin,savePinned:function(request){return raw('nemo_native_object_save_as',request);},
       getNativeIdentity:function(){if(phase==='idle')return null;var pin=requireActive();return {documentId:pin.documentId,generation:pin.lifecycleGeneration};},
@@ -238,12 +305,32 @@
   function desktop(root){
     if(!root.__TAURI__||!root.__TAURI__.core)return null;
     if(desktops.has(root))return desktops.get(root);
-    var session=create({invoke:root.__TAURI__.core.invoke.bind(root.__TAURI__.core),
+    var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
+    function projectionReady(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionMatches(root,info);}
+    function publishRevision(info){
+      if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshVisibility(root,info))
+        throw new Error('Native object row projection is uncorrelated');
+      if(root.updateUI)root.updateUI();
+      if(root.SMReference)root.SMReference.refreshNative();
+      if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
+      return true;
+    }
+    var session=create({invoke:invoke,projectionReady:projectionReady,publishRevision:publishRevision,
+      subscribeRevisions:async function(synchronize,disconnected){
+        if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
+          return null; // Private file Open remains usable; no toggle/subscriber is advertised.
+        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(invoke);
+        await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
+      },
+      unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
+      subscriptionActive:function(){return !!transport&&!!transport.status()&&!transport.isSynchronizing();},
+      dispatchMutation:function(command,request){return transport.dispatchObject(command,request);},
       openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
       frame:function(){return root.state.currentFrame;},
       mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;
         return {cssBounds:{x:b.left,y:b.top,width:b.width,height:b.height},physicalExtent:{width:Math.max(1,Math.round(b.width*d)),height:Math.max(1,Math.round(b.height*d))},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:d};},
-      changed:function(){if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();},
+      changed:function(info){if(projectionReady(info))publishRevision(info);
+        else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
     desktops.set(root,session);return session;
