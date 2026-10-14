@@ -18,6 +18,10 @@ pub(crate) mod expression_noise;
 #[path = "expression_random.rs"]
 #[allow(dead_code)]
 pub(crate) mod expression_random;
+// N22E: private math/vector expression helpers (clamp, remap, vectors).
+#[path = "expression_math.rs"]
+#[allow(dead_code)]
+pub(crate) mod expression_math;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
