@@ -20,20 +20,17 @@ fn sha256_matches_standard_empty_and_abc_vectors() {
 }
 
 #[test]
-fn a_scope_diagnostic_is_fixed_and_serializes_only_its_allowlisted_state() {
-    use super::control::{a_fixture_scope_status, AOpenScopeDiagnostic};
+fn ready_result_is_fixed_and_serializes_only_owner_acknowledgment() {
+    use super::control::accepted_checkpoint_result;
     use serde_json::json;
 
-    assert_eq!(a_fixture_scope_status(Some(true)), "allowed");
-    assert_eq!(a_fixture_scope_status(Some(false)), "refused");
-    assert_eq!(a_fixture_scope_status(None), "unavailable");
-    let packet = AOpenScopeDiagnostic {
-        a_fixture_scope: a_fixture_scope_status(Some(false)),
-    };
     assert_eq!(
-        serde_json::to_value(packet).unwrap(),
-        json!({"aFixtureScope":"refused"})
+        serde_json::to_value(accepted_checkpoint_result("ready")).unwrap(),
+        json!({"ownerAcknowledged":true})
     );
+    for phase in ["a-opened", "b-opened", "private-unknown"] {
+        assert!(accepted_checkpoint_result(phase).is_none());
+    }
 }
 
 #[test]

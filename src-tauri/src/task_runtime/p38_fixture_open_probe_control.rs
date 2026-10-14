@@ -9,7 +9,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::Manager;
-use tauri_plugin_fs::FsExt;
 
 #[cfg(target_os = "linux")]
 pub(super) const NOFOLLOW_FLAG: i32 = 0x20000;
@@ -46,29 +45,14 @@ struct Ack {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct AOpenScopeDiagnostic {
-    pub(super) a_fixture_scope: &'static str,
+pub(crate) struct ReadyCheckpointResult {
+    pub(super) owner_acknowledged: bool,
 }
 
-pub(super) fn a_fixture_scope_status(allowed: Option<bool>) -> &'static str {
-    match allowed {
-        Some(true) => "allowed",
-        Some(false) => "refused",
-        None => "unavailable",
-    }
-}
-
-fn a_fixture_scope(window: &tauri::WebviewWindow, path: &Path) -> &'static str {
-    let Ok(resolved) = fs::canonicalize(path) else {
-        return "unavailable";
-    };
-    if resolved != path {
-        return "unavailable";
-    }
-    let allowed = window
-        .try_fs_scope()
-        .map(|scope| scope.is_allowed(&resolved));
-    a_fixture_scope_status(allowed)
+pub(super) fn accepted_checkpoint_result(phase: &str) -> Option<ReadyCheckpointResult> {
+    (phase == "ready").then_some(ReadyCheckpointResult {
+        owner_acknowledged: true,
+    })
 }
 
 fn read_ack(session: &Session, phase: &str) -> Result<Option<Ack>, &'static str> {
@@ -238,7 +222,7 @@ pub(crate) async fn nemo_test_p38_fixture_open_probe(
     window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     payload_json: String,
-) -> Result<Option<AOpenScopeDiagnostic>, String> {
+) -> Result<Option<ReadyCheckpointResult>, String> {
     if payload_json.len() > MAX_PACKET {
         return Err("P38 checkpoint too large".into());
     }
@@ -251,7 +235,7 @@ pub(crate) async fn nemo_test_p38_fixture_open_probe(
     let state = app
         .try_state::<ProbeState>()
         .ok_or("P38 probe unavailable")?;
-    let (root, phase, ready_diagnostic) = {
+    let (root, phase) = {
         let mut guard = state.0.lock().map_err(|_| "P38 probe unavailable")?;
         let session = guard.as_mut().ok_or("P38 probe inactive")?;
         if session.pins.pid != std::process::id() {
@@ -259,9 +243,6 @@ pub(crate) async fn nemo_test_p38_fixture_open_probe(
         }
         runtime_matches(&app, session).map_err(str::to_owned)?;
         super::verify_fixtures(session).map_err(str::to_owned)?;
-        let ready_diagnostic = (packet.phase == "ready").then(|| AOpenScopeDiagnostic {
-            a_fixture_scope: a_fixture_scope(&window, &session.files[0]),
-        });
         if let Err(reason) = accept_packet(session, &packet) {
             if reason == "P38 operation reported a fixed failure" {
                 session.failed = true;
@@ -272,11 +253,7 @@ pub(crate) async fn nemo_test_p38_fixture_open_probe(
         }
         session.waiting = true;
         session.persist("waiting").map_err(str::to_owned)?;
-        (
-            session.root.clone(),
-            session.pins.run_id.to_owned(),
-            ready_diagnostic,
-        )
+        (session.root.clone(), session.pins.run_id.to_owned())
     };
     let expected_phase = packet.phase.clone();
     let deadline = Instant::now() + Duration::from_secs(90);
@@ -345,7 +322,7 @@ pub(crate) async fn nemo_test_p38_fixture_open_probe(
         })
         .map_err(str::to_owned)?;
     decision.map_err(str::to_owned)?;
-    Ok(ready_diagnostic)
+    Ok(accepted_checkpoint_result(&packet.phase))
 }
 
 pub(super) fn root_is_safe(path: &Path, dev: u64, ino: u64) -> bool {
