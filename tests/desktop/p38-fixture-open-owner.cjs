@@ -305,7 +305,7 @@ function waitLine(lines, timeoutMs = 10000) {
 function defaultServices(config, testServices = {}) {
   const isolation = testServices.isolation || require(path.join(ROOT, 'scripts/nemo/lib/isolation.cjs'));
   const owner = testServices.owner || require('./p38-fixture-open-installed.cjs');
-  const reportDir = path.join(ROOT, 'reports', 'p38-installed-operators', hash(config.grantId));
+  const reportDir = testServices.reportDir || path.join(ROOT, 'reports', 'p38-installed-operators', hash(config.grantId));
   const receiptFile = path.join(reportDir, 'receipt.json');
   // This observer runs only while the exact driver task is active.
   const roots = testServices.roots || isolation.taskRoots(config.taskId);
@@ -370,15 +370,23 @@ function defaultServices(config, testServices = {}) {
     if (sawPrepared) fail('probe-manifest', 'probe-ready-timeout');
     fail('probe-manifest', 'probe-manifest-timeout');
   }
-  async function waitForCheckpoint(_config, _expected, probe, _phase, index, deadline) {
+  async function waitForCheckpoint(_config, expected, probe, phase, index, deadline) {
     while (Date.now() < deadline) {
       let driver;
       try { driver = readJSONNoFollow(receiptFile); }
       catch { fail('checkpoint', 'driver-first-failure'); }
       if (driver?.firstFailure) fail('checkpoint', 'driver-first-failure');
       const manifest = readManifest(probe.root);
-      if (manifest?.failed) fail('checkpoint', 'checkpoint-refused');
-      if (manifest?.waiting === true && manifest?.checkpoint === index) return manifest;
+      if (manifest && (manifest.failed !== false || ['failed','refused'].includes(manifest.result))) {
+        let code='probe-manifest-failure-unknown';
+        if(manifest.failed===true) {
+          try { validateManifestIdentity(probe.root,manifest,expected);
+            if(PHASES[index]===phase&&manifest.checkpoint===index)code=failedManifestCategory(manifest);
+          } catch {}
+        }
+        fail('probe-manifest',code);
+      }
+      if (manifest?.waiting === true && manifest?.failed === false && manifest?.checkpoint === index) return manifest;
       await new Promise(resolve => setTimeout(resolve, 75));
     }
     fail('checkpoint', 'checkpoint-timeout');
