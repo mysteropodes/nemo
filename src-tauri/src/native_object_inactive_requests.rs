@@ -1,6 +1,5 @@
 //! Bounded, non-evicting request identities owned by the single native host.
-use super::NativeObjectHost;
-use crate::native_dispatch::NativeDispatch;
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 
 pub(super) struct InactiveRequest {
     fingerprint: Vec<u8>,

@@ -1,8 +1,10 @@
 //! Actual original-file/owner oracles; no app, GPU, or substituted authority.
-use super::*;
+use crate::application_mcp::ApplicationMcp;
 use crate::native_application::{admit_release_request, complete_release};
-use crate::native_application_contract::NativeReleaseRequest;
+use crate::native_application_contract::{HostResult, NativeReleaseRequest};
 use crate::native_dispatch::ReleaseAdmission;
+use crate::native_object_bootstrap::inactive::request_with;
+use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
 const A: &[u8] = include_bytes!("../../tests/fixtures/p38/native-project/A.json");
 const B: &[u8] = include_bytes!("../../tests/fixtures/p38/native-project/B.json");
