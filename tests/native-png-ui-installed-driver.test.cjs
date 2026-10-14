@@ -188,6 +188,18 @@ test('transport refusal performs no journal/start and wrong grant never invokes 
   assert.equal(r.startAttempts,0);assert.equal(s.events.includes('journal'),false);
   await assert.rejects(D.runOperator({...f.c,workflow:'P38'},s.services));assert.equal(s.events.includes('start'),false);
 });
+test('non-string grant/task IDs refuse before transport, package, journal, workspace or start',async t=>{
+  const spy=(s,calls)=>new Proxy(s.services,{get(target,key){const value=target[key];return typeof value==='function'?(...args)=>{calls.push(key);return value.apply(target,args);}:value;}});
+  for(const value of [null,undefined,123,true,false,[],{},new String('looks-valid')]){
+    for(const field of ['grant','taskId']){
+      const f=setup(t),s=fakeServices(f),c=field==='grant'?{...f.c,grant:{...f.c.grant,id:value}}:{...f.c,taskId:value};
+      const calls=[];await assert.rejects(D.runOperator(c,spy(s,calls)));assert.deepEqual(calls,[]);assert.deepEqual(s.events,[]);assert.deepEqual(s.saved,[]);
+    }
+  }
+  const f=setup(t),s=fakeServices(f);
+  const calls=[];await assert.rejects(D.runOperator({...f.c,taskId:'x'.repeat(121)},spy(s,calls)));assert.deepEqual(calls,[]);assert.deepEqual(s.events,[]);
+  assert.doesNotThrow(()=>P.authorize({...f.c,taskId:'x'.repeat(120)}));
+});
 for(const fault of ['foreignPin','changedPid','helperEOF','refused','timeout','cleanupFault']){
   test('operator '+fault+' stops, cleans owned children and never claims installed completion',async t=>{
     const f=setup(t),s=fakeServices(f,{[fault]:true});const r=await D.runOperator(f.c,s.services);

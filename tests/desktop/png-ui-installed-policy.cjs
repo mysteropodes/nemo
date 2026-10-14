@@ -13,8 +13,8 @@ const state=new WeakMap();
 function check(ok,code){if(!ok)throw Object.assign(Error(code),{code});}
 function hash(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 function authorize(c){
-  check(c&&c.workflow==='PNG_UI'&&c.grant?.issue===1959&&c.grant.confirmed===true&&ID.test(c.grant.id),'new-png-grant-required');
-  check(ID.test(c.taskId)&&c.sourceHead===SOURCE&&HEAD.test(c.driverHead)&&SHA.test(c.executableSha256)&&
+  check(c&&c.workflow==='PNG_UI'&&c.grant?.issue===1959&&c.grant.confirmed===true&&typeof c.grant.id==='string'&&ID.test(c.grant.id),'new-png-grant-required');
+  check(typeof c.taskId==='string'&&c.taskId.length<=120&&ID.test(c.taskId)&&c.sourceHead===SOURCE&&HEAD.test(c.driverHead)&&SHA.test(c.executableSha256)&&
     SHA.test(c.helperSha256)&&Number.isInteger(c.timeoutMs)&&c.timeoutMs>=1000&&c.timeoutMs<=600000,'png-config-refused');
   for(const key of ['appRoot','app','buildProof','windowHelper','helperProof','fixture','reportRoot'])
     check(typeof c[key]==='string'&&path.isAbsolute(c[key])&&path.normalize(c[key])===c[key],'png-path-refused');
