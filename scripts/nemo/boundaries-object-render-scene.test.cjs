@@ -60,11 +60,11 @@ test('both existing targets register contours and actual-history source controls
   assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'unavailable');
 });
 
-test('real contour consumer retains the existing eighteen-module forty-four-edge graph', () => {
+test('real contour consumer retains the adopted eighteen-module forty-nine-edge graph', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 18);
-  assert.equal(result.edges.length, 44);
+  assert.equal(result.edges.length, 49);
   assert.deepEqual(result.unsupported, []);
   assert.deepEqual(result.exceptionsApplied, []);
 });

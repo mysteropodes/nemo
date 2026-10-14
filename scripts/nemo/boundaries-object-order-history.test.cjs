@@ -12,28 +12,49 @@ const profile = JSON.parse(read('engineering/boundaries/profiles/rust.profile.js
 const policy = JSON.parse(read('engineering/boundaries/profiles/native-engine.edges.json'));
 const source = 'native-engine/tests/object_order_history.rs';
 
-test('versioned history stays in one admitted image and canonical host v1 stays separate', () => {
+function revisionAuthority(revision) {
+  assert.match(revision, /enum ProjectRevisionValue\s*\{\s*BareDrawing\(ObjectDocument\),\s*Project\(ProjectEnvelope\),\s*\}/);
+  const snapshot = revision.match(/pub struct ObjectSnapshot\s*\{([^}]+)\}/)?.[1];
+  assert.equal(typeof snapshot, 'string');
+  assert.match(snapshot, /value: Arc<ProjectRevisionValue>/);
+  assert.doesNotMatch(snapshot, /\b(?:document|project):/);
+  assert.match(revision, /snapshots: BTreeMap<u64, Arc<ProjectRevisionValue>>/);
+  assert.match(revision, /snapshots: BTreeMap::from\(\[\(0, snapshot.value\)\]\)/);
+  assert.match(revision, /ProjectRevisionValue::Project\(project.with_drawing\(document\)\)/);
+}
+
+test('versioned history shares one admitted drawing/project image and strict codec routes', () => {
   assert.equal(profile.modules.flatMap(m => m.files.map(f => `${m.dir}/${f}`)).filter(f => f === source).length, 1);
   const omitted = structuredClone(profile);
   for (const module of omitted.modules) module.files = module.files.filter(f => `${module.dir}/${f}` !== source);
   assert.ok(C.checkSourceCoverage(omitted, { root, sourcePaths: [source] }).violations
     .some(v => v.rule === 'coverage-unprofiled-source' && v.file === source));
   assert.match(read('native-engine/tests/object_history.rs'), /#\[path = "object_order_history.rs"\]/);
-  assert.match(read('native-engine/src/object_revision.rs'), /document: Arc<ObjectDocument>/);
+  const revision = read('native-engine/src/object_revision.rs');
+  revisionAuthority(revision);
+  assert.throws(() => revisionAuthority(revision.replace('value: Arc<ProjectRevisionValue>',
+    'value: Arc<ObjectDocument>')), assert.AssertionError);
+  assert.throws(() => revisionAuthority(revision.replace(
+    'ProjectRevisionValue::Project(project.with_drawing(document))',
+    'ProjectRevisionValue::BareDrawing(document)')), assert.AssertionError);
   assert.match(read('native-engine/src/object_fill.rs'), /snapshot.document\(\).clone\(\)/);
-  assert.match(read('native-engine/src/object_snapshot.rs'), /encode_storage_project\(self.document\(\)\)/);
+  const snapshot = read('native-engine/src/object_snapshot.rs');
+  const drawingOnly = /if self.project\(\).is_some\(\)\s*\{\s*return failure\(\s*DispatchErrorCode::Unavailable,[\s\S]*?encode_storage_project\(self.document\(\)\)/;
+  assert.match(snapshot, drawingOnly);
+  assert.throws(() => assert.match(snapshot.replace('if self.project().is_some() {',
+    'if false {'), drawingOnly), assert.AssertionError);
   assert.match(read('native-engine/src/object_codec.rs'), /let wire: LegacyDocument = parse\(bytes\)\?/);
-  assert.match(read('src-tauri/src/native_object_bootstrap.rs'), /use native_engine::object_codec::decode_project;/);
+  assert.match(read('src-tauri/src/native_object_bootstrap.rs'), /use native_engine::object_codec::decode_storage_project;/);
   const tooling = JSON.parse(read('engineering/boundaries/profiles/scripts-nemo.profile.json'));
   const owner = tooling.modules.find(m => m.id === 'nemo.test.boundariesRust');
   assert.equal(owner.files.filter(f => f === path.basename(__filename)).length, 1);
   assert.deepEqual(owner.publicApi, ['boundaries-rust.test.cjs']);
 });
 
-test('actual native graph and revision-layer authority controls stay unchanged', () => {
+test('adopted native graph and revision-layer authority controls stay exact', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
-  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 44);
+  assert.equal(result.moduleCount, 18); assert.equal(result.edges.length, 49);
   assert.deepEqual(result.unsupported, []); assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-order-image-boundary-'));
   try {

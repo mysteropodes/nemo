@@ -53,20 +53,27 @@ test('production command preserves main scope, serializer authority and no-repla
   assert.match(read('src-tauri/src/native_object_client.rs'), /"saveAvailable":false/);
 });
 
-test('unchanged desktop graph and actual forbidden host/engine import controls', () => {
+test('adopted desktop graph and actual forbidden host/engine import controls', () => {
   const result = R.checkRustCrate(profile, policy, { root });
   assert.equal(result.ok, true, JSON.stringify(result.violations));
   assert.equal(result.moduleCount, 17);
-  assert.equal(result.edges.length, 39);
+  assert.equal(result.edges.length, 43);
   assert.deepEqual(result.exceptionsApplied, []);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-save-boundary-'));
   try {
     fs.cpSync(path.join(root, 'src-tauri/src'), path.join(scratch, 'src-tauri/src'), { recursive: true });
     const add = (file, text) => fs.appendFileSync(path.join(scratch, file), `\n${text}\n`);
     add(source, 'use native_engine::object_snapshot::ObjectSnapshot;');
-    assert.equal(R.checkRustCrate(profile, policy, { root: scratch }).ok, false);
+    const privatePort = R.checkRustCrate(profile, policy, { root: scratch });
+    assert.equal(privatePort.ok, false);
+    assert.ok(privatePort.violations.some(v => v.rule === 'private-port-access' && v.file === source
+      && v.detail.path === 'object_snapshot::ObjectSnapshot'));
     fs.writeFileSync(path.join(scratch, source), read(source));
     add('src-tauri/src/native_object_client.rs', 'use crate::native_application_contract::HostResult;');
-    assert.equal(R.checkRustCrate(profile, policy, { root: scratch }).ok, false);
+    const wrongLayer = R.checkRustCrate(profile, policy, { root: scratch });
+    assert.equal(wrongLayer.ok, false);
+    assert.ok(wrongLayer.violations.some(v => v.rule === 'layer-violation'
+      && v.file === 'src-tauri/src/native_object_client.rs'
+      && v.detail.targetModule === 'rust.desktop.native.application.contract'));
   } finally { fs.rmSync(scratch, { recursive: true, force: true }); }
 });
