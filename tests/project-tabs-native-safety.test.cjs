@@ -17,7 +17,10 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
     const classes = new Set();
     const el = { children: [], style: {}, dataset: {}, listeners: {}, value: '', className: '', attributes: {},
       addEventListener(type, callback) { this.listeners[type] = callback; },
-      appendChild(child) { this.children.push(child); }, setAttribute(name, value) { this.attributes[name] = value; },
+      appendChild(child) { this.children.push(child); child.parent = this; return child; },
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      replaceWith(child) { child.parent = this.parent; this.parent.children[this.parent.children.indexOf(this)] = child; },
+      focus() {}, select() {}, blur() { this.listeners.blur?.(); },
       getAttribute(name) { return this.attributes[name]; }, removeChild() {}, click() { this.listeners.click?.(); } };
     el.classList = { add: name => classes.add(name), remove: name => classes.delete(name),
       contains: name => classes.has(name) || el.className.split(' ').includes(name),
@@ -30,7 +33,8 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
     getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
     createElement: element, querySelector(selector) {
       const match = selector.match(/data-tab="([^"]+)"/);
-      return match ? elements.get('project-tabs-list')?.children.find(row => row.dataset.tab === match[1]) : null;
+      const row = match ? elements.get('project-tabs-list')?.children.find(row => row.dataset.tab === match[1]) : null;
+      return selector.endsWith(' .pt-name') ? row?.children.find(child => child.className === 'pt-name') : row;
     } };
   const root = { location: { protocol: 'http:', hostname: 'localhost', port: '1420' },
     addEventListener() {}, requestAnimationFrame(callback) { callback(); },
@@ -56,7 +60,9 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
   vm.runInNewContext(fs.readFileSync('src/js/project-entry.js', 'utf8'), sandbox);
   sandbox.SMProjectEntry = root.SMProjectEntry;
   vm.runInNewContext(source, sandbox, { filename: 'project.js' });
+  const beforeReady = { bytes, state: JSON.stringify(sandbox.state), effects: effects.slice() };
   document.ready();
+  const afterReady = { bytes, state: JSON.stringify(sandbox.state), effects: effects.slice() };
   const list = () => document.getElementById('project-tabs-list').children;
   let a,b;
   if(!nativePorts){
@@ -78,7 +84,7 @@ function fixture({ populated = true, nativePorts = null, nativeFileAdapter = nul
         name: node.children[2].textContent, dirty: node.classList.contains('dirty') })) };
   }
   effects.length = 0; notices.length = 0;
-  return { root, effects, notices, document, sandbox, a, b, row, state,
+  return { root, effects, notices, document, sandbox, a, b, row, state, beforeReady, afterReady,
     close(id) { row(id).children[3].listeners.click({ stopPropagation() {} }); },
     switch(id) { row(id).listeners.click(); }, setBytes(value) { bytes = value; } };
 }
@@ -351,6 +357,61 @@ async function nativeInactiveTabDesktop(options={}) {
         lifecycleGeneration:owner.lifecycleGeneration,documentDigest:owner.documentDigest,savedDigest:owner.savedDigest,snapshotBytes:owner.snapshotBytes,
         undo:owner.undo,redo:owner.redo},frame:f.sandbox.state.currentFrame,open:f.root.SMProject.getOpenTabs()});}});
 }
+
+function semanticRows(f) {
+  const list=f.document.getElementById('project-tabs-list');
+  assert.equal(list.getAttribute('role'),'tablist');
+  assert.equal(list.getAttribute('aria-label'),'Project tabs');
+  const rows=list.children.map(row=>{
+    assert.equal(row.getAttribute('role'),'tab');
+    assert.equal(row.getAttribute('aria-label'),row.children[2].textContent);
+    assert.equal(row.getAttribute('aria-selected'),String(row.classList.contains('act')));
+    return {name:row.getAttribute('aria-label'),selected:row.getAttribute('aria-selected')};
+  });
+  assert.equal(new Set(list.children.map(row=>row.dataset.tab)).size,rows.length);
+  return rows;
+}
+test('actual empty startup publishes the named tablist without document or history effects',()=>{
+  const f=fixture({nativePorts(){}});
+  assert.deepEqual(semanticRows(f),[]);
+  assert.deepEqual(f.afterReady,f.beforeReady);
+  assert.deepEqual(f.effects,[]);
+});
+test('presentation adapter refuses missing DOM before resolving any rows or dirty state',()=>{
+  const f=fixture({nativePorts(){}});let reads=0;
+  f.root.SMProjectEntry.renderTabs({getElementById:()=>null},{readRows(){reads++;throw Error('dirty read');}});
+  assert.equal(reads,0);
+});
+test('semantic initialization is idempotent and preserves already-rendered rows and document state',()=>{
+  const f=fixture(),before=f.state(),list=f.document.getElementById('project-tabs-list'),rows=list.children.slice();
+  f.root.SMProjectEntry.initializeTabs(f.document);f.root.SMProjectEntry.initializeTabs(f.document);
+  assert.deepEqual(list.children,rows);
+  assert.deepEqual(f.state(),before);
+  assert.deepEqual(f.effects,[]);
+});
+test('shipped ordinary Open produces semantic A, A+B and A while native switch guard stays intact',async()=>{
+  const f=await admittedDesktop();
+  assert.deepEqual(semanticRows(f),[{name:'A',selected:'true'}]);
+  const before=f.snapshot();await f.root.SMProject.openPath('/B.json');
+  assert.deepEqual(semanticRows(f),[{name:'A',selected:'true'},{name:'B',selected:'false'}]);
+  const b=f.state().rows[1].id;f.switch(b);
+  assert.deepEqual(semanticRows(f),[{name:'A',selected:'true'},{name:'B',selected:'false'}]);
+  assert.equal(f.snapshot(),before);
+  f.close(b);await settleUntil(()=>f.state().rows.length===1);
+  assert.deepEqual(semanticRows(f),[{name:'A',selected:'true'}]);
+  assert.equal(f.snapshot(),before);
+});
+test('real browser switch, rename and close listeners keep displayed names and selection synchronized',()=>{
+  const f=fixture();
+  assert.equal(semanticRows(f)[0].selected,'true');
+  f.switch(f.b);assert.equal(semanticRows(f)[1].selected,'true');
+  let stopped=false;f.row(f.b).listeners.dblclick({stopPropagation(){stopped=true;}});
+  const input=f.row(f.b).children.find(node=>node.className==='pt-rename-input');
+  input.value='ordinary <name> & label';input.listeners.keydown({key:'Enter',stopPropagation(){}});
+  assert.equal(stopped,true);
+  assert.equal(semanticRows(f)[1].name,'ordinary <name> & label');
+  f.close(f.b);assert.deepEqual(semanticRows(f),[{name:'A',selected:'true'}]);
+});
 
 test('real Open callback prepares metadata-only B while pre-admitted dirty native A is unchanged',async()=>{
   const f=await nativeInactiveTabDesktop();const before=f.activeSnapshot();

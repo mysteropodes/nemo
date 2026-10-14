@@ -606,20 +606,15 @@
     return t.id===activeTabId?isDirty():!!t.dirty;
   }
   function renderTabBar(){
-    var list=document.getElementById('project-tabs-list');if(!list)return;
-    list.innerHTML='';
-    tabs.forEach(function(t){
-      var el=document.createElement('div');el.className='project-tab'+(t.id===activeTabId?' act':'');el.dataset.tab=t.id;
-      if(tabIsDirty(t))el.classList.add('dirty');
-      var dot=document.createElement('span');dot.className='pt-dot';
-      var dirtyDot=document.createElement('span');dirtyDot.className='pt-dirty';dirtyDot.title='Modifications non enregistrées';
-      var nm=document.createElement('span');nm.className='pt-name';nm.textContent=t.name;
-      var close=document.createElement('span');close.className='pt-close';close.textContent='×';close.title='Fermer l\'onglet';
-      close.addEventListener('click',function(e){e.stopPropagation();closeTab(t.id);});
-      el.appendChild(dot);el.appendChild(dirtyDot);el.appendChild(nm);el.appendChild(close);
-      el.addEventListener('click',function(){switchToTab(t.id);});
-      el.addEventListener('dblclick',function(e){e.stopPropagation();startTabRename(t.id);});
-      list.appendChild(el);
+    SMProjectEntry.renderTabs(document,{
+      readRows:function(){
+        return tabs.map(function(t){
+          return {id:t.id,name:t.name,active:t.id===activeTabId,dirty:tabIsDirty(t)};
+        });
+      },
+      switchTab:switchToTab,
+      closeTab:closeTab,
+      renameTab:startTabRename
     });
   }
   // Cheap DOM-only refresh for the active tab's dot, called from the
@@ -661,6 +656,7 @@
   }
 
   function initStartScreen(){
+    SMProjectEntry.initializeTabs(document);
     var hasAutosave=false;
     try{hasAutosave=!!localStorage.getItem('nemo-auto');}catch(e){}
     var resumeCard=document.getElementById('start-resume');
