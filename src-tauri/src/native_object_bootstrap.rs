@@ -10,6 +10,14 @@ use tauri_plugin_fs::FsExt;
 #[path = "native_object_reopen.rs"]
 mod reopen;
 
+#[path = "native_object_inactive_project.rs"]
+mod inactive;
+#[allow(unused_imports)]
+pub(crate) use inactive::{
+    __cmd__nemo_native_object_inactive_project,
+    __tauri_command_name_nemo_native_object_inactive_project, nemo_native_object_inactive_project,
+};
+
 #[path = "native_object_project_replace.rs"]
 mod replace;
 
