@@ -3,7 +3,7 @@
 // Inputs are already bounded helper facts; outputs contain only finite categories
 // and counts. No filesystem, native/UI authority, persistent state or new reads.
 // inspectProjectTabs wraps the existing observer port once; it never retries it.
-const SCHEMA = 'nemo.p38-inspection-completeness/1';
+const SCHEMA = 'nemo.p38-inspection-completeness/2';
 const LIMIT = 4096;
 const FLAGS = Object.freeze(['complete', 'truncated', 'depthClipped', 'childrenUnreadable', 'foreignChildren']);
 const FLAG_STATES = Object.freeze(['absent', 'true', 'false', 'invalid']);
@@ -12,6 +12,8 @@ const CATEGORIES = Object.freeze({
   blocked: Object.freeze(['child-owner', 'children-unavailable']),
   ownerQuery: Object.freeze(['matched', 'mismatch', 'query-failed']),
   childrenQuery: Object.freeze(['success', 'success-empty', 'unsupported', 'no-value', 'failed', 'wrong-type']),
+  childrenCountQuery: Object.freeze(['success-zero', 'success-positive', 'unsupported', 'no-value', 'failed', 'invalid']),
+  childrenWitness: Object.freeze(['empty-count-confirmed']),
 });
 const INSPECTION_CODES = Object.freeze(['inspection-budget-refused', 'inspection-transport-refused',
   'inspection-status-refused', 'inspection-identity-refused', 'inspection-projection-refused',
@@ -22,6 +24,25 @@ const INSPECTION_FAILURE_CODES = Object.freeze(['helper-input-ended', 'helper-ma
   'ready-ax-projection-refused', 'ready-phase-refused', 'ready-visible-unclassified']);
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const count = (value, limit) => Number.isInteger(value) && value >= 0 && value <= limit;
+function childrenWitnessFacts(node) {
+  const result = {}, query = node.childrenCountQuery, witness = node.childrenWitness;
+  const refused = () => { throw new Error('children-witness-refused'); };
+  if (query !== undefined) {
+    if (!CATEGORIES.childrenCountQuery.includes(query) || node.ownerQuery !== 'matched' ||
+      node.childrenQuery !== 'no-value' || node.blocked === 'child-owner') refused();
+    result.childrenCountQuery = query;
+    result.ownerQuery = 'matched'; result.childrenQuery = 'no-value';
+  }
+  if (witness !== undefined) {
+    if (witness !== 'empty-count-confirmed' || query !== 'success-zero' || node.ownerQuery !== 'matched' ||
+      node.childrenQuery !== 'no-value' || node.childCount !== 0 || node.blocked !== undefined) refused();
+    result.childrenWitness = witness;
+  }
+  if (query === 'success-zero' && witness !== 'empty-count-confirmed') refused();
+  if (node.childrenQuery === 'no-value' && node.childCount !== undefined && witness !== 'empty-count-confirmed') refused();
+  if (query !== undefined && query !== 'success-zero' && (witness !== undefined || node.childCount !== undefined)) refused();
+  return result;
+}
 
 function categoryCounts(nodes, key) {
   const categories = Object.fromEntries(CATEGORIES[key].map(category => [category, 0]));
@@ -104,5 +125,5 @@ async function inspectProjectTabs(inspect, identity, state, owner) {
   }
 }
 
-module.exports = { SCHEMA, INSPECTION_CODES, INSPECTION_FAILURE_CODES, summarizeCompleteness,
+module.exports = { SCHEMA, INSPECTION_CODES, INSPECTION_FAILURE_CODES, summarizeCompleteness, childrenWitnessFacts,
   validateCompletenessSummary, requireCompleteness, failureCompleteness, inspectProjectTabs };

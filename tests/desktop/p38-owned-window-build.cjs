@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 // node tests/desktop/p38-owned-window-build.cjs PNG_UI /absolute/helper /absolute/proof.json
-// Compile the two frozen sources, then run --self-test only. Never start an app.
+// Compile all frozen sources, then run --self-test only. Never start an app.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {spawnSync}=require('node:child_process');
-const INPUTS=Object.freeze(['p38-owned-window.swift','p38-owned-projection.swift']);
+const INPUTS=Object.freeze(['p38-owned-window.swift','p38-owned-projection.swift','p38-owned-children-query.swift']);
 const SCHEMAS=Object.freeze({PNG_UI:'nemo.png-ui-window-helper/1',P38:'nemo.p38-window-helper/1',REFERENCE:'nemo.reference-window-helper/1'});
 function check(ok){if(!ok)throw Object.assign(Error('window-helper-source-refused'),{code:'window-helper-source-refused'});}
 function hash(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
@@ -58,7 +58,7 @@ function buildHelper({workflow,output,proofFile}){
     fs.copyFileSync(executable,output,fs.constants.COPYFILE_EXCL);published=true;fs.chmodSync(output,0o700);
     const proof={schema:SCHEMAS[workflow],sourceHead:source.head,sourceSha256:manifest.sourceSha256,
       inputs:manifest.inputs,executableSha256:hash(fs.readFileSync(output)),
-      compiler:'swiftc -parse-as-library (two frozen inputs)',runtimeAX:false,foreignReads:0,staticSelfTest:result};
+      compiler:'swiftc -parse-as-library (three frozen inputs)',runtimeAX:false,foreignReads:0,staticSelfTest:result};
     fs.writeFileSync(proofFile,JSON.stringify(proof,null,2)+'\n',{flag:'wx',mode:0o600});
     return proof;
   }catch(e){

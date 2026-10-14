@@ -137,8 +137,11 @@ function sanitizeHelper(r,target='main'){
       check(p.ownerQuery==='matched'&&p.blocked!=='child-owner','png-query-refused');
       if(['success','success-empty'].includes(p.childrenQuery))check(Number.isInteger(n.childCount)&&n.childCount>=0&&n.childCount<4096&&
         (p.childrenQuery==='success-empty')===(n.childCount===0)&&p.blocked!=='children-unavailable','png-query-refused');
+      else if(p.childrenQuery==='no-value'&&n.childrenWitness==='empty-count-confirmed')check(n.childCount===0,'png-query-refused');
       else check(result.childrenUnreadable===true&&result.complete===false&&n.childCount===undefined,'png-query-refused');
     }
+    try { Object.assign(p, require('./p38-inspection-diagnostics.cjs').childrenWitnessFacts(n)); }
+    catch { check(false,'png-query-refused'); }
     for(const key of ['enabled','press','selected'])if(typeof n[key]==='boolean')p[key]=n[key];return p;
     });
   }

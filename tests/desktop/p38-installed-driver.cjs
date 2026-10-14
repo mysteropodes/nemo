@@ -82,6 +82,8 @@ function safeWindowEvidence(result, reference = false, completenessDiagnostics =
         check(Number.isInteger(node.childCount)&&node.childCount>=0&&node.childCount<4096,'ax-evidence-refused');
         clean.childCount=node.childCount;
       }
+      try { Object.assign(clean, require('./p38-inspection-diagnostics.cjs').childrenWitnessFacts(node)); }
+      catch { check(false, 'ax-evidence-refused'); }
       if(node.role==='AXTextField' && ['plain','search','other','unreadable'].includes(node.textFieldKind)) clean.textFieldKind=node.textFieldKind;
       return clean;
     }) };

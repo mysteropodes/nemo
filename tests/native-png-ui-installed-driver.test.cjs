@@ -543,3 +543,23 @@ test('PNG pages require observed roots and exact retained continuation; metadata
   for(const bad of [{childCount:'/private'},{nextChildOffset:4096},{complete:'yes'},{depthClipped:{}},{pageToken:'private-token'}])
     assert.throws(()=>P.sanitizeHelper({status:'ok',type:'inspect',...bad}));
 });
+test('PNG no-value emptiness requires correlated matched-owner zero-count evidence',()=>{
+  const identity={status:'ok',type:'inspect',pid:42,windowId:3,matchedAX:true,
+    complete:true,truncated:false,depthClipped:false,childrenUnreadable:false,foreignChildren:false};
+  const node={path:'0',role:'AXButton',ownerQuery:'matched',childrenQuery:'no-value',childCount:0,
+    childrenCountQuery:'success-zero',childrenWitness:'empty-count-confirmed',press:true};
+  const clean=P.sanitizeHelper({...identity,nodes:[node]});
+  assert.equal(clean.nodes[0].childrenQuery,'no-value');
+  assert.equal(clean.nodes[0].childrenWitness,'empty-count-confirmed');
+  for(const change of [n=>delete n.childrenWitness,n=>delete n.childrenCountQuery,n=>n.childCount=1,
+    n=>n.childrenCountQuery='success-positive',n=>n.childrenCountQuery='failed',n=>n.childrenQuery='unsupported',
+    n=>n.ownerQuery='mismatch',n=>n.blocked='children-unavailable',n=>n.childrenWitness='private-secret']){
+    const bad=structuredClone(node);change(bad);
+    assert.throws(()=>P.sanitizeHelper({...identity,nodes:[bad]}),/png-query-refused/);
+  }
+  for(const outcome of ['success-positive','unsupported','no-value','failed','invalid']){
+    const unreadable={...node,childrenCountQuery:outcome};delete unreadable.childCount;delete unreadable.childrenWitness;
+    const negative=P.sanitizeHelper({...identity,complete:false,childrenUnreadable:true,nodes:[unreadable]});
+    assert.equal(negative.complete,false);assert.equal(negative.nodes[0].childCount,undefined);
+  }
+});

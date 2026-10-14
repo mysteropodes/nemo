@@ -536,6 +536,7 @@ func boundedPinnedCGWindowSample(_ pid:pid_t, _ window:UInt32, _ deadline:UInt64
   }
 }
 func selfTest() throws {
+  try ownedChildrenQuerySelfTest()
   for fault in ["none","foreign","window","parent","child","cycle","unreadable","oversized"] {
     var reads = 0
     let ok = ownedAncestor(3,1,equal:==,owned:{ $0 != (fault == "foreign" ? 3 : -1) },
@@ -1633,12 +1634,7 @@ func run() throws {
       let projection = try ownedProjection(selected,base:base,depth:depth,maxNodes:maxNodes,
         expectedOwner:Int(inspectOwner),request:request,cursor:&projectionCursor,equal:{ CFEqual($0,$1) },hashKey:{ CFHash($0) },
         owner:{ value in var actual:pid_t = 0; return AXUIElementGetPid(value,&actual) == .success ? Int(actual) : nil },
-        children:{ current in
-          var value: CFTypeRef?
-          let query = AXUIElementCopyAttributeValue(current,kAXChildrenAttribute as CFString,&value)
-          return OwnedChildren(query:query == .success ? .success : query == .attributeUnsupported ? .unsupported : query == .noValue ? .noValue : .failed,
-            values:value as? [AXUIElement])
-        },
+        children:{ ownedAXChildren($0,expectedOwner:Int(inspectOwner)) },
         isWindow:{ attr($0,kAXRoleAttribute) as? String == kAXWindowRole },fact:fact,phase:setInspectionContext)
       result.merge(projection) { _,new in new }
       if request["projectTabs"] != nil {
