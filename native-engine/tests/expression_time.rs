@@ -2,17 +2,29 @@ use crate::evaluation::expression_time::{
     loop_plan, loop_value, step_time, to_frames, to_seconds, LoopMode, LoopPlan, LoopSide,
 };
 
+/// Bit pattern for comparison, with every NaN folded to one value. JS cannot
+/// observe a NaN's sign or payload, and engines and CPUs disagree on them
+/// (V8 on x86-64 yields 0xfff8…, JavaScriptCore and aarch64 yield 0x7ff8…);
+/// -0 versus +0 stays distinct.
+fn bits(x: f64) -> u64 {
+    if x.is_nan() {
+        f64::NAN.to_bits()
+    } else {
+        x.to_bits()
+    }
+}
+
 fn same(actual: f64, expected: f64, label: &str) {
     assert_eq!(
-        actual.to_bits(),
-        expected.to_bits(),
+        bits(actual),
+        bits(expected),
         "{label}: {actual:?} != {expected:?}"
     );
 }
 
 fn same_vec(actual: &[f64], expected: &[f64], label: &str) {
-    let a: Vec<u64> = actual.iter().map(|x| x.to_bits()).collect();
-    let e: Vec<u64> = expected.iter().map(|x| x.to_bits()).collect();
+    let a: Vec<u64> = actual.iter().map(|&x| bits(x)).collect();
+    let e: Vec<u64> = expected.iter().map(|&x| bits(x)).collect();
     assert_eq!(a, e, "{label}: {actual:?} != {expected:?}");
 }
 
