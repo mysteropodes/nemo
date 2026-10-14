@@ -43,6 +43,35 @@ mod public_target_budget {
     }
 
     #[test]
+    fn gpu_public_target_render_error_and_unwind_hold_charge_through_completion() {
+        if !isolated(concat!(
+            module_path!(),
+            "::gpu_public_target_render_error_and_unwind_hold_charge_through_completion"
+        )) {
+            return;
+        }
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+        let mut gpu = Compositor::new().unwrap();
+        let (scheduler, frame) = scheduled(10);
+        let scene = prepare(&scheduler, &frame, &input(0.0)).unwrap();
+        let budget = shared_image_resource_budget();
+        assert_eq!(budget.used().unwrap(), 0);
+        for unwind in [false, true] {
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                gpu.compose_failure_control(&scene, unwind)
+            }));
+            if unwind {
+                assert!(result.is_err());
+            } else {
+                assert!(result.unwrap().is_err());
+            }
+            assert_eq!(budget.used().unwrap(), 320 * 180 * 4);
+            complete(&gpu);
+            assert_eq!(budget.used().unwrap(), 0);
+        }
+    }
+
+    #[test]
     fn gpu_public_target_quota_overlap_and_escaped_handle_retirement() {
         if !isolated(concat!(
             module_path!(),

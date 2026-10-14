@@ -15,6 +15,8 @@ pub(crate) use object_compositor::scheduled_tests::{
     selector as object_test_selector,
 };
 pub(crate) use object_compositor::ScheduledObjectCompositionResult;
+#[cfg(all(feature = "application", feature = "project_media_codec"))]
+use object_target::ObjectTarget;
 use readback::ReadbackBytes;
 
 use crate::render_geometry::LayerShape;
@@ -167,7 +169,20 @@ impl Compositor {
 
     /// Render a prepared immutable scene into one native offscreen result.
     pub fn compose(&mut self, input: &RenderScene) -> Result<CompositionResult, CompositorError> {
+        self.compose_using(input, |gpu, view, width, height| {
+            gpu.render_target(view, width, height, Color::WHITE)
+        })
+    }
+
+    fn compose_using(
+        &mut self,
+        input: &RenderScene,
+        render: impl FnOnce(&mut Self, &wgpu::TextureView, u32, u32) -> Result<(), CompositorError>,
+    ) -> Result<CompositionResult, CompositorError> {
         let (width, height) = input.output_spec().dimensions();
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        let mut target = self.make_object_target(width, height)?;
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
         let (texture, view) = self.make_target(width, height);
         self.scene.reset();
         for layer in &input.layers {
@@ -219,15 +234,38 @@ impl Compositor {
             }
             self.scene.pop_layer();
         }
-        self.render_target(&view, width, height, Color::WHITE)?;
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        target.render(|view| render(self, view, width, height))?;
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+        render(self, &view, width, height)?;
         Ok(CompositionResult {
+            #[cfg(all(feature = "application", feature = "project_media_codec"))]
+            target,
+            #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
             texture,
+            #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
             view,
             width,
             height,
             scheduled_identity: input.scheduled_identity().clone(),
             document_id: input.document_id().to_owned(),
             content_revision: input.content_revision(),
+        })
+    }
+
+    // Exercise the same owner after a real render submission, including unwind.
+    #[cfg(all(test, feature = "application", feature = "project_media_codec"))]
+    pub(crate) fn compose_failure_control(
+        &mut self,
+        input: &RenderScene,
+        unwind: bool,
+    ) -> Result<CompositionResult, CompositorError> {
+        self.compose_using(input, |gpu, view, width, height| {
+            gpu.render_target(view, width, height, Color::WHITE)?;
+            if unwind {
+                panic!("injected public composition unwind");
+            }
+            Err(CompositorError::new("injected public composition failure"))
         })
     }
 
@@ -260,7 +298,7 @@ impl Compositor {
         &self,
         result: &CompositionResult,
     ) -> Result<NativeRgba8Readback, CompositorError> {
-        let bytes = self.readback_texture(&result.texture, result.width, result.height)?;
+        let bytes = self.readback_texture(result.texture(), result.width, result.height)?;
         Ok(NativeRgba8Readback {
             width: result.width,
             height: result.height,
@@ -271,6 +309,12 @@ impl Compositor {
         })
     }
 
+    // The desktop producer uses the charged owner. Retain this only for earlier
+    // feature-off targets and the existing raw-pixel mutation fixture.
+    #[cfg(any(
+        test,
+        not(all(feature = "application", feature = "project_media_codec"))
+    ))]
     fn make_target(&self, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("n12-vello-offscreen"),
@@ -294,7 +338,11 @@ impl Compositor {
 }
 
 pub struct CompositionResult {
+    #[cfg(all(feature = "application", feature = "project_media_codec"))]
+    target: ObjectTarget,
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     texture: wgpu::Texture,
+    #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
     view: wgpu::TextureView,
     width: u32,
     height: u32,
@@ -305,12 +353,29 @@ pub struct CompositionResult {
 
 impl CompositionResult {
     /// Native-only preview access; it never exposes CPU/JS pixel bytes.
+    /// In the desktop media configuration, cloned handles cannot extend the
+    /// owning result's lifetime; drop closes new GPU submissions through them.
     pub fn texture(&self) -> &wgpu::Texture {
-        &self.texture
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.target.texture()
+        }
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+        {
+            &self.texture
+        }
     }
 
+    /// Borrowed presentation view, with the same owner lifetime as `texture`.
     pub fn texture_view(&self) -> &wgpu::TextureView {
-        &self.view
+        #[cfg(all(feature = "application", feature = "project_media_codec"))]
+        {
+            self.target.view()
+        }
+        #[cfg(not(all(feature = "application", feature = "project_media_codec")))]
+        {
+            &self.view
+        }
     }
 
     pub fn dimensions(&self) -> (u32, u32) {

@@ -1,4 +1,5 @@
-//! Private object RGBA8 target lifetime; public legacy targets remain separate.
+//! Owned RGBA8 target lifetime for object and desktop public compositions.
+//! Feature-off public targets retain their separate, earlier behavior.
 use crate::compositor::{Compositor, CompositorError};
 
 #[cfg(all(feature = "application", feature = "project_media_codec"))]
