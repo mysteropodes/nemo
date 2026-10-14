@@ -28,7 +28,15 @@
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
-    function raw(command,request){return ports.invoke(command,{requestJson:JSON.stringify(request)});}
+    function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
+    function raw(command,request){
+      if(command!=='nemo_native_object_bootstrap'||typeof ports.openDiagnostic!=='function')return ports.invoke(command,{requestJson:JSON.stringify(request)});
+      openDiagnostic('bootstrap-dispatched');
+      var result;try{result=ports.invoke(command,{requestJson:JSON.stringify(request)});}catch(error){openDiagnostic('bootstrap-rejected',error&&error.code==='unsupported_format'?'unsupported-format':'other');throw error;}
+      function rejected(error){openDiagnostic('bootstrap-rejected',error&&error.code==='unsupported_format'?'unsupported-format':'other');throw error;}
+      if(result&&typeof result.then==='function')return result.then(function(value){openDiagnostic('bootstrap-resolved');return value;},rejected);
+      openDiagnostic('bootstrap-resolved');return result;
+    }
     function active(){return phase==='native';}
     function requireActive(){if(!active()||!info)throw new Error('Native project is unavailable; reopen Nemo');return info;}
     function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;});}
@@ -210,6 +218,7 @@
     if(!root.__TAURI__||!root.__TAURI__.core)return null;
     if(desktops.has(root))return desktops.get(root);
     var session=create({invoke:root.__TAURI__.core.invoke.bind(root.__TAURI__.core),
+      openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
       frame:function(){return root.state.currentFrame;},
       mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;
         return {cssBounds:{x:b.left,y:b.top,width:b.width,height:b.height},physicalExtent:{width:Math.max(1,Math.round(b.width*d)),height:Math.max(1,Math.round(b.height*d))},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:d};},

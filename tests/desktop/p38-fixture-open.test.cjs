@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const test = require('node:test');
 const crypto = require('node:crypto');
+const NativeObjectProject = require('../../src/js/adapters/native-object-project.js');
 const script = fs.readFileSync('tests/desktop/p38-fixture-open-bootstrap.js', 'utf8');
 const fixtures = Object.fromEntries(['A', 'B'].map(id => [id,
   `/task/tmp/p38-fixture-open-12345678-1234-1234-1234-123456789abc/${id}.json`]));
@@ -26,7 +27,8 @@ function execute(openResults, configPatch = {}, runtime = {}) {
     commands.push(command);
     if(command==='nemo_test_p38_fixture_open_probe'){
       const packet=JSON.parse(args.payloadJson); calls.push(packet);
-      return runtime.rejectCheckpointAt===packet.phase?Promise.reject(new Error('private checkpoint failure')):Promise.resolve();
+      return runtime.rejectCheckpointAt===packet.phase?Promise.reject(new Error('private checkpoint failure')):
+        Promise.resolve(packet.phase==='ready'?(runtime.readyDiagnostic===undefined?{aFixtureScope:'allowed'}:runtime.readyDiagnostic):undefined);
     }
     if(command==='nemo_native_object_client_status'){
       statusCalls.push({receiverMatchesCore:this===core,argumentCount:arguments.length});
@@ -44,7 +46,10 @@ function execute(openResults, configPatch = {}, runtime = {}) {
   fsBridge={};
   Object.defineProperty(fsBridge,'readTextFile',{enumerable:true,configurable:false,get:()=>readTextFile});
   Object.freeze(fsBridge);
-  const openPath=runtime.openPath||async function(path){opened.push(path);return openResults.shift();};
+  const openPath=runtime.openPath||async function(path){opened.push(path);
+    const events=runtime.openEvents||[['bootstrap-dispatched'],['bootstrap-resolved']];
+    for(const [event,code] of events)window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);
+    return openResults.shift();};
   project={};
   if(!runtime.missingOpenPath)Object.defineProperty(project,'openPath',{enumerable:true,configurable:false,get:()=>openPath});
   Object.freeze(project);
@@ -84,7 +89,7 @@ for(const result of [undefined,null,false,{status:'prepared'},{status:'returned'
   assert.deepEqual(r.opened,[fixtures.A]);
   assert.deepEqual(r.calls.map(x=>x.phase),['ready','a-opened']);
   assert.equal(r.calls[1].status,'failed');
-  assert.equal(r.calls[1].failureCode,result===false?'a-open-false':'a-open-unaccepted');
+  assert.equal(r.calls[1].failureCode,'a-native-bootstrap-resolved-open-refused');
   assert.equal(r.bridgesPreserved,true);
 });
 test('native open throw records only the fixed refusal and does not continue',async()=>{
@@ -93,6 +98,41 @@ test('native open throw records only the fixed refusal and does not continue',as
   assert.deepEqual(r.opened,[]);
   assert.equal(r.calls.at(-1).failureCode,'a-open-threw');
   assert.doesNotMatch(JSON.stringify(r.calls),/private|task\/tmp/);
+});
+test('a denied exact staged-file scope stops before calling production Open',async()=>{
+  const r=await execute([true],{},{readyDiagnostic:{aFixtureScope:'refused'}});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.deepEqual(r.calls.map(x=>[x.phase,x.status,x.failureCode]),[
+    ['ready','ready',undefined],['a-opened','failed','a-fs-read-rejected']]);
+});
+test('unknown scope diagnostic fails closed before fixture Open',async()=>{
+  const r=await execute([true],{},{readyDiagnostic:{aFixtureScope:'private-error'}});
+  assert.equal(r.result,'refused'); assert.deepEqual(r.opened,[]);
+  assert.equal(r.calls.at(-1).failureCode,'a-pre-native-refusal');
+  assert.doesNotMatch(JSON.stringify(r.calls),/private-error/);
+});
+test('allowOpen gate refusal and bootstrap failures retain distinct fixed stages',async()=>{
+  const gated=await execute([false],{},{openEvents:[['allow-open-refused']]});
+  assert.equal(gated.calls.at(-1).failureCode,'a-pre-native-refusal');
+  const unsupported=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-rejected','unsupported-format']]});
+  assert.equal(unsupported.calls.at(-1).failureCode,'a-native-bootstrap-unsupported-format');
+  const rejected=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-rejected','other']]});
+  assert.equal(rejected.calls.at(-1).failureCode,'a-native-bootstrap-rejected');
+  const resolved=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved']]});
+  assert.equal(resolved.calls.at(-1).failureCode,'a-native-bootstrap-resolved-open-refused');
+  for(const value of [gated,unsupported,rejected,resolved])
+    assert.doesNotMatch(JSON.stringify(value.calls),/private|task\/tmp|unavailable/);
+});
+test('native object adapter reports only fixed bootstrap outcomes and preserves rejection',async()=>{
+  const events=[], error={code:'unavailable',message:'private native path'};
+  const session=NativeObjectProject.create({openDiagnostic:(event,code)=>events.push([event,code]),invoke(command){
+    if(command==='nemo_native_object_client_status')return Promise.resolve(emptyStatus);
+    if(command==='nemo_native_object_bootstrap')return Promise.reject(error);
+    throw new Error('unexpected command');
+  }});
+  await assert.rejects(session.openPath(fixtures.A),e=>e===error);
+  assert.deepEqual(events,[['bootstrap-dispatched',undefined],['bootstrap-rejected','other']]);
+  assert.doesNotMatch(JSON.stringify(events),/private native path|unavailable/);
 });
 test('invalid empty native status refuses before opening A',async()=>{
   const r=await execute([true],{},{statusResults:[null]});
