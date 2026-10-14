@@ -120,6 +120,15 @@ fn exact_pending_subscriber_proof_presents_on_original_gpu_without_ack_or_barrie
     let mut tagged = f.raw.clone();
     tagged["revisionSync"] =
         json!({"subscriptionId":binding["subscriptionId"],"event":event.clone()});
+    let mut array_proof = tagged.clone();
+    array_proof["revisionSync"] = json!([]);
+    assert!(admit_request(&array_proof.to_string(), f.state.instance_id()).is_err());
+    let mut array_event = tagged.clone();
+    array_event["revisionSync"]["event"] = json!([]);
+    assert!(admit_request(&array_event.to_string(), f.state.instance_id()).is_err());
+    let mut null_proof = tagged.clone();
+    null_proof["revisionSync"] = serde_json::Value::Null;
+    assert!(admit_request(&null_proof.to_string(), f.state.instance_id()).is_err());
     let mut malformed = tagged.clone();
     malformed["revisionSync"]["extra"] = json!(true);
     assert!(admit_request(&malformed.to_string(), f.state.instance_id()).is_err());

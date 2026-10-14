@@ -1,7 +1,6 @@
 //! Private synchronous application route; no transport or capability activation.
 use crate::application_mcp::ApplicationMcp;
 use crate::native_dispatch::NativeObjectHost;
-use crate::native_object_desktop_preview::PreviewRevisionProof;
 use native_engine::{
     compositor::Compositor,
     desktop_viewport::{DesktopViewportHost, PresentationReceipt, SurfacePort},
@@ -43,7 +42,7 @@ impl ApplicationMcp {
         &self,
         lifecycle_generation: u64,
         expected: &ObjectFrameSelector<'_>,
-        revision_sync: Option<&PreviewRevisionProof>,
+        revision_sync: Option<(&str, &serde_json::Value)>,
         operation: impl FnOnce(&mut NativeObjectHost) -> Result<T, String>,
     ) -> Result<T, String> {
         if expected.instance_id != self.instance_id() {
@@ -73,23 +72,20 @@ impl ApplicationMcp {
             .map_err(|_| "native revision lock unavailable")?;
         revisions.reconcile(lifecycle_generation, application.document_id());
         if let Some(pending) = revisions.pending.as_ref() {
-            let exact_subscriber_preview = revision_sync.is_some_and(|proof| {
-                let event = &proof.event;
+            let exact_subscriber_preview = revision_sync.is_some_and(|(subscription_id, event)| {
+                let exact_event = serde_json::to_value(&pending.event)
+                    .ok()
+                    .is_some_and(|pending_event| pending_event == *event);
                 !pending.failed
                     && !pending.acknowledged
                     && pending.sender.is_some()
                     && revisions.subscriber.as_ref().is_some_and(|subscriber| {
-                        subscriber.subscription_id == proof.subscription_id
+                        subscriber.subscription_id == subscription_id
                             && subscriber.instance_id == expected.instance_id
                             && subscriber.document_id == expected.document_id
                             && subscriber.lifecycle_generation == lifecycle_generation
                     })
-                    && pending.event.instance_id == event.instance_id
-                    && pending.event.document_id == event.document_id
-                    && pending.event.lifecycle_generation == event.lifecycle_generation
-                    && pending.event.request_id == event.request_id
-                    && pending.event.from_revision == event.from_revision
-                    && pending.event.to_revision == event.to_revision
+                    && exact_event
                     && pending.event.to_revision == expected.content_revision
             });
             if !exact_subscriber_preview {

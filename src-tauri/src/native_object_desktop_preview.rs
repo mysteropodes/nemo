@@ -13,7 +13,7 @@ use native_engine::{
     object_frame_packet::ObjectFrameSelector,
     scheduler::OutputSpec,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
 const MAX_BYTES: usize = 8192;
@@ -27,7 +27,7 @@ pub(crate) struct PreviewRevisionProof {
     pub(crate) event: PreviewRevisionEvent,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct PreviewRevisionEvent {
     pub(crate) instance_id: String,
@@ -76,6 +76,16 @@ pub(crate) fn admit_request(raw: &str, instance: &str) -> HostResult<ObjectPrevi
             "invalid_request",
             "object preview requires bounded original JSON bytes",
         ));
+    }
+    let shape: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|_| host_error("invalid_request", "invalid raw object preview request"))?;
+    if let Some(proof) = shape.get("revisionSync") {
+        if !proof.is_object() || !proof.get("event").is_some_and(serde_json::Value::is_object) {
+            return Err(host_error(
+                "invalid_request",
+                "revision preview proof must be objects",
+            ));
+        }
     }
     let request: ObjectPreviewRequest = serde_json::from_str(raw)
         .map_err(|_| host_error("invalid_request", "invalid raw object preview request"))?;
@@ -157,11 +167,22 @@ pub(crate) fn preview_with_target(
 ) -> HostResult<NativePreviewReceipt> {
     let selector = request.selector();
     let output: OutputSpec = request.output_spec.admit()?;
+    let revision_event = request
+        .revision_sync
+        .as_ref()
+        .map(|proof| serde_json::to_value(&proof.event))
+        .transpose()
+        .map_err(|_| host_error("invalid_request", "invalid revision preview proof"))?;
+    let revision_sync = request
+        .revision_sync
+        .as_ref()
+        .zip(revision_event.as_ref())
+        .map(|(proof, event)| (proof.subscription_id.as_str(), event));
     let receipt = state
         .with_object_preview_owner_for_preview(
             request.lifecycle_generation,
             &selector,
-            request.revision_sync.as_ref(),
+            revision_sync,
             |owner| {
                 owner.with_prepared_object_preview(&selector, output, |owner| {
                     Ok(target(ObjectPreviewConsumer {

@@ -4,7 +4,6 @@ use crate::application_mcp::revision_sync::object_preview_route::tests::support:
 };
 use crate::application_mcp::revision_sync::{RevisionBinding, RevisionControl};
 use crate::native_dispatch::{NativeDispatch, NativePhase};
-use crate::native_object_desktop_preview::PreviewRevisionProof;
 use native_engine::{
     commands::NativeOpacityApplication, desktop_viewport::ViewportStatus,
     document::OpacityDocument, object_document::FrameScopeKind, scheduler::OutputSpec,
@@ -140,10 +139,9 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
     let (event, mut receiver) = delivery.notification.unwrap();
     f.refresh();
     assert!(f.run().unwrap_err().contains("pending"));
-    let proof: PreviewRevisionProof = serde_json::from_value(json!({
-        "subscriptionId": binding.subscription_id.clone(), "event": event.clone(),
-    }))
-    .unwrap();
+    let subscription_id = binding.subscription_id.clone();
+    let proof_event = serde_json::to_value(&event).unwrap();
+    let proof = (subscription_id.as_str(), &proof_event);
     f.expected_pixel.set([255, 0, 0, 255]);
     let pins = f.pins.clone();
     let selector = pins.selector();
@@ -154,28 +152,21 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
         .contains("pending"));
     let presented = f
         .state
-        .with_object_preview_owner_for_preview(
-            f.pins.generation,
-            &selector,
-            Some(&proof),
-            |owner| owner.present_object_preview(&selector, output(), &mut f.gpu, &mut f.view),
-        )
+        .with_object_preview_owner_for_preview(f.pins.generation, &selector, Some(proof), |owner| {
+            owner.present_object_preview(&selector, output(), &mut f.gpu, &mut f.view)
+        })
         .unwrap();
     assert_eq!(presented.status(), &ViewportStatus::Presented);
     assert!(matches!(
         receiver.try_recv(),
         Err(tokio::sync::oneshot::error::TryRecvError::Empty)
     ));
-    let mut foreign: PreviewRevisionProof = serde_json::from_value(json!({
-        "subscriptionId": "foreign-subscriber", "event": event.clone(),
-    }))
-    .unwrap();
     assert!(f
         .state
         .with_object_preview_owner_for_preview(
             f.pins.generation,
             &selector,
-            Some(&foreign),
+            Some(("foreign-subscriber", &proof_event)),
             |_| Ok(())
         )
         .unwrap_err()
@@ -189,16 +180,12 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
     ] {
         let mut changed_event = serde_json::to_value(&event).unwrap();
         changed_event[field] = value;
-        let changed: PreviewRevisionProof = serde_json::from_value(json!({
-            "subscriptionId": binding.subscription_id.clone(), "event": changed_event,
-        }))
-        .unwrap();
         assert!(
             f.state
                 .with_object_preview_owner_for_preview(
                     f.pins.generation,
                     &selector,
-                    Some(&changed),
+                    Some((subscription_id.as_str(), &changed_event)),
                     |_| Ok(())
                 )
                 .unwrap_err()
@@ -206,14 +193,14 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
             "{field}"
         );
     }
-    foreign.subscription_id = binding.subscription_id.clone();
-    foreign.event.request_id = "foreign-request".into();
+    let mut foreign_event = proof_event.clone();
+    foreign_event["requestId"] = json!("foreign-request");
     assert!(f
         .state
         .with_object_preview_owner_for_preview(
             f.pins.generation,
             &selector,
-            Some(&foreign),
+            Some((subscription_id.as_str(), &foreign_event)),
             |_| Ok(())
         )
         .unwrap_err()
@@ -233,17 +220,23 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
     assert!(f.run().unwrap_err().contains("pending"));
     assert!(f
         .state
-        .with_object_preview_owner_for_preview(f.pins.generation, &selector, Some(&proof), |_| Ok(
-            ()
-        ))
+        .with_object_preview_owner_for_preview(
+            f.pins.generation,
+            &selector,
+            Some(proof),
+            |_| Ok(())
+        )
         .unwrap_err()
         .contains("pending"));
     assert!(f.state.revisions.settle(&f.state.native, &event, true));
     assert!(f
         .state
-        .with_object_preview_owner_for_preview(f.pins.generation, &selector, Some(&proof), |_| Ok(
-            ()
-        ))
+        .with_object_preview_owner_for_preview(
+            f.pins.generation,
+            &selector,
+            Some(proof),
+            |_| Ok(())
+        )
         .unwrap_err()
         .contains("no pending"));
     assert_eq!(f.run().unwrap().status(), &ViewportStatus::Presented);
@@ -251,10 +244,7 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
     assert!(delivery.response.ok);
     let (second_event, _) = delivery.notification.unwrap();
     f.refresh();
-    let second_proof: PreviewRevisionProof = serde_json::from_value(json!({
-        "subscriptionId": binding.subscription_id.clone(), "event": second_event,
-    }))
-    .unwrap();
+    let second_event_value = serde_json::to_value(&second_event).unwrap();
     f.state
         .revisions
         .control(
@@ -271,7 +261,7 @@ fn gpu_real_external_revision_admits_only_exact_subscriber_preview_before_ack() 
         .with_object_preview_owner_for_preview(
             f.pins.generation,
             &second_selector,
-            Some(&second_proof),
+            Some((subscription_id.as_str(), &second_event_value)),
             |_| Ok(())
         )
         .unwrap_err()
