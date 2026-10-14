@@ -7,7 +7,7 @@ const test = require('node:test');
 const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { PHASES, PROBE_FAILURE_CODES, runObserver, fail, writeOutcome, verifyHelperExecutable,
-  helperEnvironment, stopSpawnedHelper, defaultServices, safeCode } = require('./p38-fixture-open-owner.cjs');
+  helperEnvironment, stopSpawnedHelper, defaultServices, safeCode, inspectProjectTabs } = require('./p38-fixture-open-owner.cjs');
 
 const config = Object.freeze({ taskId:'p38-task-test', grantId:'p38-grant-test',
   helperPath:'/tmp/p38-window-helper', helperSha256:'e'.repeat(64), sourceHead:'b'.repeat(40), timeoutMs:10000 });
@@ -280,7 +280,7 @@ function makeServices(overrides = {}) {
 test('actual owner discovery pages beyond 128, retains the region through all ACKs and refuses unsafe proofs',async()=>{
   const actual=require('./p38-fixture-open-installed.cjs'),token='12345678-1234-1234-1234-123456789abc';
   async function trial(fault) {
-    const f=makeServices(),state={actions:0};let phase='ready';const requests=[];
+    const f=makeServices(),state={actions:fault==='budget'?63:0};let phase='ready';const requests=[];
     const wait=f.services.waitForCheckpoint;
     f.services.waitForCheckpoint=async(...args)=>{phase=args[3];return await wait(...args);};
     f.services.owner.visibleEvidence=actual.visibleEvidence;
@@ -312,10 +312,13 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
       if(fault==='clipped'&&request.projectTabs) {raw.depthClipped=true;raw.complete=false;}
       if(fault==='stale'&&request.projectTabs&&phase==='a-opened')raw.projectTabs.token='87654321-1234-1234-1234-123456789abc';
       if(fault==='selection'&&request.projectTabs&&phase==='a-opened')raw.nodes[1].selected=false;
+      if(fault==='status')raw.status='refused';if(fault==='identity')raw.windowId=999;
+      if(fault==='projection')raw.nodes[0].path='/private/secret';if(fault==='root')raw.nodes=[];
+      if(fault==='transport')throw new Error('/private/token pid777');
       return raw;
     }
     f.services.startHelper=async()=>({next:async()=>({status:'pinned',pid:42,windowId:6068,matchedAX:true}),
-      inspect:async identity=>actual.observeProjectTabs(wire,identity,state),capture:async(window,index)=>({phase:PHASES[index],
+      inspect:async identity=>inspectProjectTabs(wire,identity,state,actual),capture:async(window,index)=>({phase:PHASES[index],
         pid:window.pid,windowId:window.windowId,capture:'capture-'+(index+1)+'.png',sha256:'e'.repeat(64),width:800,height:600}),quit:async()=>f.events.push('quit'),
       close:async()=>f.events.push('cleanup')});
     const result=await runObserver(config,f.services);return {...f,result,requests};
@@ -327,11 +330,32 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
   assert.ok(good.requests.every(r=>r.type==='inspect'&&r.maxNodes===128&&r.depth<=5));
   assert.ok(good.requests.filter(r=>r.projectTabsToken).every(r=>r.projectTabsToken===token));
   assert.equal(good.result.cleanup,'complete');assert.equal(good.result.installedAcceptance,'not-established');
-  for(const fault of ['cursor','reordered','foreign','unreadable','duplicate','missing','clipped','stale','selection']) {
+  for(const [fault,code] of [['cursor','inspection-page-refused'],['reordered','inspection-page-refused'],
+    ['foreign','inspection-completeness-refused'],['unreadable','inspection-completeness-refused'],
+    ['duplicate','inspection-marker-refused'],['missing','inspection-marker-refused'],['clipped','inspection-region-refused'],
+    ['stale','inspection-region-refused'],['selection','inspection-refused'],['status','inspection-status-refused'],
+    ['identity','inspection-identity-refused'],['projection','inspection-projection-refused'],['root','inspection-root-refused'],
+    ['transport','inspection-transport-refused'],['budget','inspection-budget-refused']]) {
     const bad=await trial(fault);assert.equal(bad.result.status,'partial',fault);assert.equal(bad.result.cleanup,'complete');
-    assert.ok(bad.result.firstFailure,fault);
+    assert.equal(bad.result.firstFailure.code,code,fault);
     assert.equal(bad.acks.filter(x=>x.decision==='accepted').length,['stale','selection'].includes(fault)?1:0,fault);
     assert.equal(bad.events.includes('quit'),false,fault);
+    assert.ok(bad.saved.some(x=>x.firstFailure?.code===code));assert.doesNotMatch(JSON.stringify(bad.saved),/private|secret|pid777/);
+  }
+});
+test('actual inspection adapter sanitizes unknown errors and preserves first failure through cleanup',async()=>{
+  for(const [code,observerCode,expected] of [['private-path-token',undefined,'inspection-refused'],
+    [undefined,undefined,'inspection-refused'],['inspection-region-refused',undefined,'inspection-region-refused'],
+    [undefined,'private-observer-code','inspection-refused'],[undefined,'helper-malformed','helper-malformed']]){
+    const f=makeServices({cleanupFailure:true});const helper=await f.services.startHelper();
+    helper.inspect=identity=>inspectProjectTabs(async()=>{},identity,{actions:0},{observeProjectTabs:async()=>{
+      throw Object.assign(new Error('/private/secret token pid777'),{code,...(observerCode?{observerStage:'inspection',observerCode}:{}),private:'raw AX value'});
+    }});
+    const result=await runObserver(config,f.services);
+    assert.equal(result.firstFailure.code,expected);assert.equal(result.firstFailure.stage,'inspection');
+    assert.equal(result.cleanup,'incomplete');assert.equal(result.observations.length,0);assert.equal(result.captures.length,0);
+    assert.equal(f.acks.length,0);assert.equal(f.events.filter(x=>x.startsWith('checkpoint:')).length,1);
+    assert.doesNotMatch(JSON.stringify(f.saved),/private|secret|pid777|raw AX/);
   }
 });
 
