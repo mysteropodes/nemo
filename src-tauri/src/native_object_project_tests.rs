@@ -76,7 +76,10 @@ fn p38_drawing(variant: bool) -> Value {
         "format": "nemo.native-object-document",
         "formatVersion": 2,
         "totalFrames": 21,
-        "layers": [{"layerUid": "legacy layer:alpha"}, {"layerUid": "0"}],
+        "layers": [
+            {"layerUid": "legacy layer:alpha", "timing": timing_tests::fixture_timing(&[0, 7])},
+            {"layerUid": "0", "timing": timing_tests::fixture_timing(&[])}
+        ],
         "objects": [at_open, authored, reference],
         "compositionOrder": {
             "format": "nemo.native-object-order-plan",
@@ -398,6 +401,9 @@ fn blank_host_snapshot(owner: &NativeObjectHost) -> Vec<u8> {
         .unwrap()
         .unwrap()
 }
+
+#[path = "native_object_project_timing_tests.rs"]
+mod timing_tests;
 
 fn blank_host_cpu_preview(owner: &mut NativeObjectHost) {
     let info = owner.project_file_info().unwrap();
