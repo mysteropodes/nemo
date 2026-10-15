@@ -10,7 +10,10 @@ const { safeWindowEvidence, verifyWindow, cleanupHelper } = require('./p38-insta
 const { INSPECTION_FAILURE_CODES, inspectProjectTabs, failureCompleteness, failureBudget } = require('./p38-inspection-diagnostics.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
-const OPEN_STAGES=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
+const OPEN_STAGES=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'].concat(
+  ['first-preview','second-preview'].flatMap(prefix=>['frame-range','mapping','viewport','owner','receipt','status','work-id','view-generation','receipt-access',
+    'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
+    'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'].map(detail=>prefix+'-'+detail)));
 const OPEN_FAILURES=OPEN_STAGES.flatMap(stage=>['invoke-rejected','local-refusal'].flatMap(kind=>
   ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch','unknown'].flatMap(code=>
     ['notDispatched','other'].map(disposition=>`post-bootstrap-${stage}:${kind}:${code}:${disposition}`))));

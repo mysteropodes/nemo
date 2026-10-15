@@ -37,7 +37,11 @@
   }
   let activeOpen = null;
   const OPEN_STAGES = ['receipt','installed-status','metadata','first-preview','first-owner','reveal',
-    'second-preview','second-owner','ui-commit','publication','subscriber'];
+    'second-preview','second-owner','ui-commit','publication','subscriber'].concat(['first-preview','second-preview'].flatMap(prefix=>
+      ['frame-range','mapping','viewport','owner','receipt','status','work-id','view-generation','receipt-access',
+        'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation',
+        'status-failed-device-lost','status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure']
+        .map(detail=>prefix+'-'+detail)));
   function postBootstrapCode(code) {
     if(typeof code!=='string')return false;
     const parts=code.split(':');

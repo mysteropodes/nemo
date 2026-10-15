@@ -209,8 +209,11 @@ fn allowed_open_failure(code: &str, prefix: &str) -> bool {
 
 fn allowed_open_stage(code: &str) -> bool {
     let fields: Vec<_> = code.split(':').collect();
+    let preview_guard = ["first-preview-", "second-preview-"].iter().any(|prefix|
+        fields.first().and_then(|stage| stage.strip_prefix(*prefix)).is_some_and(|detail|
+            "frame-range|mapping|viewport|owner|receipt|status|work-id|view-generation|receipt-access|status-stale-discarded|status-deferred-timeout|status-deferred-occluded|status-failed-validation|status-failed-device-lost|status-failed-retry-lost|status-failed-retry-outdated|status-failed-recreate|status-failed-reconfigure".split('|').any(|value|value==detail)));
     matches!(fields.as_slice(), [stage, kind, native, disposition] if
-        "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|').any(|value|value==*stage)
+        (preview_guard || "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|').any(|value|value==*stage))
         && matches!(*kind, "invoke-rejected" | "local-refusal")
         && "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|wrong_instance|wrong_document|cancelled_before_dispatch|unknown".split('|').any(|value|value==*native)
         && matches!(*disposition, "notDispatched" | "other"))

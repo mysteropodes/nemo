@@ -102,8 +102,9 @@ test('real desktop Open distinguishes all first post-bootstrap boundaries and na
   for(const stage of stages){
     const h=scenario({stage});await assert.rejects(h.open());
     const callbacks=['reveal','ui-commit','publication'].includes(stage);
+    const diagnosticStage=['first-preview','second-preview'].includes(stage)?stage+'-status':stage;
     assert.deepEqual(h.diagnostics,[['bootstrap-dispatched',undefined],['bootstrap-resolved',undefined],
-      ['post-bootstrap-failed',`post-bootstrap-${stage}:local-refusal:${callbacks?'unavailable:notDispatched':'unknown:other'}`]]);
+      ['post-bootstrap-failed',`post-bootstrap-${diagnosticStage}:local-refusal:${callbacks?'unavailable:notDispatched':'unknown:other'}`]]);
     assert.equal(h.session.isActive(),false);assert.equal(h.session.readPresentedObjectSession(),null);
     assert.equal(h.openCalls.filter(c=>c==='nemo_native_object_bootstrap').length,1);
     assert.doesNotMatch(JSON.stringify(h.diagnostics),/PRIVATE|INVALID ID/);
