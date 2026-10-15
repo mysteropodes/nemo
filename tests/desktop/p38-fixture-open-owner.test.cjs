@@ -122,12 +122,15 @@ test('post-wait validation has a distinct fixed category only on the prior curso
     {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
 });
 test('owner observation retains the fixed A-phase cause after ready acknowledgement',async()=>{
-  const result=await checkpointObservation();
-  const failure={stage:'probe-manifest',code:'probe-manifest-failed-a-fs-read-rejected'};
+  for(const failureCode of ['a-fs-read-rejected','a-post-bootstrap-first-preview:invoke-rejected:unavailable:notDispatched',
+    'a-post-bootstrap-subscriber:local-refusal:unknown:other']){
+  const result=await checkpointObservation({checkpoint:1,failureCode});
+  const failure={stage:'probe-manifest',code:'probe-manifest-failed-'+failureCode};
   assert.deepEqual(result.firstFailure&&{stage:result.firstFailure.stage,code:result.firstFailure.code},failure);
   assert.deepEqual(result.saved&&{stage:result.saved.stage,code:result.saved.code},failure);
   assert.deepEqual(result.observations.map(item=>[item.phase,item.decision]),[['ready','accepted']]);
   assert.equal(result.cleanup,'complete');
+  }
 });
 test('owner observation distinguishes post-wait validation from A refusal',async()=>{
   const result=await checkpointObservation({checkpoint:0,failureCode:'post-wait-validation-refused'});
@@ -143,11 +146,15 @@ function rustAllowedFailures(phase) {
   const source=fs.readFileSync(path.join(__dirname,'../../src-tauri/src/task_runtime/p38_fixture_open_probe_control.rs'),'utf8');
   const match=source.match(new RegExp(`pub\\(super\\) fn allowed_${phase}_failure\\(code: &str\\) -> bool \\{([\\s\\S]*?)\\n\\}`));
   assert.ok(match,`Rust ${phase} failure allowlist exists`);
-  return [...match[1].matchAll(/"([^"]+)"/g)].map(item=>item[1]);
+  const strings=body=>[...body.matchAll(/"([^"]+)"/g)].map(item=>item[1]);
+  if(!['a','b'].includes(phase))return strings(match[1]);
+  const common=source.match(/fn allowed_open_failure\([\s\S]*?\n\}/)[0];
+  return [...strings(common).filter(code=>code!=='post-bootstrap-').map(code=>phase+'-'+code),
+    ...strings(match[1]).filter(code=>code!==phase+'-')];
 }
 test('owner allowlists and classifies every fixed Rust failure by matching phase cursor',async()=>{
   for(const phase of ['ready','a','b','closed'])
-    assert.deepEqual(PROBE_FAILURE_CODES[phase],rustAllowedFailures(phase),`${phase} owner/Rust failure allowlists match`);
+    assert.deepEqual(PROBE_FAILURE_CODES[phase].filter(code=>!code.includes('-post-bootstrap-')),rustAllowedFailures(phase),`${phase} owner/Rust legacy allowlists match`);
   const cases=[['ready',0],['a',1],['b',2],['closed',3]].flatMap(([phase,checkpoint])=>
     PROBE_FAILURE_CODES[phase].map(failureCode=>({checkpoint,failureCode})));
   for(const {checkpoint,failureCode} of cases){
@@ -155,6 +162,14 @@ test('owner allowlists and classifies every fixed Rust failure by matching phase
     assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint,failureCode,result:'failed'}),
       {stage:'probe-manifest',code:category});
     assert.equal(safeCode('probe-manifest',category),category);
+  }
+  for(const field of ['stage','kind','native','disposition','extra']){
+    const values=['receipt','invoke-rejected','unavailable','notDispatched'];
+    if(field==='extra')values.push('PRIVATE');else values[['stage','kind','native','disposition'].indexOf(field)]='PRIVATE';
+    const category='probe-manifest-failed-a-post-bootstrap-'+values.join(':');
+    assert.equal(safeCode('probe-manifest',category),'probe-temp-identity-refused');
+    assert.deepEqual(await probeFailure({failed:true,waiting:false,checkpoint:1,failureCode:category.slice('probe-manifest-failed-'.length),result:'failed'}),
+      {stage:'probe-manifest',code:'probe-manifest-failure-unknown'});
   }
 });
 test('owner keeps mismatched, malformed, and private manifest failures sanitized',async()=>{

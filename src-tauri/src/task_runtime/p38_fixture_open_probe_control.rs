@@ -179,45 +179,45 @@ pub(super) fn allowed_ready_failure(code: &str) -> bool {
 }
 
 pub(super) fn allowed_a_failure(code: &str) -> bool {
+    allowed_open_failure(code, "a-")
+}
+
+fn allowed_open_failure(code: &str, prefix: &str) -> bool {
+    let Some(code) = code.strip_prefix(prefix) else {
+        return false;
+    };
     matches!(
         code,
-        "a-open-threw"
-            | "a-open-false"
-            | "a-open-unaccepted"
-            | "a-pre-native-refusal"
-            | "a-native-status-rejected"
-            | "a-native-bootstrap-unsupported-format"
-            | "a-native-bootstrap-rejected"
-            | "a-native-bootstrap-resolved-open-refused"
-            | "a-native-status-empty-no-bootstrap"
-            | "a-native-status-available-no-bootstrap"
-            | "a-native-status-malformed-no-bootstrap"
-            | "a-observer-late-untrusted"
-            | "a-fs-read-rejected"
-            | "a-fs-read-resolved-open-refused"
-    )
+        "open-threw"
+            | "open-false"
+            | "open-unaccepted"
+            | "pre-native-refusal"
+            | "native-status-rejected"
+            | "native-bootstrap-unsupported-format"
+            | "native-bootstrap-rejected"
+            | "native-bootstrap-resolved-open-refused"
+            | "native-status-empty-no-bootstrap"
+            | "native-status-available-no-bootstrap"
+            | "native-status-malformed-no-bootstrap"
+            | "observer-late-untrusted"
+            | "fs-read-rejected"
+            | "fs-read-resolved-open-refused"
+    ) || code
+        .strip_prefix("post-bootstrap-")
+        .is_some_and(allowed_open_stage)
+}
+
+fn allowed_open_stage(code: &str) -> bool {
+    let fields: Vec<_> = code.split(':').collect();
+    matches!(fields.as_slice(), [stage, kind, native, disposition] if
+        "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|').any(|value|value==*stage)
+        && matches!(*kind, "invoke-rejected" | "local-refusal")
+        && "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|wrong_instance|wrong_document|cancelled_before_dispatch|unknown".split('|').any(|value|value==*native)
+        && matches!(*disposition, "notDispatched" | "other"))
 }
 
 pub(super) fn allowed_b_failure(code: &str) -> bool {
-    matches!(
-        code,
-        "b-open-threw"
-            | "b-open-false"
-            | "b-open-unaccepted"
-            | "b-pre-native-refusal"
-            | "b-native-status-rejected"
-            | "b-native-bootstrap-unsupported-format"
-            | "b-native-bootstrap-rejected"
-            | "b-native-bootstrap-resolved-open-refused"
-            | "b-native-status-empty-no-bootstrap"
-            | "b-native-status-available-no-bootstrap"
-            | "b-native-status-malformed-no-bootstrap"
-            | "b-observer-late-untrusted"
-            | "b-fs-read-rejected"
-            | "b-fs-read-resolved-open-refused"
-            | "b-switch-unaccepted"
-            | "b-a-state-changed"
-    )
+    allowed_open_failure(code, "b-") || matches!(code, "b-switch-unaccepted" | "b-a-state-changed")
 }
 
 pub(super) fn allowed_closed_failure(code: &str) -> bool {

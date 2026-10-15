@@ -10,19 +10,23 @@ const { safeWindowEvidence, verifyWindow, cleanupHelper } = require('./p38-insta
 const { INSPECTION_FAILURE_CODES, inspectProjectTabs, failureCompleteness, failureBudget } = require('./p38-inspection-diagnostics.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
+const OPEN_STAGES=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
+const OPEN_FAILURES=OPEN_STAGES.flatMap(stage=>['invoke-rejected','local-refusal'].flatMap(kind=>
+  ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch','unknown'].flatMap(code=>
+    ['notDispatched','other'].map(disposition=>`post-bootstrap-${stage}:${kind}:${code}:${disposition}`))));
 const PROBE_FAILURE_CODES = Object.freeze({
   ready: Object.freeze(['ready-open-path-unavailable', 'ready-observer-install-failed']),
   a: Object.freeze(['a-open-threw', 'a-open-false', 'a-open-unaccepted', 'a-pre-native-refusal',
     'a-native-status-rejected', 'a-native-bootstrap-unsupported-format', 'a-native-bootstrap-rejected',
     'a-native-bootstrap-resolved-open-refused', 'a-native-status-empty-no-bootstrap',
     'a-native-status-available-no-bootstrap', 'a-native-status-malformed-no-bootstrap',
-    'a-observer-late-untrusted', 'a-fs-read-rejected', 'a-fs-read-resolved-open-refused']),
+    'a-observer-late-untrusted', 'a-fs-read-rejected', 'a-fs-read-resolved-open-refused',...OPEN_FAILURES.map(code=>'a-'+code)]),
   b: Object.freeze(['b-open-threw', 'b-open-false', 'b-open-unaccepted', 'b-pre-native-refusal',
     'b-native-status-rejected', 'b-native-bootstrap-unsupported-format', 'b-native-bootstrap-rejected',
     'b-native-bootstrap-resolved-open-refused', 'b-native-status-empty-no-bootstrap',
     'b-native-status-available-no-bootstrap', 'b-native-status-malformed-no-bootstrap',
     'b-observer-late-untrusted', 'b-fs-read-rejected', 'b-fs-read-resolved-open-refused',
-    'b-switch-unaccepted', 'b-a-state-changed']),
+    'b-switch-unaccepted', 'b-a-state-changed',...OPEN_FAILURES.map(code=>'b-'+code)]),
   closed: Object.freeze(['b-close-precondition-refused', 'b-close-threw', 'b-close-unaccepted', 'b-close-a-state-changed']),
 });
 const PROBE_FAILURE_PHASES = Object.freeze([

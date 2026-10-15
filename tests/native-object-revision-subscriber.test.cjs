@@ -5,39 +5,53 @@ const Files=require('../src/js/adapters/native-object-project-file.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
-function scenario(){
+function scenario(openFault){
   let active=false,revision=0,generation=0,visible,previewGate=null,replyGate=null,ackGate=null,failure=null;
   let nativePending=null,registered=null;
-  const log=[],listeners=new Map(),oldListeners=[],commands=[],consumers=[];
+  const log=[],listeners=new Map(),oldListeners=[],commands=[],consumers=[],diagnostics=[],openCalls=[];
+  const openError={code:'unavailable',details:{disposition:'notDispatched'},message:'PRIVATE NATIVE ERROR'};
+  let openStatus=0,openMetadata=0,openPreview=0;
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document-'+generation,lifecycleGeneration:generation,
     contentRevision:revision,documentSnapshotId:'snapshot-'+generation+'-'+revision,documentDigest:String(revision%10).repeat(64),
     byteCount:1000,canvasW:320,canvasH:180,fps:24,totalFrames:21,undoDepth:revision,redoDepth:0,reference:null,
     layers:[{layerUid:'legacy layer:alpha',name:'Alpha',...(visible===undefined?{}:{visible})},{layerUid:'sibling',name:'Sibling'}]});
   async function invoke(command,args){
     const r=args&&(args.request||JSON.parse(args.requestJson));
-    if(command==='nemo_native_status'||command==='nemo_native_object_client_status')return {...info(),available:active};
+    if(openFault)openCalls.push(command);
+    if(command==='nemo_native_status'||command==='nemo_native_object_client_status'){
+      if(openFault&&active){openStatus++;if(openStatus===({'installed-status':1,'first-owner':2,'second-owner':3})[openFault.stage])return {...info(),available:true,instanceId:'wrong'};}
+      return {...info(),available:active};
+    }
     if(command==='nemo_native_object_bootstrap'){
       active=true;generation++;revision=0;visible=undefined;
-      return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
+      return {...info(),requestId:openFault?.stage==='receipt'?'wrong':r.requestId,resourceCount:0,viewportAvailable:false};
     }
     if(command==='nemo_native_revision_sync'){
       log.push(r.action);
-      if(r.action==='binding')return {...info(),subscriptionId:'subscription-'+generation};
-      if(r.action==='subscribe'){registered=r.binding;return r.binding;}
+      if(r.action==='binding'){
+        if(openFault?.stage==='subscriber'&&openFault.invoke&&!openFault.register)throw openError;
+        return {...info(),subscriptionId:openFault?.stage==='subscriber'&&!openFault.register?'INVALID ID':'subscription-'+generation};
+      }
+      if(r.action==='subscribe'){if(openFault?.register)throw openError;registered=r.binding;return r.binding;}
       if(r.action==='acknowledge'){
         assert.equal(r.event.toRevision,revision);assert.equal(root.state.layers[0].visible,visible!==false);
         if(ackGate){const gate=ackGate;ackGate=null;await gate.promise;}
         nativePending=null;
         return null;
       }
-      if(r.action==='disconnect')return null;
+      if(r.action==='disconnect'){if(openFault?.register)throw {code:'cancelled',message:'PRIVATE CLEANUP'};return null;}
     }
     if(command==='nemo_native_object_reference'&&r.action.kind==='inspect'){
+      if(openFault&&++openMetadata===1&&openFault.stage==='metadata')return {...info(),requestId:'wrong'};
       log.push('inspect-'+revision);
       const next={...info(),requestId:r.requestId};if(failure==='metadata')next.layers[0].visible=null;
       return next;
     }
     if(command==='nemo_native_object_preview'){
+      if(openFault&&++openPreview===({'first-preview':1,'second-preview':2})[openFault.stage]){
+        if(openFault.invoke)throw openError;
+        return {status:'refused'};
+      }
       if(nativePending){
         if(!r.revisionSync||r.revisionSync.subscriptionId!==registered.subscriptionId||
           JSON.stringify(r.revisionSync.event)!==JSON.stringify(nativePending)||r.contentRevision!==nativePending.toRevision)
@@ -65,17 +79,40 @@ function scenario(){
     }},__TAURI__:{core:{invoke},event:{listen:async(name,callback)=>{
       listeners.set(name,callback);oldListeners.push(callback);return ()=>{if(listeners.get(name)===callback)listeners.delete(name);};
     }}},document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,width:320,height:180})})},
-    updateUI:()=>log.push('publish-'+revision)};
+    updateUI:()=>{if(openFault?.stage==='publication')throw openError;log.push('publish-'+revision);}};
+  if(openFault)root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>diagnostics.push([event,code]);
   const session=Project.desktop(root);
-  async function open(){return session.openPath('/native.json',{commit:meta=>Files.projectView(root,meta)});}
+  async function open(){return session.openPath('/native.json',{
+    ...(openFault?{reveal:()=>{if(openFault.stage==='reveal')throw openError;}}:{}),
+    commit:meta=>{if(openFault?.stage==='ui-commit')throw openError;Files.projectView(root,meta);}});}
   function event(from,to){return {instanceId:'instance',documentId:info().documentId,lifecycleGeneration:generation,
     requestId:'external-'+to,fromRevision:from,toRevision:to};}
   async function external(value){const from=revision;visible=value;revision++;nativePending=event(from,revision);
     return listeners.get('nemo-native-revision')({payload:nativePending});}
-  return {root,session,log,commands,open,external,listeners,oldListeners,consumers,
+  return {root,session,log,commands,open,external,listeners,oldListeners,consumers,diagnostics,openCalls,openError,
     holdPreview:gate=>{previewGate=gate;},holdReply:gate=>{replyGate=gate;},holdAck:gate=>{ackGate=gate;},fail:value=>{failure=value;},
     current:info};
 }
+
+test('real desktop Open distinguishes all first post-bootstrap boundaries and native invoke rejection',async()=>{
+  const stages=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
+  for(const stage of stages){
+    const h=scenario({stage});await assert.rejects(h.open());
+    const callbacks=['reveal','ui-commit','publication'].includes(stage);
+    assert.deepEqual(h.diagnostics,[['bootstrap-dispatched',undefined],['bootstrap-resolved',undefined],
+      ['post-bootstrap-failed',`post-bootstrap-${stage}:local-refusal:${callbacks?'unavailable:notDispatched':'unknown:other'}`]]);
+    assert.equal(h.session.isActive(),false);assert.equal(h.session.readPresentedObjectSession(),null);
+    assert.equal(h.openCalls.filter(c=>c==='nemo_native_object_bootstrap').length,1);
+    assert.doesNotMatch(JSON.stringify(h.diagnostics),/PRIVATE|INVALID ID/);
+  }
+  for(const fault of [{stage:'first-preview',invoke:true},{stage:'subscriber',invoke:true},{stage:'subscriber',invoke:true,register:true}]){
+    const {stage}=fault,h=scenario(fault);await assert.rejects(h.open(),error=>error===h.openError);
+    assert.deepEqual(h.diagnostics.at(-1),['post-bootstrap-failed',`post-bootstrap-${stage}:invoke-rejected:unavailable:notDispatched`]);
+  }
+  const success=scenario({stage:'none'});await success.open();
+  assert.deepEqual(success.diagnostics.map(value=>value[0]),['bootstrap-dispatched','bootstrap-resolved']);
+  assert.ok(success.session.isActive());assert.ok(success.session.readPresentedObjectSession());
+});
 
 test('common subscriber ACK follows exact native inspection, row publication and confirmed preview',async()=>{
   const h=scenario();await h.open();h.root.state.currentFrame=7;h.root.state.activeLayerIdx=1;

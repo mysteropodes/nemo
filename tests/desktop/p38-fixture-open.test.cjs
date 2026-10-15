@@ -243,6 +243,22 @@ test('native object adapter reports only fixed bootstrap outcomes and preserves 
   assert.deepEqual(events,[['bootstrap-dispatched',undefined],['bootstrap-rejected','other']]);
   assert.doesNotMatch(JSON.stringify(events),/private native path|unavailable/);
 });
+test('post-bootstrap first finite stage and reason survive probe categorization without private components',async()=>{
+  for(const nativeCode of ['unavailable','wrong_instance','wrong_document','cancelled_before_dispatch']){
+  for(const stage of ['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber']){
+    const code='post-bootstrap-'+stage+':invoke-rejected:'+nativeCode+':notDispatched';
+    const r=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved'],
+      ['post-bootstrap-failed',code],['post-bootstrap-failed','post-bootstrap-receipt:local-refusal:unknown:other']]});
+    assert.equal(r.calls.at(-1).failureCode,'a-'+code);assert.deepEqual(r.opened,[fixtures.A]);
+  }
+  }
+  for(const code of ['post-bootstrap-PRIVATE:invoke-rejected:unknown:other',
+    'post-bootstrap-receipt:PRIVATE:unknown:other','post-bootstrap-receipt:local-refusal:PRIVATE:other',
+    'post-bootstrap-receipt:local-refusal:unknown:PRIVATE','post-bootstrap-receipt:local-refusal:unknown:other:PRIVATE',null]){
+    const r=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved'],['post-bootstrap-failed',code]]});
+    assert.equal(r.calls.at(-1).failureCode,'a-native-bootstrap-resolved-open-refused');assert.doesNotMatch(JSON.stringify(r.calls),/PRIVATE/);
+  }
+});
 test('invalid empty native status refuses before opening A',async()=>{
   const r=await execute([true],{},{statusResults:[null]});
   assert.equal(r.result,'refused');
