@@ -244,15 +244,20 @@ test('native object adapter reports only fixed bootstrap outcomes and preserves 
   assert.doesNotMatch(JSON.stringify(events),/private native path|unavailable/);
 });
 test('post-bootstrap first finite stage and reason survive probe categorization without private components',async()=>{
-  for(const nativeCode of ['unavailable','wrong_instance','wrong_document','cancelled_before_dispatch']){
-  for(const stage of ['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber']){
-    const code='post-bootstrap-'+stage+':invoke-rejected:'+nativeCode+':notDispatched';
+  for(const kind of ['invoke-rejected','local-refusal'])for(const nativeCode of ['unavailable','wrong_instance','wrong_document','cancelled_before_dispatch']){
+  for(const stage of ['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'].concat(
+    ['first-preview','second-preview'].flatMap(prefix=>['frame-range','mapping','viewport','owner','receipt','status','work-id','view-generation','receipt-access',
+      'status-stale-discarded','status-deferred-timeout','status-deferred-occluded','status-failed-validation','status-failed-device-lost',
+      'status-failed-retry-lost','status-failed-retry-outdated','status-failed-recreate','status-failed-reconfigure'].map(detail=>prefix+'-'+detail)))){
+    const code='post-bootstrap-'+stage+':'+kind+':'+nativeCode+':notDispatched';
     const r=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved'],
       ['post-bootstrap-failed',code],['post-bootstrap-failed','post-bootstrap-receipt:local-refusal:unknown:other']]});
     assert.equal(r.calls.at(-1).failureCode,'a-'+code);assert.deepEqual(r.opened,[fixtures.A]);
   }
   }
-  for(const code of ['post-bootstrap-PRIVATE:invoke-rejected:unknown:other',
+  for(const code of ['post-bootstrap-first-preview-PRIVATE:local-refusal:unknown:other',
+    'post-bootstrap-first-preview-status-deferred-PRIVATE:local-refusal:unknown:other',
+    'post-bootstrap-first-preview-mapping\\u0000:local-refusal:unknown:other','post-bootstrap-PRIVATE:invoke-rejected:unknown:other',
     'post-bootstrap-receipt:PRIVATE:unknown:other','post-bootstrap-receipt:local-refusal:PRIVATE:other',
     'post-bootstrap-receipt:local-refusal:unknown:PRIVATE','post-bootstrap-receipt:local-refusal:unknown:other:PRIVATE',null]){
     const r=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved'],['post-bootstrap-failed',code]]});

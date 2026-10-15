@@ -111,7 +111,11 @@ fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
 #[test]
 fn post_bootstrap_failure_accepts_only_finite_components_at_the_exact_fixture_cursor() {
     use super::control::valid_failure_packet;
-    for stage in "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|') {
+    let mut stages: Vec<String> = "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|').map(str::to_owned).collect();
+    for prefix in ["first-preview", "second-preview"] {
+        stages.extend("frame-range|mapping|viewport|owner|receipt|status|work-id|view-generation|receipt-access|status-stale-discarded|status-deferred-timeout|status-deferred-occluded|status-failed-validation|status-failed-device-lost|status-failed-retry-lost|status-failed-retry-outdated|status-failed-recreate|status-failed-reconfigure".split('|').map(|detail|format!("{prefix}-{detail}")));
+    }
+    for stage in stages {
         for kind in ["invoke-rejected", "local-refusal"] {
             for native in "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|wrong_instance|wrong_document|cancelled_before_dispatch|unknown".split('|') {
                 for disposition in ["notDispatched", "other"] {
@@ -125,6 +129,10 @@ fn post_bootstrap_failure_accepts_only_finite_components_at_the_exact_fixture_cu
         }
     }
     for suffix in [
+        "first-preview-PRIVATE:local-refusal:unknown:other",
+        "first-preview-status-deferred-PRIVATE:local-refusal:unknown:other",
+        "first-preview-mapping\\u0000:local-refusal:unknown:other",
+        "third-preview-mapping:local-refusal:unknown:other",
         "PRIVATE:invoke-rejected:unknown:other",
         "receipt:PRIVATE:unknown:other",
         "receipt:local-refusal:PRIVATE:other",

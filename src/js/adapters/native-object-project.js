@@ -216,23 +216,42 @@
         }finally{openAttempt=null;openingRequested=false;}
       });
     }
+    function previewFailure(detail,error){
+      if(openAttempt&&['first-preview','second-preview'].includes(openAttempt.stage))openAttempt.stage+='-'+detail;
+      return error;
+    }
     function frameRequest(frame,pin){
-      pin=pin||requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw new Error('Frame is outside the native project');
-      var viewport=ports.mapping(pin);
-      if(!viewport||!viewport.cssBounds||!(viewport.cssBounds.width>0)||!(viewport.cssBounds.height>0)||
-          !viewport.physicalExtent||!integer(viewport.physicalExtent.width,1)||!integer(viewport.physicalExtent.height,1))
-        throw new Error('Native project viewport is unavailable');
+      pin=pin||requireActive();if(!integer(frame,0)||frame>=pin.totalFrames)throw previewFailure('frame-range',new Error('Frame is outside the native project'));
+      var viewport;
+      try{viewport=ports.mapping(pin);}catch(error){throw previewFailure('mapping',error);}
+      try{
+        if(!viewport||!viewport.cssBounds||!(viewport.cssBounds.width>0)||!(viewport.cssBounds.height>0)||
+            !viewport.physicalExtent||!integer(viewport.physicalExtent.width,1)||!integer(viewport.physicalExtent.height,1))
+          throw new Error('Native project viewport is unavailable');
+      }catch(error){throw previewFailure('viewport',error);}
       return {apiVersion:2,requestId:requestId('frame'),instanceId:pin.instanceId,documentId:pin.documentId,
         contentRevision:pin.contentRevision,documentSnapshotId:pin.documentSnapshotId,lifecycleGeneration:pin.lifecycleGeneration,
         contextId:'scene-root',scopeKind:'authored',frame:frame,
         outputSpec:{kind:'frame',format:'rgba8',width:pin.canvasW,height:pin.canvasH,colorInterpretation:'srgb',alphaMode:'straight'},
         viewport:viewport};
     }
+    function previewReceiptFailure(request,receipt){
+      if(!same(info,request))return 'owner';
+      if(!receipt)return 'receipt';
+      var status=receipt.status;
+      if(status!=='presented')return ['stale-discarded','deferred-timeout','deferred-occluded','failed-validation',
+        'failed-device-lost','failed-retry-lost','failed-retry-outdated','failed-recreate','failed-reconfigure'].includes(status)?'status-'+status:'status';
+      if(!id(receipt.workId))return 'work-id';
+      if(!integer(receipt.viewGeneration,1))return 'view-generation';
+      return null;
+    }
     async function present(frame,pin,revisionSync){
       var request=frameRequest(frame,pin);if(revisionSync)request.revisionSync=revisionSync;
       var receipt=await raw('nemo_native_object_preview',request);
-      if(!same(info,request)||!receipt||receipt.status!=='presented'||!id(receipt.workId)||!integer(receipt.viewGeneration,1)){
-        presentation=null;throw new Error('Native project frame was not presented');
+      var failure;
+      try{failure=previewReceiptFailure(request,receipt);}catch(error){throw previewFailure('receipt-access',error);}
+      if(failure){
+        presentation=null;throw previewFailure(failure,new Error('Native project frame was not presented'));
       }
       presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
         viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
