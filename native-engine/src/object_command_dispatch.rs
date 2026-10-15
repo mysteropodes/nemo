@@ -10,6 +10,7 @@ const OP_OBJECT_FILL: &str = "command.document.object.fill.set";
 const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
+const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
 const MAX_MESSAGE_BYTES: usize = 4096;
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
@@ -38,7 +39,7 @@ impl NativeObjectHistory {
         self.try_dispatch_object_command(request)
     }
 
-    /// Dispatch staged fill, layer visibility and undo/redo through one owner and
+    /// Dispatch staged fill, layer creation/visibility and undo/redo through one owner and
     /// receipt store. Typed input still requires the unchanged raw ingress gate.
     pub fn try_dispatch_object_command(
         &mut self,
@@ -46,7 +47,11 @@ impl NativeObjectHistory {
     ) -> Result<Option<ResponseEnvelope>, DispatchErrorCode> {
         if !matches!(
             request.operation.as_str(),
-            OP_OBJECT_FILL | OP_OBJECT_UNDO | OP_OBJECT_REDO | OP_LAYER_VISIBILITY
+            OP_OBJECT_FILL
+                | OP_OBJECT_UNDO
+                | OP_OBJECT_REDO
+                | OP_LAYER_VISIBILITY
+                | OP_LAYER_CREATE
         ) {
             return Ok(None);
         }
@@ -63,7 +68,9 @@ impl NativeObjectHistory {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let message = |fill, history| {
-            if request.operation == OP_LAYER_VISIBILITY {
+            if request.operation == OP_LAYER_CREATE {
+                "Layer creation request refused."
+            } else if request.operation == OP_LAYER_VISIBILITY {
                 "Layer visibility request refused."
             } else if request.operation == OP_OBJECT_FILL {
                 fill
@@ -160,7 +167,20 @@ impl NativeObjectHistory {
                 ),
             ))
         } else {
-            if request.operation == OP_LAYER_VISIBILITY {
+            if request.operation == OP_LAYER_CREATE {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_layer_create_json(&payload) {
+                    Ok(candidate) => self
+                        .commit_layer_create(candidate)
+                        .map(|_| CompactResult::Command {
+                            applied: true,
+                            history_entries_added: 1,
+                        })
+                        .map_err(|code| (code, "Layer creation could not commit.")),
+                    Err(code) => Err((code, "Layer creation payload is invalid.")),
+                }
+            } else if request.operation == OP_LAYER_VISIBILITY {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 match self.prepare_layer_visibility_json(&payload) {
