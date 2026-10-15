@@ -37,21 +37,21 @@
     var prior=inspectors.get(root);
     if(prior&&prior.panel!==panel){restoreInspector(root);prior=null;}
     if(!prior){
-      var section=text(root,'div','');section.id='native-object-inspector';section.className='psec';
-      var heading=text(root,'div','Native document');heading.className='phdr';section.appendChild(heading);
-      var notice=text(root,'div','Native drawing property inspectors are unavailable.');notice.setAttribute('role','status');section.appendChild(notice);
+      var section=createNativeObjectUiText(root,'div','');section.id='native-object-inspector';section.className='psec';
+      var heading=createNativeObjectUiText(root,'div','Native document');heading.className='phdr';section.appendChild(heading);
+      var notice=createNativeObjectUiText(root,'div','Native drawing property inspectors are unavailable.');notice.setAttribute('role','status');section.appendChild(notice);
       var rail=root.document.getElementById('props-panel-rail'),trigger=root.document.getElementById('p-ref-menu');
       prior={panel:panel,children:Array.from(panel.children).filter(function(child){return !['props-panel-hdr-row','props-panel-rail'].includes(child.id);})
         .map(function(child){return {node:child,hidden:child.hidden,display:child.style.display};}),section:section,
         rail:rail,railChildren:rail?Array.from(rail.children):[],previousShow:root._lastPropsShow,show:{'native-object-inspector':true}};
       if(trigger&&trigger.parentNode){
-        var reference=text(root,'div','Reference');reference.className='pr';
+        var reference=createNativeObjectUiText(root,'div','Reference');reference.className='pr';
         prior.trigger={node:trigger,parent:trigger.parentNode,next:trigger.nextSibling};prior.reference=reference;
         reference.appendChild(trigger);section.appendChild(reference); // Reuse the bound trigger, never clone reference controls.
       }
       panel.appendChild(section);inspectors.set(root,prior);root._lastPropsShow=prior.show;
       if(root.renderPropsPanelRail)root.renderPropsPanelRail(prior.show);
-      else if(rail){var expand=text(root,'button','Native document');expand.type='button';expand.className='rail-item';
+      else if(rail){var expand=createNativeObjectUiText(root,'button','Native document');expand.type='button';expand.className='rail-item';
         expand.addEventListener('click',function(){if(root.togglePropsPanelCollapse)root.togglePropsPanelCollapse(false);else panel.classList.remove('collapsed');});rail.replaceChildren(expand);}
     }
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
@@ -63,8 +63,8 @@
     return info;
   }
   function node(root,id){var el=root.document.getElementById(id);if(!el)throw new Error('Native document UI is unavailable: '+id);return el;}
-  function text(root,tag,value){var el=root.document.createElement(tag);el.textContent=value;return el;}
-  function render(root,info,frameOnly){
+  function createNativeObjectUiText(root,tag,value){var el=root.document.createElement(tag);el.textContent=value;return el;}
+  function renderNativeObjectUiMetadata(root,info,frameOnly){
     checked(root,info);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
     var previous=views.get(root),selection=root._layerSel||[];
@@ -81,21 +81,21 @@
     else{
       rows=info.layers.map(function(layer,i){
         var label=layer.name===undefined?layer.layerUid:layer.name;
-        var row=text(root,'div',''),pick=text(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
+        var row=createNativeObjectUiText(root,'div',''),pick=createNativeObjectUiText(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
         row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
         pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
         pick.setAttribute('aria-pressed',String(i===root.state.activeLayerIdx));
         pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
         pick.addEventListener('click',function(){root.NemoNativeObjectProject.selectLayerUI(root,i,false,layer.layerUid,info);});
-        var eye=text(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
+        var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
         eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
         // Availability is checked at CLICK time: this render can precede preview/ACK.
         eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info);});
         row.replaceChildren(pick,eye);
         return row;
       });
-      caption=text(root,'div','');
-      unavailable=text(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
+      caption=createNativeObjectUiText(root,'div','');
+      unavailable=createNativeObjectUiText(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
       unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
       // Build all nodes before replacing any visible legacy rows/cells.
       list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
@@ -141,9 +141,9 @@
     root.state.activeLayerIdx=index;
     if(!preserveLayerSel){root._layerSel=[index];root._layerSelAnchor=index;}
     root.selectedPaths=[];root.state.selectedStrokeIndices=[];root._layerActiveExplicit=true;
-    try{return render(root,info);}
+    try{return renderNativeObjectUiMetadata(root,info);}
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:render,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector});
 }));
