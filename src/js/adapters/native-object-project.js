@@ -191,9 +191,11 @@
           current();
           if(transition&&transition.reveal){openStage('reveal');await transition.reveal(candidate);
             openStage('second-preview');await present(0,candidate);openStage('second-owner');await verifyOwner(candidate);}
-          phase='native';
+          current();phase='native';
           openStage('ui-commit');if(transition&&transition.commit)await transition.commit(candidate);
+          current();
           openStage('publication');changed();openStage('subscriber');await attachSubscription();
+          current();
           return candidate;
         }catch(error){
           openFailure(error);

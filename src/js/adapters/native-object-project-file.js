@@ -47,9 +47,10 @@
         if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
         var value=creating?{canvasW:config.w,canvasH:config.h,fps:config.fps}:path;
         var info=await session[creating?'newProject':'openPath'](value,{
-          // The form intentionally becomes hidden during native reveal. Its
-          // currency predicate applies through dispatch and first presentation.
-          isCurrent:function(){return revealing||!isCurrent||isCurrent()===true;},
+          // Reveal hides this form intentionally, but never retires its request
+          // generation. Other callers retain their complete currency predicate.
+          isCurrent:function(){var current=revealing&&isCurrent&&isCurrent.requestCurrent||isCurrent;
+            return !current||current()===true;},
           confirm:async function(previous){return !previous||baseline===previous.documentDigest||
             !!(ports.confirmReplace&&await ports.confirmReplace(creating));},
           occlude:ports.occlude,reveal:ports.reveal?async function(current){revealing=true;await ports.reveal(current);}:undefined,restore:ports.restore,

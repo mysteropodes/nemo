@@ -227,3 +227,29 @@ test('ordinary post-dispatch final-frame failure keeps the form and cannot publi
   assert.equal(app.startScreen.classList.contains('hid'),false);assert.equal(app.element('start-newpanel').style.display,'block');
   assert.match(app.toasts.at(-1),/creation failed.*may have changed/i);assert.equal(app.toasts.includes('New project created'),false);
 });
+test('request currency lost during reveal cannot publish the presented New owner',async()=>{
+  const h=host(),s=session(h);let current=true;
+  const f=fileUI(s,{reveal:async()=>{current=false;}});
+  assert.equal(await f.ui.newProject({w:640,h:360,fps:30},()=>current),false);
+  assert.equal(s.isActive(),false);assert.equal(s.readPresentedObjectSession(),null);assert.equal(f.effects.includes('create'),false);
+});
+for(const supersede of [false,true])test('ordinary late '+(supersede?'newer request':'Cancel')+' during final presentation cannot publish old New',async()=>{
+  const h=host(),gate=deferred();let previews=0;
+  h.before=async command=>{if(command==='nemo_native_object_preview'&&++previews===2)await gate.promise;};
+  const app=ordinary(h),create=form(app),first=create();await turn();
+  assert.equal(app.startScreen.classList.contains('hid'),true,'own reveal has hidden the form before final frame');
+  app.element('np-cancel').listeners.click();
+  if(supersede){app.element('btn-new').listeners.click();await form(app)();}
+  gate.resolve();await first;
+  assert.equal(Project.desktop(app.window).isActive(),false);assert.equal(app.project.getCurrentLabel(),'Untitled (not saved)');
+  assert.equal(app.toasts.includes('New project created'),false);assert.equal(app.mutations,0);assert.equal(app.writes.length,0);
+});
+test('request generation cancelled while the new subscriber attaches cannot return delivered success',async()=>{
+  const h=host(),gate=deferred(),s=session(h,{projectionReady:()=>true,publishRevision:()=>true,
+    subscribeRevisions:async()=>{await gate.promise;return {...h.info(),subscriptionId:'new-subscription'};}});
+  let current=true;const notices=[];
+  const f=fileUI(s,{createdNotice:()=>notices.push('created')});
+  const creating=f.ui.newProject({w:640,h:360,fps:30},()=>current);await turn();current=false;gate.resolve();
+  assert.equal(await creating,false);assert.equal(s.isActive(),false);assert.equal(s.readPresentedObjectSession(),null);
+  assert.deepEqual(notices,[]);assert.equal(f.ui.isDirty(),true);
+});

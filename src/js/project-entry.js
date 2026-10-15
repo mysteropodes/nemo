@@ -121,6 +121,7 @@
         return generation===createGeneration&&newPanel.style.display!=='none'&&
           !document.getElementById('start-screen').classList.contains('hid');
       }
+      current.requestCurrent=function(){return generation===createGeneration;};
       function unavailable(){
         if(!current())return false;
         admissionMessage.textContent=creationFailed?
