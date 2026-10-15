@@ -263,6 +263,116 @@
         }
       }
     },
+    "ObjectLayerTimingFrame": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "ObjectLayerTimingPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame"
+      ],
+      "properties": {
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        }
+      },
+      "description": "Original selector is bounded to4096bytes; exact actual immutable revision and snapshot token must match. Unsupported contexts return Unavailable. No caller-supplied lifecycle echo."
+    },
+    "ObjectLayerTimingResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instanceId",
+        "documentId",
+        "atRevision",
+        "documentSnapshotId",
+        "contextId",
+        "layerUid",
+        "frame",
+        "cellKind",
+        "sourceFrame",
+        "hasContent",
+        "manualEdit"
+      ],
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "atRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documentSnapshotId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "const": "scene-root"
+        },
+        "layerUid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "$ref": "#/$defs/ObjectLayerTimingFrame"
+        },
+        "cellKind": {
+          "enum": [
+            "key",
+            "interpolated",
+            "held",
+            "unexposed"
+          ]
+        },
+        "sourceFrame": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ObjectLayerTimingFrame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasContent": {
+          "type": "boolean"
+        },
+        "manualEdit": {
+          "type": "boolean"
+        }
+      },
+      "description": "Actual immutable identity and selected source; complete encoded result <=4096bytes or typed Unavailable. A core read is not live host/UI epoch admission or rendering/export acceptance."
+    },
     "ObjectQueryPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -500,6 +610,7 @@
     },
     "Request": {
       "oneOf": [
+        { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.layer.timing" }, "payload": { "$ref": "#/$defs/ObjectLayerTimingPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
           { "properties": { "operation": { "const": "command.document.object.layer.create" },
             "payload": { "$ref": "#/$defs/ObjectLayerCreatePayload" } } }] },
@@ -938,6 +1049,7 @@
             { "$ref": "#/$defs/ReproductionReportResult" },
             { "$ref": "#/$defs/ReproductionReplayResult" },
             { "$ref": "#/$defs/ObjectLayerCreateResult" },
+            { "$ref": "#/$defs/ObjectLayerTimingResult" },
             { "$ref": "#/$defs/CommandResult" },
             { "$ref": "#/$defs/OpacityQueryResult" },
             { "$ref": "#/$defs/RevisionQueryResult" },

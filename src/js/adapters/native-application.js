@@ -11,6 +11,7 @@
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
     'query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    'query.document.object.layer.timing',
     'query.diagnostics.recent', 'query.reproduction.report',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
@@ -54,6 +55,7 @@
     return value;
   }
   function objectIdPaths(operation) {
+    if (operation === 'query.document.object.layer.timing') return new Set(['payload.layerUid', 'result.layerUid']);
     if (operation === 'query.document.object') return new Set([
       'payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
       'result.object.target.layerUid', 'result.object.target.strokeId',
@@ -131,6 +133,10 @@
     if (operation === 'query.document.object') {
       exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
       revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
+    } else if (operation === 'query.document.object.layer.timing') {
+      exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], [], 'timing selector');
+      revision(payload.atRevision, 'atRevision'); frame(payload.frame);
+      ['documentSnapshotId', 'contextId', 'layerUid'].forEach(key => objectUid(payload[key]));
     } else if (operation === 'command.document.object.layer.create') {
       exact(payload, ['command', 'name'], [], 'object layer create');
       if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
@@ -266,11 +272,25 @@
       }
     });
   }
+  function validateNativeObjectLayerTimingResult(value) {
+    exact(value, ['instanceId', 'documentId', 'atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame',
+      'cellKind', 'sourceFrame', 'hasContent', 'manualEdit'], [], 'timing result');
+    id(value.instanceId, 'instanceId'); id(value.documentId, 'documentId'); revision(value.atRevision, 'atRevision');
+    objectUid(value.documentSnapshotId); objectUid(value.layerUid); frame(value.frame);
+    if (value.contextId !== 'scene-root' || typeof value.hasContent !== 'boolean' || typeof value.manualEdit !== 'boolean') throw new TypeError('invalid timing result');
+    if (value.sourceFrame !== null) frame(value.sourceFrame);
+    const valid = value.cellKind === 'unexposed' ? value.sourceFrame === null && !value.hasContent && !value.manualEdit
+      : value.cellKind === 'held' ? value.sourceFrame !== null && value.sourceFrame < value.frame && !value.manualEdit
+      : ['key', 'interpolated'].includes(value.cellKind) && value.sourceFrame === value.frame && (value.cellKind === 'interpolated' || !value.manualEdit);
+    if (!valid) throw new TypeError('invalid timing exposure disposition');
+  }
   function validateResult(value, operation) {
     if (!operation) return;
     if (operation === 'query.document.object') {
       exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId); objectRecord(value.object);
+    } else if (operation === 'query.document.object.layer.timing') {
+      validateNativeObjectLayerTimingResult(value);
     } else if (operation === 'command.document.object.layer.create') {
       exact(value, ['applied', 'historyEntriesAdded', 'layerUid'], [], 'object layer create result');
       if (value.applied !== true || value.historyEntriesAdded !== 1) throw new TypeError('invalid layer creation disposition');
@@ -345,7 +365,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
-    if (['query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -358,6 +378,8 @@
       validateResult(value.result, operation);
       if (operation === 'query.document.object' && (value.result.atRevision !== value.contentRevision ||
           value.result.documentSnapshotId !== `native-object:${value.documentId}:${value.result.atRevision}`)) throw new TypeError('object read snapshot mismatch');
+      if (operation === 'query.document.object.layer.timing' && (value.result.atRevision !== value.contentRevision ||
+          value.result.instanceId !== value.instanceId || value.result.documentId !== value.documentId)) throw new TypeError('timing response identity mismatch');
     } else {
       if (!has(value, 'error') || has(value, 'result')) throw new TypeError('failed response must contain only error');
       validateError(value.error);
@@ -379,7 +401,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create'].includes(outbound.operation)) {
+          if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create'].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -388,6 +410,8 @@
                   ['contextId', 'layerUid', 'strokeId'].some((key) => actual[key] !== expected[key]) ||
                   ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
             }
+            if (response.ok && outbound.operation === 'query.document.object.layer.timing' &&
+                ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key])) throw new TypeError('timing read selector mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.visibility.set' &&

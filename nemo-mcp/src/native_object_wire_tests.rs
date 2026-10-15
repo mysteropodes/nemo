@@ -241,3 +241,129 @@ async fn unavailable_creation_refuses_before_an_authenticated_tcp_connection() {
         "unavailable request must never connect"
     );
 }
+
+fn timing_pair() -> (NativeApplicationRequest, NativeApplicationResponse) {
+    let declaration: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/capabilities-v2/native-object-layer-timing.json"
+    ))
+    .unwrap();
+    (
+        serde_json::from_value(declaration["examples"][0]["request"].clone()).unwrap(),
+        serde_json::from_value(declaration["examples"][0]["response"].clone()).unwrap(),
+    )
+}
+#[test]
+fn timing_wire_retains_full_owner_snapshot_and_selector_correlation() {
+    let (request, response) = timing_pair();
+    assert!(request.validate().is_ok());
+    assert!(validate_native_response(&response, &request).is_ok());
+    for (key, value) in [
+        ("instanceId", json!("other")),
+        ("documentId", json!("other")),
+        ("atRevision", json!(1)),
+        ("documentSnapshotId", json!("other")),
+        ("contextId", json!("other")),
+        ("layerUid", json!("other")),
+        ("frame", json!(1)),
+        ("sourceFrame", json!(null)),
+        ("manualEdit", json!(true)),
+        ("extra", json!(true)),
+    ] {
+        let mut forged = response.clone();
+        forged.result.as_mut().unwrap()[key] = value;
+        assert!(
+            validate_native_response(&forged, &request).is_err(),
+            "{key}"
+        );
+    }
+    let mut forged = response.clone();
+    forged.content_revision = 1;
+    assert!(validate_native_response(&forged, &request).is_err());
+    let mut forged = response;
+    forged.instance_id = "other".into();
+    assert!(validate_native_response(&forged, &request).is_err());
+}
+#[test]
+fn timing_wire_original_byte_admission_rejects_duplicate_unknown_and_positional_shapes() {
+    let (request, _) = timing_pair();
+    let raw = serde_json::to_string(&request).unwrap();
+    assert!(
+        decode_json_bounded::<NativeApplicationRequest>(raw.as_bytes(), 4096)
+            .unwrap()
+            .validate()
+            .is_ok()
+    );
+    for bad in [
+        raw.replace("\"frame\":0", "\"frame\":0,\"frame\":0"),
+        raw.replace("\"frame\":0", "\"fr\\u0061me\":0,\"frame\":0"),
+        raw.replace("\"payload\":", "\"extra\":true,\"payload\":"),
+        raw.replace("\"payload\":", "\"expectedRevision\":null,\"payload\":"),
+        "[2,\"request\",\"instance\",\"document\"]".into(),
+    ] {
+        assert_ne!(bad, raw);
+        assert!(decode_json_bounded::<NativeApplicationRequest>(bad.as_bytes(), 4096).is_err());
+    }
+}
+#[tokio::test]
+async fn timing_wire_full_utf8_response_limit_is_inclusive_and_never_truncated() {
+    let (mut request, _) = timing_pair();
+    let mut uid = "data:雪".to_string();
+    let response = loop {
+        request.payload["layerUid"] = json!(uid);
+        let (_, mut response) = timing_pair();
+        response.result.as_mut().unwrap()["layerUid"] = json!(uid);
+        let bytes = serde_json::to_vec(&response).unwrap();
+        if bytes.len() == 4096 {
+            break response;
+        }
+        assert!(bytes.len() < 4096);
+        uid.push('x');
+    };
+    assert!(request.validate().is_ok());
+    assert!(validate_native_response(&response, &request).is_ok());
+    let mut bytes = serde_json::to_vec(&response).unwrap();
+    bytes.push(b'\n');
+    let parsed: NativeApplicationResponse =
+        read_json_bounded(bytes.as_slice(), 4096).await.unwrap();
+    assert_eq!(parsed, response);
+    let mut oversized = response;
+    oversized.result.as_mut().unwrap()["layerUid"] = json!(uid + "x");
+    let mut bytes = serde_json::to_vec(&oversized).unwrap();
+    bytes.push(b'\n');
+    assert!(
+        read_json_bounded::<NativeApplicationResponse>(bytes.as_slice(), 4096)
+            .await
+            .is_err()
+    );
+    while serde_json::to_vec(&request).unwrap().len() < 4096 {
+        let mut uid = request.payload["layerUid"].as_str().unwrap().to_owned();
+        uid.push('x');
+        request.payload["layerUid"] = json!(uid);
+    }
+    assert_eq!(serde_json::to_vec(&request).unwrap().len(), 4096);
+    assert!(request.validate().is_ok());
+    let oversized_uid = request.payload["layerUid"].as_str().unwrap().to_owned() + "x";
+    request.payload["layerUid"] = json!(oversized_uid);
+    assert!(request.validate().is_err());
+}
+
+#[tokio::test]
+async fn malformed_timing_selector_refuses_before_the_mcp_wire_connects() {
+    let (mut request, _) = timing_pair();
+    request.payload["frame"] = Value::Null;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = Endpoint {
+        instance_id: request.instance_id.clone(),
+        port: listener.local_addr().unwrap().port(),
+        secret: "invalid-timing".into(),
+        build_id: "invalid-timing".into(),
+    };
+    assert!(call_native(&endpoint, request, CancellationToken::new())
+        .await
+        .is_err());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(50), listener.accept())
+            .await
+            .is_err()
+    );
+}

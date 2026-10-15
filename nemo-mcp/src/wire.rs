@@ -273,9 +273,18 @@ fn validate_native_response(
                         .get("verifiedContentRevision")
                         .and_then(serde_json::Value::as_u64)
                         == Some(response.content_revision))
-                && (request.operation != "query.document.object"
-                    || result.get("atRevision").and_then(serde_json::Value::as_u64)
-                        == Some(response.content_revision))
+                && (!matches!(
+                    request.operation.as_str(),
+                    "query.document.object" | "query.document.object.layer.timing"
+                ) || result.get("atRevision").and_then(serde_json::Value::as_u64)
+                    == Some(response.content_revision))
+                && (request.operation != "query.document.object.layer.timing"
+                    || (response.instance_id == request.instance_id
+                        && response.document_id == request.document_id
+                        && result.get("instanceId").and_then(serde_json::Value::as_str)
+                            == Some(response.instance_id.as_str())
+                        && result.get("documentId").and_then(serde_json::Value::as_str)
+                            == Some(response.document_id.as_str())))
                 && (request.operation != "command.document.object.layer.create"
                     || request
                         .expected_revision

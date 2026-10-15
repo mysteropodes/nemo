@@ -408,3 +408,87 @@ fn new_create_replacement_and_inverse_history_seed_only_real_authored_intent() {
     owner.commit_project_replacement(prepared).unwrap();
     assert_eq!(read(&head(&owner), "layer-1", 0)["cellKind"], "key");
 }
+
+fn shared_timing_request(pin: &ObjectSnapshot, payload: Value) -> crate::commands::OpacityRequest {
+    serde_json::from_value(json!({"apiVersion":2,"requestId":"timing-public",
+        "instanceId":pin.instance_id(),"documentId":pin.document_id(),
+        "operation":"query.document.object.layer.timing","payload":payload}))
+    .unwrap()
+}
+
+#[test]
+fn shared_timing_envelope_preserves_all_frozen_oracle_fields_and_snapshot_identity() {
+    let pin = snapshot(&drawing(1));
+    let before = serde_json::to_value(pin.document()).unwrap();
+    for expected in corpus()["drawing"]["expected"].as_array().unwrap() {
+        let frame = expected["frame"].as_u64().unwrap() as u32;
+        let response = pin
+            .dispatch(shared_timing_request(&pin, selector(&pin, "L", frame)))
+            .unwrap();
+        assert!(response.ok);
+        assert_eq!(response.content_revision, 0);
+        let result = response.result.as_ref().unwrap();
+        assert_eq!(result["instanceId"], pin.instance_id());
+        assert_eq!(result["documentId"], pin.document_id());
+        assert_eq!(result["documentSnapshotId"], pin.snapshot_id());
+        assert_eq!(result["layerUid"], "L");
+        assert_eq!(result["contextId"], "scene-root");
+        assert_eq!(result["atRevision"], 0);
+        assert_eq!(result.as_object().unwrap().len(), 11);
+        for key in [
+            "frame",
+            "cellKind",
+            "sourceFrame",
+            "hasContent",
+            "manualEdit",
+        ] {
+            assert_eq!(result[key], expected[key]);
+        }
+        assert!(serde_json::to_vec(&response).unwrap().len() <= 4096);
+    }
+    assert_eq!(serde_json::to_value(pin.document()).unwrap(), before);
+    let mut stale = selector(&pin, "L", 2);
+    stale["atRevision"] = json!(1);
+    let response = pin.dispatch(shared_timing_request(&pin, stale)).unwrap();
+    assert_eq!(
+        response.error.unwrap().code,
+        DispatchErrorCode::StaleRevision
+    );
+}
+
+#[test]
+fn timing_shared_envelope_limit_includes_outer_identity_and_never_truncates() {
+    let mut proved = false;
+    for length in (3500..3900).step_by(10) {
+        let uid = format!("雪{}", "x".repeat(length));
+        let mut document = drawing(1);
+        document["layers"][0]["layerUid"] = json!(uid);
+        for object in document["objects"].as_array_mut().unwrap() {
+            object["target"]["layerUid"] = json!(uid);
+        }
+        let pin = snapshot(&document);
+        let payload = selector(&pin, &uid, 2);
+        let request = shared_timing_request(&pin, payload.clone());
+        if serde_json::to_vec(&request).unwrap().len() > 4096 {
+            continue;
+        }
+        let Ok(inner) = pin.query_layer_timing_json(&serde_json::to_vec(&payload).unwrap()) else {
+            continue;
+        };
+        let full = json!({"apiVersion":2,"requestId":request.request_id,"instanceId":pin.instance_id(),
+            "documentId":pin.document_id(),"contentRevision":0,"ok":true,"result":inner});
+        if serde_json::to_vec(&full).unwrap().len() <= 4096 {
+            continue;
+        }
+        let response = pin.dispatch(request).unwrap();
+        assert!(!response.ok);
+        assert_eq!(response.error.unwrap().code, DispatchErrorCode::Unavailable);
+        assert!(response.result.is_none());
+        proved = true;
+        break;
+    }
+    assert!(
+        proved,
+        "a bounded selector must exercise a complete oversized success envelope"
+    );
+}

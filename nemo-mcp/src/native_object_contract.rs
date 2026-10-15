@@ -34,6 +34,91 @@ pub(super) fn request(value: &Value) -> bool {
     })
 }
 
+pub(super) fn timing_request(value: &Value) -> bool {
+    exact(
+        value,
+        &[
+            "atRevision",
+            "documentSnapshotId",
+            "contextId",
+            "layerUid",
+            "frame",
+        ],
+        &[],
+    )
+    .is_some_and(|value| {
+        revision(value.get("atRevision")).is_some()
+            && frame(value.get("frame")).is_some()
+            && ["documentSnapshotId", "contextId", "layerUid"]
+                .iter()
+                .all(|key| {
+                    value
+                        .get(*key)
+                        .and_then(Value::as_str)
+                        .is_some_and(|text| !text.is_empty())
+                })
+    })
+}
+
+pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
+    if !timing_request(payload) {
+        return false;
+    }
+    exact(
+        result,
+        &[
+            "instanceId",
+            "documentId",
+            "atRevision",
+            "documentSnapshotId",
+            "contextId",
+            "layerUid",
+            "frame",
+            "cellKind",
+            "sourceFrame",
+            "hasContent",
+            "manualEdit",
+        ],
+        &[],
+    )
+    .is_some_and(|value| {
+        let Some(requested) = frame(payload.get("frame")) else {
+            return false;
+        };
+        let source = frame(value.get("sourceFrame"));
+        let Some(content) = value.get("hasContent").and_then(Value::as_bool) else {
+            return false;
+        };
+        let Some(manual) = value.get("manualEdit").and_then(Value::as_bool) else {
+            return false;
+        };
+        value
+            .get("instanceId")
+            .and_then(Value::as_str)
+            .is_some_and(crate::contract::bounded_identifier)
+            && value.get("documentId").and_then(Value::as_str) == Some(document_id)
+            && value.get("contextId").and_then(Value::as_str) == Some("scene-root")
+            && [
+                "atRevision",
+                "documentSnapshotId",
+                "contextId",
+                "layerUid",
+                "frame",
+            ]
+            .iter()
+            .all(|key| value.get(*key) == payload.get(*key))
+            && match value.get("cellKind").and_then(Value::as_str) {
+                Some("key") => source == Some(requested) && !manual,
+                Some("interpolated") => source == Some(requested),
+                Some("held") => source.is_some_and(|source| source < requested) && !manual,
+                Some("unexposed") => {
+                    value.get("sourceFrame").is_some_and(Value::is_null) && !content && !manual
+                }
+                _ => false,
+            }
+    })
+}
+
 pub(super) fn visibility_request(value: &Value) -> bool {
     exact(value, &["command", "layerUid", "visible"], &[]).is_some_and(|value| {
         value.get("command").and_then(Value::as_str) == Some("object.layer.visibility.set")

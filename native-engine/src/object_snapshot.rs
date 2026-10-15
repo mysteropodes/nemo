@@ -309,6 +309,9 @@ impl ObjectSnapshot {
         if request.operation == "query.document.object.serialize" {
             return self.serialize_response(&request);
         }
+        if request.operation == "query.document.object.layer.timing" {
+            return self.dispatch_layer_timing(&request);
+        }
         if request.operation != "query.document.object" {
             return failure(
                 DispatchErrorCode::InvalidRequest,
