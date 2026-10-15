@@ -26,9 +26,39 @@ pub(crate) struct TimingSample {
     manual_edit: Presence<bool>,
 }
 object_deserialize!(LayerTiming { format: String, format_version: u32, family: String,
-    context_id: String, keys: Vec<TimingKey>, samples: Vec<TimingSample> });
+    context_id: String, #[serde(deserialize_with = "bounded_entries")] keys: Vec<TimingKey>,
+    #[serde(deserialize_with = "bounded_entries")] samples: Vec<TimingSample> });
 object_deserialize!(TimingKey { frame: u32 });
 object_deserialize!(TimingSample { frame: u32, #[serde(default)] manual_edit: Presence<bool> });
+
+// Refuse oversized arrays during decoding, before an unbounded Vec allocation.
+fn bounded_entries<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct Entries<T>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Entries<T> {
+        type Value = Vec<T>;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("at most 4096 sparse timing entries")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(
+            self,
+            mut sequence: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut entries = Vec::new();
+            while let Some(entry) = sequence.next_element()? {
+                if entries.len() == MAX_ENTRIES {
+                    return Err(serde::de::Error::custom("too many sparse timing entries"));
+                }
+                entries.push(entry);
+            }
+            Ok(entries)
+        }
+    }
+    deserializer.deserialize_seq(Entries(std::marker::PhantomData))
+}
 
 impl LayerTiming {
     pub(crate) fn blank_drawing() -> Self {
