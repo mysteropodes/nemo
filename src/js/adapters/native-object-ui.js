@@ -4,8 +4,9 @@
  * Rust owns document/revision state. Visibility uses the existing native.object
  * declaration/shared visibility handler through Project's SDK/transport queue.
  * UI state: this adapter's WeakMaps retain DOM bindings, read pins and the prior
- * inspector layout. Ports: DOM, Project desktop/presentation, Files' correlated
- * projection, existing Reference nodes/bindings and the props-panel layout helper.
+ * inspector layout. Injected ports: projectionReady, currentSession (live at click),
+ * selectLayer and repaint. No concrete Project/File provider is resolved here.
+ * Other presentation ports: DOM, Reference bindings and props-panel layout helper.
  * Lifecycle: owner/revision/metadata/selection/DOM changes invalidate row reuse;
  * restoreInspector clears the cache and restores nodes/styles on non-object routing.
  * Frame-only invariant: unchanged inputs retain row/control DOM and focus.
@@ -56,19 +57,22 @@
     }
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
   }
-  function checked(root,info){
-    if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)||
+  function nativeObjectUiPortsReady(ports){
+    return !!ports&&['projectionReady','currentSession','selectLayer','repaint'].every(function(k){return typeof ports[k]==='function';});
+  }
+  function checked(root,info,ports){
+    if(!nativeObjectUiPortsReady(ports)||ports.projectionReady(info)!==true||
       !Number.isInteger(root.state.currentFrame)||root.state.currentFrame<0||root.state.currentFrame>=info.totalFrames)
       throw new Error('Native document UI metadata is uncorrelated');
     return info;
   }
   function node(root,id){var el=root.document.getElementById(id);if(!el)throw new Error('Native document UI is unavailable: '+id);return el;}
   function createNativeObjectUiText(root,tag,value){var el=root.document.createElement(tag);el.textContent=value;return el;}
-  function renderNativeObjectUiMetadata(root,info,frameOnly){
-    checked(root,info);
+  function renderNativeObjectUiMetadata(root,info,frameOnly,ports){
+    checked(root,info,ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
     var previous=views.get(root),selection=root._layerSel||[];
-    var reuse=frameOnly===true&&previous&&previous.list===list&&previous.header===header&&previous.grid===grid&&
+    var reuse=frameOnly===true&&previous&&previous.ports===ports&&previous.list===list&&previous.header===header&&previous.grid===grid&&
       previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].every(function(k){return previous.pin[k]===info[k];})&&
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
@@ -86,11 +90,11 @@
         pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
         pick.setAttribute('aria-pressed',String(i===root.state.activeLayerIdx));
         pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
-        pick.addEventListener('click',function(){root.NemoNativeObjectProject.selectLayerUI(root,i,false,layer.layerUid,info);});
+        pick.addEventListener('click',function(){if(!nativeObjectUiPortsReady(ports))return false;return ports.selectLayer(i,false,layer.layerUid,info);});
         var eye=createNativeObjectUiText(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
         eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
         // Availability is checked at CLICK time: this render can precede preview/ACK.
-        eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info);});
+        eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info,ports);});
         row.replaceChildren(pick,eye);
         return row;
       });
@@ -105,7 +109,7 @@
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
         controls:rows.map(function(row){return [row.children[0],row.children[1]];}),caption:caption,unavailable:unavailable,
-        pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible];})});}
+        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible];})});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
@@ -118,22 +122,23 @@
       !!presented.presentation&&presented.presentation.owner==='native'&&presented.presentation.status==='presented'&&presented.presentation.frame===root.state.currentFrame&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return presented.presentation[k]===info[k];});
   }
-  function toggleVisibility(root,uid,expected){
+  function toggleVisibility(root,uid,expected,ports){
     function refused(){try{if(root.showToast)root.showToast('Native layer visibility was not confirmed.');}catch(_){}return false;}
     try{
-      var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root),info=session&&session.info();
+      if(!nativeObjectUiPortsReady(ports))return Promise.resolve(false);
+      var session=ports.currentSession(),info=session&&session.info();
       if(!session||!session.isActive()||!expected||!info||
         !['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return expected[k]===info[k];})||
         !confirmed(root,info,session.readPresentedObjectSession()))return Promise.resolve(false);
-      checked(root,info);
+      checked(root,info,ports);
       var toggle=session.toggleLayerVisibility;
       if(typeof toggle!=='function'||info.layers.filter(function(layer){return layer.layerUid===uid;}).length!==1)return Promise.resolve(false);
-      if(root.NemoNativeObjectProject.paintUI(root,true)!==true)return Promise.resolve(false);
+      if(ports.repaint(true)!==true)return Promise.resolve(false);
       return Promise.resolve(toggle(uid)).catch(refused);
     }catch(_){return Promise.resolve(refused());}
   }
-  function select(root,info,index,preserveLayerSel,uid,presented){
-    checked(root,info);
+  function select(root,info,index,preserveLayerSel,uid,presented,ports){
+    checked(root,info,ports);
     if(!Number.isInteger(index)||index<0||index>=info.layers.length||uid!==undefined&&info.layers[index].layerUid!==uid)return false;
     if(!confirmed(root,info,presented))return false;
     var old={active:root.state.activeLayerIdx,selection:root._layerSel,anchor:root._layerSelAnchor,paths:root.selectedPaths,
@@ -141,7 +146,7 @@
     root.state.activeLayerIdx=index;
     if(!preserveLayerSel){root._layerSel=[index];root._layerSelAnchor=index;}
     root.selectedPaths=[];root.state.selectedStrokeIndices=[];root._layerActiveExplicit=true;
-    try{return renderNativeObjectUiMetadata(root,info);}
+    try{return renderNativeObjectUiMetadata(root,info,false,ports);}
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }

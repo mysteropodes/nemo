@@ -47,10 +47,15 @@ function shippedEntrypoints(root){
   return root;
 }
 function view(){const root={state:{},userLayers:[],document:document(),NemoNativeObjectProjectFile:Files,NemoNativeObjectUI:UI};Files.projectView(root,metadata());root.state.currentFrame=7;return root;}
+const fixtureBindings=new WeakMap();
+function fixturePorts(root){if(!fixtureBindings.has(root))fixtureBindings.set(root,{
+  projectionReady:info=>Files.projectionReadyForUI(root,info),currentSession:()=>Project.desktop(root),
+  selectLayer:(index,preserve,uid,expected)=>Project.selectLayerUI(root,index,preserve,uid,expected),
+  repaint:frameOnly=>Project.paintUI(root,frameOnly)});return fixtureBindings.get(root);}
 function presented(info,frame=7){return {...info,available:true,kind:'native-object',presentation:{...info,owner:'native',status:'presented',frame,workId:'work',viewGeneration:1}};}
 function poisonFrames(root){root.state.layers.forEach(row=>Object.defineProperty(row,'frames',{configurable:true,get(){throw Error('LEGACY FRAME READER');}}));}
 test('metadata presenter builds real text/button rows and explicit unavailable timing without reading frames',()=>{
-  const root=view();poisonFrames(root);assert.equal(UI.render(root,metadata()),true);
+  const root=view();poisonFrames(root);assert.equal(UI.render(root,metadata(),false,fixturePorts(root)),true);
   const rows=root.document.nodes.get('layer-list').children;
   assert.equal(rows.length,2);assert.equal(pick(root,0).textContent,'<b>A</b> — Visible');assert.equal(rows[0].dataset.layerUid,A.layerUid);
   assert.equal(pick(root,1).textContent,'B — Hidden');assert.equal(pick(root,0).type,'button');assert.equal(eye(root,1).textContent,'Show');
@@ -62,27 +67,27 @@ test('selection needs exact outer AND final-presented identity, never constructs
   const root=view();assert.equal(Files.refreshLayerTable(root,metadata([A,B,C],1)),true);
   const next=metadata([A,B,C],1);poisonFrames(root);
   for(const pin of [null,presented(next,6),presented({...next,documentId:'foreign'}),{...presented(next),presentation:{...presented(next).presentation,documentSnapshotId:'foreign'}}]){
-    assert.equal(UI.select(root,next,2,false,'C',pin),false);assert.equal(root.state.activeLayerIdx,0);
+    assert.equal(UI.select(root,next,2,false,'C',pin,fixturePorts(root)),false);assert.equal(root.state.activeLayerIdx,0);
   }
-  assert.equal(UI.select(root,next,2,false,'C',presented(next)),true);
+  assert.equal(UI.select(root,next,2,false,'C',presented(next),fixturePorts(root)),true);
   assert.equal(root.state.activeLayerIdx,2);assert.deepEqual(root._layerSel,[2]);assert.equal(root.state.currentFrame,7);
   assert.equal(pick(root,2).attributes['aria-pressed'],'true');
-  assert.equal(UI.select(root,next,2,false,'replaced',presented(next)),false);
+  assert.equal(UI.select(root,next,2,false,'replaced',presented(next),fixturePorts(root)),false);
 });
 test('stale projection and absent UI nodes refuse; failed selection restores editor state',()=>{
   const root=view(),selection=root._layerSel,paths=root.selectedPaths;
-  assert.throws(()=>UI.render(root,{...metadata(),documentSnapshotId:'foreign'}),/uncorrelated/);
+  assert.throws(()=>UI.render(root,{...metadata(),documentSnapshotId:'foreign'},false,fixturePorts(root)),/uncorrelated/);
   root.document.nodes.delete('frame-grid');
-  assert.throws(()=>UI.select(root,metadata(),1,false,'B',presented(metadata())),/unavailable/);
+  assert.throws(()=>UI.select(root,metadata(),1,false,'B',presented(metadata()),fixturePorts(root)),/unavailable/);
   assert.equal(root.state.activeLayerIdx,0);assert.equal(root._layerSel,selection);assert.equal(root.selectedPaths,paths);
 });
 test('unadmitted inspector values are hidden explicitly, with original nodes/visibility restored on non-object routing',()=>{
   const root=view(),panel=element(),width=element(),hiddenSection=element();
   width.value=1920;width.hidden=false;hiddenSection.hidden=true;panel.appendChild(width);panel.appendChild(hiddenSection);
-  root.document.nodes.set('props-panel',panel);UI.render(root,metadata());
+  root.document.nodes.set('props-panel',panel);UI.render(root,metadata(),false,fixturePorts(root));
   assert.equal(width.hidden,true);assert.equal(width.value,1920,'do not fabricate native property values in legacy controls');
   assert.equal(panel.children[2].children[1].textContent,'Native drawing property inspectors are unavailable.');
-  UI.render(root,metadata());assert.equal(panel.children.length,3,'one owned availability notice');
+  UI.render(root,metadata(),false,fixturePorts(root));assert.equal(panel.children.length,3,'one owned availability notice');
   const foreign=element();panel.appendChild(foreign);root.NemoNativeObjectProject=Project;
   assert.equal(Project.paintUI(root),false);assert.equal(panel.children.length,3);assert.equal(panel.children[0],width);
   assert.equal(width.hidden,false);assert.equal(hiddenSection.hidden,true);assert.equal(panel.children[2],foreign);
@@ -107,7 +112,7 @@ test('native inspector reuses actual bound Reference nodes, preserves collapsed 
   root.renderPropsPanelRail=context.renderPropsPanelRail;root.togglePropsPanelCollapse=context.togglePropsPanelCollapse;
   vm.runInContext(fs.readFileSync('src/js/reference-bridge.js','utf8'),context);
   const inputBinding=input.listener('change'),settingBinding=on.listener('change');
-  UI.render(root,metadata());
+  UI.render(root,metadata(),false,fixturePorts(root));
   assert.equal(doc.getElementById('p-ref-menu'),trigger);assert.equal(doc.getElementById('ref-file-input'),input);assert.equal(doc.getElementById('ref-pop'),pop);
   assert.equal(input.listener('change'),inputBinding);assert.equal(on.listener('change'),settingBinding);
   assert.notEqual(trigger.parentNode,home);assert.equal(layer.hidden,true);assert.equal(layer.style.display,'none');
@@ -165,7 +170,7 @@ function desktop(){
   }
   root.__TAURI__={core:{invoke},event:{listen:async(name,callback)=>{listeners.set(name,callback);return ()=>listeners.delete(name);}},dialog:{ask:async()=>true}};
   const session=Project.desktop(root);
-  const render=UI.render;root.NemoNativeObjectUI={...UI,render(r,i,frameOnly){log.push('UI:'+i.contentRevision);return render(r,i,frameOnly);}};
+  const render=UI.render;root.NemoNativeObjectUI={...UI,render(r,i,frameOnly,ports){log.push('UI:'+i.contentRevision);return render(r,i,frameOnly,ports);}};
   root.SMProjectDocument={baseName:()=> 'Project'};root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
   root.requestAnimationFrame=f=>setImmediate(f);
   const file=Files.bind(root,{read:()=>({tabId:'tab',name:'Project'}),touchRecent(){},commit(){},renderRecents(){},
@@ -234,7 +239,7 @@ for(const fault of ['missing','refused','stale','preview'])test('native '+fault+
   const h=desktop();await h.open();
   if(fault==='missing')delete h.root.NemoNativeObjectUI;
   if(fault==='refused')h.root.NemoNativeObjectUI={...UI,render:()=>false};
-  if(fault==='stale')h.root.NemoNativeObjectUI={...UI,render:(root,info)=>UI.render(root,{...info,documentId:'foreign'})};
+  if(fault==='stale')h.root.NemoNativeObjectUI={...UI,render:(root,info,frameOnly,ports)=>UI.render(root,{...info,documentId:'foreign'},frameOnly,ports)};
   if(fault==='preview')h.fault('preview');
   await h.external([A,B,C]);assert.equal(h.log.includes('ACK'),false);
   assert.equal(h.session.isIndeterminate(),true);
@@ -302,7 +307,50 @@ for(const fault of ['missing','refused','stale'])test('retained eye refuses '+fa
   const h=desktop();await h.open();const button=eye(h.root,0),before=h.calls.length;
   if(fault==='missing')delete h.root.NemoNativeObjectUI;
   if(fault==='refused')h.root.NemoNativeObjectUI={...UI,render:()=>false};
-  if(fault==='stale')h.root.NemoNativeObjectUI={...UI,render:(root,info)=>UI.render(root,{...info,documentId:'foreign'})};
+  if(fault==='stale')h.root.NemoNativeObjectUI={...UI,render:(root,info,frameOnly,ports)=>UI.render(root,{...info,documentId:'foreign'},frameOnly,ports)};
   assert.equal(await button.click(),false);assert.equal(h.calls.length,before);
   assert.equal(h.meta().layers[0].visible,true);assert.equal(h.root.document.nodes.get('start-screen').classList.contains('hid'),false);
+});
+test('actual presenter and events use explicit narrow ports without resolving concrete providers',async()=>{
+  const root=view(),info=metadata(),calls=[];let current=null;
+  const session={info:()=>info,isActive:()=>true,readPresentedObjectSession:()=>presented(info),
+    toggleLayerVisibility:uid=>{calls.push(['toggle',uid]);return Promise.resolve({ok:true});}};
+  const ports=Object.freeze({projectionReady:value=>Files.projectionReadyForUI(root,value),currentSession:()=>{calls.push('read-live');return current;},
+    selectLayer:(index,preserve,uid,expected)=>{calls.push(['select',index,preserve,uid,expected]);return true;},
+    repaint:frameOnly=>UI.render(root,info,frameOnly,ports)});
+  for(const name of ['NemoNativeObjectProject','NemoNativeObjectProjectFile'])Object.defineProperty(root,name,{get(){throw Error('concrete provider lookup: '+name);}});
+  assert.equal(UI.render(root,info,false,ports),true);pick(root,1).click();
+  assert.deepEqual(calls[0],['select',1,false,'B',info]);
+  const button=eye(root,0);assert.equal(await button.click(),false);assert.equal(calls.filter(x=>Array.isArray(x)&&x[0]==='toggle').length,0);
+  current=session;assert.equal((await button.click()).ok,true);assert.deepEqual(calls.at(-1),['toggle',A.layerUid]);
+  current={...session,info:()=>({...info,documentId:'replacement'})};assert.equal(await button.click(),false);
+  current={...session,info:()=>({...info,contentRevision:1})};assert.equal(await button.click(),false);
+  assert.equal(calls.filter(x=>Array.isArray(x)&&x[0]==='toggle').length,1,'retired pins cannot use the live replacement');
+  assert.equal(root.state.layers[0].visible,true,'callback dispatch never applies optimistic metadata');
+  assert.doesNotMatch(fs.readFileSync('src/js/adapters/native-object-ui.js','utf8'),/NemoNativeObjectProject(?:File)?\b/);
+});
+test('production composition reuses frozen callback identities and resolves session state at click time',async()=>{
+  const h=desktop(),bindings=[],render=h.root.NemoNativeObjectUI.render;
+  h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){bindings.push(ports);return render(root,info,frameOnly,ports);}};
+  await h.open();const first=bindings[0],old=first.currentSession().info(),button=eye(h.root,0);
+  h.root.updateUI(true);assert.equal(eye(h.root,0),button);assert.equal(Object.isFrozen(first),true);
+  assert.deepEqual(Object.keys(first).sort(),['currentSession','projectionReady','repaint','selectLayer']);
+  await h.external([A,B,C]);assert.equal(first.currentSession().info().contentRevision,old.contentRevision+1);
+  await h.file.newProject({w:320,h:180,fps:24,name:'Replacement'});
+  assert.notEqual(first.currentSession().info().documentId,old.documentId);assert.ok(bindings.every(value=>value===first));
+  const before=h.calls.length;assert.equal(await button.click(),false);assert.equal(h.calls.length,before);
+});
+for(const name of ['projectionReady','currentSession','selectLayer','repaint'])test('actual row and eye events fail closed if injected '+name+' disappears',async()=>{
+  const h=desktop();let installed;
+  h.root.NemoNativeObjectUI={...UI,render(root,info,frameOnly,ports){installed={...ports};return UI.render(root,info,frameOnly,installed);}};
+  await h.open();const row=pick(h.root,1),button=eye(h.root,0),before=h.calls.length;
+  installed[name]=null;assert.equal(row.click(),false);assert.equal(await button.click(),false);
+  assert.equal(h.root.state.activeLayerIdx,0);assert.equal(h.calls.length,before);assert.equal(h.meta().layers[0].visible,true);
+});
+for(const bad of [undefined,{}, {projectionReady:()=>true}])test('missing or incomplete explicit ports cannot publish or acknowledge a real revision '+Object.keys(bad||{}).join(','),async()=>{
+  const h=desktop();await h.open();
+  h.root.NemoNativeObjectUI={...UI,render:(root,info,frameOnly)=>UI.render(root,info,frameOnly,bad)};
+  await h.external([A,B,C]);assert.equal(h.log.includes('ACK'),false);assert.equal(h.session.isIndeterminate(),true);
+  assert.equal(h.root.document.nodes.get('start-screen').classList.contains('hid'),false);
+  assert.throws(()=>h.root.updateUI(true),/Native/);
 });
