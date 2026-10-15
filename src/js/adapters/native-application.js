@@ -10,6 +10,7 @@
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
+    'query.document.object', 'command.document.object.layer.visibility.set',
     'query.diagnostics.recent', 'query.reproduction.report',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
@@ -18,6 +19,7 @@
   const requiredRevision = new Set([
     'command.document.apply', 'transaction.begin', 'history.undo', 'history.redo',
     'job.export.png.begin',
+    'command.document.object.layer.visibility.set',
   ]);
   const commonErrors = new Set([
     'invalid_request', 'wrong_instance', 'wrong_document', 'stale_revision', 'busy_conflict',
@@ -51,9 +53,16 @@
     if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${label} must be a non-negative safe integer`);
     return value;
   }
-  function rejectForbidden(value, seen) {
+  function objectIdPaths(operation) {
+    if (operation === 'query.document.object') return new Set([
+      'payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
+      'result.object.target.layerUid', 'result.object.target.strokeId',
+    ]);
+    return operation === 'command.document.object.layer.visibility.set' ? new Set(['payload.layerUid']) : null;
+  }
+  function rejectForbidden(value, seen, opaquePaths, at) {
     if (typeof value === 'string') {
-      if (/^(data|blob):/i.test(value)) throw new TypeError('raw or binary resource payload is forbidden');
+      if (/^(data|blob):/i.test(value) && !(opaquePaths && opaquePaths.has(at))) throw new TypeError('raw or binary resource payload is forbidden');
       return;
     }
     if (value === null || ['number', 'boolean'].includes(typeof value)) return;
@@ -68,10 +77,11 @@
     const visited = seen || new Set();
     if (visited.has(value)) throw new TypeError('cyclic payload is forbidden');
     visited.add(value);
-    if (Array.isArray(value)) value.forEach((item) => rejectForbidden(item, visited));
+    const child = (key) => at ? `${at}.${key}` : key;
+    if (Array.isArray(value)) value.forEach((item, index) => rejectForbidden(item, visited, opaquePaths, child(index)));
     else {
       if (!plain(value)) throw new TypeError('unadmitted object payload is forbidden');
-      Object.values(value).forEach((item) => rejectForbidden(item, visited));
+      Object.entries(value).forEach(([key, item]) => rejectForbidden(item, visited, opaquePaths, child(key)));
     }
     visited.delete(value);
   }
@@ -85,8 +95,46 @@
     exact(payload, ['transactionId'], [], label);
     id(payload.transactionId, `${label}.transactionId`);
   }
+  function objectUid(value) {
+    if (typeof value !== 'string' || !value.length) throw new TypeError('object UID must be a nonempty opaque string');
+  }
+  function objectTarget(value) {
+    exact(value, ['contextId', 'frameScope', 'layerUid', 'strokeId'], [], 'object target');
+    if (value.contextId !== 'scene-root') throw new TypeError('unsupported object context');
+    objectUid(value.layerUid); objectUid(value.strokeId);
+    exact(value.frameScope, ['kind', 'frame'], [], 'object frame scope');
+    if (!['authored', 'reference'].includes(value.frameScope.kind)) throw new TypeError('unsupported object frame scope');
+    frame(value.frameScope.frame);
+  }
+  function objectRecord(value) {
+    exact(value, ['schemaVersion', 'family', 'target', 'geometry', 'fill'], [], 'object record');
+    if (value.schemaVersion !== 1 || value.family !== 'closed-solid-fill-cubic-path') throw new TypeError('unsupported object family');
+    objectTarget(value.target);
+    const geometry = value.geometry;
+    exact(geometry, ['kind', 'closed', 'coordinateSpace', 'handleSpace', 'segments'], [], 'object geometry');
+    if (geometry.kind !== 'cubic-path' || geometry.closed !== true || geometry.coordinateSpace !== 'document-world' ||
+        geometry.handleSpace !== 'relative' || !Array.isArray(geometry.segments) || geometry.segments.length < 2 ||
+        geometry.segments.length > 256) throw new TypeError('unsupported object geometry');
+    geometry.segments.forEach((segment) => {
+      exact(segment, ['point', 'handleIn', 'handleOut'], [], 'object segment');
+      [segment.point, segment.handleIn, segment.handleOut].forEach((point) => {
+        exact(point, ['x', 'y'], [], 'object point');
+        if (![point.x, point.y].every(Number.isFinite)) throw new TypeError('invalid object coordinates');
+      });
+    });
+    exact(value.fill, ['kind', 'r', 'g', 'b', 'a'], [], 'object fill');
+    if (value.fill.kind !== 'solid' || !['r', 'g', 'b', 'a'].every((key) =>
+      Number.isFinite(value.fill[key]) && value.fill[key] >= 0 && value.fill[key] <= 1)) throw new TypeError('unsupported object fill');
+  }
   function validatePayload(operation, payload) {
-    if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
+    if (operation === 'query.document.object') {
+      exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
+      revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
+    } else if (operation === 'command.document.object.layer.visibility.set') {
+      exact(payload, ['command', 'layerUid', 'visible'], [], 'object visibility command');
+      if (payload.command !== 'object.layer.visibility.set' || typeof payload.visible !== 'boolean') throw new TypeError('invalid object visibility command');
+      objectUid(payload.layerUid);
+    } else if (operation === 'query.document.serialize' || operation === 'query.document.evaluate') {
       const evaluate = operation === 'query.document.evaluate';
       exact(payload, evaluate ? ['atRevision', 'contextId', 'frame'] : ['atRevision'], [], 'pinned read');
       revision(payload.atRevision, 'atRevision');
@@ -141,7 +189,7 @@
     });
   }
   function validateRequest(value) {
-    rejectForbidden(value);
+    rejectForbidden(value, undefined, objectIdPaths(value && value.operation));
     exact(value, ['apiVersion', 'requestId', 'instanceId', 'documentId', 'operation', 'payload'], ['expectedRevision', 'cancelledBeforeDispatch'], 'request');
     if (value.apiVersion !== 2) throw new TypeError('apiVersion must be 2');
     ['requestId', 'instanceId', 'documentId'].forEach((key) => id(value[key], key));
@@ -216,7 +264,13 @@
   }
   function validateResult(value, operation) {
     if (!operation) return;
-    if (operation === 'query.diagnostics.recent') {
+    if (operation === 'query.document.object') {
+      exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
+      revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId); objectRecord(value.object);
+    } else if (operation === 'command.document.object.layer.visibility.set') {
+      exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
+      if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
+    } else if (operation === 'query.diagnostics.recent') {
       exact(value, ['records', 'truncated'], [], 'diagnostics result');
       if (!Array.isArray(value.records) || value.records.length > 32 || typeof value.truncated !== 'boolean') throw new TypeError('invalid diagnostics bounds');
       let prior = 0;
@@ -282,8 +336,8 @@
     } else if (operation.startsWith('job.export.png.')) validateJobReceipt(value);
   }
   function validateResponse(value, requestId, operation) {
-    rejectForbidden(value);
-    if (['query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    rejectForbidden(value, undefined, objectIdPaths(operation));
+    if (['query.document.object', 'command.document.object.layer.visibility.set', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -294,6 +348,8 @@
     if (value.ok) {
       if (!has(value, 'result') || has(value, 'error')) throw new TypeError('successful response must contain only result');
       validateResult(value.result, operation);
+      if (operation === 'query.document.object' && (value.result.atRevision !== value.contentRevision ||
+          value.result.documentSnapshotId !== `native-object:${value.documentId}:${value.result.atRevision}`)) throw new TypeError('object read snapshot mismatch');
     } else {
       if (!has(value, 'error') || has(value, 'result')) throw new TypeError('failed response must contain only error');
       validateError(value.error);
@@ -315,6 +371,18 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
+          if (['query.document.object', 'command.document.object.layer.visibility.set'].includes(outbound.operation)) {
+            const replacement = !response.ok && response.error.code === 'wrong_document';
+            if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
+            if (response.ok && outbound.operation === 'query.document.object') {
+              const expected = outbound.payload.stableTarget, actual = response.result.object.target;
+              if (response.result.atRevision !== outbound.payload.atRevision ||
+                  ['contextId', 'layerUid', 'strokeId'].some((key) => actual[key] !== expected[key]) ||
+                  ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
+            }
+            if (response.ok && outbound.operation === 'command.document.object.layer.visibility.set' &&
+                response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
+          }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
               (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId)) throw new TypeError('diagnostics response identity mismatch');
           if (outbound.operation === 'query.reproduction.report' && response.ok &&
