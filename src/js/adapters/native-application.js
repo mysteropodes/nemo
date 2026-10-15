@@ -10,7 +10,7 @@
     'command.document.apply',
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
-    'query.document.object', 'command.document.object.layer.visibility.set',
+    'query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
     'query.diagnostics.recent', 'query.reproduction.report',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
     'transaction.status', 'history.undo', 'history.redo',
@@ -19,7 +19,7 @@
   const requiredRevision = new Set([
     'command.document.apply', 'transaction.begin', 'history.undo', 'history.redo',
     'job.export.png.begin',
-    'command.document.object.layer.visibility.set',
+    'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
   ]);
   const commonErrors = new Set([
     'invalid_request', 'wrong_instance', 'wrong_document', 'stale_revision', 'busy_conflict',
@@ -58,6 +58,7 @@
       'payload.stableTarget.layerUid', 'payload.stableTarget.strokeId',
       'result.object.target.layerUid', 'result.object.target.strokeId',
     ]);
+    if (operation === 'command.document.object.layer.create') return new Set(['payload.name', 'result.layerUid']);
     return operation === 'command.document.object.layer.visibility.set' ? new Set(['payload.layerUid']) : null;
   }
   function rejectForbidden(value, seen, opaquePaths, at) {
@@ -130,6 +131,9 @@
     if (operation === 'query.document.object') {
       exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
       revision(payload.atRevision, 'atRevision'); objectTarget(payload.stableTarget);
+    } else if (operation === 'command.document.object.layer.create') {
+      exact(payload, ['command', 'name'], [], 'object layer create');
+      if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
     } else if (operation === 'command.document.object.layer.visibility.set') {
       exact(payload, ['command', 'layerUid', 'visible'], [], 'object visibility command');
       if (payload.command !== 'object.layer.visibility.set' || typeof payload.visible !== 'boolean') throw new TypeError('invalid object visibility command');
@@ -267,6 +271,10 @@
     if (operation === 'query.document.object') {
       exact(value, ['atRevision', 'documentSnapshotId', 'object'], [], 'object read result');
       revision(value.atRevision, 'atRevision'); objectUid(value.documentSnapshotId); objectRecord(value.object);
+    } else if (operation === 'command.document.object.layer.create') {
+      exact(value, ['applied', 'historyEntriesAdded', 'layerUid'], [], 'object layer create result');
+      if (value.applied !== true || value.historyEntriesAdded !== 1) throw new TypeError('invalid layer creation disposition');
+      objectUid(value.layerUid);
     } else if (operation === 'command.document.object.layer.visibility.set') {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
       if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
@@ -337,7 +345,7 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
-    if (['query.document.object', 'command.document.object.layer.visibility.set', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    if (['query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -371,7 +379,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'command.document.object.layer.visibility.set'].includes(outbound.operation)) {
+          if (['query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create'].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -380,6 +388,8 @@
                   ['contextId', 'layerUid', 'strokeId'].some((key) => actual[key] !== expected[key]) ||
                   ['kind', 'frame'].some((key) => actual.frameScope[key] !== expected.frameScope[key])) throw new TypeError('object read selector mismatch');
             }
+            if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
+                response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.visibility.set' &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
           }

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.layer-create",
+  "version": 1,
+  "status": "staged",
+  "availability": {
+    "state": "unavailable",
+    "reason": "Native layer creation requires accepted native timeline/selected-row readers and ordinary caller publication policy; metadata projection alone is insufficient."
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.create"
+  ],
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained creation receipt or typed refusal."
+  },
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Prepared contract only: execution unavailable until native reader acceptance",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "layer-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.create",
+        "payload": {
+          "command": "object.layer.create",
+          "name": "Drawing layer"
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "layer-create-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1,
+          "layerUid": "native-layer:8:0"
+        }
+      }
+    }
+  ]
+}

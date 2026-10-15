@@ -49,16 +49,24 @@ impl NativeApplicationRequest {
                 "native object selector does not match its declared contract".into(),
             ));
         }
-        if self.operation == "command.document.object.layer.visibility.set" {
+        if matches!(
+            self.operation.as_str(),
+            "command.document.object.layer.visibility.set" | "command.document.object.layer.create"
+        ) {
+            let action = if self.operation.ends_with(".create") {
+                "creation"
+            } else {
+                "visibility"
+            };
             if self.expected_revision.is_none() {
-                return Err(RequestError::InvalidRequest(
-                    "native object visibility command requires expectedRevision".into(),
-                ));
+                return Err(RequestError::InvalidRequest(format!(
+                    "native object {action} command requires expectedRevision"
+                )));
             }
             if !crate::native_contract::validate_request(&self.operation, &self.payload) {
-                return Err(RequestError::InvalidRequest(
-                    "native object visibility command does not match its declared contract".into(),
-                ));
+                return Err(RequestError::InvalidRequest(format!(
+                    "native object {action} command does not match its declared contract"
+                )));
             }
         }
         if !self.payload.is_object() {

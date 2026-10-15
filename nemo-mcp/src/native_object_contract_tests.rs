@@ -259,11 +259,81 @@ fn registered_examples_keep_full_admission_for_all_available_features() {
             let request: NativeApplicationRequest =
                 serde_json::from_value(example["request"].clone()).unwrap();
             let outcome = request.validate();
-            assert!(
-                outcome.is_ok(),
-                "available feature {}: {outcome:?}",
-                descriptor["id"]
-            );
+            if descriptor["availability"]["state"] == "available" {
+                assert!(
+                    outcome.is_ok(),
+                    "available feature {}: {outcome:?}",
+                    descriptor["id"]
+                );
+            } else {
+                assert!(request.validate_input().is_ok());
+                assert_eq!(outcome.unwrap_err().code(), "unavailable");
+            }
         }
     }
+}
+
+#[test]
+fn creation_shape_and_result_are_exact_but_do_not_authorize_execution() {
+    let payload = json!({"command":"object.layer.create","name":""});
+    let mut request: NativeApplicationRequest = serde_json::from_value(json!({
+        "apiVersion":2,"requestId":"create","instanceId":"instance","documentId":"document",
+        "expectedRevision":0,"operation":"command.document.object.layer.create","payload":payload
+    }))
+    .unwrap();
+    assert!(create_request(&payload));
+    assert!(request.validate_input().is_ok());
+    assert_eq!(request.validate().unwrap_err().code(), "unavailable");
+    for invalid in [
+        json!({}),
+        json!([]),
+        Value::Null,
+        json!({"command":"object.layer.create","name":null}),
+        json!({"command":"object.layer.create","name":false}),
+        json!({"command":"object.layer.create","name":0}),
+        json!({"command":"object.layer.create","name":"a","layerUid":"caller"}),
+        json!({"command":"object.layer.create","name":"a","extra":true}),
+        json!({"command":"layer.create","name":"a"}),
+    ] {
+        assert!(!create_request(&invalid));
+        request.payload = invalid;
+        assert!(request.validate_input().is_err());
+    }
+    request.payload = payload.clone();
+    request.expected_revision = None;
+    assert!(request.validate_input().is_err());
+    request.expected_revision = Some(crate::contract::MAX_SAFE_REVISION + 1);
+    assert!(request.validate_input().is_err());
+    request.expected_revision = Some(0);
+    request.payload["name"] = json!("层".repeat(1500));
+    assert!(request.validate_input().is_err());
+    let result = json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:1:0"});
+    assert!(create_result(&result));
+    assert!(crate::native_contract::validate_result(
+        "command.document.object.layer.create",
+        "document",
+        &payload,
+        &result
+    ));
+    for invalid in [
+        json!({"applied":true,"historyEntriesAdded":1}),
+        json!({"applied":false,"historyEntriesAdded":0,"layerUid":"x"}),
+        json!({"applied":true,"historyEntriesAdded":0,"layerUid":"x"}),
+        json!({"applied":true,"historyEntriesAdded":1,"layerUid":""}),
+        json!({"applied":true,"historyEntriesAdded":1,"layerUid":0}),
+        json!({"applied":true,"historyEntriesAdded":1,"layerUid":"x","extra":true}),
+    ] {
+        assert!(!create_result(&invalid));
+    }
+    assert_eq!(
+        crate::capabilities::native_catalog()
+            .capability_for_operation("command.document.object.layer.create")
+            .unwrap()["availability"]["state"],
+        "unavailable"
+    );
+    assert!(crate::capabilities::validate_native_operation("query.document.object").is_ok());
+    assert!(crate::capabilities::validate_native_operation(
+        "command.document.object.layer.visibility.set"
+    )
+    .is_ok());
 }

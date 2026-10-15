@@ -113,6 +113,11 @@
       "reason": "no executable regions in the coverage report",
       "note": "N25C2b/#1607: cargo-llvm-cov 0.9.1 measured clean source 159e9062c8ce2e25e40b57f93f35f4fb761275f9. The report contains no executable regions for this cfg(test) child; it is explicitly listed, not excluded."
     },
+    "nemo-mcp/src/native_object_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "W02-LAYER-CONTRACT/#2041: pinned cargo-llvm-cov 0.9.1 named test:coverage-rust measured clean source 37ab73195809987a85a16c852962fdd089845d41 with 109 passing tests and none failing. This cfg(test) wire.rs child is absent from all 15 LLVM file records; explicitly listed, not excluded or assigned a guessed zero floor. Test source SHA256 27bd6f5415682a203d3fad0a9a1b55b446923e6b3e7d417d68b5ed478231c493. Export reports/20261015T140630Z-37ab731/coverage-rust/coverage.json SHA256 fe72db14c8bca405a59d220196f9ccbda9485d7f0e6a95be34cc64fa3636ef8a. Every prior file/aggregate floor and tool/history value is retained. Whole-crate coverage remains failed, with old percentage deficits reported separately; this registration is not coverage acceptance."
+    },
     "nemo-mcp/src/raw_envelope.rs": {
       "lines": 96.12,
       "regions": 95.91,

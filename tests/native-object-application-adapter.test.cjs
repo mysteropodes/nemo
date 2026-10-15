@@ -157,3 +157,57 @@ test('typed replacement refusal stays observable without successful wrong-owner 
   assert.deepEqual(await adapter(() => response).api.dispatch(request), response);
   await assert.rejects(adapter(() => ({ ...response, error: { code: 'unavailable', message: 'not a replacement' } })).api.dispatch(request));
 });
+
+function creation(name = 'Drawing') {
+  return { ...visibility(), operation: 'command.document.object.layer.create',
+    payload: { command: 'object.layer.create', name } };
+}
+function created(request) {
+  return { ...commandResponse(request, true),
+    result: { applied: true, historyEntriesAdded: 1, layerUid: 'native-layer:8:0' } };
+}
+
+test('prepared creation adapter preserves scalar display names and native identity without claiming availability', async () => {
+  for (const name of ['', 'Drawing', '层 / ink', 'data:display name', 'blob:display name']) {
+    const request = creation(name), original = copy(request), h = adapter(created);
+    assert.strictEqual(validateRequest(request), request);
+    assert.deepEqual(await h.api.dispatch(request), created(request));
+    assert.deepEqual(request, original); assert.deepEqual(h.calls, [original]);
+  }
+  const request = creation(), refusal = { ...created(request), contentRevision: 7, ok: false,
+    error: { code: 'unavailable', message: 'Native timeline reader pending' } };
+  delete refusal.result;
+  assert.deepEqual(await adapter(() => refusal).api.dispatch(request), refusal);
+});
+
+test('creation shape rejects malformed caller identity, raw resource extras and invalid name before transport', () => {
+  const base = creation();
+  for (const [pointer, value, remove] of [
+    ['/payload', []], ['/payload/name', null], ['/payload/name', 1], ['/payload/name', false],
+    ['/payload/name', '', true], ['/payload/command', 'layer.create'], ['/payload/layerUid', 'caller-id'],
+    ['/payload/frames', []], ['/payload/pixels', new Uint8Array(4)],
+    ['/expectedRevision', 7, true], ['/expectedRevision', null], ['/expectedRevision', -1],
+    ['/expectedRevision', Number.MAX_SAFE_INTEGER + 1], ['/payload/name', '层'.repeat(1500)],
+    ['/payload/data', 'data:raw-pixels'],
+  ]) {
+    const h = adapter(() => { throw Error('must not dispatch'); });
+    assert.throws(() => h.api.dispatch(change(base, pointer, value, remove)), undefined, pointer);
+    assert.equal(h.calls.length, 0);
+  }
+});
+
+test('creation success must retain exact disposition UID and expected plus one revision in the same owner', async () => {
+  const request = creation(), response = created(request);
+  for (const [pointer, value, remove] of [
+    ['/result/layerUid', '', true], ['/result/layerUid', ''], ['/result/layerUid', null],
+    ['/result/layerUid', 1], ['/result/applied', false], ['/result/applied', 'true'],
+    ['/result/historyEntriesAdded', 0], ['/result/historyEntriesAdded', 2], ['/result/extra', true],
+    ['/contentRevision', 7], ['/contentRevision', 9], ['/instanceId', 'other'], ['/documentId', 'other'],
+    ['/requestId', 'other'], ['/result/layerUid', '层'.repeat(1500)],
+  ]) await assert.rejects(adapter(() => change(response, pointer, value, remove)).api.dispatch(request), undefined, pointer);
+  const bounded = creation(); bounded.expectedRevision = Number.MAX_SAFE_INTEGER;
+  await assert.rejects(adapter(created).api.dispatch(bounded));
+  const historical = created(request);
+  assert.deepEqual(await adapter(() => historical).api.dispatch(request), historical,
+    'retained historical UID remains valid; this is not a current-presence query');
+});

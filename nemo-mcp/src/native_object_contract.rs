@@ -57,6 +57,24 @@ pub(super) fn visibility_result(value: &Value) -> bool {
     })
 }
 
+pub(super) fn create_request(value: &Value) -> bool {
+    exact(value, &["command", "name"], &[]).is_some_and(|value| {
+        value.get("command").and_then(Value::as_str) == Some("object.layer.create")
+            && value.get("name").is_some_and(Value::is_string)
+    })
+}
+
+pub(super) fn create_result(value: &Value) -> bool {
+    exact(value, &["applied", "historyEntriesAdded", "layerUid"], &[]).is_some_and(|value| {
+        value.get("applied").and_then(Value::as_bool) == Some(true)
+            && value.get("historyEntriesAdded").and_then(Value::as_u64) == Some(1)
+            && value
+                .get("layerUid")
+                .and_then(Value::as_str)
+                .is_some_and(|uid| !uid.is_empty())
+    })
+}
+
 fn point(value: &Value) -> bool {
     exact(value, &["x", "y"], &[]).is_some_and(|value| {
         ["x", "y"].iter().all(|key| {
