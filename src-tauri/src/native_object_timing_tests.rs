@@ -159,8 +159,8 @@ async fn timing_new_internal_create_and_reopened_project_reach_the_same_public_r
             .dispatch(serde_json::from_value(create).unwrap())
             .unwrap()
     };
-    assert!(created.ok);
-    let uid = created.result.unwrap()["layerUid"]
+    assert!(created.is_ok());
+    let uid = created.result().unwrap()["layerUid"]
         .as_str()
         .unwrap()
         .to_owned();
