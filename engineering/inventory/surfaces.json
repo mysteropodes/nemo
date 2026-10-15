@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "b18b0d56c523f24c2a84c108bf94c0791251df62",
-  "describe": "v0.7.0-alpha.4-1837-gb18b0d56-dirty"
+  "head": "7efafea75840d2792c7ce8804fe063111f826e19",
+  "describe": "v0.7.0-alpha.4-1839-g7efafea7-dirty"
  },
- "inputsDigest": "ff3c580137251ef290f247110b8dede9df7945eff65869932867b8c63cc10a23",
+ "inputsDigest": "5d71029232056415f73995ef38fddafa870d0275756b966e0d154247326d0906",
  "states": [
   "inventoried",
   "characterized",
@@ -271,7 +271,7 @@
   },
   "SMProjectEntry": {
    "file": "src/js/project-entry.js",
-   "line": 188,
+   "line": 189,
    "members": 0
   },
   "SMProject": {
@@ -15795,9 +15795,9 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:170 bindStartScreen()",
     "src/js/project-entry.js:171 bindStartScreen()",
-    "src/js/project-entry.js:172 bindStartScreen()"
+    "src/js/project-entry.js:172 bindStartScreen()",
+    "src/js/project-entry.js:173 bindStartScreen()"
    ],
    "events": [
     "keydown",
@@ -15836,7 +15836,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project-entry.js:163 bindStartScreen()"
+    "src/js/project-entry.js:164 bindStartScreen()"
    ],
    "events": [
     "click"
