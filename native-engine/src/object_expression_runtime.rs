@@ -5,7 +5,8 @@ use crate::object_expression_pin::{
     prepare_expression_request, verify_owner_snapshot, ExpressionRequest, ExpressionSelector,
 };
 use crate::object_frame_packet::{
-    prepare_object_frame_with_resolver, ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
+    prepare_object_exposure_frame_with_resolver, prepare_object_frame_with_resolver,
+    ObjectFrameError, ObjectFramePacket, ObjectFrameSelector,
 };
 use crate::revision::ObjectSnapshot;
 use rquickjs::{context::intrinsic, Context, Ctx, Error, Function, Runtime, Value};
@@ -382,6 +383,26 @@ pub(crate) fn prepare_expression_order_frame_for_owner(
     selector: &ObjectFrameSelector<'_>,
     limits: ExpressionLimits,
 ) -> Result<ObjectFramePacket, ExpressionRefusal> {
+    prepare_order_frame_for_owner(owner, snapshot, selector, limits, false)
+}
+
+/// Explicit temporal consumer; no exact-scope fallback on unavailable timing.
+pub(crate) fn prepare_expression_order_exposure_frame_for_owner(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    limits: ExpressionLimits,
+) -> Result<ObjectFramePacket, ExpressionRefusal> {
+    prepare_order_frame_for_owner(owner, snapshot, selector, limits, true)
+}
+
+fn prepare_order_frame_for_owner(
+    owner: &NativeObjectHistory,
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    limits: ExpressionLimits,
+    exposure: bool,
+) -> Result<ObjectFramePacket, ExpressionRefusal> {
     let verify = || {
         let current = owner
             .acquire_snapshot(owner.content_revision())
@@ -392,19 +413,24 @@ pub(crate) fn prepare_expression_order_frame_for_owner(
     if snapshot.document().format_version() != 2 {
         return Err(ObjectFrameError::Unavailable.into());
     }
-    let packet = prepare_object_frame_with_resolver(snapshot, selector, |layer_uid, stroke_id| {
+    let evaluate = |source_frame, layer_uid: &str, stroke_id: Option<&str>| {
         evaluate_order_for_owner(
             owner,
             snapshot,
             &ExpressionSelector {
                 frame: selector.clone(),
-                source_frame: selector.frame,
+                source_frame,
                 layer_uid,
                 stroke_id,
             },
             limits,
         )
-    });
+    };
+    let packet = if exposure {
+        prepare_object_exposure_frame_with_resolver(snapshot, selector, evaluate)
+    } else {
+        prepare_object_frame_with_resolver(snapshot, selector, evaluate)
+    };
     verify()?;
     packet
 }

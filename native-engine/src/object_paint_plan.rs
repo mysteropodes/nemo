@@ -107,7 +107,7 @@ fn join(
         let target = source.record().target();
         if target.context_id() != packet.context_id()
             || target.scope_kind() != packet.scope_kind()
-            || target.frame() != packet.frame()
+            || Some(target.frame()) != packet.source_frame_for_layer(source.source_layer_index())
             || packet
                 .source_layers()
                 .get(source.source_layer_index())

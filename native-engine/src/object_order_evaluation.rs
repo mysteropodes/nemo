@@ -150,18 +150,33 @@ fn elements<E, F>(
     sources: &SourceIndices<'_>,
     context: &OrderContext,
     frame: u32,
+    source_frame: Option<u32>,
+    exposure: bool,
     layer: &str,
     resolver: &mut F,
 ) -> Result<Vec<NumericElementOrder>, E>
 where
     E: From<ObjectFrameError>,
-    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
 {
+    let Some(source_frame) = source_frame else {
+        return Ok(Vec::new());
+    };
     let scope = context
         .scopes
         .iter()
-        .find(|scope| scope.frame_scope.frame == frame)
-        .ok_or(ObjectFrameError::Unavailable)?;
+        .find(|scope| scope.frame_scope.frame == source_frame);
+    let scope = match scope {
+        Some(scope) => scope,
+        None if exposure
+            && !sources.keys().any(|(ctx, scope, uid, _)| {
+                *ctx == context.context_id && scope.frame == source_frame && *uid == layer
+            }) =>
+        {
+            return Ok(Vec::new())
+        } // Explicit empty key, never an inferred missing scope.
+        None => return Err(ObjectFrameError::Unavailable.into()),
+    };
     let mut entries: Vec<_> = scope
         .elements
         .iter()
@@ -172,7 +187,7 @@ where
     let mut result = Vec::new();
     for entry in entries {
         let value = if routed && active_expression(&entry.order) {
-            resolver(layer, Some(&entry.stroke_id))?
+            resolver(source_frame, layer, Some(&entry.stroke_id))?
         } else if routed {
             numeric(&entry.order, frame)?
         } else {
@@ -204,8 +219,12 @@ where
 pub(crate) fn prepare(
     snapshot: &ObjectSnapshot,
     frame: u32,
+    sources: &[Option<u32>],
+    exposure: bool,
 ) -> Result<NumericOrderPlan, ObjectFrameError> {
-    prepare_with_resolver(snapshot, frame, |_, _| Err(ObjectFrameError::Unavailable))
+    prepare_with_resolver(snapshot, frame, sources, exposure, |_, _, _| {
+        Err(ObjectFrameError::Unavailable)
+    })
 }
 
 /// Private native application seam; evaluation never imports a runtime/owner.
@@ -213,11 +232,13 @@ pub(crate) fn prepare(
 pub(super) fn prepare_with_resolver<E, F>(
     snapshot: &ObjectSnapshot,
     frame: u32,
+    source_frames: &[Option<u32>],
+    exposure: bool,
     mut resolver: F,
 ) -> Result<NumericOrderPlan, E>
 where
     E: From<ObjectFrameError>,
-    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
 {
     let doc = snapshot.document();
     let plan = doc
@@ -254,9 +275,15 @@ where
     entries.sort_by_key(|l| l.natural_position);
     let mut layers = Vec::new();
     for layer in entries {
+        let source_layer_index = *source
+            .get(layer.layer_uid.as_str())
+            .ok_or(ObjectFrameError::InvalidSource)?;
+        let source_frame = *source_frames
+            .get(source_layer_index)
+            .ok_or(ObjectFrameError::InvalidSource)?;
         let explicit = has_keys(&layer.order) || !layer.order.static_value.missing();
         let value = if explicit && active_expression(&layer.order) {
-            resolver(&layer.layer_uid, None)?
+            resolver(source_frame.unwrap_or(frame), &layer.layer_uid, None)?
         } else if explicit {
             numeric(&layer.order, frame)?
         } else {
@@ -266,13 +293,19 @@ where
             return Err(ObjectFrameError::Unavailable.into());
         }
         layers.push(NumericLayerOrder {
-            source_layer_index: *source
-                .get(layer.layer_uid.as_str())
-                .ok_or(ObjectFrameError::InvalidSource)?,
+            source_layer_index,
             natural_position: layer.natural_position,
             value,
             explicit,
-            elements: elements(&sources, context, frame, &layer.layer_uid, &mut resolver)?,
+            elements: elements(
+                &sources,
+                context,
+                frame,
+                source_frame,
+                exposure,
+                &layer.layer_uid,
+                &mut resolver,
+            )?,
         });
     }
     let mut front: Vec<_> = layers

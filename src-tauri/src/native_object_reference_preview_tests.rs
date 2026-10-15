@@ -26,7 +26,7 @@ fn host() -> NativeObjectHost {
     record["fill"] = json!({"kind":"solid","r":1,"g":0,"b":0,"a":1});
     NativeObjectHost::from_project_file("reference-preview-host".into(),&serde_json::to_vec(&json!({
         "format":"nemo.native-project-document","formatVersion":1,"project":{"canvasW":64,"canvasH":64,"fps":24},"viewportReference":null,"assets":[],
-        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,"layers":[{"layerUid":"L0"}],"objects":[record],
+        "drawing":{"format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,"layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],"objects":[record],
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,
             "contexts":[{"contextId":"scene-root","layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],
                 "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[{"layerUid":"L0","strokeId":"a","naturalPosition":0,"order":{}}]}]}],
@@ -349,3 +349,6 @@ fn gpu_reference_replacement_decode_failure_drops_stale_caches_and_retries() {
     assert!(owner.release_project().unwrap().reconciliation_complete());
     assert!(owner.preview.reference_cache.is_none());
 }
+
+#[path = "native_object_exposure_tests.rs"]
+mod exposure_tests;

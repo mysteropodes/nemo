@@ -36,7 +36,7 @@ pub(super) fn host() -> NativeObjectHost {
     }
     let document = json!({
         "format":"nemo.native-object-document", "formatVersion":2, "totalFrames":2,
-        "layers":[{"layerUid":"L0"}], "objects":objects,
+        "layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0},{"frame":1}],"samples":[]}}], "objects":objects,
         "compositionOrder":{
             "format":"nemo.native-object-order-plan", "formatVersion":1, "documentFormatVersion":2,
             "contexts":[{"contextId":"scene-root", "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}], "scopes":scopes}],

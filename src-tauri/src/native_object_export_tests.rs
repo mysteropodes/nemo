@@ -47,7 +47,7 @@ fn host() -> NativeObjectHost {
     record["fill"] = json!({"kind":"solid","r":0,"g":0,"b":1,"a":1});
     let document = json!({
         "format":"nemo.native-object-document","formatVersion":2,"totalFrames":1,
-        "layers":[{"layerUid":"L0"}],"objects":[record],
+        "layers":[{"layerUid":"L0","timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],"objects":[record],
         "compositionOrder":{"format":"nemo.native-object-order-plan","formatVersion":1,
             "documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
                 "layers":[{"layerUid":"L0","naturalPosition":0,"order":{}}],

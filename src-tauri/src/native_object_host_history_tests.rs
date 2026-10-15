@@ -273,6 +273,8 @@ mod inactive {
         const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGklEQVR4nGMQVDL+7xKa1sBQ3jGTYdXuM/8BN4oHrU/zhk0AAAAASUVORK5CYII=";
         let mut drawing = document();
         drawing["formatVersion"] = json!(version);
+        drawing["layers"][0]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[{"frame":7}],"samples":[]});
+        drawing["layers"][1]["timing"] = json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root","keys":[],"samples":[]});
         if version == 2 {
             drawing["compositionOrder"] = json!({
                 "format":"nemo.native-object-order-plan","formatVersion":1,"documentFormatVersion":2,

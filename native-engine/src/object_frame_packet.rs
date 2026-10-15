@@ -144,6 +144,7 @@ pub struct ObjectFramePacket {
     scope_kind: FrameScopeKind,
     frame: u32,
     records: Vec<ObjectFrameIndices>,
+    source_frames: Vec<Option<u32>>,
     numeric_order: Option<NumericOrderPlan>,
 }
 
@@ -177,6 +178,11 @@ impl ObjectFramePacket {
     pub fn frame(&self) -> u32 {
         self.frame
     }
+    /// Selected authored source for this layer; packet.frame() remains evaluation time.
+    /// An unexposed layer (or invalid index) has no selected source.
+    pub fn source_frame_for_layer(&self, index: usize) -> Option<u32> {
+        self.source_frames.get(index).copied().flatten()
+    }
     /// Original layer table, including layers with no matching records.
     pub fn source_layers(&self) -> &[ObjectLayer] {
         self.snapshot.document().layers()
@@ -205,15 +211,25 @@ impl ObjectFramePacket {
     }
 }
 
-/// Select exact scope/frame only. A valid selection may contain zero records.
+/// Explicit exact-scoped native query, not a temporal desktop fallback.
+/// A valid selection may contain zero records; no authored timing is inferred.
 pub fn prepare_object_frame(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
 ) -> Result<ObjectFramePacket, ObjectFrameError> {
-    prepare_frame_with_order(snapshot, selector, order::prepare)
+    prepare_frame_with_order(snapshot, selector, false, order::prepare)
 }
 
-/// Private resolver seam; all packet pins, records and sorting stay native.
+/// Desktop drawing exposure requires explicit timing for every admitted layer.
+/// Reference-scoped object data remains stored, never exposed for display here.
+pub fn prepare_object_exposure_frame(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+) -> Result<ObjectFramePacket, ObjectFrameError> {
+    prepare_frame_with_order(snapshot, selector, true, order::prepare)
+}
+
+/// Private exact-scoped resolver seam, with source and evaluated clocks distinct.
 pub(crate) fn prepare_object_frame_with_resolver<E, F>(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
@@ -221,21 +237,47 @@ pub(crate) fn prepare_object_frame_with_resolver<E, F>(
 ) -> Result<ObjectFramePacket, E>
 where
     E: From<ObjectFrameError>,
-    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
+    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
 {
-    prepare_frame_with_order(snapshot, selector, |snapshot, frame| {
-        order::prepare_with_resolver(snapshot, frame, resolver)
-    })
+    prepare_frame_with_order(
+        snapshot,
+        selector,
+        false,
+        |snapshot, frame, sources, exposure| {
+            order::prepare_with_resolver(snapshot, frame, sources, exposure, resolver)
+        },
+    )
+}
+
+/// The same native ordering kernel, explicitly requiring authored exposure.
+pub(crate) fn prepare_object_exposure_frame_with_resolver<E, F>(
+    snapshot: &ObjectSnapshot,
+    selector: &ObjectFrameSelector<'_>,
+    resolver: F,
+) -> Result<ObjectFramePacket, E>
+where
+    E: From<ObjectFrameError>,
+    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
+{
+    prepare_frame_with_order(
+        snapshot,
+        selector,
+        true,
+        |snapshot, frame, sources, exposure| {
+            order::prepare_with_resolver(snapshot, frame, sources, exposure, resolver)
+        },
+    )
 }
 
 fn prepare_frame_with_order<E, F>(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
+    exposure: bool,
     prepare_order: F,
 ) -> Result<ObjectFramePacket, E>
 where
     E: From<ObjectFrameError>,
-    F: FnOnce(&ObjectSnapshot, u32) -> Result<NumericOrderPlan, E>,
+    F: FnOnce(&ObjectSnapshot, u32, &[Option<u32>], bool) -> Result<NumericOrderPlan, E>,
 {
     if selector.instance_id != snapshot.instance_id() {
         return Err(ObjectFrameError::WrongInstance.into());
@@ -250,7 +292,7 @@ where
         return Err(ObjectFrameError::WrongSnapshot.into());
     }
     let v2 = snapshot.document().format_version() == 2;
-    if v2
+    if (exposure || v2)
         && (selector.context_id != "scene-root" || selector.scope_kind != FrameScopeKind::Authored)
     {
         return Err(ObjectFrameError::Unavailable.into());
@@ -262,8 +304,28 @@ where
     if selector.frame >= document.total_frames() {
         return Err(ObjectFrameError::FrameOutOfRange.into());
     }
+    let source_frames: Vec<_> = document
+        .layers()
+        .iter()
+        .map(|layer| {
+            if exposure {
+                layer
+                    .timing
+                    .value()
+                    .map(|timing| timing.exposure(selector.frame).1)
+                    .ok_or(ObjectFrameError::Unavailable)
+            } else {
+                Ok(Some(selector.frame))
+            }
+        })
+        .collect::<Result<_, _>>()?;
     let numeric_order = if v2 {
-        Some(prepare_order(snapshot, selector.frame)?)
+        Some(prepare_order(
+            snapshot,
+            selector.frame,
+            &source_frames,
+            exposure,
+        )?)
     } else {
         None
     };
@@ -276,14 +338,14 @@ where
     let mut records = Vec::new();
     for (source_object_index, record) in document.objects().iter().enumerate() {
         let target = record.target();
-        if target.context_id() == selector.context_id
-            && target.scope_kind() == &selector.scope_kind
-            && target.frame() == selector.frame
+        if target.context_id() == selector.context_id && target.scope_kind() == &selector.scope_kind
         {
             let source_layer_index = *layers
                 .get(target.layer_uid())
                 .ok_or(ObjectFrameError::InvalidSource)?;
-            if !document.layers()[source_layer_index].visible() {
+            if source_frames[source_layer_index] != Some(target.frame())
+                || !document.layers()[source_layer_index].visible()
+            {
                 continue;
             }
             records.push(ObjectFrameIndices {
@@ -298,6 +360,11 @@ where
         scope_kind: selector.scope_kind.clone(),
         frame: selector.frame,
         records,
+        source_frames,
         numeric_order,
     })
 }
+
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_exposure.rs"]
+mod exposure_tests;
