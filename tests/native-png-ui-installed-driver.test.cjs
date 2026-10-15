@@ -320,6 +320,10 @@ print("three actual source modes, distinct grants; runtimeAX=false")`;
 });
 test('compiled actual Swift inspect gates service reads on retained tokens, process, ancestry and owner proofs',()=>{
   if(process.platform!=='darwin')return;
+  const projection=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const marker='func ownedControl(',start=projection.indexOf(marker);
+  assert.ok(start>=0,'actual pure projection declaration must exist');
+  assert.equal(projection.indexOf(marker,start+marker.length),-1,'actual pure projection declaration must be unique');
   const source=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-window.swift'),'utf8');
   function slice(begin,end){const a=source.indexOf(begin),b=source.indexOf(end,a);assert.ok(a>=0&&b>a);return source.slice(a,b);}
   const gates=slice('    let target = request["target"]','    switch action {');
@@ -330,7 +334,7 @@ test('compiled actual Swift inspect gates service reads on retained tokens, proc
   const childBinding=childSource.slice(childStart,childEnd),childCore=childSource.slice(0,childStart);
   const definitions=slice('struct ProcessStart:','func processStart(')+slice('func localFacts(','// A path is diagnostic')+
     slice('func boundedOwnedTree<','func guardedElementAction(')+
-    fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8').replace(/^import .*$/gm,'')+childCore;
+    projection.slice(start)+childCore;
   const verify=slice('  func verifyService()','  try emit(["status":"pinned"');
   const node=slice('  func node(_ value:','  func supports(');
   const code=`import Foundation

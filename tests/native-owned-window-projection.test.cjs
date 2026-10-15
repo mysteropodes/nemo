@@ -2,6 +2,13 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const assert=require('node:assert/strict'),test=require('node:test'),{spawnSync}=require('node:child_process');
 const B=require('./desktop/p38-owned-window-build.cjs');
+function projectionCore(){
+  const source=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const marker='func ownedControl(',start=source.indexOf(marker);
+  assert.ok(start>=0,'actual pure projection declaration must exist');
+  assert.equal(source.indexOf(marker,start+marker.length),-1,'actual pure projection declaration must be unique');
+  return source.slice(start);
+}
 function fixture(){
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'owned-projection-')));
   for(const name of B.INPUTS)fs.writeFileSync(path.join(root,name),'// '+name+'\n');
@@ -23,7 +30,7 @@ test('helper compilation identity covers all three ordered files and refuses alt
 });
 test('actual extracted Swift projects owned late controls with strict retained pages and honest completeness',()=>{
   if(process.platform!=='darwin')return;
-  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const module=projectionCore();
   const code=`import Foundation
 import CoreFoundation
 struct Refusal:Error {let code:String}
@@ -109,7 +116,7 @@ print("actual owned projection pages and refusal controls; runtimeAX=false")
 });
 test('actual Swift retains semantic region identity through generic pages and refuses changed proofs',()=>{
   if(process.platform!=='darwin')return;
-  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const module=projectionCore();
   const code=`import Foundation
 import CoreFoundation
 struct Refusal:Error {let code:String};func check(_ ok:Bool)throws{if !ok{throw Refusal(code:"adapter-refused")}}
@@ -155,7 +162,7 @@ test('actual fresh Swift role/control guard refuses stale, forged and malformed 
   assert.ok(start>=0&&end>start);const guard=source.slice(start,end);
   const begin=source.lastIndexOf('        if let control = ownedControl',start),finish=source.indexOf('\n',begin);
   assert.ok(begin>=0);const classify=source.slice(begin,finish);
-  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const module=projectionCore();
   const classifier=module.slice(0,module.indexOf('struct OwnedProjectionCursor'));
   const code=`import Foundation
 struct Refusal:Error{let code:String};func check(_ ok:Bool)throws{if !ok{throw Refusal(code:"adapter-refused")}}
@@ -208,7 +215,7 @@ test('compiled actual owner and children adapters keep typed failures blocked wi
   const start=source.indexOf('        owner:{ value in var actual:pid_t'),end=source.indexOf('        isWindow:',start);
   assert.ok(start>=0&&end>start);const adapters=source.slice(start,end);
   const childrenAdapter=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-children-query.swift'),'utf8').replace(/^import .*$/gm,'');
-  const module=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const module=projectionCore();
   const code=`import Foundation
 import CoreFoundation
 typealias AXUIElement=Int
@@ -289,7 +296,7 @@ print("actual typed query adapters; foreignReads=0; runtimeAX=false")`;
 });
 test('compiled actual AX count binding admits only fresh same-node owned noValue SUCCESS0',()=>{
   if(process.platform!=='darwin')return;
-  const projection=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-projection.swift'),'utf8');
+  const projection=projectionCore();
   const adapter=fs.readFileSync(path.join(__dirname,'desktop/p38-owned-children-query.swift'),'utf8').replace(/^import .*$/gm,'');
   const code=`import Foundation
 import CoreFoundation
