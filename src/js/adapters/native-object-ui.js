@@ -1,4 +1,17 @@
-/* Native metadata presentation; visibility delegates to the existing native owner. */
+/* Private native document metadata presenter.
+ * Owner: Ilya/A1; independent reviewer: Ilya/O Root.
+ * API: render, select, toggleVisibility, restoreInspector.
+ * Rust owns document/revision state. Visibility uses the existing native.object
+ * declaration/shared visibility handler through Project's SDK/transport queue.
+ * UI state: this adapter's WeakMaps retain DOM bindings, read pins and the prior
+ * inspector layout. Ports: DOM, Project desktop/presentation, Files' correlated
+ * projection, existing Reference nodes/bindings and the props-panel layout helper.
+ * Lifecycle: owner/revision/metadata/selection/DOM changes invalidate row reuse;
+ * restoreInspector clears the cache and restores nodes/styles on non-object routing.
+ * Frame-only invariant: unchanged inputs retain row/control DOM and focus.
+ * Fixture: tests/native-object-ui.test.cjs (inline independent controls).
+ * This source slice leaves full UI selection/MCP/timing/inspector acceptance open.
+ */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -66,26 +79,26 @@
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
     else{
-    rows=info.layers.map(function(layer,i){
-      var label=layer.name===undefined?layer.layerUid:layer.name;
-      var row=text(root,'div',''),pick=text(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
-      row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
-      pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
-      pick.setAttribute('aria-pressed',String(i===root.state.activeLayerIdx));
-      pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
-      pick.addEventListener('click',function(){root.NemoNativeObjectProject.selectLayerUI(root,i,false,layer.layerUid,info);});
-      var eye=text(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
-      eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
-      // Availability is checked at CLICK time: this render can precede preview/ACK.
-      eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info);});
-      row.replaceChildren(pick,eye);
-      return row;
-    });
-    caption=text(root,'div','');
-    unavailable=text(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
-    unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
-    // Build all nodes before replacing any visible legacy rows/cells.
-    list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
+      rows=info.layers.map(function(layer,i){
+        var label=layer.name===undefined?layer.layerUid:layer.name;
+        var row=text(root,'div',''),pick=text(root,'button',label+' — '+(layer.visible===false?'Hidden':'Visible'));
+        row.className='native-object-layer';row.dataset.layerUid=layer.layerUid;row.style.display='flex';
+        pick.type='button';pick.style.flex='1';pick.style.textAlign='left';
+        pick.setAttribute('aria-pressed',String(i===root.state.activeLayerIdx));
+        pick.setAttribute('aria-label',label+' ('+layer.layerUid+')');
+        pick.addEventListener('click',function(){root.NemoNativeObjectProject.selectLayerUI(root,i,false,layer.layerUid,info);});
+        var eye=text(root,'button',layer.visible===false?'Show':'Hide');eye.type='button';
+        eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
+        // Availability is checked at CLICK time: this render can precede preview/ACK.
+        eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info);});
+        row.replaceChildren(pick,eye);
+        return row;
+      });
+      caption=text(root,'div','');
+      unavailable=text(root,'div','Native keyframe, held-frame and tween timing is unavailable.');
+      unavailable.setAttribute('role','status');unavailable.className='native-object-timing-unavailable';
+      // Build all nodes before replacing any visible legacy rows/cells.
+      list.replaceChildren.apply(list,rows);header.replaceChildren(caption);grid.replaceChildren(unavailable);
     }
     caption.textContent='Frame '+(root.state.currentFrame+1)+' / '+info.totalFrames;
     unavailableInspector(root);
