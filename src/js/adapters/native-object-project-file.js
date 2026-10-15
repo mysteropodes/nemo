@@ -22,6 +22,45 @@
     root.state.layers.forEach(function(row,i){row.visible=values[i];});
     return true;
   }
+  function layerTable(layers){
+    if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
+    var seen=new Set(),next=[];
+    for(var i=0;i<layers.length;i++){
+      var layer=layers[i];
+      if(!layer||typeof layer.layerUid!=='string'||!layer.layerUid||seen.has(layer.layerUid))
+        throw new Error('Native layer identity is invalid');
+      if(Object.keys(layer).some(function(k){return !['layerUid','name','visible'].includes(k);}))
+        throw new Error('Native layer metadata is unsupported');
+      if(Object.prototype.hasOwnProperty.call(layer,'name')&&typeof layer.name!=='string')throw new Error('Native layer name is invalid');
+      if(Object.prototype.hasOwnProperty.call(layer,'visible')&&typeof layer.visible!=='boolean')throw new Error('Native layer visibility is invalid');
+      seen.add(layer.layerUid);next.push({layerUid:layer.layerUid,
+        name:Object.prototype.hasOwnProperty.call(layer,'name')?layer.name:undefined,visible:layer.visible!==false});
+    }
+    return next;
+  }
+  function refreshLayerTable(root,info){
+    var pin=projections.get(root),s=root.state,rows=s&&s.layers;
+    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})||
+      !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid;}))return false;
+    var next=layerTable(info.layers),delta=next.length-rows.length;
+    if(Math.abs(delta)>1||!next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
+    // Prepare all metadata and selection before changing this read-side table.
+    var active=s.activeLayerIdx,selection=root._layerSel;
+    if(delta<0){
+      var previousSelection=selection;
+      selection=Array.isArray(selection)?selection.filter(function(i){return Number.isInteger(i)&&i>=0&&i<next.length;}):[];
+      if(!Number.isInteger(active)||active<0||active>=next.length)active=selection.length?selection[0]:Math.max(0,next.length-1);
+      if(!selection.length&&next.length&&previousSelection&&previousSelection.length)selection=[active];
+      else if(previousSelection&&selection.length===previousSelection.length)selection=previousSelection;
+    }
+    if(delta>0){var added=next[next.length-1];rows.push({layerUid:added.layerUid,
+      name:added.name===undefined?'Layer '+next.length:added.name,visible:added.visible});}
+    else if(delta<0)rows.pop();
+    next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;});
+    if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
+    projections.set(root,Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;})}));
+    return true;
+  }
   function create(session,ports,workflow,acknowledgement){
     var baseline=null,saving=false,opening=false;
     var saved=acknowledgement.create({
@@ -90,10 +129,7 @@
   function projectView(root,info){
     // These rows are read-side UI projections. The native edit guard denies
     // all legacy writes, and no Paper object or serializable document is built.
-    if(!info.layers.every(function(l){return !Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string';}))
-      throw new Error('Native layer name is invalid');
-    if(!info.layers.every(function(l){return !Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean';}))
-      throw new Error('Native layer visibility is invalid');
+    layerTable(info.layers);
     var s=root.state;
     s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
     s.canvasBg='#ffffff';s.waIn=0;s.waOut=info.totalFrames-1;s.currentFrame=0;s.activeLayerIdx=0;
@@ -105,7 +141,9 @@
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
-    projections.set(root,{instanceId:info.instanceId,documentId:info.documentId,lifecycleGeneration:info.lifecycleGeneration});
+    var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;})};
+    ['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].forEach(function(k){pin[k]=info[k];});
+    projections.set(root,pin);
   }
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
@@ -145,5 +183,6 @@
     return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
-    projectionMatches:projectionMatches,refreshVisibility:refreshVisibility});
+    projectionMatches:projectionMatches,refreshVisibility:refreshVisibility,refreshLayerTable:refreshLayerTable,
+    hasProjection:function(root){return projections.has(root);}});
 }));
