@@ -1,6 +1,7 @@
 //! Actual shared timing authority and MCP wire core; no installed webview claim.
-use super::*;
+use crate::{application_mcp::ApplicationMcp, native_object_bootstrap::bootstrap_raw};
 use nemo_mcp::{contract::NativeApplicationResponse, registry::Endpoint, wire};
+use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::net::TcpListener;
 
@@ -12,8 +13,12 @@ fn oracle() -> Value {
 }
 fn timed_document(uid: &str) -> Value {
     let values = oracle();
+    let original: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-object-v1/cases.json"
+    ))
+    .unwrap();
     let objects: Vec<_> = values["drawing"]["objects"].as_array().unwrap().iter().map(|entry| {
-        let mut record = document()["objects"][0].clone();
+            let mut record = original["records"][0].clone();
         record["target"] = json!({"contextId":"scene-root","layerUid":uid,"strokeId":entry["strokeId"],
             "frameScope":{"kind":"authored","frame":entry["frame"]}});
         record
