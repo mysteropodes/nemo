@@ -59,8 +59,7 @@ struct NativeStatusWireRequestFields {
     native_status: NativeStatusRequest,
 }
 
-// Serde's derived struct reader also accepts positional arrays. Native v2
-// authentication and dispatch require named object members at both levels.
+// Serde accepts positional structs; native v2 requires object maps at both levels.
 fn deserialize_object_only<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -101,8 +100,7 @@ impl<'de> Deserialize<'de> for NativeStatusWireRequest {
     }
 }
 
-/// Host-side authenticated request parser. The legacy member remains `request`
-/// byte-for-byte; v2 application and status traffic have distinct top-level keys.
+/// Host parser: legacy `request` is unchanged; v2 application/status use distinct keys.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AuthenticatedWireRequest {
@@ -127,8 +125,7 @@ pub async fn write_json(
 pub async fn read_json<T: serde::de::DeserializeOwned>(
     reader: impl AsyncRead + Unpin,
 ) -> io::Result<T> {
-    // Preserve the v1 rule exactly: content + newline must be strictly smaller
-    // than MAX_MESSAGE_BYTES.
+    // Preserve v1: content + newline must be strictly smaller than MAX_MESSAGE_BYTES.
     read_json_bounded(reader, MAX_MESSAGE_BYTES - 2).await
 }
 
@@ -419,7 +416,11 @@ mod object_tests {
                 .is_ok()
         }
         let (mut request, _) = pair();
+        request.operation = "command.document.object.layer.visibility.set".into();
+        request.payload =
+            json!({"command":"object.layer.visibility.set","layerUid":"l","visible":false});
         request.expected_revision = Some(0);
+        assert!(request.validate_input().is_ok());
         let native = serde_json::to_value(&request).unwrap();
         let positional = json!([
             request.api_version,
