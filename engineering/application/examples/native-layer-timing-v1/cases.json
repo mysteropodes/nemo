@@ -1,0 +1,195 @@
+{
+  "oracleVersion": "nemo.native-layer-timing-cases/1",
+  "baselineRef": "66ece0641708122eb8447e85ad8dd7e3402aaf6c",
+  "acceptedProducerFamily": "drawing",
+  "pendingProducerFamilies": [
+    "component-outer-timing"
+  ],
+  "drawing": {
+    "totalFrames": 8,
+    "layerUid": "L",
+    "timing": {
+      "format": "nemo.native-layer-timing",
+      "formatVersion": 1,
+      "family": "drawing",
+      "contextId": "scene-root",
+      "keys": [
+        {
+          "frame": 1
+        },
+        {
+          "frame": 5
+        }
+      ],
+      "samples": [
+        {
+          "frame": 3,
+          "manualEdit": false
+        },
+        {
+          "frame": 6,
+          "manualEdit": true
+        }
+      ]
+    },
+    "objects": [
+      {
+        "frame": 1,
+        "strokeId": "A"
+      },
+      {
+        "frame": 2,
+        "strokeId": "ignored"
+      },
+      {
+        "frame": 3,
+        "strokeId": "C"
+      },
+      {
+        "frame": 6,
+        "strokeId": "D"
+      }
+    ],
+    "expected": [
+      {
+        "frame": 0,
+        "cellKind": "unexposed",
+        "sourceFrame": null,
+        "hasContent": false,
+        "manualEdit": false
+      },
+      {
+        "frame": 1,
+        "cellKind": "key",
+        "sourceFrame": 1,
+        "hasContent": true,
+        "manualEdit": false
+      },
+      {
+        "frame": 2,
+        "cellKind": "held",
+        "sourceFrame": 1,
+        "hasContent": true,
+        "manualEdit": false
+      },
+      {
+        "frame": 3,
+        "cellKind": "interpolated",
+        "sourceFrame": 3,
+        "hasContent": true,
+        "manualEdit": false
+      },
+      {
+        "frame": 4,
+        "cellKind": "held",
+        "sourceFrame": 1,
+        "hasContent": true,
+        "manualEdit": false
+      },
+      {
+        "frame": 5,
+        "cellKind": "key",
+        "sourceFrame": 5,
+        "hasContent": false,
+        "manualEdit": false
+      },
+      {
+        "frame": 6,
+        "cellKind": "interpolated",
+        "sourceFrame": 6,
+        "hasContent": true,
+        "manualEdit": true
+      },
+      {
+        "frame": 7,
+        "cellKind": "held",
+        "sourceFrame": 5,
+        "hasContent": false,
+        "manualEdit": false
+      }
+    ],
+    "effectiveStrokes": [
+      [],
+      [
+        "A"
+      ],
+      [
+        "A"
+      ],
+      [
+        "C"
+      ],
+      [
+        "A"
+      ],
+      [],
+      [
+        "D"
+      ],
+      []
+    ],
+    "timelineClasses": [
+      [],
+      [
+        "kf-full"
+      ],
+      [
+        "span-full",
+        "span-end"
+      ],
+      [
+        "tw"
+      ],
+      [
+        "span-full",
+        "span-end"
+      ],
+      [
+        "kf-empty"
+      ],
+      [
+        "tw-manual"
+      ],
+      [
+        "span-empty",
+        "span-end"
+      ]
+    ]
+  },
+  "componentOracle": {
+    "producerAvailability": "unavailable",
+    "cases": [
+      "empty-strokes seed key displays full unless blankOverride",
+      "outer blank key hides actual nonempty component content throughout held span",
+      "explicit component source frame holds until next outer key",
+      "next key without source override restores default clock"
+    ],
+    "internalContent": [
+      "S0",
+      "S1",
+      "S2",
+      "S3",
+      "S4"
+    ]
+  },
+  "characterizationEvidence": {
+    "baseline": {
+      "sourceRef": "66ece0641708122eb8447e85ad8dd7e3402aaf6c",
+      "functionSha256": {
+        "getEffectiveStrokes": "77b9630daeda531296cd3b96bdfa7095f2bbc6097a46e53f7b21c65c9cd70212",
+        "resolveSymbolFrameIdx": "a87c5f559553cb7700bc8d8943a1938915a2bdc0026540f3722c4b159f8ebeef",
+        "renderKeyframeCellsInto": "8670688c16acfbd9490f7f0420d11a393faac7e008fcae230bac5a8a0453fbbb"
+      },
+      "observedExpectedMatrix": true
+    },
+    "admission": {
+      "sourceRef": "8487c7b827ac7b1b1f8b418601110fcb30024edc",
+      "functionSha256": {
+        "getEffectiveStrokes": "c938d85f31af331657711d3956169917c6cae3390557c615d4f6e008cc9e3295",
+        "resolveSymbolFrameIdx": "a87c5f559553cb7700bc8d8943a1938915a2bdc0026540f3722c4b159f8ebeef",
+        "renderKeyframeCellsInto": "8670688c16acfbd9490f7f0420d11a393faac7e008fcae230bac5a8a0453fbbb"
+      },
+      "observedExpectedMatrix": true
+    }
+  }
+}

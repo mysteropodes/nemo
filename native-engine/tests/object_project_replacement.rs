@@ -180,7 +180,9 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
         let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
             "project":{"canvasW":640,"canvasH":360,"fps":fps},
             "drawing":{"format":"nemo.native-object-document","formatVersion":2,
-                "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
+                "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
+                    "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+                        "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],
                 "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",
                     "formatVersion":1,"documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
                         "layers":[{"layerUid":"layer-1","naturalPosition":0,"order":{}}],
@@ -193,7 +195,8 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
             (info["totalFrames"].as_u64(), info["fps"].as_f64()),
             (Some(frames as u64), Some(fps))
         );
-        assert_eq!(info["layers"], expected["drawing"]["layers"]);
+        assert_eq!(info["layers"], json!([{"layerUid":"layer-1","name":"Layer 1","visible":true}]),
+            "existing file-info metadata stays UID/name/visible; canonical timing uses its own read");
         let reopened = NativeObjectHistory::from_project_file("new", &bytes).unwrap();
         let another = NativeObjectHistory::new_blank_project("new", 640, 360, fps).unwrap();
         assert_ne!(reopened.document_id(), original.document_id());
@@ -301,7 +304,9 @@ fn blank_replacement_prepares_immutably_and_commits_in_the_original_history() {
     let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":640,"canvasH":360,"fps":29.97},
         "drawing":{"format":"nemo.native-object-document","formatVersion":2,
-            "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
+            "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
+                "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+                    "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],
             "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",
                 "formatVersion":1,"documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
                     "layers":[{"layerUid":"layer-1","naturalPosition":0,"order":{}}],
