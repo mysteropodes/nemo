@@ -1,7 +1,9 @@
 //! Scalar New through the real bootstrap, authority, replacement and save ports.
-use super::{admission, bootstrap_raw, reopen, replace, ObjectBootstrapReceipt};
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{host_error, HostResult};
+use crate::native_object_bootstrap::{
+    admission, bootstrap_raw, reopen, replace, ObjectBootstrapReceipt,
+};
 use serde_json::{json, Value};
 use std::cell::Cell;
 

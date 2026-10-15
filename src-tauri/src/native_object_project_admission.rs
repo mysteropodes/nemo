@@ -1,8 +1,4 @@
 //! File and scalar New admission into the same replacement lifecycle.
-use super::{
-    reopen::{self, FileRequest, ReplacementPins},
-    ObjectBootstrapReceipt,
-};
 use crate::application_mcp::ApplicationMcp;
 use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, HostResult,
@@ -10,6 +6,10 @@ use crate::native_application_contract::{
 use crate::native_dispatch::{
     NativeAuthority, NativeDispatch, NativeObjectHost, ReplacementAdmission, ReplacementIdentity,
     ReplacementReplay,
+};
+use crate::native_object_bootstrap::{
+    reopen::{self, FileRequest, ReplacementPins},
+    ObjectBootstrapReceipt,
 };
 use native_engine::history::PreparedProjectReplacement;
 use nemo_mcp::contract::NativeApplicationError;

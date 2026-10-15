@@ -8,8 +8,8 @@ use native_engine::{history::PreparedProjectReplacement, resource_leases::WorkId
 use serde_json::json;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-use super::admission::replay;
-pub(super) use super::admission::{prepare, Admission};
+use crate::native_object_bootstrap::admission::replay;
+pub(super) use crate::native_object_bootstrap::admission::{prepare, Admission};
 
 /// The callback owns its failure hook independently of the invoking waiter.
 /// A discarded callback terminalizes the reserved authority even after cancel.
