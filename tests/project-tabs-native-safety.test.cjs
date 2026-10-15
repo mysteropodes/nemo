@@ -317,14 +317,15 @@ async function nativeInactiveTabDesktop(options={}) {
   const owner={admitted:true,active:false,apiVersion:2,instanceId:'native-i',documentId:'native-A',contentRevision:9,
     documentSnapshotId:'snapshot-A',lifecycleGeneration:23,savedDigest:'a'.repeat(64),documentDigest:'b'.repeat(64),
     snapshotBytes:'native-A-bytes-at-revision-9',undo:['open-A','edit-A'],redo:['redo-A']};
-  const calls=[];let sequence=0,retained=null;
-  const projectFileAdapter={bind(root){const session={isActive:()=>owner.active,isDirty:()=>owner.documentDigest!==owner.savedDigest,canOpen:()=>true,
+  const calls=[];let sequence=0,retained=null,projectUI=null;
+  const projectFileAdapter={bind(root,ports){projectUI=ports;const session={isActive:()=>owner.active,isDirty:()=>owner.documentDigest!==owner.savedDigest,canOpen:()=>true,
     identity:()=>({apiVersion:2,instanceId:owner.instanceId,documentId:owner.documentId,contentRevision:owner.contentRevision,
       documentSnapshotId:owner.documentSnapshotId,lifecycleGeneration:owner.lifecycleGeneration}),
     info(){return this.identity();},openPath(){throw Error('same-document replacement must not run for inactive B');},saveAs(){throw Error('unexpected Save As');}};
     root.NemoNativeObjectProject={desktop:()=>session};return session;}};
-  const f=fixture({populated:false,nativeFileAdapter:projectFileAdapter});
-  f.switch(f.a);f.close(f.b);
+  // Skip browser New entirely: A is declared already admitted by this source
+  // model. Publish its identity through the same UI ports as native file Open.
+  const f=fixture({populated:false,nativePorts:()=>{},nativeFileAdapter:projectFileAdapter});
   f.root.crypto={randomUUID:()=>`ui-${++sequence}`};
   f.root.__TAURI__={dialog:{async open(){return '/Projects/B.json';}},window:{getCurrentWindow:()=>({async setFocus(){}})},core:{async invoke(name,args){
     const req=JSON.parse(args.requestJson);calls.push({name,req});
@@ -348,6 +349,11 @@ async function nativeInactiveTabDesktop(options={}) {
     throw Error('unexpected inactive action');
   }}};
   owner.active=true;
+  assert.ok(projectUI,'native file UI ports were bound');
+  projectUI.commit('/Projects/A.json','A');projectUI.hide();projectUI.opened();
+  assert.equal(f.state().rows.length,1,'pre-admitted A has one real tab row');
+  assert.equal(f.state().rows[0].active,true);assert.equal(f.state().rows[0].name,'A');
+  assert.equal(f.effects.some(effect=>/import|release|create layer|frame save|Paper/.test(effect)),false);
   f.root.SMProject.refreshActiveTabDirtyDot();
   f.effects.length=0;f.notices.length=0;
   return Object.assign(f,{owner,calls,retained:()=>retained,
