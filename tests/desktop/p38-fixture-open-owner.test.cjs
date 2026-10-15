@@ -299,7 +299,8 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
           return index===129?marker:{path:String(index),role:'AXButton',control:'B',childCount:0,
             ...(index===2&&phase==='b-opened'?{alert:'switch-unavailable'}:{})};
         })];
-        raw.truncated=end<130;raw.depthClipped=phase!=='ready';raw.complete=!raw.truncated&&!raw.depthClipped;
+        raw.truncated=end<130;raw.depthClipped=request.childOffset!==undefined&&raw.nodes.slice(1).some(n=>n.childCount>0);
+        raw.complete=!raw.truncated&&!raw.depthClipped;
         if(request.childOffset!==undefined)Object.assign(raw,{childOffset:offset,nextChildOffset:end,
           childCount:130,pageToken:'87654321-1234-1234-1234-123456789abc',childrenComplete:end===130});
       }
@@ -307,7 +308,7 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
       if(fault==='reordered'&&request.childOffset>0)raw.nodes[1].path='999';
       if(fault==='foreign'&&request.childOffset===0)raw.foreignChildren=true;
       if(fault==='unreadable'&&request.childOffset===0)raw.childrenUnreadable=true;
-      if(fault==='duplicate'&&request.childOffset===0)raw.nodes[1].control='Project tabs';
+      if(fault==='duplicate')for(const n of raw.nodes)if(n.path==='0')n.control='Project tabs';
       if(fault==='missing')for(const n of raw.nodes)if(n.control==='Project tabs')delete n.control;
       if(fault==='clipped'&&request.projectTabs) {raw.depthClipped=true;raw.complete=false;}
       if(fault==='stale'&&request.projectTabs&&phase==='a-opened')raw.projectTabs.token='87654321-1234-1234-1234-123456789abc';
@@ -333,7 +334,7 @@ test('actual owner discovery pages beyond 128, retains the region through all AC
   for(const [fault,code] of [['cursor','inspection-page-refused'],['reordered','inspection-page-refused'],
     ['foreign','inspection-completeness-refused'],['unreadable','inspection-completeness-refused'],
     ['duplicate','inspection-marker-refused'],['missing','inspection-marker-refused'],['clipped','inspection-region-refused'],
-    ['stale','inspection-region-refused'],['selection','inspection-refused'],['status','inspection-status-refused'],
+    ['stale','inspection-region-refused'],['selection','inspection-region-refused'],['status','inspection-status-refused'],
     ['identity','inspection-identity-refused'],['projection','inspection-projection-refused'],['root','inspection-root-refused'],
     ['transport','inspection-transport-refused'],['budget','inspection-budget-refused']]) {
     const bad=await trial(fault);assert.equal(bad.result.status,'partial',fault);assert.equal(bad.result.cleanup,'complete');

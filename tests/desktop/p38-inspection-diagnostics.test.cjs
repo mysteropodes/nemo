@@ -251,31 +251,168 @@ test('P38 and Reference preserve raw no-value only with the exact same owned zer
   assert.equal(diagnostics.validateCompletenessSummary({ ...summary, schema: 'nemo.p38-inspection-completeness/1' }), undefined);
 });
 
-// Independent bounded wire models exercise the real discovery producer. The
-// wide tree plus one grandchild reaches node4097 in35 reads; the branching tree reaches read64
-// with162 collected nodes. Repeated root nodes must not inflate either count.
-function budgetWire(boundary) {
-  const children = boundary === 'read-action-cap' ? 100 : 4095;
-  return request => {
-    const element = request.element || '', offset = request.childOffset || 0;
-    const page = request.childOffset !== undefined, branching = children === 100;
-    const end = Math.min(children, offset + 127);
-    const root = { path: element, role: element ? 'AXGroup' : 'AXWindow', childCount: element ? 1 : children };
-    const nodes = element ? [root, { path: element + '.0', role: 'AXButton', childCount: 0 }] :
-      [root, ...Array.from({ length: end - offset }, (_, i) => ({ path: String(offset + i),
-        role: 'AXGroup', childCount: branching || offset + i === 0 ? 1 : 0 }))];
-    return { status: 'ok', type: 'inspect', pid: 42, windowId: 9, matchedAX: true,
-      complete: !!element || end === children && !branching,
-      truncated: !element && end < children, depthClipped: !element && branching,
-      childrenUnreadable: false, foreignChildren: false, private: 'PRIVATE-RAW-SENTINEL', nodes,
-      ...(page ? { childOffset: offset, nextChildOffset: end, childCount: children,
-        pageToken: '12345678-1234-1234-1234-123456789abc', childrenComplete: end === children } : {}) };
+// Independent adjacency-list oracle and faithful bounded depth-first wire.
+// The oracle never invokes the collector to generate expected paths/counts.
+function projectionWire(graph, mutate = () => {}) {
+  let cursor;
+  const observed = new Set(['']), requests = [];
+  const wire = request => {
+    const base = request.element || '', page = request.childOffset !== undefined, offset = request.childOffset || 0;
+    assert.ok(observed.has(base), 'only an explicitly observed root may be requested');
+    assert.equal(request.maxNodes, 128); assert.equal(request.depth, page ? 1 : 5);
+    assert.ok(graph.has(base)); requests.push({ ...request });
+    const root = graph.get(base), nodes = []; let truncated = false, depthClipped = false;
+    if (page) {
+      if (!offset) { assert.equal(request.pageToken, undefined); cursor = { base, next: 0, clipped: false, children: [...root.children] }; }
+      else { assert.equal(request.pageToken, '12345678-1234-1234-1234-123456789abc'); assert.equal(cursor.base, base);
+        assert.equal(cursor.next, offset); assert.deepEqual(cursor.children, root.children); }
+    } else cursor = undefined;
+    function visit(route, level) {
+      const value = graph.get(route);
+      nodes.push({ path: route, role: route ? 'AXGroup' : 'AXWindow', childCount: value.children.length, ...value.facts });
+      if (level === request.depth) { depthClipped ||= value.children.length > 0; return; }
+      for (const child of value.children.slice(level === 0 ? offset : 0)) {
+        if (nodes.length === 128) { truncated = true; return; }
+        visit(child, level + 1);
+      }
+    }
+    visit(base, 0);
+    let paging = {};
+    if (page) { cursor.clipped ||= depthClipped; depthClipped = cursor.clipped; cursor.next = offset + nodes.length - 1;
+      paging = { childOffset: offset, nextChildOffset: cursor.next, childCount: root.children.length,
+        pageToken: '12345678-1234-1234-1234-123456789abc', childrenComplete: cursor.next === root.children.length }; }
+    const raw = { status: 'ok', type: 'inspect', pid: 42, windowId: 9, matchedAX: true, nodes,
+      complete: !truncated && !depthClipped, truncated, depthClipped, childrenUnreadable: false, foreignChildren: false,
+      private: 'PRIVATE-RAW-SENTINEL', ...paging,
+      ...(request.projectTabs ? { projectTabs: { path: base, token: '87654321-1234-1234-1234-123456789abc' } } : {}) };
+    mutate(raw, request); for (const node of raw.nodes) observed.add(node.path);
+    return raw;
   };
+  return Object.assign(wire, { observed, requests });
 }
+function chain(graph, base, length) {
+  for (let i = 0, route = base; i < length; i++, route += '.0')
+    graph.set(route, { children: i + 1 < length ? [route + '.0'] : [] });
+}
+function budgetWire(boundary) {
+  const graph = new Map(), width = boundary === 'read-action-cap' ? 41 : 4095;
+  graph.set('', { children: Array.from({ length: width }, (_, i) => String(i)) });
+  for (let i = 0; i < width; i++) chain(graph, String(i), boundary === 'read-action-cap' ? 31 : i === 0 ? 2 : 1);
+  return projectionWire(graph);
+}
+
+function acceptanceGraph(kind, phase) {
+  const graph = new Map(), marker = kind === 'deep' ? '0' : '129';
+  graph.set('', { children: kind === 'deep' ? ['0', '1', '2'] : Array.from({ length: 130 }, (_, i) => String(i)) });
+  if (kind === 'deep') { chain(graph, '1', 31); graph.set('2', { children: [] }); }
+  else for (let i = 0; i < 130; i++) graph.set(String(i), { children: [] });
+  const rows = phase === 'ready' ? [] : phase === 'b-opened' ? ['A', 'B'] : ['A'];
+  graph.set(marker, { children: rows.map((_, i) => marker + '.' + i), facts: { control: 'Project tabs' } });
+  for (const [i, control] of rows.entries()) graph.set(marker + '.' + i,
+    { children: [], facts: { control, selected: i === 0 } });
+  if (phase === 'b-opened') graph.get(kind === 'deep' ? '2' : '0').facts = { alert: 'switch-unavailable' };
+  return graph;
+}
+
+test('independent deep and broad graph oracles close all four observations and count three captures within63', async () => {
+  for (const [kind, expectedReads] of [['deep', [8, 8, 8, 8]], ['broad', [4, 5, 5, 5]]]) {
+    const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'p38-frontier-oracle-')));
+    try {
+      const f = observerServices(directory), state = { actions: 0 }, wires = [], events = [];
+      let phase, wire, graph;
+      const checkpoint = f.services.waitForCheckpoint, receipt = f.services.owner.receipt;
+      f.services.waitForCheckpoint = async (...args) => {
+        phase = args[3]; graph = acceptanceGraph(kind, phase); wire = projectionWire(graph);
+        wires.push(wire); return { ...await checkpoint(...args), checkpoint: args[4] };
+      };
+      f.services.owner.receipt = () => ({ value: { ...receipt().value,
+        checkpoint: ['ready', 'a-opened', 'b-opened', 'b-closed'].indexOf(phase || 'ready') } });
+      f.services.owner.visibleEvidence = semantic.visibleEvidence;
+      f.services.owner.acknowledge = (_root, expected, _token, decision, snapshot) => {
+        assert.equal(decision, 'accepted'); semantic.visibleEvidence(snapshot, expected);
+        events.push('ack:' + expected.phase); f.calls.acknowledgments++;
+      };
+      f.services.startHelper = async () => ({
+        next: async () => ({ status: 'pinned', pid: 42, windowId: 9, matchedAX: true }),
+        inspect: identity => diagnostics.inspectProjectTabs(request => {
+          if (request.projectTabs) {
+            assert.deepEqual([...wire.observed].sort(), [...graph.keys()].sort(), 'no scoped acceptance before the ENTIRE oracle graph was observed');
+            assert.equal(request.projectTabsToken, phase === 'ready' ? undefined : '87654321-1234-1234-1234-123456789abc');
+          }
+          f.calls.reads++; return wire(request);
+        }, identity, state, semantic),
+        capture: async (window, index) => {
+          assert.ok(state.actions++ < 63); f.calls.captures++; events.push('capture:' + phase);
+          return { phase, pid: window.pid, windowId: window.windowId, capture: 'capture-' + (index + 1) + '.png',
+            sha256: 'e'.repeat(64), width: 800, height: 600 };
+        },
+        quit: async () => { assert.ok(state.actions + 1 <= 64); events.push('quit'); },
+        close: async () => { f.calls.closes++; },
+      });
+      const outcome = await runObserver(f.config, f.services);
+      assert.equal(outcome.status, 'observed'); assert.equal(outcome.firstFailure, null);
+      assert.deepEqual(wires.map(w => w.requests.length), expectedReads);
+      assert.equal(state.actions, expectedReads.reduce((a, b) => a + b, 0) + 3);
+      assert.ok(state.actions <= 63); assert.equal(outcome.observations.length, 4); assert.equal(outcome.captures.length, 3);
+      assert.deepEqual(events, ['ack:ready', 'capture:a-opened', 'ack:a-opened', 'capture:b-opened', 'ack:b-opened',
+        'capture:b-closed', 'ack:b-closed', 'quit']);
+      assert.equal(outcome.cleanup, 'complete'); assert.equal(outcome.installedAcceptance, 'not-established');
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+  }
+});
+
+test('malformed partial topology and changed overlaps refuse before scoped acceptance', async () => {
+  const faults = {
+    alias: raw => { raw.nodes[1].path = '00'; },
+    orphan: raw => { raw.nodes[1].path = '0.0'; },
+    duplicate: raw => { raw.nodes[2].path = raw.nodes[1].path; },
+    missing: raw => { raw.nodes.splice(2, 1); },
+    overlap: (raw, request) => { if (request.childOffset !== undefined) raw.nodes[0].control = 'A'; },
+  };
+  for (const [fault, mutate] of Object.entries(faults)) {
+    const wire = projectionWire(acceptanceGraph('broad', 'ready'), mutate);
+    await assert.rejects(diagnostics.inspectProjectTabs(wire, { pid: 42, windowId: 9 }, { actions: 0 }, semantic),
+      error => { assert.equal(error.observerCode, 'inspection-page-refused', fault); return true; });
+    assert.equal(wire.requests.some(r => r.projectTabs), false, fault);
+  }
+});
+
+test('a new observation rediscovers topology and refuses a duplicate marker beyond the first partial read', async () => {
+  const state = { actions: 0 }, first = projectionWire(acceptanceGraph('broad', 'ready'));
+  await diagnostics.inspectProjectTabs(first, { pid: 42, windowId: 9 }, state, semantic);
+  const graph = acceptanceGraph('broad', 'ready'); graph.get('128').facts = { control: 'Project tabs' };
+  const second = projectionWire(graph);
+  await assert.rejects(diagnostics.inspectProjectTabs(second, { pid: 42, windowId: 9 }, state, semantic),
+    error => { assert.equal(error.observerCode, 'inspection-marker-refused'); return true; });
+  assert.deepEqual([...second.observed].sort(), [...graph.keys()].sort());
+  assert.equal(second.requests[0].element, ''); assert.equal(second.requests.some(r => r.childOffset === 127), true);
+  assert.equal(second.requests.some(r => r.projectTabs), false);
+  assert.equal(state.token, '87654321-1234-1234-1234-123456789abc');
+});
+
+test('an infeasible mixed graph still refuses at63 without scoped acceptance or a cap increase', async () => {
+  const graph = new Map([['', { children: Array.from({ length: 40 }, (_, i) => String(i)) }]]);
+  for (let i = 0; i < 40; i++) {
+    graph.set(String(i), { children: Array.from({ length: 8 }, (_, j) => i + '.' + j), facts: i ? {} : { control: 'Project tabs' } });
+    for (let j = 0; j < 8; j++) graph.set(i + '.' + j, { children: [] });
+  }
+  const state = { actions: 0 };
+  for (let pass = 0; pass < 3; pass++) {
+    const wire = projectionWire(graph);
+    if (pass < 2) {
+      const result = await diagnostics.inspectProjectTabs(wire, { pid: 42, windowId: 9 }, state, semantic);
+      assert.equal(result.projectTabs.unique, true); assert.deepEqual([...wire.observed].sort(), [...graph.keys()].sort());
+      if (pass) state.actions++; // Count the prior successful capture slot.
+    } else await assert.rejects(diagnostics.inspectProjectTabs(wire, { pid: 42, windowId: 9 }, state, semantic), error => {
+      assert.equal(error.observerCode, 'inspection-budget-refused'); assert.equal(error.budget.sharedActionsUsed, 63);
+      assert.equal(wire.requests.some(r => r.projectTabs), false); return true;
+    });
+  }
+});
 
 test('actual budget producer, adapter and persisted owner distinguish both unchanged caps without a later effect', async () => {
   for (const [boundary, reads, collectedNodes, priorActions] of [
-    ['read-action-cap', 63, 162, 0], ['collected-node-cap', 35, 4097, 0], ['collected-node-cap', 35, 4097, 2],
+    ['read-action-cap', 63, 448, 0], ['collected-node-cap', 34, 4097, 0], ['collected-node-cap', 34, 4097, 2],
   ]) {
     for (const cleanupFails of [false, true]) {
       const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'p38-budget-receipt-')));

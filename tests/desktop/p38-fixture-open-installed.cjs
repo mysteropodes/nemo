@@ -97,7 +97,7 @@ function visibleEvidence(snapshot, expected) {
 // Complete bounded discovery establishes uniqueness. Root clipping permits only
 // authenticated read-only pages; a fresh retained region is required for ACK.
 async function observeProjectTabs(inspect,identity,state={actions:0}) {
-  const seen=new Map(),queue=[''];
+  const seen=new Map(),edges=new Map(),attempted=new Set();
   const complete=s=>s.complete===true&&['truncated','depthClipped','childrenUnreadable','foreignChildren'].every(k=>s[k]===false);
   async function read(request) {
     const used=state.actions++; // Shared with captures across phases; leave the 64th action for quit.
@@ -113,16 +113,60 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
       s.nodes.every(n=>n.blocked===undefined&&Number.isInteger(n.childCount)),s,'projected-nodes');
     return s;
   }
-  function collect(nodes) {
-    for(const n of nodes) {
+  const parent=route=>route.includes('.')?route.slice(0,route.lastIndexOf('.')):'';
+  const index=route=>Number(route.slice(route.lastIndexOf('.')+1));
+  const canonical=route=>route===''||/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*$/.test(route);
+  function fragment(s,base,paged=false) {
+    const local=new Map(s.nodes.map(n=>[n.path,n])),children=new Map();
+    check(local.size===s.nodes.length,'inspection-page-refused');
+    if(!paged)check(s.depthClipped===s.nodes.some(n=>
+      (n.path===''?0:n.path.split('.').length)-(base===''?0:base.split('.').length)===5&&n.childCount>0)&&
+      (!s.truncated||s.nodes.length===128),'inspection-page-refused');
+    for(const n of s.nodes) {
+      check(canonical(n.path)&&(n.path===base||base===''||n.path.startsWith(base+'.'))&&
+        (n.path===''?0:n.path.split('.').length)-(base===''?0:base.split('.').length)<=(paged?1:5),'inspection-page-refused');
+      check(n.path===''||n.role!=='AXWindow','inspection-page-refused');
+      if(n.path===base)continue;
+      const p=local.get(parent(n.path)),i=index(n.path);
+      check(p&&Number.isSafeInteger(i)&&i<p.childCount,'inspection-page-refused');
+      const list=children.get(p.path)||[];list.push(i);children.set(p.path,list);
+    }
+    for(const n of s.nodes) {
+      const list=(children.get(n.path)||[]).sort((a,b)=>a-b),start=paged&&n.path===base?s.childOffset:0;
+      check(list.every((i,k)=>i===start+k)&&start+list.length<=n.childCount&&
+        (paged||!complete(s)||list.length===n.childCount),'inspection-page-refused');
+    }
+    return local;
+  }
+  function collect(s,base,paged=false) {
+    fragment(s,base,paged);
+    check(base===''||seen.has(base),'inspection-page-refused'); // Never synthesize an unread root.
+    for(const n of s.nodes) {
       check(!seen.has(n.path)||JSON.stringify(seen.get(n.path))===JSON.stringify(n),'inspection-page-refused');
       seen.set(n.path,n);requireBudget(seen.size<=4096,'collected-node-cap',state.actions,seen.size);
+      if(n.path!=='') {
+        const p=parent(n.path),list=edges.get(p)||new Map();
+        list.set(index(n.path),n.path);edges.set(p,list);
+      }
     }
   }
-  while(queue.length) {
-    const element=queue.shift(),first=await read({element,depth:5});
-    if(complete(first)) {collect(first.nodes);continue;}
-    requireCompleteness(first.complete===false&&typeof first.depthClipped==='boolean'&&typeof first.truncated==='boolean',first,'paging-flags');
+  function frontier() {
+    check(seen.has(''),'inspection-page-refused');
+    for(const n of seen.values()) {
+      if(n.path!=='')check(seen.has(parent(n.path)),'inspection-page-refused');
+      const list=edges.get(n.path)||new Map();
+      check(list.size<=n.childCount,'inspection-page-refused');
+      if(list.size<n.childCount)return n.path;
+      for(let i=0;i<n.childCount;i++)check(list.has(i),'inspection-page-refused');
+    }
+  }
+  async function subtree(element) {
+    const first=await read({element,depth:5});attempted.add(element);
+    if(!complete(first))requireCompleteness(first.complete===false&&typeof first.depthClipped==='boolean'&&
+      typeof first.truncated==='boolean'&&(first.depthClipped||first.truncated),first,'paging-flags');
+    collect(first,element);
+  }
+  async function pages(element) {
     let offset=0,token,count,root,done=false;
     while(!done) {
       const s=await read({element,depth:1,childOffset:offset,...(offset?{pageToken:token}:{})});
@@ -133,16 +177,25 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
       root=s.nodes[0];count=s.childCount;token=s.pageToken;done=s.childrenComplete;
       check(new Set(s.nodes.map(n=>n.path)).size===s.nodes.length&&s.nodes.slice(1).every((n,i)=>
         n.path===(element?element+'.':'')+(offset+i)),'inspection-page-refused');
-      collect(s.nodes);
-      for(const n of s.nodes.slice(1))if(n.childCount>0)queue.push(n.path);
+      collect(s,element,true);
       offset=s.nextChildOffset;
     }
+  }
+  await subtree('');
+  for(let element=frontier();element!==undefined;element=frontier()) {
+    // Partial child lists require authenticated pages. A depth-cut root with
+    // no exposed children can first supply a new bounded subtree observation.
+    if(attempted.has(element)||(edges.get(element)?.size||0)>0)await pages(element);
+    else await subtree(element);
   }
   const markers=[...seen.values()].filter(n=>n.control==='Project tabs');
   check(markers.length===1,'inspection-marker-refused');
   const region=await read({element:markers[0].path,depth:5,projectTabs:true,...(state.token?{projectTabsToken:state.token}:{})});
   check(complete(region)&&region.projectTabs?.path===markers[0].path&&
     (!state.token||state.token===region.projectTabs.token),'inspection-region-refused');
+  fragment(region,markers[0].path);
+  check(region.nodes.every(n=>seen.has(n.path)&&JSON.stringify(seen.get(n.path))===JSON.stringify(n)),
+    'inspection-region-refused');
   state.token=region.projectTabs.token;
   const paths=new Set(region.nodes.map(n=>n.path));
   return {...region,projectTabs:{...region.projectTabs,unique:true},nodes:[...region.nodes,

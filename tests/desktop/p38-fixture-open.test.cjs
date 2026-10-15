@@ -434,7 +434,7 @@ test('first inspection diagnostic uses only literal finite categories, with no l
     ['inspection-completeness-refused',s=>delete s.nodes[0].childCount],
     ['inspection-completeness-refused',s=>delete s.complete],
     ['inspection-marker-refused',s=>s.nodes[1].control='private-title'],
-    ['inspection-marker-refused',s=>s.nodes.push({...s.nodes[1],path:'1'})],
+    ['inspection-marker-refused',s=>{s.nodes[0].childCount=2;s.nodes.push({...s.nodes[1],path:'1'});}],
   ];
   for(const [code,mutate] of cases){let reads=0;await assert.rejects(observeProjectTabs(async request=>{
     reads++;const raw=reply(request);mutate(raw);raw.private='/private/secret';return raw;
