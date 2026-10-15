@@ -1,7 +1,10 @@
 //! Actual strict host preview/export with fixed authored key/sample/blank pixels.
 //! The inherited surface records real GPU bytes; this is not installed/AppKit proof.
-use super::{attach, output, pixel, selector, snapshot, viewport};
 use crate::native_application_ports::DesktopArtifactPort;
+use crate::native_dispatch::object_host::preview::{
+    reference_tests::{attach, pixel, viewport},
+    tests::{output, selector, snapshot},
+};
 use crate::native_dispatch::NativeObjectHost;
 use native_engine::{
     compositor::Compositor, desktop_viewport::ViewportStatus, export_job::JobStatus,
