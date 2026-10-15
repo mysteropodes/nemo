@@ -155,6 +155,8 @@ function desktop(){
       return {status:fault==='preview'?'refused':'presented',workId:'work-'+generation+'-'+revision,viewGeneration:generation};
     }
     if(command==='nemo_native_dispatch'){
+      if(r.operation==='query.document.object.layer.timing')return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,
+        documentId:r.documentId,contentRevision:revision,ok:false,error:{code:'unavailable',message:'This metadata fixture has no authored timing'}};
       assert.equal(r.operation,'command.document.object.layer.visibility.set');assert.equal(r.expectedRevision,revision);
       assert.equal(r.payload.command,'object.layer.visibility.set');assert.equal(typeof r.payload.visible,'boolean');
       log.push('public-visibility');if(dispatchGate){const wait=dispatchGate;dispatchGate=null;await wait;}
@@ -262,13 +264,14 @@ test('ordinary eye button uses real desktop/SDK/shared transport, waits for nati
   assert.equal(row.visible,false);assert.equal(h.meta().layers[0].visible,false);assert.equal(eye(h.root,0).textContent,'Show');
   assert.notEqual(eye(h.root,0).disabled,true,'pre-preview rendering must not permanently disable the control');
   assert.equal(await eye(h.root,0).click(),false,'pending presentation cannot dispatch a second click');
-  assert.equal(h.calls.slice(before).filter(c=>c.command==='nemo_native_dispatch').length,1);
+  assert.equal(h.calls.slice(before).filter(c=>c.command==='nemo_native_dispatch'&&c.request.operation==='command.document.object.layer.visibility.set').length,1);
   previewDone();assert.equal((await change).ok,true);
   assert.ok(h.log.indexOf('public-visibility')<h.log.indexOf('UI:1'));assert.ok(h.log.indexOf('UI:1')<h.log.indexOf('preview'));
   assert.equal((await eye(h.root,0).click()).ok,true);assert.equal(row.visible,true);assert.equal(h.meta().undoDepth,2);
   await h.session.historyFromUi('undo');assert.equal(row.visible,false);assert.equal(eye(h.root,0).textContent,'Show');
   await h.session.historyFromUi('redo');assert.equal(row.visible,true);assert.equal(eye(h.root,0).textContent,'Hide');
-  const sent=h.calls.slice(before);assert.equal(sent.filter(c=>c.command==='nemo_native_dispatch').length,2);
+  const sent=h.calls.slice(before);assert.equal(sent.filter(c=>c.command==='nemo_native_dispatch'&&c.request.operation==='command.document.object.layer.visibility.set').length,2);
+  assert.ok(sent.filter(c=>c.command==='nemo_native_dispatch').every(c=>['command.document.object.layer.visibility.set','query.document.object.layer.timing'].includes(c.request.operation)));
   assert.equal(sent.filter(c=>c.command==='nemo_native_object_dispatch').length,2,'private object route used ONLY by the existing history controls');
   assert.ok(sent.filter(c=>c.command==='nemo_native_object_dispatch').every(c=>/\.(undo|redo)$/.test(c.request.operation)));
   assert.equal(h.log.includes('ACK'),false,'local command completion is not an external subscription ACK');
@@ -300,7 +303,7 @@ test('visibility preview failure and broken refusal notice never become successf
   const h=desktop();await h.open();h.fault('preview');h.root.showToast=()=>{throw Error('broken notice');};
   assert.equal(await eye(h.root,0).click(),false);
   assert.equal(h.session.readPresentedObjectSession(),null);assert.equal(h.log.includes('ACK'),false);
-  const sent=h.calls.filter(c=>c.command==='nemo_native_dispatch');assert.equal(sent.length,1);
+  const sent=h.calls.filter(c=>c.command==='nemo_native_dispatch'&&c.request.operation==='command.document.object.layer.visibility.set');assert.equal(sent.length,1);
   const count=h.calls.length;assert.equal(await eye(h.root,0).click(),false);assert.equal(h.calls.length,count,'unconfirmed receipt must prevent redispatch');
 });
 for(const fault of ['missing','refused','stale'])test('retained eye refuses '+fault+' presenter before dispatching native visibility',async()=>{
@@ -320,9 +323,9 @@ test('actual presenter and events use explicit narrow ports without resolving co
     repaint:frameOnly=>UI.render(root,info,frameOnly,ports)});
   for(const name of ['NemoNativeObjectProject','NemoNativeObjectProjectFile'])Object.defineProperty(root,name,{get(){throw Error('concrete provider lookup: '+name);}});
   assert.equal(UI.render(root,info,false,ports),true);pick(root,1).click();
-  assert.deepEqual(calls[0],['select',1,false,'B',info]);
+  assert.deepEqual(calls.find(x=>Array.isArray(x)&&x[0]==='select'),['select',1,false,'B',info]);
   const button=eye(root,0);assert.equal(await button.click(),false);assert.equal(calls.filter(x=>Array.isArray(x)&&x[0]==='toggle').length,0);
-  current=session;assert.equal((await button.click()).ok,true);assert.deepEqual(calls.at(-1),['toggle',A.layerUid]);
+  current=session;assert.equal((await button.click()).ok,true);assert.deepEqual(calls.findLast(x=>Array.isArray(x)&&x[0]==='toggle'),['toggle',A.layerUid]);
   current={...session,info:()=>({...info,documentId:'replacement'})};assert.equal(await button.click(),false);
   current={...session,info:()=>({...info,contentRevision:1})};assert.equal(await button.click(),false);
   assert.equal(calls.filter(x=>Array.isArray(x)&&x[0]==='toggle').length,1,'retired pins cannot use the live replacement');

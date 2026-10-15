@@ -1,6 +1,6 @@
 /* Private native document metadata presenter.
  * Owner: Ilya/A1; independent reviewer: Ilya/O Root.
- * API: render, select, toggleVisibility, restoreInspector.
+ * API: render, select, toggleVisibility, restoreInspector, refreshTiming.
  * Rust owns document/revision state. Visibility uses the existing native.object
  * declaration/shared visibility handler through Project's SDK/transport queue.
  * UI state: this adapter's WeakMaps retain DOM bindings, read pins and the prior
@@ -11,7 +11,7 @@
  * restoreInspector clears the cache and restores nodes/styles on non-object routing.
  * Frame-only invariant: unchanged inputs retain row/control DOM and focus.
  * Fixture: tests/native-object-ui.test.cjs (inline independent controls).
- * This source slice leaves full UI selection/MCP/timing/inspector acceptance open.
+ * Timing uses the Project session's pinned SDK reader; installed acceptance stays open.
  */
 (function(root,factory){
   var api=factory();
@@ -19,9 +19,10 @@
   else root.NemoNativeObjectUI=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
-  var inspectors=new WeakMap(),views=new WeakMap();
+  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap();
   function restoreInspector(root){
     views.delete(root);
+    var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
     var prior=inspectors.get(root);if(!prior)return;
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
@@ -68,6 +69,48 @@
   }
   function node(root,id){var el=root.document.getElementById(id);if(!el)throw new Error('Native document UI is unavailable: '+id);return el;}
   function createNativeObjectUiText(root,tag,value){var el=root.document.createElement(tag);el.textContent=value;return el;}
+  function sameTimingPin(a,b){return !!a&&!!b&&['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].every(function(k){return a[k]===b[k];});}
+  function timingText(value){
+    var kind={key:'Key',interpolated:'Sample',held:'Held',unexposed:'Unexposed'}[value.cellKind];
+    return kind+' — '+(value.sourceFrame===null?'No source frame':'Source frame '+(value.sourceFrame+1))+
+      ' — '+(value.hasContent?'Content':'Blank')+(value.manualEdit?' — Manual edit':'');
+  }
+  function requestTiming(root,info,ports){
+    var view=views.get(root),session=ports.currentSession(),layer=info.layers[root.state.activeLayerIdx];
+    var work=timings.get(root);if(!work){work={serial:0,running:false,latest:null,job:null};timings.set(root,work);}
+    var selection=(root._layerSel||[]).slice(),frame=root.state.currentFrame;
+    var ready=!!(session&&typeof session.readPresentedObjectSession==='function'&&confirmed(root,info,session.readPresentedObjectSession()));
+    var old=work.job;
+    if(old&&old.view===view&&old.session===session&&old.frame===frame&&old.uid===(layer&&layer.layerUid)&&(work.running||old.ready===ready)&&
+      sameTimingPin(old.info,info)&&old.selection.length===selection.length&&old.selection.every(function(v,i){return v===selection[i];}))return;
+    var job={serial:++work.serial,view:view,ports:ports,session:session,info:info,frame:frame,uid:layer&&layer.layerUid,selection:selection,ready:ready};
+    work.job=job;work.latest=job;view.unavailable.textContent='Native timing is unavailable.';
+    function current(value){
+      var ports=value.ports,selected=root._layerSel||[],live=ports.currentSession();
+      return work.serial===value.serial&&views.get(root)===value.view&&live===value.session&&live&&live.isActive()&&
+        ports.projectionReady(value.info)===true&&sameTimingPin(live.info(),value.info)&&root.state.currentFrame===value.frame&&
+        value.info.layers[root.state.activeLayerIdx]&&value.info.layers[root.state.activeLayerIdx].layerUid===value.uid&&
+        selected.length===value.selection.length&&selected.every(function(v,i){return v===value.selection[i];})&&
+        root.document.getElementById('frame-grid')===value.view.grid&&value.view.grid.children[0]===value.view.unavailable&&
+        confirmed(root,value.info,live.readPresentedObjectSession());
+    }
+    if(work.running)return;
+    work.running=true;
+    // One outstanding read per root, including replaced owners and detached views.
+    (async function(){try{
+      while(work.latest){var next=work.latest;work.latest=null;var result=null;
+        try{if(next.uid!==undefined&&next.session&&typeof next.session.readLayerTiming==='function')
+          result=await next.session.readLayerTiming(next.uid,next.frame,next.info);}catch(_){}
+        next.ready=!!(next.session&&typeof next.session.readPresentedObjectSession==='function'&&confirmed(root,next.info,next.session.readPresentedObjectSession()));
+        if(current(next))next.view.unavailable.textContent=result?timingText(result):'Native timing is unavailable.';
+      }
+    }finally{work.running=false;}}()).catch(function(){});
+  }
+  function refreshTiming(root){
+    var view=views.get(root),session=view&&view.ports.currentSession(),info=session&&session.info();
+    if(view&&session&&session.isActive()&&sameTimingPin(view.pin,info)&&view.ports.projectionReady(info)===true)
+      requestTiming(root,info,view.ports);
+  }
   function renderNativeObjectUiMetadata(root,info,frameOnly,ports){
     checked(root,info,ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
@@ -114,6 +157,7 @@
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
+    requestTiming(root,info,ports);
     return true;
   }
   function confirmed(root,info,presented){
@@ -150,5 +194,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming});
 }));
