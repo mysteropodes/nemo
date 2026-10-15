@@ -1573,6 +1573,7 @@ window.SM={
     else if(typeof window._motionExpandedLayer==='number'&&window._motionExpandedLayer>=ni)window._motionExpandedLayer++;
     activateUL(ni);_layerSel=[ni];_layerSelAnchor=ni;loadFrame(state.currentFrame);updateUI();},
   setActiveLayer:function(idx,preserveLayerSel){if(idx<0||idx>=state.layers.length)return;
+    if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.selectLayerUI(window,idx,preserveLayerSel))return;
     // Native owns the saved frame; selecting a row only changes editor state.
     // Only an absent controller or exact legacy ownership permits a flush.
     // Unavailable ownership must not turn selection into a legacy write.
@@ -2803,6 +2804,7 @@ function syncDocFields(){
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
@@ -4103,6 +4105,7 @@ function _tlScrollRestore(s){
   if(s.panel)s.panel.scrollTop=s.panelTop;
 }
 function renderTimeline(){
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window))return;
   var _scroll=_tlScrollSnapshot();
   var hdr=document.getElementById('frame-hdr'),grid=document.getElementById('frame-grid');hdr.innerHTML='';grid.innerHTML='';
   var fps=Math.max(1,state.fps);
@@ -6412,6 +6415,7 @@ function reconcileFrameSelection(){
   }
 }
 function renderLayerList(frameOnly){
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   reconcileLayerIndexState();
   reconcileFrameSelection();
   if(frameOnly&&state.appMode!=='motion')return;

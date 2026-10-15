@@ -1,4 +1,6 @@
-/* Native project session: detached UI metadata and request ordering only. */
+/* Native project session: detached UI metadata and request ordering only.
+ * Composition supplies stable, narrow UI callbacks; the presenter never resolves
+ * this provider or the file adapter. Callback reads retain current native authority. */
 (function(root,factory){
   var api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -330,7 +332,7 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
-    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
@@ -340,7 +342,7 @@
       identity:requireActive,requestRelease:function(){return false;},releaseCurrent:function(){return false;},
       persistenceJSON:function(){throw new Error('Native project files must be saved through the native file command');}});
   }
-  var desktops=new WeakMap();
+  var desktops=new WeakMap(),uiBindings=new WeakMap();
   function desktop(root){
     if(!root.__TAURI__||!root.__TAURI__.core)return null;
     if(desktops.has(root))return desktops.get(root);
@@ -349,7 +351,8 @@
     function publishRevision(info){
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
-      if(root.updateUI)root.updateUI();
+      if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
+      root.updateUI();
       if(root.SMReference)root.SMReference.refreshNative();
       if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
       return true;
@@ -379,5 +382,38 @@
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
     desktops.set(root,session);return session;
   }
-  return Object.freeze({create:create,desktop:desktop});
+  function uiSession(root){var session=desktop(root);return session&&session.blocksLegacy()?session:null;}
+  function nativeObjectUiPorts(root){
+    var ports=uiBindings.get(root);if(ports)return ports;
+    ports=Object.freeze({
+      projectionReady:function(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;},
+      currentSession:function(){return uiSession(root);},
+      selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
+      repaint:function(frameOnly){return paintUI(root,frameOnly);}
+    });uiBindings.set(root,ports);return ports;
+  }
+  function uiFailure(root,error){
+    var start=root.document&&root.document.getElementById('start-screen');if(start)start.classList.remove('hid');
+    throw error;
+  }
+  function paintUI(root,frameOnly){
+    var session=uiSession(root);if(!session){
+      uiBindings.delete(root);
+      if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
+      return false;
+    }
+    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly,nativeObjectUiPorts(root))!==true)
+      throw new Error('Native document UI presentation is unavailable');}
+    catch(error){return uiFailure(root,error);}
+    return true;
+  }
+  function selectLayerUI(root,index,preserveLayerSel,uid,expected){
+    var session=uiSession(root);if(!session)return false;
+    if(expected&&!same(session.info(),expected))return true;
+    try{if(!root.NemoNativeObjectUI)throw new Error('Native document UI selection is unavailable');
+      root.NemoNativeObjectUI.select(root,session.info(),index,preserveLayerSel,uid,session.readPresentedObjectSession(),nativeObjectUiPorts(root));}
+    catch(error){return uiFailure(root,error);}
+    return true; // An unconfirmed selection is consumed, never a legacy fallback.
+  }
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI});
 }));

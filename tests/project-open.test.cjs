@@ -80,6 +80,7 @@ function harness({ auto = null, version = null, deferFrames = false, dirtyDot = 
     return context.requestAnimationFrame(fn);
   };
   if (version !== null) window.__TAURI__ = { core: { invoke() {} }, fs: { readTextFile: async () => version } };
+  window.updateUI = context.updateUI;
   configureWindow(window);
   vm.runInNewContext(documentSource, context, { filename: 'project-document.js' });
   vm.runInNewContext(entrySource, context, { filename: 'project-entry.js' });

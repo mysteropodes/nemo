@@ -201,6 +201,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/application/native-object-saved-acknowledgement.js',
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
+    'src/js/adapters/native-object-ui.js',
     'src/js/adapters/native-object-reference.js',
     'src/js/application/native-opacity-operations.js',
     'src/js/application/opacity-application.js',
@@ -223,8 +224,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
-      129, 175, 176, 177, 178, 179, 180, 181, 182, 183]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+      130, 176, 177, 178, 179, 180, 181, 182, 183, 184]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -232,10 +233,33 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 126);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 127);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 128);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 130);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 127);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 128);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 129);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 131);
+});
+
+test('bootstrap numerical observations match actual HTML and retained declarations', () => {
+  const policy = read('app-js.coverage.json'), observed = policy.bootstrapObservations;
+  const html = fs.readFileSync(path.join(ROOT, observed.path), 'utf8');
+  const attr = (text, name) => {
+    const match = text.match(new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i'));
+    return match && (match[1] || match[2] || match[3]);
+  };
+  const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map((match, index) => ({
+    src: attr(match[1], 'src'), module: attr(match[1], 'type') === 'module',
+    path: observed.path, line: html.slice(0, match.index).split('\n').length, scriptOrdinal: index + 1,
+  }));
+  const retained = new Map(policy.retainedSources.map((record) => [record.path, record]));
+  assert.equal(observed.totalScriptTags, scripts.length);
+  assert.equal(observed.externalClassicTags, scripts.filter((s) => s.src && !s.module).length);
+  assert.equal(observed.externalModuleTags, scripts.filter((s) => s.src && s.module).length);
+  assert.equal(observed.inlineClassicTags, scripts.filter((s) => !s.src && !s.module).length);
+  assert.equal(observed.retainedClassicTags, scripts.filter((s) => s.src && !s.module && retained.get('src/' + s.src)?.executionClass === 'document-classic').length);
+  assert.equal(observed.retainedModuleTags, scripts.filter((s) => s.src && s.module && retained.get('src/' + s.src)?.executionClass === 'document-module').length);
+  assert.equal(observed.classicTagsUnderSrcJsIncludingVendors, scripts.filter((s) => s.src?.startsWith('js/') && !s.module).length);
+  assert.deepEqual(observed.inlineScripts, scripts.filter((s) => !s.src).map(({ path, line, scriptOrdinal }) => ({ path, line, scriptOrdinal })));
+  assert.equal(observed.noLoadSiteAudit.paths, policy.retainedSources.filter((s) => !s.loadSites?.length).length);
 });
 
 test('source, profile and exclusion provenance cannot drift behind unchanged policy', () => {

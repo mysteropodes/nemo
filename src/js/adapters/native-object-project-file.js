@@ -22,6 +22,12 @@
     root.state.layers.forEach(function(row,i){row.visible=values[i];});
     return true;
   }
+  function projectionReadyForUI(root,info){
+    var pin=projections.get(root);
+    return projectionMatches(root,info)&&['contentRevision','documentSnapshotId','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})&&
+      info.layers.every(function(layer,i){var row=root.state.layers[i];return row.visible===(layer.visible!==false)&&
+        (layer.name===undefined||row.name===layer.name);});
+  }
   function layerTable(layers){
     if(!Array.isArray(layers))throw new Error('Native layer table is invalid');
     var seen=new Set(),next=[];
@@ -166,7 +172,7 @@
       occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
       restore:function(previous){if(previous&&startWasHidden)ports.hide();},
       reveal:async function(info){
-        projectView(root,info);ports.hide();
+        projectView(root,info);if(root.updateUI)root.updateUI();ports.hide();
         await new Promise(function(resolve,reject){var done=false,timer=setTimeout(function(){
             if(done)return;done=true;reject(new Error('Native project layout did not settle'));
           },1500);
@@ -188,6 +194,7 @@
     return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
+    projectionReadyForUI:projectionReadyForUI,
     projectionMatches:projectionMatches,refreshVisibility:refreshVisibility,refreshLayerTable:refreshLayerTable,
     hasProjection:function(root){return projections.has(root);}});
 }));
