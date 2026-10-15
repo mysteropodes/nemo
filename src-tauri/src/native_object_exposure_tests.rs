@@ -22,8 +22,6 @@ const ORANGE: [u8; 4] = [255, 128, 0, 255];
 // sample-as-key selection differ at2/4; blank-as-missing differs at5/7.
 const A_PIXELS: [[u8; 4]; 8] = [WHITE, BLUE, BLUE, RED, BLUE, WHITE, GREEN, WHITE];
 const B_PIXELS: [[u8; 4]; 8] = [GRAY, GRAY, ORANGE, ORANGE, ORANGE, ORANGE, WHITE, WHITE];
-// A blank drawing layer exposes the existing opaque viewport-only reference.
-const B_VIEW_PIXELS: [[u8; 4]; 8] = [GRAY, GRAY, ORANGE, ORANGE, ORANGE, ORANGE, BLUE, BLUE];
 fn timing(keys: &[u32], samples: Value) -> Value {
     json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root",
         "keys":keys.iter().map(|frame|json!({"frame":frame})).collect::<Vec<_>>(),"samples":samples})
@@ -175,8 +173,8 @@ fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_ref
             "requested output identity, never held source"
         );
         pixel(&trace, 8, 8, A_PIXELS[frame as usize]);
-        pixel(&trace, 40, 40, B_VIEW_PIXELS[frame as usize]);
-        pixel(&trace, 32, 24, BLUE); // Still-reference strip is behind artwork in viewport.
+        pixel(&trace, 40, 56, B_PIXELS[frame as usize]);
+        pixel(&trace, 8, 32, [128, 128, 255, 255]); // Existing blue/white reference at its native 0.5 opacity.
     }
     let scratch = Scratch::new();
     let mut port = scratch.port();
@@ -208,8 +206,8 @@ fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_ref
         let rgba = decode_png(&bytes);
         for (x, y, expected) in [
             (8, 8, A_PIXELS[frame]),
-            (40, 40, B_PIXELS[frame]),
-            (32, 24, WHITE),
+            (40, 56, B_PIXELS[frame]),
+            (8, 32, WHITE),
         ] {
             let actual = &rgba[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4];
             assert!(
