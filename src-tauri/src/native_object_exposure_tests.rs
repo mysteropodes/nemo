@@ -22,6 +22,8 @@ const ORANGE: [u8; 4] = [255, 128, 0, 255];
 // sample-as-key selection differ at2/4; blank-as-missing differs at5/7.
 const A_PIXELS: [[u8; 4]; 8] = [WHITE, BLUE, BLUE, RED, BLUE, WHITE, GREEN, WHITE];
 const B_PIXELS: [[u8; 4]; 8] = [GRAY, GRAY, ORANGE, ORANGE, ORANGE, ORANGE, WHITE, WHITE];
+// A blank drawing layer exposes the existing opaque viewport-only reference.
+const B_VIEW_PIXELS: [[u8; 4]; 8] = [GRAY, GRAY, ORANGE, ORANGE, ORANGE, ORANGE, BLUE, BLUE];
 fn timing(keys: &[u32], samples: Value) -> Value {
     json!({"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing","contextId":"scene-root",
         "keys":keys.iter().map(|frame|json!({"frame":frame})).collect::<Vec<_>>(),"samples":samples})
@@ -170,7 +172,7 @@ fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_ref
             "requested output identity, never held source"
         );
         pixel(&trace, 8, 8, A_PIXELS[frame as usize]);
-        pixel(&trace, 40, 40, B_PIXELS[frame as usize]);
+        pixel(&trace, 40, 40, B_VIEW_PIXELS[frame as usize]);
         pixel(&trace, 32, 24, BLUE); // Still-reference strip is behind artwork in viewport.
     }
     let scratch = Scratch::new();
