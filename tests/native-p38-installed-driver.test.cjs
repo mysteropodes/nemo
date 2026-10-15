@@ -164,7 +164,7 @@ test('package proof refusal does not acquire native/window authority',async()=>{
   assert.equal(r.status,'partial');assert.equal(f.events.some(e=>e.startsWith('window-')),false);
 });
 test('static owned-window adapter excludes global input and requires exact PID/window/AX actions',()=>{
-  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8')+fs.readFileSync('tests/desktop/p38-owned-projection.swift','utf8');
+  const s=fs.readFileSync('tests/desktop/p38-owned-window.swift','utf8')+fs.readFileSync('tests/desktop/p38-owned-projection.swift','utf8')+fs.readFileSync('tests/desktop/p38-owned-children-query.swift','utf8');
   assert.ok(s.includes('initialRows.count == 1'));assert.ok(s.includes('AXUIElementGetPid'));assert.ok(s.includes('CFEqual(parent,main)'));
   assert.ok(s.includes('"-l"+String(number)'));assert.equal(/\.post\s*\(|CGEventPost\s*\(|SystemWide|osascript/.test(s),false);
   assert.equal(/\w+\.postToPid\([^)]*\)|CGEvent|kAXFocusedUIElementAttribute/.test(s),false);
