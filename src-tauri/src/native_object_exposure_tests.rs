@@ -157,10 +157,13 @@ fn cpu_missing_mixed_and_reference_object_temporal_preview_refuse_before_borrowi
 fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_reference_media() {
     let mut owner = host(&document());
     attach(&mut owner);
-    let saved = snapshot(&owner).serialize_project_file().unwrap();
+    let s = snapshot(&owner);
+    let saved = owner
+        .project_file_snapshot(s.content_revision(), s.snapshot_id())
+        .unwrap()
+        .expect("native project fixture");
     let mut gpu = Compositor::new().unwrap();
     let (mut view, trace) = viewport();
-    let s = snapshot(&owner);
     for frame in 0..8 {
         let shown = owner
             .present_object_preview(&selector(&s, frame), output(), &mut gpu, &mut view)
@@ -215,8 +218,14 @@ fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_ref
             );
         }
     }
+    let current = snapshot(&owner);
+    assert_eq!(current.content_revision(), s.content_revision());
+    assert_eq!(current.snapshot_id(), s.snapshot_id());
     assert_eq!(
-        snapshot(&owner).serialize_project_file().unwrap(),
+        owner
+            .project_file_snapshot(current.content_revision(), current.snapshot_id())
+            .unwrap()
+            .expect("native project fixture"),
         saved,
         "render/export cannot change source"
     );
