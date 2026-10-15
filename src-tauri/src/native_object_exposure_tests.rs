@@ -255,3 +255,106 @@ fn gpu_actual_host_preview_and_png_use_independent_layer_sources_and_exclude_ref
         "refusal before staging/session"
     );
 }
+
+#[test]
+fn cpu_canonical_p38_default_preview_selects_authored_sources_at_0_6_7_12_20() {
+    let fixtures = [
+        (
+            "A",
+            include_bytes!("../../tests/fixtures/p38/native-project/A.json").as_slice(),
+        ),
+        (
+            "B",
+            include_bytes!("../../tests/fixtures/p38/native-project/B.json").as_slice(),
+        ),
+    ];
+    for (label, bytes) in fixtures {
+        let mut owner =
+            NativeObjectHost::from_project_file(format!("p38-held-{label}"), bytes).unwrap();
+        let source = snapshot(&owner);
+        let info = owner.project_file_info().unwrap();
+        let output = native_engine::scheduler::OutputSpec::new(
+            "frame",
+            "rgba8",
+            info["canvasW"].as_u64().unwrap() as u32,
+            info["canvasH"].as_u64().unwrap() as u32,
+            "srgb",
+            "straight",
+        )
+        .unwrap();
+        let saved = owner
+            .project_file_snapshot(source.content_revision(), source.snapshot_id())
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.as_slice(), bytes, "canonical fixture bytes remain exact");
+        assert_eq!(source.document().objects().len(), 3);
+        let alpha = source
+            .document()
+            .layers()
+            .iter()
+            .position(|layer| layer.layer_uid() == "legacy layer:alpha")
+            .unwrap();
+        let reference = source
+            .document()
+            .layers()
+            .iter()
+            .position(|layer| layer.layer_uid() == "0")
+            .unwrap();
+        assert!(source.document().objects().iter().any(|record| {
+            record.target().layer_uid() == "0"
+                && record.target().frame() == 12
+                && record.target().scope_kind()
+                    == &native_engine::object_document::FrameScopeKind::Reference
+        }));
+        for (requested, authored, stroke) in [
+            (0, 0, "ink/path_A"),
+            (6, 0, "ink/path_A"),
+            (7, 7, "ink/path_B"),
+            (12, 7, "ink/path_B"),
+            (20, 7, "ink/path_B"),
+        ] {
+            owner
+                .with_prepared_object_preview(
+                    &selector(&source, requested),
+                    output.clone(),
+                    |host| {
+                        let prepared = host.preview.prepared.as_ref().unwrap();
+                        let packet = prepared.plan.packet();
+                        assert_eq!(prepared.key.frame(), requested);
+                        assert_eq!(packet.frame(), requested);
+                        assert_eq!(packet.content_revision(), source.content_revision());
+                        assert_eq!(packet.document_snapshot_id(), source.snapshot_id());
+                        assert_eq!(packet.source_frame_for_layer(alpha), Some(authored));
+                        assert_eq!(packet.source_frame_for_layer(reference), None);
+                        assert_eq!(packet.records().len(), 1);
+                        let record = packet.records().next().unwrap();
+                        assert_eq!(record.source_layer_index(), alpha);
+                        assert_eq!(record.record().target().layer_uid(), "legacy layer:alpha");
+                        assert_eq!(record.record().target().stroke_id(), stroke);
+                        assert_eq!(record.record().target().frame(), authored);
+                        assert_eq!(
+                            record.record().target().scope_kind(),
+                            &native_engine::object_document::FrameScopeKind::Authored
+                        );
+                        assert!(std::ptr::eq(
+                            record.record(),
+                            &source.document().objects()[record.source_object_index()]
+                        ));
+                        assert_eq!(prepared.plan.commands().len(), 1);
+                        Ok(())
+                    },
+                )
+                .unwrap();
+        }
+        let current = snapshot(&owner);
+        assert_eq!(current.content_revision(), source.content_revision());
+        assert_eq!(current.snapshot_id(), source.snapshot_id());
+        assert_eq!(
+            owner
+                .project_file_snapshot(current.content_revision(), current.snapshot_id())
+                .unwrap()
+                .unwrap(),
+            saved
+        );
+    }
+}
