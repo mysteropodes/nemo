@@ -185,6 +185,7 @@
         "src/native_contract.rs",
         "src/native_object_contract.rs",
         "src/native_object_contract_tests.rs",
+        "src/native_object_wire_tests.rs",
         "src/native_reproduction_contract.rs",
         "src/raw_envelope.rs", "src/stdio_transport.rs", "src/stdio_output.rs",
         "src/raw_envelope_tests.rs",
