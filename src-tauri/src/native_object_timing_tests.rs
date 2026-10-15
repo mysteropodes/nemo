@@ -27,10 +27,13 @@ fn timed_document(uid: &str) -> Value {
         "layers":[{"layerUid":uid,"timing":values["drawing"]["timing"]}],"objects":objects})
 }
 fn install_timed(state: &ApplicationMcp, document: &Value) -> String {
+    let project = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":64,"canvasH":48,"fps":24.0},"drawing":document,
+        "viewportReference":null,"assets":[]});
     let receipt = bootstrap_raw(
         state,
         &json!({"apiVersion":2,"requestId":"timing-install",
-        "instanceId":state.instance_id(),"documentJson":document.to_string()})
+        "instanceId":state.instance_id(),"documentJson":project.to_string()})
         .to_string(),
     )
     .unwrap();
