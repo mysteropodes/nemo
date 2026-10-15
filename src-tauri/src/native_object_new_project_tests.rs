@@ -69,7 +69,9 @@ fn initial_new_uses_native_project_owner_and_roundtrips_without_file_intent() {
     assert_eq!(project["drawing"]["formatVersion"], 2);
     assert_eq!(
         project["drawing"]["layers"],
-        json!([{"layerUid":"layer-1","name":"Layer 1","visible":true}])
+        json!([{"layerUid":"layer-1","name":"Layer 1","visible":true,
+            "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+                "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}])
     );
     assert_eq!(project["drawing"]["objects"], json!([]));
     assert_eq!(
