@@ -139,26 +139,38 @@
       if(!same(info,next))presentation=null;
       info=next;return next;
     }
-    function openPath(path,transition){
+    function openPath(path,transition){return enterProject({sourcePath:path,projectOnly:true},transition);}
+    function newProject(intent,transition){
+      if(!intent||typeof intent!=='object'||Array.isArray(intent)||Object.keys(intent).length!==3||!integer(intent.canvasW,1)||!integer(intent.canvasH,1)||
+        !Number.isFinite(intent.fps)||intent.fps<=0)
+        return Promise.reject(localRefusal('Native New Project scalar intent is invalid'));
+      return enterProject({newProject:{canvasW:intent.canvasW,canvasH:intent.canvasH,fps:intent.fps}},transition);
+    }
+    function enterProject(source,transition){
       if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
       openingRequested=true;wantedFrame=null;
       return enqueue(async function(){
         var previous=info,priorPresentation=presentation,priorPhase=phase,dispatched=false,inBootstrap=false;
+        function current(){if(transition&&transition.isCurrent&&transition.isCurrent()!==true){
+          if(dispatched)throw new Error('Native project request changed after dispatch');
+          throw localRefusal('Native project request was cancelled');}}
         phase='opening';presentation=null;
         try{
+          current();
           await retireSubscription();
           if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
             phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();return false;}
+          current();
           if(transition&&transition.occlude)await transition.occlude();
           var before=await status();
           if(!before||before.apiVersion!==2||!id(before.instanceId)||
               (previous?before.available!==true||before.instanceId!==previous.instanceId||before.documentId!==previous.documentId||
                 before.contentRevision!==previous.contentRevision||before.lifecycleGeneration!==previous.lifecycleGeneration:before.available!==false))
             throw localRefusal('Native project slot changed before Open');
-          var rid=requestId('open'),request={apiVersion:2,requestId:rid,instanceId:before.instanceId,sourcePath:path,projectOnly:true};
+          var rid=requestId(source.newProject?'new':'open'),request=Object.assign({apiVersion:2,requestId:rid,instanceId:before.instanceId},source);
           if(previous)request.replace={documentId:previous.documentId,expectedRevision:previous.contentRevision,
             documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
-          dispatched=true;inBootstrap=true;
+          current();dispatched=true;inBootstrap=true;
           var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
           if(typeof ports.openDiagnostic==='function')openAttempt={stage:'receipt',invokeErrors:new Set()};
           if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
@@ -172,17 +184,22 @@
             throw new Error('Native project installation is uncorrelated');
           openStage('metadata');var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
             contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});
-          info=candidate;
+          if(source.newProject&&(candidate.canvasW!==source.newProject.canvasW||candidate.canvasH!==source.newProject.canvasH||
+            candidate.fps!==source.newProject.fps||receipt.resourceCount!==0))throw new Error('Native New Project metadata is uncorrelated');
+          info=candidate;current();
           openStage('first-preview');await present(0,candidate);openStage('first-owner');await verifyOwner(candidate);
+          current();
           if(transition&&transition.reveal){openStage('reveal');await transition.reveal(candidate);
             openStage('second-preview');await present(0,candidate);openStage('second-owner');await verifyOwner(candidate);}
-          phase='native';
+          current();phase='native';
           openStage('ui-commit');if(transition&&transition.commit)await transition.commit(candidate);
+          current();
           openStage('publication');changed();openStage('subscriber');await attachSubscription();
+          current();
           return candidate;
         }catch(error){
           openFailure(error);
-          if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!previous&&error&&error.code==='unsupported_format')){
+          if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!source.newProject&&!previous&&error&&error.code==='unsupported_format')){
             try{
               if(previous)await verifyOwner(previous);
               else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
@@ -190,7 +207,7 @@
               if(transition&&transition.restore)await transition.restore(previous);
               if(previous)await attachSubscription();
             }catch(unknown){throw fence(unknown);}
-            if(!previous&&error&&error.code==='unsupported_format')return null;
+            if(!source.newProject&&!previous&&error&&error.code==='unsupported_format')return null;
             throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
           }
           throw fence(error);
@@ -313,7 +330,7 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
-    return Object.freeze({openPath:openPath,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},

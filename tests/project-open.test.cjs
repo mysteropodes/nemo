@@ -994,22 +994,21 @@ test('actual native boot/exposed baseline follows native content through edit/un
   h.app.window.NemoNativeOpacityCutover.isActive = () => true;
   assert.equal(h.app.project.isDirty(), true, 'old content stays dirty against the last accepted baseline');
 });
-test('actual New reports partial failure without clean stamp/autosave/success when persistence is refused', async () => {
+test('desktop New without the native object adapter refuses before legacy construction or persistence', async () => {
   const h = baselineHarness(root => {
     delete root.NemoNativeOpacityCutover;
-    // Controlled admission tests the existing post-creation failure path;
-    // ordinary native New denial remains covered independently above.
+    // A permissive legacy surface cannot bypass the ordinary native caller.
     root.NemoNativeOpacityLegacySurface = { allowProjectTransition: () => true, releaseProjectTransition: () => null };
     root.n20AllowLegacyWrite = () => true;
   });
   const form = newProjectForm(h.app);
   await h.app.elements.get('np-create').listeners.click();
-  assert.ok(h.app.mutations > 0, 'creation may already have changed the document');
+  assert.equal(h.app.mutations, 0, 'native New cannot construct a legacy document');
   assert.equal(h.calls.paper, 0); assert.deepEqual(h.calls.baselines, []);
   assert.deepEqual(h.app.writes, []);
   assert.equal(h.app.project.isDirty(), true);
   assert.equal(h.app.toasts.includes('New project created'), false);
-  assert.match(admissionMessage(form).textContent, /creation failed.*may have changed/i);
+  assert.match(admissionMessage(form).textContent, /unavailable.*admission was denied/i);
 });
 test('ordinary browser New stamps current browser bytes and keeps autosave ordering', async () => {
   const app = harness();
