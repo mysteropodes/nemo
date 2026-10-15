@@ -5,7 +5,7 @@ use crate::native_dispatch::object_host::preview::{
     reference_tests::{attach, pixel, viewport},
     tests::{output, selector, snapshot},
 };
-use crate::native_dispatch::NativeObjectHost;
+use crate::native_dispatch::{NativeDispatch, NativeObjectHost};
 use native_engine::{
     compositor::Compositor, desktop_viewport::ViewportStatus, export_job::JobStatus,
 };
