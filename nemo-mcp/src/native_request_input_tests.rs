@@ -37,17 +37,15 @@ fn visibility_request() -> NativeApplicationRequest {
 }
 
 #[test]
-fn staged_visibility_is_registered_and_strict_without_authorizing_dispatch() {
+fn public_visibility_is_registered_and_strict() {
     let base = visibility_request();
     assert!(base.validate_input().is_ok());
     let descriptor = crate::capabilities::native_catalog()
         .capability_for_operation(&base.operation)
         .unwrap();
     assert_eq!(descriptor["id"], "native.object");
-    assert_eq!(descriptor["availability"]["state"], "unavailable");
-    let error = base.validate().unwrap_err();
-    assert_eq!(error.code(), "unavailable");
-    assert_eq!(error.message(), descriptor["availability"]["reason"]);
+    assert_eq!(descriptor["availability"]["state"], "available");
+    assert!(base.validate().is_ok());
 
     let mut missing_revision = base.clone();
     missing_revision.expected_revision = None;
@@ -107,24 +105,22 @@ fn staged_visibility_is_registered_and_strict_without_authorizing_dispatch() {
 }
 
 #[test]
-fn fixed_authored_and_reference_input_does_not_authorize_object_dispatch() {
+fn fixed_authored_and_reference_input_admits_public_route_without_asserting_existence() {
     for index in [0, 1] {
         let request = object_request(index);
         let before = serde_json::to_value(&request).unwrap();
         assert!(request.validate_input().is_ok());
-        let error = request.validate().unwrap_err();
-        assert_eq!(error.code(), "unavailable");
+        assert!(request.validate().is_ok());
         let descriptor = crate::capabilities::native_catalog()
             .capability_for_operation("query.document.object")
             .unwrap();
-        assert_eq!(descriptor["availability"]["state"], "unavailable");
-        assert_eq!(error.message(), descriptor["availability"]["reason"]);
+        assert_eq!(descriptor["availability"]["state"], "available");
         assert_eq!(serde_json::to_value(&request).unwrap(), before);
         let mut absent_target = request.clone();
         absent_target.payload["stableTarget"]["strokeId"] = json!("not-in-a-document");
         // Existence belongs to the actual owner, not this pure input check.
         assert!(absent_target.validate_input().is_ok());
-        assert_eq!(absent_target.validate().unwrap_err().code(), "unavailable");
+        assert!(absent_target.validate().is_ok());
     }
 }
 
@@ -135,11 +131,7 @@ fn every_registered_available_example_retains_full_validation() {
             let request: NativeApplicationRequest =
                 serde_json::from_value(example["request"].clone()).unwrap();
             assert!(request.validate_input().is_ok(), "{}", descriptor["id"]);
-            if descriptor["id"] == "native.object" {
-                assert_eq!(request.validate().unwrap_err().code(), "unavailable");
-            } else {
-                assert!(request.validate().is_ok(), "{}", descriptor["id"]);
-            }
+            assert!(request.validate().is_ok(), "{}", descriptor["id"]);
         }
     }
 }
@@ -250,7 +242,10 @@ fn registration_identity_and_cancellation_remain_separate_from_availability() {
     let mut cancelled = base.clone();
     cancelled.cancelled_before_dispatch = true;
     assert!(cancelled.validate_input().is_ok());
-    assert_eq!(cancelled.validate().unwrap_err().code(), "unavailable");
+    assert!(
+        cancelled.validate().is_ok(),
+        "execution handles cancellation after shape admission"
+    );
 }
 
 #[test]

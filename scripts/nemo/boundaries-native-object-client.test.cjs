@@ -17,12 +17,13 @@ test('bounded common object client and controls are censused without policy rela
   for (const file of files) assert.ok(missing.violations.some(v => v.rule === 'coverage-unprofiled-source' && v.file.endsWith(file)));
   const limits = profile.sizeProfiles['Rust production module'];
   assert.equal(limits.hardMax, 500);
-  assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'unavailable');
+  assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'available');
 });
 test('production raw entry stays behind main-window and common authority while typed entry validates availability', () => {
   const client = read('src-tauri/src/native_object_client.rs');
   assert.match(client, /wire::decode_json_bounded\(raw\.as_bytes\(\), MAX_BYTES\)/);
   assert.match(client, /state\.dispatch_object_client\(admit_raw\(raw\)\?\)/);
+  assert.match(client, /query\.validate\(\)\.is_ok\(\) && visibility\.validate\(\)\.is_ok\(\)/);
   assert.match(client, /require_main\(&window\)\?;\s*dispatch_raw/);
   assert.doesNotMatch(client, /active_mut|\.dispatch\(/);
   const sync = read('src-tauri/src/native_revision_sync.rs');

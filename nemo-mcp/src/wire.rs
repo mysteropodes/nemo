@@ -17,7 +17,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
-use tokio_util::sync::CancellationToken;
+pub use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -373,8 +373,8 @@ mod object_tests {
     }
 
     #[tokio::test]
-    async fn staged_object_call_never_connects_to_a_registered_endpoint() {
-        let (request, _) = pair();
+    async fn available_object_call_uses_authenticated_native_endpoint() {
+        let (request, response) = pair();
         let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
             .unwrap();
@@ -384,15 +384,20 @@ mod object_tests {
             secret: "test".into(),
             build_id: "test".into(),
         };
-        let error = call_native(&endpoint, request, CancellationToken::new())
-            .await
-            .unwrap_err();
-        assert!(error.to_string().contains("Object reads are staged"));
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), listener.accept())
-                .await
-                .is_err()
-        );
+        let server = async {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let message: NativeWireRequest = read_json(&mut stream).await.unwrap();
+            assert_eq!(message.secret, endpoint.secret);
+            assert_eq!(message.native_request, request);
+            write_json(&mut stream, &response).await.unwrap();
+        };
+        let client = call_native(&endpoint, request.clone(), CancellationToken::new());
+        let (_, actual) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(server, client)
+        })
+        .await
+        .unwrap();
+        assert_eq!(actual.unwrap(), response);
     }
 
     #[tokio::test]

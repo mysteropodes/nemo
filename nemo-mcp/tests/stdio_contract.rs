@@ -1,5 +1,5 @@
 //! Client-visible payload schemas and typed rejections checked against the compiled
-//! stdio executable, including staged native discovery and availability denial.
+//! stdio executable, including public native discovery and missing-owner denial.
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use serde_json::{json, Map, Value};
 use std::process::Command;
@@ -250,7 +250,7 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
         .iter()
         .find(|d| d["id"] == "native.object")
         .unwrap();
-    assert_eq!(object["availability"]["state"], "unavailable");
+    assert_eq!(object["availability"]["state"], "available");
     assert_eq!(
         object["ports"],
         json!([{"label":"ui","state":"pending"},{"label":"mcp","state":"pending"}])
@@ -260,8 +260,8 @@ async fn compiled_discovery_advertises_complete_registered_descriptors_without_a
     let error = result.structured_content.unwrap()["error"].clone();
     assert_eq!(error["code"], "unavailable");
     assert_eq!(
-        error["message"], object["availability"]["reason"],
-        "denied before missing-endpoint lookup"
+        error["message"], "Selected instance is absent; discover again after reconnect",
+        "admitted operation still needs a live desktop owner"
     );
     for (field, value) in [
         ("payload", json!({})),

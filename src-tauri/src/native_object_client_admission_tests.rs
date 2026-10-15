@@ -123,7 +123,7 @@ fn strict_envelope_and_original_utf8_byte_limit_precede_command_dispatch() {
     assert_eq!(client_status(&state).unwrap()["contentRevision"], 1);
 }
 #[test]
-fn closed_query_and_command_shapes_cannot_open_other_operations_or_public_availability() {
+fn closed_query_and_command_shapes_keep_private_operations_off_the_public_route() {
     let state = ApplicationMcp::default();
     let receipt = install(&state);
     for operation in [
@@ -151,9 +151,13 @@ fn closed_query_and_command_shapes_cannot_open_other_operations_or_public_availa
     bad = fill(&receipt, "bad-target", 0);
     bad["payload"]["stableTarget"]["frameScope"]["frame"] = json!(8);
     assert_eq!(dispatch(&state, &bad)["error"]["code"], "not_found");
+    let public_query = state
+        .dispatch_native(serde_json::from_value(read(&receipt, "public-query", 0, 0)).unwrap())
+        .unwrap();
+    assert!(public_query.ok);
+    assert_eq!(public_query.content_revision, 0);
     for r in [
-        read(&receipt, "public-query", 0, 0),
-        fill(&receipt, "public-fill", 0),
+        fill(&receipt, "private-fill", 0),
         history(&receipt, "public-undo", 0, "undo"),
         history(&receipt, "public-redo", 0, "redo"),
     ] {
@@ -205,13 +209,10 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         "command.document.object.layer.visibility.set"
     ]);
     assert_eq!(status["operations"], operations);
-    for flag in [
-        "publicCapabilityAvailable",
-        "mcpAvailable",
-        "saveAvailable",
-        "viewportAvailable",
-        "exportAvailable",
-    ] {
+    for flag in ["publicCapabilityAvailable", "mcpAvailable"] {
+        assert_eq!(status[flag], true);
+    }
+    for flag in ["saveAvailable", "viewportAvailable", "exportAvailable"] {
         assert_eq!(status[flag], false);
     }
     let command = fill(&receipt, "incarnation-fill", 0);
@@ -224,6 +225,11 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         _ => panic!("unexpected retry"),
     };
     assert_eq!(client_status(&state).unwrap()["available"], false);
+    assert_eq!(
+        client_status(&state).unwrap()["publicCapabilityAvailable"],
+        false
+    );
+    assert_eq!(client_status(&state).unwrap()["mcpAvailable"], false);
     assert!(!dispatch_raw(&state, &command.to_string()).unwrap().ok);
     complete_release(&native, generation, &request, || {
         Ok((Vec::new(), "complete"))
@@ -234,6 +240,10 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
     assert!(!dispatch_raw(&state, &command.to_string()).unwrap().ok);
     let next = install(&state);
     assert_eq!(client_status(&state).unwrap()["operations"], operations);
+    assert_eq!(
+        client_status(&state).unwrap()["publicCapabilityAvailable"],
+        true
+    );
     assert_ne!(next["documentId"], receipt["documentId"]);
     assert_eq!(
         dispatch(&state, &command)["error"]["code"],

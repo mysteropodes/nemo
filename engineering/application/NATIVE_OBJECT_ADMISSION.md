@@ -1,4 +1,24 @@
-# Staged native object admission, immutable reads and fill history
+# Native object admission, immutable reads and fill history
+
+## W02-OBJ-PUBLIC source-route amendment (2026-10-15)
+
+The `native.object` declaration now admits `query.document.object` and
+`command.document.object.layer.visibility.set` through the common v2 application
+route. Both route to the installed `NativeObjectHost` through the existing
+`ApplicationMcp`/`RevisionSync`/`NativeAuthority`; neither creates a second
+document owner or a JavaScript/Paper writer. A public request still needs the
+current instance/document, an active object owner, a valid pinned selector or
+current revision, and (for a changing external command) an acknowledged native
+subscriber before success bytes are returned. The public status bits derive
+from the shared request validator and the active owner, not a mutable status
+switch. The private raw route retains its original-byte duplicate-key guard.
+
+`availability: available` describes this bounded **source execution route**.
+The descriptor's UI and MCP port states remain `pending` until installed client
+round trips are accepted. This amendment neither activates save, viewport or
+export nor accepts an installed UI/MCP client. The paragraphs below preserve
+the historical staged-slice design and should not be read as the current public
+availability claim where they conflict with this amendment.
 
 N25B implements the persisted records frozen by
 [N25A](NATIVE_OBJECT_IDENTITY.md). N25C1 adds a staged common-envelope read API

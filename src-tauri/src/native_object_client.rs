@@ -87,13 +87,35 @@ pub(super) fn client_status(state: &ApplicationMcp) -> Result<Value, String> {
     let owner = authority
         .active()
         .filter(|(_, owner)| owner.object_client_available());
+    // Ask the shared public validator rather than maintaining a second
+    // availability bit alongside the capability declaration.
+    let public_available = owner.is_some_and(|(_, active)| {
+        let query = NativeApplicationRequest {
+            api_version: NATIVE_API_VERSION,
+            request_id: "object-route-status".into(),
+            instance_id: state.instance_id().into(),
+            document_id: active.document_id().into(),
+            expected_revision: None,
+            operation: OPERATIONS[0].into(),
+            payload: json!({"atRevision":active.content_revision(),"stableTarget":{
+                "contextId":"scene-root","frameScope":{"kind":"authored","frame":0},
+                "layerUid":"route-probe","strokeId":"route-probe"}}),
+            cancelled_before_dispatch: false,
+        };
+        let mut visibility = query.clone();
+        visibility.operation = OPERATIONS[5].into();
+        visibility.expected_revision = Some(active.content_revision());
+        visibility.payload = json!({"command":"object.layer.visibility.set",
+            "layerUid":"route-probe","visible":false});
+        query.validate().is_ok() && visibility.validate().is_ok()
+    });
     Ok(json!({"apiVersion":2,"instanceId":state.instance_id(),
         "available":owner.is_some(),"route":"nemo_native_object_dispatch",
         "operations":if owner.is_some(){OPERATIONS.as_slice()}else{&[]},
         "documentId":owner.map(|(_,a)|a.document_id()),
         "contentRevision":owner.map(|(_,a)|a.content_revision()),
         "lifecycleGeneration":owner.map(|(g,_)|g),
-        "publicCapabilityAvailable":false,"mcpAvailable":false,
+        "publicCapabilityAvailable":public_available,"mcpAvailable":public_available,
         "saveAvailable":false,"viewportAvailable":false,"exportAvailable":false}))
 }
 
