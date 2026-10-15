@@ -201,6 +201,37 @@ async function observeProjectTabs(inspect,identity,state={actions:0}) {
   return {...region,projectTabs:{...region.projectTabs,unique:true},nodes:[...region.nodes,
     ...[...seen.values()].filter(n=>n.alert&&!paths.has(n.path))]};
 }
+function publishAck(root, guard, ack) {
+  const file=path.join(root,'ack.json'),temporary=path.join(root,`.ack-${crypto.randomUUID()}.tmp`);
+  const bytes=Buffer.from(JSON.stringify(ack));
+  guard.verify();
+  const fd=fs.openSync(temporary,fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW,0o600);
+  let opened,failure;
+  function verifyTemporary() {
+    guard.verify();
+    const named=fs.lstatSync(temporary);
+    check(named.isFile()&&!named.isSymbolicLink()&&named.dev===opened.dev&&named.ino===opened.ino,
+      'probe-ack-identity-refused');
+  }
+  try {
+    opened=fs.fstatSync(fd);
+    check(opened.isFile(),'probe-ack-identity-refused');
+    guard.verify();fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);
+    verifyTemporary();
+    check(fs.fstatSync(fd).size===bytes.length,'probe-ack-identity-refused');
+    // Same-root hard-link publication is atomic and refuses every existing target.
+    // The native reader can see only the complete fsynced inode, never our write.
+    fs.linkSync(temporary,file);
+    guard.verify();
+  } catch(error) { failure=error; }
+  finally {
+    try { fs.closeSync(fd); } catch(error) { failure??=error; }
+    try {
+      if(opened) { verifyTemporary();fs.unlinkSync(temporary); }
+    } catch(error) { failure??=error; }
+  }
+  if(failure)throw failure; // Never undo a possibly consumed publication or retry it.
+}
 function acknowledge(root, expected, ownerToken, decision, snapshot) {
   check(typeof ownerToken==='string'&&/^[a-f0-9]{32,128}$/.test(ownerToken),'owner-token-refused');
   check(['accepted','refused'].includes(decision),'decision-refused');
@@ -212,8 +243,7 @@ function acknowledge(root, expected, ownerToken, decision, snapshot) {
   if(decision==='accepted') visibleEvidence(snapshot,expected);
   const ack={runId:value.runId,taskKey:value.taskKey,sourceSha:value.sourceSha,buildSha:value.buildSha,
     manifestSha256:value.manifestSha256,phase:expected.phase,ownerToken,decision};
-  const file=path.join(root,'ack.json'), fd=fs.openSync(file,fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW,0o600);
-  try { guard.verify(); fs.writeFileSync(fd,JSON.stringify(ack)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  publishAck(root,guard,ack);
   guard.verify();
   return {phase:expected.phase,decision,windowId:expected.windowId};
 }
