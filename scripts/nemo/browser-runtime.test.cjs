@@ -225,11 +225,23 @@ test('an exited requested browser is reported and shutdown waits for a stubborn 
   } finally { await stopOwned(failed); }
   const stubborn = path.join(scratch, 'browser-stubborn');
   const ready = path.join(scratch, 'stubborn-ready');
-  fs.writeFileSync(stubborn, `#!/usr/bin/env node\nprocess.on('SIGTERM', () => {});\nrequire('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready');\nsetInterval(() => {}, 1000);\n`, { mode: 0o700 });
+  const quote = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
+  // A delayed marker proves startup waits for readiness beyond the former 1s poll.
+  const program = `process.on('SIGTERM', () => {});\nsetTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready'), 2000);\nsetInterval(() => {}, 1000);\n`;
+  fs.writeFileSync(stubborn, `#!/bin/sh\nexec ${quote(process.execPath)} -e ${quote(program)} -- "$@"\n`, { mode: 0o700 });
+  const readyBy = performance.now() + 10000; // Existing launcher startup budget.
   const instance = await launch(`preview-browser-stubborn-${process.pid}`, ['--browser', stubborn]);
   try {
-    for (let i = 0; i < 100 && !fs.existsSync(ready); i++) await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.equal(fs.existsSync(ready), true);
+    while (!fs.existsSync(ready) && performance.now() < readyBy) {
+      const response = await request(instance.info.identityUrl, {
+        signal: AbortSignal.timeout(Math.max(1, Math.ceil(readyBy - performance.now()))),
+      });
+      const identity = JSON.parse(response.body);
+      assert.equal(identity.browser.error, null, `browser exited before readiness: ${identity.browser.error}`);
+      assert.equal(identity.browser.active, true, 'browser exited before readiness');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(fs.existsSync(ready), true, 'browser readiness marker missing within startup budget');
     const pid = instance.info.browser.pid;
     assert.equal(isolation.pidAlive(pid), true);
     await stopOwned(instance);
