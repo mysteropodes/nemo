@@ -33,13 +33,23 @@ impl RevisionSync {
             }
         };
         let application = authority.active_mut(generation)?;
-        if object_client && !application.object_client_available() {
+        // The private raw token is not the only route into this core: the
+        // versioned public API and bundled MCP also carry object operations.
+        // Fence those before an unrelated active native owner sees the body.
+        let object_operation = request.operation == "query.document.object"
+            || request.operation.starts_with("query.document.object.")
+            || request.operation.starts_with("command.document.object.");
+        if (object_client || object_operation) && !application.object_client_available() {
             return Ok(Delivery {
                 response: unavailable(
                     &request,
                     instance,
                     application.content_revision(),
-                    "bounded object client has no active object owner",
+                    if object_client {
+                        "bounded object client has no active object owner"
+                    } else {
+                        "native object operation has no active object owner"
+                    },
                     false,
                 ),
                 notification: None,
@@ -123,5 +133,87 @@ impl RevisionSync {
             response,
             notification,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{application_mcp::ApplicationMcp, native_dispatch::TerminalPump};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    #[test]
+    fn public_object_operations_refuse_non_object_owner_before_dispatch() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut state = ApplicationMcp::default();
+        state.instance_id = "pump-fixture".into();
+        let reservation = state.reserve_native_install().unwrap();
+        let generation = reservation.generation();
+        state
+            .install_dispatch(generation, Box::new(TerminalPump(calls.clone())))
+            .unwrap();
+        let cases: serde_json::Value = serde_json::from_str(include_str!(
+            "../../engineering/application/examples/native-object-v1/cases.json"
+        ))
+        .unwrap();
+        let mut read_payload = cases["read"]["request"]["payload"].clone();
+        read_payload["atRevision"] = serde_json::json!(0);
+        for (operation, expected_revision, payload, external) in [
+            ("query.document.object", None, read_payload, false),
+            (
+                "command.document.object.layer.visibility.set",
+                Some(0),
+                serde_json::json!({"command":"object.layer.visibility.set",
+                    "layerUid":"legacy layer:alpha","visible":false}),
+                true,
+            ),
+        ] {
+            let request = NativeApplicationRequest {
+                api_version: NATIVE_API_VERSION,
+                request_id: format!("wrong-owner-{operation}"),
+                instance_id: state.instance_id().into(),
+                document_id: "document-fixture".into(),
+                expected_revision,
+                operation: operation.into(),
+                payload,
+                cancelled_before_dispatch: false,
+            };
+            assert!(request.validate_input().is_ok());
+            let delivery = state
+                .revisions
+                .dispatch_admitted(state.instance_id(), &state.native, request, external, false)
+                .unwrap();
+            assert!(delivery.notification.is_none());
+            assert!(!delivery.response.ok);
+            let error = delivery.response.error.unwrap();
+            assert_eq!(error.code, "unavailable");
+            assert_eq!(error.details.unwrap()["disposition"], "notDispatched");
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+            let authority = state.native.lock().unwrap();
+            assert_eq!(authority.active_generation(), Ok(generation));
+            assert_eq!(authority.active().unwrap().1.content_revision(), 0);
+        }
+        let ordinary = NativeApplicationRequest {
+            api_version: NATIVE_API_VERSION,
+            request_id: "ordinary-query".into(),
+            instance_id: state.instance_id().into(),
+            document_id: "document-fixture".into(),
+            expected_revision: None,
+            operation: "query.document.revision".into(),
+            payload: serde_json::json!({}),
+            cancelled_before_dispatch: false,
+        };
+        assert_eq!(
+            state
+                .revisions
+                .dispatch_admitted(state.instance_id(), &state.native, ordinary, false, false)
+                .err()
+                .unwrap(),
+            "terminal pump has no document dispatcher"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }
