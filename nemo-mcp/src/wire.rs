@@ -11,8 +11,11 @@ use crate::{
     },
     registry::Endpoint,
 };
-use serde::{Deserialize, Serialize};
-use std::{io, time::Duration};
+use serde::{
+    de::{value::MapAccessDeserializer, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::{fmt, io, marker::PhantomData, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
@@ -26,18 +29,76 @@ pub struct WireRequest {
     pub request: ApplicationRequest,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeWireRequest {
     pub secret: String,
     pub native_request: NativeApplicationRequest,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeWireRequestFields {
+    secret: String,
+    #[serde(deserialize_with = "deserialize_object_only")]
+    native_request: NativeApplicationRequest,
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeStatusWireRequest {
     pub secret: String,
     pub native_status: NativeStatusRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeStatusWireRequestFields {
+    secret: String,
+    #[serde(deserialize_with = "deserialize_object_only")]
+    native_status: NativeStatusRequest,
+}
+
+// Serde's derived struct reader also accepts positional arrays. Native v2
+// authentication and dispatch require named object members at both levels.
+fn deserialize_object_only<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct ObjectOnly<T>(PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectOnly<T> {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a JSON object")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
+            T::deserialize(MapAccessDeserializer::new(map))
+        }
+    }
+    deserializer.deserialize_map(ObjectOnly(PhantomData))
+}
+
+impl<'de> Deserialize<'de> for NativeWireRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields: NativeWireRequestFields = deserialize_object_only(deserializer)?;
+        Ok(Self {
+            secret: fields.secret,
+            native_request: fields.native_request,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for NativeStatusWireRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields: NativeStatusWireRequestFields = deserialize_object_only(deserializer)?;
+        Ok(Self {
+            secret: fields.secret,
+            native_status: fields.native_status,
+        })
+    }
 }
 
 /// Host-side authenticated request parser. The legacy member remains `request`
@@ -346,6 +407,41 @@ mod object_tests {
             serde_json::from_value(request).unwrap(),
             serde_json::from_value(response).unwrap(),
         )
+    }
+
+    #[tokio::test]
+    async fn authenticated_native_envelopes_require_named_objects_at_both_levels() {
+        async fn accepts(value: Value) -> bool {
+            let mut bytes = serde_json::to_vec(&value).unwrap();
+            bytes.push(b'\n');
+            read_json::<AuthenticatedWireRequest>(bytes.as_slice())
+                .await
+                .is_ok()
+        }
+        let (mut request, _) = pair();
+        request.expected_revision = Some(0);
+        let native = serde_json::to_value(&request).unwrap();
+        let positional = json!([
+            request.api_version,
+            request.request_id,
+            request.instance_id,
+            request.document_id,
+            0,
+            request.operation,
+            request.payload,
+            false
+        ]);
+        assert!(serde_json::from_value::<NativeApplicationRequest>(positional.clone()).is_ok());
+        assert!(accepts(json!({"secret":"test","nativeRequest":native.clone()})).await);
+        assert!(!accepts(json!(["test", native])).await);
+        assert!(!accepts(json!({"secret":"test","nativeRequest":positional.clone()})).await);
+        assert!(!accepts(json!(["test", positional])).await);
+        let status = json!({"apiVersion":2,"requestId":"status-1","instanceId":"instance"});
+        let status_seq = json!([2, "status-1", "instance"]);
+        assert!(serde_json::from_value::<NativeStatusRequest>(status_seq.clone()).is_ok());
+        assert!(accepts(json!({"secret":"test","nativeStatus":status.clone()})).await);
+        assert!(!accepts(json!(["test", status])).await);
+        assert!(!accepts(json!({"secret":"test","nativeStatus":status_seq})).await);
     }
 
     #[test]
