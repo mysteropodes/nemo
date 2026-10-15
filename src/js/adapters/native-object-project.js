@@ -330,7 +330,7 @@
         !Array.isArray(receipt.artifactFiles)||receipt.artifactFiles.length!==manifest.length||!manifest.every(function(name,i){return receipt.artifactFiles[i]===name;}))throw new Error('Native export publication is unconfirmed');
       if(onProgress)onProgress(requested.length,requested.length);return receipt;
     });}
-    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,blocksLegacy:function(){return phase!=='idle'||openingRequested;},
+    return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
@@ -349,7 +349,8 @@
     function publishRevision(info){
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
-      if(root.updateUI)root.updateUI();
+      if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
+      root.updateUI();
       if(root.SMReference)root.SMReference.refreshNative();
       if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
       return true;
@@ -379,5 +380,25 @@
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
     desktops.set(root,session);return session;
   }
-  return Object.freeze({create:create,desktop:desktop});
+  function uiSession(root){var session=desktop(root);return session&&session.blocksLegacy()?session:null;}
+  function uiFailure(root,error){
+    var start=root.document&&root.document.getElementById('start-screen');if(start)start.classList.remove('hid');
+    throw error;
+  }
+  function paintUI(root){
+    var session=uiSession(root);if(!session)return false;
+    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info())!==true)
+      throw new Error('Native document UI presentation is unavailable');}
+    catch(error){return uiFailure(root,error);}
+    return true;
+  }
+  function selectLayerUI(root,index,preserveLayerSel,uid,expected){
+    var session=uiSession(root);if(!session)return false;
+    if(expected&&!same(session.info(),expected))return true;
+    try{if(!root.NemoNativeObjectUI)throw new Error('Native document UI selection is unavailable');
+      root.NemoNativeObjectUI.select(root,session.info(),index,preserveLayerSel,uid,session.readPresentedObjectSession());}
+    catch(error){return uiFailure(root,error);}
+    return true; // An unconfirmed selection is consumed, never a legacy fallback.
+  }
+  return Object.freeze({create:create,desktop:desktop,paintUI:paintUI,selectLayerUI:selectLayerUI});
 }));
