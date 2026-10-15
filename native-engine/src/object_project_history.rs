@@ -41,6 +41,45 @@ impl InactiveProject {
 mod reference_dispatch;
 
 impl NativeObjectHistory {
+    /// Create the native blank drawing from explicit New Project intent. The
+    /// five-second timeline matches the existing desktop New form. This only
+    /// constructs an owner; host replacement and UI publication remain separate.
+    pub fn new_blank_project(
+        instance: impl Into<String>,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+    ) -> Result<Self, DispatchErrorCode> {
+        use crate::object_document::{
+            ObjectDocument, ObjectLayer, Presence, ProjectEnvelope, ProjectMetadata,
+            OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+        };
+        let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
+            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let frames = (fps * 5.0).round().max(1.0);
+        if !frames.is_finite() || frames > u32::MAX as f64 {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let instance = instance.into();
+        if instance.is_empty() {
+            return Err(DispatchErrorCode::InvalidRequest);
+        }
+        let drawing = ObjectDocument {
+            format: OBJECT_DOCUMENT_FORMAT.into(),
+            format_version: OBJECT_DOCUMENT_FORMAT_VERSION,
+            total_frames: frames as u32,
+            layers: vec![ObjectLayer {
+                layer_uid: "layer-1".into(),
+                name: Presence::Present("Layer 1".into()),
+                visible: Presence::Present(true),
+            }],
+            objects: vec![],
+            composition_order: Presence::Missing,
+        };
+        Self::from_admitted_project(instance, ProjectEnvelope::no_media(metadata, drawing))
+            .map_err(|_| DispatchErrorCode::Unavailable)
+    }
+
     /// Admit B without replacing A or constructing a second writable owner.
     /// Check A's current snapshot before parsing or reserving B's resources.
     pub fn prepare_inactive_project(
