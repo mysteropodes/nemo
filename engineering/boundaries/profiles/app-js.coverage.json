@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 177,
-    "externalClassicTags": 174,
+    "totalScriptTags": 188,
+    "externalClassicTags": 185,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 170,
+    "retainedClassicTags": 181,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 173,
+    "classicTagsUnderSrcJsIncludingVendors": 184,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -139,7 +139,7 @@
     "runtimeLimit": "Source-declared sites, not observed successful execution: gpu-gate.js may stop boot. No browser/Tauri/runtime acceptance is claimed.",
     "noLoadSiteAudit": {
       "scope": "All committed HTML and src JS-family sources at candidateCommit: local script URLs, imports, worker constructors and script injection inspected; Node test consumers are separate evidence.",
-      "paths": 12,
+      "paths": 16,
       "labsRegistry": {
         "path": "src/js/labs/labs-core.js",
         "line": 18
