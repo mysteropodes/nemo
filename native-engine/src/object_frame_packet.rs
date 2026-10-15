@@ -229,22 +229,24 @@ pub fn prepare_object_exposure_frame(
     prepare_frame_with_order(snapshot, selector, true, order::prepare)
 }
 
-/// Private exact-scoped resolver seam, with source and evaluated clocks distinct.
+/// Explicit exact-scoped resolver; its authored source equals the selector frame.
 pub(crate) fn prepare_object_frame_with_resolver<E, F>(
     snapshot: &ObjectSnapshot,
     selector: &ObjectFrameSelector<'_>,
-    resolver: F,
+    mut resolver: F,
 ) -> Result<ObjectFramePacket, E>
 where
     E: From<ObjectFrameError>,
-    F: FnMut(u32, &str, Option<&str>) -> Result<f64, E>,
+    F: FnMut(&str, Option<&str>) -> Result<f64, E>,
 {
     prepare_frame_with_order(
         snapshot,
         selector,
         false,
         |snapshot, frame, sources, exposure| {
-            order::prepare_with_resolver(snapshot, frame, sources, exposure, resolver)
+            order::prepare_with_resolver(snapshot, frame, sources, exposure, |_, layer, stroke| {
+                resolver(layer, stroke)
+            })
         },
     )
 }

@@ -429,7 +429,9 @@ fn prepare_order_frame_for_owner(
     let packet = if exposure {
         prepare_object_exposure_frame_with_resolver(snapshot, selector, evaluate)
     } else {
-        prepare_object_frame_with_resolver(snapshot, selector, evaluate)
+        prepare_object_frame_with_resolver(snapshot, selector, |layer, stroke| {
+            evaluate(selector.frame, layer, stroke)
+        })
     };
     verify()?;
     packet
