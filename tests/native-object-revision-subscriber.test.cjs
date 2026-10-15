@@ -3,12 +3,14 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const Project=require('../src/js/adapters/native-object-project.js');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
+const Application=require('../src/js/adapters/native-application.js');
+const Surface=require('../src/js/adapters/native-opacity-legacy-surface.js');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 function scenario(openFault){
   let active=false,revision=0,generation=0,visible,previewGate=null,replyGate=null,ackGate=null,failure=null;
   let nativePending=null,registered=null;
-  const log=[],listeners=new Map(),oldListeners=[],commands=[],consumers=[],diagnostics=[],openCalls=[];
+  const log=[],listeners=new Map(),oldListeners=[],commands=[],routes=[],consumers=[],diagnostics=[],openCalls=[];
   const openError={code:'unavailable',details:{disposition:'notDispatched'},message:'PRIVATE NATIVE ERROR'};
   let openStatus=0,openMetadata=0,openPreview=0;
   const info=()=>({apiVersion:2,instanceId:'instance',documentId:'document-'+generation,lifecycleGeneration:generation,
@@ -61,17 +63,18 @@ function scenario(openFault){
       log.push('present-'+r.contentRevision);
       return {status:failure==='preview'?'refused':'presented',workId:'work-'+r.contentRevision,viewGeneration:1};
     }
-    assert.equal(command,'nemo_native_object_dispatch');assert.equal(r.expectedRevision,revision);
+    assert.equal(command,'nemo_native_dispatch');routes.push(command);assert.equal(r.expectedRevision,revision);
     assert.equal(r.documentId,info().documentId);commands.push(r);
     const applied=(visible!==false)!==r.payload.visible;
     if(applied){visible=r.payload.visible;revision++;}
     const response={apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,
       contentRevision:revision,ok:true,result:{applied,historyEntriesAdded:applied?1:0}};
     if(replyGate){const gate=replyGate;replyGate=null;await gate.promise;}
+    if(failure==='malformed-reply')response.result.historyEntriesAdded=2;
     return response;
   }
   const root={state:{},selectedPaths:[],userLayers:[],NemoNativeObjectProjectFile:Files,
-    NemoApplicationMcpTransport:{createNativeTauriTransport:invoke=>{
+    NemoNativeApplicationAdapter:Application,NemoApplicationMcpTransport:{createNativeTauriTransport:invoke=>{
       const transport=Transport.createNativeTauriTransport(invoke);
       return {...transport,subscribeRevisions:(listen,synchronize,disconnected)=>{
         consumers.push(synchronize);return transport.subscribeRevisions(listen,synchronize,disconnected);
@@ -89,7 +92,7 @@ function scenario(openFault){
     requestId:'external-'+to,fromRevision:from,toRevision:to};}
   async function external(value){const from=revision;visible=value;revision++;nativePending=event(from,revision);
     return listeners.get('nemo-native-revision')({payload:nativePending});}
-  return {root,session,log,commands,open,external,listeners,oldListeners,consumers,diagnostics,openCalls,openError,
+  return {root,session,log,commands,routes,open,external,listeners,oldListeners,consumers,diagnostics,openCalls,openError,
     holdPreview:gate=>{previewGate=gate;},holdReply:gate=>{replyGate=gate;},holdAck:gate=>{ackGate=gate;},fail:value=>{failure=value;},
     current:info};
 }
@@ -149,6 +152,53 @@ test('two queued ordinary toggle intents derive successive native booleans rathe
   assert.equal(h.session.info().contentRevision,2);assert.equal(h.root.state.layers[0].visible,true);
   await h.external(false);assert.equal(h.log.includes('acknowledge'),true);
   assert.equal(h.root.state.layers[0].visible,false);
+});
+
+test('ordinary eye reaches the public SDK and common native endpoint with no optimistic or legacy write',async()=>{
+  const h=scenario();await h.open();let legacy=0;
+  h.root.SM={toggleLayerVis(){legacy++;}};
+  const dispose=Surface.wrapObjectVisibility(h.root,()=>h.session,()=>true);
+  const gate=deferred();h.holdReply(gate);
+  const first=h.root.SM.toggleLayerVis(0),second=h.root.SM.toggleLayerVis(0);
+  for(let i=0;i<10&&!h.commands.length;i++)await turn();
+  assert.equal(h.root.state.layers[0].visible,true);assert.equal(h.commands.length,1);
+  assert.equal(h.commands[0].payload.layerUid,'legacy layer:alpha');
+  gate.resolve();await Promise.all([first,second]);
+  assert.deepEqual(h.routes,['nemo_native_dispatch','nemo_native_dispatch']);
+  assert.deepEqual(h.commands.map(r=>[r.expectedRevision,r.payload.visible]),[[0,false],[1,true]]);
+  assert.equal(legacy,0);assert.equal(h.root.state.layers[0].visible,true);
+  assert.equal(h.session.readPresentedObjectSession().contentRevision,2);dispose();
+});
+
+test('desktop public SDK absence refuses the eye without using the private or legacy writer',async()=>{
+  const h=scenario();await h.open();let legacy=0;
+  h.root.SM={toggleLayerVis(){legacy++;}};delete h.root.NemoNativeApplicationAdapter;
+  const dispose=Surface.wrapObjectVisibility(h.root,()=>h.session,()=>true);
+  await assert.rejects(h.root.SM.toggleLayerVis(0),/public application client is unavailable/);
+  assert.deepEqual(h.routes,[]);assert.equal(h.commands.length,0);assert.equal(legacy,0);
+  assert.equal(h.root.state.layers[0].visible,true);assert.equal(h.session.info().contentRevision,0);dispose();
+});
+
+test('public visibility no-op remains at the current revision before the next changed eye intent',async()=>{
+  const h=scenario();await h.open();
+  const same=await h.session.setLayerVisibility('legacy layer:alpha',true);
+  assert.deepEqual(same.result,{applied:false,historyEntriesAdded:0});
+  assert.equal(h.session.readPresentedObjectSession().contentRevision,0);
+  const changed=await h.session.toggleLayerVisibility('legacy layer:alpha');
+  assert.deepEqual(changed.result,{applied:true,historyEntriesAdded:1});
+  assert.deepEqual(h.commands.map(r=>[r.expectedRevision,r.payload.visible]),[[0,true],[0,false]]);
+  assert.deepEqual(h.routes,['nemo_native_dispatch','nemo_native_dispatch']);
+  assert.equal(h.root.state.layers[0].visible,false);assert.equal(h.session.info().contentRevision,1);
+});
+
+test('ordinary public eye rejects malformed native disposition through the real SDK without retry',async()=>{
+  const h=scenario();await h.open();let legacy=0;
+  h.root.SM={toggleLayerVis(){legacy++;}};h.fail('malformed-reply');
+  const dispose=Surface.wrapObjectVisibility(h.root,()=>h.session,()=>true);
+  await assert.rejects(h.root.SM.toggleLayerVis(0),/invalid visibility disposition/);
+  assert.deepEqual(h.routes,['nemo_native_dispatch']);assert.equal(h.commands.length,1);assert.equal(legacy,0);
+  // The committed owner is reconciled, but a rejected SDK response is never delivered success.
+  assert.equal(h.session.info().contentRevision,1);assert.equal(h.root.state.layers[0].visible,false);dispose();
 });
 
 test('external event waits for the actual object UI reply and tolerates the still-pending metadata refresh',async()=>{
