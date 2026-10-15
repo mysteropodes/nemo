@@ -61,10 +61,11 @@ fn expected(mut before: Value, revision: u64) -> Value {
     } else {
         format!("native-layer:{revision}:0")
     };
-    before["layers"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!({"layerUid":id,"name":"新しい Layer","visible":true}));
+    before["layers"].as_array_mut().unwrap().push(
+        json!({"layerUid":id,"name":"新しい Layer","visible":true,
+            "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
+                "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}),
+    );
     if let Some(contexts) = before
         .pointer_mut("/compositionOrder/contexts")
         .and_then(Value::as_array_mut)

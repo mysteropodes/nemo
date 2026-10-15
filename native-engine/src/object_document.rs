@@ -16,6 +16,13 @@ pub(crate) use project::{
     ProjectEnvelope, ProjectMetadata, ProjectMetadataError, ProjectReferenceState,
 };
 
+#[path = "object_layer_timing.rs"]
+mod timing;
+pub(crate) use timing::LayerTiming;
+#[cfg(all(test, feature = "history", feature = "project_media_codec"))]
+#[path = "../tests/object_timing.rs"]
+mod timing_tests;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ObjectDocument {
@@ -36,6 +43,8 @@ pub struct ObjectLayer {
     pub(crate) name: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) visible: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) timing: Presence<LayerTiming>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -153,7 +162,7 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
-    #[serde(default)] visible: Presence<bool> });
+    #[serde(default)] visible: Presence<bool>, #[serde(default)] timing: Presence<LayerTiming> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -237,6 +246,7 @@ impl ObjectLayer {
             layer_uid,
             name: Presence::Missing,
             visible: Presence::Missing,
+            timing: Presence::Missing,
         }
     }
     pub fn layer_uid(&self) -> &str {

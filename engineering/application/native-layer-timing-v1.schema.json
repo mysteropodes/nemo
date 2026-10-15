@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nemo.native-layer-timing/1",
+  "title": "Explicit sparse ordinary drawing timing stored in ObjectLayer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "formatVersion",
+    "family",
+    "contextId",
+    "keys",
+    "samples"
+  ],
+  "properties": {
+    "format": {
+      "const": "nemo.native-layer-timing"
+    },
+    "formatVersion": {
+      "const": 1
+    },
+    "family": {
+      "const": "drawing"
+    },
+    "contextId": {
+      "const": "scene-root"
+    },
+    "keys": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/Key"
+      }
+    },
+    "samples": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "$ref": "#/$defs/Sample"
+      }
+    }
+  },
+  "description": "Both vectors strictly increase by frame, are disjoint, total <=4096, and every frame is below document totalFrames. Missing timing remains missing/Unavailable; null is invalid. New/Create seed explicit key0 only from authored intent. Core point read pins actual immutable IDs; no UI epoch, host API or framepacket acceptance. Components remain unsupported with retained baseline oracle.",
+  "$defs": {
+    "Frame": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "Key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame"
+      ],
+      "properties": {
+        "frame": {
+          "$ref": "#/$defs/Frame"
+        }
+      }
+    },
+    "Sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame"
+      ],
+      "properties": {
+        "frame": {
+          "$ref": "#/$defs/Frame"
+        },
+        "manualEdit": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

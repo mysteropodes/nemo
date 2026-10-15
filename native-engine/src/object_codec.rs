@@ -213,6 +213,9 @@ pub(crate) fn validate_content(
     }
     let mut layers = HashSet::new();
     for layer in declared_layers {
+        if let Some(timing) = layer.timing.value() {
+            timing.validate(total_frames)?;
+        }
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
         }

@@ -7,7 +7,10 @@ use crate::request_receipts::{
     DispatchError, DispatchErrorCode, OpacityRequest, ResponseEnvelope, APPLICATION_API_VERSION,
 };
 pub use crate::revision::ObjectSnapshot;
+#[path = "object_timing_snapshot.rs"]
+mod timing;
 use serde::{Deserialize, Serialize};
+pub use timing::LayerTimingReadResponse;
 const MAX_MESSAGE_BYTES: usize = 4096;
 
 #[cfg(all(feature = "history", feature = "project_media_codec"))]

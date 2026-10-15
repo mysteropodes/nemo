@@ -66,6 +66,7 @@ fn blank_project(
             layer_uid: "layer-1".into(),
             name: Presence::Present("Layer 1".into()),
             visible: Presence::Present(true),
+            timing: Presence::Present(crate::object_document::LayerTiming::blank_drawing()),
         }],
         objects: vec![],
         // Native painting consumes the explicit v2 order plan even when empty.
@@ -294,6 +295,21 @@ fn project_snapshot_info(
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
+    let layers: Vec<_> = project
+        .drawing()
+        .layers
+        .iter()
+        .map(|layer| {
+            let mut info = serde_json::json!({"layerUid": layer.layer_uid()});
+            if let Some(name) = layer.name() {
+                info["name"] = serde_json::json!(name);
+            }
+            if let Some(visible) = layer.visible.value() {
+                info["visible"] = serde_json::json!(visible);
+            }
+            info
+        })
+        .collect();
     let reference = match project.reference_state() {
         ProjectReferenceState::NoMedia => serde_json::Value::Null,
         ProjectReferenceState::StillImage(image) => serde_json::json!({
@@ -306,7 +322,7 @@ fn project_snapshot_info(
         "contentRevision":snapshot.content_revision(), "documentDigest":digest,
         "byteCount":bytes.len(), "canvasW":width, "canvasH":height,
         "fps":project.project().fps(), "totalFrames":project.drawing().total_frames,
-        "layers":project.drawing().layers, "reference":reference}),
+        "layers":layers, "reference":reference}),
     )
 }
 
