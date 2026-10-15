@@ -3,12 +3,13 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const Files=require('../src/js/adapters/native-object-project-file.js');
 const Project=require('../src/js/adapters/native-object-project.js');
 const Transport=require('../src/js/adapters/application-mcp.js');
+const fs=require('node:fs'),vm=require('node:vm');
 const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 const A={layerUid:'opaque A:雪',name:'A',visible:true},B={layerUid:'B',name:'B',visible:false},C={layerUid:'C',name:'',visible:true};
 const clone=rows=>rows.map(row=>({...row}));
-function info(layers){return {apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
-  contentRevision:0,documentSnapshotId:'snapshot-0',documentDigest:'a'.repeat(64),byteCount:1000,
+function info(layers,revision=0){return {apiVersion:2,instanceId:'instance',documentId:'document',lifecycleGeneration:1,
+  contentRevision:revision,documentSnapshotId:'snapshot-'+revision,documentDigest:'a'.repeat(64),byteCount:1000,
   canvasW:320,canvasH:180,fps:24,totalFrames:24,reference:null,undoDepth:0,redoDepth:0,layers:clone(layers)};}
 function view(layers=[A,B]){
   const root={state:{},userLayers:[],selectedPaths:[]};Files.projectView(root,info(layers));
@@ -24,7 +25,7 @@ test('strict delivered matching remains false for append until the complete read
   const reference=root.state.refMedia,paths=root.selectedPaths,selection=root._layerSel;
   assert.equal(Files.projectionMatches(root,info([A,B,C])),false);
   assert.equal(Files.refreshVisibility(root,info([A,B,C])),false);assert.equal(rows.length,2);
-  assert.equal(Files.refreshLayerTable(root,info([A,B,C])),true);
+  assert.equal(Files.refreshLayerTable(root,info([A,B,C],1)),true);
   assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
   assert.equal(first.frames,frames);assert.equal(first.motion,motion);assert.deepEqual(first.uiOnly,{expanded:true});
   assert.deepEqual(Object.keys(rows[2]).sort(),['layerUid','name','visible']);
@@ -32,24 +33,24 @@ test('strict delivered matching remains false for append until the complete read
   assert.equal(root.state.currentFrame,7);assert.equal(root._curFrame,7);assert.equal(root.state.waIn,3);assert.equal(root.state.waOut,19);
   assert.equal(root._waIn,3);assert.equal(root._waOut,19);assert.equal(root.state.activeLayerIdx,1);
   assert.equal(root._layerSel,selection);assert.equal(root.selectedPaths,paths);assert.equal(root.state.refMedia,reference);
-  assert.equal(Files.refreshLayerTable(root,info([A,B])),true);assert.equal(rows[0],first);assert.equal(rows[1],second);
-  assert.equal(Files.refreshLayerTable(root,info([A,B,C])),true);assert.equal(rows[2].layerUid,'C');
+  assert.equal(Files.refreshLayerTable(root,info([A,B],2)),true);assert.equal(rows[0],first);assert.equal(rows[1],second);
+  assert.equal(Files.refreshLayerTable(root,info([A,B,C],3)),true);assert.equal(rows[2].layerUid,'C');
 });
 test('unchanged membership refreshes only native row metadata and preserves surrounding UI values',()=>{
   const root=view(),rows=root.state.layers,selection=root._layerSel,reference=root.state.refMedia;
-  assert.equal(Files.refreshLayerTable(root,info([{...A,visible:false,name:'Native name'},{layerUid:'B'}])),true);
+  assert.equal(Files.refreshLayerTable(root,info([{...A,visible:false,name:'Native name'},{layerUid:'B'}],1)),true);
   assert.equal(root.state.layers,rows);assert.equal(rows[0].visible,false);assert.equal(rows[0].name,'Native name');
   assert.equal(rows[1].visible,true);assert.equal(rows[1].name,'B');assert.equal(root._layerSel,selection);assert.equal(root.state.refMedia,reference);
 });
 test('last removal preserves surviving UID selection and picks a remaining UI row if only removed row was selected',()=>{
   for(const selected of [[1,2],[2]]){
     const root=view([A,B,C]),rows=root.state.layers;root._layerSel=selected;root.state.activeLayerIdx=2;
-    assert.equal(Files.refreshLayerTable(root,info([A,B])),true);
+    assert.equal(Files.refreshLayerTable(root,info([A,B],1)),true);
     assert.deepEqual(root._layerSel,[1]);assert.equal(root.state.activeLayerIdx,1);assert.equal(root.state.layers,rows);
     assert.equal(root.state.layers[1].layerUid,'B');assert.equal(root.state.currentFrame,7);
   }
   const root=view([A,B,C]),empty=[];root._layerSel=empty;root.state.activeLayerIdx=0;
-  assert.equal(Files.refreshLayerTable(root,info([A,B])),true);assert.equal(root._layerSel,empty);
+  assert.equal(Files.refreshLayerTable(root,info([A,B],1)),true);assert.equal(root._layerSel,empty);
 });
 for(const [name,layers] of [
   ['reordered',[B,A]],['middle deletion',[B]],['replaced',[A,C]],['two appends',[A,B,C,{layerUid:'D'}]],
@@ -58,7 +59,7 @@ for(const [name,layers] of [
   ['late malformed name',[{...A,visible:false},{...B,name:null}]],['document payload',[A,B,{...C,frames:[]}]],
 ])test('unsupported '+name+' refuses without partial row, selection or reference mutation',()=>{
   const root=view(),before=snapshot(root),rows=root.state.layers,first=rows[0],second=rows[1];
-  try{assert.equal(Files.refreshLayerTable(root,info(layers)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
+  try{assert.equal(Files.refreshLayerTable(root,info(layers,1)),false);}catch(error){if(error.code==='ERR_ASSERTION')throw error;assert.match(error.message,/Native layer/);}
   assert.equal(snapshot(root),before);assert.equal(root.state.layers,rows);assert.equal(rows[0],first);assert.equal(rows[1],second);
 });
 for(const [key,value] of [['instanceId','foreign'],['documentId','foreign'],['lifecycleGeneration',2],['canvasW',321],['fps',30],['totalFrames',25]]){
@@ -73,6 +74,42 @@ test('locally corrupted membership and sparse next metadata are rejected before 
   const clean=view(),sparse=[A,B];sparse.length=3;const cleanBefore=snapshot(clean);
   assert.throws(()=>Files.refreshLayerTable(clean,{...info([A,B]),layers:sparse}),/identity is invalid/);
   assert.equal(snapshot(clean),cleanBefore);
+});
+test('old or same-revision membership cannot masquerade as a later native undo',()=>{
+  for(const revision of [0,1]){
+    const root=view();assert.equal(Files.refreshLayerTable(root,info([A,B,C],1)),true);const before=snapshot(root);
+    assert.equal(Files.refreshLayerTable(root,info([A,B],revision)),false);assert.equal(snapshot(root),before);
+  }
+});
+function shippedTimeline(root){
+  const source=fs.readFileSync('src/js/timeline.js','utf8');
+  function shipped(name){const start=source.indexOf('function '+name+'('),end=source.indexOf('\n}\n',start);
+    assert.ok(start>=0&&end>start);return source.slice(start,end+2);}
+  function element(){return {style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){}},
+    appendChild(){},addEventListener(){},setAttribute(){},getBoundingClientRect:()=>({width:320,height:180})};}
+  const nodes=new Map(),context={state:root.state,selectedPaths:root.selectedPaths,FC:30,ROW_H:24,SM:{t:()=>'{n}'},
+    document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},
+      createElement:element,querySelectorAll:()=>[]},getEffectiveStrokes:()=>[],selHas:()=>false,
+    computeLayerRenderOrder:()=>root.state.layers.map((_,idx)=>({type:'layer',idx})).reverse()};
+  for(const name of ['syncDocFields','updateWaBar','updateOmMarkers','updatePlayhead','renderLayerList',
+    'updateCompInstancePanel','updateDuplicatorPanel','updateFootagePanel','updateSelPropsPanel','updateFsSelPanel',
+    'updateRevisionPanel','updateMaskPanel','updateCornersPanel','updateEllipseArcPanel','updateStarPanel',
+    'updateTextActionsPanel','updateTextPropsPanel','updatePropsContext','_tlScrollSnapshot','_tlScrollRestore',
+    'installLayerReorderGrip','layerCurveRowExtraHeight','playheadLeftPx','syncPlayheadToViewport','renderTweenCurveStrips'])context[name]=()=>0;
+  context.window=context;vm.createContext(context);
+  vm.runInContext(['hexToRgbTriplet','updateUI','renderTimeline','renderKeyframeCellsInto'].map(shipped).join('\n'),context);
+  return context;
+}
+test('known ordinary timeline frame-reader gap remains explicit for metadata projections, with no invented frames',()=>{
+  const root=view(),ui=shippedTimeline(root);
+  assert.doesNotThrow(()=>ui.updateUI(true),'baseline active-row badge tolerates an empty compatibility frame array');
+  assert.throws(()=>ui.updateUI(false),/isKeyframe/,'baseline full timeline already requires legacy frame records');
+  assert.equal(Files.refreshLayerTable(root,info([A,B,C],1)),true);
+  assert.doesNotThrow(()=>ui.updateUI(true),'append preserves the working active-row reader');
+  assert.throws(()=>ui.updateUI(false),/reading '0'/,'new metadata row does not fabricate legacy frame records');
+  root.state.activeLayerIdx=2;
+  assert.throws(()=>ui.updateUI(true),/reading '7'/,'selecting the new row needs a separately admitted native UI reader');
+  assert.equal(Object.hasOwn(root.state.layers[2],'frames'),false);
 });
 function desktop(){
   let active=false,revision=0,layers=clone([A,B]),pending=null,previewGate=null,fault=null;

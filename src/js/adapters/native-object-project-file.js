@@ -42,8 +42,12 @@
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
     if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})||
       !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid;}))return false;
+    if(!Number.isSafeInteger(pin.contentRevision)||!Number.isSafeInteger(info.contentRevision)||info.contentRevision<pin.contentRevision||
+      typeof info.documentSnapshotId!=='string'||!info.documentSnapshotId||
+      info.contentRevision===pin.contentRevision&&info.documentSnapshotId!==pin.documentSnapshotId)return false;
     var next=layerTable(info.layers),delta=next.length-rows.length;
-    if(Math.abs(delta)>1||!next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
+    if(Math.abs(delta)>1||delta!==0&&info.contentRevision===pin.contentRevision||
+      !next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
     // Prepare all metadata and selection before changing this read-side table.
     var active=s.activeLayerIdx,selection=root._layerSel;
     if(delta<0){
@@ -58,7 +62,8 @@
     else if(delta<0)rows.pop();
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;});
     if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
-    projections.set(root,Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;})}));
+    projections.set(root,Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
+      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}));
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
@@ -141,7 +146,7 @@
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
-    var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;})};
+    var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;}),contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId};
     ['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].forEach(function(k){pin[k]=info[k];});
     projections.set(root,pin);
   }
