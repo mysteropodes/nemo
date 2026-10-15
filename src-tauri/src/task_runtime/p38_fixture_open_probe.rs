@@ -24,8 +24,8 @@ fn build_clean() -> bool {
 }
 const FIXTURE_A: &[u8] = include_bytes!("../../../tests/fixtures/p38/native-project/A.json");
 const FIXTURE_B: &[u8] = include_bytes!("../../../tests/fixtures/p38/native-project/B.json");
-const HASH_A: &str = "e1bc63b0e284f521e170d8236296392bdcf19d4b1f13b4e04683727844fa71a0";
-const HASH_B: &str = "a438bda3b5c25ec3e8797d1c95fb8ade1da7b0bda675c2279499c659ece46bf6";
+const HASH_A: &str = "84b8f14e205b1788b98fbee2c3c481a93f628e67e378d43b91ffb395c5ccc106";
+const HASH_B: &str = "cac28233fe4602c65921a4b4daf100b692762e3d5fef27cb8b654d58399a1417";
 const MAX_PACKET: usize = 2048;
 const PHASES: [&str; 4] = ["ready", "a-opened", "b-opened", "b-closed"];
 
