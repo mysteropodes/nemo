@@ -144,3 +144,125 @@ fn cpu_invalid_project_preflight_and_foreign_or_stale_origin_leave_owner_unchang
     let result: Value = serde_json::from_slice(&bytes(&owner)).unwrap();
     assert_eq!(result["project"]["canvasW"], 80);
 }
+
+fn current(owner: &NativeObjectHistory) -> crate::revision::ObjectSnapshot {
+    owner.acquire_snapshot(owner.content_revision()).unwrap()
+}
+fn save(owner: &NativeObjectHistory, revision: u64) -> Vec<u8> {
+    let snapshot = owner.acquire_snapshot(revision).unwrap();
+    owner
+        .serialize_project_file(revision, snapshot.snapshot_id())
+        .unwrap()
+}
+
+#[test]
+fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reopen() {
+    // Frozen desktop rule: max(1, round(fps * 5)); positive halfway rounds up.
+    for (fps, frames) in [
+        (24., 120),
+        (29.97, 150),
+        (60., 300),
+        (0.1, 1),
+        (0.49, 2),
+        (0.5, 3),
+        (f64::MIN_POSITIVE, 1),
+        (u32::MAX as f64 / 5., u32::MAX),
+    ] {
+        let mut original = NativeObjectHistory::new_blank_project("new", 640, 360, fps).unwrap();
+        let initial = current(&original);
+        assert_eq!(
+            (original.content_revision(), original.history_depths()),
+            (0, (0, 0))
+        );
+        assert_eq!(original.undo(0), Err(DispatchErrorCode::Unavailable));
+        assert_eq!(original.redo(0), Err(DispatchErrorCode::Unavailable));
+        let bytes = save(&original, 0);
+        let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
+            "project":{"canvasW":640,"canvasH":360,"fps":fps},
+            "drawing":{"format":"nemo.native-object-document","formatVersion":1,
+                "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
+                "objects":[]},"viewportReference":null,"assets":[]});
+        assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), expected);
+        let info = original.project_file_info().unwrap();
+        assert_eq!(
+            (info["totalFrames"].as_u64(), info["fps"].as_f64()),
+            (Some(frames as u64), Some(fps))
+        );
+        assert_eq!(info["layers"], expected["drawing"]["layers"]);
+        let reopened = NativeObjectHistory::from_project_file("new", &bytes).unwrap();
+        let another = NativeObjectHistory::new_blank_project("new", 640, 360, fps).unwrap();
+        assert_ne!(reopened.document_id(), original.document_id());
+        assert_ne!(another.document_id(), original.document_id());
+        assert_eq!(
+            (reopened.content_revision(), reopened.history_depths()),
+            (0, (0, 0))
+        );
+        assert_eq!(save(&reopened, 0), bytes);
+        assert_eq!(save(&another, 0), bytes);
+        drop(original);
+        assert_eq!(initial.serialize_project_file().unwrap(), bytes);
+    }
+}
+
+#[test]
+fn blank_project_refuses_invalid_intent_and_frame_overflow_without_touching_existing_owner() {
+    let existing = NativeObjectHistory::from_project_file("existing", &file(64)).unwrap();
+    let before = save(&existing, 0);
+    for (width, height, fps) in [
+        (0, 360, 24.),
+        (640, 0, 24.),
+        (640, 360, 0.),
+        (640, 360, -1.),
+        (640, 360, f64::NAN),
+        (640, 360, f64::INFINITY),
+        (640, 360, f64::NEG_INFINITY),
+        (640, 360, f64::MAX),
+        (640, 360, (u32::MAX as f64 + 1.) / 5.),
+    ] {
+        assert!(matches!(
+            NativeObjectHistory::new_blank_project("existing", width, height, fps),
+            Err(DispatchErrorCode::InvalidRequest)
+        ));
+    }
+    assert!(matches!(
+        NativeObjectHistory::new_blank_project("", 640, 360, 24.),
+        Err(DispatchErrorCode::InvalidRequest)
+    ));
+    assert_eq!(
+        (existing.content_revision(), existing.history_depths()),
+        (0, (0, 0))
+    );
+    assert_eq!(save(&existing, 0), before);
+}
+
+#[test]
+fn blank_project_uses_the_existing_visibility_history_and_retained_snapshot_consumers() {
+    let mut original =
+        NativeObjectHistory::new_blank_project("new-history", 320, 180, 24.).unwrap();
+    let before = save(&original, 0);
+    let request = serde_json::from_value::<crate::commands::OpacityRequest>(json!({
+        "apiVersion":2,"requestId":"hide-new","instanceId":original.instance_id(),
+        "documentId":original.document_id(),"expectedRevision":0,
+        "operation":"command.document.object.layer.visibility.set",
+        "payload":{"command":"object.layer.visibility.set","layerUid":"layer-1","visible":false}
+    }))
+    .unwrap();
+    assert!(
+        original
+            .try_dispatch_object_command(&request)
+            .unwrap()
+            .unwrap()
+            .ok
+    );
+    let after = save(&original, 1);
+    assert_ne!(after, before);
+    assert_eq!(original.history_depths(), (1, 0));
+    assert_eq!(original.undo(1), Ok(2));
+    assert_eq!(save(&original, 2), before);
+    assert_eq!(original.redo(2), Ok(3));
+    assert_eq!(save(&original, 3), after);
+    assert_eq!(save(&original, 0), before);
+    let reopened = NativeObjectHistory::from_project_file("reopened", &after).unwrap();
+    assert_eq!(save(&reopened, 0), after);
+    assert!(!current(&reopened).document().layers()[0].visible());
+}
