@@ -21,6 +21,9 @@ pub(crate) use inactive::{
 #[path = "native_object_project_replace.rs"]
 mod replace;
 
+#[path = "native_object_project_admission.rs"]
+mod admission;
+
 #[path = "native_object_reference.rs"]
 mod reference;
 #[path = "native_object_save.rs"]
@@ -47,6 +50,10 @@ mod v2_tests;
 #[cfg(test)]
 #[path = "native_object_project_tests.rs"]
 mod project_tests;
+
+#[cfg(test)]
+#[path = "native_object_new_project_tests.rs"]
+mod new_project_tests;
 
 // This bounds the complete original wrapper, including escaped document bytes.
 const MAX_OBJECT_BOOTSTRAP_BYTES: usize = 1_048_576;
@@ -79,6 +86,9 @@ pub(crate) fn bootstrap_raw(
     state: &ApplicationMcp,
     request_json: &str,
 ) -> HostResult<ObjectBootstrapReceipt> {
+    if let Some(request) = admission::new_request(request_json) {
+        return admission::bootstrap_new(state, request);
+    }
     if request_json.len() > MAX_OBJECT_BOOTSTRAP_BYTES {
         return Err(host_error(
             "invalid_request",
@@ -165,14 +175,22 @@ pub(crate) async fn nemo_native_object_bootstrap(
     request_json: String,
 ) -> HostResult<ObjectBootstrapReceipt> {
     require_main(&window)?;
-    if let Some(request) =
+    let admitted = if let Some(request) =
+        admission::new_request(&request_json).filter(|request| request.replace.is_some())
+    {
+        Some(admission::prepare_blank(&state, request)?)
+    } else if let Some(request) =
         reopen::file_request(&request_json).filter(|request| request.replace.is_some())
     {
-        let admitted = replace::prepare(&state, request, |path| {
+        Some(replace::prepare(&state, request, |path| {
             window
                 .try_fs_scope()
                 .is_some_and(|scope| scope.is_allowed(path))
-        })?;
+        })?)
+    } else {
+        None
+    };
+    if let Some(admitted) = admitted {
         let replace::Admission::Execute {
             generation,
             request_id,
