@@ -1,6 +1,8 @@
 //! Partial numeric Order producer; no expression interpreter or renderer policy.
 use crate::animation_curve::{evaluate_curve, CurveSample};
-use crate::object_document::{AuthoredOrder, FrameScope, OrderContext, OrderCurvePoint};
+use crate::object_document::{
+    AuthoredOrder, FrameScope, FrameScopeKind, OrderContext, OrderCurvePoint,
+};
 use crate::object_frame_packet::ObjectFrameError;
 use crate::revision::ObjectSnapshot;
 use serde_json::Number;
@@ -170,7 +172,10 @@ where
         Some(scope) => scope,
         None if exposure
             && !sources.keys().any(|(ctx, scope, uid, _)| {
-                *ctx == context.context_id && scope.frame == source_frame && *uid == layer
+                *ctx == context.context_id
+                    && scope.kind == FrameScopeKind::Authored
+                    && scope.frame == source_frame
+                    && *uid == layer
             }) =>
         {
             return Ok(Vec::new())
