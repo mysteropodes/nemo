@@ -420,7 +420,7 @@ mod object_tests {
         request.payload =
             json!({"command":"object.layer.visibility.set","layerUid":"l","visible":false});
         request.expected_revision = Some(0);
-        assert!(request.validate_input().is_ok());
+        assert!(request.validate().is_ok());
         let native = serde_json::to_value(&request).unwrap();
         let positional = json!([
             request.api_version,
