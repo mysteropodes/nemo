@@ -1,7 +1,7 @@
-//! Staged object fill/history authority; no transport, retries or replacement port.
+//! Staged object edits/history authority; no transport, retries or replacement port.
 use crate::commands::{
-    ObjectFillOwner, PreparedLayerVisibility, PreparedObjectFill, PreparedReferenceEdit,
-    ReferenceEdit,
+    ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
+    PreparedReferenceEdit, ReferenceEdit,
 };
 use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode;
@@ -21,6 +21,10 @@ struct ObjectHistoryEntry {
 #[path = "../tests/object_project_history.rs"]
 mod project_tests;
 
+#[cfg(test)]
+#[path = "../tests/object_layer_create.rs"]
+mod layer_create_tests;
+
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]
 mod project_workflow;
@@ -37,6 +41,25 @@ pub struct NativeObjectHistory {
 }
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_layer_create_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedLayerCreate, DispatchErrorCode> {
+        self.owner.prepare_layer_create_json(bytes)
+    }
+    pub(crate) fn commit_layer_create(
+        &mut self,
+        candidate: PreparedLayerCreate,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before_revision = self.content_revision();
+        let after_revision = self.owner.commit_layer_create(candidate)?;
+        self.undo.push(ObjectHistoryEntry {
+            before_revision,
+            after_revision,
+        });
+        self.redo.clear();
+        Ok(after_revision)
+    }
     pub(crate) fn prepare_reference_edit(
         &self,
         edit: ReferenceEdit,
