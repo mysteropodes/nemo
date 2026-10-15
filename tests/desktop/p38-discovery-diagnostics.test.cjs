@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const crypto=require('node:crypto');
+const {spawnSync}=require('node:child_process');
 const {SCHEMA,STAGES,safeDiscoveryDiagnostics}=require('./p38-discovery-diagnostics.cjs');
 const {runOperator,createWindowTransport,safeDirectory,atomicJSON,cleanupHelper}=require('./p38-installed-driver.cjs');
 const {fixture}=require('./p38-operator-model.cjs');
@@ -23,7 +24,7 @@ function environment(t,frames,executable) {
   if(!helper) {
     helper=path.join(root,'fixture-helper');
     fs.writeFileSync(helper,'#!/usr/bin/env node\nconst frames='+JSON.stringify(frames)+';\n'+
-      'function emit(){const f=frames.shift();if(!f)return;console.log(JSON.stringify(f));if(f.status==="refused")process.exit(1);}\n'+
+      'function emit(){const f=frames.shift();if(!f)return;require("node:fs").writeSync(1,JSON.stringify(f)+"\\n");if(f.status==="refused")process.exit(1);}\n'+
       'emit();require("node:readline").createInterface({input:process.stdin}).on("line",emit);\n',{mode:0o700});
   }
   const fixtures=['A','B'].map(label=>{
@@ -54,6 +55,17 @@ async function failureBeforeCleanup(t,facts,{executable,invalidPid=false,cleanup
   assert.ok(f.events.indexOf('helpers-close')<f.events.indexOf('cleanup'));
   return result;
 }
+
+test('actual fixture writes its complete refusal before exit under asynchronous pipe backpressure',t=>{
+  const facts=diagnostic('pid'),e=environment(t,[refuse(facts)]),root=path.dirname(e.guard.directory);
+  const preload=path.join(root,'pipe-backpressure.cjs');
+  fs.writeFileSync(preload,'const write=process.stdout._write.bind(process.stdout);\n'+
+    'process.stdout._write=(chunk,encoding,callback)=>setTimeout(()=>write(chunk,encoding,callback),25);\n');
+  const result=spawnSync(process.execPath,['--require',preload,path.join(root,'fixture-helper')],
+    {encoding:'utf8',timeout:2000});
+  assert.equal(result.error,undefined);assert.equal(result.status,1);
+  assert.deepEqual(JSON.parse(result.stdout),refuse(facts));assert.equal(result.stderr,'');
+});
 
 for(const stage of STAGES)test(`structured ${stage} refusal crosses real transport and is durable before cleanup`,async t=>{
   const facts=diagnostic(stage),r=await failureBeforeCleanup(t,facts);
