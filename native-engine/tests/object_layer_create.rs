@@ -1,6 +1,6 @@
 //! Existing-owner structural creation, immutable consumers and shared history.
 use super::*;
-use crate::object_codec::{decode_project, encode_project};
+use crate::object_codec::{decode_storage_project, encode_storage_project};
 use serde_json::{json, Value};
 
 fn drawing(version: u32) -> Value {
@@ -28,7 +28,7 @@ fn drawing(version: u32) -> Value {
 fn owner(version: u32) -> NativeObjectHistory {
     NativeObjectHistory::new(
         "layer-create",
-        decode_project(drawing(version).to_string().as_bytes()).unwrap(),
+        decode_storage_project(drawing(version).to_string().as_bytes()).unwrap(),
     )
     .unwrap()
 }
@@ -36,7 +36,7 @@ fn current(owner: &NativeObjectHistory) -> ObjectSnapshot {
     owner.acquire_snapshot(owner.content_revision()).unwrap()
 }
 fn value(owner: &NativeObjectHistory) -> Value {
-    serde_json::from_slice(&encode_project(current(owner).document()).unwrap()).unwrap()
+    serde_json::from_slice(&encode_storage_project(current(owner).document()).unwrap()).unwrap()
 }
 fn payload() -> Value {
     json!({"command":"object.layer.create","name":"新しい Layer"})
@@ -94,9 +94,9 @@ fn create_preserves_v1_v2_content_and_every_context_with_one_history_entry() {
         assert_eq!(value(&owner), expected(original.clone(), 1));
         assert_eq!(serde_json::to_value(before.document()).unwrap(), original);
         assert_eq!(owner.history_depths(), (1, 0));
-        let bytes = encode_project(current(&owner).document()).unwrap();
+        let bytes = encode_storage_project(current(&owner).document()).unwrap();
         assert_eq!(
-            serde_json::to_value(decode_project(&bytes).unwrap()).unwrap(),
+            serde_json::to_value(decode_storage_project(&bytes).unwrap()).unwrap(),
             value(&owner)
         );
         owner.undo(1).unwrap();
@@ -160,7 +160,7 @@ fn prepared_creation_rejects_foreign_and_stale_owners_without_history_effects() 
     assert_eq!(other.history_depths(), (0, 0));
     let mut foreign = NativeObjectHistory::new(
         "foreign",
-        decode_project(drawing(2).to_string().as_bytes()).unwrap(),
+        decode_storage_project(drawing(2).to_string().as_bytes()).unwrap(),
     )
     .unwrap();
     assert_eq!(
@@ -292,7 +292,7 @@ fn project_reference_and_metadata_survive_create_save_reopen_and_undo() {
         .map(|b| u8::from_str_radix(std::str::from_utf8(b).unwrap(), 16).unwrap())
         .collect();
     for version in [1, 2] {
-        let document = decode_project(drawing(version).to_string().as_bytes()).unwrap();
+        let document = decode_storage_project(drawing(version).to_string().as_bytes()).unwrap();
         let project =
             ProjectEnvelope::no_media(ProjectMetadata::new(320, 180, 29.97).unwrap(), document)
                 .with_reference(
@@ -354,7 +354,7 @@ fn actual_frame_packets_retain_old_layers_and_admit_new_empty_layer_metadata() {
         source["layers"][0]["visible"] = json!(true);
         let mut owner = NativeObjectHistory::new(
             "layer-create",
-            decode_project(source.to_string().as_bytes()).unwrap(),
+            decode_storage_project(source.to_string().as_bytes()).unwrap(),
         )
         .unwrap();
         let zero = current(&owner);
