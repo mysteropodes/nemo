@@ -1,9 +1,14 @@
 //! Sparse authored drawing timing; document data, never a second live owner.
-use crate::object_codec::{ObjectCodecError, ObjectCodecErrorKind};
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 
 const MAX_ENTRIES: usize = 4096;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LayerTimingError {
+    Invalid,
+    Unsupported,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LayerTiming {
@@ -71,18 +76,14 @@ impl LayerTiming {
             samples: vec![],
         }
     }
-    pub(crate) fn validate(&self, total: u32) -> Result<(), ObjectCodecError> {
-        let invalid =
-            || ObjectCodecError::new(ObjectCodecErrorKind::Invalid, "invalid sparse layer timing");
+    pub(crate) fn validate(&self, total: u32) -> Result<(), LayerTimingError> {
+        let invalid = || LayerTimingError::Invalid;
         if self.format != "nemo.native-layer-timing"
             || self.format_version != 1
             || self.family != "drawing"
             || self.context_id != "scene-root"
         {
-            return Err(ObjectCodecError::new(
-                ObjectCodecErrorKind::Unsupported,
-                "unsupported layer timing format, family or context",
-            ));
+            return Err(LayerTimingError::Unsupported);
         }
         if self
             .keys

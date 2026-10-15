@@ -1,7 +1,7 @@
 //! Snapshot-pinned timing read; host lifecycle and public routing are separate gates.
-use super::ObjectSnapshot;
-use crate::object_document::{object_deserialize, FrameScopeKind};
+use crate::object_codec::{object_deserialize, FrameScopeKind};
 use crate::request_receipts::DispatchErrorCode;
+use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]

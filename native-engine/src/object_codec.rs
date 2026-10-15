@@ -2,7 +2,7 @@
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
-pub use crate::object_document::{ObjectDocument, ObjectRecord, ObjectTarget};
+pub use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget};
 use crate::object_document::{
     ObjectLayer, Presence, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
@@ -214,7 +214,18 @@ pub(crate) fn validate_content(
     let mut layers = HashSet::new();
     for layer in declared_layers {
         if let Some(timing) = layer.timing.value() {
-            timing.validate(total_frames)?;
+            timing.validate(total_frames).map_err(|error| {
+                let (kind, message) = match error {
+                    crate::object_document::LayerTimingError::Invalid => {
+                        (Invalid, "invalid sparse layer timing")
+                    }
+                    crate::object_document::LayerTimingError::Unsupported => (
+                        Unsupported,
+                        "unsupported layer timing format, family or context",
+                    ),
+                };
+                reject(kind, message)
+            })?;
         }
         if layer.layer_uid.is_empty() {
             return Err(reject(Invalid, "empty layerUid"));
