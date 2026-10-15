@@ -2804,7 +2804,7 @@ function syncDocFields(){
 // that CHANGED CONTENT must not pass frameOnly — the panel refreshes below
 // still run either way, only the wholesale timeline rebuild is skipped.
 function updateUI(frameOnly){
-  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window))return;
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   syncDocFields();
   // countOnly: this is only ever read for .length just below.
   var strokes=getEffectiveStrokes(state.activeLayerIdx,state.currentFrame,true);
@@ -6415,7 +6415,7 @@ function reconcileFrameSelection(){
   }
 }
 function renderLayerList(frameOnly){
-  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window))return;
+  if(window.NemoNativeObjectProject&&window.NemoNativeObjectProject.paintUI(window,frameOnly))return;
   reconcileLayerIndexState();
   reconcileFrameSelection();
   if(frameOnly&&state.appMode!=='motion')return;

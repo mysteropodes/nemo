@@ -385,9 +385,12 @@
     var start=root.document&&root.document.getElementById('start-screen');if(start)start.classList.remove('hid');
     throw error;
   }
-  function paintUI(root){
-    var session=uiSession(root);if(!session)return false;
-    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info())!==true)
+  function paintUI(root,frameOnly){
+    var session=uiSession(root);if(!session){
+      if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.restoreInspector)root.NemoNativeObjectUI.restoreInspector(root);
+      return false;
+    }
+    try{if(session.isIndeterminate()||!root.NemoNativeObjectUI||root.NemoNativeObjectUI.render(root,session.info(),frameOnly)!==true)
       throw new Error('Native document UI presentation is unavailable');}
     catch(error){return uiFailure(root,error);}
     return true;
