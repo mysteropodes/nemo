@@ -375,7 +375,10 @@
     return report;
   }
 
-  var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){var generation=++newProjectGeneration;return afterMaybe(newProject(cfg,function(){return generation===newProjectGeneration&&(!isCurrent||isCurrent());},onCreationFailure),function(admitted){if(admitted===false)return false;try{hideStartScreen();ensureInitialTab();}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});},
+  var newProjectGeneration=0;window.SMProject={save:save,saveAs:saveAs,open:openDialog,openPath:openPath,newProject:function(cfg,isCurrent,onCreationFailure){
+    if(nativeSavedUI&&nativeSavedUI.nativeObject)return typeof nativeSavedUI.nativeObject.newProject==='function'?nativeSavedUI.nativeObject.newProject(cfg,isCurrent,onCreationFailure):false;
+    if(tauriOk()||window.NemoNativeObjectProject)return false;
+    var generation=++newProjectGeneration;return afterMaybe(newProject(cfg,function(){return generation===newProjectGeneration&&(!isCurrent||isCurrent());},onCreationFailure),function(admitted){if(admitted===false)return false;try{hideStartScreen();ensureInitialTab();}catch(e){if(onCreationFailure)onCreationFailure(e);return false;}});},
     // "A project is now open, show the editor" — hideStartScreen +
     // ensureInitialTab, the pair newProject above already runs. Exported
     // (2026-09 QA sweep) because kitsu.js called those two by their bare

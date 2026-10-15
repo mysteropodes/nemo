@@ -33,23 +33,37 @@
       },
       markSavedIndeterminate:function(){baseline=null;ports.repaint();}
     });
-    async function openPath(path){
+    async function openPath(path){return enter(path,null);}
+    async function newProject(config,isCurrent,onCreationFailure){
+      if(!config||typeof config!=='object')return false;
+      config={w:config.w,h:config.h,fps:config.fps,name:typeof config.name==='string'?config.name:'Untitled'};
+      return enter(null,config,isCurrent,onCreationFailure);
+    }
+    async function enter(path,config,isCurrent,onCreationFailure){
       if(saving||opening)return false;
       opening=true;
       try{
-        var info=await session.openPath(path,{
+        var creating=!!config,revealing=false;
+        if(creating&&typeof session.newProject!=='function')throw {message:'Native New Project is unavailable',details:{disposition:'notDispatched'}};
+        var value=creating?{canvasW:config.w,canvasH:config.h,fps:config.fps}:path;
+        var info=await session[creating?'newProject':'openPath'](value,{
+          // The form intentionally becomes hidden during native reveal. Its
+          // currency predicate applies through dispatch and first presentation.
+          isCurrent:function(){return revealing||!isCurrent||isCurrent()===true;},
           confirm:async function(previous){return !previous||baseline===previous.documentDigest||
-            !!(ports.confirmReplace&&await ports.confirmReplace());},
-          occlude:ports.occlude,reveal:ports.reveal,restore:ports.restore,
+            !!(ports.confirmReplace&&await ports.confirmReplace(creating));},
+          occlude:ports.occlude,reveal:ports.reveal?async function(current){revealing=true;await ports.reveal(current);}:undefined,restore:ports.restore,
           commit:function(current){
-            if(ports.opened(path,current)!==true)throw new Error('Native project UI publication failed');
-            baseline=current.documentDigest;ports.repaint();
+            if((creating?ports.created(config.name||'Untitled',current):ports.opened(path,current))!==true)
+              throw new Error('Native project UI publication failed');
+            baseline=creating?null:current.documentDigest;ports.repaint();
           }
         });
+        if(creating&&info&&ports.createdNotice)ports.createdNotice();
         return info===null?null:!!info;
       }catch(error){
         if(error&&error.details&&error.details.disposition==='notDispatched')ports.refused(error);
-        else{baseline=null;ports.failed(error);ports.repaint();}
+        else{baseline=null;ports.failed(error);ports.repaint();if(onCreationFailure)onCreationFailure(error);}
         return false;
       }finally{opening=false;}
     }
@@ -68,7 +82,7 @@
       }catch(error){ports.notice({status:'refused'},null,error);return {status:'refused'};}
       finally{saving=false;}
     }
-    return Object.freeze({openPath:openPath,saveAs:saveAs,
+    return Object.freeze({openPath:openPath,newProject:newProject,saveAs:saveAs,
       canOpen:function(){return !saving&&!opening&&(!session.blocksLegacy()||session.isActive());},
       isDirty:function(){var info=session.info();return !session.isActive()&&session.blocksLegacy()||!baseline||!info||info.documentDigest!==baseline;}});
   }
@@ -103,8 +117,8 @@
     }
     var ui=create(session,{
       readUI:function(){return {handle:ports.read().tabId||'native-project-opening',generation:1};},
-      confirmReplace:function(){return root.__TAURI__.dialog.ask('Unsaved changes will be lost. Open another project?',
-        {title:'Unsaved changes',kind:'warning',okLabel:'Discard and open',cancelLabel:'Cancel'});},
+      confirmReplace:function(creating){return root.__TAURI__.dialog.ask('Unsaved changes will be lost. '+(creating?'Create a new project?':'Open another project?'),
+        {title:'Unsaved changes',kind:'warning',okLabel:creating?'Discard and create':'Discard and open',cancelLabel:'Cancel'});},
       occlude:function(){startWasHidden=root.document.getElementById('start-screen').classList.contains('hid');ports.show();},
       restore:function(previous){if(previous&&startWasHidden)ports.hide();},
       reveal:async function(info){
@@ -116,6 +130,8 @@
           root.requestAnimationFrame(function(){root.requestAnimationFrame(finish);});});
       },
       opened:function(path,info){if(commit(path,info)!==true)return false;ports.opened();ports.notice('Opened: '+ports.read().name);return true;},
+      created:function(name){ports.commit(null,name);ports.opened();return true;},
+      createdNotice:function(){ports.notice('New project created');},
       commit:commit,repaint:ports.repaint,
       pick:function(){return root.__TAURI__.dialog.save({title:'Save Project As',defaultPath:ports.read().name+'-copy.json',filters:[{name:'Nemo Project',extensions:['json']}]});},
       notice:function(result,written,error){
@@ -125,7 +141,7 @@
       refused:function(error){ports.notice('Could not open native project: '+(error.message||error));},
       failed:function(error){ports.show();ports.notice('Could not open native project: '+(error.message||error));}
     },root.NemoNativeObjectSaveAsWorkflow,root.NemoNativeObjectSavedAcknowledgement);
-    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath});
+    return Object.freeze({isActive:session.blocksLegacy,canOpen:ui.canOpen,isDirty:ui.isDirty,saveAs:ui.saveAs,openPath:ui.openPath,newProject:ui.newProject});
   }
   return Object.freeze({create:create,projectView:projectView,bind:bind,
     projectionMatches:projectionMatches,refreshVisibility:refreshVisibility});
