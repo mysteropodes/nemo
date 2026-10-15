@@ -1,0 +1,32 @@
+diff --git a/native-engine/src/evaluation.rs b/native-engine/src/evaluation.rs
+index a19179b9..c9e6f138 100644
+--- a/native-engine/src/evaluation.rs
++++ b/native-engine/src/evaluation.rs
+@@ -26,6 +26,14 @@ pub(crate) mod expression_math;
+ #[path = "expression_time.rs"]
+ #[allow(dead_code)]
+ pub(crate) mod expression_time;
++// R18.2 prep (local draft): private Motion parent-chain affine kernel.
++#[path = "motion_parent_chain.rs"]
++#[allow(dead_code)]
++pub(crate) mod motion_parent_chain;
++// R18.2 prep (local draft): private expression-control read rules.
++#[path = "expression_controls.rs"]
++#[allow(dead_code)]
++pub(crate) mod expression_controls;
+ 
+ pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
+ 
+diff --git a/native-engine/src/lib.rs b/native-engine/src/lib.rs
+index ea35f4f2..5b93323c 100644
+--- a/native-engine/src/lib.rs
++++ b/native-engine/src/lib.rs
+@@ -59,6 +59,8 @@ test_modules! {
+     "test-evaluation" => expression_random_tests = "../tests/expression_random.rs";
+     "test-evaluation" => expression_math_tests = "../tests/expression_math.rs";
+     "test-evaluation" => expression_time_tests = "../tests/expression_time.rs";
++    "test-evaluation" => motion_parent_chain_tests = "../tests/motion_parent_chain.rs";
++    "test-evaluation" => expression_controls_tests = "../tests/expression_controls.rs";
+     "test-scheduler" => scheduler_tests = "../tests/scheduler.rs";
+     "test-compositor" => compositor_tests = "../tests/compositor.rs";
+     "test-compositor" => render_geometry_tests = "../tests/render_geometry.rs";
