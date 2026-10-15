@@ -1,10 +1,11 @@
 // Build self-contained JSC bundles of the two oracle generators.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-const G = '/tmp/claude-0/r18prep-wt/oracle-gen/';
+// usage: node jsc-bundle.mjs <repo>  (run from this directory)
+const G = new URL('./', import.meta.url).pathname;
 const common = readFileSync(G + 'common.mjs', 'utf8');
 const PIN = '660ac5ef79f9a1da54cfabbe5279aeb76a941f73';
-const src = execFileSync('git', ['-C', '/home/claude/nemo', 'show', `${PIN}:src/js/motion.js`], { encoding: 'utf8', maxBuffer: 64 << 20 });
+const src = execFileSync('git', ['-C', process.argv[2] || '.', 'show', `${PIN}:src/js/motion.js`], { encoding: 'utf8', maxBuffer: 64 << 20 });
 // reuse the real extract() on the real source
 const commonBody = common.replace(/^import .*$/m, '').replace(/^export /gm, '');
 const extract = new Function('src', 'name', commonBody.match(/function extract[\s\S]*?\n}\n/)[0] + 'return extract(src, name);');
