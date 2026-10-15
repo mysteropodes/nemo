@@ -13,6 +13,24 @@ impl ApplicationMcp {
         bytes: &[u8],
     ) -> Result<(String, u64, usize), String> {
         let owner = NativeObjectHost::from_project_file(self.instance_id().into(), bytes)?;
+        self.install_project_owner(owner)
+    }
+
+    pub(crate) fn install_native_blank_project(
+        &self,
+        width: u32,
+        height: u32,
+        fps: f64,
+    ) -> Result<(String, u64, usize), String> {
+        let owner =
+            NativeObjectHost::new_blank_project(self.instance_id().into(), width, height, fps)?;
+        self.install_project_owner(owner)
+    }
+
+    fn install_project_owner(
+        &self,
+        owner: NativeObjectHost,
+    ) -> Result<(String, u64, usize), String> {
         let info = owner.project_file_info()?;
         let count = usize::from(!info["reference"].is_null());
         let identity = (
