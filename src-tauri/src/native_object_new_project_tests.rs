@@ -104,7 +104,17 @@ fn original_byte_budget_and_named_objects_refuse_ambiguous_new_input() {
 
     let state = ApplicationMcp::default();
     let raw = request(&state).to_string();
-    let intent = r#"{"canvasW":64,"canvasH":48,"fps":24.0}"#;
+    let pins = json!({"documentId":"doc","expectedRevision":0,
+        "documentSnapshotId":"snap","lifecycleGeneration":1});
+    let sequence = json!([2,"new-a",state.instance_id(),
+        {"canvasW":64,"canvasH":48,"fps":24.0},pins,false])
+    .to_string();
+    // The derived DTO accepts this complete sequence. The original-byte
+    // wrapper guard must be what rejects it, not a malformed nested value.
+    assert!(serde_json::from_str::<admission::NewRequest>(&sequence).is_ok());
+    let mut named = request(&state);
+    named["replace"] = pins;
+    assert!(admission::new_request(&named.to_string()).is_some());
     let mut bad = vec![
         raw.replacen(
             "\"requestId\":",
@@ -113,11 +123,7 @@ fn original_byte_budget_and_named_objects_refuse_ambiguous_new_input() {
         ),
         raw.replacen("\"newProject\":", "\"newProject\":{},\"newProject\":", 1),
         raw.replacen("\"canvasW\":", "\"canvas\\u0057\":64,\"canvasW\":", 1),
-        format!(
-            "[2,\"new-a\",\"{}\",{},null,false]",
-            state.instance_id(),
-            intent
-        ),
+        sequence,
     ];
     for value in [
         json!([64, 48, 24.0]),
