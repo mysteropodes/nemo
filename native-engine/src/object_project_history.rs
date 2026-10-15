@@ -48,8 +48,9 @@ fn blank_project(
     fps: f64,
 ) -> Result<crate::object_document::ProjectEnvelope, DispatchErrorCode> {
     use crate::object_document::{
-        ObjectDocument, ObjectLayer, Presence, ProjectEnvelope, ProjectMetadata,
-        OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+        AuthoredOrder, FrameScope, FrameScopeKind, ObjectDocument, ObjectLayer, OrderContext,
+        OrderLayer, OrderPlan, OrderScope, Presence, ProjectEnvelope, ProjectMetadata,
+        OBJECT_DOCUMENT_FORMAT,
     };
     let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
         .map_err(|_| DispatchErrorCode::InvalidRequest)?;
@@ -59,7 +60,7 @@ fn blank_project(
     }
     let drawing = ObjectDocument {
         format: OBJECT_DOCUMENT_FORMAT.into(),
-        format_version: OBJECT_DOCUMENT_FORMAT_VERSION,
+        format_version: 2,
         total_frames: frames as u32,
         layers: vec![ObjectLayer {
             layer_uid: "layer-1".into(),
@@ -67,7 +68,33 @@ fn blank_project(
             visible: Presence::Present(true),
         }],
         objects: vec![],
-        composition_order: Presence::Missing,
+        // Native painting consumes the explicit v2 order plan even when empty.
+        composition_order: Presence::Present(OrderPlan {
+            format: "nemo.native-object-order-plan".into(),
+            format_version: 1,
+            document_format_version: 2,
+            contexts: vec![OrderContext {
+                context_id: "scene-root".into(),
+                layers: vec![OrderLayer {
+                    layer_uid: "layer-1".into(),
+                    natural_position: 0,
+                    order: AuthoredOrder {
+                        static_value: Presence::Missing,
+                        track: Presence::Missing,
+                        expression: Presence::Missing,
+                    },
+                }],
+                scopes: vec![OrderScope {
+                    frame_scope: FrameScope {
+                        kind: FrameScopeKind::Authored,
+                        frame: 0,
+                    },
+                    elements: vec![],
+                }],
+            }],
+            migration: "explicit-plan-required".into(),
+            reference_policy: "unresolved".into(),
+        }),
     };
     Ok(ProjectEnvelope::no_media(metadata, drawing))
 }

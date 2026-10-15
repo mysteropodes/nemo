@@ -179,9 +179,14 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
         let bytes = save(&original, 0);
         let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
             "project":{"canvasW":640,"canvasH":360,"fps":fps},
-            "drawing":{"format":"nemo.native-object-document","formatVersion":1,
+            "drawing":{"format":"nemo.native-object-document","formatVersion":2,
                 "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
-                "objects":[]},"viewportReference":null,"assets":[]});
+                "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",
+                    "formatVersion":1,"documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
+                        "layers":[{"layerUid":"layer-1","naturalPosition":0,"order":{}}],
+                        "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[]}]}],
+                    "migration":"explicit-plan-required","referencePolicy":"unresolved"}},
+            "viewportReference":null,"assets":[]});
         assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), expected);
         let info = original.project_file_info().unwrap();
         assert_eq!(
@@ -295,9 +300,14 @@ fn blank_replacement_prepares_immutably_and_commits_in_the_original_history() {
     let saved = bytes(&owner);
     let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
         "project":{"canvasW":640,"canvasH":360,"fps":29.97},
-        "drawing":{"format":"nemo.native-object-document","formatVersion":1,
+        "drawing":{"format":"nemo.native-object-document","formatVersion":2,
             "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
-            "objects":[]},"viewportReference":null,"assets":[]});
+            "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",
+                "formatVersion":1,"documentFormatVersion":2,"contexts":[{"contextId":"scene-root",
+                    "layers":[{"layerUid":"layer-1","naturalPosition":0,"order":{}}],
+                    "scopes":[{"frameScope":{"kind":"authored","frame":0},"elements":[]}]}],
+                "migration":"explicit-plan-required","referencePolicy":"unresolved"}},
+        "viewportReference":null,"assets":[]});
     assert_eq!(serde_json::from_slice::<Value>(&saved).unwrap(), expected);
     let reopened = NativeObjectHistory::from_project_file("reopened", &saved).unwrap();
     assert_eq!(bytes(&reopened), saved);
