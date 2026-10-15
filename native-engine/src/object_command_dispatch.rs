@@ -171,13 +171,12 @@ impl NativeObjectHistory {
                 let payload = serde_json::to_vec(&request.payload)
                     .map_err(|_| DispatchErrorCode::InvalidRequest)?;
                 match self.prepare_layer_create_json(&payload) {
-                    Ok(candidate) => self
-                        .commit_layer_create(candidate)
-                        .map(|_| CompactResult::Command {
-                            applied: true,
-                            history_entries_added: 1,
-                        })
-                        .map_err(|code| (code, "Layer creation could not commit.")),
+                    Ok(candidate) => {
+                        let layer_uid = candidate.layer_uid().to_owned();
+                        self.commit_layer_create(candidate)
+                            .map(|_| CompactResult::LayerCreated { layer_uid })
+                            .map_err(|code| (code, "Layer creation could not commit."))
+                    }
                     Err(code) => Err((code, "Layer creation payload is invalid.")),
                 }
             } else if request.operation == OP_LAYER_VISIBILITY {

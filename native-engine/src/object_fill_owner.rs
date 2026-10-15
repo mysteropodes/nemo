@@ -63,6 +63,13 @@ object_deserialize!(LayerCreatePayload {
 pub(crate) struct PreparedLayerCreate {
     origin: ObjectSnapshot,
     document: ObjectDocument,
+    layer_uid: String,
+}
+
+impl PreparedLayerCreate {
+    pub(crate) fn layer_uid(&self) -> &str {
+        &self.layer_uid
+    }
 }
 
 #[derive(Debug)]
@@ -115,13 +122,17 @@ impl ObjectFillOwner {
             }
         }
         document.layers.push(ObjectLayer {
-            layer_uid,
+            layer_uid: layer_uid.clone(),
             name: Presence::Present(payload.name),
             visible: Presence::Present(true),
         });
         ObjectSnapshot::validate_drawing(&document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        Ok(PreparedLayerCreate { origin, document })
+        Ok(PreparedLayerCreate {
+            origin,
+            document,
+            layer_uid,
+        })
     }
     pub(crate) fn commit_layer_create(
         &mut self,

@@ -216,6 +216,9 @@ pub(crate) enum CompactResult {
         applied: bool,
         history_entries_added: u64,
     },
+    LayerCreated {
+        layer_uid: String,
+    },
     Transaction(TransactionRecord),
 }
 
@@ -242,6 +245,9 @@ impl RetainedDisposition {
                     } => json!({
                         "applied": applied,
                         "historyEntriesAdded": history_entries_added
+                    }),
+                    CompactResult::LayerCreated { layer_uid } => json!({
+                        "applied": true, "historyEntriesAdded": 1, "layerUid": layer_uid
                     }),
                     CompactResult::Transaction(record) => record.result(),
                 };

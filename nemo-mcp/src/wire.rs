@@ -276,6 +276,11 @@ fn validate_native_response(
                 && (request.operation != "query.document.object"
                     || result.get("atRevision").and_then(serde_json::Value::as_u64)
                         == Some(response.content_revision))
+                && (request.operation != "command.document.object.layer.create"
+                    || request
+                        .expected_revision
+                        .and_then(|revision| revision.checked_add(1))
+                        == Some(response.content_revision))
                 && crate::native_contract::validate_result(
                     &request.operation,
                     &request.document_id,
@@ -384,147 +389,5 @@ async fn cancellable<T>(
 }
 
 #[cfg(test)]
-mod object_tests {
-    use super::*;
-    use serde_json::{json, Value};
-
-    fn pair() -> (NativeApplicationRequest, NativeApplicationResponse) {
-        let cases: Value = serde_json::from_str(include_str!(
-            "../../engineering/application/examples/native-object-v1/cases.json"
-        ))
-        .unwrap();
-        let mut request = cases["read"]["request"].clone();
-        request["payload"]["atRevision"] = json!(0);
-        let response = json!({"apiVersion":2,"requestId":request["requestId"],
-            "instanceId":request["instanceId"],"documentId":request["documentId"],
-            "contentRevision":0,"ok":true,"result":{"atRevision":0,
-            "documentSnapshotId":format!("native-object:{}:0",request["documentId"].as_str().unwrap()),
-            "object":cases["records"][0]}});
-        (
-            serde_json::from_value(request).unwrap(),
-            serde_json::from_value(response).unwrap(),
-        )
-    }
-
-    #[tokio::test]
-    async fn authenticated_native_envelopes_require_named_objects_at_both_levels() {
-        async fn accepts(value: Value) -> bool {
-            let mut bytes = serde_json::to_vec(&value).unwrap();
-            bytes.push(b'\n');
-            read_json::<AuthenticatedWireRequest>(bytes.as_slice())
-                .await
-                .is_ok()
-        }
-        let (mut request, _) = pair();
-        request.operation = "command.document.object.layer.visibility.set".into();
-        request.payload =
-            json!({"command":"object.layer.visibility.set","layerUid":"l","visible":false});
-        request.expected_revision = Some(0);
-        assert!(request.validate().is_ok());
-        let native = serde_json::to_value(&request).unwrap();
-        let positional = json!([
-            request.api_version,
-            request.request_id,
-            request.instance_id,
-            request.document_id,
-            0,
-            request.operation,
-            request.payload,
-            false
-        ]);
-        assert!(serde_json::from_value::<NativeApplicationRequest>(positional.clone()).is_ok());
-        assert!(accepts(json!({"secret":"test","nativeRequest":native.clone()})).await);
-        assert!(!accepts(json!(["test", native])).await);
-        assert!(!accepts(json!({"secret":"test","nativeRequest":positional.clone()})).await);
-        assert!(!accepts(json!(["test", positional])).await);
-        let status = json!({"apiVersion":2,"requestId":"status-1","instanceId":"instance"});
-        let status_seq = json!([2, "status-1", "instance"]);
-        assert!(serde_json::from_value::<NativeStatusRequest>(status_seq.clone()).is_ok());
-        assert!(accepts(json!({"secret":"test","nativeStatus":status.clone()})).await);
-        assert!(!accepts(json!(["test", status])).await);
-        assert!(!accepts(json!({"secret":"test","nativeStatus":status_seq})).await);
-    }
-
-    #[test]
-    fn object_response_requires_the_complete_correlated_immutable_result() {
-        let (request, response) = pair();
-        assert!(validate_native_response(&response, &request).is_ok());
-        let mut later = response.clone();
-        later.content_revision = 1;
-        assert!(validate_native_response(&later, &request).is_err());
-        let mut wrong = response.clone();
-        wrong.result.as_mut().unwrap()["object"]["target"]["strokeId"] = json!("replacement");
-        assert!(validate_native_response(&wrong, &request).is_err());
-        let mut extra = response.clone();
-        extra.result.as_mut().unwrap()["truncated"] = json!(true);
-        assert!(validate_native_response(&extra, &request).is_err());
-        let mut missing = response;
-        missing
-            .result
-            .as_mut()
-            .unwrap()
-            .as_object_mut()
-            .unwrap()
-            .remove("object");
-        assert!(validate_native_response(&missing, &request).is_err());
-    }
-
-    #[tokio::test]
-    async fn available_object_call_uses_authenticated_native_endpoint() {
-        let (request, response) = pair();
-        let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
-            .await
-            .unwrap();
-        let endpoint = Endpoint {
-            instance_id: request.instance_id.clone(),
-            port: listener.local_addr().unwrap().port(),
-            secret: "test".into(),
-            build_id: "test".into(),
-        };
-        let server = async {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let message: NativeWireRequest = read_json(&mut stream).await.unwrap();
-            assert_eq!(message.secret, endpoint.secret);
-            assert_eq!(message.native_request, request);
-            write_json(&mut stream, &response).await.unwrap();
-        };
-        let client = call_native(&endpoint, request.clone(), CancellationToken::new());
-        let (_, actual) = tokio::time::timeout(Duration::from_secs(5), async {
-            tokio::join!(server, client)
-        })
-        .await
-        .unwrap();
-        assert_eq!(actual.unwrap(), response);
-    }
-
-    #[tokio::test]
-    async fn object_reader_preserves_complete_bytes_and_rejects_oversized_envelopes() {
-        let (request, response) = pair();
-        let original = serde_json::to_vec(&response).unwrap();
-        assert!(original.len() < NATIVE_MAX_MESSAGE_BYTES);
-        let mut bytes = original;
-        bytes.push(b'\n');
-        let received: NativeApplicationResponse =
-            read_json_bounded(bytes.as_slice(), NATIVE_MAX_MESSAGE_BYTES)
-                .await
-                .unwrap();
-        assert_eq!(received, response);
-        assert!(validate_native_response(&received, &request).is_ok());
-        let mut too_large = response.clone();
-        let segments = &mut too_large.result.as_mut().unwrap()["object"]["geometry"]["segments"];
-        *segments = Value::Array(vec![segments[0].clone(); 256]);
-        // Still a complete schema-valid record; encoded transport refuses it.
-        assert!(validate_native_response(&too_large, &request).is_ok());
-        let before = too_large.clone();
-        let mut bytes = serde_json::to_vec(&too_large).unwrap();
-        assert!(bytes.len() > NATIVE_MAX_MESSAGE_BYTES);
-        bytes.push(b'\n');
-        assert!(read_json_bounded::<NativeApplicationResponse>(
-            bytes.as_slice(),
-            NATIVE_MAX_MESSAGE_BYTES
-        )
-        .await
-        .is_err());
-        assert_eq!(too_large, before);
-    }
-}
+#[path = "native_object_wire_tests.rs"]
+mod object_tests;

@@ -24,6 +24,7 @@ pub const CAPABILITY_SOURCES: &[&str] = &[
 pub const NATIVE_CAPABILITY_SOURCES: &[&str] = &[
     include_str!("../../engineering/application/capabilities-v2/native-opacity.json"),
     include_str!("../../engineering/application/capabilities-v2/native-object.json"),
+    include_str!("../../engineering/application/capabilities-v2/native-object-layer-create.json"),
     include_str!("../../engineering/application/capabilities-v2/native-diagnostics.json"),
     include_str!("../../engineering/application/capabilities-v2/native-reproduction.json"),
 ];

@@ -279,6 +279,18 @@
         }
       }
     },
+    "ObjectLayerCreatePayload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command", "name"],
+      "properties": { "command": { "const": "object.layer.create" }, "name": { "type": "string" } }
+    },
+    "ObjectLayerCreateResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["applied", "historyEntriesAdded", "layerUid"],
+      "properties": { "applied": { "const": true }, "historyEntriesAdded": { "const": 1 },
+        "layerUid": { "$ref": "#/$defs/ObjectOpaqueId" } },
+      "description": "Prepared success contract only: outer contentRevision equals expectedRevision + 1. Retained replay proves historical creation identity, not current presence after undo. Public execution remains unavailable until native readers and caller policy are accepted."
+    },
     "ObjectLayerVisibilityPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -488,6 +500,9 @@
     },
     "Request": {
       "oneOf": [
+        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
+          { "properties": { "operation": { "const": "command.document.object.layer.create" },
+            "payload": { "$ref": "#/$defs/ObjectLayerCreatePayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" },
           { "properties": { "operation": { "const": "query.document.object" },
             "payload": { "$ref": "#/$defs/ObjectQueryPayload" } } }] },
@@ -922,6 +937,7 @@
             { "$ref": "#/$defs/ReproductionExportResult" },
             { "$ref": "#/$defs/ReproductionReportResult" },
             { "$ref": "#/$defs/ReproductionReplayResult" },
+            { "$ref": "#/$defs/ObjectLayerCreateResult" },
             { "$ref": "#/$defs/CommandResult" },
             { "$ref": "#/$defs/OpacityQueryResult" },
             { "$ref": "#/$defs/RevisionQueryResult" },

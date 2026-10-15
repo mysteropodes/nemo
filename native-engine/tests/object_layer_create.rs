@@ -116,9 +116,10 @@ fn exact_replay_collision_and_create_after_undo_keep_native_identity_monotonic()
     assert_eq!(first["ok"], true);
     assert_eq!(
         first["result"],
-        json!({"applied":true,"historyEntriesAdded":1})
+        json!({"applied":true,"historyEntriesAdded":1,"layerUid":"native-layer:1:1"})
     );
     let after = value(&owner);
+    assert_eq!(first["result"]["layerUid"], after["layers"][2]["layerUid"]);
     assert_eq!(dispatch(&mut owner, &req), first);
     assert_eq!(owner.content_revision(), 1);
     assert_eq!(owner.history_depths(), (1, 0));
@@ -135,7 +136,13 @@ fn exact_replay_collision_and_create_after_undo_keep_native_identity_monotonic()
     assert_eq!(owner.content_revision(), 2);
     assert_eq!(owner.history_depths(), (0, 1));
     let next = request(&owner, "create-after-undo");
-    assert_eq!(dispatch(&mut owner, &next)["ok"], true);
+    let next_receipt = dispatch(&mut owner, &next);
+    assert_eq!(next_receipt["ok"], true);
+    assert_eq!(next_receipt["result"]["layerUid"], "native-layer:3:0");
+    assert_ne!(
+        next_receipt["result"]["layerUid"],
+        first["result"]["layerUid"]
+    );
     assert_eq!(value(&owner), expected(drawing(2), 3));
     assert_eq!(owner.history_depths(), (1, 0));
     assert_ne!(

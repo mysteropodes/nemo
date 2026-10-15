@@ -400,3 +400,54 @@ fn common_pending_revision_barrier_blocks_raw_client_reexecution_and_other_write
         false
     );
 }
+
+#[test]
+fn prepared_public_creation_refuses_before_owner_history_or_revision_publication() {
+    use nemo_mcp::{contract::NativeApplicationRequest, wire::decode_json_bounded};
+    let state = ApplicationMcp::default();
+    let receipt = install(&state);
+    let create = request(
+        &receipt,
+        "public-create",
+        0,
+        "command.document.object.layer.create",
+        json!({"command":"object.layer.create","name":"Drawing"}),
+    );
+    let raw = create.to_string();
+    for _ in 0..2 {
+        let admitted: NativeApplicationRequest = decode_json_bounded(raw.as_bytes(), 4096).unwrap();
+        assert!(admitted.validate_input().is_ok());
+        assert_eq!(admitted.validate().unwrap_err().code(), "unavailable");
+        assert!(state
+            .dispatch_native(admitted)
+            .unwrap_err()
+            .contains("native timeline"));
+    }
+    assert!(
+        crate::application_mcp::object_client::dispatch_raw(&state, &raw).is_err(),
+        "private route cannot bypass operation admission"
+    );
+    let after = dispatch(&state, &read(&receipt, "after-refused-create", 0, 0));
+    assert_eq!(after["ok"], true);
+    assert_eq!(after["contentRevision"], 0);
+    assert_eq!(after["result"]["object"], document()["objects"][0]);
+    let undo = dispatch(
+        &state,
+        &history(&receipt, "after-create-no-undo", 0, "undo"),
+    );
+    assert_eq!(undo["ok"], false);
+    assert_eq!(undo["contentRevision"], 0);
+    // Existing available operations still reach this same owner and its history.
+    assert_eq!(
+        dispatch(&state, &fill(&receipt, "after-create-fill", 0))["contentRevision"],
+        1
+    );
+    assert_eq!(
+        dispatch(&state, &history(&receipt, "after-fill-undo", 1, "undo"))["contentRevision"],
+        2
+    );
+    assert_eq!(
+        dispatch(&state, &read(&receipt, "after-fill-undo-read", 2, 0))["result"]["object"],
+        document()["objects"][0]
+    );
+}

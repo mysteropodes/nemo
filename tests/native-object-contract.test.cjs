@@ -298,3 +298,30 @@ test('transport complete-record definitions preserve each frozen field constrain
   }
   for (const record of cases.records) assert.deepEqual(validate(transport.$defs.ObjectRecord, record, transport.$defs), []);
 });
+
+test('prepared layer creation descriptor is separate and execution unavailable until real native readers', () => {
+  const create = load('engineering/application/capabilities-v2/native-object-layer-create.json');
+  assert.equal(create.id, 'native.object.layer-create');
+  assert.deepEqual(create.operations, ['command.document.object.layer.create']);
+  assert.equal(create.availability.state, 'unavailable');
+  assert.match(create.availability.reason, /timeline\/selected-row readers/);
+  assert.equal(descriptor.availability.state, 'available', 'existing object query and visibility remain available');
+  const { request, response } = create.examples[0];
+  assert.strictEqual(validateRequest(request), request);
+  assert.strictEqual(validateResponse(response, request.requestId, request.operation), response);
+  const branch = transport.$defs.Request.oneOf.find(entry =>
+    entry.allOf?.some(part => part.properties?.operation?.const === request.operation));
+  assert.equal(branch.allOf[0].$ref, '#/$defs/RequiredRevisionRequest');
+  assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectLayerCreatePayload');
+  const payload = transport.$defs.ObjectLayerCreatePayload;
+  const result = transport.$defs.ObjectLayerCreateResult;
+  assert.deepEqual(validate(payload, request.payload, transport.$defs), []);
+  assert.deepEqual(validate(result, response.result, transport.$defs), []);
+  assert.ok(transport.$defs.ResponseBase.properties.result.oneOf.some(value => value.$ref === '#/$defs/ObjectLayerCreateResult'));
+  for (const invalid of [[], null, {}, { command: 'object.layer.create', name: null },
+    { command: 'object.layer.create', name: 'x', layerUid: 'caller' },
+    { command: 'object.layer.create', name: 0 }]) assert.ok(validate(payload, invalid, transport.$defs).length);
+  for (const invalid of [{ applied: false, historyEntriesAdded: 0, layerUid: 'x' },
+    { applied: true, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: 1, layerUid: '' },
+    { applied: true, historyEntriesAdded: 1, layerUid: 'x', extra: true }]) assert.ok(validate(result, invalid, transport.$defs).length);
+});
