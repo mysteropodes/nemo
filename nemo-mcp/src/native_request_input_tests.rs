@@ -131,7 +131,16 @@ fn every_registered_available_example_retains_full_validation() {
             let request: NativeApplicationRequest =
                 serde_json::from_value(example["request"].clone()).unwrap();
             assert!(request.validate_input().is_ok(), "{}", descriptor["id"]);
-            assert!(request.validate().is_ok(), "{}", descriptor["id"]);
+            if descriptor["availability"]["state"] == "available" {
+                assert!(request.validate().is_ok(), "{}", descriptor["id"]);
+            } else {
+                assert_eq!(
+                    request.validate().unwrap_err().code(),
+                    "unavailable",
+                    "{}",
+                    descriptor["id"]
+                );
+            }
         }
     }
 }
