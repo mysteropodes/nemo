@@ -607,7 +607,7 @@ test('N25C2f immutable snapshot port stays within actual host seam and its tests
   assert.match(host, /snapshot\s*\.\s*dispatch\(request\)/);
   assert.match(host, /acquire_snapshot\(self\.content_revision\(\)\)/);
   const descriptor = JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8'));
-  assert.equal(descriptor.availability.state, 'unavailable');
+  assert.equal(descriptor.availability.state, 'available');
   for (const raw of [false, true]) {
     const root = desktopFixture(t), prefix = raw ? 'r#' : '';
     appendSource(root, 'src-tauri/src/native_object_bootstrap.rs', `use ${prefix}native_engine::object_snapshot::ObjectSnapshot;`);
@@ -638,7 +638,14 @@ test('N25C2g input child registration keeps full validation at every production 
     assert.match(caller, /request\.validate\(\)/);
     assert.equal(caller.includes('validate_input('), false);
   }
-  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8')).availability.state, 'unavailable');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/application/capabilities-v2/native-object.json'), 'utf8')).availability.state, 'available');
+  const policy = read('nemo-desktop.edges.json');
+  assert.deepEqual(policy.externalCratePorts.nemo_mcp.allowedModules,
+    ['rust.desktop.mcp.adapter', 'rust.desktop.native.application.contract', 'rust.desktop.native.application.commands',
+      'rust.desktop.native.application.tests', 'rust.desktop.native.host.release.tests']);
+  const denied = structuredClone(policy); denied.externalCratePorts.nemo_mcp.allowedModules.pop();
+  assert.ok(R.checkRustCrate(read('rust.profile.json'), denied, { root: ROOT }).violations
+    .some(v => v.rule === 'external-crate-violation' && v.file === 'src-tauri/src/native_object_host_read_tests.rs'));
 });
 
 require('./boundaries-native-object-client.test.cjs');

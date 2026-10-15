@@ -141,8 +141,67 @@ fn raw_visibility_uses_real_owner_history_replay_and_strict_original_bytes() {
         .as_array()
         .unwrap()
         .contains(&json!("command.document.object.layer.visibility.set")));
+    assert_eq!(status["publicCapabilityAvailable"], true);
+    assert_eq!(status["mcpAvailable"], true);
+}
+
+#[test]
+fn public_status_requires_an_installed_object_owner() {
+    let state = ApplicationMcp::default();
+    let status = crate::application_mcp::object_client::client_status(&state).unwrap();
+    assert_eq!(status["available"], false);
     assert_eq!(status["publicCapabilityAvailable"], false);
     assert_eq!(status["mcpAvailable"], false);
+}
+
+#[test]
+fn public_visibility_uses_existing_owner_receipts_and_revision_rules() {
+    let state = ApplicationMcp::default();
+    let receipt = install(&state);
+    let visibility = |id: &str, revision, visible| {
+        request(
+            &receipt,
+            id,
+            revision,
+            "command.document.object.layer.visibility.set",
+            json!({"command":"object.layer.visibility.set",
+                "layerUid":"legacy layer:alpha","visible":visible}),
+        )
+    };
+    let call = |value: Value| {
+        serde_json::to_value(
+            state
+                .dispatch_native(serde_json::from_value(value).unwrap())
+                .unwrap(),
+        )
+        .unwrap()
+    };
+    let hide = visibility("public-hide", 0, false);
+    let changed = call(hide.clone());
+    assert_eq!(changed["ok"], true);
+    assert_eq!(changed["contentRevision"], 1);
+    assert_eq!(changed["result"]["applied"], true);
+    assert_eq!(
+        call(hide.clone()),
+        changed,
+        "exact retry retains its receipt"
+    );
+    let noop = call(visibility("public-noop", 1, false));
+    assert_eq!(noop["ok"], true);
+    assert_eq!(noop["contentRevision"], 1);
+    assert_eq!(noop["result"]["applied"], false);
+    let mut altered = hide;
+    altered["payload"]["visible"] = json!(true);
+    assert_eq!(call(altered)["error"]["code"], "invalid_request");
+    assert_eq!(
+        call(visibility("public-stale", 0, true))["error"]["code"],
+        "stale_revision"
+    );
+    let query = read(&receipt, "public-after", 1, 0);
+    let result = call(query);
+    assert_eq!(result["ok"], true);
+    assert_eq!(result["contentRevision"], 1);
+    assert_eq!(result["result"]["object"], document()["objects"][0]);
 }
 
 #[test]

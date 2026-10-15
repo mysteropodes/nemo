@@ -11,13 +11,16 @@ use crate::{
     },
     registry::Endpoint,
 };
-use serde::{Deserialize, Serialize};
-use std::{io, time::Duration};
+use serde::{
+    de::{value::MapAccessDeserializer, MapAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::{fmt, io, marker::PhantomData, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     net::TcpStream,
 };
-use tokio_util::sync::CancellationToken;
+pub use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -26,22 +29,78 @@ pub struct WireRequest {
     pub request: ApplicationRequest,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeWireRequest {
     pub secret: String,
     pub native_request: NativeApplicationRequest,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeWireRequestFields {
+    secret: String,
+    #[serde(deserialize_with = "deserialize_object_only")]
+    native_request: NativeApplicationRequest,
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct NativeStatusWireRequest {
     pub secret: String,
     pub native_status: NativeStatusRequest,
 }
 
-/// Host-side authenticated request parser. The legacy member remains `request`
-/// byte-for-byte; v2 application and status traffic have distinct top-level keys.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeStatusWireRequestFields {
+    secret: String,
+    #[serde(deserialize_with = "deserialize_object_only")]
+    native_status: NativeStatusRequest,
+}
+
+// Serde accepts positional structs; native v2 requires object maps at both levels.
+fn deserialize_object_only<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct ObjectOnly<T>(PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectOnly<T> {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a JSON object")
+        }
+
+        fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<T, A::Error> {
+            T::deserialize(MapAccessDeserializer::new(map))
+        }
+    }
+    deserializer.deserialize_map(ObjectOnly(PhantomData))
+}
+
+impl<'de> Deserialize<'de> for NativeWireRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields: NativeWireRequestFields = deserialize_object_only(deserializer)?;
+        Ok(Self {
+            secret: fields.secret,
+            native_request: fields.native_request,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for NativeStatusWireRequest {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields: NativeStatusWireRequestFields = deserialize_object_only(deserializer)?;
+        Ok(Self {
+            secret: fields.secret,
+            native_status: fields.native_status,
+        })
+    }
+}
+
+/// Host parser: legacy `request` is unchanged; v2 application/status use distinct keys.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AuthenticatedWireRequest {
@@ -66,8 +125,7 @@ pub async fn write_json(
 pub async fn read_json<T: serde::de::DeserializeOwned>(
     reader: impl AsyncRead + Unpin,
 ) -> io::Result<T> {
-    // Preserve the v1 rule exactly: content + newline must be strictly smaller
-    // than MAX_MESSAGE_BYTES.
+    // Preserve v1: content + newline must be strictly smaller than MAX_MESSAGE_BYTES.
     read_json_bounded(reader, MAX_MESSAGE_BYTES - 2).await
 }
 
@@ -348,6 +406,45 @@ mod object_tests {
         )
     }
 
+    #[tokio::test]
+    async fn authenticated_native_envelopes_require_named_objects_at_both_levels() {
+        async fn accepts(value: Value) -> bool {
+            let mut bytes = serde_json::to_vec(&value).unwrap();
+            bytes.push(b'\n');
+            read_json::<AuthenticatedWireRequest>(bytes.as_slice())
+                .await
+                .is_ok()
+        }
+        let (mut request, _) = pair();
+        request.operation = "command.document.object.layer.visibility.set".into();
+        request.payload =
+            json!({"command":"object.layer.visibility.set","layerUid":"l","visible":false});
+        request.expected_revision = Some(0);
+        assert!(request.validate().is_ok());
+        let native = serde_json::to_value(&request).unwrap();
+        let positional = json!([
+            request.api_version,
+            request.request_id,
+            request.instance_id,
+            request.document_id,
+            0,
+            request.operation,
+            request.payload,
+            false
+        ]);
+        assert!(serde_json::from_value::<NativeApplicationRequest>(positional.clone()).is_ok());
+        assert!(accepts(json!({"secret":"test","nativeRequest":native.clone()})).await);
+        assert!(!accepts(json!(["test", native])).await);
+        assert!(!accepts(json!({"secret":"test","nativeRequest":positional.clone()})).await);
+        assert!(!accepts(json!(["test", positional])).await);
+        let status = json!({"apiVersion":2,"requestId":"status-1","instanceId":"instance"});
+        let status_seq = json!([2, "status-1", "instance"]);
+        assert!(serde_json::from_value::<NativeStatusRequest>(status_seq.clone()).is_ok());
+        assert!(accepts(json!({"secret":"test","nativeStatus":status.clone()})).await);
+        assert!(!accepts(json!(["test", status])).await);
+        assert!(!accepts(json!({"secret":"test","nativeStatus":status_seq})).await);
+    }
+
     #[test]
     fn object_response_requires_the_complete_correlated_immutable_result() {
         let (request, response) = pair();
@@ -373,8 +470,8 @@ mod object_tests {
     }
 
     #[tokio::test]
-    async fn staged_object_call_never_connects_to_a_registered_endpoint() {
-        let (request, _) = pair();
+    async fn available_object_call_uses_authenticated_native_endpoint() {
+        let (request, response) = pair();
         let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
             .unwrap();
@@ -384,15 +481,20 @@ mod object_tests {
             secret: "test".into(),
             build_id: "test".into(),
         };
-        let error = call_native(&endpoint, request, CancellationToken::new())
-            .await
-            .unwrap_err();
-        assert!(error.to_string().contains("Object reads are staged"));
-        assert!(
-            tokio::time::timeout(Duration::from_millis(20), listener.accept())
-                .await
-                .is_err()
-        );
+        let server = async {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let message: NativeWireRequest = read_json(&mut stream).await.unwrap();
+            assert_eq!(message.secret, endpoint.secret);
+            assert_eq!(message.native_request, request);
+            write_json(&mut stream, &response).await.unwrap();
+        };
+        let client = call_native(&endpoint, request.clone(), CancellationToken::new());
+        let (_, actual) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(server, client)
+        })
+        .await
+        .unwrap();
+        assert_eq!(actual.unwrap(), response);
     }
 
     #[tokio::test]

@@ -211,26 +211,26 @@ test('shared SDK admits declared object reads while preserving opacity schema an
 const descriptor = load('engineering/application/capabilities-v2/native-object.json');
 const transport = load('engineering/application/native-transport-v2.schema.json');
 
-test('registered object read remains staged with pending ports and a complete-result byte policy', () => {
+test('registered object read has an active source route with pending installed ports and a complete-result byte policy', () => {
   assert.equal(descriptor.id, 'native.object');
-  assert.equal(descriptor.status, 'staged');
+  assert.equal(descriptor.status, 'active');
   assert.deepEqual(descriptor.operations, [
     'query.document.object', 'command.document.object.layer.visibility.set',
   ]);
-  assert.equal(descriptor.availability.state, 'unavailable');
-  assert.match(descriptor.availability.reason, /raw-envelope.*host installation.*UI\/MCP/);
+  assert.equal(descriptor.availability.state, 'available');
+  assert.equal(descriptor.availability.reason, null);
   assert.deepEqual(descriptor.ports, [{ label: 'ui', state: 'pending' }, { label: 'mcp', state: 'pending' }]);
   assert.equal(descriptor.resourceBoundary.maxReadResponseBytes, 4096);
   assert.match(descriptor.resourceBoundary.policy, /never truncate or simplify/);
   assert.match(descriptor.typedValueBoundary, /duplicate raw JSON keys/);
   assert.deepEqual(descriptor.examples[0].request, cases.read.request);
-  assert.equal(descriptor.examples[0].error.code, 'unavailable');
+  assert.equal(descriptor.examples[0].error, undefined);
   assert.strictEqual(validateRequest(descriptor.examples[0].request), descriptor.examples[0].request,
-    'pure SDK shape admission leaves public execution and desktop/browser acceptance separate');
+    'pure SDK shape admission leaves live-owner execution and installed client acceptance separate');
   assert.equal(load('engineering/application/capabilities-v2/native-opacity.json').availability.state, 'available');
 });
 
-test('staged visibility command declares a required revision and exact opaque-UID boolean payload', () => {
+test('public visibility command declares a required revision and exact opaque-UID boolean payload', () => {
   const request = {
     apiVersion: 2, requestId: 'visibility-contract-7', instanceId: 'instance-A',
     documentId: 'document-A', expectedRevision: 7,
@@ -238,7 +238,7 @@ test('staged visibility command declares a required revision and exact opaque-UI
     payload: { command: 'object.layer.visibility.set', layerUid: 'legacy layer:alpha', visible: false },
   };
   assert.deepEqual(descriptor.examples[1].request.operation, request.operation);
-  assert.equal(descriptor.examples[1].error.code, 'unavailable');
+  assert.equal(descriptor.examples[1].error, undefined);
   const branch = transport.$defs.Request.oneOf.find((entry) =>
     entry.allOf?.some((part) => part.properties?.operation?.const === request.operation));
   assert.ok(branch);
@@ -257,7 +257,7 @@ test('staged visibility command declares a required revision and exact opaque-UI
     { path: ['visible'], delete: true },
   ]) assert.notDeepEqual(validate(payload, changed(request.payload, change), transport.$defs), [], change.path.join('.'));
   assert.notDeepEqual(validate(payload, { ...request.payload, extra: true }, transport.$defs), []);
-  assert.strictEqual(validateRequest(request), request, 'SDK shape admission does not activate the unavailable catalog');
+  assert.strictEqual(validateRequest(request), request, 'SDK shape admission is separate from live-owner and subscriber acceptance');
 });
 
 test('transport object selector carries the frozen closed scope and bounded envelope contract', () => {

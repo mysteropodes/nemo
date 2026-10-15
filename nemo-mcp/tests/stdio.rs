@@ -335,19 +335,23 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     });
     assert!(
         validator.is_valid(&visibility),
-        "the advertised v2 schema accepts its declared staged command"
+        "the advertised v2 schema accepts its declared public command"
     );
-    let staged = client
+    let missing_owner = client
         .call_tool(
             CallToolRequestParams::new("nemo_command")
                 .with_arguments(visibility.as_object().unwrap().clone()),
         )
         .await
         .unwrap();
-    assert_eq!(staged.is_error, Some(true));
-    let error = staged.structured_content.unwrap()["error"].clone();
+    assert_eq!(missing_owner.is_error, Some(true));
+    let error = missing_owner.structured_content.unwrap()["error"].clone();
     assert_eq!(error["code"], "unavailable");
-    assert_eq!(error["message"], object["availability"]["reason"]);
+    assert_eq!(
+        error["message"],
+        "Selected instance is absent; discover again after reconnect"
+    );
+    assert_eq!(object["availability"]["state"], "available");
     for invalid in [
         {
             let mut value = visibility.clone();

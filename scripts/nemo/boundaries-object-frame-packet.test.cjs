@@ -52,7 +52,7 @@ test('existing evaluation and application targets both register packet tests', (
     assert.match(read('native-engine/Cargo.toml'), new RegExp(`name = "${target}"[\\s\\S]*?required-features = \\["test-${target}"\\]`));
   }
   assert.match(read(controls), /#\[cfg\(feature = "history"\)\][\s\S]*fn actual_history_fill_undo_redo_and_reopen/);
-  assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'unavailable');
+  assert.equal(JSON.parse(read('engineering/application/capabilities-v2/native-object.json')).availability.state, 'available');
 });
 
 test('producer stays in the adopted eighteen-module forty-nine-edge graph', () => {

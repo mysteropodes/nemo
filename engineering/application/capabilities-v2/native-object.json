@@ -3,10 +3,10 @@
   "apiVersion": 2,
   "id": "native.object",
   "version": 1,
-  "status": "staged",
+  "status": "active",
   "availability": {
-    "state": "unavailable",
-    "reason": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
+    "state": "available",
+    "reason": null
   },
   "transportSchema": "../native-transport-v2.schema.json",
   "operations": [
@@ -47,7 +47,7 @@
   ],
   "examples": [
     {
-      "label": "Staged selector; valid admission returns unavailable before endpoint lookup",
+      "label": "Pinned object query through the shared v2 application route; requires an active object owner",
       "request": {
         "apiVersion": 2,
         "requestId": "object-read-7",
@@ -66,14 +66,10 @@
             "strokeId": "ink/path_A"
           }
         }
-      },
-      "error": {
-        "code": "unavailable",
-        "message": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
       }
     },
     {
-      "label": "Staged visibility command; a strict current-revision input remains unavailable before endpoint lookup",
+      "label": "Current-revision object visibility command through the shared v2 route; requires an active object owner and subscriber",
       "request": {
         "apiVersion": 2,
         "requestId": "object-visibility-8",
@@ -86,10 +82,6 @@
           "layerUid": "legacy layer:alpha",
           "visible": false
         }
-      },
-      "error": {
-        "code": "unavailable",
-        "message": "Object reads are staged; layer-visibility commands are staged: strict raw-envelope duplicate-key admission, single-owner host installation and a real common UI/MCP round trip remain unaccepted."
       }
     }
   ]

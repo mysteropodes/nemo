@@ -203,21 +203,14 @@ fn full_segment_and_numeric_boundaries_never_simplify_a_record() {
 }
 
 #[test]
-fn request_admission_denies_staged_objects_without_hiding_malformed_or_oversized_requests() {
+fn request_admission_accepts_objects_without_hiding_malformed_or_oversized_requests() {
     let mut value = cases()["read"]["request"].clone();
     let admission = |value: &Value| {
         serde_json::from_value::<NativeApplicationRequest>(value.clone())
             .unwrap()
             .validate()
     };
-    let error = admission(&value).unwrap_err();
-    assert_eq!(error.code(), "unavailable");
-    assert_eq!(
-        error.message(),
-        crate::capabilities::native_catalog()
-            .capability_for_operation("query.document.object")
-            .unwrap()["availability"]["reason"]
-    );
+    assert!(admission(&value).is_ok());
     for payload in [json!({}), Value::Null, json!([]), json!("{}")] {
         let mut invalid = value.clone();
         invalid["payload"] = payload;
@@ -260,23 +253,17 @@ fn generic_object_result_front_door_rejects_a_malformed_selector() {
 }
 
 #[test]
-fn registered_examples_keep_existing_feature_admission_while_objects_are_unavailable() {
+fn registered_examples_keep_full_admission_for_all_available_features() {
     for descriptor in crate::capabilities::native_catalog().descriptors() {
         for example in descriptor["examples"].as_array().unwrap() {
             let request: NativeApplicationRequest =
                 serde_json::from_value(example["request"].clone()).unwrap();
             let outcome = request.validate();
-            if descriptor["id"] == "native.object" {
-                let error = outcome.unwrap_err();
-                assert_eq!(error.code(), "unavailable");
-                assert_eq!(error.message(), descriptor["availability"]["reason"]);
-            } else {
-                assert!(
-                    outcome.is_ok(),
-                    "existing feature {}: {outcome:?}",
-                    descriptor["id"]
-                );
-            }
+            assert!(
+                outcome.is_ok(),
+                "available feature {}: {outcome:?}",
+                descriptor["id"]
+            );
         }
     }
 }
