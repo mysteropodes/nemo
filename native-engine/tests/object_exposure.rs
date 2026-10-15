@@ -214,6 +214,46 @@ fn missing_mixed_hidden_missing_reference_objects_and_all_bad_pins_refuse_withou
         );
     }
 }
+#[test]
+fn preserved_reference_only_record_at_blank_key_cannot_poison_authored_exposure() {
+    let mut value = drawing(2);
+    // This key is explicitly BLANK. Only stored Reference data shares its frame.
+    value["objects"].as_array_mut().unwrap().last_mut().unwrap()["target"]["frameScope"]["frame"] =
+        json!(5);
+    assert!(!value["compositionOrder"]["contexts"][0]["scopes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|scope| scope["frameScope"]["frame"] == 5));
+    let s = snapshot(&value);
+    let before = encode_storage_project(s.document()).unwrap();
+    for (frame, expected) in [(5, vec![("B".into(), "B2".into(), 2)]), (7, vec![])] {
+        let selected = selector(&s, frame);
+        let p = prepare_object_exposure_frame(&s, &selected).unwrap();
+        assert_eq!(p.source_frame_for_layer(0), Some(5));
+        assert_eq!(contents(&p), expected);
+        #[cfg(feature = "compositor")]
+        {
+            let scene =
+                crate::object_render_scene::prepare_object_render_scene(&p, &selected).unwrap();
+            let paint =
+                crate::object_render_scene::prepare_object_paint_plan(&scene, &selected).unwrap();
+            assert_eq!(paint.commands().len(), expected.len());
+        }
+    }
+    assert_eq!(encode_storage_project(s.document()).unwrap(), before);
+    let saved: Value = serde_json::from_slice(&before).unwrap();
+    assert_eq!(
+        saved["objects"].as_array().unwrap().last().unwrap()["target"]["frameScope"],
+        json!({"kind":"reference","frame":5})
+    );
+    let reopened = snapshot(&saved);
+    assert_eq!(
+        contents(&prepare_object_exposure_frame(&reopened, &selector(&reopened, 5)).unwrap()),
+        vec![("B".into(), "B2".into(), 2)]
+    );
+}
+
 fn order_drawing() -> Value {
     let mut value = json!({"format":"nemo.native-object-document","formatVersion":2,"totalFrames":18,
         "layers":[{"layerUid":"A","timing":timing(&[1],json!([]))},{"layerUid":"B","timing":timing(&[2],json!([]))}],
