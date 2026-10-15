@@ -79,6 +79,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
   assert.deepEqual(policy.externalCratePorts.nemo_mcp.allowedModules.slice().sort(), [
     'rust.desktop.mcp.adapter', 'rust.desktop.native.application.commands',
     'rust.desktop.native.application.contract', 'rust.desktop.native.application.tests',
+    'rust.desktop.native.host.release.tests',
   ]);
 
   assert.match(applicationTests, /use crate::application_mcp::\*/);
@@ -189,7 +190,7 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
       'export_job::export_object_frames', 'history::InactiveProject', 'history::NativeObjectHistory',
       'history::PreparedProjectReplacement',
       'object_document::ObjectDocument', 'object_frame_packet::ObjectFrameSelector',
-      'object_frame_packet::prepare_object_frame',
+      'object_frame_packet::prepare_object_exposure_frame',
       'object_render_scene::prepare_object_paint_plan', 'object_render_scene::ObjectPaintPlan',
       'object_render_scene::prepare_object_composition',
       'object_render_scene::prepare_object_render_scene',
@@ -214,4 +215,22 @@ test('adopted nemo-desktop policy holds at HEAD: exact edges, no debt, MCP and n
     for (const item of items) assert.ok(refs.some((ref) => ref === item || ref.startsWith(`${item}::`)),
       `${moduleId} grants unused native_engine item ${item}`);
   }
+});
+
+test('temporal preview and export require the precise exposure port, not an exact-frame fallback grant', () => {
+  const profile = read('rust.profile.json'), policy = read('nemo-desktop.edges.json');
+  const moduleId = 'rust.desktop.native.dispatch';
+  const item = 'object_frame_packet::prepare_object_exposure_frame';
+  const items = policy.externalCratePorts.native_engine.moduleItems[moduleId];
+  assert.equal(items.filter((value) => value === item).length, 1);
+  assert.equal(items.includes('object_frame_packet::prepare_object_frame'), false);
+  const denied = structuredClone(policy);
+  denied.externalCratePorts.native_engine.moduleItems[moduleId] = items.filter((value) => value !== item);
+  const result = R.checkRustCrate(profile, denied, { root: ROOT });
+  assert.equal(result.ok, false);
+  assert.equal(result.violations.length, 2, JSON.stringify(result.violations));
+  assert.ok(result.violations.every((violation) => violation.rule === 'private-port-access'
+    && violation.module === moduleId && violation.detail.path === item));
+  assert.deepEqual(result.violations.map((violation) => violation.file).sort(),
+    ['src-tauri/src/native_object_export.rs', 'src-tauri/src/native_object_preview.rs']);
 });
