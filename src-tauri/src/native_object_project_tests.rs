@@ -387,3 +387,122 @@ fn regenerate_p38_native_project_fixtures() {
     fs::write(root.join("A.json"), p38_project_bytes(320, 180, 24, false)).unwrap();
     fs::write(root.join("B.json"), p38_project_bytes(640, 360, 30, true)).unwrap();
 }
+
+fn blank_host_snapshot(owner: &NativeObjectHost) -> Vec<u8> {
+    let info = owner.project_file_info().unwrap();
+    owner
+        .project_file_snapshot(
+            owner.content_revision(),
+            info["documentSnapshotId"].as_str().unwrap(),
+        )
+        .unwrap()
+        .unwrap()
+}
+
+fn blank_host_cpu_preview(owner: &mut NativeObjectHost) {
+    let info = owner.project_file_info().unwrap();
+    let instance = owner.instance_id().to_owned();
+    let document = owner.document_id().to_owned();
+    let selector = ObjectFrameSelector {
+        instance_id: &instance,
+        document_id: &document,
+        content_revision: owner.content_revision(),
+        document_snapshot_id: info["documentSnapshotId"].as_str().unwrap(),
+        context_id: "scene-root",
+        scope_kind: FrameScopeKind::Authored,
+        frame: 0,
+    };
+    let output = OutputSpec::new(
+        "frame",
+        "rgba8",
+        info["canvasW"].as_u64().unwrap() as u32,
+        info["canvasH"].as_u64().unwrap() as u32,
+        "srgb",
+        "straight",
+    )
+    .unwrap();
+    owner
+        .with_prepared_object_preview(&selector, output, |_| Ok(()))
+        .unwrap();
+}
+
+#[test]
+fn blank_host_replacement_requires_cleanup_then_preserves_preview_and_save_reopen() {
+    let mut owner =
+        NativeObjectHost::new_blank_project("blank-host".into(), 320, 180, 24.).unwrap();
+    blank_host_cpu_preview(&mut owner);
+    let before = owner.project_file_info().unwrap();
+    let original = owner.document_id().to_owned();
+    let saved = blank_host_snapshot(&owner);
+    let pin = before["documentSnapshotId"].as_str().unwrap();
+    let premature = owner
+        .prepare_blank_project_replacement(pin, 640, 360, 29.97)
+        .unwrap();
+    assert_eq!(owner.project_file_info().unwrap(), before);
+    assert!(owner
+        .commit_project_replacement(premature)
+        .unwrap_err()
+        .contains("complete owner cleanup"));
+    assert_eq!(blank_host_snapshot(&owner), saved);
+    let next = owner
+        .prepare_blank_project_replacement(pin, 640, 360, 29.97)
+        .unwrap();
+    owner.validate_project_replacement(&next).unwrap();
+    assert!(owner.release_project().unwrap().reconciliation_complete());
+    assert!(!owner.object_client_available());
+    assert!(owner
+        .prepare_blank_project_replacement(pin, 80, 48, 24.)
+        .is_err());
+    owner.commit_project_replacement(next).unwrap();
+    assert!(owner.object_client_available());
+    assert!(owner.release_progress().is_none());
+    assert_ne!(owner.document_id(), original);
+    let info = owner.project_file_info().unwrap();
+    assert_eq!(
+        (info["canvasW"].as_u64(), info["canvasH"].as_u64()),
+        (Some(640), Some(360))
+    );
+    assert_eq!(info["fps"], 29.97);
+    assert_eq!(info["totalFrames"], 150);
+    assert_eq!(info["undoDepth"], 0);
+    assert_eq!(info["redoDepth"], 0);
+    assert_eq!(owner.content_revision(), 0);
+    blank_host_cpu_preview(&mut owner);
+    let new_bytes = blank_host_snapshot(&owner);
+    assert_ne!(new_bytes, saved);
+    let mut reopened =
+        NativeObjectHost::from_project_file("blank-reopen".into(), &new_bytes).unwrap();
+    assert_eq!(blank_host_snapshot(&reopened), new_bytes);
+    blank_host_cpu_preview(&mut reopened);
+}
+
+#[test]
+fn blank_host_rejects_invalid_identity_intent_and_snapshot_without_mutating_owner() {
+    for instance in ["", "has space", "?invalid"] {
+        assert!(NativeObjectHost::new_blank_project(instance.into(), 64, 48, 24.).is_err());
+    }
+    let owner =
+        NativeObjectHost::from_project_file("blank-refuse".into(), file().as_bytes()).unwrap();
+    let before = owner.project_file_info().unwrap();
+    let saved = blank_host_snapshot(&owner);
+    let pin = before["documentSnapshotId"].as_str().unwrap();
+    for (w, h, fps) in [
+        (0, 48, 24.),
+        (64, 0, 24.),
+        (64, 48, f64::NAN),
+        (64, 48, 0.),
+        (64, 48, f64::MAX),
+    ] {
+        assert!(NativeObjectHost::new_blank_project("valid".into(), w, h, fps).is_err());
+        assert!(owner
+            .prepare_blank_project_replacement(pin, w, h, fps)
+            .is_err());
+        assert_eq!(owner.project_file_info().unwrap(), before);
+    }
+    assert!(owner
+        .prepare_blank_project_replacement("stale", 64, 48, 24.)
+        .is_err());
+    assert_eq!(blank_host_snapshot(&owner), saved);
+    assert!(owner.release_progress().is_none());
+    assert!(owner.object_client_available());
+}

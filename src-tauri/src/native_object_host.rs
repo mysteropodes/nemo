@@ -180,6 +180,20 @@ impl NativeObjectHost {
             .validate_project_replacement(prepared)
             .map_err(|_| "native project replacement origin changed".into())
     }
+    pub(crate) fn prepare_blank_project_replacement(
+        &self,
+        snapshot: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+    ) -> Result<PreparedProjectReplacement, String> {
+        if self.released.is_some() {
+            return Err("native project owner was released".into());
+        }
+        self.history
+            .prepare_blank_project_replacement(snapshot, canvas_width, canvas_height, fps)
+            .map_err(|error| format!("native blank project admission: {error:?}"))
+    }
     pub(crate) fn commit_project_replacement(
         &mut self,
         prepared: PreparedProjectReplacement,
@@ -245,6 +259,27 @@ impl NativeObjectHost {
         }
         let history = NativeObjectHistory::from_project_file(instance_id, bytes)
             .map_err(|_| "native project file admission failed")?;
+        Ok(Self {
+            history,
+            inactive_project: None,
+            inactive_requests: BTreeMap::new(),
+            preview: preview::ObjectPreview::default(),
+            object_export: None,
+            released: None,
+        })
+    }
+    pub(crate) fn new_blank_project(
+        instance_id: String,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+    ) -> Result<Self, String> {
+        if !envelope_identity(&instance_id) {
+            return Err("native project instance identity is invalid".into());
+        }
+        let history =
+            NativeObjectHistory::new_blank_project(instance_id, canvas_width, canvas_height, fps)
+                .map_err(|error| format!("native blank project admission: {error:?}"))?;
         Ok(Self {
             history,
             inactive_project: None,
