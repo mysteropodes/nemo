@@ -36,6 +36,16 @@
       : Reflect.apply(original, core, [command]);
   }
   let activeOpen = null;
+  const OPEN_STAGES = ['receipt','installed-status','metadata','first-preview','first-owner','reveal',
+    'second-preview','second-owner','ui-commit','publication','subscriber'];
+  function postBootstrapCode(code) {
+    if(typeof code!=='string')return false;
+    const parts=code.split(':');
+    return parts.length===4&&OPEN_STAGES.some(stage=>parts[0]==='post-bootstrap-'+stage)&&
+      ['invoke-rejected','local-refusal'].includes(parts[1])&&
+      ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','unknown'].includes(parts[2])&&
+      ['notDispatched','other'].includes(parts[3]);
+  }
   function diagnostic(event, code) {
     if (!activeOpen) return;
     if (event === 'allow-open-refused') activeOpen.gateRefused = true;
@@ -43,6 +53,7 @@
     else if (event === 'bootstrap-resolved') activeOpen.resolved++;
     else if (event === 'bootstrap-rejected' && (code === 'unsupported-format' || code === 'other'))
       activeOpen.rejected = code;
+    else if(event==='post-bootstrap-failed'&&!activeOpen.postBootstrap&&postBootstrapCode(code))activeOpen.postBootstrap=code;
   }
   window.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__ = diagnostic;
   function openFailureCode(state, fixtureId, threw) {
@@ -52,7 +63,7 @@
     if (state && state.dispatches === 1 && state.rejected === 'other')
       return prefix + '-native-bootstrap-rejected';
     if (state && state.dispatches === 1 && state.resolved === 1)
-      return prefix + '-native-bootstrap-resolved-open-refused';
+      return state.postBootstrap?prefix+'-'+state.postBootstrap:prefix + '-native-bootstrap-resolved-open-refused';
     if (state && state.dispatches === 0)
       return state.gateRefused ? prefix + '-pre-native-refusal' :
         threw ? prefix + '-open-threw' : prefix + '-native-status-empty-no-bootstrap';

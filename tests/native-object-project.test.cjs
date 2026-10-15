@@ -58,6 +58,23 @@ function host(){
 }
 function session(h){return Project.create({invoke:h.invoke,mapping:info=>({cssBounds:{x:0,y:0,width:320,height:180},
   physicalExtent:{width:320,height:180},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:1}),frame:()=>0});}
+test('post-bootstrap diagnostics preserve original errors, safe unknowns and successful request order',async()=>{
+  for(const hostile of [false,true]){
+    const h=host(),events=[],error={message:'PRIVATE PATH AND DOCUMENT'};
+    if(hostile)Object.defineProperty(error,'code',{get(){throw Error('PRIVATE GETTER');}});
+    else Object.assign(error,{code:'unavailable',details:{disposition:'notDispatched'}});
+    const s=Project.create({invoke:(command,args)=>command==='nemo_native_object_preview'?Promise.reject(error):h.invoke(command,args),
+      mapping:()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}}),
+      openDiagnostic:(event,code)=>{if(event==='post-bootstrap-failed'){events.push(code);throw Error('PRIVATE CALLBACK');}}});
+    await assert.rejects(s.openPath('/project.json'),value=>value===error);
+    assert.deepEqual(events,['post-bootstrap-first-preview:invoke-rejected:'+(hostile?'unknown:other':'unavailable:notDispatched')]);
+    assert.equal(s.isActive(),false);assert.doesNotMatch(JSON.stringify(events),/PRIVATE/);
+  }
+  const h=host(),control=host(),events=[],mapping=()=>({cssBounds:{width:320,height:180},physicalExtent:{width:320,height:180}});
+  await Project.create({invoke:h.invoke,mapping,openDiagnostic:(...event)=>events.push(event)}).openPath('/project.json');
+  await Project.create({invoke:control.invoke,mapping}).openPath('/project.json');
+  assert.deepEqual(h.calls,control.calls);assert.deepEqual(events.map(e=>e[0]),['bootstrap-dispatched','bootstrap-resolved']);
+});
 async function presented(h){const s=session(h);await s.openPath('/project.json');await s.presentPreview(0);return s;}
 function files(s,overrides={}){
   const effects=[];let handle='tab';

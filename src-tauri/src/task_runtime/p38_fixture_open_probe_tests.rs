@@ -81,58 +81,64 @@ fn categorical_open_failures_accept_only_the_fixed_fixture_allowlist() {
 #[test]
 fn pre_ready_failure_accepts_only_the_fixed_code_without_fixture_identity() {
     use super::control::{allowed_ready_failure, valid_failure_packet};
-    assert!(allowed_ready_failure("ready-open-path-unavailable"));
-    assert!(allowed_ready_failure("ready-observer-install-failed"));
-    assert!(!allowed_ready_failure("ready-tauri-invoke-unavailable"));
-    assert!(!allowed_ready_failure("private exception or path"));
-    assert!(valid_failure_packet(
-        0,
-        None,
-        None,
-        Some("ready-open-path-unavailable")
-    ));
-    assert!(valid_failure_packet(
-        0,
-        None,
-        None,
-        Some("ready-observer-install-failed")
-    ));
-    assert!(!valid_failure_packet(
-        0,
-        Some("A"),
-        Some(HASH_A),
-        Some("ready-open-path-unavailable")
-    ));
-    assert!(!valid_failure_packet(
-        0,
-        None,
-        Some(HASH_A),
-        Some("ready-open-path-unavailable")
-    ));
-    assert!(!valid_failure_packet(
-        0,
-        None,
-        None,
-        Some("private exception or path")
-    ));
-    assert!(!valid_failure_packet(
-        0,
-        Some("A"),
-        Some(HASH_A),
-        Some("ready-observer-install-failed")
-    ));
-    assert!(!valid_failure_packet(
-        1,
-        None,
-        None,
-        Some("ready-open-path-unavailable")
-    ));
-    assert!(!valid_failure_packet(
-        1,
-        None,
-        None,
-        Some("ready-observer-install-failed")
-    ));
+    for code in [
+        "ready-open-path-unavailable",
+        "ready-observer-install-failed",
+    ] {
+        assert!(allowed_ready_failure(code));
+        for (cursor, fixture, hash, accepted) in [
+            (0, None, None, true),
+            (0, Some("A"), Some(HASH_A), false),
+            (0, None, Some(HASH_A), false),
+            (0, Some("A"), None, false),
+            (1, None, None, false),
+        ] {
+            assert_eq!(
+                valid_failure_packet(cursor, fixture, hash, Some(code)),
+                accepted
+            );
+        }
+    }
+    for code in [
+        "ready-tauri-invoke-unavailable",
+        "private exception or path",
+    ] {
+        assert!(!allowed_ready_failure(code));
+        assert!(!valid_failure_packet(0, None, None, Some(code)));
+    }
+}
+
+#[test]
+fn post_bootstrap_failure_accepts_only_finite_components_at_the_exact_fixture_cursor() {
+    use super::control::valid_failure_packet;
+    for stage in "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|') {
+        for kind in ["invoke-rejected", "local-refusal"] {
+            for native in "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|unknown".split('|') {
+                for disposition in ["notDispatched", "other"] {
+                    for (cursor, fixture, hash, prefix) in [(1, "A", HASH_A, "a"), (2, "B", HASH_B, "b")] {
+                        let code = format!("{prefix}-post-bootstrap-{stage}:{kind}:{native}:{disposition}");
+                        assert!(valid_failure_packet(cursor, Some(fixture), Some(hash), Some(&code)));
+                        assert!(!valid_failure_packet(3, Some(fixture), Some(hash), Some(&code)));
+                    }
+                }
+            }
+        }
+    }
+    for suffix in [
+        "PRIVATE:invoke-rejected:unknown:other",
+        "receipt:PRIVATE:unknown:other",
+        "receipt:local-refusal:PRIVATE:other",
+        "receipt:local-refusal:unknown:PRIVATE",
+        "receipt:local-refusal:unknown:other:PRIVATE",
+        "receipt:local-refusal:unknown",
+    ] {
+        assert!(!valid_failure_packet(
+            1,
+            Some("A"),
+            Some(HASH_A),
+            Some(&format!("a-post-bootstrap-{suffix}"))
+        ));
+    }
 }
 
 #[test]

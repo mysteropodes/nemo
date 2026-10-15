@@ -31,14 +31,30 @@
   }
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
-    var subscription=null,subscriptionTicket=0,synchronizing=false;
+    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
+    function openStage(stage){if(openAttempt){openAttempt.stage=stage;openAttempt.invokeErrors=new Set();}}
+    function invokeTracked(command,args){
+      var attempt=openAttempt,stage=attempt&&attempt.stage;
+      function rejected(error){if(attempt&&openAttempt===attempt&&attempt.stage===stage)attempt.invokeErrors.add(error);throw error;}
+      var result;try{result=arguments.length>1?ports.invoke(command,args):ports.invoke(command);}catch(error){return rejected(error);}
+      return attempt&&result&&typeof result.then==='function'?result.then(function(value){return value;},rejected):result;
+    }
+    function openFailure(error){
+      if(!openAttempt)return;
+      var code='unknown',disposition='other';
+      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled'].includes(value))code=value;
+        if(error&&error.details&&error.details.disposition==='notDispatched')disposition='notDispatched';}catch(_){}
+      openDiagnostic('post-bootstrap-failed','post-bootstrap-'+openAttempt.stage+':'+
+        (openAttempt.invokeErrors.has(error)?'invoke-rejected':'local-refusal')+':'+code+':'+disposition);
+      openAttempt=null;
+    }
     function raw(command,request){
       if(subscription&&typeof ports.dispatchMutation==='function'&&
         (command==='nemo_native_object_dispatch'||command==='nemo_native_object_reference'&&request.action.kind!=='inspect'))
         return ports.dispatchMutation(command,request);
-      if(command!=='nemo_native_object_bootstrap'||typeof ports.openDiagnostic!=='function')return ports.invoke(command,{requestJson:JSON.stringify(request)});
+      if(command!=='nemo_native_object_bootstrap'||typeof ports.openDiagnostic!=='function')return invokeTracked(command,{requestJson:JSON.stringify(request)});
       openDiagnostic('bootstrap-dispatched');
       var result;try{result=ports.invoke(command,{requestJson:JSON.stringify(request)});}catch(error){openDiagnostic('bootstrap-rejected',error&&error.code==='unsupported_format'?'unsupported-format':'other');throw error;}
       function rejected(error){openDiagnostic('bootstrap-rejected',error&&error.code==='unsupported_format'?'unsupported-format':'other');throw error;}
@@ -62,7 +78,7 @@
       var pin=epoch(info),ticket=++subscriptionTicket;
       var value=await ports.subscribeRevisions(function(event,binding){return synchronizeRevision(event,pin,ticket,binding);},function(error){
         if(ticket===subscriptionTicket&&sameEpoch(pin,epoch(info)))fence(error);
-      });
+      },invokeTracked);
       if(value===null)return;
       if(ticket!==subscriptionTicket||!active()||!sameEpoch(pin,epoch(info))||
         !sameEpoch(value,pin)||value.contentRevision!==info.contentRevision||!id(value.subscriptionId))
@@ -95,7 +111,7 @@
     }
     function disposition(error){return error&&error.details&&error.details.disposition;}
     function localRefusal(message){return {code:'replacement_refused',message:message,details:{disposition:'notDispatched',retryExecution:false}};}
-    async function status(){return ports.invoke('nemo_native_object_client_status');}
+    async function status(){return invokeTracked('nemo_native_object_client_status');}
     async function inspectFor(pin){
       var request={apiVersion:2,requestId:requestId('inspect'),instanceId:pin.instanceId,documentId:pin.documentId,action:{kind:'inspect'}};
       var next=metadata(await raw('nemo_native_object_reference',request),request);
@@ -140,26 +156,28 @@
             documentSnapshotId:previous.documentSnapshotId,lifecycleGeneration:previous.lifecycleGeneration};
           dispatched=true;inBootstrap=true;
           var receipt=await raw('nemo_native_object_bootstrap',request);inBootstrap=false;
+          if(typeof ports.openDiagnostic==='function')openAttempt={stage:'receipt',invokeErrors:new Set()};
           if(!receipt||receipt.apiVersion!==2||receipt.requestId!==rid||receipt.instanceId!==before.instanceId||
               !id(receipt.documentId)||receipt.contentRevision!==0||!integer(receipt.resourceCount,0)||
               receipt.resourceCount>1||receipt.viewportAvailable!==false||previous&&receipt.documentId===previous.documentId)
             throw new Error('Native project Open could not be reconciled');
-          var installed=await status();
+          openStage('installed-status');var installed=await status();
           if(!installed||installed.apiVersion!==2||installed.available!==true||installed.documentId!==receipt.documentId||
               installed.instanceId!==before.instanceId||installed.contentRevision!==0||
               !integer(installed.lifecycleGeneration,previous?previous.lifecycleGeneration+1:1))
             throw new Error('Native project installation is uncorrelated');
-          var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
+          openStage('metadata');var candidate=await inspectFor({instanceId:installed.instanceId,documentId:installed.documentId,
             contentRevision:0,lifecycleGeneration:installed.lifecycleGeneration});
           info=candidate;
-          await present(0,candidate);await verifyOwner(candidate);
-          if(transition&&transition.reveal){await transition.reveal(candidate);
-            await present(0,candidate);await verifyOwner(candidate);}
+          openStage('first-preview');await present(0,candidate);openStage('first-owner');await verifyOwner(candidate);
+          if(transition&&transition.reveal){openStage('reveal');await transition.reveal(candidate);
+            openStage('second-preview');await present(0,candidate);openStage('second-owner');await verifyOwner(candidate);}
           phase='native';
-          if(transition&&transition.commit)await transition.commit(candidate);
-          changed();await attachSubscription();
+          openStage('ui-commit');if(transition&&transition.commit)await transition.commit(candidate);
+          openStage('publication');changed();openStage('subscriber');await attachSubscription();
           return candidate;
         }catch(error){
+          openFailure(error);
           if(!dispatched||inBootstrap&&(disposition(error)==='notDispatched'||!previous&&error&&error.code==='unsupported_format')){
             try{
               if(previous)await verifyOwner(previous);
@@ -172,7 +190,7 @@
             throw disposition(error)==='notDispatched'?error:localRefusal(error&&error.message||'Native project Open was not dispatched');
           }
           throw fence(error);
-        }finally{openingRequested=false;}
+        }finally{openAttempt=null;openingRequested=false;}
       });
     }
     function frameRequest(frame,pin){
@@ -316,10 +334,10 @@
       return true;
     }
     var session=create({invoke:invoke,projectionReady:projectionReady,publishRevision:publishRevision,
-      subscribeRevisions:async function(synchronize,disconnected){
+      subscribeRevisions:async function(synchronize,disconnected,trackedInvoke){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
-        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(invoke);
+        transport=root.NemoApplicationMcpTransport.createNativeTauriTransport(trackedInvoke||invoke);
         await transport.connect();return transport.subscribeRevisions(root.__TAURI__.event.listen.bind(root.__TAURI__.event),synchronize,disconnected);
       },
       unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
