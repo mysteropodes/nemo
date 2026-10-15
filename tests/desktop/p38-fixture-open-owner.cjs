@@ -12,7 +12,7 @@ const ROOT = path.resolve(__dirname, '../..');
 const PHASES = Object.freeze(['ready', 'a-opened', 'b-opened', 'b-closed']);
 const OPEN_STAGES=['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber'];
 const OPEN_FAILURES=OPEN_STAGES.flatMap(stage=>['invoke-rejected','local-refusal'].flatMap(kind=>
-  ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','unknown'].flatMap(code=>
+  ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch','unknown'].flatMap(code=>
     ['notDispatched','other'].map(disposition=>`post-bootstrap-${stage}:${kind}:${code}:${disposition}`))));
 const PROBE_FAILURE_CODES = Object.freeze({
   ready: Object.freeze(['ready-open-path-unavailable', 'ready-observer-install-failed']),

@@ -212,7 +212,7 @@ fn allowed_open_stage(code: &str) -> bool {
     matches!(fields.as_slice(), [stage, kind, native, disposition] if
         "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|').any(|value|value==*stage)
         && matches!(*kind, "invoke-rejected" | "local-refusal")
-        && "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|unknown".split('|').any(|value|value==*native)
+        && "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|wrong_instance|wrong_document|cancelled_before_dispatch|unknown".split('|').any(|value|value==*native)
         && matches!(*disposition, "notDispatched" | "other"))
 }
 

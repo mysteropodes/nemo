@@ -244,11 +244,13 @@ test('native object adapter reports only fixed bootstrap outcomes and preserves 
   assert.doesNotMatch(JSON.stringify(events),/private native path|unavailable/);
 });
 test('post-bootstrap first finite stage and reason survive probe categorization without private components',async()=>{
+  for(const nativeCode of ['unavailable','wrong_instance','wrong_document','cancelled_before_dispatch']){
   for(const stage of ['receipt','installed-status','metadata','first-preview','first-owner','reveal','second-preview','second-owner','ui-commit','publication','subscriber']){
-    const code='post-bootstrap-'+stage+':invoke-rejected:unavailable:notDispatched';
+    const code='post-bootstrap-'+stage+':invoke-rejected:'+nativeCode+':notDispatched';
     const r=await execute([false],{},{openEvents:[['bootstrap-dispatched'],['bootstrap-resolved'],
       ['post-bootstrap-failed',code],['post-bootstrap-failed','post-bootstrap-receipt:local-refusal:unknown:other']]});
     assert.equal(r.calls.at(-1).failureCode,'a-'+code);assert.deepEqual(r.opened,[fixtures.A]);
+  }
   }
   for(const code of ['post-bootstrap-PRIVATE:invoke-rejected:unknown:other',
     'post-bootstrap-receipt:PRIVATE:unknown:other','post-bootstrap-receipt:local-refusal:PRIVATE:other',

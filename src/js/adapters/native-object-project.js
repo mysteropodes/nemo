@@ -44,7 +44,7 @@
     function openFailure(error){
       if(!openAttempt)return;
       var code='unknown',disposition='other';
-      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled'].includes(value))code=value;
+      try{var value=error&&error.code;if(['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch'].includes(value))code=value;
         if(error&&error.details&&error.details.disposition==='notDispatched')disposition='notDispatched';}catch(_){}
       openDiagnostic('post-bootstrap-failed','post-bootstrap-'+openAttempt.stage+':'+
         (openAttempt.invokeErrors.has(error)?'invoke-rejected':'local-refusal')+':'+code+':'+disposition);

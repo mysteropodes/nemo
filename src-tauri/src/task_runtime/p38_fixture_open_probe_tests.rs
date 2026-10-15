@@ -113,7 +113,7 @@ fn post_bootstrap_failure_accepts_only_finite_components_at_the_exact_fixture_cu
     use super::control::valid_failure_packet;
     for stage in "receipt|installed-status|metadata|first-preview|first-owner|reveal|second-preview|second-owner|ui-commit|publication|subscriber".split('|') {
         for kind in ["invoke-rejected", "local-refusal"] {
-            for native in "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|unknown".split('|') {
+            for native in "invalid_request|unavailable|unsupported_format|replacement_refused|stale_revision|stale_owner|cancelled|wrong_instance|wrong_document|cancelled_before_dispatch|unknown".split('|') {
                 for disposition in ["notDispatched", "other"] {
                     for (cursor, fixture, hash, prefix) in [(1, "A", HASH_A, "a"), (2, "B", HASH_B, "b")] {
                         let code = format!("{prefix}-post-bootstrap-{stage}:{kind}:{native}:{disposition}");

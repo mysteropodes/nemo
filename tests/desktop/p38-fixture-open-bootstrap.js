@@ -43,7 +43,7 @@
     const parts=code.split(':');
     return parts.length===4&&OPEN_STAGES.some(stage=>parts[0]==='post-bootstrap-'+stage)&&
       ['invoke-rejected','local-refusal'].includes(parts[1])&&
-      ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','unknown'].includes(parts[2])&&
+      ['invalid_request','unavailable','unsupported_format','replacement_refused','stale_revision','stale_owner','cancelled','wrong_instance','wrong_document','cancelled_before_dispatch','unknown'].includes(parts[2])&&
       ['notDispatched','other'].includes(parts[3]);
   }
   function diagnostic(event, code) {
