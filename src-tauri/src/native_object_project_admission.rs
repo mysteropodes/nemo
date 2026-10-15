@@ -4,8 +4,7 @@ use crate::native_application_contract::{
     bounded_id, host_error, require_api_instance, HostResult,
 };
 use crate::native_dispatch::{
-    NativeAuthority, NativeDispatch, NativeObjectHost, ReplacementAdmission, ReplacementIdentity,
-    ReplacementReplay,
+    NativeAuthority, NativeObjectHost, ReplacementAdmission, ReplacementIdentity, ReplacementReplay,
 };
 use crate::native_object_bootstrap::{
     reopen::{self, FileRequest, ReplacementPins},
