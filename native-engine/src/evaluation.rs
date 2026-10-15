@@ -26,6 +26,10 @@ pub(crate) mod expression_math;
 #[path = "expression_time.rs"]
 #[allow(dead_code)]
 pub(crate) mod expression_time;
+// N22G: private Motion parent-chain affine kernel (transforms, chain walks, blends).
+#[path = "motion_parent_chain.rs"]
+#[allow(dead_code)]
+pub(crate) mod motion_parent_chain;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
