@@ -1,6 +1,114 @@
 // Owned AX projection and retained direct-child pages; no global input or state.
 import Foundation
 import CoreFoundation
+import ApplicationServices
+import CoreGraphics
+import Darwin
+
+enum OwnedDiscoveryStage: String {
+  case arguments, scope, pid, processStart = "process-start", cgFirst = "cg-first"
+  case cgID = "cg-window-id", reportPath = "report-path", reportAttributes = "report-attributes"
+  case reportKind = "report-kind", cgSecondQuery = "cg-second-query", cgSecondCount = "cg-second-count"
+  case cgBounds = "cg-bounds", axTrust = "ax-trust", axMatch = "ax-match"
+}
+struct OwnedDiscoveryRefusal: Error { let diagnostics: [String:Any] }
+struct OwnedDiscoveryTrace {
+  var stage: OwnedDiscoveryStage = .arguments
+  var facts: [String:Any] = [:]
+  mutating func at(_ next: OwnedDiscoveryStage) { stage = next; facts = [:] }
+  func refusal() -> OwnedDiscoveryRefusal {
+    var value = facts; value["schema"] = "nemo.p38-discovery/1"; value["stage"] = stage.rawValue
+    return OwnedDiscoveryRefusal(diagnostics:value)
+  }
+  mutating func require(_ ok: Bool, _ witness: [String:Any]) throws {
+    facts = witness; if !ok { throw refusal() }
+  }
+}
+struct OwnedInitialWindow {
+  let scope: (reference:Bool,report:String)
+  let pid: pid_t
+  let start: ProcessStart
+  let number: UInt32
+  let physical: URL
+  let reportIdentity: [FileAttributeKey:Any]
+  let application: AXUIElement
+  let main: AXUIElement
+  let cg: (Bool)->[[String:Any]]?
+}
+func discoveryQueryClass(_ error: AXError) -> String {
+  switch error {
+  case .success: return "success"
+  case .attributeUnsupported: return "unsupported"
+  case .noValue: return "no-value"
+  case .cannotComplete: return "cannot-complete"
+  default: return "other-error"
+  }
+}
+
+// The original one-shot predicate sequence, moved intact from run(). No retries.
+func discoverOwnedInitialWindow(_ args: [String], _ environment: [String:String]) throws -> OwnedInitialWindow {
+  var trace = OwnedDiscoveryTrace()
+  do {
+    try trace.require(args.count == 3,["valid":false])
+    trace.at(.scope)
+    let scope = try operatorScope(args[1],environment)
+    trace.at(.pid); trace.facts = ["available":false]
+    guard let pid = Int32(args[2]), pid > 0 else { throw trace.refusal() }
+    trace.at(.processStart); trace.facts = ["available":false]
+    guard let pinnedProcessStart = processStart(pid) else { throw trace.refusal() }
+    trace.at(.cgFirst)
+    let first = CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]]
+    let initialRows = (first ?? []).filter {
+      ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
+    }
+    try trace.require(initialRows.count == 1,["available":first != nil,"countBucket":min(initialRows.count,2)])
+    trace.at(.cgID); trace.facts = ["available":false]
+    guard let number = initialRows[0][kCGWindowNumber as String] as? UInt32 else { throw trace.refusal() }
+    let reportURL = URL(fileURLWithPath:scope.report).standardizedFileURL
+    let physical = reportURL.resolvingSymlinksInPath()
+    trace.at(.reportPath)
+    try trace.require(physical.path == reportURL.path && FileManager.default.fileExists(atPath:physical.path),["valid":false])
+    trace.at(.reportAttributes)
+    let reportIdentity = try FileManager.default.attributesOfItem(atPath:physical.path)
+    trace.at(.reportKind)
+    try trace.require(reportIdentity[.type] as? FileAttributeType == .typeDirectory,["valid":false])
+    func cg(_ all: Bool) -> [[String:Any]]? {
+      let flags: CGWindowListOption = all ? [.optionAll,.excludeDesktopElements] : [.optionOnScreenOnly,.excludeDesktopElements]
+      guard let rows = CGWindowListCopyWindowInfo(flags,kCGNullWindowID) as? [[String:Any]] else { return nil }
+      return rows.filter {
+        ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
+      }
+    }
+    trace.at(.cgSecondQuery); trace.facts = ["available":false]
+    guard let initial = cg(false) else { throw trace.refusal() }
+    trace.at(.cgSecondCount)
+    try trace.require(initial.count == 1,["countBucket":min(initial.count,2)])
+    trace.at(.cgBounds); trace.facts = ["valid":false]
+    guard let row = initial.first, row[kCGWindowNumber as String] as? UInt32 == number,
+      let bounds = row[kCGWindowBounds as String] as? [String:CGFloat] else { throw trace.refusal() }
+    trace.at(.axTrust)
+    try trace.require(AXIsProcessTrusted(),["trusted":false])
+    let application = AXUIElementCreateApplication(pid)
+    trace.at(.axMatch)
+    // Exactly the former attr() call: a failed query still becomes nil/[],
+    // and only the existing unique-match predicate refuses it.
+    var raw: CFTypeRef?
+    let query = AXUIElementCopyAttributeValue(application,kAXWindowsAttribute as CFString,&raw)
+    let value: CFTypeRef? = query == .success ? raw : nil
+    let windowValue = value as? [AXUIElement], windows = windowValue ?? []
+    let matched = windows.filter {
+      guard owns($0,pid), let p = xy($0), let s = wh($0) else { return false }
+      return abs(p.x-(bounds["X"] ?? -10000)) < 3 && abs(p.y-(bounds["Y"] ?? -10000)) < 3 &&
+        abs(s.width-(bounds["Width"] ?? -10000)) < 3 && abs(s.height-(bounds["Height"] ?? -10000)) < 3
+    }
+    try trace.require(matched.count == 1,["queryClass":discoveryQueryClass(query),
+      "valueClass":windowValue != nil ? "array" : value == nil ? "missing" : "wrong-type",
+      "candidates":min(windows.count,2),"matches":min(matched.count,2)])
+    return OwnedInitialWindow(scope:scope,pid:pid,start:pinnedProcessStart,number:number,physical:physical,
+      reportIdentity:reportIdentity,application:application,main:matched[0],cg:cg)
+  } catch let error as OwnedDiscoveryRefusal { throw error }
+  catch { throw trace.refusal() }
+}
 
 // Ordered public controls; the semantic region marker is inspection-only.
 func ownedControl(_ reference: Bool, _ title: String, _ value: String, _ description: ()->String?, inspection: Bool = false) -> String? {

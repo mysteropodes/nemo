@@ -888,42 +888,11 @@ func run() throws {
   let args = CommandLine.arguments
   if args == [args[0], "--self-test"] { try selfTest(); return }
   if args.count == 4 && args[1] == "--p38-cg-sample" { try cgWindowSampleWorker(args); return }
-  try check(args.count == 3)
-  let scope = try operatorScope(args[1],ProcessInfo.processInfo.environment)
+  let initialWindow = try discoverOwnedInitialWindow(args,ProcessInfo.processInfo.environment)
+  let scope = initialWindow.scope, pid = initialWindow.pid, pinnedProcessStart = initialWindow.start
+  let number = initialWindow.number, physical = initialWindow.physical, reportIdentity = initialWindow.reportIdentity
+  let application = initialWindow.application, main = initialWindow.main, cg = initialWindow.cg
   var projectionCursor: OwnedProjectionCursor<AXUIElement>? = nil
-  let report = scope.report
-  guard let pid = Int32(args[2]), pid > 0 else { throw Refusal(code:"adapter-refused") }
-  guard let pinnedProcessStart=processStart(pid) else { throw Refusal(code:"adapter-refused") }
-  let initialRows = (CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []).filter {
-    ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
-  }
-  try check(initialRows.count == 1)
-  guard let number = initialRows[0][kCGWindowNumber as String] as? UInt32 else { throw Refusal(code:"adapter-refused") }
-  let reportURL = URL(fileURLWithPath: report).standardizedFileURL
-  let physical = reportURL.resolvingSymlinksInPath()
-  try check(physical.path == reportURL.path && FileManager.default.fileExists(atPath: physical.path))
-  let reportIdentity = try FileManager.default.attributesOfItem(atPath: physical.path)
-  try check(reportIdentity[.type] as? FileAttributeType == .typeDirectory)
-  func cg(_ all: Bool) -> [[String:Any]]? {
-    let flags: CGWindowListOption = all ? [.optionAll,.excludeDesktopElements] : [.optionOnScreenOnly,.excludeDesktopElements]
-    guard let rows = CGWindowListCopyWindowInfo(flags,kCGNullWindowID) as? [[String:Any]] else { return nil }
-    return rows.filter {
-      ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
-    }
-  }
-  guard let initial = cg(false) else { throw Refusal(code:"adapter-refused") }
-  try check(initial.count == 1)
-  guard let row = initial.first, row[kCGWindowNumber as String] as? UInt32 == number,
-        let bounds = row[kCGWindowBounds as String] as? [String:CGFloat] else { throw Refusal(code:"adapter-refused") }
-  try check(AXIsProcessTrusted())
-  let application = AXUIElementCreateApplication(pid)
-  let windows = attr(application,kAXWindowsAttribute) as? [AXUIElement] ?? []
-  let matched = windows.filter {
-    guard owns($0,pid), let p = xy($0), let s = wh($0) else { return false }
-    return abs(p.x-(bounds["X"] ?? -10000)) < 3 && abs(p.y-(bounds["Y"] ?? -10000)) < 3 &&
-      abs(s.width-(bounds["Width"] ?? -10000)) < 3 && abs(s.height-(bounds["Height"] ?? -10000)) < 3
-  }
-  try check(matched.count == 1); let main = matched[0]
   var ordinal = 0
   var sheet: AXUIElement? = nil, sheetToken: String? = nil
   var location: AXUIElement? = nil, locationField: AXUIElement? = nil, locationToken: String? = nil
@@ -1667,6 +1636,7 @@ func run() throws {
 @main struct P38OwnedWindow {
   static func main() {
     do { try run() }
+    catch let error as OwnedDiscoveryRefusal { try? emit(["status":"refused","code":"adapter-refused","discoveryDiagnostics":error.diagnostics]); exit(1) }
     catch let error as SelectionRefusal { try? emit(["status":"refused","code":"adapter-refused","selectionDiagnostics":error.diagnostics]); exit(1) }
     catch let error as ActionRefusal { try? emit(["status":"refused","code":"adapter-refused","actionDiagnostics":error.diagnostics]); exit(1) }
     catch let error as InspectionRefusal {

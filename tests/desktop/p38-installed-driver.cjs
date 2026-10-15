@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { performance } = require('node:perf_hooks');
+const { safeDiscoveryDiagnostics } = require('./p38-discovery-diagnostics.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function check(value, code) { if (!value) throw Object.assign(new Error(code), { code }); }
@@ -286,7 +287,9 @@ function verifyWindow(info, pid, expected) {
   return info.windowId;
 }
 function windowResult(info,pid,expected,allowInspectionDiagnostics=false) {
+  if(info?.discoveryDiagnostics!==undefined)check(expected===undefined&&info.status==='refused','helper-malformed');
   if(info?.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(info.code)?info.code:'adapter-refused',
+    ...(info.discoveryDiagnostics!==undefined?{discoveryDiagnostics:safeDiscoveryDiagnostics(info.discoveryDiagnostics)}:{}),
     ...(info.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(info.selectionDiagnostics)} : {}),
     ...(info.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(info.actionDiagnostics)} : {}),
     ...(allowInspectionDiagnostics && safeInspectionDiagnostics(info.inspectionDiagnostics) ?
@@ -390,6 +393,11 @@ async function runScopedOperator(config, services, reference) {
     }
     receipt.status = 'operator-complete'; // No claim that tab/alert/native evidence passes.
   } catch (error) { failure = error;
+    let discoveryDiagnostics;
+    try {
+      if(error.discoveryDiagnostics!==undefined)check(receipt.stage==='identity','helper-malformed');
+      discoveryDiagnostics=safeDiscoveryDiagnostics(error.discoveryDiagnostics);
+    } catch { error=Object.assign(Error('helper-malformed'),{code:'helper-malformed'}); }
     if (operatorWaitStartedAt !== null) { receipt.operatorWaitTimedOutMs = Math.max(0,Math.round(performance.now()-operatorWaitStartedAt)); receipt.operatorWaitMs = (receipt.operatorWaitMs || 0) + receipt.operatorWaitTimedOutMs; }
     receipt.reason = ['watchdog-timeout','native-identity-refused','flat-app-pid-required','owned-window-refused',
       'native-pid-changed','action-refused','element-refused','value-refused','capture-proof-refused','action-budget-exhausted',
@@ -398,6 +406,7 @@ async function runScopedOperator(config, services, reference) {
       'helper-malformed','fixture-refused','sheet-token-refused','sheet-feedback-required','sheet-active','target-refused',
       'location-token-refused','location-state-refused',...REFUSALS,...(reference ? reference.errors : [])].includes(error.code) ? error.code : 'operator-failed';
     receipt.firstFailure = Object.freeze({ code: receipt.reason, stage: receipt.stage || 'preflight', elapsedMs:Math.max(0,Math.round(performance.now()-runStarted)),
+      ...(discoveryDiagnostics?{discoveryDiagnostics}:{}),
       ...(safeStartupDiagnostics(error.startupDiagnostics) ? { startupDiagnostics: safeStartupDiagnostics(error.startupDiagnostics) } : {}),
       ...(error.selectionDiagnostics ? { selectionDiagnostics:safeSelectionDiagnostics(error.selectionDiagnostics) } : {}),
       ...(error.actionDiagnostics ? { actionDiagnostics:safeActionDiagnostics(error.actionDiagnostics) } : {}),
@@ -469,7 +478,7 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       });
       const lines = readline.createInterface({input:child.stdout,terminal:false})[Symbol.asyncIterator]();
       channel = {child,lines,pid,windowId:null}; // Track BEFORE the first readiness read.
-      const pinned = await reply(); check(pinned.status==='pinned','owned-window-refused'); verifyWindow(pinned,pid);
+      const pinned = await reply(false,true); check(pinned.status==='pinned','owned-window-refused'); verifyWindow(pinned,pid);
       channel.windowId = pinned.windowId; return pinned;
     }
     check(mode !== 'discover' && channel.pid===pid && channel.windowId===windowId, 'owned-window-refused');
@@ -493,7 +502,7 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
     if(mode==='inspect')atomicJSON(reportGuard,'ax-'+ordinal+'.json',safeWindowEvidence(result,!!reference));
     return result;
   }
-  async function reply(allowInspectionDiagnostics=false) {
+  async function reply(allowInspectionDiagnostics=false,allowDiscoveryDiagnostics=false) {
     let timer;
     try {
       const line = await Promise.race([channel.lines.next(),new Promise((_,reject)=>{
@@ -501,7 +510,9 @@ function createWindowTransport(config,directory,getGuard,helpers,helperTimeoutMs
       check(!line.done && line.value.length<=1024*1024,'helper-input-ended');
       let value;try{value=JSON.parse(line.value);}catch{throw Object.assign(Error('helper-malformed'),{code:'helper-malformed'});}
       check(value&&typeof value==='object'&&!Array.isArray(value),'helper-malformed');
+      if(value.discoveryDiagnostics!==undefined)check(allowDiscoveryDiagnostics&&value.status==='refused','helper-malformed');
       if(value.status==='refused')throw Object.assign(Error('owned-control-refused'),{code:REFUSALS.has(value.code)?value.code:'adapter-refused',
+        ...(value.discoveryDiagnostics!==undefined?{discoveryDiagnostics:safeDiscoveryDiagnostics(value.discoveryDiagnostics)}:{}),
         ...(value.selectionDiagnostics ? {selectionDiagnostics:safeSelectionDiagnostics(value.selectionDiagnostics)} : {}),
         ...(value.actionDiagnostics ? {actionDiagnostics:safeActionDiagnostics(value.actionDiagnostics)} : {}),
         ...(allowInspectionDiagnostics && safeInspectionDiagnostics(value.inspectionDiagnostics) ?
