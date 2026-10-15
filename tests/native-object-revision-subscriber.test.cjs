@@ -179,6 +179,18 @@ test('desktop public SDK absence refuses the eye without using the private or le
   assert.equal(h.root.state.layers[0].visible,true);assert.equal(h.session.info().contentRevision,0);dispose();
 });
 
+test('public visibility no-op remains at the current revision before the next changed eye intent',async()=>{
+  const h=scenario();await h.open();
+  const same=await h.session.setLayerVisibility('legacy layer:alpha',true);
+  assert.deepEqual(same.result,{applied:false,historyEntriesAdded:0});
+  assert.equal(h.session.readPresentedObjectSession().contentRevision,0);
+  const changed=await h.session.toggleLayerVisibility('legacy layer:alpha');
+  assert.deepEqual(changed.result,{applied:true,historyEntriesAdded:1});
+  assert.deepEqual(h.commands.map(r=>[r.expectedRevision,r.payload.visible]),[[0,true],[0,false]]);
+  assert.deepEqual(h.routes,['nemo_native_dispatch','nemo_native_dispatch']);
+  assert.equal(h.root.state.layers[0].visible,false);assert.equal(h.session.info().contentRevision,1);
+});
+
 test('ordinary public eye rejects malformed native disposition through the real SDK without retry',async()=>{
   const h=scenario();await h.open();let legacy=0;
   h.root.SM={toggleLayerVis(){legacy++;}};h.fail('malformed-reply');
