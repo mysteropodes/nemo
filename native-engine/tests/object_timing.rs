@@ -224,6 +224,16 @@ fn long_timelines_and_the_exact_sparse_entry_cap_never_expand_per_frame() {
         .unwrap()
         .push(json!({"frame":4096}));
     assert!(decode_storage_project(doc.to_string().as_bytes()).is_err());
+    for field in ["keys", "samples"] {
+        doc["layers"][0]["timing"]["keys"] = json!([]);
+        doc["layers"][0]["timing"]["samples"] = json!([]);
+        doc["layers"][0]["timing"][field] =
+            Value::Array((0..4097).map(|i| json!({"frame":i})).collect());
+        assert!(
+            decode_storage_project(doc.to_string().as_bytes()).is_err(),
+            "per-vector bound {field}"
+        );
+    }
 }
 
 #[test]
