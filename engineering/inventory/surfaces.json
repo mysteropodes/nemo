@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "ed931090f4b08c48b051e2f444f18f1d4e257986",
-  "describe": "v0.7.0-alpha.4-1806-ged931090-dirty"
+  "head": "f80dc3e64cf3d20bcaac6302387ddb292e07a9f9",
+  "describe": "v0.7.0-alpha.4-1807-gf80dc3e6-dirty"
  },
- "inputsDigest": "79d583682bab7a5eb24de46c736cdbc58fbf42975567828e1ef258a15389cf10",
+ "inputsDigest": "616e373ae3d56b62d94cdbd02e35fc0632609ae624076d6f9328f93f3cabe41a",
  "states": [
   "inventoried",
   "characterized",
@@ -52,13 +52,13 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 284,
+   "native": 283,
    "export": 5,
    "animation": 468,
    "history": 358,
    "selection": 384,
    "render": 491,
-   "persist": 416
+   "persist": 415
   }
  },
  "fixturesByArea": {
@@ -271,7 +271,7 @@
   },
   "SMProjectEntry": {
    "file": "src/js/project-entry.js",
-   "line": 165,
+   "line": 188,
    "members": 0
   },
   "SMProject": {
@@ -2471,7 +2471,7 @@
    "capability": "history",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:714 initStartScreen()"
+    "src/js/project.js:695 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3355,7 +3355,7 @@
    "capability": "new",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:711 initStartScreen()"
+    "src/js/project.js:692 initStartScreen()"
    ],
    "events": [
     "click"
@@ -3436,7 +3436,7 @@
    "capability": "open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:710 initStartScreen()"
+    "src/js/project.js:691 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4656,7 +4656,7 @@
    "capability": "save",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:708 initStartScreen()"
+    "src/js/project.js:689 initStartScreen()"
    ],
    "events": [
     "click"
@@ -4696,7 +4696,7 @@
    "capability": "saveas",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:709 initStartScreen()"
+    "src/js/project.js:690 initStartScreen()"
    ],
    "events": [
     "click"
@@ -7843,7 +7843,7 @@
    "capability": "file input",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:715 initStartScreen()"
+    "src/js/project.js:696 initStartScreen()"
    ],
    "events": [
     "change"
@@ -15796,9 +15796,9 @@
    "capability": "start open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:703 initStartScreen()",
-    "src/js/project.js:704 initStartScreen()",
-    "src/js/project.js:705 initStartScreen()"
+    "src/js/project-entry.js:170 bindStartScreen()",
+    "src/js/project-entry.js:171 bindStartScreen()",
+    "src/js/project-entry.js:172 bindStartScreen()"
    ],
    "events": [
     "keydown",
@@ -15810,10 +15810,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 1
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:38",
@@ -15823,8 +15821,8 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 66,
-    "via": "variable startOpen",
+    "functionsVisited": 1,
+    "via": "variable open",
     "references": []
    },
    "fixtures": [
@@ -15839,7 +15837,7 @@
    "capability": "start resume",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/project.js:668 initStartScreen()"
+    "src/js/project-entry.js:163 bindStartScreen()"
    ],
    "events": [
     "click"
@@ -15849,9 +15847,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "persist": 1
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -15862,11 +15858,9 @@
     "container": "start-cards",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 58,
-    "via": "chain",
-    "references": [
-     "src/js/project.js:656 initStartScreen()"
-    ]
+    "functionsVisited": 0,
+    "via": "variable resume",
+    "references": []
    },
    "fixtures": [
     "media",

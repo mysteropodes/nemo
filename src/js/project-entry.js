@@ -148,6 +148,29 @@
       }catch(e){return failed();}
     });
   }
+  // Storage and admission stay in project.js. This view receives only presence
+  // booleans and the existing actions, never an autosave or document payload.
+  function bindStartScreen(document,ports){
+    var screen=document.getElementById('start-screen');
+    var resume=document.getElementById('start-resume');
+    var cards=document.getElementById('start-cards');
+    var open=document.getElementById('start-open');
+    if(!screen||!resume||!cards||!open||!document.getElementById('start-newpanel'))return;
+    function showResume(){resume.style.display='';cards.classList.add('has-resume');}
+    if(ports.readResumePresence())showResume();
+    else ports.readResumePresenceAsync(function(available){if(available)showResume();});
+    ports.renderRecents();
+    resume.addEventListener('click',ports.resume);
+    bindNewProjectForm(document,ports);
+    // Preserve the native button's default Enter/Space activation. Only stop
+    // propagation so document playback shortcuts cannot cancel these keys.
+    function keepOpenKeysLocal(event){
+      if(event.key==='Enter'||event.key===' ')event.stopPropagation();
+    }
+    open.addEventListener('keydown',keepOpenKeysLocal);
+    open.addEventListener('keyup',keepOpenKeysLocal);
+    open.addEventListener('click',ports.open);
+  }
   function repaintProjectEntry(){
     // Native Open/Resume can restore live paths while the canvas stays blank
     // until an explicit render. Cross one complete presentation boundary
@@ -163,5 +186,6 @@
     });
   }
   window.SMProjectEntry={repaint:repaintProjectEntry,initializeTabs:initializeProjectTabs,
-    renderTabs:renderProjectTabs,renderRecents:renderRecentProjects,bindNewProjectForm:bindNewProjectForm};
+    renderTabs:renderProjectTabs,renderRecents:renderRecentProjects,bindNewProjectForm:bindNewProjectForm,
+    bindStartScreen:bindStartScreen};
 })();

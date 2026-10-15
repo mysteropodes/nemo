@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'src/index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'src/css/style.css'), 'utf8');
 const project = fs.readFileSync(path.join(root, 'src/js/project.js'), 'utf8');
+const entry = fs.readFileSync(path.join(root, 'src/js/project-entry.js'), 'utf8');
 const i18n = fs.readFileSync(path.join(root, 'src/js/i18n.js'), 'utf8');
 
 function openCard() {
@@ -32,12 +33,13 @@ test('Open Project uses a named native button with legal, localized children', (
 });
 
 test('the existing ordinary Open callback remains the sole start-card click binding', () => {
-  assert.match(project, /var startOpen=document\.getElementById\('start-open'\)/);
-  assert.equal((project.match(/startOpen\.addEventListener\('click',openDialog\)/g) || []).length, 1);
-  assert.match(project, /if\(e\.key==='Enter'\|\|e\.key===' '\)e\.stopPropagation\(\)/);
-  assert.match(project, /startOpen\.addEventListener\('keydown',keepStartOpenKeysLocal\)/);
-  assert.match(project, /startOpen\.addEventListener\('keyup',keepStartOpenKeysLocal\)/);
-  assert.doesNotMatch(project, /startOpen\.addEventListener\('key(?:down|up)',[^)]*preventDefault/);
+  assert.equal((project.match(/SMProjectEntry\.bindStartScreen\(document,/g) || []).length, 1);
+  assert.match(project, /resume:resumeAutosave,open:openDialog/);
+  assert.equal((entry.match(/\.addEventListener\('click',ports\.open\)/g) || []).length, 1);
+  assert.doesNotMatch(project, /startOpen\.addEventListener/);
+  // The companion shipped presenter tests execute keyboard handlers and prove
+  // default activation is neither cancelled nor synthesized at this boundary.
+  assert.doesNotMatch(entry, /open\.addEventListener\('key(?:down|up)',[^)]*preventDefault/);
 });
 
 test('the button keeps the card layout and an explicit keyboard focus cue', () => {

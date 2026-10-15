@@ -649,23 +649,7 @@
     });
   }
 
-  function initStartScreen(){
-    SMProjectEntry.initializeTabs(document);
-    var hasAutosave=false;
-    try{hasAutosave=!!localStorage.getItem('nemo-auto');}catch(e){}
-    var resumeCard=document.getElementById('start-resume');
-    function showResumeCard(){
-      resumeCard.style.display='';
-      document.getElementById('start-cards').classList.add('has-resume');
-    }
-    if(hasAutosave)showResumeCard();
-    // localStorage may be empty because a media-heavy autosave overflowed
-    // its quota and only landed in IndexedDB (see autosaveWrite) — check
-    // async so "Resume" still appears in that case, just a tick later.
-    else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){if(v)showResumeCard();}).catch(function(){});
-    renderRecents();
-
-    document.getElementById('start-resume').addEventListener('click',function(){
+  function resumeAutosave(){
       // Load autosave explicitly; boot may still hold a blank project.
       // Native Resume follows Open's occluded admission and final revealed
       // presentation before publishing its tab or success.
@@ -688,21 +672,18 @@
       if(auto)applyAuto(auto);
       else if(window.SMIdb)window.SMIdb.get('nemo-auto').then(applyAuto).catch(function(){applyAuto(null);});
       else applyAuto(null);
-    });
-    SMProjectEntry.bindNewProjectForm(document,{
+  }
+  function initStartScreen(){
+    SMProjectEntry.initializeTabs(document);
+    SMProjectEntry.bindStartScreen(document,{
+      readResumePresence:function(){try{return !!localStorage.getItem('nemo-auto');}catch(e){return false;}},
+      // Media-heavy autosave can be present only in IndexedDB after quota
+      // overflow. Resolve to a boolean before crossing the view boundary.
+      readResumePresenceAsync:function(publish){if(window.SMIdb)window.SMIdb.get('nemo-auto').then(function(v){publish(!!v);}).catch(function(){});},
+      renderRecents:renderRecents,resume:resumeAutosave,open:openDialog,
       createProject:function(config,current,onCreationFailure){return window.SMProject.newProject(config,current,onCreationFailure);},
       showStartScreen:showStartScreen,notice:showToast
     });
-    var startOpen=document.getElementById('start-open');
-    // Keep this native button's Enter/Space activation local. The timeline's
-    // document shortcuts otherwise cancel those keys for playback/panning;
-    // do not preventDefault or synthesize a click (the browser owns both).
-    function keepStartOpenKeysLocal(e){
-      if(e.key==='Enter'||e.key===' ')e.stopPropagation();
-    }
-    startOpen.addEventListener('keydown',keepStartOpenKeysLocal);
-    startOpen.addEventListener('keyup',keepStartOpenKeysLocal);
-    startOpen.addEventListener('click',openDialog);
 
     // Project panel buttons (right-hand Project section)
     document.getElementById('btn-save').addEventListener('click',save);
