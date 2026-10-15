@@ -51,6 +51,10 @@
       openAttempt=null;
     }
     function raw(command,request){
+      if(command==='nemo_native_dispatch'){
+        if(typeof ports.dispatchApplication!=='function')throw new Error('Native public application client is unavailable');
+        return ports.dispatchApplication(request);
+      }
       if(subscription&&typeof ports.dispatchMutation==='function'&&
         (command==='nemo_native_object_dispatch'||command==='nemo_native_object_reference'&&request.action.kind!=='inspect'))
         return ports.dispatchMutation(command,request);
@@ -268,7 +272,7 @@
         return {apiVersion:2,requestId:requestId('visibility'),instanceId:pin.instanceId,documentId:pin.documentId,
           operation:'command.document.object.layer.visibility.set',expectedRevision:pin.contentRevision,
           payload:{command:'object.layer.visibility.set',layerUid:layerUid,visible:visible}};
-      },'nemo_native_object_dispatch');
+      },'nemo_native_dispatch');
     }
     function setLayerVisibility(layerUid,visible){
       if(typeof visible!=='boolean')return Promise.reject(new Error('Native layer visibility target or value is invalid'));
@@ -343,6 +347,11 @@
       unsubscribeRevisions:function(){return transport?transport.disconnect():Promise.resolve();},
       subscriptionActive:function(){return !!transport&&!!transport.status()&&!transport.isSynchronizing();},
       dispatchMutation:function(command,request){return transport.dispatchObject(command,request);},
+      dispatchApplication:function(request){
+        if(!transport||!root.NemoNativeApplicationAdapter||typeof root.NemoNativeApplicationAdapter.createNativeApplicationAdapter!=='function')
+          throw new Error('Native public application client is unavailable');
+        return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui',transport).dispatch(request);
+      },
       openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
       frame:function(){return root.state.currentFrame;},
       mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;

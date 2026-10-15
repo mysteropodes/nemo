@@ -7,7 +7,7 @@ const turn=()=>new Promise(setImmediate);
 function deferred(){let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};}
 
 // Adapter protocol oracle only; the Rust raw-client test exercises the real owner.
-function scenario(layers=[{layerUid:'legacy layer:alpha'},{layerUid:'sibling',visible:true}]){
+function scenario(layers=[{layerUid:'legacy layer:alpha'},{layerUid:'sibling',visible:true}],publicClient=true){
   let active=false,revision=0,failure=null,hold=null;
   layers=structuredClone(layers);
   const calls=[],changes=[];
@@ -16,7 +16,7 @@ function scenario(layers=[{layerUid:'legacy layer:alpha'},{layerUid:'sibling',vi
     documentDigest:String(revision%10).repeat(64),byteCount:1000,canvasW:320,canvasH:180,fps:24,
     totalFrames:21,layers:structuredClone(layers),reference:null,undoDepth:revision,redoDepth:0};}
   async function invoke(command,args){
-    const r=args?JSON.parse(args.requestJson):null;calls.push({command,r});
+    const r=args?(args.request||JSON.parse(args.requestJson)):null;calls.push({command,r});
     if(command==='nemo_native_object_client_status')return {...info(),available:active};
     if(command==='nemo_native_object_bootstrap'){
       active=true;return {...info(),requestId:r.requestId,resourceCount:0,viewportAvailable:false};
@@ -24,7 +24,7 @@ function scenario(layers=[{layerUid:'legacy layer:alpha'},{layerUid:'sibling',vi
     if(command==='nemo_native_object_reference')return {...info(),requestId:r.requestId};
     if(command==='nemo_native_object_preview')return {status:failure==='preview'?'refused':'presented',
       workId:'visible-work-'+revision,viewGeneration:1};
-    assert.equal(command,'nemo_native_object_dispatch');
+    assert.equal(command,'nemo_native_dispatch');
     assert.equal(r.instanceId,'visibility-instance');assert.equal(r.documentId,'visibility-document');
     assert.equal(r.expectedRevision,revision);
     assert.equal(r.operation,'command.document.object.layer.visibility.set');
@@ -41,11 +41,12 @@ function scenario(layers=[{layerUid:'legacy layer:alpha'},{layerUid:'sibling',vi
     return {...response,contentRevision:revision,documentId:failure==='foreign'?'replaced':r.documentId,
       result:{applied,historyEntriesAdded:applied?1:0}};
   }
-  const session=Project.create({invoke,frame:()=>7,mapping:i=>({cssBounds:{x:0,y:0,width:320,height:180},
+  const session=Project.create({invoke,...(publicClient?{dispatchApplication:r=>invoke('nemo_native_dispatch',{request:r})}:{}),
+    frame:()=>7,mapping:i=>({cssBounds:{x:0,y:0,width:320,height:180},
     physicalExtent:{width:320,height:180},compositionExtent:{width:i.canvasW,height:i.canvasH},reportedDpr:1}),
     changed:i=>changes.push(i)});
   return {session,calls,changes,open:()=>session.openPath('/visibility.json'),
-    commands:()=>calls.filter(c=>c.command==='nemo_native_object_dispatch'),
+    commands:()=>calls.filter(c=>c.command==='nemo_native_dispatch'),
     fail:value=>{failure=value;},hold:gate=>{hold=gate;}};
 }
 
@@ -105,6 +106,14 @@ test('native refusal restores actual presentation without changing visibility or
   await assert.rejects(h.session.setLayerVisibility('legacy layer:alpha',false),/stale_revision/);
   assert.equal(h.commands().length,1);assert.equal(h.session.info().contentRevision,0);
   assert.equal(Object.hasOwn(h.session.info().layers[0],'visible'),false);
+  assert.equal(h.session.readPresentedObjectSession().contentRevision,0);
+});
+
+test('missing public application client refuses without private visibility fallback',async()=>{
+  const h=scenario(undefined,false);await h.open();
+  await assert.rejects(h.session.setLayerVisibility('legacy layer:alpha',false),/public application client is unavailable/);
+  assert.equal(h.session.info().contentRevision,0);
+  assert.equal(h.calls.some(c=>c.command==='nemo_native_dispatch'||c.command==='nemo_native_object_dispatch'),false);
   assert.equal(h.session.readPresentedObjectSession().contentRevision,0);
 });
 
