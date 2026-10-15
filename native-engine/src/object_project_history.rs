@@ -40,6 +40,38 @@ impl InactiveProject {
 #[path = "object_reference_dispatch.rs"]
 mod reference_dispatch;
 
+// Both initial New and replacement admit this same fully specified blank value.
+// It has no external resources and cannot carry an unchecked drawing from a caller.
+fn blank_project(
+    canvas_width: u32,
+    canvas_height: u32,
+    fps: f64,
+) -> Result<crate::object_document::ProjectEnvelope, DispatchErrorCode> {
+    use crate::object_document::{
+        ObjectDocument, ObjectLayer, Presence, ProjectEnvelope, ProjectMetadata,
+        OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+    };
+    let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
+        .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+    let frames = (fps * 5.0).round().max(1.0);
+    if !frames.is_finite() || frames > u32::MAX as f64 {
+        return Err(DispatchErrorCode::InvalidRequest);
+    }
+    let drawing = ObjectDocument {
+        format: OBJECT_DOCUMENT_FORMAT.into(),
+        format_version: OBJECT_DOCUMENT_FORMAT_VERSION,
+        total_frames: frames as u32,
+        layers: vec![ObjectLayer {
+            layer_uid: "layer-1".into(),
+            name: Presence::Present("Layer 1".into()),
+            visible: Presence::Present(true),
+        }],
+        objects: vec![],
+        composition_order: Presence::Missing,
+    };
+    Ok(ProjectEnvelope::no_media(metadata, drawing))
+}
+
 impl NativeObjectHistory {
     /// Create the native blank drawing from explicit New Project intent. The
     /// five-second timeline matches the existing desktop New form. This only
@@ -50,34 +82,34 @@ impl NativeObjectHistory {
         canvas_height: u32,
         fps: f64,
     ) -> Result<Self, DispatchErrorCode> {
-        use crate::object_document::{
-            ObjectDocument, ObjectLayer, Presence, ProjectEnvelope, ProjectMetadata,
-            OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
-        };
-        let metadata = ProjectMetadata::new(canvas_width, canvas_height, fps)
-            .map_err(|_| DispatchErrorCode::InvalidRequest)?;
-        let frames = (fps * 5.0).round().max(1.0);
-        if !frames.is_finite() || frames > u32::MAX as f64 {
-            return Err(DispatchErrorCode::InvalidRequest);
-        }
+        let project = blank_project(canvas_width, canvas_height, fps)?;
         let instance = instance.into();
         if instance.is_empty() {
             return Err(DispatchErrorCode::InvalidRequest);
         }
-        let drawing = ObjectDocument {
-            format: OBJECT_DOCUMENT_FORMAT.into(),
-            format_version: OBJECT_DOCUMENT_FORMAT_VERSION,
-            total_frames: frames as u32,
-            layers: vec![ObjectLayer {
-                layer_uid: "layer-1".into(),
-                name: Presence::Present("Layer 1".into()),
-                visible: Presence::Present(true),
-            }],
-            objects: vec![],
-            composition_order: Presence::Missing,
-        };
-        Self::from_admitted_project(instance, ProjectEnvelope::no_media(metadata, drawing))
-            .map_err(|_| DispatchErrorCode::Unavailable)
+        Self::from_admitted_project(instance, project).map_err(|_| DispatchErrorCode::Unavailable)
+    }
+
+    /// Prepare New without a second writable history. Existing replacement
+    /// validation and cleanup/commit rules also govern this immutable token.
+    pub fn prepare_blank_project_replacement(
+        &self,
+        snapshot_id: &str,
+        canvas_width: u32,
+        canvas_height: u32,
+        fps: f64,
+    ) -> Result<PreparedProjectReplacement, DispatchErrorCode> {
+        let origin = self
+            .acquire_snapshot(self.content_revision())
+            .filter(|snapshot| snapshot.snapshot_id() == snapshot_id)
+            .ok_or(DispatchErrorCode::StaleRevision)?;
+        if origin.project().is_none() {
+            return Err(DispatchErrorCode::Unavailable);
+        }
+        let project = blank_project(canvas_width, canvas_height, fps)?;
+        let next = ObjectSnapshot::from_admitted_project(self.instance_id().into(), project)
+            .map_err(|_| DispatchErrorCode::Unavailable)?;
+        Ok(PreparedProjectReplacement { origin, next })
     }
 
     /// Admit B without replacing A or constructing a second writable owner.

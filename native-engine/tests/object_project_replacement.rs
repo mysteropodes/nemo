@@ -266,3 +266,98 @@ fn blank_project_uses_the_existing_visibility_history_and_retained_snapshot_cons
     assert_eq!(save(&reopened, 0), after);
     assert!(!current(&reopened).document().layers()[0].visible());
 }
+
+#[test]
+fn blank_replacement_prepares_immutably_and_commits_in_the_original_history() {
+    let mut owner = NativeObjectHistory::from_project_file("new-replace", &file(64)).unwrap();
+    attach(&mut owner);
+    let original = current(&owner);
+    let before = bytes(&owner);
+    let address = &owner as *const _;
+    let prepared = owner
+        .prepare_blank_project_replacement(original.snapshot_id(), 640, 360, 29.97)
+        .unwrap();
+    assert_eq!(bytes(&owner), before);
+    assert_eq!(owner.document_id(), original.document_id());
+    assert_eq!(
+        (owner.content_revision(), owner.history_depths()),
+        (1, (1, 0))
+    );
+    owner.validate_project_replacement(&prepared).unwrap();
+    owner.commit_project_replacement(prepared).unwrap();
+    assert_eq!(&owner as *const _, address);
+    assert_eq!(owner.instance_id(), original.instance_id());
+    assert_ne!(owner.document_id(), original.document_id());
+    assert_eq!(
+        (owner.content_revision(), owner.history_depths()),
+        (0, (0, 0))
+    );
+    let saved = bytes(&owner);
+    let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
+        "project":{"canvasW":640,"canvasH":360,"fps":29.97},
+        "drawing":{"format":"nemo.native-object-document","formatVersion":1,
+            "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true}],
+            "objects":[]},"viewportReference":null,"assets":[]});
+    assert_eq!(serde_json::from_slice::<Value>(&saved).unwrap(), expected);
+    let reopened = NativeObjectHistory::from_project_file("reopened", &saved).unwrap();
+    assert_eq!(bytes(&reopened), saved);
+    assert_eq!(owner.undo(0), Err(DispatchErrorCode::Unavailable));
+    assert_eq!(owner.redo(0), Err(DispatchErrorCode::Unavailable));
+    drop(owner);
+    assert_eq!(original.serialize_project_file().unwrap(), before);
+}
+
+#[test]
+fn blank_replacement_refuses_invalid_stale_and_foreign_intent_before_commit() {
+    let mut owner = NativeObjectHistory::from_project_file("new-refuse", &file(64)).unwrap();
+    let before = owner.project_file_info().unwrap();
+    for (w, h, fps) in [
+        (0, 360, 24.),
+        (640, 0, 24.),
+        (640, 360, 0.),
+        (640, 360, f64::NAN),
+        (640, 360, f64::INFINITY),
+        (640, 360, f64::MAX),
+    ] {
+        assert!(matches!(
+            owner.prepare_blank_project_replacement(&pin(&owner), w, h, fps),
+            Err(DispatchErrorCode::InvalidRequest)
+        ));
+        assert_eq!(owner.project_file_info().unwrap(), before);
+    }
+    assert!(matches!(
+        owner.prepare_blank_project_replacement("stale", 0, 0, f64::NAN),
+        Err(DispatchErrorCode::StaleRevision)
+    ));
+    let stale = owner
+        .prepare_blank_project_replacement(&pin(&owner), 80, 48, 24.)
+        .unwrap();
+    attach(&mut owner);
+    let changed = owner.project_file_info().unwrap();
+    assert_eq!(
+        owner.commit_project_replacement(stale),
+        Err(DispatchErrorCode::StaleRevision)
+    );
+    assert_eq!(owner.project_file_info().unwrap(), changed);
+    for (instance, error) in [
+        ("other", DispatchErrorCode::WrongInstance),
+        ("new-refuse", DispatchErrorCode::WrongDocument),
+    ] {
+        let token = owner
+            .prepare_blank_project_replacement(&pin(&owner), 80, 48, 24.)
+            .unwrap();
+        let mut foreign = NativeObjectHistory::from_project_file(instance, &file(96)).unwrap();
+        let unchanged = foreign.project_file_info().unwrap();
+        assert_eq!(foreign.commit_project_replacement(token), Err(error));
+        assert_eq!(foreign.project_file_info().unwrap(), unchanged);
+    }
+    let bare: crate::object_document::ObjectDocument = serde_json::from_value(
+        serde_json::from_slice::<Value>(&file(64)).unwrap()["drawing"].clone(),
+    )
+    .unwrap();
+    let bare = NativeObjectHistory::new("bare", bare).unwrap();
+    assert!(matches!(
+        bare.prepare_blank_project_replacement(&pin(&bare), 80, 48, 24.),
+        Err(DispatchErrorCode::Unavailable)
+    ));
+}
