@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "f80dc3e64cf3d20bcaac6302387ddb292e07a9f9",
-  "describe": "v0.7.0-alpha.4-1807-gf80dc3e6-dirty"
+  "head": "c22bc4a18a6bdb2617227170b175bb984a5eb705",
+  "describe": "v0.7.0-alpha.4-1821-gc22bc4a1-dirty"
  },
- "inputsDigest": "616e373ae3d56b62d94cdbd02e35fc0632609ae624076d6f9328f93f3cabe41a",
+ "inputsDigest": "280cc7e1a22f80e096500a33a3acc930d4ce7ac34f88131a924257008be736b2",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 283,
+   "native": 282,
    "export": 5,
    "animation": 468,
    "history": 358,
@@ -5092,8 +5092,8 @@
     "history": 2,
     "animation": 2,
     "render": 2,
-    "native": 3,
-    "selection": 3
+    "selection": 3,
+    "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -5105,7 +5105,7 @@
     "container": "track-apply-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 98,
+    "functionsVisited": 101,
     "via": "helper el()",
     "references": []
    },
@@ -5136,10 +5136,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "render": 1,
-    "native": 3
+    "render": 1
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1393",
@@ -5149,7 +5148,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 23,
+    "functionsVisited": 25,
     "via": "helper el()",
     "references": []
    },
@@ -5192,7 +5191,7 @@
     "container": "footage-track-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 58,
+    "functionsVisited": 62,
     "via": "helper el()",
     "references": []
    },
