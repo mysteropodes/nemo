@@ -337,3 +337,88 @@ fn creation_shape_and_result_are_exact_but_do_not_authorize_execution() {
     )
     .is_ok());
 }
+
+fn timing_payload() -> Value {
+    json!({"atRevision":0,"documentSnapshotId":"native-object:document:0",
+        "contextId":"scene-root","layerUid":"data:雪","frame":2})
+}
+fn timing_result_fixture() -> Value {
+    let mut value = timing_payload();
+    let object = value.as_object_mut().unwrap();
+    object.extend(
+        json!({"instanceId":"instance","documentId":"document","cellKind":"held",
+        "sourceFrame":1,"hasContent":true,"manualEdit":false})
+        .as_object()
+        .unwrap()
+        .clone(),
+    );
+    value
+}
+#[test]
+fn timing_contract_keeps_strict_input_and_current_head_result_correlation() {
+    let payload = timing_payload();
+    assert!(timing_request(&payload));
+    let response = timing_result_fixture();
+    assert!(timing_result("document", &payload, &response));
+    for (key, value) in [
+        ("atRevision", json!(-1)),
+        ("atRevision", json!(9_007_199_254_740_992u64)),
+        ("frame", json!(4_294_967_296u64)),
+        ("frame", json!(null)),
+        ("layerUid", json!("")),
+        ("documentSnapshotId", json!("")),
+        ("contextId", json!("")),
+        ("lifecycleGeneration", json!(1)),
+    ] {
+        let mut invalid = payload.clone();
+        invalid[key] = value;
+        assert!(!timing_request(&invalid));
+    }
+    for (key, value) in [
+        ("documentId", json!("other")),
+        ("atRevision", json!(1)),
+        ("documentSnapshotId", json!("other")),
+        ("contextId", json!("other")),
+        ("layerUid", json!("other")),
+        ("frame", json!(3)),
+        ("sourceFrame", json!(2)),
+        ("cellKind", json!("key")),
+        ("manualEdit", json!(true)),
+        ("hasContent", json!(null)),
+        ("extra", json!(true)),
+    ] {
+        let mut invalid = response.clone();
+        invalid[key] = value;
+        assert!(!timing_result("document", &payload, &invalid), "{key}");
+    }
+    let mut request: NativeApplicationRequest = serde_json::from_value(json!({"apiVersion":2,
+        "requestId":"timing","instanceId":"instance","documentId":"document",
+        "operation":"query.document.object.layer.timing","payload":payload}))
+    .unwrap();
+    assert!(request.validate().is_ok());
+    request.expected_revision = Some(0);
+    assert!(request.validate().is_err());
+    assert_eq!(
+        crate::capabilities::native_catalog()
+            .capability_for_operation("command.document.object.layer.create")
+            .unwrap()["availability"]["state"],
+        "unavailable"
+    );
+}
+#[test]
+fn timing_contract_accepts_the_frozen_exposure_oracle_including_blank_keys() {
+    let corpus: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/examples/native-layer-timing-v1/cases.json"
+    ))
+    .unwrap();
+    for expected in corpus["drawing"]["expected"].as_array().unwrap() {
+        let mut payload = timing_payload();
+        payload["frame"] = expected["frame"].clone();
+        let mut value = timing_result_fixture();
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(expected.as_object().unwrap().clone());
+        assert!(timing_result("document", &payload, &value), "{expected}");
+    }
+}

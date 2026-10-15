@@ -325,3 +325,23 @@ test('prepared layer creation descriptor is separate and execution unavailable u
     { applied: true, historyEntriesAdded: 1 }, { applied: true, historyEntriesAdded: 1, layerUid: '' },
     { applied: true, historyEntriesAdded: 1, layerUid: 'x', extra: true }]) assert.ok(validate(result, invalid, transport.$defs).length);
 });
+
+test('timing declaration and closed transport definitions retain the accepted selector/read-result contract', () => {
+  const timing = load('engineering/application/capabilities-v2/native-object-layer-timing.json');
+  const accepted = load('engineering/application/native-layer-timing-v1.schema.json').$defs;
+  const branch = transport.$defs.Request.oneOf.find(entry => entry.allOf?.some(part => part.properties?.operation?.const === 'query.document.object.layer.timing'));
+  assert.equal(timing.id, 'native.object.layer-timing'); assert.deepEqual(timing.operations, ['query.document.object.layer.timing']);
+  assert.equal(timing.availability.state, 'available'); assert.ok(timing.ports.every(port => port.state === 'pending'));
+  assert.equal(branch.allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest'); assert.equal(branch.allOf[1].properties.payload.$ref, '#/$defs/ObjectLayerTimingPayload');
+  const normalize = value => JSON.parse(JSON.stringify(value).replaceAll('#/$defs/ObjectLayerTimingFrame', '#/$defs/Frame'));
+  assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingPayload), accepted.Selector);
+  assert.deepEqual(normalize(transport.$defs.ObjectLayerTimingResult), accepted.ReadResult);
+  assert.deepEqual(transport.$defs.ObjectLayerTimingFrame, accepted.Frame);
+  assert.ok(transport.$defs.ResponseBase.properties.result.oneOf.some(value => value.$ref === '#/$defs/ObjectLayerTimingResult'));
+  const request = timing.examples[0].request; assert.equal(validateRequest(request), request);
+  assert.deepEqual(validate(transport.$defs.ObjectLayerTimingPayload, request.payload, transport.$defs), []);
+  for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }]) {
+    assert.ok(validate(transport.$defs.ObjectLayerTimingPayload, bad, transport.$defs).length);
+  }
+  assert.equal(load('engineering/application/capabilities-v2/native-object-layer-create.json').availability.state, 'unavailable');
+});

@@ -4,7 +4,19 @@ const test = require('node:test');
 const fs = require('node:fs');
 const { createNativeApplicationAdapter, validateRequest, validateResponse } = require('../src/js/adapters/native-application.js');
 const cases = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '../engineering/application/examples/native-object-v1/cases.json')));
+const timingCases = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '../engineering/application/examples/native-layer-timing-v1/cases.json')));
+const { createNativeTauriTransport } = require('../src/js/adapters/application-mcp.js');
 const copy = value => structuredClone(value);
+function timingRead(frame = 2) {
+  return { apiVersion: 2, requestId: 'timing-read', instanceId: 'instance-A', documentId: 'document-A',
+    operation: 'query.document.object.layer.timing', payload: { atRevision: 0, documentSnapshotId: 'native-object:document-A:0',
+      contextId: 'scene-root', layerUid: 'data:opaque 雪', frame } };
+}
+function timingResponse(request) {
+  return { apiVersion: 2, requestId: request.requestId, instanceId: request.instanceId, documentId: request.documentId,
+    contentRevision: request.payload.atRevision, ok: true, result: { instanceId: request.instanceId, documentId: request.documentId,
+      ...request.payload, ...timingCases.drawing.expected[request.payload.frame] } };
+}
 function read() { return copy(cases.read.request); }
 function readResponse(request) {
   const value = copy(cases.read.response);
@@ -210,4 +222,88 @@ test('creation success must retain exact disposition UID and expected plus one r
   const historical = created(request);
   assert.deepEqual(await adapter(() => historical).api.dispatch(request), historical,
     'retained historical UID remains valid; this is not a current-presence query');
+});
+
+test('timing SDK preserves the accepted eight-row oracle and exact opaque selector without mutation', async () => {
+  for (const expected of timingCases.drawing.expected) {
+    const request = timingRead(expected.frame), before = copy(request), reply = timingResponse(request), a = adapter(() => reply);
+    assert.deepEqual(await a.api.dispatch(request), reply); assert.deepEqual(request, before);
+    assert.deepEqual(a.calls[0], before); assert.equal(reply.result.layerUid, 'data:opaque 雪');
+    for (const key of ['cellKind', 'sourceFrame', 'hasContent', 'manualEdit']) assert.equal(reply.result[key], expected[key]);
+  }
+});
+test('timing selector rejects malformed values before sending and retains typed unsupported refusals', async () => {
+  for (const [pointer, value, remove] of [
+    ['/expectedRevision', 0], ['/payload/lifecycleGeneration', 1], ['/payload/atRevision', -1], ['/payload/atRevision', Number.MAX_SAFE_INTEGER + 1],
+    ['/payload/documentSnapshotId', ''], ['/payload/contextId', ''], ['/payload/layerUid', ''], ['/payload/layerUid', null],
+    ['/payload/frame', -1], ['/payload/frame', 1.5], ['/payload/frame', 4294967296], ['/payload/frame', 0, true], ['/payload/extra', true],
+  ]) {
+    const a = adapter(timingResponse); await assert.rejects(async () => a.api.dispatch(change(timingRead(), pointer, value, remove))); assert.equal(a.calls.length, 0);
+  }
+  const request = timingRead(); request.payload.contextId = 'component-context';
+  const refusal = { ...timingResponse(request), ok: false, error: { code: 'unavailable', message: 'Unsupported timing context' } }; delete refusal.result;
+  assert.deepEqual(await adapter(() => refusal).api.dispatch(request), refusal);
+  const maxFrame = timingRead(); maxFrame.payload.frame = 4294967295; assert.equal(validateRequest(maxFrame), maxFrame);
+  const maxRevision = timingRead(); maxRevision.payload.atRevision = Number.MAX_SAFE_INTEGER; assert.equal(validateRequest(maxRevision), maxRevision);
+});
+test('timing replies cannot substitute owner, snapshot, selector or exposure semantics', async () => {
+  const request = timingRead(), response = timingResponse(request);
+  for (const [pointer, value, remove] of [
+    ['/instanceId', 'other'], ['/documentId', 'other'], ['/contentRevision', 1], ['/requestId', 'other'],
+    ['/result/instanceId', 'other'], ['/result/documentId', 'other'], ['/result/atRevision', 1], ['/result/documentSnapshotId', 'other'],
+    ['/result/contextId', 'other'], ['/result/layerUid', 'other'], ['/result/frame', 1], ['/result/cellKind', 'key'],
+    ['/result/sourceFrame', 2], ['/result/manualEdit', true], ['/result/hasContent', 1], ['/result/extra', true], ['/result/frame', 0, true],
+  ]) await assert.rejects(adapter(() => change(response, pointer, value, remove)).api.dispatch(request), undefined, pointer);
+  const beforeKey = timingRead(0), empty = timingResponse(beforeKey);
+  for (const patch of [{ sourceFrame: 0 }, { hasContent: true }, { manualEdit: true }]) {
+    await assert.rejects(adapter(() => ({ ...empty, result: { ...empty.result, ...patch } })).api.dispatch(beforeKey));
+  }
+  const blankKey = timingRead(5); assert.equal((await adapter(timingResponse).api.dispatch(blankKey)).result.hasContent, false);
+});
+test('timing request and COMPLETE response enforce actual UTF8 4096 bounds with only UID opacity', async () => {
+  const request = timingRead(), bytes = value => Buffer.byteLength(JSON.stringify(value));
+  request.payload.layerUid = 'data:雪';
+  while (bytes(timingResponse(request)) < 4096) request.payload.layerUid += 'x';
+  const exact = timingResponse(request); assert.equal(bytes(exact), 4096); assert.ok(bytes(request) < 4096);
+  assert.deepEqual(await adapter(() => exact).api.dispatch(request), exact);
+  request.payload.layerUid += 'x'; await assert.rejects(adapter(timingResponse).api.dispatch(request));
+  while (bytes(request) < 4096) request.payload.layerUid += 'x';
+  assert.equal(bytes(request), 4096); assert.equal(validateRequest(request), request);
+  request.payload.layerUid += 'x'; assert.throws(() => validateRequest(request));
+  const resource = timingRead(); resource.payload.documentSnapshotId = 'data:binary'; assert.throws(() => validateRequest(resource));
+});
+test('actual Tauri transport retires delayed timing replies across disconnect/reconnect without a UI write', async () => {
+  let finish, documentId = 'document-A'; const calls = [];
+  const transport = createNativeTauriTransport(async (command, args) => {
+    calls.push(command); if (command === 'nemo_native_status') return { apiVersion: 2, available: true, instanceId: 'instance-A', documentId, contentRevision: 0 };
+    assert.equal(command, 'nemo_native_dispatch'); return new Promise(resolve => { finish = () => resolve(timingResponse(args.request)); });
+  });
+  await transport.connect(); const api = createNativeApplicationAdapter('timing-sdk', transport), pending = api.dispatch(timingRead());
+  const rejected = assert.rejects(pending, /disconnected/); await transport.disconnect(); documentId = 'document-B'; await transport.connect();
+  finish(); await rejected; assert.equal(transport.status().documentId, 'document-B'); assert.equal(calls.filter(x => x === 'nemo_native_dispatch').length, 1);
+});
+test('actual Tauri transport permits committed-head timing reads while publication awaits its own ACK', async () => {
+  const listeners = new Map(), actions = []; let finish;
+  const binding = { instanceId: 'instance-A', documentId: 'document-A', contentRevision: 0, lifecycleGeneration: 1, subscriptionId: 'timing-sub' };
+  const transport = createNativeTauriTransport(async (command, args) => {
+    if (command === 'nemo_native_status') return { apiVersion: 2, available: true, ...binding };
+    if (command === 'nemo_native_revision_sync') { actions.push(args.request.action); return args.request.action === 'acknowledge' ? null : binding; }
+    assert.equal(command, 'nemo_native_dispatch'); return timingResponse(args.request);
+  });
+  await transport.connect(); const gate = new Promise(resolve => { finish = resolve; });
+  await transport.subscribeRevisions(async (name, callback) => { listeners.set(name, callback); return () => {}; }, async event => { await gate; return event; });
+  const event = { instanceId: binding.instanceId, documentId: binding.documentId, lifecycleGeneration: 1, requestId: 'external-write', fromRevision: 0, toRevision: 1 };
+  const applying = listeners.get('nemo-native-revision')({ payload: event }); await new Promise(setImmediate);
+  assert.equal(transport.isSynchronizing(), true);
+  const request = timingRead(); request.payload.atRevision = 1; request.payload.documentSnapshotId = 'native-object:document-A:1';
+  const response = await createNativeApplicationAdapter('pending-reader', transport).dispatch(request);
+  assert.equal(response.ok, true); assert.equal(actions.includes('acknowledge'), false); assert.equal(transport.isSynchronizing(), true);
+  finish(); await applying; assert.equal(actions.filter(action => action === 'acknowledge').length, 1); assert.equal(transport.isSynchronizing(), false);
+});
+test('actual Tauri transport invalidates a successful wrong-owner timing response before SDK delivery', async () => {
+  const transport = createNativeTauriTransport(async (command, args) => command === 'nemo_native_status'
+    ? { apiVersion: 2, available: true, instanceId: 'instance-A', documentId: 'document-A', contentRevision: 0 }
+    : { ...timingResponse(args.request), documentId: 'document-B' });
+  await transport.connect(); await assert.rejects(createNativeApplicationAdapter('wrong-owner', transport).dispatch(timingRead()));
+  assert.equal(transport.status(), null);
 });

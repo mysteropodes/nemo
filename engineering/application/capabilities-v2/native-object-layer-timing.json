@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.object.layer-timing",
+  "version": 1,
+  "status": "active",
+  "availability": { "state": "available", "reason": null },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": ["query.document.object.layer.timing"],
+  "input": { "$ref": "../native-layer-timing-v1.schema.json#/$defs/Selector" },
+  "output": { "$ref": "../native-layer-timing-v1.schema.json#/$defs/ReadResult" },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "readPolicy": "The shared host selects its current immutable head. Older public selectors fail stale_revision; explicitly retained historical core snapshots are a separate internal contract. Committed-head reads during pending UI acknowledgement do not mutate, publish or acknowledge.",
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated shared envelope or typed unavailable; no truncation, inferred timing, caller lifecycle echo or public Add activation."
+  },
+  "commonErrorCodes": ["invalid_request", "wrong_instance", "wrong_document", "stale_revision", "not_found", "unavailable", "cancelled_before_dispatch", "internal"],
+  "ports": [{ "label": "ui", "state": "pending" }, { "label": "mcp", "state": "pending" }],
+  "examples": [{
+    "label": "Pinned current-head timing query through the existing shared v2 application service",
+    "request": {
+      "apiVersion": 2,
+      "requestId": "timing-read-0",
+      "instanceId": "instance-A",
+      "documentId": "document-A",
+      "operation": "query.document.object.layer.timing",
+      "payload": { "atRevision": 0, "documentSnapshotId": "native-object:document-A:0", "contextId": "scene-root", "layerUid": "layer-1", "frame": 0 }
+    },
+    "response": {
+      "apiVersion": 2, "requestId": "timing-read-0", "instanceId": "instance-A", "documentId": "document-A", "contentRevision": 0, "ok": true,
+      "result": { "instanceId": "instance-A", "documentId": "document-A", "atRevision": 0, "documentSnapshotId": "native-object:document-A:0", "contextId": "scene-root", "layerUid": "layer-1", "frame": 0, "cellKind": "key", "sourceFrame": 0, "hasContent": false, "manualEdit": false }
+    }
+  }]
+}

@@ -1,4 +1,6 @@
 //! Independent common-application object command/readback oracle.
+#[path = "native_object_timing_tests.rs"]
+mod timing_tests;
 use crate::{application_mcp::ApplicationMcp, native_object_bootstrap::bootstrap_raw};
 use serde_json::{json, Value};
 

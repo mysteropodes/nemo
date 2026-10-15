@@ -1,6 +1,7 @@
 //! Snapshot-pinned timing read; host lifecycle and public routing are separate gates.
 use crate::object_codec::{object_deserialize, FrameScopeKind};
-use crate::request_receipts::DispatchErrorCode;
+use crate::object_snapshot::MAX_MESSAGE_BYTES;
+use crate::request_receipts::{DispatchErrorCode, OpacityRequest, ResponseEnvelope};
 use crate::revision::ObjectSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +37,47 @@ pub struct LayerTimingReadResponse {
     pub manual_edit: bool,
 }
 impl ObjectSnapshot {
+    /// The parent dispatcher has admitted the complete envelope and owner.
+    /// Reuse the immutable selector; a historical snapshot is never acquired here.
+    pub(super) fn dispatch_layer_timing(
+        &self,
+        request: &OpacityRequest,
+    ) -> Result<ResponseEnvelope, DispatchErrorCode> {
+        let payload =
+            serde_json::to_vec(&request.payload).map_err(|_| DispatchErrorCode::InvalidRequest)?;
+        let read = match self.query_layer_timing_json(&payload) {
+            Ok(read) => read,
+            Err(code) => {
+                return Ok(self.read_failure(
+                    request,
+                    code,
+                    "Native timing selector is invalid or unavailable.",
+                ))
+            }
+        };
+        let response = ResponseEnvelope {
+            api_version: request.api_version,
+            request_id: request.request_id.clone(),
+            instance_id: self.instance_id().into(),
+            document_id: self.document_id().into(),
+            content_revision: self.content_revision(),
+            ok: true,
+            result: Some(serde_json::to_value(read).map_err(|_| DispatchErrorCode::Internal)?),
+            error: None,
+        };
+        if !matches!(
+            serde_json::to_vec(&response).map(|value| value.len()),
+            Ok(0..=MAX_MESSAGE_BYTES)
+        ) {
+            return Ok(self.read_failure(
+                request,
+                DispatchErrorCode::Unavailable,
+                "Complete native timing response exceeds 4096 bytes.",
+            ));
+        }
+        Ok(response)
+    }
+
     /// Original-byte core selector. A missing timing model is not a blank key.
     /// The caller holds this immutable view; this grants no live UI epoch or API availability.
     pub fn query_layer_timing_json(

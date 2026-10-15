@@ -54,6 +54,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
+            | "query.document.object.layer.timing"
             | "query.document.serialize"
             | "query.document.evaluate"
             | "query.diagnostics.recent"
@@ -68,6 +69,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
         "query.document.object" => object::request(payload),
+        "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
@@ -211,6 +213,9 @@ pub(crate) fn validate_result(
     }
     if operation == "query.document.object" {
         return object::result(request_document_id, payload, result);
+    }
+    if operation == "query.document.object.layer.timing" {
+        return object::timing_result(request_document_id, payload, result);
     }
     if operation == "command.document.object.layer.create" {
         return object::create_result(result);
