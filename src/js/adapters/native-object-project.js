@@ -347,7 +347,7 @@
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
     function projectionReady(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionMatches(root,info);}
     function publishRevision(info){
-      if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshVisibility(root,info))
+      if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
       if(root.updateUI)root.updateUI();
       if(root.SMReference)root.SMReference.refreshNative();
@@ -373,7 +373,7 @@
       frame:function(){return root.state.currentFrame;},
       mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;
         return {cssBounds:{x:b.left,y:b.top,width:b.width,height:b.height},physicalExtent:{width:Math.max(1,Math.round(b.width*d)),height:Math.max(1,Math.round(b.height*d))},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:d};},
-      changed:function(info){if(projectionReady(info))publishRevision(info);
+      changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
       failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
