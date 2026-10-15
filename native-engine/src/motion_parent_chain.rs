@@ -324,7 +324,8 @@ pub fn compose_chain(entries: &[ChainEntry]) -> Option<Pose> {
 }
 
 /// `legacyParentChainMats`: from the walking layer `start`, follow
-/// `parent_of` (its keyed parent at the sampled frame) and turn each
+/// `parent_of` (the caller resolves the keyed parent at the sampled frame,
+/// e.g. through `parent_uid_at`; this module never picks it) and turn each
 /// ancestor into a chain entry, immediate parent first, keeping its index.
 /// `ancestor` gives an ancestor's mat and pivot base.
 pub fn legacy_chain(
@@ -342,10 +343,11 @@ pub fn legacy_chain(
         .collect()
 }
 
-/// `composeChainTransform`: from `first` itself, follow the static
-/// `parent_of` and compose. It has no Null branch: `ancestor` gives each
-/// node's mat and bounds centre (`None` without bounds; an empty Null
-/// layer's Paper bounds centre is the origin).
+/// `composeChainTransform`: from `first` itself, follow `parent_of` (the
+/// caller passes the static `parentLayerUid`, not the keyed one) and
+/// compose. It has no Null branch: `ancestor` gives each node's mat and
+/// bounds centre (`None` without bounds; an empty Null layer's Paper bounds
+/// centre is the origin).
 pub fn compose_static_chain(
     first: Option<usize>,
     parent_of: impl Fn(usize) -> Option<usize>,
@@ -392,7 +394,10 @@ pub fn blend_two(a: Option<Pose>, b: Option<Pose>, parent_blend: f64) -> Option<
 
 /// `weightedParentsOf`' weights: A gets `1 - t`, B gets `t`, then one
 /// absolute percent per extra parent (each read through `|| 0`). The caller
-/// drops extras without a uid before sampling, as the JavaScript does.
+/// drops extras without a uid, samples `parentWeight{i}` by the extra's
+/// original `parentsMore` index, and takes this weighted path whenever
+/// `parentsMore` is non-empty, even if no extra survives (the JavaScript
+/// then blends two parts here instead of `blend_two`).
 pub fn parent_weights(parent_blend: f64, extras: &[f64]) -> Vec<f64> {
     let t = or0(parent_blend) / 100.0;
     let mut w = vec![1.0 - t, t];

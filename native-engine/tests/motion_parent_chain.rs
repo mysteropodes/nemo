@@ -16,34 +16,30 @@ fn bits(x: f64) -> u64 {
     }
 }
 
-/// Exact rows must match bit for bit. Rows marked `t` reached a non-trivial
-/// `Math.cos`/`sin`/`atan2`, whose last ulp is libm-dependent: a value there
-/// may differ by at most `TRIG_ULPS` units of roundoff of its own output
-/// group (the point, handle, translation, size, scale pair or angle). Rotations preserve
-/// a group's norm, so a one-ulp trig difference moves a component by about
-/// one ulp of the group's magnitude. An angle in degrees comes from
-/// `atan2`, whose error is absolute (about one ulp of pi radians), so an
-/// angle group's magnitude is at least a half turn. Nothing else in the row
-/// widens the bound, so a huge unrelated input cannot excuse a wrong result
-/// (`huge_unrelated_input_does_not_widen_the_bound`).
-///
-/// Measured worst gap: 1.620 group ulps against JavaScriptCore, 1.027
-/// against V8. 4 leaves room for the final rounding without admitting a
-/// wrong order, sign or pivot (`mutations_are_detected`).
+/// Exact rows match bit for bit. On `t` rows (a non-trivial cos/sin/atan2,
+/// libm-dependent in the last ulp) a value may differ by `TRIG_ULPS` units
+/// of roundoff of its own group: rotation-coupled coordinates (a point,
+/// handle, composed translation) share one, whose norm a rotation keeps;
+/// any other quantity is alone; an angle's magnitude is at least a half
+/// turn, as atan2 error is absolute. Nothing else in the row widens it
+/// (`huge_unrelated_input_does_not_widen_the_bound`). Measured worst on
+/// Linux: 1.620 vs JavaScriptCore, 1.027 vs V8 (macOS: 0.793); a real
+/// sign, pivot or order mistake still fails (`mutations_are_detected`).
 const TRIG_ULPS: f64 = 4.0;
 const ANGLE_FLOOR: f64 = 180.0;
 
-/// How a compared value splits into groups.
+/// A group of `n` coordinates sharing one magnitude, or one angle in degrees.
 #[derive(Clone, Copy)]
 enum G {
-    /// Coordinates sharing one magnitude (a point, a size, a scale pair).
     N(usize),
-    /// One angle in degrees.
     Deg,
 }
+use G::{Deg, N};
 
-const MAT: &[G] = &[G::N(2), G::Deg, G::N(2), G::N(1), G::N(2)];
-const POSE: &[G] = &[G::N(2), G::Deg, G::N(2)];
+// A MotionMat's fields are independent sums and products; a composed
+// Pose's translation is rotation-coupled, its two axis lengths are not.
+const MAT: &[G] = &[N(1), N(1), Deg, N(1), N(1), N(1), N(1), N(1)];
+const POSE: &[G] = &[N(2), Deg, N(1), N(1)];
 
 fn magnitude(xs: &[f64]) -> f64 {
     xs.iter()
@@ -87,7 +83,8 @@ impl Check {
             if bits(a) == bits(e) {
                 continue;
             }
-            if self.trig && a.is_finite() && e.is_finite() {
+            // A signed-zero mismatch is never a rounding difference.
+            if self.trig && a.is_finite() && e.is_finite() && a != e {
                 let ulps = (a - e).abs() / (mag.max(f64::MIN_POSITIVE) * f64::EPSILON);
                 self.worst_ulps = self.worst_ulps.max(ulps);
                 if ulps <= TRIG_ULPS {
@@ -115,10 +112,10 @@ impl Check {
         let mut at = 0;
         for g in groups {
             match *g {
-                G::N(n) => self.v(&actual[at..at + n], &expected[at..at + n]),
-                G::Deg => self.deg(actual[at], expected[at]),
+                N(n) => self.v(&actual[at..at + n], &expected[at..at + n]),
+                Deg => self.deg(actual[at], expected[at]),
             }
-            at += if let G::N(n) = *g { n } else { 1 };
+            at += if let N(n) = *g { n } else { 1 };
         }
     }
 
@@ -132,8 +129,8 @@ impl Check {
 
     fn seg(&mut self, a: &Segment, point: &str, hi: &str, ho: &str) {
         self.v(&a.point, &list(point));
-        self.opt(a.handle_in.map(Vec::from), maybe(hi), &[G::N(2)]);
-        self.opt(a.handle_out.map(Vec::from), maybe(ho), &[G::N(2)]);
+        self.opt(a.handle_in.map(Vec::from), maybe(hi), &[N(2)]);
+        self.opt(a.handle_out.map(Vec::from), maybe(ho), &[N(2)]);
     }
 }
 
@@ -197,19 +194,11 @@ enum Mutation {
 
 impl Mutation {
     fn angle(self, deg: f64) -> f64 {
-        if self == Mutation::Sign {
-            -deg
-        } else {
-            deg
-        }
+        [deg, -deg][usize::from(self == Mutation::Sign)]
     }
 
     fn pivot(self, p: [f64; 2]) -> [f64; 2] {
-        if self == Mutation::Pivot {
-            [p[1], p[0]]
-        } else {
-            p
-        }
+        [p, [p[1], p[0]]][usize::from(self == Mutation::Pivot)]
     }
 
     fn mat(self, mut m: MotionMat) -> MotionMat {
@@ -375,6 +364,7 @@ fn check_entries(c: &mut Check, actual: &[(usize, ChainEntry)], expected: &str) 
 // patterns in hex; `-` is null/undefined.
 const ORACLE: &str = include_str!("fixtures/motion-parent-chain/oracle.txt");
 
+#[derive(Default)]
 struct Run {
     rows: usize,
     exact_rows: usize,
@@ -384,13 +374,7 @@ struct Run {
 }
 
 fn run(m: Mutation) -> Run {
-    let mut r = Run {
-        rows: 0,
-        exact_rows: 0,
-        inexact: 0,
-        worst_ulps: 0.0,
-        bad: Vec::new(),
-    };
+    let mut r = Run::default();
     for (line_no, row) in ORACLE.lines().enumerate() {
         let t: Vec<&str> = row.split(' ').collect();
         let mut c = Check::new(row, line_no);
@@ -417,7 +401,7 @@ fn run(m: Mutation) -> Run {
                 let mm = m.mat(mat(t[5]).expect("mat"));
                 let o = transform_image_rect(&r, m.pivot(pair(t[4])), &mm);
                 let out = [o.x, o.y, o.width, o.height, o.rotation];
-                c.split(&out, &list(t[6]), &[G::N(2), G::N(2), G::Deg]);
+                c.split(&out, &list(t[6]), &[N(2), N(1), N(1), Deg]);
             }
             "lerp" => {
                 let a = list(t[2]);
@@ -441,7 +425,7 @@ fn run(m: Mutation) -> Run {
                 let r = rect(&list(t[3]), f64::NAN);
                 let (o, op) = apply_chain_to_image_rect(&r, &m.chain(t[2]));
                 let out = [o.x, o.y, o.width, o.height, o.rotation, op];
-                c.split(&out, &list(t[4]), &[G::N(2), G::N(2), G::Deg, G::N(1)]);
+                c.split(&out, &list(t[4]), &[N(2), N(1), N(1), Deg, N(1)]);
             }
             "graph" => {
                 let ls = layers(t[2]);
@@ -520,24 +504,40 @@ fn mutations_are_detected() {
     }
 }
 
-/// An oracle row whose chain carries a 1e300 translation unrelated to the
-/// inverted vector: a result wrong by one part in a billion must still fail.
+/// Rows where a 1e300 value sits beside a small result: an `inv` whose
+/// chain carries an unrelated 1e300 translation, and blends whose other
+/// translation axis is ~1e299. One part in a billion off must still fail.
 #[test]
 fn huge_unrelated_input_does_not_widen_the_bound() {
-    let row = ORACLE
-        .lines()
-        .map(|l| l.split(' ').collect::<Vec<&str>>())
-        .find(|t| {
-            t[..2] == ["inv", "t"] && t[2].contains("7e37e43c8800759c") && !t[3].contains("7e37")
-        })
+    let rows: Vec<Vec<&str>> = ORACLE.lines().map(|l| l.split(' ').collect()).collect();
+    let inv = rows
+        .iter()
+        .find(|t| t[..2] == ["inv", "t"] && t[2].contains("7e37e43c") && !t[3].contains("7e37"))
         .expect("inv row with a 1e300 operand");
-    let v = list(row[3]);
-    let out = invert_vector_through_chain(&Mutation::None.chain(row[2]), v[0], v[1]);
-    let expected = list(row[4]);
-    assert!(magnitude(&expected) < 1e6, "the result itself is small");
-    let mut c = Check::new("inv t", 0);
-    c.v(&out, &expected);
-    assert!(c.bad.is_none(), "{:?}", c.bad);
-    c.v(&[out[0] * (1.0 + 1e-9), out[1]], &expected);
-    assert!(c.bad.is_some(), "a 1e-9 relative error was accepted");
+    let (v, chain) = (list(inv[3]), Mutation::None.chain(inv[2]));
+    let mut cases = vec![(
+        invert_vector_through_chain(&chain, v[0], v[1]).to_vec(),
+        list(inv[4]),
+        0,
+    )];
+    for t in rows.iter().filter(|t| t[..2] == ["blendW", "t"]) {
+        let e = list(t[5]);
+        let small = (0..2).find(|&i| e[i].abs() < 1e6 && e[1 - i].abs() > 1e298);
+        if let Some(i) = small {
+            let w = parent_weights(hex(t[2]), &list(t[3]));
+            let parts: Vec<_> = w.into_iter().zip(t[4].split(';').map(pose)).collect();
+            cases.push((mat_vec(blend_weighted(&parts)).expect("mat"), e, i));
+        }
+    }
+    assert!(cases.len() >= 4, "inv plus the 1e299 blend rows");
+    for (out, expected, i) in cases {
+        let groups: &[G] = if out.len() == 8 { MAT } else { &[N(2)] };
+        let mut c = Check::new("huge t", 0);
+        c.split(&out, &expected, groups);
+        assert!(c.bad.is_none(), "{:?}", c.bad);
+        let mut off = out.clone();
+        off[i] *= 1.0 + 1e-9;
+        c.split(&off, &expected, groups);
+        assert!(c.bad.is_some(), "1e-9 off accepted: {expected:?}");
+    }
 }
