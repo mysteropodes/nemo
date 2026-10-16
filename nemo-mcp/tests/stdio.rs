@@ -91,6 +91,11 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     native_object.remove("oneOf");
     native_object.insert("$ref".into(), json!("#/$defs/Request"));
     assert_eq!(command_schema["$defs"]["native"], expected_native);
+    let native_metadata: Value = serde_json::from_str(include_str!(
+        "../../engineering/application/native-property-metadata-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(command_schema["$defs"]["nativePropertyMetadata"], native_metadata);
     assert_eq!(command_schema["type"], "object");
     for keyword in ["allOf", "oneOf", "anyOf", "$ref"] {
         assert!(
@@ -131,6 +136,22 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
         .expect("advertised command schema is valid Draft 2020-12");
     let validator = jsonschema::draft202012::new(&command_schema)
         .expect("advertised command schema compiles with a standard validator");
+    let metadata_query = json!({
+        "apiVersion": 2, "requestId": "metadata-page-0", "instanceId": "instance-a",
+        "documentId": "native-object-document-1",
+        "operation": "query.document.object.property.metadata",
+        "payload": {"atRevision": 0, "documentSnapshotId": "native-object:native-object-document-1:0",
+                    "view": {"kind": "targets", "offset": 0, "limit": 2}}
+    });
+    assert!(validator.is_valid(&metadata_query));
+    let mut revision_on_query = metadata_query.clone();
+    revision_on_query["expectedRevision"] = json!(0);
+    assert!(!validator.is_valid(&revision_on_query));
+    for view in [json!({"kind": "targets", "offset": 0}), json!({"kind": "unsupported"})] {
+        let mut invalid = metadata_query.clone();
+        invalid["payload"]["view"] = view;
+        assert!(!validator.is_valid(&invalid), "metadata selector rejects {invalid}");
+    }
     for example in command_schema["examples"].as_array().unwrap() {
         assert!(
             validator.is_valid(example),

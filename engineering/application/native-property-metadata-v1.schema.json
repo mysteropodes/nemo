@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "nemo.native-property-metadata/1",
+  "$id": "https://github.com/mysteropodes/nemo/engineering/application/native-property-metadata-v1.schema.json",
   "title": "Native property metadata read projection; no property writer",
   "$defs": {
     "Target": {
