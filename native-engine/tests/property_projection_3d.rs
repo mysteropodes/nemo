@@ -176,6 +176,30 @@ fn proj(t: &[&str]) -> Projector3D {
     )
 }
 
+/// The fixture's image rect (x 100, y 50, 400 x 200) with a given rotation.
+fn img(rotation: Option<f64>) -> Rect {
+    Rect {
+        x: 100.0,
+        y: 50.0,
+        width: 400.0,
+        height: 200.0,
+        rotation,
+    }
+}
+
+/// An I-row rect token `x,y,w,h,rot` (`!` = absent rotation).
+fn rect_tok(tok: &str) -> Rect {
+    let r: Vec<Option<f64>> = tok.split(',').map(|s| (s != "!").then(|| hex(s))).collect();
+    let v = |i: usize| r[i].expect("rect field");
+    Rect {
+        x: v(0),
+        y: v(1),
+        width: v(2),
+        height: v(3),
+        rotation: r[4],
+    }
+}
+
 fn flat_seg_tok(tok: &str) -> Vec<f64> {
     seg_flat(&seg_list(tok))
 }
@@ -271,21 +295,11 @@ fn every_s_row_matches_the_oracle() {
 #[test]
 fn every_i_row_matches_the_oracle() {
     for (i, t) in rows("I").iter().enumerate() {
-        let r = t[5]
-            .split(',')
-            .map(|s| (s != "!").then(|| hex(s)))
-            .collect::<Vec<_>>();
-        let rect = Rect {
-            x: r[0].unwrap(),
-            y: r[1].unwrap(),
-            width: r[2].unwrap(),
-            height: r[3].unwrap(),
-            rotation: r[4],
-        };
+        let rect = rect_tok(t[5]);
         let o = project_image_rect(&rect, &proj(t));
         let got = [o.x, o.y, o.width, o.height, o.rotation];
         let w = list(t[6]);
-        let trig = rotates(t) || r[4].is_some_and(truthy);
+        let trig = rotates(t) || rect.rotation.is_some_and(truthy);
         assert!(matches(&got[..4], &w[..4], trig), "I {i}: {got:?} != {w:?}");
         // the rotation always goes through atan2
         assert!(
@@ -418,31 +432,13 @@ fn projector_extra_and_segment_controls() {
     );
     assert_eq!(project_segments(&seg, &far)[0].handle_in, Some([-5.0, 2.5]));
     // image rect: identity pose keeps size, centre lands at the projected centre
-    let r = project_image_rect(
-        &Rect {
-            x: 100.0,
-            y: 50.0,
-            width: 400.0,
-            height: 200.0,
-            rotation: None,
-        },
-        &id,
-    );
+    let r = project_image_rect(&img(None), &id);
     assert_eq!(
         (r.x, r.y, r.width, r.height, r.rotation),
         (1060.0, 590.0, 400.0, 200.0, 0.0)
     );
     // rect rotation adds to the projected rotation under identity
-    let q = project_image_rect(
-        &Rect {
-            x: 100.0,
-            y: 50.0,
-            width: 400.0,
-            height: 200.0,
-            rotation: Some(30.0),
-        },
-        &id,
-    );
+    let q = project_image_rect(&img(Some(30.0)), &id);
     assert!((q.rotation - 30.0).abs() < 1e-12 && (q.width - 400.0).abs() < 1e-9);
     // layer rotation adds the same way
     let lr = make_projector(
@@ -452,16 +448,7 @@ fn projector_extra_and_segment_controls() {
         1080.0,
         None,
     );
-    let rr = project_image_rect(
-        &Rect {
-            x: 100.0,
-            y: 50.0,
-            width: 400.0,
-            height: 200.0,
-            rotation: Some(30.0),
-        },
-        &lr,
-    );
+    let rr = project_image_rect(&img(Some(30.0)), &lr);
     assert!((rr.rotation - 50.0).abs() < 1e-12);
 }
 
@@ -484,16 +471,9 @@ fn nan_extra_fields_and_rect_rotation_read_as_zero() {
         make_projector(&base(), &B, 1920.0, 1080.0, Some(&all_nan)),
         id
     );
-    let rect = |rotation| Rect {
-        x: 100.0,
-        y: 50.0,
-        width: 400.0,
-        height: 200.0,
-        rotation,
-    };
     assert_eq!(
-        project_image_rect(&rect(n), &id),
-        project_image_rect(&rect(None), &id)
+        project_image_rect(&img(n), &id),
+        project_image_rect(&img(None), &id)
     );
 }
 
@@ -534,20 +514,10 @@ fn hypot_is_v8_math_hypot_bit_for_bit() {
 fn image_rect_size_uses_the_v8_hypot() {
     // recompute the half axes with the kernel's own projector; size must be 2 * hypot2
     for t in rows("I") {
-        let q: Vec<Option<f64>> = t[5]
-            .split(',')
-            .map(|s| (s != "!").then(|| hex(s)))
-            .collect();
-        let r: Vec<f64> = q[..4].iter().map(|v| v.unwrap()).collect();
-        let rect = Rect {
-            x: r[0],
-            y: r[1],
-            width: r[2],
-            height: r[3],
-            rotation: q[4],
-        };
+        let rect = rect_tok(t[5]);
+        let r = [rect.x, rect.y, rect.width, rect.height];
         let (p, o) = (proj(&t), project_image_rect(&rect, &proj(&t)));
-        let rot = q[4].filter(|v| truthy(*v)).unwrap_or(0.0) * PI / 180.0;
+        let rot = rect.rotation.filter(|v| truthy(*v)).unwrap_or(0.0) * PI / 180.0;
         let (c, s) = (rot.cos(), rot.sin());
         let (cx, cy, hw, hh) = (r[0] + r[2] / 2.0, r[1] + r[3] / 2.0, r[2] / 2.0, r[3] / 2.0);
         let half = |dx: f64, dy: f64| {
