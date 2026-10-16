@@ -166,51 +166,42 @@ impl ProjectReferenceState {
     }
 }
 
-/// Immutable composite value retained by the single revision/history owner.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ProjectEnvelope {
-    project: ProjectMetadata,
-    drawing: Arc<ObjectDocument>,
-    reference: ProjectReferenceState,
-}
-impl ProjectEnvelope {
-    /// The input drawing has ALREADY passed the existing strict storage codec.
-    /// Metadata validation is embodied by ProjectMetadata; no second admission,
-    /// migration, history, decoder or wire interpretation runs at this floor.
-    pub(crate) fn no_media(project: ProjectMetadata, drawing: ObjectDocument) -> Self {
-        Self {
-            project,
-            drawing: Arc::new(drawing),
-            reference: ProjectReferenceState::NoMedia,
+impl ProjectReferenceState {
+    /// Codec + same-owner quota admission precede this retention-only factory.
+    pub(crate) fn admitted_still_shared(
+        id: String,
+        name: String,
+        visible: bool,
+        opacity: f64,
+        offset_frames: i64,
+        encoded: Arc<Vec<u8>>,
+        encoded_limit: usize,
+    ) -> Result<Self, ProjectReferenceError> {
+        if id.is_empty() || id.len() > 255 || id.contains('\0') {
+            return Err(ProjectReferenceError::Id);
         }
-    }
-    pub(crate) fn project(&self) -> &ProjectMetadata {
-        &self.project
-    }
-    pub(crate) fn drawing(&self) -> &ObjectDocument {
-        &self.drawing
-    }
-    /// Replacement drawing has already passed the existing command admission.
-    pub(crate) fn with_drawing(&self, drawing: ObjectDocument) -> Self {
-        Self {
-            project: self.project,
-            drawing: Arc::new(drawing),
-            reference: self.reference.clone(),
+        Self::validate_settings(&name, opacity, offset_frames)?;
+        if encoded_limit == 0
+            || encoded_limit > 16 * 1024 * 1024
+            || encoded.is_empty()
+            || encoded.capacity() > encoded_limit
+        {
+            return Err(ProjectReferenceError::EncodedBudget);
         }
-    }
-    /// Returns a new immutable value sharing the ORIGINAL drawing authority.
-    /// It does not publish a revision, mutate history or activate media.
-    pub(crate) fn with_reference(&self, reference: ProjectReferenceState) -> Self {
-        Self {
-            project: self.project,
-            drawing: Arc::clone(&self.drawing),
-            reference,
-        }
-    }
-    pub(crate) fn reference_state(&self) -> ProjectReferenceState {
-        self.reference.clone()
+        Ok(Self::StillImage(Arc::new(StillReference {
+            id,
+            name,
+            visible,
+            opacity,
+            offset_frames,
+            encoded,
+        })))
     }
 }
+
+#[path = "project_envelope_value.rs"]
+mod value;
+pub(crate) use value::ProjectEnvelope;
 
 #[cfg(test)]
 mod tests {
