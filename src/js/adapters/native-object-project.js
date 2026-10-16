@@ -40,7 +40,7 @@
   }
   function create(ports){
     var phase='idle',info=null,presentation=null,queue=Promise.resolve(),serial=0,pending=0,rendering=null,wantedFrame=null,openingRequested=false;
-    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null;
+    var subscription=null,subscriptionTicket=0,synchronizing=false,openAttempt=null,presentationBounds=null;
     function requestId(kind){return 'project-'+kind+'-'+(++serial);}
     function openDiagnostic(event,code){if(typeof ports.openDiagnostic==='function')try{ports.openDiagnostic(event,code);}catch(_){} }
     function openStage(stage){if(openAttempt){openAttempt.stage=stage;openAttempt.invokeErrors=new Set();}}
@@ -77,7 +77,7 @@
     function active(){return phase==='native';}
     function requireActive(){if(!active()||!info)throw new Error('Native project is unavailable; reopen Nemo');return info;}
     function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;if(pending===0&&ports.presented)ports.presented(info);});}
-    function fence(error){phase='indeterminate';presentation=null;retireSubscription().catch(function(){});if(ports.failed)ports.failed(error);return error;}
+    function fence(error){phase='indeterminate';presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);retireSubscription().catch(function(){});if(ports.failed)ports.failed(error);return error;}
     function epoch(value){return value&&{instanceId:value.instanceId,documentId:value.documentId,lifecycleGeneration:value.lifecycleGeneration};}
     function sameEpoch(a,b){return !!a&&!!b&&a.instanceId===b.instanceId&&a.documentId===b.documentId&&a.lifecycleGeneration===b.lifecycleGeneration;}
     function guardEpoch(value){if(!active()||!sameEpoch(value,epoch(info)))throw new Error('Native project owner changed before queued action');}
@@ -159,16 +159,17 @@
       if(openingRequested||phase!=='idle'&&phase!=='native')return Promise.reject(new Error('Native project Open is unavailable'));
       openingRequested=true;wantedFrame=null;
       return enqueue(async function(){
-        var previous=info,priorPresentation=presentation,priorPhase=phase,dispatched=false,inBootstrap=false;
+        var previous=info,priorPresentation=presentation,priorBounds=presentationBounds,priorPhase=phase,dispatched=false,inBootstrap=false;
         function current(){if(transition&&transition.isCurrent&&transition.isCurrent()!==true){
           if(dispatched)throw new Error('Native project request changed after dispatch');
           throw localRefusal('Native project request was cancelled');}}
-        phase='opening';presentation=null;
+        phase='opening';presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);
         try{
           current();
           await retireSubscription();
           if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
-            phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();return false;}
+            phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();
+            if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);return false;}
           current();
           if(transition&&transition.occlude)await transition.occlude();
           var before=await status();
@@ -214,6 +215,7 @@
               else{var empty=await status();if(!empty||empty.apiVersion!==2||empty.available!==false)throw new Error('Native project slot changed');}
               info=previous;phase=priorPhase;presentation=priorPresentation;
               if(transition&&transition.restore)await transition.restore(previous);
+              if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);
               if(previous)await attachSubscription();
             }catch(unknown){throw fence(unknown);}
             if(!source.newProject&&!previous&&error&&error.code==='unsupported_format')return null;
@@ -243,7 +245,7 @@
         viewport:viewport};
     }
     function previewReceiptFailure(request,receipt){
-      if(!same(info,request))return 'owner';
+      if(!['opening','native'].includes(phase)||!same(info,request))return 'owner';
       if(!receipt)return 'receipt';
       var status=receipt.status;
       if(status!=='presented')return ['stale-discarded','deferred-timeout','deferred-occluded','failed-validation',
@@ -253,16 +255,22 @@
       return null;
     }
     async function present(frame,pin,revisionSync){
-      var request=frameRequest(frame,pin);if(revisionSync)request.revisionSync=revisionSync;
-      var receipt=await raw('nemo_native_object_preview',request);
+      var request;
+      try{request=frameRequest(frame,pin);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
+      if(revisionSync)request.revisionSync=revisionSync;
+      var bounds=Object.assign({},request.viewport.cssBounds);
+      var receipt;
+      try{receipt=await raw('nemo_native_object_preview',request);}
+      catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw error;}
       var failure;
-      try{failure=previewReceiptFailure(request,receipt);}catch(error){throw previewFailure('receipt-access',error);}
+      try{failure=previewReceiptFailure(request,receipt);}catch(error){if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure('receipt-access',error);}
       if(failure){
-        presentation=null;throw previewFailure(failure,new Error('Native project frame was not presented'));
+        presentation=null;if(ports.surfaceChanged)ports.surfaceChanged(null);throw previewFailure(failure,new Error('Native project frame was not presented'));
       }
       presentation=freeze({owner:'native',status:'presented',contextId:'scene-root',frame:frame,workId:receipt.workId,
         viewGeneration:receipt.viewGeneration,instanceId:request.instanceId,documentId:request.documentId,
         contentRevision:request.contentRevision,documentSnapshotId:request.documentSnapshotId,lifecycleGeneration:request.lifecycleGeneration});
+      presentationBounds=bounds;if(ports.surfaceChanged)ports.surfaceChanged(presentation,bounds);
       return presentation;
     }
     function presentPreview(frame){
@@ -409,7 +417,6 @@
     if(!root.__TAURI__||!root.__TAURI__.core)return null;
     if(desktops.has(root))return desktops.get(root);
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
-    function projectionReady(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionMatches(root,info);}
     function settingsNotice(kind,info){var c=root.NemoNativeProjectSettingsController;if(c&&typeof c[kind]==='function')c[kind](info);}
     function publishRevision(info){
       settingsNotice('willProject',info);
@@ -421,7 +428,7 @@
       if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();
       return true;
     }
-    var session=create({invoke:invoke,projectionReady:projectionReady,publishRevision:publishRevision,
+    var session=create(Object.assign({},root.NemoNativeViewportUnderlay.desktop(root),{invoke:invoke,publishRevision:publishRevision,
       subscribeRevisions:async function(synchronize,disconnected,trackedInvoke){
         if(!root.NemoApplicationMcpTransport||!root.__TAURI__.event||typeof root.__TAURI__.event.listen!=='function')
           return null; // Private file Open remains usable; no toggle/subscriber is advertised.
@@ -448,14 +455,11 @@
         return root.NemoNativeApplicationAdapter.createNativeApplicationAdapter('ui',transport).dispatch(request);
       },
       openDiagnostic:typeof root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__==='function'?function(event,code){try{root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__(event,code);}catch(_){} }:null,
-      frame:function(){return root.state.currentFrame;},
-      mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;
-        return {cssBounds:{x:b.left,y:b.top,width:b.width,height:b.height},physicalExtent:{width:Math.max(1,Math.round(b.width*d)),height:Math.max(1,Math.round(b.height*d))},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:d};},
       presented:function(info){settingsNotice('presented',info);},
       changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
-      failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}});
+      failed:function(){if(root.showToast)root.showToast('Native project state is unconfirmed. Reopen Nemo before continuing.');}}));
     desktops.set(root,session);return session;
   }
   function uiSession(root){var session=desktop(root);return session&&session.blocksLegacy()?session:null;}

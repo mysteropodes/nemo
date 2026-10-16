@@ -235,6 +235,11 @@ function ordinary(h,deferFrames=false){
     documentSource:fs.readFileSync('src/js/project-document.js','utf8'),entrySource:fs.readFileSync('src/js/project-entry.js','utf8')});
   vm.runInContext(code+'\nthis.makeHarness=harness;',context);
   return context.makeHarness({dirtyDot:true,deferFrames,configureWindow(root){
+    const classes=new Set(),styles=new Map();
+    root.document.documentElement={clientWidth:1280,clientHeight:900,
+      classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)},
+      style:{getPropertyValue:k=>styles.get(k)||'',getPropertyPriority:()=>'',setProperty:(k,v)=>styles.set(k,v),removeProperty:k=>styles.delete(k)}};
+    root.NemoNativeViewportUnderlay=require('../src/js/adapters/native-viewport-underlay.js');
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeObjectInactiveProjectTabs=require('../src/js/adapters/native-object-inactive-project-tabs.js');
     let id=0;root.crypto={randomUUID:()=>`inactive-ui-${++id}`};
@@ -243,6 +248,7 @@ function ordinary(h,deferFrames=false){
 }
 test('complete production Project Open/Save As updates tab, recents and dirty state through native adapters',async()=>{
   const h=host(),app=ordinary(h);assert.equal(await app.project.openPath('/ordinary.json'),true);
+  assert.equal(app.window.document.documentElement.classList.contains('nemo-native-underlay'),true);
   assert.equal(app.project.getCurrentLabel(),'ordinary — /ordinary.json');assert.equal(app.project.isDirty(),false);
   assert.equal(app.element('project-tabs-list').children.length,1);assert.equal(app.startScreen.classList.contains('hid'),true);
   const s=Project.desktop(app.window);await s.reference({kind:'remove'});assert.equal(app.project.isDirty(),true);
