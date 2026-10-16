@@ -288,10 +288,22 @@ pub(crate) struct AdmittedProject {
 
 impl OutputSpecInput {
     pub(crate) fn admit(&self) -> HostResult<OutputSpec> {
+        if self.width != 320 || self.height != 180 {
+            return Err(host_error(
+                "invalid_request",
+                "unsupported preview output contract",
+            ));
+        }
+        self.admit_object()
+    }
+
+    pub(crate) fn admit_object(&self) -> HostResult<OutputSpec> {
+        // Match object_compositor's 4096 dimension / 64 MiB RGBA budget.
+        // At this bound, even 256-byte padded rows fit that allocation limit.
         if self.kind != "frame"
             || self.format != "rgba8"
-            || self.width != 320
-            || self.height != 180
+            || !(1..=4096).contains(&self.width)
+            || !(1..=4096).contains(&self.height)
             || self.color_interpretation != "srgb"
             || self.alpha_mode != "straight"
         {
@@ -320,6 +332,24 @@ impl ViewportInput {
                 "unsupported viewport composition extent",
             ));
         }
+        self.mapping()
+    }
+
+    pub(crate) fn admit_object(self, output: &OutputSpec) -> HostResult<ViewportMapping> {
+        if (
+            self.composition_extent.width,
+            self.composition_extent.height,
+        ) != output.dimensions()
+        {
+            return Err(host_error(
+                "invalid_request",
+                "object viewport and output extent differ",
+            ));
+        }
+        self.mapping()
+    }
+
+    fn mapping(self) -> HostResult<ViewportMapping> {
         ViewportMapping::new(
             CssBounds {
                 x: self.css_bounds.x,

@@ -11,6 +11,8 @@ use native_engine::{
 };
 use serde_json::{json, Value};
 use std::{cell::Cell, fs, path::PathBuf};
+#[path = "native_object_desktop_export_extent_tests.rs"]
+mod extent_tests;
 
 struct Scratch(PathBuf);
 impl Scratch {

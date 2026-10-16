@@ -121,8 +121,8 @@ fn admit_request(
             "object export was cancelled",
         ));
     }
-    let output = request.output_spec.admit()?;
-    let mapping = request.viewport.admit()?;
+    let output = request.output_spec.admit_object()?;
+    let mapping = request.viewport.admit_object(&output)?;
     let raw_destination = Path::new(&request.destination_directory);
     if !raw_destination.is_absolute()
         || !matches!(
@@ -271,6 +271,7 @@ fn export_with_target(
     let selector = admitted.request.selector();
     let outcome = state
         .with_object_preview_owner(admitted.request.lifecycle_generation, &selector, |owner| {
+            owner.require_project_output(admitted.output.dimensions())?;
             Ok(target(ObjectExportConsumer {
                 owner,
                 selector: selector.clone(),
