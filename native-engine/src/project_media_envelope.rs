@@ -2,44 +2,9 @@
 use crate::object_document::ObjectDocument;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ProjectMetadataError {
-    InvalidCanvas,
-    InvalidFps,
-}
-
-/// Supplied metadata only. This model never invents values for a bare drawing.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct ProjectMetadata {
-    canvas_width: u32,
-    canvas_height: u32,
-    fps: f64,
-}
-impl ProjectMetadata {
-    pub(crate) fn new(
-        canvas_width: u32,
-        canvas_height: u32,
-        fps: f64,
-    ) -> Result<Self, ProjectMetadataError> {
-        if canvas_width == 0 || canvas_height == 0 {
-            return Err(ProjectMetadataError::InvalidCanvas);
-        }
-        if !fps.is_finite() || fps <= 0.0 {
-            return Err(ProjectMetadataError::InvalidFps);
-        }
-        Ok(Self {
-            canvas_width,
-            canvas_height,
-            fps,
-        })
-    }
-    pub(crate) fn canvas_dimensions(&self) -> (u32, u32) {
-        (self.canvas_width, self.canvas_height)
-    }
-    pub(crate) fn fps(&self) -> f64 {
-        self.fps
-    }
-}
+#[path = "project_settings.rs"]
+mod project_settings;
+pub(crate) use project_settings::{ProjectMetadata, ProjectMetadataError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ProjectReferenceError {

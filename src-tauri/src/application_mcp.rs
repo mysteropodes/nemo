@@ -483,3 +483,7 @@ mod object_client_admission_tests;
 #[cfg(test)]
 #[path = "native_object_serialization_tests.rs"]
 mod object_serialization_tests;
+
+#[cfg(test)]
+#[path = "native_project_settings_public_tests.rs"]
+mod project_settings_public_tests;

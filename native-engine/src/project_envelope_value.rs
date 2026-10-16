@@ -24,6 +24,13 @@ impl ProjectEnvelope {
             asset_inventory: None,
         }
     }
+    /// Replace settings without copying drawing or any retained media allocation.
+    pub(crate) fn with_metadata(&self, project: ProjectMetadata) -> Self {
+        Self {
+            project,
+            ..self.clone()
+        }
+    }
     pub(crate) fn project(&self) -> &ProjectMetadata {
         &self.project
     }

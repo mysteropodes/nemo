@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.project-settings",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.project.settings.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectProjectSettingsPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained settings receipt or typed refusal; no path, resource or raw document payload."
+  },
+  "semantics": "One project metadata revision; no-op adds no history and preserves redo. Storage absence stays absent until that exact setting is edited. setFps command clamps finite values to1..60; work-area numbers are finite without range normalization. Bare drawing without project metadata reports unavailable. No totalFrames mutation or optional-setting clearing is admitted.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native project settings command; installed acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "settings-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.project.settings.edit",
+        "payload": {
+          "command": "object.project.settings.edit",
+          "action": {
+            "kind": "setCanvasBackground",
+            "color": "#AbC8dE80"
+          }
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "settings-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}

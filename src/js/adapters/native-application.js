@@ -11,6 +11,7 @@
     'query.document.opacity', 'query.document.revision', 'query.document.snapshot.acquire',
     'query.document.serialize', 'query.document.evaluate',
     'query.document.object', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    'command.document.object.project.settings.edit',
     'query.document.object.layer.timing',
     'query.diagnostics.recent', 'query.reproduction.report',
     'transaction.begin', 'transaction.update', 'transaction.commit', 'transaction.cancel',
@@ -21,6 +22,7 @@
     'command.document.apply', 'transaction.begin', 'history.undo', 'history.redo',
     'job.export.png.begin',
     'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    'command.document.object.project.settings.edit',
   ]);
   const commonErrors = new Set([
     'invalid_request', 'wrong_instance', 'wrong_document', 'stale_revision', 'busy_conflict',
@@ -129,6 +131,20 @@
     if (value.fill.kind !== 'solid' || !['r', 'g', 'b', 'a'].every((key) =>
       Number.isFinite(value.fill[key]) && value.fill[key] >= 0 && value.fill[key] <= 1)) throw new TypeError('unsupported object fill');
   }
+  function projectSettingsPayload(payload) {
+    exact(payload, ['command', 'action'], [], 'project settings');
+    if (payload.command !== 'object.project.settings.edit') throw new TypeError('invalid project settings command');
+    const action = payload.action;
+    if (!plain(action)) throw new TypeError('project settings action must be an object');
+    const fields = {setCanvasSize:['width','height'],setFps:['fps'],setCanvasBackground:['color'],setWorkArea:['inFrame','outFrame']};
+    if (!has(fields, action.kind)) throw new TypeError('unsupported project settings action');
+    exact(action, ['kind', ...fields[action.kind]], [], 'project settings action');
+    if (action.kind === 'setCanvasSize') {
+      if (![action.width, action.height].every(v => Number.isInteger(v) && v > 0 && v <= 4294967295)) throw new TypeError('invalid canvas dimensions');
+    } else if (action.kind === 'setCanvasBackground') {
+      if (typeof action.color !== 'string' || !/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(action.color)) throw new TypeError('invalid canvas background');
+    } else if (!fields[action.kind].every(key => Number.isFinite(action[key]))) throw new TypeError('invalid numeric project setting');
+  }
   function validatePayload(operation, payload) {
     if (operation === 'query.document.object') {
       exact(payload, ['atRevision', 'stableTarget'], [], 'object query');
@@ -137,6 +153,8 @@
       exact(payload, ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'], [], 'timing selector');
       revision(payload.atRevision, 'atRevision'); frame(payload.frame);
       ['documentSnapshotId', 'contextId', 'layerUid'].forEach(key => objectUid(payload[key]));
+    } else if (operation === 'command.document.object.project.settings.edit') {
+      projectSettingsPayload(payload);
     } else if (operation === 'command.document.object.layer.create') {
       exact(payload, ['command', 'name'], [], 'object layer create');
       if (payload.command !== 'object.layer.create' || typeof payload.name !== 'string') throw new TypeError('invalid object layer create');
@@ -295,7 +313,7 @@
       exact(value, ['applied', 'historyEntriesAdded', 'layerUid'], [], 'object layer create result');
       if (value.applied !== true || value.historyEntriesAdded !== 1) throw new TypeError('invalid layer creation disposition');
       objectUid(value.layerUid);
-    } else if (operation === 'command.document.object.layer.visibility.set') {
+    } else if (['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit'].includes(operation)) {
       exact(value, ['applied', 'historyEntriesAdded'], [], 'visibility result');
       if (typeof value.applied !== 'boolean' || value.historyEntriesAdded !== (value.applied ? 1 : 0)) throw new TypeError('invalid visibility disposition');
     } else if (operation === 'query.diagnostics.recent') {
@@ -365,7 +383,8 @@
   }
   function validateResponse(value, requestId, operation) {
     rejectForbidden(value, undefined, objectIdPaths(operation));
-    if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
+    if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create',
+    'command.document.object.project.settings.edit', 'query.document.serialize', 'query.document.evaluate', 'query.diagnostics.recent', 'query.reproduction.report'].includes(operation)) {
       const encoded = JSON.stringify(value);
       const bytes = typeof TextEncoder === 'function' ? new TextEncoder().encode(encoded).length : unescape(encodeURIComponent(encoded)).length;
       if (bytes > 4096) throw new TypeError('read response exceeds 4096 encoded bytes');
@@ -401,7 +420,7 @@
         const outbound = clone(request);
         return Promise.resolve(transport.dispatch(outbound)).then((response) => {
           validateResponse(response, outbound.requestId, outbound.operation);
-          if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create'].includes(outbound.operation)) {
+          if (['query.document.object', 'query.document.object.layer.timing', 'command.document.object.layer.visibility.set', 'command.document.object.layer.create', 'command.document.object.project.settings.edit'].includes(outbound.operation)) {
             const replacement = !response.ok && response.error.code === 'wrong_document';
             if (response.instanceId !== outbound.instanceId || response.documentId !== outbound.documentId && !replacement) throw new TypeError('object response identity mismatch');
             if (response.ok && outbound.operation === 'query.document.object') {
@@ -414,7 +433,7 @@
                 ['atRevision', 'documentSnapshotId', 'contextId', 'layerUid', 'frame'].some(key => response.result[key] !== outbound.payload[key])) throw new TypeError('timing read selector mismatch');
             if (response.ok && outbound.operation === 'command.document.object.layer.create' &&
                 response.contentRevision !== outbound.expectedRevision + 1) throw new TypeError('creation receipt revision mismatch');
-            if (response.ok && outbound.operation === 'command.document.object.layer.visibility.set' &&
+            if (response.ok && ['command.document.object.layer.visibility.set', 'command.document.object.project.settings.edit'].includes(outbound.operation) &&
                 response.contentRevision !== outbound.expectedRevision + (response.result.applied ? 1 : 0)) throw new TypeError('visibility receipt revision mismatch');
           }
           if (['query.diagnostics.recent', 'query.reproduction.report'].includes(outbound.operation) &&
