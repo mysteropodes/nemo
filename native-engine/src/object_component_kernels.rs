@@ -4,3 +4,10 @@
 #[path = "object_component_playback.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_component_playback;
+
+#[path = "duplicator_placement_modes.rs"]
+#[allow(dead_code)]
+pub(crate) mod duplicator_placement_modes;
+#[path = "duplicator_placement_rng.rs"]
+#[allow(dead_code)]
+pub(crate) mod duplicator_placement_rng;
