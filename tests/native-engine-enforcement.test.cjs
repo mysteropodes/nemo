@@ -608,6 +608,63 @@ test('D31 3D projection kernel stays a private evaluation child and fails closed
   }
 });
 
+test('L09-A media timing video kernel stays a private document child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectMediaTimingRegistration, /L09-A\/#2126/);
+  const documentText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_document.rs'), 'utf8');
+  assert.match(documentText, /#\[path = "object_media_timing_core\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod media_timing;/);
+  const coreText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_timing_core.rs'), 'utf8');
+  assert.match(coreText, /#\[path = "object_media_timing_video\.rs"\]\s*pub\(crate\) mod object_media_timing_video;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_media_timing_video.rs'), 'utf8');
+  for (const [name, mod] of [['object_media_timing_video', 'tests'], ['object_media_timing_video_controls', 'controls'], ['object_media_timing_video_pins', 'pins']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.document', 'native-engine/src/object_media_timing_core.rs'],
+    ['rust.native.engine.document', 'native-engine/src/object_media_timing_video.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_video.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_video_controls.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_media_timing_video_pins.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
+test('L10-A montage timing kernel stays a private evaluation child and fails closed without registration', () => {
+  const profile = readJson(ROOT, PROFILE);
+  const coverage = readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json');
+  assert.match(coverage.nativeObjectMontageTimingRegistration, /L10-A\/#2123/);
+  const evaluationText = fs.readFileSync(path.join(ROOT, 'native-engine/src/evaluation.rs'), 'utf8');
+  assert.match(evaluationText, /#\[path = "object_montage_timing\.rs"\]\s*#\[allow\(dead_code\)\]\s*pub\(crate\) mod object_montage_timing;/);
+  const kernelText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_montage_timing.rs'), 'utf8');
+  for (const [name, mod] of [['object_montage_timing_rows', 'rows'], ['object_montage_timing', 'tests'], ['object_montage_timing_controls', 'controls']]) {
+    assert.match(kernelText, new RegExp(`#\\[cfg\\(test\\)\\]\\s*#\\[path = "\\.\\./tests/${name}\\.rs"\\]\\s*mod ${mod};`));
+  }
+  for (const [id, file] of [
+    ['rust.native.engine.evaluation', 'native-engine/src/object_montage_timing.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_timing.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_timing_rows.rs'],
+    ['rust.native.engine.tests', 'native-engine/tests/object_montage_timing_controls.rs'],
+  ]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    assert.equal(owner?.files.filter((name) => name === path.basename(file)).length, 1, `${id} must own ${file}`);
+    assert.equal(owner.publicApi.includes(path.basename(file)), false, `${file} stays private`);
+    const missing = structuredClone(profile);
+    missing.modules.find((entry) => entry.id === id).files = owner.files.filter((name) => name !== path.basename(file));
+    const result = checkSourceCoverage(missing, { root: ROOT, sourcePaths: [file] });
+    assert.ok(result.violations.some((entry) => entry.rule === 'coverage-unprofiled-source' && entry.file === file),
+      `${file} must fail when unregistered`);
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
