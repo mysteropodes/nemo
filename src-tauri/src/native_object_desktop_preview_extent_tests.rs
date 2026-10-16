@@ -1,5 +1,5 @@
 //! Object extent and owned-project correspondence; controlled targets only.
-use super::*;
+use crate::native_object_desktop_preview::tests::*;
 
 // Scalar New is the actual project authority; no fabricated metadata/owner.
 fn extent_project(
