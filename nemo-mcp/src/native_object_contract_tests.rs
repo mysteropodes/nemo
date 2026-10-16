@@ -440,3 +440,28 @@ fn timing_result_front_door_refuses_an_invalid_original_selector() {
         ));
     }
 }
+
+#[test]
+fn timing_selector_accepts_closed_frame_bounds_and_refuses_out_of_domain_selectors() {
+    for frame in [0, u32::MAX] {
+        let mut payload = timing_payload();
+        payload["frame"] = json!(frame);
+        let mut result = timing_result_fixture();
+        result["frame"] = json!(frame);
+        result["sourceFrame"] = json!(frame);
+        result["cellKind"] = json!("key");
+        result["manualEdit"] = json!(false);
+        assert!(timing_request(&payload));
+        assert!(timing_result("document", &payload, &result));
+        for bad in [
+            json!(-1),
+            json!(u32::MAX as u64 + 1),
+            json!(0.5),
+            json!("0"),
+        ] {
+            payload["frame"] = bad;
+            assert!(!timing_request(&payload));
+            assert!(!timing_result("document", &payload, &result));
+        }
+    }
+}

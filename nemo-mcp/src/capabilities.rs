@@ -297,8 +297,7 @@ fn validate_native_availability(descriptor: &Value) -> Result<(), crate::contrac
 
 #[cfg(test)]
 mod native_availability_tests {
-    use super::{validate_native_availability, NativeCapabilityCatalog};
-    use crate::contract::RequestError;
+    use super::{validate_native_availability, validate_native_operation, NativeCapabilityCatalog};
     use serde_json::{json, Value};
 
     fn catalog_with(availability: Value) -> NativeCapabilityCatalog {
@@ -346,10 +345,9 @@ mod native_availability_tests {
             let descriptor = catalog
                 .capability_for_operation("query.test.native.availability")
                 .unwrap();
-            match validate_native_availability(descriptor) {
-                Err(RequestError::Unavailable(reason)) => assert_eq!(reason, expected),
-                other => panic!("unavailable declaration must fail closed: {other:?}"),
-            }
+            let error = validate_native_availability(descriptor).unwrap_err();
+            assert_eq!(error.code(), "unavailable");
+            assert_eq!(error.message(), expected);
         }
     }
 
@@ -363,5 +361,14 @@ mod native_availability_tests {
         assert!(catalog
             .capability_for_operation("query.test.missing")
             .is_none());
+    }
+    #[test]
+    fn undeclared_native_operation_is_rejected_before_availability() {
+        let error = validate_native_operation("query.test.missing").unwrap_err();
+        assert_eq!(error.code(), "invalid_request");
+        assert_eq!(
+            error.message(),
+            "operation query.test.missing is not declared by a registered native capability"
+        );
     }
 }
