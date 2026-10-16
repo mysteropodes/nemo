@@ -98,7 +98,8 @@
     "profiles": {
       "candidate": "engineering/boundaries/profiles/rust.profile.json",
       "baseline": "engineering/boundaries/profiles/rust.baseline.json"
-    }
+    },
+    "nativeExpressionVendorAccounting": "E2/#2088 classifies exactly the 25 upstream-identical Rust files in the preserved 306-file rquickjs-sys 0.14.0 archive as separately counted vendor source, not handwritten application modules or exclusions. The normal Rust source census verifies the raw pinned manifest, every vendor file, the literal two-file C patch and provenance, refuses missing/extra/changed files and module overlap, and reports selected = handwritten + vendor with exclusions still empty. Handwritten module ownership, size ceilings, frozen size baseline, coverage floors, dependency edges and public APIs are unchanged. Compiler-free private fixture controls do not establish Cargo, parser-runtime, platform or installed acceptance."
   },
   "relatedPolicies": [
     {
