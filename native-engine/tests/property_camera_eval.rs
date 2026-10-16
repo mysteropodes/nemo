@@ -1,7 +1,7 @@
 //! Oracle tests for the camera track kernel (K-CAM).
 //!
-//! `fixtures/property-camera-eval/oracle.txt` (`ORACLE`, sha256 2d3bdbc4aa7b60d8
-//! fd8b3345f5f32aeab546b106f6e80bee214e8f) was produced by running `bezierEase`,
+//! `fixtures/property-camera-eval/oracle.txt` (`ORACLE`, sha256
+//! 2d3bdbc4aa7b60d8fcf81a10ddfd8b3345f5f32aeab546b106f6e80bee214e8f) was produced by running `bezierEase`,
 //! `snap`, `cameraAtFrameFor` and `cameraMatrixAtFrame`, cut verbatim from
 //! `src/js/camera.js` at 1f663ac3 against the real Paper.js 0.12.18 `Matrix`
 //! (generator `gen.js`, kept outside the repo).
@@ -293,4 +293,22 @@ fn rot_and_matrix_controls() {
         (0.0, 1.0)
     );
     assert!(bezier_ease(0.5, 0.0, 0.0, 0.0, 0.0).is_finite());
+}
+
+#[test]
+fn nan_rot_reads_as_zero_and_skips_the_roll() {
+    // JS `k.rot || 0`: a NaN rot is +0, and the matrix is the no-rot one
+    let mut a = k(0.0, 100.0, 100.0, 960.0);
+    a.rot = Some(f64::NAN);
+    assert_eq!(pose(&[a], 0.0).rot.to_bits(), 0.0f64.to_bits());
+    let plain = k(0.0, 100.0, 100.0, 960.0);
+    assert_eq!(
+        camera_matrix_at_frame(Some(&[a]), 0.0, 1920.0, 1080.0),
+        camera_matrix_at_frame(Some(&[plain]), 0.0, 1920.0, 1080.0)
+    );
+    // interpolating from a NaN rot starts from 0
+    let mut b = linear(k(10.0, 100.0, 100.0, 960.0));
+    b.rot = Some(90.0);
+    let a = linear(a);
+    assert_eq!(pose(&[a, b], 5.0).rot, 45.0);
 }

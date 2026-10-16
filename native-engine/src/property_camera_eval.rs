@@ -4,7 +4,9 @@
 //! `snap`, `cameraAtFrameFor` and `cameraMatrixAtFrame`, plus the Paper.js
 //! 0.12.18 `Matrix` append semantics (`translate`, `scale(s, center)`,
 //! `rotate(deg, center)`) they rely on. Arithmetic keeps the JS operand
-//! order, so results are bit-identical (NaN payloads aside).
+//! order, so results are bit-identical (NaN payloads aside) wherever the
+//! platform `sin`/`cos` agree with V8's; the `Math.max`/`min` NaN and `-0`
+//! cases are mirrored but no oracle row reaches them.
 //!
 //! Camera semantics kept on purpose:
 //! - keys are used as given: never sorted, duplicates allowed. The first and
