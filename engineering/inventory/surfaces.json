@@ -3,8 +3,8 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "42e77b5b515f95a323ff08821874918875d7ceb0",
-  "describe": "v0.7.0-alpha.4-1963-g42e77b5b-dirty"
+  "head": "10a98cf097d0a6701d50bc5b945404427c9ac4e6",
+  "describe": "v0.7.0-alpha.4-1970-g10a98cf0-dirty"
  },
  "inputsDigest": "d78511dd8627159e9551ccbed40ff8e8f8eedcc4397915f0443e110f6f883c43",
  "states": [
