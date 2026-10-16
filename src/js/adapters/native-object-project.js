@@ -15,7 +15,9 @@
     if(!v||v.apiVersion!==2||v.requestId!==request.requestId||v.instanceId!==request.instanceId||v.documentId!==request.documentId||
       !id(v.documentSnapshotId)||!integer(v.contentRevision,0)||!integer(v.lifecycleGeneration,1)||
       !/^[a-f0-9]{64}$/.test(v.documentDigest)||!integer(v.byteCount,1)||v.byteCount>32*1024*1024||
-      !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!(v.fps>0)||
+      !integer(v.canvasW,1)||!integer(v.canvasH,1)||!integer(v.totalFrames,1)||!Number.isFinite(v.fps)||!(v.fps>0)||
+      (Object.prototype.hasOwnProperty.call(v,'canvasBg')&&(typeof v.canvasBg!=='string'||!/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(v.canvasBg)))||
+      ['waIn','waOut'].some(function(k){return Object.prototype.hasOwnProperty.call(v,k)&&!Number.isFinite(v[k]);})||
       !Array.isArray(v.layers)||!v.layers.every(function(l){return l&&typeof l.layerUid==='string'&&
         (!Object.prototype.hasOwnProperty.call(l,'name')||typeof l.name==='string')&&
         (!Object.prototype.hasOwnProperty.call(l,'visible')||typeof l.visible==='boolean')&&
@@ -25,6 +27,7 @@
     // Copy only admitted UI fields; embedded files/objects never become JS state.
     var result={};['apiVersion','instanceId','documentId','contentRevision','documentSnapshotId','lifecycleGeneration',
       'documentDigest','byteCount','canvasW','canvasH','fps','totalFrames','undoDepth','redoDepth'].forEach(function(k){result[k]=v[k];});
+    ['canvasBg','waIn','waOut'].forEach(function(k){if(Object.prototype.hasOwnProperty.call(v,k))result[k]=v[k];});
     result.layers=v.layers.map(function(l){var row={layerUid:l.layerUid};
       if(Object.prototype.hasOwnProperty.call(l,'name'))row.name=l.name;
       if(Object.prototype.hasOwnProperty.call(l,'visible'))row.visible=l.visible;
@@ -321,6 +324,12 @@
       return {apiVersion:2,requestId:requestId('layer-create'),instanceId:pin.instanceId,documentId:pin.documentId,
         operation:'command.document.object.layer.create',expectedRevision:pin.contentRevision,payload:{command:'object.layer.create',name:name}};
     },'nemo_native_dispatch');}
+    function editProjectSettings(action,expected){return mutation(function(pin){
+      if(!same(pin,expected))throw new Error('Native project settings intent is stale');
+      return {apiVersion:2,requestId:requestId('project-settings'),instanceId:pin.instanceId,documentId:pin.documentId,
+        operation:'command.document.object.project.settings.edit',expectedRevision:pin.contentRevision,
+        payload:{command:'object.project.settings.edit',action:action}};
+    },'nemo_native_dispatch');}
     function setLayerVisibility(layerUid,visible){
       if(typeof visible!=='boolean')return Promise.reject(new Error('Native layer visibility target or value is invalid'));
       return visibilityIntent(layerUid,visible);
@@ -383,6 +392,8 @@
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      get editProjectSettings(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?editProjectSettings:undefined;},
       get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?createLayer:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
