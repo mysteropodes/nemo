@@ -58,6 +58,10 @@ impl ObjectCompositionWitness {
     pub(crate) fn is_viewport(&self) -> bool {
         self.viewport
     }
+    /// Read the same retained snapshot used for every painted record.
+    pub(crate) fn canvas_background_rgba8(&self) -> [u8; 4] {
+        self.plan.packet().canvas_background_rgba8()
+    }
     pub fn plan(&self) -> &ObjectPaintPlan {
         &self.plan
     }
