@@ -245,7 +245,7 @@ fn duplicate_json_members_and_holder_property_control_identities_never_overwrite
 #[cfg(feature = "history")]
 #[test]
 fn existing_fill_owner_history_and_immutable_pins_retain_holder_values() {
-    use crate::history::object_history::NativeObjectHistory;
+    use crate::history::NativeObjectHistory;
     for version in [1, 2] {
         let mut value = source(version);
         value["propertyHolders"] = holders();
@@ -277,7 +277,7 @@ fn existing_fill_owner_history_and_immutable_pins_retain_holder_values() {
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 #[test]
 fn full_project_save_reopen_and_retained_reads_preserve_control_and_holder_presence() {
-    use crate::history::object_history::NativeObjectHistory;
+    use crate::history::NativeObjectHistory;
     for version in [1, 2] {
         let mut drawing = source(version);
         drawing["propertyHolders"] = holders();
