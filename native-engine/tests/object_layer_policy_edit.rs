@@ -277,7 +277,7 @@ fn staged_policy_receipt_replay_is_exact_and_does_not_repeat_history() {
     conflict.payload["value"] = json!(false);
     assert_eq!(
         dispatch(&mut o, &conflict)["error"]["code"],
-        "InvalidRequest"
+        "invalid_request"
     );
     assert_eq!(state(&o), before);
     let new = request(&o, "same-lock", "locked", true);
@@ -301,23 +301,23 @@ fn staged_policy_cancel_stale_missing_revision_wrong_scope_and_malformed_payload
     cancelled.cancelled_before_dispatch = true;
     assert_eq!(
         dispatch(&mut o, &cancelled)["error"]["code"],
-        "CancelledBeforeDispatch"
+        "cancelled_before_dispatch"
     );
     assert_eq!(state(&o), before);
     let mut stale = request(&o, "stale", "locked", true);
     stale.expected_revision = Some(0);
-    assert_eq!(dispatch(&mut o, &stale)["error"]["code"], "StaleRevision");
+    assert_eq!(dispatch(&mut o, &stale)["error"]["code"], "stale_revision");
     assert_eq!(state(&o), before);
     let mut missing = request(&o, "missing-revision", "locked", true);
     missing.expected_revision = None;
     assert_eq!(
         dispatch(&mut o, &missing)["error"]["code"],
-        "InvalidRequest"
+        "invalid_request"
     );
     assert_eq!(state(&o), before);
     for (id, code, instance) in [
-        ("wrong-instance", "WrongInstance", true),
-        ("wrong-document", "WrongDocument", false),
+        ("wrong-instance", "wrong_instance", true),
+        ("wrong-document", "wrong_document", false),
     ] {
         let mut wrong = request(&o, id, "shy", true);
         if instance {
@@ -332,7 +332,7 @@ fn staged_policy_cancel_stale_missing_revision_wrong_scope_and_malformed_payload
     invalid.payload["flag"] = json!("solo");
     assert_eq!(
         dispatch(&mut o, &invalid)["error"]["code"],
-        "InvalidRequest"
+        "invalid_request"
     );
     assert_eq!(state(&o), before);
 }
