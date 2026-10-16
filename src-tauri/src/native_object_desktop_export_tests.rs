@@ -307,6 +307,7 @@ fn exact_application_owner_repeats_literal_png_through_real_port() {
 fn sequence_document() -> Value {
     let mut document = object_document();
     document["totalFrames"] = json!(2);
+    document["layers"][0]["timing"]["keys"] = json!([{"frame": 0}, {"frame": 1}]);
     let mut next = document["objects"][0].clone();
     next["target"]["frameScope"]["frame"] = json!(1);
     next["fill"] = json!({"kind":"solid","r":0,"g":1,"b":0,"a":1});
