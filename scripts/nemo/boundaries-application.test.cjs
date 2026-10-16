@@ -202,6 +202,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
     'src/js/adapters/native-object-ui.js',
+    'src/js/adapters/native-drawing-add.js',
+    'src/js/adapters/native-drawing-add-desktop.js',
     'src/js/adapters/native-object-reference.js',
     'src/js/application/native-opacity-operations.js',
     'src/js/application/opacity-application.js',
@@ -224,8 +226,8 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-      130, 176, 177, 178, 179, 180, 181, 182, 183, 184]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+      132, 178, 179, 180, 181, 182, 183, 184, 185, 186]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -233,10 +235,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 127);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 128);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 129);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 131);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 129);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 130);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 131);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 133);
 });
 
 test('bootstrap numerical observations match actual HTML and retained declarations', () => {

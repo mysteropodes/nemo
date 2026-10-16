@@ -2077,6 +2077,22 @@
       ]
     },
     {
+      "id": "app.native.drawing-add.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": ["native-drawing-add.js"],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": ["native-drawing-add.js"]
+    },
+    {
+      "id": "app.native.drawing-add.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": ["native-drawing-add-desktop.js"],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": ["native-drawing-add-desktop.js"]
+    },
+    {
       "id": "app.native.object.project.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

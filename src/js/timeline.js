@@ -900,7 +900,7 @@ window.SM={
     // array already does (see layerInPoint/layerOutPoint, app.js).
     if(state.waIn>=state.waOut)state.waIn=Math.max(0,state.waOut-1);
     window._waIn=state.waIn;window._waOut=state.waOut;if(state.currentFrame>=v)goToFrame(v-1);updateUI();},
-  addLayer:function(){saveAllLayerFrames();pushUndoLayers(true);var idx=createUserLayer(nextLayerName());activateUL(idx);_layerSel=[idx];_layerSelAnchor=idx;loadFrame(state.currentFrame);updateUI();},
+  addLayer:function(){var caller=window.NemoNativeDrawingAddController;return caller&&typeof caller.add==='function'?caller.add():Promise.resolve({status:'unavailable'});},
   // Null layer (2026-07, Motion) — AE's "Null Object": exists purely as a
   // parenting/pivot target for other layers (SMMotion's existing
   // parentLayerUid/parentChainMats — a Null is just any other layer as far
