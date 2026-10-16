@@ -18,7 +18,7 @@
 //! The last four were appended after the first six so existing duplicators
 //! keep their pattern; reordering would silently reshuffle every project.
 
-use super::duplicator_placement_modes::JsNumber;
+use crate::evaluation::object_component_kernels::duplicator_placement_modes::JsNumber;
 
 /// The prime that decorrelates clone streams (`k * 7919`).
 pub(crate) const CLONE_STRIDE: f64 = 7919.0;
