@@ -242,10 +242,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 141);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 142);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 143);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 145);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 144);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 145);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 146);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 148);
   const order = sourcePath => actual.get('src/' + sourcePath).scriptOrdinal;
   assert.ok(order('js/adapters/native-object-project-metadata.js') < order('js/adapters/native-object-project-desktop.js'));
   assert.ok(order('js/adapters/native-object-project-desktop.js') < order('js/adapters/native-object-project.js'));
@@ -359,7 +359,7 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 86);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 89);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
