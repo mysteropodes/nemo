@@ -371,10 +371,12 @@ test('replacement publishes B only after both current frame-0 receipts and post-
   assert.equal(s.info().documentId,'document-2');assert.equal(s.readPresentedObjectSession().presentation.workId,'b-final');
 });
 
-test('dirty cancellation sends no native request; typed invalid replacement preserves A',async()=>{
+test('dirty cancellation only verifies native ownership; typed invalid replacement preserves A',async()=>{
   const h=replacementHost(),s=session(h),f=files(s,{confirmReplace:async()=>false});
   assert.equal(await f.ui.openPath('/a.json'),true);await s.reference({kind:'remove'});
-  const count=h.calls.length;assert.equal(await f.ui.openPath('/b.json'),false);assert.equal(h.calls.length,count);
+  const count=h.calls.length;assert.equal(await f.ui.openPath('/b.json'),false);
+  assert.deepEqual(h.calls.slice(count).map(c=>c.command),['nemo_native_object_client_status','nemo_native_object_reference']);
+  assert.equal(h.calls.at(-1).r.action.kind,'inspect');
   assert.equal(s.info().documentId,'document-1');assert.equal(f.ui.isDirty(),true);
   const previews=h.previews.length,g=files(s);assert.equal(await g.ui.openPath('/bad.json'),false);
   assert.equal(s.isActive(),true);assert.equal(s.info().documentId,'document-1');

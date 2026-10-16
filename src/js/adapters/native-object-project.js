@@ -168,7 +168,7 @@
           current();
           await retireSubscription();
           if(transition&&transition.confirm&&await transition.confirm(previous)!==true){
-            phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();
+            if(previous)await verifyOwner(previous);phase=priorPhase;presentation=priorPresentation;if(previous)await attachSubscription();
             if(priorPresentation&&ports.surfaceChanged)ports.surfaceChanged(priorPresentation,priorBounds);return false;}
           current();
           if(transition&&transition.occlude)await transition.occlude();
