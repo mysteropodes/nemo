@@ -1,6 +1,6 @@
 //! Project settings are one transaction in the existing object history.
-use super::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::commands::PreparedProjectSettings;
+use crate::history::object_history::{NativeObjectHistory, ObjectHistoryEntry};
 use crate::request_receipts::DispatchErrorCode;
 
 impl NativeObjectHistory {

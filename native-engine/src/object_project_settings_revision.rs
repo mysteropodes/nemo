@@ -1,6 +1,6 @@
 //! Metadata publication preserves the current drawing and every resource allocation.
-use super::{ObjectRevisionOwner, ProjectRevisionValue};
 use crate::object_document::ProjectMetadata;
+use crate::revision::object_revision::{ObjectRevisionOwner, ProjectRevisionValue};
 use std::sync::Arc;
 
 impl ObjectRevisionOwner {
