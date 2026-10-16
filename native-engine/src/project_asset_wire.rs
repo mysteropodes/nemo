@@ -1,5 +1,5 @@
 //! strict prepared native-project input; no owner or file I/O.
-use super::{
+use crate::object_codec::project::{
     asset_entry, object, text, Input, Metadata, ProjectWireError, ProjectWireLimits, Reference,
     FORMAT,
 };
@@ -256,7 +256,7 @@ fn prepare_legacy(
     let mut pending_data = None;
     if let Some(raw) = asset {
         limits.png.ok_or(ProjectWireError::Budget)?;
-        let a: super::Asset<'_> = object(raw)?;
+        let a: crate::object_codec::project::Asset<'_> = object(raw)?;
         if text(a.media_type, 9)? != "image/png" || text(a.encoding, 6)? != "base64" {
             return Err(ProjectWireError::Unsupported);
         }

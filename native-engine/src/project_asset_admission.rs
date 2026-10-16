@@ -1,6 +1,8 @@
 //! pending tickets from the SAME existing owner ledger.
-use super::encoded_retention_budget::{Admission, EncodedRetentionBudget};
 use crate::object_document::{AssetKind, ProjectEnvelope, ProjectReferenceState};
+use crate::revision::object_revision::encoded_retention_budget::{
+    Admission, EncodedRetentionBudget,
+};
 
 pub(super) fn pending_charges(
     project: &ProjectEnvelope,
