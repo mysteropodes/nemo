@@ -19,8 +19,9 @@
   else root.NemoNativeObjectUI=api;
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
-  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap();
+  var inspectors=new WeakMap(),views=new WeakMap(),timings=new WeakMap(),policyTasks=new WeakMap(),policyEpochs=new WeakMap(),policyBindings=new WeakMap();
   function restoreInspector(root){
+    retirePolicy(root);
     views.delete(root);
     var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
     var prior=inspectors.get(root);if(!prior)return;
@@ -150,15 +151,17 @@
   }
   function renderNativeObjectUiMetadata(root,info,frameOnly,ports){
     checked(root,info,ports);
+    if(info.layers.some(function(l){return ['locked','shy'].some(function(k){return l[k]!==undefined&&typeof l[k]!=='boolean';});}))throw new Error('Invalid native layer flags');
+    var shyMode=typeof ports.readShyMode==='function'&&ports.readShyMode()===true,policyOwner=policyPort(ports);
     var list=node(root,'layer-list'),header=node(root,'frame-hdr'),grid=node(root,'frame-grid');
     var previous=views.get(root),selection=root._layerSel||[];
     var reuse=frameOnly===true&&previous&&previous.ports===ports&&previous.list===list&&previous.header===header&&previous.grid===grid&&
-      previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
+      previous.shyMode===shyMode&&previous.inspector===root.document.getElementById('props-panel')&&previous.active===root.state.activeLayerIdx&&
       ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].every(function(k){return previous.pin[k]===info[k];})&&
       selection.length===previous.selection.length&&selection.every(function(value,i){return previous.selection[i]===value;})&&
-      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible;})&&
+      info.layers.length===previous.metadata.length&&info.layers.every(function(layer,i){var old=previous.metadata[i];return old[0]===layer.layerUid&&old[1]===layer.name&&old[2]===layer.visible&&old[3]===layer.locked&&old[4]===layer.shy;})&&
       list.children.length===previous.rows.length&&previous.rows.every(function(row,i){return list.children[i]===row&&
-        row.children.length===2&&row.children[0]===previous.controls[i][0]&&row.children[1]===previous.controls[i][1];})&&
+        row.children.length===4&&previous.controls[i].every(function(control,k){return row.children[k]===control;});})&&
       header.children.length===1&&header.children[0]===previous.caption&&grid.children.length===1&&grid.children[0]===previous.unavailable;
     var rows,caption,unavailable;
     if(reuse){rows=previous.rows;caption=previous.caption;unavailable=previous.unavailable;}
@@ -175,7 +178,13 @@
         eye.setAttribute('aria-label',(layer.visible===false?'Show ':'Hide ')+label+' ('+layer.layerUid+')');
         // Availability is checked at CLICK time: this render can precede preview/ACK.
         eye.addEventListener('click',function(){return toggleVisibility(root,layer.layerUid,info,ports);});
-        row.replaceChildren(pick,eye);
+        var flags=['locked','shy'].map(function(flag){
+          var on=layer[flag]===true,label=flag==='locked'?(on?'Unlock':'Lock'):(on?'Unmark shy':'Mark shy');
+          var button=createNativeObjectUiText(root,'button',label);button.type='button';button.dataset.policyFlag=flag;
+          button.setAttribute('aria-pressed',String(on));button.setAttribute('aria-label',label+' '+(layer.name===undefined?layer.layerUid:layer.name));
+          button.disabled=!policyOwner;button.addEventListener('click',function(){if(row.parentNode!==list||!views.get(root)||!views.get(root).rows.includes(row))return false;return setLayerPolicy(root,layer.layerUid,flag,!on,info,ports);});return button;
+        });
+        row.hidden=shyMode&&layer.shy===true;row.style.display=row.hidden?'none':'flex';row.replaceChildren(pick,eye,flags[0],flags[1]);
         return row;
       });
       caption=createNativeObjectUiText(root,'div','');
@@ -188,8 +197,8 @@
     unavailableInspector(root,ports,info);
     if(!reuse){var pin={};['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId','totalFrames'].forEach(function(k){pin[k]=info[k];});
       views.set(root,{list:list,header:header,grid:grid,inspector:root.document.getElementById('props-panel'),rows:rows,
-        controls:rows.map(function(row){return [row.children[0],row.children[1]];}),caption:caption,unavailable:unavailable,
-        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible];})});}
+        controls:rows.map(function(row){return Array.from(row.children);}),shyMode:shyMode,caption:caption,unavailable:unavailable,
+        ports:ports,pin:pin,active:root.state.activeLayerIdx,selection:selection.slice(),metadata:info.layers.map(function(layer){return [layer.layerUid,layer.name,layer.visible,layer.locked,layer.shy];})});}
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
@@ -207,8 +216,95 @@
     }
     if(root.updateWaBar&&root.document.getElementById('wa-bar'))root.updateWaBar();
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
-    requestTiming(root,info,ports);
+    requestTiming(root,info,ports);refreshPolicy(root);
     return true;
+  }
+  // Ordinary native policy entries bind on paint and dispose when the UI retires.
+  function bindLayerPolicy(root,ports){
+    if(policyBindings.has(root))throw new Error('Layer policy entry is already bound');
+    if(!root.SM||['toggleLayerLock','toggleLayerShy','toggleShyMode'].some(function(k){return typeof root.SM[k]!=='function';}))throw new Error('Ordinary layer policy entries are unavailable');
+    var original={},bound={},retired=false;
+    ['toggleLayerLock','toggleLayerShy','toggleShyMode'].forEach(function(name){
+      original[name]=root.SM[name];bound[name]=function(index){
+        if(retired)return false;
+        var session=ports.currentSession(),owned=session&&typeof session.blocksLegacy==='function'?session.blocksLegacy():null;
+        if(owned===false)return original[name].apply(this,arguments);
+        if(owned!==true||!session.isActive())return false;
+        var info=session.info();if(!info||ports.projectionReady(info)!==true||!confirmed(root,info,session.readPresentedObjectSession()))return false;
+        if(name==='toggleShyMode'){
+          if(typeof ports.readShyMode!=='function'||typeof ports.setShyMode!=='function')return false;
+          ports.setShyMode(ports.readShyMode()!==true,info);return renderNativeObjectUiMetadata(root,info,true,ports);
+        }
+        var i=index==null?root.state.activeLayerIdx:index;if(!Number.isInteger(i)||i<0||i>=info.layers.length)return false;
+        var layer=info.layers[i],flag=name==='toggleLayerLock'?'locked':'shy';return setLayerPolicy(root,layer.layerUid,flag,layer[flag]!==true,info,ports);
+      };root.SM[name]=bound[name];
+    });
+    var binding=Object.freeze({dispose:function(){if(retired)return;retired=true;retirePolicy(root);Object.keys(bound).forEach(function(name){if(root.SM[name]===bound[name])root.SM[name]=original[name];});policyBindings.delete(root);}});policyBindings.set(root,binding);return binding;
+  }
+  function createPolicyPorts(root,base){
+    var entry=null;
+    function current(expected){
+      var session=base.currentSession(),info=session&&session.info();
+      return session&&session.isActive()&&session.blocksLegacy()===true&&info&&base.projectionReady(info)===true&&(!expected||sameTimingPin(expected,info))&&confirmed(root,info,session.readPresentedObjectSession())?session:null;
+    }
+    var owner=Object.freeze({edit:async function(payload,pin){
+      var session=current(pin),method=session&&session.editLayerPolicy;if(typeof method!=='function')return false;
+      var receipt=await method(payload,pin);return base.currentSession()===session&&session.isActive()&&receipt&&receipt.ok===true;
+    }});
+    return Object.freeze({
+      layerPolicy:function(){var session=current();return session&&typeof session.editLayerPolicy==='function'?owner:null;},
+      readTransportGeneration:function(){var session=base.currentSession();return session&&typeof session.readSubscriptionGeneration==='function'?session.readSubscriptionGeneration():null;},
+      readShyMode:function(){return root.state.shyEnabled===true;},
+      setShyMode:function(value,info){if(typeof value!=='boolean'||!current(info))return false;
+        root.state.shyEnabled=value;var button=root.document.getElementById('btn-shy');if(button&&button.classList&&typeof button.classList.toggle==='function')button.classList.toggle('active',value);return true;},
+      clearDrawingSelection:function(uid,info){var session=current(info);if(!session)return false;
+        var live=session.info(),layer=live.layers[root.state.activeLayerIdx];
+        if(root.state.appMode!=='drawing'||!layer||layer.layerUid!==uid)return true;
+        if(layer.locked!==true)return false;root.selectedPaths=[];root.state.selectedStrokeIndices=[];return true;},
+      bindPolicyEntries:function(){
+        if(entry)return true;if(!root.SM||['toggleLayerLock','toggleLayerShy','toggleShyMode'].some(function(name){return typeof root.SM[name]!=='function';}))return false;
+        entry=bindLayerPolicy(root,base);return true;},
+      disposePolicyEntries:function(){if(entry){entry.dispose();entry=null;}}
+    });
+  }
+  function refreshPolicy(root){
+    var view=views.get(root);if(!view||view.list!==root.document.getElementById('layer-list')||!view.rows.every(function(row,i){return row.parentNode===view.list&&view.controls[i].every(function(control,k){return row.children[k]===control;});}))return false;
+    var ready=false,owner=null;
+    try{var ports=view.ports,session=ports.currentSession(),info=session&&session.info();owner=policyPort(ports);
+      ready=!!owner&&!policyTasks.has(root)&&!!session&&session.isActive()&&session.blocksLegacy()===true&&sameTimingPin(view.pin,info)&&ports.projectionReady(info)===true&&confirmed(root,info,session.readPresentedObjectSession());
+    }catch(_){}
+    view.controls.forEach(function(controls){controls.slice(2).forEach(function(button){button.disabled=!ready;});});
+    return ready;
+  }
+  function policyPort(ports){try{var value=typeof ports.layerPolicy==='function'&&ports.layerPolicy();return value&&typeof value.edit==='function'?value:null;}catch(_){return null;}}
+  function retirePolicy(root){policyEpochs.set(root,(policyEpochs.get(root)||0)+1);policyTasks.delete(root);views.delete(root);}
+  function policySelection(root){return JSON.stringify([root.state.appMode,root.state.activeLayerIdx,root._layerSel||[]]);}
+  function setLayerPolicy(root,uid,flag,value,expected,ports){
+    function refused(){if(root.showToast)root.showToast('Native layer policy was not confirmed.');return false;}
+    try{
+      if(!nativeObjectUiPortsReady(ports)||!['locked','shy'].includes(flag)||typeof value!=='boolean'||typeof ports.readTransportGeneration!=='function'||!Number.isSafeInteger(ports.readTransportGeneration())||ports.readTransportGeneration()<0||policyTasks.has(root))return Promise.resolve(false);
+      var owner=policyPort(ports),session=ports.currentSession(),info=session&&session.info(),view=views.get(root),epoch=policyEpochs.get(root)||0;
+      var layer=info&&info.layers.filter(function(l){return l.layerUid===uid;});
+      if(!view||!sameTimingPin(view.pin,info)||!owner||!session||!session.isActive()||!sameTimingPin(expected,info)||!confirmed(root,info,session.readPresentedObjectSession())||!layer||layer.length!==1||ports.projectionReady(info)!==true)return Promise.resolve(false);
+      if(['locked','shy'].some(function(k){return layer[0][k]!==undefined&&typeof layer[0][k]!=='boolean';}))return Promise.resolve(false);
+      if(value&&(flag==='locked'&&root.state.appMode==='drawing'&&typeof ports.clearDrawingSelection!=='function'||flag==='shy'&&(typeof ports.setShyMode!=='function'||typeof ports.readShyMode!=='function')))return Promise.resolve(false);
+      if((layer[0][flag]===true)===value)return Promise.resolve(true); // Absence reads false without authoring false.
+      var signature=policySelection(root),transport=ports.readTransportGeneration?ports.readTransportGeneration():null,pin={};
+      ['instanceId','documentId','lifecycleGeneration','contentRevision','documentSnapshotId'].forEach(function(k){pin[k]=info[k];});
+      var request=Object.freeze({command:'object.layer.policy.edit',layerUid:uid,flag:flag,value:value}),ticket={};policyTasks.set(root,ticket);refreshPolicy(root);
+      return Promise.resolve().then(function(){
+        if(policySelection(root)!==signature||ports.currentSession()!==session||!session.isActive()||(policyEpochs.get(root)||0)!==epoch||ports.readTransportGeneration&&ports.readTransportGeneration()!==transport||policyPort(ports)!==owner||!sameTimingPin(pin,session.info())||!confirmed(root,session.info(),session.readPresentedObjectSession()))return false;
+        return owner.edit(request,Object.freeze(pin));
+      }).then(function(result){
+        if(result!==true||policyTasks.get(root)!==ticket||(policyEpochs.get(root)||0)!==epoch||policySelection(root)!==signature||ports.currentSession()!==session||!session.isActive()||!views.get(root)||views.get(root).ports!==ports||views.get(root).list!==view.list||policyPort(ports)!==owner||ports.readTransportGeneration&&ports.readTransportGeneration()!==transport)return refused();
+        var next=session.info(),target=next&&next.layers.filter(function(l){return l.layerUid===uid;});
+        if(!next||!['instanceId','documentId','lifecycleGeneration'].every(function(k){return next[k]===pin[k];})||next.contentRevision<=pin.contentRevision||next.documentSnapshotId===pin.documentSnapshotId||!target||target.length!==1||target[0][flag]!==value||ports.projectionReady(next)!==true||!confirmed(root,next,session.readPresentedObjectSession()))return refused();
+        // Only UI-owned selection/presentation ports run after native confirmation.
+        if(flag==='locked'&&value&&root.state.appMode==='drawing'&&typeof ports.clearDrawingSelection==='function')ports.clearDrawingSelection(uid,next);
+        if(flag==='shy'&&value&&typeof ports.setShyMode==='function')ports.setShyMode(true,next);
+        return renderNativeObjectUiMetadata(root,next,false,ports);
+      }).catch(refused).finally(function(){if(policyTasks.get(root)===ticket){policyTasks.delete(root);refreshPolicy(root);}});
+    }catch(_){return Promise.resolve(refused());}
   }
   function confirmed(root,info,presented){
     return !!presented&&presented.available===true&&presented.kind==='native-object'&&
@@ -244,5 +340,5 @@
     catch(error){root.state.activeLayerIdx=old.active;root._layerSel=old.selection;root._layerSelAnchor=old.anchor;
       root.selectedPaths=old.paths;root.state.selectedStrokeIndices=old.indices;root._layerActiveExplicit=old.explicit;throw error;}
   }
-  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming});
+  return Object.freeze({render:renderNativeObjectUiMetadata,select:select,toggleVisibility:toggleVisibility,restoreInspector:restoreInspector,refreshTiming:refreshTiming,setLayerPolicy:setLayerPolicy,retirePolicy:retirePolicy,bindLayerPolicy:bindLayerPolicy,refreshPolicy:refreshPolicy,createPolicyPorts:createPolicyPorts});
 }));

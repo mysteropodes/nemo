@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "apiVersion": 2,
+  "id": "native.layer-policy",
+  "version": 1,
+  "status": "active",
+  "availability": {
+    "state": "available",
+    "reason": null
+  },
+  "transportSchema": "../native-transport-v2.schema.json",
+  "operations": [
+    "command.document.object.layer.policy.edit"
+  ],
+  "input": {
+    "$ref": "../native-transport-v2.schema.json#/$defs/ObjectLayerPolicyPayload"
+  },
+  "authority": {
+    "document": "native-engine::object_snapshot::ObjectSnapshot",
+    "adapterOwnsWritableMirror": false,
+    "fallback": "none"
+  },
+  "resourceBoundary": {
+    "maxRequestBytes": 4096,
+    "maxReadResponseBytes": 4096,
+    "policy": "Complete correlated retained layer-policy receipt or typed refusal; no document/resource payload."
+  },
+  "semantics": "Set exactly one persisted Drawing layer locked or shy flag. Missing and explicit false have effectivefalse; same-effective-value edits preserve field presence and add no revision/history or redo clearing. A changed flag adds one revision and one undo entry. Drawing Fill alone uses the admitted lock guard; generic Motion value/track edits stay permitted. Shy is an organization flag, not global hide-mode or visibility authority. No JS/Paper writer or optimistic mutation.",
+  "commonErrorCodes": [
+    "invalid_request",
+    "wrong_instance",
+    "wrong_document",
+    "stale_revision",
+    "unavailable",
+    "not_found",
+    "cancelled_before_dispatch",
+    "internal"
+  ],
+  "ports": [
+    {
+      "label": "ui",
+      "state": "pending"
+    },
+    {
+      "label": "mcp",
+      "state": "pending"
+    }
+  ],
+  "examples": [
+    {
+      "label": "Shared native layer policy command; installed/UI acceptance remains pending",
+      "request": {
+        "apiVersion": 2,
+        "requestId": "policy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "expectedRevision": 7,
+        "operation": "command.document.object.layer.policy.edit",
+        "payload": {
+          "command": "object.layer.policy.edit",
+          "layerUid": "legacy layer:alpha",
+          "flag": "locked",
+          "value": true
+        }
+      },
+      "response": {
+        "apiVersion": 2,
+        "requestId": "policy-7",
+        "instanceId": "instance-A",
+        "documentId": "document-A",
+        "contentRevision": 8,
+        "ok": true,
+        "result": {
+          "applied": true,
+          "historyEntriesAdded": 1
+        }
+      }
+    }
+  ]
+}
