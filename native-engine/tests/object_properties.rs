@@ -197,14 +197,19 @@ fn duplicate_json_members_and_holder_property_control_identities_never_overwrite
     for version in [1, 2] {
         let mut doc = source(version);
         doc["propertyHolders"] = holders();
-        for name in [
-            "target", "property", "static", "track", "controls", "strokeId",
+        for (name, value) in [
+            ("target", json!({"contextId":"scene-root","layerUid":"L0"})),
+            ("property", json!("position")),
+            ("static", json!([1.25, -0.0])),
+            ("track", json!({"keys":[]})),
+            ("controls", holders()[0]["controls"].clone()),
+            ("strokeId", json!("ink")),
         ] {
             let index = usize::from(name == "strokeId");
             let raw = doc["propertyHolders"][index].to_string();
             let marker = format!("\"{name}\":");
-            // A duplicate with null must still fail, rather than erase the authored field.
-            let duplicate = raw.replacen(&marker, &format!("\"{name}\":null,{marker}"), 1);
+            // Both values are valid: only actual duplicate rejection can fail this case.
+            let duplicate = raw.replacen(&marker, &format!("\"{name}\":{value},{marker}"), 1);
             assert_ne!(duplicate, raw);
             assert!(
                 serde_json::from_str::<PropertyHolder>(&duplicate).is_err(),
