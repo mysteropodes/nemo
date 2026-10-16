@@ -411,3 +411,25 @@ async fn executable_advertises_constructible_command_and_reports_no_running_app(
     }
     client.cancel().await.unwrap();
 }
+
+
+#[test]
+fn schema_binary_rejects_unsupported_arguments_without_partial_contract_output() {
+    for arguments in [
+        vec!["--api-version", "3"],
+        vec!["--api-version"],
+        vec!["--api-version", "2", "extra"],
+        vec!["--help"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_nemo-mcp-schema"))
+            .args(&arguments)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{arguments:?}");
+        assert!(
+            output.stdout.is_empty(),
+            "no partial schema for {arguments:?}"
+        );
+        assert_eq!(output.stderr, b"usage: nemo-mcp-schema [--api-version 2]\n");
+    }
+}

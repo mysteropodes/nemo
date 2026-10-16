@@ -38,6 +38,17 @@
     "functions": 96.55
   },
   "files": {
+    "nemo-mcp/src/native_property_metadata_contract.rs": {
+      "lines": 100,
+      "regions": 99.6,
+      "functions": 100,
+      "note": "D35/#2099: exact clean measured source 7033dfe12cfc774e50f2e6b4350df98c3e0ab272, crate 473f325b86ba13e5fa6b5bff28252ce03f33f6d6, cargo-llvm-cov 0.9.1; full 131 tests/0 failed across 18 binaries. Coverage report SHA256 e5d49748c3a50832d57a55ad5b1cf709de37a2c00bf477a71c130fb6fb27fc10. Floors derived by the existing baseline builder. Existing floors and all prior metadata are preserved; this entry is not whole-crate coverage acceptance."
+    },
+    "nemo-mcp/src/native_property_metadata_wire_tests.rs": {
+      "noRegions": true,
+      "reason": "no executable regions in the coverage report",
+      "note": "D35/#2099: exact clean measured source 7033dfe12cfc774e50f2e6b4350df98c3e0ab272, crate 473f325b86ba13e5fa6b5bff28252ce03f33f6d6, cargo-llvm-cov 0.9.1; full 131 tests/0 failed across 18 binaries. Coverage report SHA256 e5d49748c3a50832d57a55ad5b1cf709de37a2c00bf477a71c130fb6fb27fc10. Normal full producer emitted no executable file record; noRegions derived by its existing baseline builder. Existing floors and all prior metadata are preserved; this entry is not whole-crate coverage acceptance."
+    },
     "nemo-mcp/src/capabilities.rs": {
       "lines": 100,
       "regions": 100,

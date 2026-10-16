@@ -422,3 +422,21 @@ fn timing_contract_accepts_the_frozen_exposure_oracle_including_blank_keys() {
         assert!(timing_result("document", &payload, &value), "{expected}");
     }
 }
+
+#[test]
+fn timing_result_front_door_refuses_an_invalid_original_selector() {
+    let response = timing_result_fixture();
+    for payload in [
+        json!({}),
+        json!({"atRevision":0,"documentSnapshotId":"native-object:document:0",
+            "contextId":"scene-root","layerUid":"data:雪","frame":null}),
+    ] {
+        assert!(!timing_result("document", &payload, &response));
+        assert!(!crate::native_contract::validate_result(
+            "query.document.object.layer.timing",
+            "document",
+            &payload,
+            &response
+        ));
+    }
+}

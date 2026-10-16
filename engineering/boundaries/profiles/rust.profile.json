@@ -214,6 +214,7 @@
       "files": [
         "native_catalog.rs",
         "native_status.rs",
+        "native_contract_boundaries.rs",
         "stdio.rs",
         "stdio_application.rs",
         "stdio_cancellation.rs",

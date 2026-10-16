@@ -274,8 +274,14 @@ pub(crate) fn validate_native_operation_registration(
 pub(crate) fn validate_native_operation(
     operation: &str,
 ) -> Result<(), crate::contract::RequestError> {
+    validate_native_availability(registered_native_operation(operation)?)
+}
+
+/// Availability remains descriptor-owned even when every currently registered
+/// native operation is available. Keep the same validator usable for future
+/// unavailable declarations without replacing the embedded catalog in tests.
+fn validate_native_availability(descriptor: &Value) -> Result<(), crate::contract::RequestError> {
     use crate::contract::RequestError;
-    let descriptor = registered_native_operation(operation)?;
     if descriptor["availability"]["state"] == "available" {
         Ok(())
     } else {
@@ -286,5 +292,76 @@ pub(crate) fn validate_native_operation(
                 .unwrap_or("native capability is unavailable")
                 .to_owned(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod native_availability_tests {
+    use super::{validate_native_availability, NativeCapabilityCatalog};
+    use crate::contract::RequestError;
+    use serde_json::{json, Value};
+
+    fn catalog_with(availability: Value) -> NativeCapabilityCatalog {
+        let source = json!({
+            "schemaVersion": 2,
+            "apiVersion": 2,
+            "id": "test.native.availability",
+            "operations": ["query.test.native.availability"],
+            "availability": availability
+        })
+        .to_string();
+        NativeCapabilityCatalog::from_sources(&[&source]).unwrap()
+    }
+
+    #[test]
+    fn declared_unavailability_preserves_reason_and_supplies_safe_fallback() {
+        for (availability, expected) in [
+            (
+                json!({"state": "unavailable", "reason": "owner is not installed"}),
+                "owner is not installed",
+            ),
+            (
+                json!({"state": "unavailable", "reason": ""}),
+                "native capability is unavailable",
+            ),
+            (
+                json!({"state": "unavailable", "reason": null}),
+                "native capability is unavailable",
+            ),
+            (
+                json!({"state": "unavailable", "reason": 17}),
+                "native capability is unavailable",
+            ),
+            (
+                json!({"state": "unavailable"}),
+                "native capability is unavailable",
+            ),
+            (
+                json!({"state": "unknown"}),
+                "native capability is unavailable",
+            ),
+            (json!({}), "native capability is unavailable"),
+        ] {
+            let catalog = catalog_with(availability);
+            let descriptor = catalog
+                .capability_for_operation("query.test.native.availability")
+                .unwrap();
+            match validate_native_availability(descriptor) {
+                Err(RequestError::Unavailable(reason)) => assert_eq!(reason, expected),
+                other => panic!("unavailable declaration must fail closed: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn declared_available_operation_does_not_inherit_an_unavailable_reason() {
+        let catalog = catalog_with(json!({"state": "available", "reason": "old explanation"}));
+        let descriptor = catalog
+            .capability_for_operation("query.test.native.availability")
+            .unwrap();
+        assert!(validate_native_availability(descriptor).is_ok());
+        assert!(catalog
+            .capability_for_operation("query.test.missing")
+            .is_none());
     }
 }
