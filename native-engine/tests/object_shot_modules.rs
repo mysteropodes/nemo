@@ -105,7 +105,14 @@ fn split_sound_refuses_what_the_baseline_would_have_split_into_a_broken_pair() {
             ShotChainError::CursorNotInside
         };
         assert_eq!(split_sound(&module), Err(want), "{:?}", fields);
-        assert_eq!(module, snapshot);
+        // A refused split leaves the module untouched. Compared through Debug because a
+        // NaN cursor (oracle rows carry one) is never `==` to itself under PartialEq.
+        assert_eq!(
+            format!("{module:?}"),
+            format!("{snapshot:?}"),
+            "{:?}",
+            fields
+        );
     }
     assert_eq!(reasons, [50, 407]);
     // both range ends and the missing cursor are in the oracle as accepted-by-baseline rows
