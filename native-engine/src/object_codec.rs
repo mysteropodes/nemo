@@ -2,7 +2,9 @@
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
-pub use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget};
+pub use crate::object_document::{
+    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
+};
 use crate::object_document::{
     ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };

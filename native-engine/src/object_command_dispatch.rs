@@ -11,6 +11,7 @@ const OP_OBJECT_UNDO: &str = "command.document.object.undo";
 const OP_OBJECT_REDO: &str = "command.document.object.redo";
 const OP_LAYER_VISIBILITY: &str = "command.document.object.layer.visibility.set";
 const OP_LAYER_CREATE: &str = "command.document.object.layer.create";
+const OP_PROPERTY_EDIT: &str = "command.document.object.property.edit";
 const MAX_MESSAGE_BYTES: usize = 4096;
 const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
 
@@ -52,6 +53,7 @@ impl NativeObjectHistory {
                 | OP_OBJECT_REDO
                 | OP_LAYER_VISIBILITY
                 | OP_LAYER_CREATE
+                | OP_PROPERTY_EDIT
         ) {
             return Ok(None);
         }
@@ -68,7 +70,9 @@ impl NativeObjectHistory {
             return Err(DispatchErrorCode::InvalidRequest);
         }
         let message = |fill, history| {
-            if request.operation == OP_LAYER_CREATE {
+            if request.operation == OP_PROPERTY_EDIT {
+                "Property edit request refused."
+            } else if request.operation == OP_LAYER_CREATE {
                 "Layer creation request refused."
             } else if request.operation == OP_LAYER_VISIBILITY {
                 "Layer visibility request refused."
@@ -195,6 +199,24 @@ impl NativeObjectHistory {
                     Err(code) => Err((
                         code,
                         "Layer visibility payload is invalid or target is absent.",
+                    )),
+                }
+            } else if request.operation == OP_PROPERTY_EDIT {
+                let payload = serde_json::to_vec(&request.payload)
+                    .map_err(|_| DispatchErrorCode::InvalidRequest)?;
+                match self.prepare_property_edit_json(&payload) {
+                    Ok(candidate) => {
+                        let before = self.content_revision();
+                        self.commit_property_edit(candidate)
+                            .map(|revision| CompactResult::Command {
+                                applied: revision != before,
+                                history_entries_added: u64::from(revision != before),
+                            })
+                            .map_err(|code| (code, "Property edit could not commit."))
+                    }
+                    Err(code) => Err((
+                        code,
+                        "Property edit payload or target is invalid or unavailable.",
                     )),
                 }
             } else if request.operation == OP_OBJECT_FILL {
