@@ -15,6 +15,14 @@ use std::sync::{
     Arc,
 };
 
+// E2 (#2088): the typed Motion property entry, over the helpers below.
+#[path = "object_expression_property.rs"]
+mod property;
+#[allow(unused_imports)] // consumers arrive with E2 tests and registration
+pub(crate) use property::{
+    evaluate_property_detached, evaluate_property_for_owner, PropertyCandidate,
+};
+
 /// Bounded values must be chosen explicitly by the caller for its workload.
 /// The private feature has no production default or public host route.
 #[derive(Clone, Copy, Debug)]
@@ -132,26 +140,29 @@ freeze(globalThis);
 return 1;
 })()"#;
 
-fn guest_error(ctx: &Ctx<'_>, error: Error, polls: usize, budget: usize) -> ExpressionRefusal {
+fn guest_error(
+    ctx: &Ctx<'_>,
+    error: Error,
+    polls: usize,
+    budget: usize,
+) -> (ExpressionRefusal, String) {
     if polls >= budget {
-        return ExpressionRefusal::Interrupted;
+        return (ExpressionRefusal::Interrupted, String::new());
     }
     if matches!(error, Error::Allocation) {
-        return ExpressionRefusal::Memory;
+        return (ExpressionRefusal::Memory, String::new());
     }
     if !matches!(error, Error::Exception) {
-        return ExpressionRefusal::Guest;
+        return (ExpressionRefusal::Guest, String::new());
     }
     let exception = ctx.catch();
     let Some(object) = exception.as_object() else {
-        return ExpressionRefusal::Guest;
+        return (ExpressionRefusal::Guest, String::new());
     };
     let name = object.get::<_, String>("name").unwrap_or_default();
-    let message = object
-        .get::<_, String>("message")
-        .unwrap_or_default()
-        .to_lowercase();
-    if message.contains("stack") {
+    let text = object.get::<_, String>("message").unwrap_or_default();
+    let message = text.to_lowercase();
+    let refusal = if message.contains("stack") {
         ExpressionRefusal::Stack
     } else if message.contains("memory") || message.contains("alloc") {
         ExpressionRefusal::Memory
@@ -159,7 +170,8 @@ fn guest_error(ctx: &Ctx<'_>, error: Error, polls: usize, budget: usize) -> Expr
         ExpressionRefusal::Syntax
     } else {
         ExpressionRefusal::Guest
-    }
+    };
+    (refusal, text)
 }
 
 fn guest_result(value: Value<'_>) -> Result<f64, ExpressionRefusal> {
@@ -205,12 +217,25 @@ fn read_guest_result<'js>(
     }
 }
 
-fn evaluate_in_context(
+/// Classifies a guest error while its exception is still catchable.
+struct Fail {
+    polls: Arc<AtomicUsize>,
+    budget: usize,
+}
+
+impl Fail {
+    fn of(&self, ctx: &Ctx<'_>, error: Error) -> (ExpressionRefusal, String) {
+        guest_error(ctx, error, self.polls.load(Ordering::SeqCst), self.budget)
+    }
+}
+
+/// One fresh hardened context with the interrupt budget armed. `body` must
+/// return only Rust data: the context is destroyed before this returns.
+fn with_context<T>(
     rt: &Runtime,
-    request: &ExpressionRequest,
     limits: ExpressionLimits,
-    reading: ResultReading,
-) -> Result<f64, ExpressionRefusal> {
+    body: impl for<'js> FnOnce(&Ctx<'js>, &Fail) -> Result<T, ExpressionRefusal>,
+) -> Result<T, ExpressionRefusal> {
     let context = Context::custom::<(
         intrinsic::Eval,
         intrinsic::RegExpCompiler,
@@ -228,66 +253,54 @@ fn evaluate_in_context(
         rt.run_gc();
         return Err(ExpressionRefusal::Bootstrap);
     }
-    let polls = Arc::new(AtomicUsize::new(0));
-    let seen = Arc::clone(&polls);
+    let fail = Fail {
+        polls: Arc::new(AtomicUsize::new(0)),
+        budget: limits.interrupt_polls,
+    };
+    let seen = Arc::clone(&fail.polls);
     rt.set_interrupt_handler(Some(Box::new(move || {
         seen.fetch_add(1, Ordering::SeqCst) + 1 >= limits.interrupt_polls
     })));
-    let result = context.with(|ctx| {
-        let expression = format!(
-            "(function(value,frame){{'use strict';return ({}\n);}})",
-            request.code()
-        );
-        let function: Function = match ctx.eval(expression) {
-            Ok(function) => function,
-            Err(error) => {
-                let refusal = guest_error(
-                    &ctx,
-                    error,
-                    polls.load(Ordering::SeqCst),
-                    limits.interrupt_polls,
-                );
-                if refusal != ExpressionRefusal::Syntax {
-                    return Err(refusal);
-                }
-                let body = format!(
-                    "(function(value,frame){{'use strict';{}\n}})",
-                    request.code()
-                );
-                ctx.eval(body).map_err(|error| {
-                    guest_error(
-                        &ctx,
-                        error,
-                        polls.load(Ordering::SeqCst),
-                        limits.interrupt_polls,
-                    )
-                })?
-            }
-        };
-        let value: Value = function
-            .call((request.raw_numeric(), request.evaluated_frame()))
-            .map_err(|error| {
-                guest_error(
-                    &ctx,
-                    error,
-                    polls.load(Ordering::SeqCst),
-                    limits.interrupt_polls,
-                )
-            })?;
-        let value = read_guest_result(&ctx, value, reading).map_err(|error| {
-            guest_error(
-                &ctx,
-                error,
-                polls.load(Ordering::SeqCst),
-                limits.interrupt_polls,
-            )
-        })?;
-        guest_result(value)
-    });
+    let result = context.with(|ctx| body(&ctx, &fail));
     rt.set_interrupt_handler(None);
     drop(context);
     rt.run_gc();
     result
+}
+
+/// The expression form first, then a statement body on a SyntaxError.
+fn compile<'js>(
+    ctx: &Ctx<'js>,
+    code: &str,
+    fail: &Fail,
+) -> Result<Function<'js>, (ExpressionRefusal, String)> {
+    let expression = format!("(function(value,frame){{'use strict';return ({code}\n);}})");
+    match ctx.eval(expression) {
+        Ok(function) => Ok(function),
+        Err(error) => match fail.of(ctx, error) {
+            (ExpressionRefusal::Syntax, _) => {
+                let body = format!("(function(value,frame){{'use strict';{code}\n}})");
+                ctx.eval(body).map_err(|error| fail.of(ctx, error))
+            }
+            other => Err(other),
+        },
+    }
+}
+
+fn evaluate_in_context(
+    rt: &Runtime,
+    request: &ExpressionRequest,
+    limits: ExpressionLimits,
+    reading: ResultReading,
+) -> Result<f64, ExpressionRefusal> {
+    with_context(rt, limits, |ctx, fail| {
+        let function = compile(ctx, request.code(), fail).map_err(|e| e.0)?;
+        let value = function
+            .call((request.raw_numeric(), request.evaluated_frame()))
+            .and_then(|value| read_guest_result(ctx, value, reading))
+            .map_err(|error| fail.of(ctx, error).0)?;
+        guest_result(value)
+    })
 }
 
 /// Source-only stage: always one fresh Runtime; no job executor or loader.
@@ -311,7 +324,18 @@ fn evaluate_detached_with_reading(
     limits: ExpressionLimits,
     reading: ResultReading,
 ) -> Result<DetachedCandidate, ExpressionRefusal> {
-    if request.code().len() > limits.input_bytes {
+    let outcome = in_runtime(request.code(), limits, |rt| {
+        evaluate_in_context(rt, request, limits, reading)
+    })?;
+    Ok(DetachedCandidate { outcome })
+}
+
+fn in_runtime<T>(
+    code: &str,
+    limits: ExpressionLimits,
+    run: impl FnOnce(&Runtime) -> Result<T, ExpressionRefusal>,
+) -> Result<Result<T, ExpressionRefusal>, ExpressionRefusal> {
+    if code.len() > limits.input_bytes {
         return Err(ExpressionRefusal::InputLimit);
     }
     let rt = Runtime::new().map_err(|_| ExpressionRefusal::RuntimeUnavailable)?;
@@ -322,19 +346,19 @@ fn evaluate_detached_with_reading(
     let mut outcome = if initial_queue {
         Err(ExpressionRefusal::InitialQueue)
     } else {
-        evaluate_in_context(&rt, request, limits, reading)
+        run(&rt)
     };
     let pending = rt.is_job_pending();
     if pending {
         outcome = Err(ExpressionRefusal::QueuedAsyncWork);
     }
-    // The outcome above holds only Rust f64/error data; context and every JS
-    // value were destroyed by evaluate_in_context before the sole Runtime drop.
+    // The outcome above holds only Rust data; context and every JS value were
+    // destroyed by with_context before the sole Runtime drop.
     drop(rt);
     if weak.try_ref().is_some() {
         return Err(ExpressionRefusal::RuntimeOwnerRetained);
     }
-    Ok(DetachedCandidate { outcome })
+    Ok(outcome)
 }
 
 /// The only private scalar entry point: finalization rechecks the real owner.
