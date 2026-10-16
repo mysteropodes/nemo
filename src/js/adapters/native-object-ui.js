@@ -156,6 +156,12 @@
     var field=root.document.getElementById('tl-cf');
     if(field){if(root.document.activeElement!==field)field.value=root.state.currentFrame+1;field.max=info.totalFrames;}
     ['tl-tf','info-frame'].forEach(function(id){var el=root.document.getElementById(id);if(el)el.textContent=id==='tl-tf'?info.totalFrames:root.state.currentFrame+1;});
+    // These are read-side projections only; legacy field event handlers remain
+    // guarded and no legacy document/frame reader is called.
+    var metadata={'p-cw':info.canvasW,'p-ch':info.canvasH,'tl-fps':info.fps,'tl-total':info.totalFrames,
+      'proj-fps':info.fps,'proj-frames':info.totalFrames};
+    Object.keys(metadata).forEach(function(id){var el=root.document.getElementById(id);if(el)el.value=metadata[id];});
+    if(root.updateWaBar&&root.document.getElementById('wa-bar'))root.updateWaBar();
     ['info-badge','info-strokes','info-sel'].forEach(function(id){var el=root.document.getElementById(id);if(el){el.textContent='Unavailable';if(id==='info-badge')el.style.display='none';}});
     requestTiming(root,info,ports);
     return true;

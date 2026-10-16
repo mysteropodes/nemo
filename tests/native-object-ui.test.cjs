@@ -357,3 +357,28 @@ for(const bad of [undefined,{}, {projectionReady:()=>true}])test('missing or inc
   assert.equal(h.root.document.nodes.get('start-screen').classList.contains('hid'),false);
   assert.throws(()=>h.root.updateUI(true),/Native/);
 });
+
+
+test('ordinary native render refreshes stale boot metadata and actual work-area label without enabling writers',()=>{
+  const root=view(),info={...metadata(),fps:24,totalFrames:2};
+  Files.projectView(root,info);root.state.currentFrame=0;
+  for(const [id,value] of Object.entries({'tl-fps':12,'tl-total':24,'proj-fps':12,'proj-frames':24,'p-cw':1920,'p-ch':1080})){
+    const el=element();el.value=value;el.disabled=true;
+    el.addEventListener('change',()=>{throw Error('legacy writer dispatched');});root.document.nodes.set(id,el);
+  }
+  const bar=element(),label=element();label.className='wa-dur';label.textContent='24 f · 2.00 s';bar.appendChild(label);
+  root.document.nodes.set('wa-bar',bar);
+  const uiSource=fs.readFileSync('src/js/ui.js','utf8'),start=uiSource.indexOf('window.updateWaBar=function(){'),end=uiSource.indexOf('\n  };',start);
+  assert.ok(start>=0&&end>start);
+  vm.runInNewContext(uiSource.slice(start,end+5),{window:root,state:root.state,document:root.document,FC:40});
+  poisonFrames(root);
+  UI.render(root,info,false,fixturePorts(root));
+  for(const [id,value] of Object.entries({'tl-fps':24,'tl-total':2,'proj-fps':24,'proj-frames':2,'p-cw':320,'p-ch':180})){
+    assert.equal(root.document.nodes.get(id).value,value,id);assert.equal(root.document.nodes.get(id).disabled,true);
+  }
+  assert.equal(label.textContent,'2 f · 0.08 s');assert.equal(bar.style.width,'80px');
+  assert.equal(root.document.nodes.get('tl-tf').textContent,2);
+  assert.equal(root.document.nodes.get('tl-cf').max,2);
+  assert.equal(root.document.nodes.get('frame-hdr').children[0].textContent,'Frame 1 / 2');
+  assert.equal(root.state.fps,24);assert.equal(root.state.totalFrames,2);
+});
