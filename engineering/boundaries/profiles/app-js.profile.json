@@ -2141,6 +2141,18 @@
       "publicApi": ["native-viewport-underlay.js"]
     },
     {
+      "id": "app.native.object.project-metadata.adapter",
+      "layer": "domain",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-object-project-metadata.js"
+      ],
+      "sizeProfile": "Domain/application",
+      "publicApi": [
+        "native-object-project-metadata.js"
+      ]
+    },
+    {
       "id": "app.native.object.project.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",

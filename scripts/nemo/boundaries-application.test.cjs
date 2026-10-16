@@ -200,6 +200,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     'src/js/application/native-object-save-as-workflow.js',
     'src/js/application/native-object-saved-acknowledgement.js',
     'src/js/adapters/native-viewport-underlay.js',
+    'src/js/adapters/native-object-project-metadata.js',
     'src/js/adapters/native-object-project.js',
     'src/js/adapters/native-object-project-file.js',
     'src/js/adapters/native-object-ui.js',
@@ -229,8 +230,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
     assert.deepEqual(entry.loadSites, [actual.get(sourcePath)], sourcePath);
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
-    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 136, 183, 184, 185, 186, 187, 188, 189, 190, 191]);
+    [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 137, 184, 185, 186, 187, 188, 189, 190, 191, 192]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -238,10 +238,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 133);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 134);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 135);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 137);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 134);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 135);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 136);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 138);
   const updaterPath = 'src/js/adapters/updater-platform.js';
   const updater = policy.retainedSources.find((record) => record.path === updaterPath);
   assert.equal(updater.moduleId, 'app.updater.platform.adapter');
@@ -342,14 +342,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 81); assert.equal(data[0].ordinal, 82);
+  assert.equal(runtime[0].ordinal, 82); assert.equal(data[0].ordinal, 83);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 81);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 82);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};
@@ -364,4 +364,79 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
     scope.SM.setLanguage(locale); assert.equal(scope.SM.t('settingsTitle'), title);
   }
   assert.deepEqual(storage.map((entry) => entry[1]), ['en', 'fr', 'ja', 'es']);
+});
+
+
+function assertF06Bootstrap(html) {
+  const scripts = [...html.matchAll(/<script\b([^>]*)>\s*<\/script>/gi)].map((match) => ({
+    tag: match[0], src: match[1].match(/\bsrc=["']([^"']+)/)?.[1],
+  }));
+  const sources = ['native-viewport-underlay', 'native-object-project-metadata',
+    'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const positions = sources.map((name) => {
+    const source = 'js/adapters/' + name + '.js';
+    const selected = scripts.filter((entry) => entry.src === source);
+    assert.equal(selected.length, 1, source + ' must have one registration');
+    assert.equal(selected[0].tag, '<script src="' + source + '"></script>', source + ' must be synchronous classic');
+    return scripts.indexOf(selected[0]);
+  });
+  assert.deepEqual(positions, positions.map((_, index) => positions[0] + index),
+    'underlay → parser → Project → ProjectFile → UI must remain in that order');
+  const updater = ['js/adapters/updater-platform.js', 'js/updater-bridge.js'].map((source) => {
+    const selected = scripts.filter((entry) => entry.src === source);
+    assert.equal(selected.length, 1, source + ' must remain unique');
+    assert.equal(selected[0].tag, '<script src="' + source + '"></script>');
+    return scripts.indexOf(selected[0]);
+  });
+  assert.equal(updater[0] + 1, updater[1], 'I40 platform remains immediately before its bridge');
+}
+
+test('F06 parser bootstrap is unique synchronous and precedes Project, ProjectFile and UI', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+  assertF06Bootstrap(html);
+  const parser = '<script src="js/adapters/native-object-project-metadata.js"></script>';
+  const project = '<script src="js/adapters/native-object-project.js"></script>';
+  for (const broken of [
+    html.replace(parser, ''),
+    html.replace(parser, parser + '\n' + parser),
+    html.replace(parser, parser.replace('<script ', '<script async ')),
+    html.replace(parser, parser.replace('<script ', '<script defer ')),
+    html.replace(parser, parser.replace('<script ', '<script type="module" ')),
+    html.replace(parser + '\n' + project, project + '\n' + parser),
+  ]) assert.throws(() => assertF06Bootstrap(broken), assert.AssertionError);
+});
+
+test('F06 real browser exports initialize in declared order and missing parser refuses before Project export', () => {
+  const vm = require('node:vm'), html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+  const names = ['native-object-project-metadata', 'native-object-project', 'native-object-project-file', 'native-object-ui'];
+  const load = (context, name) => vm.runInContext(fs.readFileSync(path.join(ROOT, 'src/js/adapters', name + '.js'), 'utf8'), context, {filename: name});
+  const context = vm.createContext({});
+  const actual = [...html.matchAll(/<script src="js\/adapters\/([^"/]+)\.js"><\/script>/g)]
+    .map((match) => match[1]).filter((name) => names.includes(name));
+  assert.deepEqual(actual, names);
+  for (const name of actual) load(context, name);
+  for (const [global, method] of [['NemoNativeObjectProjectMetadata', 'decode'], ['NemoNativeObjectProject', 'create'],
+    ['NemoNativeObjectProjectFile', 'projectionReadyForUI'], ['NemoNativeObjectUI', 'createPolicyPorts']]) {
+    assert.equal(typeof context[global][method], 'function'); assert.equal(Object.isFrozen(context[global]), true);
+  }
+  const missing = vm.createContext({});
+  assert.throws(() => load(missing, 'native-object-project'), /Native project metadata parser is unavailable/);
+  assert.equal(missing.NemoNativeObjectProject, undefined);
+});
+
+test('F06 project metadata parser has ordinary membership with real missing and duplicate controls', () => {
+  const profile = read('app-js.profile.json'), id = 'app.native.object.project-metadata.adapter';
+  const members = profile.modules.filter((module) => module.id === id);
+  assert.equal(members.length, 1);
+  assert.deepEqual(members[0], {id, layer: 'domain', dir: 'src/js/adapters',
+    files: ['native-object-project-metadata.js'], sizeProfile: 'Domain/application',
+    publicApi: ['native-object-project-metadata.js']});
+  const {checkSourceCoverage} = require('./lib/boundaries-coverage.cjs');
+  const options = {root: ROOT, sourcePaths: ['src/js/adapters/native-object-project-metadata.js'], exclusions: []};
+  assert.equal(checkSourceCoverage({modules: members}, options).ok, true);
+  assert.deepEqual(checkSourceCoverage({modules: []}, options).violations.map(({rule, file}) => ({rule, file})),
+    [{rule: 'coverage-unprofiled-source', file: options.sourcePaths[0]}]);
+  const duplicate = checkSourceCoverage({modules: [...members, {...members[0], id: id + '.duplicate'}]}, options);
+  assert.deepEqual(duplicate.violations.map(({rule, file}) => ({rule, file})),
+    [{rule: 'coverage-duplicate-declaration', file: options.sourcePaths[0]}]);
 });

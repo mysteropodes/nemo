@@ -15,6 +15,9 @@ pub(crate) use property_edit::PreparedPropertyEdit;
 #[path = "object_project_settings.rs"]
 mod project_settings;
 pub(crate) use project_settings::PreparedProjectSettings;
+#[path = "object_layer_policy_edit.rs"]
+mod layer_policy_edit;
+pub(crate) use layer_policy_edit::PreparedLayerPolicy;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {

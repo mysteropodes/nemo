@@ -73,6 +73,7 @@ fn blank_project(
         )],
         objects: vec![],
         property_holders: Presence::Missing,
+        layer_folders: Presence::Missing,
         // Native painting consumes the explicit v2 order plan even when empty.
         composition_order: Presence::Present(OrderPlan {
             format: "nemo.native-object-order-plan".into(),
@@ -321,6 +322,9 @@ fn project_snapshot_info(
             }
             if let Some(visible) = layer.visible.value() {
                 info["visible"] = serde_json::json!(visible);
+            }
+            if let Some(shy) = layer.shy.value() {
+                info["shy"] = serde_json::json!(shy);
             }
             if let Some(locked) = layer.locked.value() {
                 info["locked"] = serde_json::json!(locked);
