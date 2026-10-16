@@ -76,7 +76,7 @@
     }
     function active(){return phase==='native';}
     function requireActive(){if(!active()||!info)throw new Error('Native project is unavailable; reopen Nemo');return info;}
-    function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;});}
+    function enqueue(action){pending++;var next=queue.then(action);queue=next.catch(function(){});return next.finally(function(){pending--;if(pending===0&&ports.presented)ports.presented(info);});}
     function fence(error){phase='indeterminate';presentation=null;retireSubscription().catch(function(){});if(ports.failed)ports.failed(error);return error;}
     function epoch(value){return value&&{instanceId:value.instanceId,documentId:value.documentId,lifecycleGeneration:value.lifecycleGeneration};}
     function sameEpoch(a,b){return !!a&&!!b&&a.instanceId===b.instanceId&&a.documentId===b.documentId&&a.lifecycleGeneration===b.lifecycleGeneration;}
@@ -410,7 +410,9 @@
     if(desktops.has(root))return desktops.get(root);
     var invoke=root.__TAURI__.core.invoke.bind(root.__TAURI__.core),transport=null;
     function projectionReady(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionMatches(root,info);}
+    function settingsNotice(kind,info){var c=root.NemoNativeProjectSettingsController;if(c&&typeof c[kind]==='function')c[kind](info);}
     function publishRevision(info){
+      settingsNotice('willProject',info);
       if(!root.NemoNativeObjectProjectFile||!root.NemoNativeObjectProjectFile.refreshLayerTable(root,info))
         throw new Error('Native object row projection is uncorrelated');
       if(typeof root.updateUI!=='function')throw new Error('Native document UI publication is unavailable');
@@ -430,7 +432,7 @@
             return Promise.resolve(response).then(function(value){
               // Observe the completed ACK after transport clears its in-flight flag.
               setTimeout(function(){try{if(root.NemoNativeObjectUI&&root.NemoNativeObjectUI.refreshTiming)
-                root.NemoNativeObjectUI.refreshTiming(root);}catch(_){}},0);
+                root.NemoNativeObjectUI.refreshTiming(root);settingsNotice('presented');}catch(_){}},0);
               return value;
             });
           return response;
@@ -449,6 +451,7 @@
       frame:function(){return root.state.currentFrame;},
       mapping:function(info){var b=root.document.getElementById('drawing-canvas').getBoundingClientRect(),d=root.devicePixelRatio||1;
         return {cssBounds:{x:b.left,y:b.top,width:b.width,height:b.height},physicalExtent:{width:Math.max(1,Math.round(b.width*d)),height:Math.max(1,Math.round(b.height*d))},compositionExtent:{width:info.canvasW,height:info.canvasH},reportedDpr:d};},
+      presented:function(info){settingsNotice('presented',info);},
       changed:function(info){if(root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.hasProjection(root))publishRevision(info);
         else{if(root.SMReference)root.SMReference.refreshNative();if(root.SMProject)root.SMProject.refreshActiveTabDirtyDot();}},
       notice:function(message){if(root.showToast)root.showToast(message);},
@@ -462,6 +465,7 @@
       projectionReady:function(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;},
       currentSession:function(){return uiSession(root);},
       selectLayer:function(index,preserve,uid,expected){return selectLayerUI(root,index,preserve,uid,expected);},
+      projectSettings:function(){return root.NemoNativeProjectSettingsController||null;},
       repaint:function(frameOnly){return paintUI(root,frameOnly);}
     });uiBindings.set(root,ports);return ports;
   }

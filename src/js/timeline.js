@@ -184,7 +184,7 @@ function manualBakeCache(){
     else showToast(SM.t('toastPlaybackCacheReady')+res.cached+' images)','success');
   });
 }
-function stopPlay(){if(!state.playing)return;state.playing=false;
+function stopPlay(mode){if(!state.playing){if(nativePlayScheduler)nativePlayScheduler.stop();return;}state.playing=false;
   try{var observer=window.NemoTestPlayObserver;if(observer)observer.playState(state.playing,state.currentFrame);}catch(_){}
   var nativeStop=nativePlayScheduler&&nativePlayScheduler.stop();
   if(playRaf){cancelAnimationFrame(playRaf);playRaf=null;}
@@ -195,10 +195,10 @@ function stopPlay(){if(!state.playing)return;state.playing=false;
   if(nativeStop&&nativeStop.wasNative){
     // A same-frame request supersedes a pending playback intent and restores
     // its last committed frame. A replaced/released owner must not receive it.
-    if(nativeStop.restore)goToFrame(state.currentFrame);
-    updateUI(true);return;
+    if(mode==='native-settings-publication')return nativeStop;var restored=nativeStop.restore?goToFrame(state.currentFrame):null;
+    updateUI(true);return mode==='native-settings-intent'?Promise.resolve(restored).then(function(ok){return {presented:ok===true,token:nativeStop};}):undefined;
   }
-  renderOS();renderArcs();updateUI();
+  if(mode==='native-settings-publication')return nativeStop;renderOS();renderArcs();updateUI();
 }
 function togglePlay(){if(state.playing)stopPlay();else startPlay();}
 
@@ -10791,7 +10791,7 @@ document.getElementById('p-maskmode').addEventListener('change',function(){windo
 document.getElementById('p-maskmode-type').addEventListener('change',function(){window.SM.setMaskModeType(this.value);});
 document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
 document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
-document.getElementById('p-cbg').addEventListener('input',function(){window.SM.setCanvasBg(this.value);});
+document.getElementById('p-cbg').addEventListener('input',function(){var c=this.dataset.hex8;window.SM.setCanvasBg(c&&c.slice(0,7).toLowerCase()===this.value.toLowerCase()?c:this.value);});
 document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
 document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});
 var _btnRulers=document.getElementById('btn-rulers');
@@ -11040,7 +11040,7 @@ function matteModeLabel(mode){
 // Width/Height (p-cw/p-ch below) — the old separate proj-w/proj-h duplicate
 // pair was removed (audit 2026-07-17); syncDocFields() still keeps these
 // two ids in sync with state.
-document.getElementById('proj-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
+document.getElementById('proj-fps').addEventListener('change',function(){window.SM.setFps(parseFloat(this.value));});
 document.getElementById('proj-frames').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 document.getElementById('btn-fit').addEventListener('click',function(){window.SM.fitCanvas();});
 document.getElementById('btn-resetv').addEventListener('click',function(){window.SM.resetView();});
@@ -11365,7 +11365,7 @@ document.getElementById('btn-pf').addEventListener('click',function(){if(state.p
 document.getElementById('btn-play').addEventListener('click',function(){togglePlay();});
 document.getElementById('btn-nf').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.currentFrame+1);});
 document.getElementById('btn-lf').addEventListener('click',function(){if(state.playing)stopPlay();goToFrame(state.waOut);});
-document.getElementById('tl-fps').addEventListener('change',function(){window.SM.setFps(parseInt(this.value));});
+document.getElementById('tl-fps').addEventListener('change',function(){window.SM.setFps(parseFloat(this.value));});
 document.getElementById('tl-total').addEventListener('change',function(){window.SM.setTotalFrames(parseInt(this.value));});
 // tl-cf drag/type-to-scrub through frames (2026-07, "rendre la frame 1/120
 // draggable") — goToFrame() itself no-ops silently on an out-of-range

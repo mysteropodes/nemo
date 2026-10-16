@@ -942,13 +942,13 @@
   function initWaDrag(){
     var bar=document.getElementById('wa-bar'),hleft=bar.querySelector('.wa-handle.left'),hright=bar.querySelector('.wa-handle.right');
     var dragType=null,startX,origIn,origOut;
-    function onDown(type,e){dragType=type;startX=e.clientX;origIn=window._waIn||0;origOut=window._waOut||23;e.stopPropagation();e.preventDefault();}
+    function onDown(type,e){dragType=type;startX=e.clientX;origIn=Number.isFinite(window._waIn)?window._waIn:0;origOut=Number.isFinite(window._waOut)?window._waOut:23;e.stopPropagation();e.preventDefault();}
     hleft.addEventListener('mousedown',function(e){onDown('in',e);});
     hright.addEventListener('mousedown',function(e){onDown('out',e);});
     bar.addEventListener('mousedown',function(e){if(e.target===bar)onDown('both',e);});
     window.addEventListener('mousemove',function(e){
       if(!dragType)return;var dx=Math.round((e.clientX-startX)/FC);var total=window._totalF||24;
-      if(dragType==='in')window._waIn=Math.max(0,Math.min(origIn+dx,(window._waOut||total-1)-1));
+      if(dragType==='in')window._waIn=Math.max(0,Math.min(origIn+dx,(Number.isFinite(window._waOut)?window._waOut:total-1)-1));
       else if(dragType==='out')window._waOut=Math.min(total-1,Math.max(origOut+dx,(window._waIn||0)+1));
       else{var w=origOut-origIn;var ni=Math.max(0,origIn+dx);if(ni+w>=total)ni=total-1-w;window._waIn=ni;window._waOut=ni+w;}
       // Commit to state FIRST, then read it back via updateWaBar() below —
@@ -984,7 +984,7 @@
     // or a reference video, both of which are timed in seconds.
     var lab=bar.querySelector('.wa-dur');
     if(!lab){lab=document.createElement('span');lab.className='wa-dur';bar.appendChild(lab);}
-    var n=outF-inF+1, secs=n/Math.max(1,state.fps);
+    var n=outF-inF+1, secs=n/(Number.isFinite(state.fps)&&state.fps>0?state.fps:1);
     lab.textContent=n+' f · '+(secs<10?secs.toFixed(2):secs.toFixed(1))+' s';
     // Hide it when the bar is too narrow to hold the text rather than let it
     // spill over the handles.
