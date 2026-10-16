@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "450e5f8af7a23d90dafd3780198e087956298762",
-  "describe": "v0.7.0-alpha.4-1999-g450e5f8a-dirty"
+  "head": "50bf46d3fe955c10516333bb7af68a4c224b3ea0",
+  "describe": "v0.7.0-alpha.4-2014-g50bf46d3-dirty"
  },
- "inputsDigest": "007430d471f67fb31e54086a70e694e8cb96cbd55a302c2ef843fe8b5e9fb724",
+ "inputsDigest": "7586fd394cc476d7f759ca4bba76c9b524ff1b39a3939ecbcea09daa95b78ed5",
  "states": [
   "inventoried",
   "characterized",
@@ -54,11 +54,11 @@
   "byConsumer": {
    "native": 295,
    "export": 5,
-   "animation": 480,
+   "animation": 476,
    "history": 358,
    "selection": 384,
-   "render": 492,
-   "persist": 415
+   "render": 490,
+   "persist": 413
   }
  },
  "fixturesByArea": {
@@ -505,7 +505,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 74,
+    "functionsVisited": 72,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -550,7 +550,7 @@
     "container": "assets-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 74,
+    "functionsVisited": 72,
     "via": "variable btn",
     "references": [
      "src/js/assets-panel.js:16 select()",
@@ -760,7 +760,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 38,
+    "functionsVisited": 39,
     "via": "chain",
     "references": []
    },
@@ -1698,7 +1698,7 @@
     "container": "media-convert-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 112,
+    "functionsVisited": 113,
     "via": "variable convertBtn",
     "references": [
      "src/js/linked-media.js:660 onConvertMediaClick()",
@@ -1875,7 +1875,7 @@
     "container": "duplicator-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 173,
+    "functionsVisited": 172,
     "via": "chain",
     "references": []
    },
@@ -2187,7 +2187,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 132,
+    "functionsVisited": 138,
     "via": "chain",
     "references": []
    },
@@ -2498,7 +2498,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 141,
+    "functionsVisited": 145,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9135 action()"
@@ -2806,7 +2806,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 132,
+    "functionsVisited": 138,
     "via": "chain",
     "references": []
    },
@@ -3419,7 +3419,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 132,
+    "functionsVisited": 138,
     "via": "chain",
     "references": []
    },
@@ -3827,7 +3827,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 132,
+    "functionsVisited": 138,
     "via": "chain",
     "references": []
    },
@@ -3869,7 +3869,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 39,
+    "functionsVisited": 41,
     "via": "chain",
     "references": [
      "src/js/timeline.js:41 startNativePlay()",
@@ -4080,9 +4080,8 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "animation": 3,
-    "render": 3,
-    "native": 3
+    "native": 3,
+    "render": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -4094,7 +4093,7 @@
     "container": "ref-pop",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 43,
+    "functionsVisited": 47,
     "via": "variable rm",
     "references": [
      "src/js/reference-bridge.js:359 syncUI()"
@@ -8066,7 +8065,7 @@
     "container": "footage-blend-row",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 267,
+    "functionsVisited": 269,
     "via": "variable sel",
     "references": []
    },
@@ -9253,7 +9252,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 55,
+    "functionsVisited": 54,
     "via": "chain",
     "references": []
    },
@@ -9617,8 +9616,7 @@
    "consumers": {
     "persist": 3,
     "history": 3,
-    "render": 3,
-    "animation": 3
+    "render": 3
    },
    "platforms": "browser and desktop",
    "status": "inventoried",
@@ -9630,7 +9628,7 @@
     "container": "effects-stack-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 53,
+    "functionsVisited": 57,
     "via": "variable addBtn",
     "references": [
      "src/js/tutorial.js:1310 check()"
@@ -9985,9 +9983,11 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 11,
+    "functionsVisited": 23,
     "via": "chain",
-    "references": []
+    "references": [
+     "src/js/adapters/native-object-ui.js:200 renderNativeObjectUiMetadata()"
+    ]
    },
    "fixtures": [
     "static-props",
@@ -10028,7 +10028,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 15,
+    "functionsVisited": 26,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10486"
@@ -10267,7 +10267,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 115,
+    "functionsVisited": 119,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2900 updateCornersPanel()",
@@ -10356,7 +10356,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 15,
+    "functionsVisited": 26,
     "via": "chain",
     "references": [
      "src/js/timeline.js:10494"
@@ -12334,7 +12334,7 @@
     "functionsVisited": 22,
     "via": "variable trig",
     "references": [
-     "src/js/adapters/native-object-ui.js:45 unavailableInspector()",
+     "src/js/adapters/native-object-ui.js:79 unavailableInspector()",
      "src/js/reference-bridge.js:362 syncUI()",
      "src/js/reference-bridge.js:431 openOptions()"
     ]
@@ -14068,7 +14068,7 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 99,
+    "functionsVisited": 96,
     "via": "variable copyBtn",
     "references": []
    },
@@ -14646,11 +14646,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "animation": 3,
-    "render": 3,
-    "persist": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -14663,7 +14659,7 @@
     "container": "canvas-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 49,
+    "functionsVisited": 22,
     "via": "chain",
     "references": []
    },
@@ -16435,10 +16431,10 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 134,
+    "functionsVisited": 140,
     "via": "chain",
     "references": [
-     "src/js/adapters/native-object-ui.js:156 renderNativeObjectUiMetadata()",
+     "src/js/adapters/native-object-ui.js:191 renderNativeObjectUiMetadata()",
      "src/js/app.js:5100 syncInput()",
      "src/js/timeline.js:220 updatePlayhead()",
      "src/js/timeline.js:2813 updateUI()"
@@ -16467,11 +16463,7 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "animation": 3,
-    "render": 3,
-    "persist": 3
-   },
+   "consumers": {},
    "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
@@ -16484,7 +16476,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 49,
+    "functionsVisited": 22,
     "via": "chain",
     "references": []
    },
@@ -22168,7 +22160,7 @@
    "nextGate": "R03/R18.6: decide ship, keep as Labs, or retire; Labs are not release surfaces",
    "source": "src/js/labs/timelapse.js:81",
    "meta": {
-    "functionsVisited": 9
+    "functionsVisited": 11
    },
    "fixtures": []
   },
@@ -22785,7 +22777,7 @@
    "source": "src/js/labs/command-palette.js:25",
    "meta": {
     "i18n": "labsCmdPlayStop",
-    "functionsVisited": 39
+    "functionsVisited": 41
    },
    "fixtures": []
   },
@@ -23920,7 +23912,7 @@
    "source": "src/js/markers.js:210",
    "meta": {
     "i18n": null,
-    "functionsVisited": 58
+    "functionsVisited": 56
    },
    "fixtures": [
     "static-props",
@@ -24074,7 +24066,7 @@
    "source": "src/js/media-library.js:553",
    "meta": {
     "i18n": "ctxRelinkReplaceFile",
-    "functionsVisited": 56
+    "functionsVisited": 58
    },
    "fixtures": [
     "mesh",
@@ -32667,7 +32659,7 @@
    "nextGate": "R14: expose through the MCP adapter with the same handler",
    "source": "src/js/nemo-script.js:468",
    "meta": {
-    "functionsVisited": 417
+    "functionsVisited": 416
    },
    "fixtures": [
     "media",
