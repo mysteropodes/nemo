@@ -299,12 +299,15 @@ test('transport complete-record definitions preserve each frozen field constrain
   for (const record of cases.records) assert.deepEqual(validate(transport.$defs.ObjectRecord, record, transport.$defs), []);
 });
 
-test('prepared layer creation descriptor is separate and execution unavailable until real native readers', () => {
+test('layer creation uses its single available descriptor with strict payload and receipt contracts', () => {
   const create = load('engineering/application/capabilities-v2/native-object-layer-create.json');
   assert.equal(create.id, 'native.object.layer-create');
   assert.deepEqual(create.operations, ['command.document.object.layer.create']);
-  assert.equal(create.availability.state, 'unavailable');
-  assert.match(create.availability.reason, /timeline\/selected-row readers/);
+  assert.equal(create.status, 'active');
+  assert.equal(create.availability.state, 'available');
+  assert.equal(create.availability.reason, null);
+  assert.equal(create.authority.fallback, 'none');
+  assert.equal(create.authority.adapterOwnsWritableMirror, false);
   assert.equal(descriptor.availability.state, 'available', 'existing object query and visibility remain available');
   const { request, response } = create.examples[0];
   assert.strictEqual(validateRequest(request), request);
@@ -343,5 +346,5 @@ test('timing declaration and closed transport definitions retain the accepted se
   for (const bad of [null, [], {}, { ...request.payload, lifecycleGeneration: 1 }, { ...request.payload, frame: 4294967296 }, { ...request.payload, atRevision: -1 }]) {
     assert.ok(validate(transport.$defs.ObjectLayerTimingPayload, bad, transport.$defs).length);
   }
-  assert.equal(load('engineering/application/capabilities-v2/native-object-layer-create.json').availability.state, 'unavailable');
+  assert.equal(load('engineering/application/capabilities-v2/native-object-layer-create.json').availability.state, 'available');
 });
