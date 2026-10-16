@@ -212,6 +212,8 @@
       "layer": "tests",
       "dir": "nemo-mcp/tests",
       "files": [
+        "native_catalog.rs",
+        "native_status.rs",
         "stdio.rs",
         "stdio_application.rs",
         "stdio_cancellation.rs",
