@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "3e3ead9a8534cab37e327c9484522e11857e04c5",
-  "describe": "v0.7.0-alpha.4-2083-g3e3ead9a"
+  "head": "834e66302956345b9071034a3d41b16eb4e4addf",
+  "describe": "v0.7.0-alpha.4-2108-g834e6630"
  },
- "inputsDigest": "6198e7ea6032630bb6406172f38e7598c3f2a6ca2d90c35421e628bb850b76c6",
+ "inputsDigest": "dc0ea35a6864a286054f0954693ef62f002a11ef6e91d520e7192d328ba37da9",
  "states": [
   "inventoried",
   "characterized",
@@ -52,12 +52,12 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 293,
+   "native": 284,
    "export": 5,
    "animation": 476,
    "history": 358,
    "selection": 384,
-   "render": 490,
+   "render": 489,
    "persist": 413
   }
  },
@@ -186,7 +186,7 @@
   },
   "SMKitsu": {
    "file": "src/js/kitsu.js",
-   "line": 288,
+   "line": 254,
    "members": 3
   },
   "SMLabs": {
@@ -2498,7 +2498,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 132,
+    "functionsVisited": 112,
     "via": "variable histBtn",
     "references": [
      "src/js/timeline.js:9135 action()"
@@ -2699,7 +2699,7 @@
    "capability": "kitsu open",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:426 initKitsuUI()"
+    "src/js/kitsu.js:392 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -2738,7 +2738,7 @@
    "capability": "kitsu publish",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:452 initKitsuUI()"
+    "src/js/kitsu.js:418 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -3459,7 +3459,7 @@
     "container": "legacy-project-actions",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 68,
+    "functionsVisited": 72,
     "via": "chain",
     "references": []
    },
@@ -5017,7 +5017,7 @@
     "container": "tl-toolbar",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 60,
+    "functionsVisited": 64,
     "via": "variable trigger",
     "references": []
    },
@@ -5178,7 +5178,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 2
+    "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -7556,8 +7556,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 3
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1955",
@@ -7701,10 +7703,11 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
+    "native": 3,
     "persist": 3,
     "render": 3
    },
-   "platforms": "browser and desktop",
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1878",
@@ -8373,7 +8376,7 @@
    "capability": "&larr; Back",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:447 initKitsuUI()"
+    "src/js/kitsu.js:413 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8410,7 +8413,7 @@
    "capability": "&times;",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:428 initKitsuUI()"
+    "src/js/kitsu.js:394 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8447,7 +8450,7 @@
    "capability": "kitsu email",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8471,7 +8474,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8486,7 +8489,7 @@
    "capability": "Log in",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:433 initKitsuUI()"
+    "src/js/kitsu.js:399 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8497,7 +8500,7 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 2
+    "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
@@ -8509,7 +8512,7 @@
     "container": "kitsu-step-login",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 44,
+    "functionsVisited": 40,
     "via": "helper el()",
     "references": []
    },
@@ -8525,7 +8528,7 @@
    "capability": "Log out",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:449 initKitsuUI()"
+    "src/js/kitsu.js:415 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8562,7 +8565,7 @@
    "capability": "kitsu password",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8586,7 +8589,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -8601,7 +8604,7 @@
    "capability": "kitsu url",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/kitsu.js:430 initKitsuUI()"
+    "src/js/kitsu.js:396 initKitsuUI()"
    ],
    "events": [
     "click"
@@ -8625,7 +8628,7 @@
     "functionsVisited": 3,
     "via": "container delegation #kitsu-modal",
     "references": [
-     "src/js/kitsu.js:435 initKitsuUI()"
+     "src/js/kitsu.js:401 initKitsuUI()"
     ]
    },
    "fixtures": [
@@ -9237,7 +9240,6 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "render": 3,
     "native": 3
    },
    "platforms": "desktop (native bridge); browser degrades or is gated",
@@ -9250,7 +9252,7 @@
     "container": "start-newpanel",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 50,
+    "functionsVisited": 25,
     "via": "chain",
     "references": []
    },
@@ -9809,7 +9811,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 41,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3338 updatePropsContext()"
@@ -10265,7 +10267,7 @@
     "container": "corners-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 115,
+    "functionsVisited": 95,
     "via": "chain",
     "references": [
      "src/js/timeline.js:2900 updateCornersPanel()",
@@ -11399,7 +11401,7 @@
     "container": "layer-sec",
     "modal": false,
     "hiddenAtLoad": true,
-    "functionsVisited": 37,
+    "functionsVisited": 41,
     "via": "variable dd",
     "references": [
      "src/js/timeline.js:3344 updatePropsContext()",
@@ -11992,7 +11994,7 @@
     "container": "fill-sec",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 12,
+    "functionsVisited": 17,
     "via": "chain",
     "references": [
      "src/js/timeline.js:6319 paintFillSwatches()"
@@ -17478,8 +17480,10 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {},
-   "platforms": "browser and desktop",
+   "consumers": {
+    "native": 2
+   },
+   "platforms": "desktop (native bridge); browser degrades or is gated",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1820",
@@ -18863,10 +18867,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1758",
@@ -18902,10 +18905,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1759",
@@ -18941,10 +18943,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1760",
@@ -18980,10 +18981,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1761",
@@ -19019,10 +19019,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1762",
@@ -19058,10 +19057,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1763",
@@ -19097,10 +19095,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1764",
@@ -19136,10 +19133,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:1765",
@@ -19175,10 +19171,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2073",
@@ -19217,10 +19212,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2074",
@@ -19259,10 +19253,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2075",
@@ -19301,10 +19294,9 @@
    "mcp": "none (R14)",
    "sdk": "none",
    "consumers": {
-    "native": 3,
     "animation": 3
    },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:2076",
@@ -23095,7 +23087,7 @@
    "source": "src/js/labs/command-palette.js:35",
    "meta": {
     "i18n": "labsCmdUndo",
-    "functionsVisited": 3
+    "functionsVisited": 8
    },
    "fixtures": []
   },
@@ -23125,7 +23117,7 @@
    "source": "src/js/labs/command-palette.js:36",
    "meta": {
     "i18n": "labsCmdRedo",
-    "functionsVisited": 3
+    "functionsVisited": 8
    },
    "fixtures": []
   },
