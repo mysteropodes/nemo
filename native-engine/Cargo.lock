@@ -614,6 +614,7 @@ dependencies = [
  "png",
  "pollster",
  "raw-window-handle",
+ "read-fonts",
  "rquickjs",
  "serde",
  "serde_json",

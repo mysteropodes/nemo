@@ -43,6 +43,8 @@ const CANDIDATE_FILES = [
   'native-engine/src/object_document.rs',
   'native-engine/src/project_media_envelope.rs',
   'native-engine/src/object_codec.rs',
+  'native-engine/src/font_asset_admission.rs',
+  'native-engine/tests/font_asset_admission.rs',
   'native-engine/src/project_media_codec.rs',
   'native-engine/tests/project_media_codec.rs',
   'native-engine/tests/object_project_admission.rs',
@@ -267,6 +269,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   const rootText = fs.readFileSync(path.join(ROOT, 'native-engine/src/lib.rs'), 'utf8');
   const compositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/compositor.rs'), 'utf8');
   const objectCompositorText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_compositor.rs'), 'utf8');
+  const objectCodecText = fs.readFileSync(path.join(ROOT, 'native-engine/src/object_codec.rs'), 'utf8');
+  const fontText = fs.readFileSync(path.join(ROOT, 'native-engine/src/font_asset_admission.rs'), 'utf8');
   const policy = readJson(ROOT, POLICY), cargo = cargoContract(cargoText);
   assert.deepEqual(cargo.features, policy.features.declared);
   const members = cargoFeatureMembers(cargoText);
@@ -277,6 +281,8 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   assert.match(cargoText, /^flate2 = \{ version = "=1\.1\.10", default-features = false, features = \["rust_backend"\], optional = true \}$/m);
   assert.match(cargoText, /^miniz_oxide = \{ version = "=0\.9\.1", default-features = false, optional = true \}$/m);
   assert.deepEqual(members.project_media_codec, ['codec', 'reference_image_asset', 'dep:base64']);
+  assert.deepEqual(members.font_asset_admission, ['project_media_codec', 'dep:read-fonts']);
+  assert.match(cargoText, /^read-fonts = \{ version = "=0\.39\.2", optional = true \}$/m);
   assert.deepEqual(members['test-codec'], ['project_media_codec']);
   assert.deepEqual(members['test-compositor'], ['compositor']);
   assert.deepEqual(members['test-application'], ['application', 'project_media_codec']);
@@ -293,13 +299,20 @@ test('Cargo features, targets and declaration macros are one exact contract', ()
   };
   for (const feature of cargo.features.filter((name) => name !== 'reference_image_asset')) {
     assert.equal(reaches(feature, 'reference_image_asset'),
-      feature === 'project_media_codec' || feature === 'test-codec' || feature === 'test-application',
+      feature === 'project_media_codec' || feature === 'font_asset_admission' || feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private PNG selector`);
   }
   for (const feature of cargo.features.filter((name) => name !== 'project_media_codec')) {
-    assert.equal(reaches(feature, 'project_media_codec'), feature === 'test-codec' || feature === 'test-application',
+    assert.equal(reaches(feature, 'project_media_codec'), feature === 'font_asset_admission' || feature === 'test-codec' || feature === 'test-application',
       `${feature} must not activate the private attached-codec selector`);
   }
+  for (const feature of cargo.features.filter((name) => name !== 'font_asset_admission')) {
+    assert.equal(reaches(feature, 'font_asset_admission'), false,
+      `${feature} must not activate the private font-admission selector`);
+  }
+  assert.match(objectCodecText, /#\[cfg\(feature = "font_asset_admission"\)\]\s*#\[path = "font_asset_admission\.rs"\]\s*mod font_assets;/);
+  assert.equal((objectCodecText.match(/mod font_assets;/g) || []).length, 1);
+  assert.match(fontText, /#\[cfg\(test\)\]\s*#\[path = "\.\.\/tests\/font_asset_admission\.rs"\]\s*mod tests;/);
   for (const feature of cargo.features.filter((name) => name !== 'object_expression_pin')) {
     assert.equal(reaches(feature, 'object_expression_pin'),
       ['test-object_expression_pin', 'object_expression_runtime', 'test-object_expression_runtime'].includes(feature),

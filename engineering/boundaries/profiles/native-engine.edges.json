@@ -60,7 +60,7 @@
     "items": []
   },
   "features": {
-    "declared": ["default", "codec", "reference_image_asset", "project_media_codec", "commands", "history", "evaluation", "scheduler", "compositor", "viewport", "export_job", "application", "object_expression_pin", "object_expression_runtime", "test-codec", "test-commands", "test-history", "test-evaluation", "test-scheduler", "test-compositor", "test-viewport", "test-export_job", "test-application", "test-object_expression_pin", "test-object_expression_runtime"],
+    "declared": ["default", "codec", "reference_image_asset", "project_media_codec", "font_asset_admission", "commands", "history", "evaluation", "scheduler", "compositor", "viewport", "export_job", "application", "object_expression_pin", "object_expression_runtime", "test-codec", "test-commands", "test-history", "test-evaluation", "test-scheduler", "test-compositor", "test-viewport", "test-export_job", "test-application", "test-object_expression_pin", "test-object_expression_runtime"],
     "declaredNote": "Exact [features] keys from native-engine/Cargo.toml. The declaration macro uses a metavariable cfg; the N19 test pins every production and test mapping to Cargo and proves a literal undeclared feature is rejected.",
     "allowedCfgs": ["test", "feature = $feature"]
   },
