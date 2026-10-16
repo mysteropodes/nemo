@@ -11,7 +11,12 @@
 //! `M ld bounds cw,ch extra px,py x,y`, `S ld bounds cw,ch extra segs segs'`
 //! (segs `;`-fields, `|`-joined), `I ld bounds cw,ch extra x,y,w,h,rot out`.
 //! `ld` = posX,posY,ancX,ancY,rot,sclX,sclY,posZ,rotX,rotY. Numbers compare on
-//! bits; two NaNs match (payload ignored). Only the I-row rotation (`atan2`) is allowed 1 ulp.
+//! bits; two NaNs match (payload ignored). One exception: values that go
+//! through `cos`/`sin`/`atan2` (an R row with an angle, an M/S/I row whose pose
+//! or delta rotates, every I-row rotation) are libm-dependent in the last ulp
+//! (macOS differs from the Linux/V8 oracle). They may differ by `TRIG_ULPS`
+//! units of roundoff of their group's largest entry; an angle's floor is a
+//! half turn, as atan2 error is absolute. P rows and unrotated rows stay exact.
 
 use crate::evaluation::property_projection_3d::{
     make_projector, project_image_rect, project_segments, project_to_screen, rotate_3d, Bounds,
@@ -30,6 +35,49 @@ fn same(a: f64, b: f64) -> bool {
 
 fn all_same(a: &[f64], b: &[f64]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| same(*x, *y))
+}
+
+const TRIG_ULPS: f64 = 4.0;
+const ANGLE_FLOOR: f64 = 180.0;
+
+/// Bit-equal, or a finite rounding difference within `TRIG_ULPS` of the
+/// group's magnitude (at least `floor`); a signed-zero mismatch never passes.
+fn trig_near(a: &[f64], b: &[f64], floor: f64) -> bool {
+    let mag = a
+        .iter()
+        .chain(b)
+        .filter(|x| x.is_finite())
+        .fold(floor, |m, x| m.max(x.abs()));
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(&x, &y)| {
+            same(x, y)
+                || (x.is_finite()
+                    && y.is_finite()
+                    && x != y
+                    && (x - y).abs() <= TRIG_ULPS * mag * f64::EPSILON)
+        })
+}
+
+fn matches(a: &[f64], b: &[f64], trig: bool) -> bool {
+    if trig {
+        trig_near(a, b, 0.0)
+    } else {
+        all_same(a, b)
+    }
+}
+
+fn truthy(v: f64) -> bool {
+    v != 0.0 && !v.is_nan()
+}
+
+/// Whether the row's projector rotates (pose or delta rot, rotX or rotY).
+fn rotates(t: &[&str]) -> bool {
+    let p = pose(t[1]);
+    let e = extra(t[4]).unwrap_or_default();
+    [p.rotation, p.rotation_x, p.rotation_y]
+        .into_iter()
+        .any(truthy)
+        || [e.drot, e.drx, e.dry].into_iter().flatten().any(truthy)
 }
 
 fn list(tok: &str) -> Vec<f64> {
@@ -177,12 +225,13 @@ fn every_p_row_is_bit_identical() {
 }
 
 #[test]
-fn every_r_row_is_bit_identical() {
+fn every_r_row_matches_the_oracle() {
     for (i, t) in rows("R").iter().enumerate() {
         let a = list(t[1]);
         let got = rotate_3d(a[0], a[1], a[2], a[3], a[4], a[5]);
+        let trig = a[3..].iter().any(|v| truthy(*v));
         assert!(
-            all_same(&got, &list(t[2])),
+            matches(&got, &list(t[2]), trig),
             "R {i}: {got:?} != {:?}",
             list(t[2])
         );
@@ -190,12 +239,12 @@ fn every_r_row_is_bit_identical() {
 }
 
 #[test]
-fn every_m_row_is_bit_identical() {
+fn every_m_row_matches_the_oracle() {
     for (i, t) in rows("M").iter().enumerate() {
         let p = list(t[5]);
         let got = proj(t).project(p[0], p[1]);
         assert!(
-            all_same(&got, &list(t[6])),
+            matches(&got, &list(t[6]), rotates(t)),
             "M {i}: {got:?} != {:?}",
             list(t[6])
         );
@@ -203,16 +252,22 @@ fn every_m_row_is_bit_identical() {
 }
 
 #[test]
-fn every_s_row_is_bit_identical() {
+fn every_s_row_matches_the_oracle() {
     for (i, t) in rows("S").iter().enumerate() {
         let got = seg_flat(&project_segments(&seg_list(t[5]), &proj(t)));
         let want = flat_seg_tok(t[6]);
-        assert!(all_same(&got, &want), "S {i}: {got:?} != {want:?}");
+        // one magnitude group per segment: handles are differences of projected points
+        let ok = got.len() == want.len()
+            && got
+                .chunks(6)
+                .zip(want.chunks(6))
+                .all(|(g, w)| matches(g, w, rotates(t)));
+        assert!(ok, "S {i}: {got:?} != {want:?}");
     }
 }
 
 #[test]
-fn every_i_row_is_bit_identical() {
+fn every_i_row_matches_the_oracle() {
     for (i, t) in rows("I").iter().enumerate() {
         let r = t[5]
             .split(',')
@@ -228,11 +283,11 @@ fn every_i_row_is_bit_identical() {
         let o = project_image_rect(&rect, &proj(t));
         let got = [o.x, o.y, o.width, o.height, o.rotation];
         let w = list(t[6]);
-        assert!(all_same(&got[..4], &w[..4]), "I {i}: {got:?} != {w:?}");
-        // rotation is atan2: V8 (fdlibm) and glibc differ by 1 ulp on row 20 only; every other row is exact
-        let ulp = got[4].to_bits().abs_diff(w[4].to_bits());
+        let trig = rotates(t) || r[4].is_some_and(truthy);
+        assert!(matches(&got[..4], &w[..4], trig), "I {i}: {got:?} != {w:?}");
+        // the rotation always goes through atan2
         assert!(
-            same(got[4], w[4]) || (i == 20 && ulp <= 1),
+            trig_near(&got[4..], &w[4..], ANGLE_FLOOR),
             "I {i} rot {:?} != {:?}",
             got[4],
             w[4]
@@ -438,4 +493,37 @@ fn nan_extra_fields_and_rect_rotation_read_as_zero() {
         project_image_rect(&rect(n), &id),
         project_image_rect(&rect(None), &id)
     );
+}
+
+#[test]
+fn trig_tolerance_still_rejects_real_mistakes() {
+    let got = rotate_3d(120.0, -80.0, 15.0, 20.0, 35.0, 50.0);
+    let flipped = rotate_3d(120.0, -80.0, 15.0, -20.0, 35.0, 50.0);
+    assert!(matches(&got, &got, true) && !matches(&flipped, &got, true));
+    let mut nudged = got;
+    nudged[2] *= 1.0 + 1e-12;
+    assert!(!matches(&nudged, &got, true));
+    let mut one_ulp = got;
+    one_ulp[0] = f64::from_bits(got[0].to_bits() + 1);
+    assert!(matches(&one_ulp, &got, true) && !matches(&one_ulp, &got, false));
+    assert!(!trig_near(&[0.0], &[-0.0], ANGLE_FLOOR));
+    assert!(!trig_near(&[10.0], &[10.0 + 1e-11], ANGLE_FLOOR));
+}
+
+#[test]
+fn hypot_is_v8_math_hypot_bit_for_bit() {
+    // V8 Math.hypot results (Node 22) where libm `f64::hypot` rounds differently.
+    // hypot2 is IEEE arithmetic plus sqrt only, so it is exact on every host,
+    // and this pins the port even where trig rows carry TRIG_ULPS.
+    for row in [
+        "406364edf70c0000 c06865f0f0000000 406f2addc1c80788",
+        "40666ec470000000 4065a3f290000000 406f2b5f83753a01",
+        "c07230d356c00000 4071f92d1f800000 407992839d618cc0",
+        "407734e718000000 40757fcca8000000 407fa286cff995a0",
+        "c05ec15926000000 4011fd4920000000 405ec69b9003dd6a",
+        "4041e613b8000000 4075a9261b000000 4075c6a68df8fa23",
+    ] {
+        let v: Vec<f64> = row.split(' ').map(hex).collect();
+        assert_eq!(super::hypot2(v[0], v[1]).to_bits(), v[2].to_bits(), "{row}");
+    }
 }
