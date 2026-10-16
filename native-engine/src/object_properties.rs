@@ -1,5 +1,5 @@
 //! Typed, frame-independent Motion holders in the existing object document.
-use super::{
+use crate::object_document::{
     object_deserialize, FrameScopeKind, ObjectLayer, ObjectRecord, OrderExpression, OrderPlan,
     OrderTrack, Presence,
 };

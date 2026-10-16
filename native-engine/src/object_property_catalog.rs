@@ -1,5 +1,5 @@
 //! Baseline Motion metadata. Values are descriptive, never another state owner.
-use super::{ExpressionControl, PropertyMetadata};
+use crate::object_document::{ExpressionControl, PropertyMetadata};
 use serde_json::Number;
 
 fn values(input: &[f64]) -> Vec<Number> {
