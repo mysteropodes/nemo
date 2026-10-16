@@ -10,6 +10,11 @@ use crate::transaction::StageReceipts;
 
 #[path = "object_command_dispatch.rs"]
 mod object_command_dispatch;
+#[path = "object_project_settings_history.rs"]
+mod project_settings;
+#[cfg(all(test, feature = "project_media_codec"))]
+#[path = "../tests/object_project_settings.rs"]
+mod project_settings_tests;
 
 #[derive(Debug, Clone)]
 struct ObjectHistoryEntry {
