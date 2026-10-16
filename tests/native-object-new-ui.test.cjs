@@ -62,6 +62,7 @@ function ordinary(h,extra={}){
     documentSource:fs.readFileSync('src/js/project-document.js','utf8'),entrySource:fs.readFileSync('src/js/project-entry.js','utf8')});
   vm.runInContext(code+'\nthis.makeHarness=harness;',context);
   return context.makeHarness({dirtyDot:true,configureWindow(root){
+    require('./helpers/native-viewport-underlay.cjs').install(root);
     root.NemoNativeObjectProject=Project;root.NemoNativeObjectProjectFile=Files;
     root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
     root.NemoNativeOpacityCutover={blocksLegacy:()=>true,requestRelease:()=>assert.fail('legacy release')};

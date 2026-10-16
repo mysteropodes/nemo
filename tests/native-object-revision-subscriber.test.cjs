@@ -81,9 +81,10 @@ function scenario(openFault){
       }};
     }},__TAURI__:{core:{invoke},event:{listen:async(name,callback)=>{
       listeners.set(name,callback);oldListeners.push(callback);return ()=>{if(listeners.get(name)===callback)listeners.delete(name);};
-    }}},document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,width:320,height:180})})},
+    }}},document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,left:0,top:0,width:320,height:180})})},
     updateUI:()=>{if(openFault?.stage==='publication')throw openError;log.push('publish-'+revision);}};
   if(openFault)root.__NEMO_P38_FIXTURE_OPEN_DIAGNOSTIC__=(event,code)=>diagnostics.push([event,code]);
+  require('./helpers/native-viewport-underlay.cjs').install(root);
   const session=Project.desktop(root);
   async function open(){return session.openPath('/native.json',{
     ...(openFault?{reveal:()=>{if(openFault.stage==='reveal')throw openError;}}:{}),

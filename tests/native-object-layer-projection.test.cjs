@@ -117,7 +117,7 @@ function desktop(){
     subscriptionId:'subscription',contentRevision:0};
   const meta=()=>({...info(layers),contentRevision:revision,documentSnapshotId:'snapshot-'+revision,documentDigest:String(revision).repeat(64)});
   const root={state:{},userLayers:[],selectedPaths:[],NemoNativeObjectProjectFile:Files,
-    NemoApplicationMcpTransport:Transport,document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,width:320,height:180})})},
+    NemoApplicationMcpTransport:Transport,document:{getElementById:()=>({getBoundingClientRect:()=>({x:0,y:0,left:0,top:0,width:320,height:180})})},
     updateUI:()=>log.push('rows:'+root.state.layers.map(row=>row.layerUid).join('|'))};
   async function invoke(command,args){
     const r=args&&(args.request||JSON.parse(args.requestJson));calls.push({command,r});
@@ -147,6 +147,7 @@ function desktop(){
       contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
   }
   root.__TAURI__={core:{invoke},event:{listen:async(name,callback)=>{listeners.set(name,callback);return ()=>listeners.delete(name);}}};
+  require('./helpers/native-viewport-underlay.cjs').install(root);
   const session=Project.desktop(root);
   return {root,session,log,calls,meta,hold:gate=>{previewGate=gate;},fail:value=>{fault=value;},
     async open(){await session.openPath('/native.json',{commit:value=>Files.projectView(root,value)});log.length=0;root.state.currentFrame=7;root.state.waIn=3;root.state.waOut=19;root._layerSel=[1];root.state.activeLayerIdx=1;},

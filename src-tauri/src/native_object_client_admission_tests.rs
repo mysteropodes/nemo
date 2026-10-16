@@ -206,7 +206,8 @@ fn actual_release_reinstall_changes_incarnation_and_never_replays_into_new_owner
         "command.document.object.undo",
         "command.document.object.redo",
         "query.document.object.serialize",
-        "command.document.object.layer.visibility.set"
+        "command.document.object.layer.visibility.set",
+        "command.document.object.project.settings.edit"
     ]);
     assert_eq!(status["operations"], operations);
     for flag in ["publicCapabilityAvailable", "mcpAvailable"] {
