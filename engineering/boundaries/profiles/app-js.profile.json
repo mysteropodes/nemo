@@ -265,6 +265,18 @@
       ]
     },
     {
+      "id": "app.i18n.runtime.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "i18n-runtime.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "i18n-runtime.js"
+      ]
+    },
+    {
       "id": "app.i18n",
       "layer": "app-legacy",
       "dir": "src/js",
@@ -2091,6 +2103,22 @@
       "files": ["native-drawing-add-desktop.js"],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": ["native-drawing-add-desktop.js"]
+    },
+    {
+      "id": "app.native.project-settings.intent.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": ["native-project-settings-intent.js"],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": ["native-project-settings-intent.js"]
+    },
+    {
+      "id": "app.native.project-settings.desktop.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": ["native-project-settings-desktop.js"],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": ["native-project-settings-desktop.js"]
     },
     {
       "id": "app.native.object.project.adapter",

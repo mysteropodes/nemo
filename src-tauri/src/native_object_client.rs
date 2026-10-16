@@ -8,13 +8,14 @@ use serde_json::{json, Value};
 
 const MAX_BYTES: usize = 4096;
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
-const OPERATIONS: [&str; 6] = [
+const OPERATIONS: [&str; 7] = [
     "query.document.object",
     "command.document.object.fill.set",
     "command.document.object.undo",
     "command.document.object.redo",
     "query.document.object.serialize",
     "command.document.object.layer.visibility.set",
+    "command.document.object.project.settings.edit",
 ];
 
 /// Only original-byte admission can construct this token. Public typed dispatch

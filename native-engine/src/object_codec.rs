@@ -21,6 +21,11 @@ pub(crate) use crate::reference_image_asset::{
 
 #[path = "project_media_codec.rs"]
 mod project;
+// Literal settings wire oracles exercise the real private codec without history.
+#[cfg(all(test, feature = "project_media_codec"))]
+pub(crate) mod project_settings_test_codec {
+    pub(crate) use super::project::{decode_project, encode_project, ProjectWireLimits};
+}
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]

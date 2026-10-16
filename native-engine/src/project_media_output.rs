@@ -122,12 +122,7 @@ fn encode_legacy_project(
     let drawing = bounded_json(envelope.drawing(), limits.drawing_bytes)?;
     let raw =
         serde_json::from_slice::<&RawValue>(&drawing).map_err(|_| ProjectWireError::Invalid)?;
-    let (canvas_w, canvas_h) = envelope.project().canvas_dimensions();
-    let project = Metadata {
-        canvas_w,
-        canvas_h,
-        fps: envelope.project().fps(),
-    };
+    let project = Metadata::from_metadata(envelope.project());
     #[cfg(feature = "project_media_codec")]
     if let ProjectReferenceState::StillImage(data) = &reference {
         let viewport_reference = ReferenceOutput {
@@ -340,16 +335,11 @@ mod catalog {
         if assets.len() > 1024 {
             return Err(ProjectWireError::Budget);
         }
-        let (canvas_w, canvas_h) = envelope.project().canvas_dimensions();
         bounded_json(
             &Output {
                 format: crate::object_codec::project::FORMAT,
                 format_version: 2,
-                project: Metadata {
-                    canvas_w,
-                    canvas_h,
-                    fps: envelope.project().fps(),
-                },
+                project: Metadata::from_metadata(envelope.project()),
                 drawing,
                 viewport_reference,
                 assets,

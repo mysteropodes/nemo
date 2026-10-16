@@ -215,6 +215,18 @@ impl NativeObjectHost {
         Ok(())
     }
 
+    pub(crate) fn require_project_output(&self, dimensions: (u32, u32)) -> Result<(), String> {
+        let expected = self
+            .history
+            .project_canvas_dimensions()
+            .map_err(|_| "native project dimensions unavailable")?
+            .unwrap_or((320, 180)); // Preserve the bare-object compatibility contract.
+        if dimensions != expected {
+            return Err("object output extent differs from the owned project".into());
+        }
+        Ok(())
+    }
+
     pub(crate) fn project_file_info(&self) -> Result<serde_json::Value, String> {
         self.history
             .project_file_info()

@@ -12,6 +12,9 @@ use std::collections::HashSet;
 #[path = "object_property_edit.rs"]
 mod property_edit;
 pub(crate) use property_edit::PreparedPropertyEdit;
+#[path = "object_project_settings.rs"]
+mod project_settings;
+pub(crate) use project_settings::PreparedProjectSettings;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {

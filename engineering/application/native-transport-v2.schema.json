@@ -389,6 +389,100 @@
         }
       }
     },
+    "ObjectProjectSettingsPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "action"
+      ],
+      "properties": {
+        "command": {
+          "const": "object.project.settings.edit"
+        },
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "width",
+                "height"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setCanvasSize"
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4294967295
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4294967295
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "fps"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setFps"
+                },
+                "fps": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "color"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setCanvasBackground"
+                },
+                "color": {
+                  "type": "string",
+                  "pattern": "^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "inFrame",
+                "outFrame"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "setWorkArea"
+                },
+                "inFrame": {
+                  "type": "number"
+                },
+                "outFrame": {
+                  "type": "number"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
     "ObjectLayerCreatePayload": {
       "type": "object", "additionalProperties": false,
       "required": ["command", "name"],
@@ -610,6 +704,7 @@
     },
     "Request": {
       "oneOf": [
+        { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" }, { "properties": { "operation": { "const": "command.document.object.project.settings.edit" }, "payload": { "$ref": "#/$defs/ObjectProjectSettingsPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/ForbiddenRevisionRequest" }, { "properties": { "operation": { "const": "query.document.object.layer.timing" }, "payload": { "$ref": "#/$defs/ObjectLayerTimingPayload" } } }] },
         { "allOf": [{ "$ref": "#/$defs/RequiredRevisionRequest" },
           { "properties": { "operation": { "const": "command.document.object.layer.create" },

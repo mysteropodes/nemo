@@ -178,7 +178,8 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
         assert_eq!(original.redo(0), Err(DispatchErrorCode::Unavailable));
         let bytes = save(&original, 0);
         let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
-            "project":{"canvasW":640,"canvasH":360,"fps":fps},
+            "project":{"canvasW":640,"canvasH":360,"fps":fps,
+                "canvasBg":"#ffffff","waIn":0.0,"waOut":(frames - 1) as f64},
             "drawing":{"format":"nemo.native-object-document","formatVersion":2,
                 "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
                     "locked":false,"color":"#5FA875","parentLayerUid":null,
@@ -307,7 +308,8 @@ fn blank_replacement_prepares_immutably_and_commits_in_the_original_history() {
     );
     let saved = bytes(&owner);
     let expected = json!({"format":"nemo.native-project-document","formatVersion":1,
-        "project":{"canvasW":640,"canvasH":360,"fps":29.97},
+        "project":{"canvasW":640,"canvasH":360,"fps":29.97,
+            "canvasBg":"#ffffff","waIn":0.0,"waOut":149.0},
         "drawing":{"format":"nemo.native-object-document","formatVersion":2,
             "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
                     "locked":false,"color":"#5FA875","parentLayerUid":null,
