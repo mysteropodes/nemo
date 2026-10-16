@@ -2213,7 +2213,8 @@
       "layer": "adapters",
       "dir": "src/js/adapters",
       "files": [
-        "native-object-project.js"
+        "native-object-project.js",
+        "native-object-project-desktop.js"
       ],
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
@@ -2530,6 +2531,20 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "tutorial-native-placement.js"
+      ]
+    },
+    {
+      "id": "app.native.motion.properties.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "native-motion-property-view.js",
+        "native-motion-property-panel.js",
+        "native-motion-property-binding.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "native-motion-property-binding.js"
       ]
     }
   ],
