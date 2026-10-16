@@ -171,6 +171,7 @@ function desktop(initial=[A,B]){
     return {apiVersion:2,requestId:r.requestId,instanceId:r.instanceId,documentId:r.documentId,contentRevision:revision,ok:true,result:{applied:true,historyEntriesAdded:1}};
   }
   root.__TAURI__={core:{invoke},event:{listen:async(name,callback)=>{listeners.set(name,callback);return ()=>listeners.delete(name);}},dialog:{ask:async()=>true}};
+  require('./helpers/native-viewport-underlay.cjs').install(root);
   const session=Project.desktop(root);
   const render=UI.render;root.NemoNativeObjectUI={...UI,render(r,i,frameOnly,ports){log.push('UI:'+i.contentRevision);return render(r,i,frameOnly,ports);}};
   root.SMProjectDocument={baseName:()=> 'Project'};root.NemoNativeObjectSaveAsWorkflow=Workflow;root.NemoNativeObjectSavedAcknowledgement=Ack;
