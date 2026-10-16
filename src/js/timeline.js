@@ -877,17 +877,17 @@ window.SM={
       saveActiveLayerFrame();updateUI();
     }
   },
-  setFps:function(v){state.fps=Math.max(1,Math.min(60,v));if(state.playing){stopPlay();startPlay();}if(window.SMAudio)SMAudio.invalidateWaveforms();syncDocFields();},
+  setFps:function(v){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setFps',fps:v}):Promise.resolve({status:'unavailable'});},
   setCurve:function(points){state.easingCurve={points:points};},
   setResamplePts:function(v){state.resamplePts=v;},setTweenStep:function(v){state.tweenStep=parseInt(v);},
-  setCanvasSize:function(w,h){state.canvasW=w;state.canvasH=h;drawStage();syncDocFields();},setCanvasBg:function(c){state.canvasBg=c;drawStage();syncDocFields();},
+  setCanvasSize:function(w,h){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasSize',width:w,height:h}):Promise.resolve({status:'unavailable'});},setCanvasBg:function(c){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setCanvasBackground',color:c}):Promise.resolve({status:'unavailable'});},
   setCanvasClip:function(v){state.canvasClip=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   setSafetyZones:function(v){state.safetyZones=!!v;if(window.SMEngineBridge)window.SMEngineBridge.renderNow();},
   fitCanvas:fitCanvas,resetView:resetView,
   setOnionRange:function(inF,outF){state.onionIn=inF;state.onionOut=outF;renderOS();},
   setOnionPrevOp:function(v){state.onionPrevOpacity=v;renderOS();},setOnionNextOp:function(v){state.onionNextOpacity=v;renderOS();},
   setOnionMode:function(v){state.onionMode=v;renderOS();},
-  setWorkArea:function(inF,outF){state.waIn=inF;state.waOut=outF;},
+  setWorkArea:function(inF,outF){var caller=window.NemoNativeProjectSettingsController;return caller&&typeof caller.edit==='function'?caller.edit({kind:'setWorkArea',inFrame:inF,outFrame:outF}):Promise.resolve({status:'unavailable'});},
   setTotalFrames:function(v){v=Math.max(1,Math.min(999,v));saveAllLayerFrames();for(var i=0;i<state.layers.length;i++){while(state.layers[i].frames.length<v)state.layers[i].frames.push({strokes:[],isKeyframe:false,isInterpolated:false});}state.totalFrames=v;window._totalF=v;if(state.waOut>=v)state.waOut=v-1;
     // waIn had no clamp beside waOut's (2026-08-16): shrinking the timeline
     // below a moved work-area start left waIn > waOut — not merely out of
@@ -9895,14 +9895,14 @@ function onKeyDown(event){
   if((k==='b'||k==='B')&&_pointerOverTimeline){
     event.preventDefault();
     var curOut=(state.waOut!=null)?state.waOut:state.totalFrames-1;
-    state.waIn=Math.max(0,Math.min(state.currentFrame,curOut-1));
+    window.SM.setWorkArea(Math.max(0,Math.min(state.currentFrame,curOut-1)),curOut);
     if(window.updateWaBar)updateWaBar();
     return;
   }
   if((k==='n'||k==='N')&&_pointerOverTimeline){
     event.preventDefault();
     var curIn=(state.waIn!=null)?state.waIn:0;
-    state.waOut=Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1));
+    window.SM.setWorkArea(curIn,Math.min(state.totalFrames-1,Math.max(state.currentFrame,curIn+1)));
     if(window.updateWaBar)updateWaBar();
     return;
   }

@@ -6,6 +6,23 @@
 }(typeof globalThis==='object'?globalThis:this,function(){
   'use strict';
   var projections=new WeakMap();
+  var settingsKeys=['canvasW','canvasH','fps','totalFrames','canvasBg','waIn','waOut'];
+  function has(value,key){return Object.prototype.hasOwnProperty.call(value,key);}
+  function validateSettings(info){
+    if(!info||!['canvasW','canvasH','totalFrames'].every(function(k){return Number.isSafeInteger(info[k])&&info[k]>0;})||
+      !Number.isFinite(info.fps)||info.fps<=0||has(info,'canvasBg')&&(typeof info.canvasBg!=='string'||!/^#?(?:[a-fA-F0-9]{3}|[a-fA-F0-9]{6}|[a-fA-F0-9]{8})$/.test(info.canvasBg))||
+      ['waIn','waOut'].some(function(k){return has(info,k)&&!Number.isFinite(info[k]);}))throw new Error('Native project settings are invalid');
+  }
+  function settingsMatch(a,b){return settingsKeys.every(function(k){return has(a,k)===has(b,k)&&a[k]===b[k];});}
+  function pinSettings(pin,info){settingsKeys.forEach(function(k){if(has(info,k))pin[k]=info[k];else delete pin[k];});return pin;}
+  function projectSettings(root,info,previous){
+    var s=root.state,defaults={canvasBg:'#ffffff',waIn:0,waOut:info.totalFrames-1};
+    s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;
+    ['canvasBg','waIn','waOut'].forEach(function(k){
+      if(has(info,k))s[k]=info[k];else if(!previous||has(previous,k))s[k]=defaults[k];
+    });
+    root._waIn=s.waIn;root._waOut=s.waOut;
+  }
   function projectionMatches(root,info){
     var pin=projections.get(root),rows=root.state&&root.state.layers;
     return !!pin&&!!info&&['instanceId','documentId','lifecycleGeneration'].every(function(k){return pin[k]===info[k];})&&
@@ -20,8 +37,10 @@
   }
   function projectionReadyForUI(root,info){
     var pin=projections.get(root),next;
-    try{next=layerTable(info&&info.layers);}catch(_){return false;}
-    return projectionMatches(root,info)&&['contentRevision','documentSnapshotId','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})&&
+    try{validateSettings(info);next=layerTable(info&&info.layers);}catch(_){return false;}
+    return projectionMatches(root,info)&&['contentRevision','documentSnapshotId'].every(function(k){return pin[k]===info[k];})&&settingsMatch(pin,info)&&
+      ['canvasW','canvasH','fps','totalFrames'].every(function(k){return root.state[k]===info[k];})&&
+      ['canvasBg','waIn','waOut'].every(function(k){return !has(info,k)||root.state[k]===info[k];})&&
       next.every(function(layer,i){var row=root.state.layers[i];return row.visible===layer.visible&&
         (layer.name===undefined||row.name===layer.name)&&['locked','color','parentLayerUid'].every(function(k){
           return !Object.prototype.hasOwnProperty.call(layer,k)||row[k]===layer[k];
@@ -54,11 +73,12 @@
   }
   function refreshLayerTable(root,info){
     var pin=projections.get(root),s=root.state,rows=s&&s.layers;
-    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].every(function(k){return pin[k]===info[k];})||
+    if(!pin||!info||!['instanceId','documentId','lifecycleGeneration','totalFrames'].every(function(k){return pin[k]===info[k];})||
       !Array.isArray(rows)||rows.length!==pin.layerUids.length||!pin.layerUids.every(function(uid,i){return rows[i]&&rows[i].layerUid===uid;}))return false;
+    validateSettings(info);
     if(!Number.isSafeInteger(pin.contentRevision)||!Number.isSafeInteger(info.contentRevision)||info.contentRevision<pin.contentRevision||
       typeof info.documentSnapshotId!=='string'||!info.documentSnapshotId||
-      info.contentRevision===pin.contentRevision&&info.documentSnapshotId!==pin.documentSnapshotId)return false;
+      info.contentRevision===pin.contentRevision&&(info.documentSnapshotId!==pin.documentSnapshotId||!settingsMatch(pin,info)))return false;
     var next=layerTable(info.layers),delta=next.length-rows.length;
     if(Math.abs(delta)>1||delta!==0&&info.contentRevision===pin.contentRevision||
       !next.slice(0,Math.min(next.length,rows.length)).every(function(row,i){return row.layerUid===pin.layerUids[i];}))return false;
@@ -76,8 +96,9 @@
     else if(delta<0)rows.pop();
     next.forEach(function(layer,i){if(layer.name!==undefined)rows[i].name=layer.name;rows[i].visible=layer.visible;projectFields(rows[i],layer);});
     if(delta<0){s.activeLayerIdx=active;root._layerSel=selection;}
-    projections.set(root,Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
-      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}));
+    projectSettings(root,info,pin);
+    projections.set(root,pinSettings(Object.assign({},pin,{layerUids:next.map(function(layer){return layer.layerUid;}),
+      contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId}),info));
     return true;
   }
   function create(session,ports,workflow,acknowledgement){
@@ -148,21 +169,21 @@
   function projectView(root,info){
     // These rows are read-side UI projections. The native edit guard denies
     // all legacy writes, and no Paper object or serializable document is built.
-    var layers=layerTable(info.layers);
+    var layers=layerTable(info.layers);validateSettings(info);
     var s=root.state;
     s.canvasW=info.canvasW;s.canvasH=info.canvasH;s.fps=info.fps;s.totalFrames=info.totalFrames;
-    s.canvasBg='#ffffff';s.waIn=0;s.waOut=info.totalFrames-1;s.currentFrame=0;s.activeLayerIdx=0;
+    projectSettings(root,info,null);s.currentFrame=0;s.activeLayerIdx=0;
     s.layers=layers.map(function(l,i){var row={layerUid:l.layerUid,
       name:l.name===undefined?'Layer '+(i+1):l.name,visible:l.visible,locked:false,color:'#5FA875',parentLayerUid:null,frames:[],motion:{}};
       projectFields(row,l);return row;});
     s.symbols={};s.cameraKeys=[];s.activeSymbolId=null;s.refMedia=null;
-    root._curFrame=0;root._totalF=info.totalFrames;root._waIn=0;root._waOut=info.totalFrames-1;
+    root._curFrame=0;root._totalF=info.totalFrames;root._waIn=s.waIn;root._waOut=s.waOut;
     root._layerSel=info.layers.length?[0]:[];root.selectedPaths=[];
     if(root.userLayers)root.userLayers.forEach(function(layer){layer.visible=false;});
     if(root.SMReference)root.SMReference.refreshNative();
     var pin={layerUids:info.layers.map(function(layer){return layer.layerUid;}),contentRevision:info.contentRevision,documentSnapshotId:info.documentSnapshotId};
     ['instanceId','documentId','lifecycleGeneration','canvasW','canvasH','fps','totalFrames'].forEach(function(k){pin[k]=info[k];});
-    projections.set(root,pin);
+    projections.set(root,pinSettings(pin,info));
   }
   function bind(root,ports){
     var session=root.NemoNativeObjectProject&&root.NemoNativeObjectProject.desktop(root);
