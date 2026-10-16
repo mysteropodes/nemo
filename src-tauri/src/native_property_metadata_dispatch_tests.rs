@@ -1,15 +1,20 @@
 //! Metadata reads use actual common capability admission and native owner locks.
 use super::*;
 use crate::application_mcp::ApplicationMcp;
-use crate::native_object_bootstrap::bootstrap_raw;
+use crate::native_object_bootstrap::{bootstrap_raw, replace_blank_without_viewport_for_test};
 use serde_json::{json, Value};
 fn new_project(state: &ApplicationMcp, replace: Option<Value>) -> String {
     let mut q = json!({"apiVersion":2,"requestId":"metadata-install","instanceId":state.instance_id(),"newProject":{"canvasW":64,"canvasH":48,"fps":24.0}});
-    if let Some(replace) = replace {
+    let receipt = if let Some(replace) = replace {
         q["requestId"] = json!("metadata-replace");
         q["replace"] = replace;
-    }
-    let receipt = serde_json::to_value(bootstrap_raw(state, &q.to_string()).unwrap()).unwrap();
+        let raw = q.to_string();
+        assert_eq!(bootstrap_raw(state, &raw).unwrap_err().code, "invalid_request");
+        replace_blank_without_viewport_for_test(state, &raw).unwrap()
+    } else {
+        bootstrap_raw(state, &q.to_string()).unwrap()
+    };
+    let receipt = serde_json::to_value(receipt).unwrap();
     receipt["documentId"].as_str().unwrap().into()
 }
 fn query(state: &ApplicationMcp, id: &str) -> NativeApplicationRequest {

@@ -24,6 +24,11 @@ const CANDIDATE_FILES = [
   POLICY,
   PROFILE,
   'engineering/boundaries/profiles/rust.coverage.json',
+  'engineering/boundaries/profiles/mcp-rust.profile.json',
+  'native-engine/tests/object_property_metadata_dispatch.rs',
+  'nemo-mcp/src/native_property_metadata_contract.rs',
+  'nemo-mcp/src/native_property_metadata_wire_tests.rs',
+  'src-tauri/src/native_property_metadata_dispatch_tests.rs',
   'native-engine/Cargo.toml',
   'native-engine/src/lib.rs',
   'native-engine/src/commands.rs',
@@ -626,6 +631,25 @@ test('D31 3D projection kernel stays a private evaluation child and fails closed
   }
 });
 
+test('D35 public metadata children keep their existing private owners', () => {
+  const profile = readJson(ROOT, PROFILE);
+  assert.match(readJson(ROOT, 'engineering/boundaries/profiles/rust.coverage.json')
+    .provenance.nativePropertyMetadataPublicRegistration, /D35\/#2099/);
+  for (const [id, relative] of [["rust.native.engine.tests", "native-engine/tests/object_property_metadata_dispatch.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_contract.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_wire_tests.rs"], ["rust.desktop.native.host.release.tests", "src-tauri/src/native_property_metadata_dispatch_tests.rs"]]) {
+    const owner = profile.modules.find((entry) => entry.id === id);
+    const file = relative.slice(owner.dir.length + 1);
+    assert.equal(owner.files.filter((name) => name === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
+    assert.ok(CANDIDATE_FILES.includes(relative));
+  }
+  const mcp = readJson(ROOT, 'engineering/boundaries/profiles/mcp-rust.profile.json');
+  const owner = mcp.modules.find((entry) => entry.id === 'mcp.transport');
+  for (const file of ['src/native_property_metadata_contract.rs', 'src/native_property_metadata_wire_tests.rs']) {
+    assert.equal(owner.files.filter((name) => name === file).length, 1);
+    assert.equal(owner.publicApi.includes(file), false);
+  }
+});
+
 test('isolated negative controls fail closed and restore every touched byte', (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nemo-n19-enforcement-'));
   const clone = path.join(temp, 'repo');
@@ -660,6 +684,22 @@ test('isolated negative controls fail closed and restore every touched byte', (t
       const sourceBytes = fs.readFileSync(path.join(clone, relative));
       const missing = structuredClone(d35Profile);
       const owner = missing.modules.find((entry) => entry.id === id);
+      owner.files = owner.files.filter((name) => name !== file);
+      fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
+      assert.deepEqual(d35Coverage().violations.map((entry) => [entry.rule, entry.file]),
+        [['coverage-unprofiled-source', relative]]);
+      restore(clone, new Map([[PROFILE, original.get(PROFILE)]]));
+      assert.deepEqual(fs.readFileSync(path.join(clone, relative)), sourceBytes);
+      assert.deepEqual(fs.readFileSync(path.join(clone, PROFILE)), original.get(PROFILE));
+      assert.deepEqual(d35Coverage().violations, []);
+    }
+
+    for (const [id, relative] of [["rust.native.engine.tests", "native-engine/tests/object_property_metadata_dispatch.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_contract.rs"], ["rust.mcp.transport", "nemo-mcp/src/native_property_metadata_wire_tests.rs"], ["rust.desktop.native.host.release.tests", "src-tauri/src/native_property_metadata_dispatch_tests.rs"]]) {
+      assert.ok(d35Sources.includes(relative));
+      const sourceBytes = fs.readFileSync(path.join(clone, relative));
+      const missing = structuredClone(d35Profile);
+      const owner = missing.modules.find((entry) => entry.id === id);
+      const file = relative.slice(owner.dir.length + 1);
       owner.files = owner.files.filter((name) => name !== file);
       fs.writeFileSync(path.join(clone, PROFILE), JSON.stringify(missing));
       assert.deepEqual(d35Coverage().violations.map((entry) => [entry.rule, entry.file]),
