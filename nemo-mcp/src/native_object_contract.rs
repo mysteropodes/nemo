@@ -34,8 +34,10 @@ pub(super) fn request(value: &Value) -> bool {
     })
 }
 
-pub(super) fn timing_request(value: &Value) -> bool {
-    exact(
+/// One closed selector parser supplies both admission and response correlation.
+/// Carry its validated frame forward instead of reparsing an immutable payload.
+fn timing_selector(value: &Value) -> Option<u64> {
+    let value = exact(
         value,
         &[
             "atRevision",
@@ -45,25 +47,28 @@ pub(super) fn timing_request(value: &Value) -> bool {
             "frame",
         ],
         &[],
-    )
-    .is_some_and(|value| {
-        revision(value.get("atRevision")).is_some()
-            && frame(value.get("frame")).is_some()
-            && ["documentSnapshotId", "contextId", "layerUid"]
-                .iter()
-                .all(|key| {
-                    value
-                        .get(*key)
-                        .and_then(Value::as_str)
-                        .is_some_and(|text| !text.is_empty())
-                })
-    })
+    )?;
+    let requested = frame(value.get("frame"))?;
+    (revision(value.get("atRevision")).is_some()
+        && ["documentSnapshotId", "contextId", "layerUid"]
+            .iter()
+            .all(|key| {
+                value
+                    .get(*key)
+                    .and_then(Value::as_str)
+                    .is_some_and(|text| !text.is_empty())
+            }))
+    .then_some(requested)
+}
+
+pub(super) fn timing_request(value: &Value) -> bool {
+    timing_selector(value).is_some()
 }
 
 pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) -> bool {
-    if !timing_request(payload) {
+    let Some(requested) = timing_selector(payload) else {
         return false;
-    }
+    };
     exact(
         result,
         &[
@@ -82,9 +87,6 @@ pub(super) fn timing_result(document_id: &str, payload: &Value, result: &Value) 
         &[],
     )
     .is_some_and(|value| {
-        let Some(requested) = frame(payload.get("frame")) else {
-            return false;
-        };
         let source = frame(value.get("sourceFrame"));
         let Some(content) = value.get("hasContent").and_then(Value::as_bool) else {
             return false;

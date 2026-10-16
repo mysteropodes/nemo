@@ -116,3 +116,26 @@ test('pinned read schemas declare strict selectors and exact native result ident
   assert.equal(nativeDescriptors[0].resourceBoundary.maxReadResponseBytes, 4096);
   assert.deepEqual(nativeDescriptors[0].availability, { state: 'available', reason: null });
 });
+
+// D35 is one feature-owned query, not a new transport-v1 operation variant.
+test('D35 metadata is declared once with its closed public payload and bounded result', () => {
+  const operation = 'query.document.object.property.metadata';
+  const descriptors = nativeDescriptors.filter((entry) => entry.operations.includes(operation));
+  assert.equal(descriptors.length, 1);
+  const descriptor = descriptors[0];
+  assert.equal(descriptor.id, 'native.object.property-metadata');
+  assert.deepEqual(descriptor.operations, [operation]);
+  assert.deepEqual(descriptor.availability, { state: 'available', reason: null });
+  assert.equal(descriptor.resourceBoundary.maxProviderResponseBytes, 3072);
+  assert.equal(descriptor.resourceBoundary.maxReadResponseBytes, 4096);
+  assert.ok(descriptor.examples.length > 0, 'public declaration needs a real fixed request/result example');
+  const branches = nativeSchema.$defs.Request.oneOf.filter((entry) => entry.allOf[1].properties.operation.const === operation);
+  assert.equal(branches.length, 1);
+  assert.equal(branches[0].allOf[0].$ref, '#/$defs/ForbiddenRevisionRequest');
+  assert.equal(branches[0].allOf[1].properties.payload.$ref, '#/$defs/ObjectPropertyMetadataPayload');
+  assert.equal(nativeSchema.$defs.ObjectPropertyMetadataPayload.$ref, './native-property-metadata-v1.schema.json#/$defs/Selector');
+  assert.equal(nativeSchema.$defs.ResponseBase.properties.result.oneOf.filter((entry) => entry.$ref === '#/$defs/ObjectPropertyMetadataResult').length, 1);
+  const metadata = load('engineering', 'application', 'native-property-metadata-v1.schema.json');
+  assert.deepEqual(metadata.$defs.Selector.required, ['atRevision', 'documentSnapshotId', 'view']);
+  assert.equal(metadata.$defs.Selector.additionalProperties, false);
+});

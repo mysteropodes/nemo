@@ -5,9 +5,8 @@ pub(crate) use crate::object_document::object_deserialize;
 pub use crate::object_document::{
     FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
 };
-use crate::object_document::{
-    ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
-};
+use crate::object_document::{ObjectLayer, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION};
+pub(crate) use crate::object_document::{Presence, PropertyHolder};
 use serde::Deserialize;
 use std::collections::HashSet;
 
