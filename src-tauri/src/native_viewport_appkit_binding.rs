@@ -13,6 +13,34 @@ use objc::runtime::Object;
 use objc::{class, msg_send, sel, sel_impl};
 use tauri::Manager;
 
+// Keep the NSWindow opaque; only its WKWebView needs a transparent backing.
+// Tauri's pinned macos-private-api feature enables Wry's implementation. On
+// the main thread the dispatcher applies this synchronously before attachment.
+fn underlay_parent(window: &tauri::WebviewWindow) -> Result<*mut Object, NativeViewportError> {
+    let main: bool = unsafe { msg_send![class!(NSThread), isMainThread] };
+    if !main {
+        return Err(NativeViewportError::new(
+            "native viewport requires the AppKit main thread",
+        ));
+    }
+    let parent = window
+        .ns_view()
+        .map_err(|error| NativeViewportError::new(format!("resolve AppKit view: {error}")))?
+        as *mut Object;
+    if parent.is_null() {
+        return Err(NativeViewportError::new(
+            "native AppKit parent view is absent",
+        ));
+    }
+    let webview: &tauri::Webview = window.as_ref();
+    webview
+        .set_background_color(Some(tauri::webview::Color(0, 0, 0, 0)))
+        .map_err(|error| {
+            NativeViewportError::new(format!("prepare native viewport underlay: {error}"))
+        })?;
+    Ok(parent)
+}
+
 impl NativeViewport {
     pub(crate) fn from_app(
         app: &tauri::AppHandle,
@@ -32,10 +60,7 @@ impl NativeViewport {
         mapping: ViewportMapping,
     ) -> Result<(Self, Compositor), NativeViewportError> {
         let occlusion = occlusion::WindowOcclusionObserver::new(window)?;
-        let content_view = window
-            .ns_view()
-            .map_err(|error| NativeViewportError::new(format!("resolve AppKit view: {error}")))?
-            as *mut Object;
+        let content_view = underlay_parent(window)?;
         let construction = CompositorInstance::new();
         let view = OwnedView::new(content_view, mapping)?;
         let surface = create_surface(construction.instance(), &view)?;
@@ -68,10 +93,7 @@ impl NativeViewport {
             return Err(NativeViewportError::new("native viewport was not retired"));
         }
         let occlusion = occlusion::WindowOcclusionObserver::new(&self.window)?;
-        let content_view =
-            self.window.ns_view().map_err(|error| {
-                NativeViewportError::new(format!("resolve AppKit view: {error}"))
-            })? as *mut Object;
+        let content_view = underlay_parent(&self.window)?;
         let view = OwnedView::new(content_view, self.mapping)?;
         let surface = create_surface(compositor.instance(), &view)?;
         let port = MacOsSurfacePort::new(surface, view, compositor, self.mapping)?;

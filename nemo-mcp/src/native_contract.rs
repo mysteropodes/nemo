@@ -7,11 +7,19 @@ use std::collections::HashSet;
 #[path = "native_reproduction_contract.rs"]
 mod reproduction;
 
+#[path = "native_property_metadata_contract.rs"]
+pub(crate) mod metadata;
 #[path = "native_object_contract.rs"]
 mod object;
 
 #[path = "native_project_settings_contract.rs"]
 pub(crate) mod settings;
+
+#[path = "native_diagnostics_contract.rs"]
+mod diagnostics;
+#[path = "native_layer_policy_contract.rs"]
+pub(crate) mod layer_policy;
+use diagnostics::diagnostics_result;
 
 const OPACITY_CURVE: [[f64; 2]; 5] = [
     [0.0, 0.0],
@@ -57,6 +65,7 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
     matches!(
         operation,
         "query.document.object"
+            | metadata::OP
             | "query.document.object.layer.timing"
             | "query.document.serialize"
             | "query.document.evaluate"
@@ -72,9 +81,11 @@ pub(crate) fn forbids_expected_revision(operation: &str) -> bool {
 pub(crate) fn validate_request(operation: &str, payload: &Value) -> bool {
     match operation {
         "query.document.object" => object::request(payload),
+        metadata::OP => metadata::request(payload),
         "query.document.object.layer.timing" => object::timing_request(payload),
         "command.document.object.layer.visibility.set" => object::visibility_request(payload),
         "command.document.object.project.settings.edit" => settings::request(payload),
+        layer_policy::OP => layer_policy::request(payload),
         "command.document.object.layer.create" => object::create_request(payload),
         "query.diagnostics.recent" => exact(payload, &[], &[]).is_some(),
         "command.reproduction.opt_in"
@@ -215,11 +226,17 @@ pub(crate) fn validate_result(
     if !validate_request(operation, payload) {
         return false;
     }
+    if operation == metadata::OP {
+        return metadata::result(request_document_id, payload, result);
+    }
     if operation == "query.document.object" {
         return object::result(request_document_id, payload, result);
     }
     if operation == "query.document.object.layer.timing" {
         return object::timing_result(request_document_id, payload, result);
+    }
+    if operation == layer_policy::OP {
+        return layer_policy::result(result);
     }
     if operation == "command.document.object.project.settings.edit" {
         return settings::result(result);
@@ -303,87 +320,6 @@ pub(crate) fn validate_result(
         }),
         _ => true,
     }
-}
-
-fn diagnostics_result(value: &Value) -> bool {
-    let Some(result) = exact(value, &["records", "truncated"], &[]) else {
-        return false;
-    };
-    let Some(records) = result["records"].as_array() else {
-        return false;
-    };
-    let mut prior = 0;
-    result["truncated"].is_boolean()
-        && (records.first().is_none_or(|record| record["sequence"] == 1)
-            || result["truncated"] == true)
-        && records.len() <= 32
-        && records.iter().all(|record| {
-            let Some(record) = exact(
-                record,
-                &["sequence", "operation", "contentRevision", "ok"],
-                &["requestId", "requestIdRedacted", "targetId", "errorCode"],
-            ) else {
-                return false;
-            };
-            let Some(sequence) = revision(record.get("sequence"))
-                .filter(|sequence| *sequence > 0 && (prior == 0 || *sequence == prior + 1))
-            else {
-                return false;
-            };
-            prior = sequence;
-            let disposition = match record.get("ok").and_then(Value::as_bool) {
-                Some(true) => !record.contains_key("errorCode"),
-                Some(false) => {
-                    record
-                        .get("errorCode")
-                        .and_then(Value::as_str)
-                        .is_some_and(|code| {
-                            matches!(
-                                code,
-                                "invalid_request"
-                                    | "wrong_instance"
-                                    | "wrong_document"
-                                    | "stale_revision"
-                                    | "busy_conflict"
-                                    | "unavailable"
-                                    | "not_found"
-                                    | "cancelled_before_dispatch"
-                                    | "internal"
-                            )
-                        })
-                }
-                None => false,
-            };
-            disposition
-                && revision(record.get("contentRevision")).is_some()
-                && match (record.get("requestId"), record.get("requestIdRedacted")) {
-                    (Some(id), None) => id
-                        .as_str()
-                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/'])),
-                    (None, Some(redacted)) => redacted == true,
-                    _ => false,
-                }
-                && record.get("targetId").is_none_or(|value| {
-                    value
-                        .as_str()
-                        .is_some_and(|id| bounded_identifier(id) && !id.contains([':', '/']))
-                })
-                && record
-                    .get("operation")
-                    .and_then(Value::as_str)
-                    .is_some_and(|operation| {
-                        matches!(
-                            operation,
-                            "command.document.apply"
-                                | "transaction.begin"
-                                | "transaction.update"
-                                | "transaction.commit"
-                                | "transaction.cancel"
-                                | "history.undo"
-                                | "history.redo"
-                        )
-                    })
-        })
 }
 
 #[cfg(test)]

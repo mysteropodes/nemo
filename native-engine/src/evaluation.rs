@@ -42,6 +42,41 @@ pub(crate) mod property_follow_path_sample;
 #[path = "property_expression_views.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_expression_views;
+#[path = "property_camera_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_camera_eval;
+#[path = "property_projection_3d.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_projection_3d;
+// L10-A (#2123): private montage timing kernel (retime, totals, source-frame map,
+// looping montage-layer frame, montage-view segments); consumers arrive in L10-I.
+#[path = "object_montage_timing.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_montage_timing;
+// L01-A (#2129): lane-1 vector/parametric/path-effect family aggregator.
+#[path = "object_vector_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_vector_kernels;
+// L03-A (#2138): lane-3 image-mesh family aggregator (private kernels declared there).
+#[path = "object_image_mesh_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_kernels;
+// L04-A (#2120): lane-4 component/storyboard/duplicator family aggregator.
+#[path = "object_component_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_kernels;
+// L06-A (#2135): lane-6 text layout/glyph family aggregator.
+#[path = "object_text_layout_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_kernels;
+// L07-A (#2141): lane-7 typed scene/style family aggregator.
+#[path = "object_scene_style_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_style_kernels;
+// L05-F/L05-H (#2133, #2134): lane-5 frame/exposure/clipboard family aggregator.
+#[path = "object_frame_edit_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_frame_edit_kernels;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 

@@ -1,5 +1,7 @@
 //! Pinned CPU commands join existing numeric order to retained real contours.
+use crate::evaluation::object_scene_style_kernels::object_scene_style_paint::SceneSolid;
 use crate::object_frame_packet::{ObjectFramePacket, ObjectFrameRecord, ObjectFrameSelector};
+use crate::object_render_scene::object_scene_producer_contour;
 use crate::object_render_scene::{
     validate_pins, ObjectRenderEntry, ObjectRenderScene, ObjectSceneError,
 };
@@ -28,8 +30,20 @@ impl<'a> ObjectPaintCommand<'a> {
         self.entry.contour()
     }
     pub fn paint(&self) -> [&'a Number; 4] {
-        let paint = &self.entry.source().record().fill;
+        // Paint commands exist only for closed-solid-fill-cubic-path records: the scene compiler refuses every
+        // other family and the codec requires a solid fill for that one.
+        let paint = self
+            .entry
+            .source()
+            .record()
+            .solid_fill()
+            .expect("paint commands come from records with a solid fill");
         [&paint.r, &paint.g, &paint.b, &paint.a]
+    }
+    /// Typed straight-RGBA paint (L07-A `SceneSolid`) retained with the contour;
+    /// equal by value to `paint()`, which keeps borrowing the immutable source fill.
+    pub(crate) fn solid(&self) -> &'a SceneSolid {
+        self.entry.solid()
     }
 }
 
@@ -63,30 +77,9 @@ pub fn prepare_object_paint_plan(
     validate_pins(scene.packet(), expected).map_err(ObjectPaintPlanError::Pins)?;
     // The admitted F1 producer offers numeric_order ONLY for scene-root
     // Authored v2. v1/no-plan and all Reference/nonroot inputs are unavailable.
-    let order = scene
-        .packet()
-        .numeric_order()
-        .ok_or(ObjectPaintPlanError::Unavailable)?;
-    let sequence = order
-        .layers()
-        .iter()
-        .map(|layer| {
-            let visible = scene
-                .packet()
-                .source_layers()
-                .get(layer.source_layer_index())
-                .is_some_and(|source| source.visible());
-            (
-                layer.source_layer_index(),
-                layer
-                    .elements()
-                    .iter()
-                    .filter(|_| visible)
-                    .map(|e| e.source_object_index())
-                    .collect(),
-            )
-        })
-        .collect();
+    // L07-F: the retained scene is reported as the contour producer output and joined
+    // through the pinned registry (pin check once, NumericOrderPlan order).
+    let sequence = object_scene_producer_contour::command_sequence(scene, expected)?;
     let indices = join(scene, &sequence)?;
     Ok(ObjectPaintPlan {
         scene: Arc::new(scene.clone()),

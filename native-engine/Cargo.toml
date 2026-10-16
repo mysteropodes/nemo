@@ -106,3 +106,9 @@ required-features = ["test-object_expression_pin"]
 name = "object_expression_runtime"
 path = "src/lib.rs"
 required-features = ["test-object_expression_runtime"]
+
+# E2 (#2088): unmodified upstream rquickjs-sys 0.14.0 plus the two-file
+# QuickJS single-function parser patch; see
+# third_party/rquickjs-sys-0.14.0.PROVENANCE.md. Same version, no bump.
+[patch.crates-io]
+rquickjs-sys = { path = "third_party/rquickjs-sys-0.14.0" }

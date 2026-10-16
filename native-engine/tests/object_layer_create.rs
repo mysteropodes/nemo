@@ -462,7 +462,6 @@ fn layer_defaults_preserve_missing_fields_custom_color_and_original_snapshots() 
 fn layer_defaults_refuse_unimplemented_policy_malformed_values_and_duplicate_fields() {
     for version in [1, 2] {
         for (field, invalid) in [
-            ("locked", json!(true)),
             ("locked", Value::Null),
             ("locked", json!(0)),
             ("parentLayerUid", json!("L0")),

@@ -73,6 +73,7 @@ fn blank_project(
         )],
         objects: vec![],
         property_holders: Presence::Missing,
+        layer_folders: Presence::Missing,
         // Native painting consumes the explicit v2 order plan even when empty.
         composition_order: Presence::Present(OrderPlan {
             format: "nemo.native-object-order-plan".into(),
@@ -255,6 +256,17 @@ impl NativeObjectHistory {
         Ok(value)
     }
 
+    /// Current immutable project extent without serializing media or file bytes.
+    /// Bare drawing snapshots intentionally have no project dimensions.
+    pub fn project_canvas_dimensions(&self) -> Result<Option<(u32, u32)>, DispatchErrorCode> {
+        let snapshot = self
+            .acquire_snapshot(self.content_revision())
+            .ok_or(DispatchErrorCode::Unavailable)?;
+        Ok(snapshot
+            .project()
+            .map(|project| project.project().canvas_dimensions()))
+    }
+
     pub fn is_project_file(&self) -> bool {
         self.acquire_snapshot(self.content_revision())
             .is_some_and(|s| s.project().is_some())
@@ -310,6 +322,9 @@ fn project_snapshot_info(
             }
             if let Some(visible) = layer.visible.value() {
                 info["visible"] = serde_json::json!(visible);
+            }
+            if let Some(shy) = layer.shy.value() {
+                info["shy"] = serde_json::json!(shy);
             }
             if let Some(locked) = layer.locked.value() {
                 info["locked"] = serde_json::json!(locked);

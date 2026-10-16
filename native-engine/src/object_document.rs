@@ -34,10 +34,40 @@ pub(crate) use project::{
 
 #[path = "object_layer_timing.rs"]
 mod timing;
+#[allow(unused_imports)]
+pub(crate) use timing::TimingEdit;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
+// L09-A (#2126): private lane-9 media timing aggregator; its kernels are private children there.
+#[path = "object_media_timing_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod media_timing;
+// L02-A (#2117): lane-2 group/boolean/clipboard/lifecycle family aggregator.
+#[path = "object_group_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_group_kernels;
+// L06-C (#2137): lane-6 raster asset family aggregator.
+#[path = "object_raster_asset_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_kernels;
+
+// L01-D (#2107): editable-vector-path record body (storage DTO; admission is object_vector_codec.rs).
+#[path = "object_vector_record.rs"]
+#[allow(dead_code)]
+mod vector_record;
+pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
+
+#[path = "object_layer_organization.rs"]
+mod organization;
+pub(crate) use organization::validate_layer_organization;
+pub use organization::{LayerFolder, LayerFolders};
+#[cfg(all(test, feature = "codec"))]
+#[path = "../tests/object_layer_organization.rs"]
+mod layer_organization_tests;
+#[path = "object_layer_policy.rs"]
+mod layer_policy;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -49,6 +79,8 @@ pub struct ObjectDocument {
     pub(crate) objects: Vec<ObjectRecord>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) layer_folders: Presence<Option<LayerFolders>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
 }
@@ -67,6 +99,10 @@ pub struct ObjectLayer {
     pub(crate) color: Presence<String>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) parent_layer_uid: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) folder_id: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) shy: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
 }
@@ -116,7 +152,12 @@ pub struct ObjectRecord {
     pub(crate) family: String,
     pub(crate) target: ObjectTarget,
     pub(crate) geometry: ObjectGeometry,
-    pub(crate) fill: SolidFill,
+    /// Legacy family: a required solid fill. Vector family: explicit null (no fill) or solid.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) fill: Presence<Option<SolidFill>>,
+    /// Present exactly for the `editable-vector-path` family.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) vector: Presence<VectorBody>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -185,11 +226,14 @@ pub(crate) use object_deserialize;
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
+    #[serde(default)] layer_folders: Presence<Option<LayerFolders>>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
     #[serde(default)] color: Presence<String>,
     #[serde(default)] parent_layer_uid: Presence<Option<String>>,
+    #[serde(default)] folder_id: Presence<Option<String>>,
+    #[serde(default)] shy: Presence<bool>,
     #[serde(default)] timing: Presence<LayerTiming> });
 object_deserialize!(ObjectTarget {
     context_id: String,
@@ -206,7 +250,8 @@ object_deserialize!(ObjectRecord {
     family: String,
     target: ObjectTarget,
     geometry: ObjectGeometry,
-    fill: SolidFill
+    #[serde(default)] fill: Presence<Option<SolidFill>>,
+    #[serde(default)] vector: Presence<VectorBody>
 });
 object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
     handle_space: String, segments: Vec<ObjectSegment> });
@@ -228,6 +273,10 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    /// Organizational folder metadata, not structural folder layers.
+    pub fn layer_folders(&self) -> Option<&LayerFolders> {
+        self.layer_folders.value().and_then(Option::as_ref)
+    }
     /// Immutable authored holder metadata; absence is not an empty authored table.
     pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
         self.property_holders.value().map(Vec::as_slice)
@@ -262,6 +311,15 @@ impl ObjectRecord {
     pub fn target(&self) -> &ObjectTarget {
         &self.target
     }
+    /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
+    pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
+        self.fill.value().and_then(Option::as_ref)
+    }
+    /// The vector body of an `editable-vector-path` record.
+    #[allow(dead_code)]
+    pub(crate) fn vector(&self) -> Option<&VectorBody> {
+        self.vector.value()
+    }
 }
 impl SolidFill {
     pub(crate) fn valid_channels(&self) -> bool {
@@ -272,6 +330,17 @@ impl SolidFill {
     }
 }
 impl ObjectLayer {
+    /// UI row filtering only: shy never changes visibility or content ownership.
+    pub fn shy(&self) -> bool {
+        self.shy.value().copied().unwrap_or(false)
+    }
+    /// Legacy falsy memberships have no active folder, but retain wire presence.
+    pub fn folder_id(&self) -> Option<&str> {
+        self.folder_id
+            .value()
+            .and_then(Option::as_deref)
+            .filter(|id| !id.is_empty())
+    }
     /// Native New and Add share the existing desktop creation defaults. The
     /// palette is selected by the number of layers before insertion, not revision.
     pub(crate) fn blank_drawing(layer_uid: String, name: String, existing_layers: usize) -> Self {
@@ -285,6 +354,8 @@ impl ObjectLayer {
             locked: Presence::Present(false),
             color: Presence::Present(COLORS[existing_layers % COLORS.len()].into()),
             parent_layer_uid: Presence::Present(None),
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Present(LayerTiming::blank_drawing()),
         }
     }
@@ -297,6 +368,8 @@ impl ObjectLayer {
             locked: Presence::Missing,
             color: Presence::Missing,
             parent_layer_uid: Presence::Missing,
+            folder_id: Presence::Missing,
+            shy: Presence::Missing,
             timing: Presence::Missing,
         }
     }

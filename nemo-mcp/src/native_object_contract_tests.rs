@@ -384,6 +384,8 @@ fn timing_contract_keeps_strict_input_and_current_head_result_correlation() {
         ("sourceFrame", json!(2)),
         ("cellKind", json!("key")),
         ("manualEdit", json!(true)),
+        ("manualEdit", json!(null)),
+        ("cellKind", json!("future-cell-kind")),
         ("hasContent", json!(null)),
         ("extra", json!(true)),
     ] {
@@ -420,5 +422,48 @@ fn timing_contract_accepts_the_frozen_exposure_oracle_including_blank_keys() {
             .unwrap()
             .extend(expected.as_object().unwrap().clone());
         assert!(timing_result("document", &payload, &value), "{expected}");
+    }
+}
+
+#[test]
+fn timing_result_front_door_refuses_an_invalid_original_selector() {
+    let response = timing_result_fixture();
+    for payload in [
+        json!({}),
+        json!({"atRevision":0,"documentSnapshotId":"native-object:document:0",
+            "contextId":"scene-root","layerUid":"data:雪","frame":null}),
+    ] {
+        assert!(!timing_result("document", &payload, &response));
+        assert!(!crate::native_contract::validate_result(
+            "query.document.object.layer.timing",
+            "document",
+            &payload,
+            &response
+        ));
+    }
+}
+
+#[test]
+fn timing_selector_accepts_closed_frame_bounds_and_refuses_out_of_domain_selectors() {
+    for frame in [0, u32::MAX] {
+        let mut payload = timing_payload();
+        payload["frame"] = json!(frame);
+        let mut result = timing_result_fixture();
+        result["frame"] = json!(frame);
+        result["sourceFrame"] = json!(frame);
+        result["cellKind"] = json!("key");
+        result["manualEdit"] = json!(false);
+        assert!(timing_request(&payload));
+        assert!(timing_result("document", &payload, &result));
+        for bad in [
+            json!(-1),
+            json!(u32::MAX as u64 + 1),
+            json!(0.5),
+            json!("0"),
+        ] {
+            payload["frame"] = bad;
+            assert!(!timing_request(&payload));
+            assert!(!timing_result("document", &payload, &result));
+        }
     }
 }

@@ -11,12 +11,13 @@ use tracing_subscriber::prelude::*;
 const MAX_TRACE_EVENT_BYTES: usize = 512;
 const MAX_TRACE_TOTAL_BYTES: usize = 4096;
 
-struct BoundedStderr {
+struct BoundedStderr<W = io::Stderr> {
+    writer: W,
     budget: Arc<AtomicUsize>,
     remaining: usize,
 }
 
-impl Write for BoundedStderr {
+impl<W: Write> Write for BoundedStderr<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let requested = bytes.len().min(self.remaining);
         let count = loop {
@@ -36,14 +37,14 @@ impl Write for BoundedStderr {
             }
         };
         if count > 0 {
-            io::stderr().write_all(&bytes[..count])?;
+            self.writer.write_all(&bytes[..count])?;
             self.remaining -= count;
         }
         Ok(bytes.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        io::stderr().flush()
+        self.writer.flush()
     }
 }
 
@@ -64,6 +65,7 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
                 .with_target(false)
                 .with_level(false)
                 .with_writer(move || BoundedStderr {
+                    writer: io::stderr(),
                     budget: Arc::clone(&budget),
                     remaining: MAX_TRACE_EVENT_BYTES,
                 }),
@@ -86,3 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "main_trace_tests.rs"]
+mod trace_tests;

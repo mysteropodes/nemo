@@ -233,6 +233,25 @@ pub(crate) async fn nemo_native_object_bootstrap(
     })
 }
 
+// Test fixtures without a viewport still use the real replacement admission,
+// cleanup and commit path. Initial-only bootstrap_raw must keep rejecting pins.
+#[cfg(test)]
+pub(crate) fn replace_blank_without_viewport_for_test(
+    state: &ApplicationMcp,
+    request_json: &str,
+) -> HostResult<ObjectBootstrapReceipt> {
+    let request = admission::new_request(request_json)
+        .ok_or_else(|| host_error("invalid_request", "invalid blank replacement fixture"))?;
+    match admission::prepare_blank(state, request)? {
+        admission::Admission::Replay(receipt) => Ok(receipt),
+        admission::Admission::Execute { generation, request_id, prepared, .. } => {
+            replace::complete(&state.native_state(), generation, &request_id, prepared, || {
+                Ok((Vec::new(), "already_absent"))
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "native_object_bootstrap_tests.rs"]
 mod tests;

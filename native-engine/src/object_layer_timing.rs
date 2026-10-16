@@ -2,6 +2,13 @@
 use crate::object_document::{object_deserialize, Presence};
 use serde::{Deserialize, Serialize};
 
+// L05-A (#2132): private sparse frame-edit kernel over the private LayerTiming fields.
+#[path = "object_frame_edit_sparse.rs"]
+#[allow(dead_code)]
+mod object_frame_edit_sparse;
+#[allow(unused_imports)]
+pub(crate) use object_frame_edit_sparse::TimingEdit;
+
 const MAX_ENTRIES: usize = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayerTimingError {

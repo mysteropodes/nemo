@@ -1,0 +1,2837 @@
+# L04-A object_component_playback oracle. Baseline commit fbe4b8a33e6d5a229f014154df2ba21988a9fabc.
+# resolveSymbolFrameIdx = src/js/app.js blob 816979f85fd8bfe583c52e889bd1f0733cb5db2a (verbatim function, Node vm);
+# blank-hold loop       = src/js/app.js (getEffectiveStrokes symbolId branch, verbatim loop);
+# componentFrame writer = src/js/timeline.js blob 6ba3d735211ec3cb707644d8fe35761cd79caa50 (setSymbolSingleFrame line, verbatim);
+# cross-check           = tests/fixtures/lib/reference.cjs blob 4ea14b136922a05a2791ab65d88b6c312444901d symbolFrameAt: 1619 resolve rows agree (generator aborts otherwise).
+# timeRemapValue (motion.js) is the typed port: the row supplies its value (`-` timeRemap absent, `null` flag with no value).
+# Fields: `-` undefined; `~` a null entry in layer.frames; mode `""` is the empty string.
+# R mode speed placedAt single trimIn trimOut total frame remap keys out    (resolveSymbolFrameIdx)
+# B frame keys held-blank(0|1)                                               (blank-hold loop)
+# O <R fields> out(b|number)                                                  (blank first, then resolve)
+# A kf cf blank picked kf' cf' blank'                                        (componentFrame writer)
+# key = isKeyframe(0|1):componentFrame(- absent, n null, number):blankOverride(- absent, 0 false, 1 true)
+R - - - - - - 0 0 - - 0
+R - 2 3 2 1 3 0 0 - - 0
+R - - - - - - 0 1 - - 0
+R - 2 3 2 1 3 0 1 - - 0
+R - - - - - - 0 4 - - 0
+R - 2 3 2 1 3 0 4 - - 0
+R - - - - - - 0 5 - - 0
+R - 2 3 2 1 3 0 5 - - 0
+R - - - - - - 0 9 - - 0
+R - 2 3 2 1 3 0 9 - - 0
+R - - - - - - 0 10 - - 0
+R - 2 3 2 1 3 0 10 - - 0
+R - - - - - - 0 23 - - 0
+R - 2 3 2 1 3 0 23 - - 0
+R - - - - - - 0 -2 - - 0
+R - 2 3 2 1 3 0 -2 - - 0
+R - - - - - - -3 0 - - 0
+R - 2 3 2 1 3 -3 0 - - 0
+R - - - - - - -3 1 - - 0
+R - 2 3 2 1 3 -3 1 - - 0
+R - - - - - - -3 4 - - 0
+R - 2 3 2 1 3 -3 4 - - 0
+R - - - - - - -3 5 - - 0
+R - 2 3 2 1 3 -3 5 - - 0
+R - - - - - - -3 9 - - 0
+R - 2 3 2 1 3 -3 9 - - 0
+R - - - - - - -3 10 - - 0
+R - 2 3 2 1 3 -3 10 - - 0
+R - - - - - - -3 23 - - 0
+R - 2 3 2 1 3 -3 23 - - 0
+R - - - - - - -3 -2 - - 0
+R - 2 3 2 1 3 -3 -2 - - 0
+R - - - - - - 1 0 - - 0
+R - 2 3 2 1 3 1 0 - - 0
+R - - - - - - 1 1 - - 0
+R - 2 3 2 1 3 1 1 - - 0
+R - - - - - - 1 4 - - 0
+R - 2 3 2 1 3 1 4 - - 0
+R - - - - - - 1 5 - - 0
+R - 2 3 2 1 3 1 5 - - 0
+R - - - - - - 1 9 - - 0
+R - 2 3 2 1 3 1 9 - - 0
+R - - - - - - 1 10 - - 0
+R - 2 3 2 1 3 1 10 - - 0
+R - - - - - - 1 23 - - 0
+R - 2 3 2 1 3 1 23 - - 0
+R - - - - - - 1 -2 - - 0
+R - 2 3 2 1 3 1 -2 - - 0
+R - - - - - - 2 0 - - 0
+R - 2 3 2 1 3 2 0 - - 0
+R - - - - - - 2 1 - - 1
+R - 2 3 2 1 3 2 1 - - 0
+R - - - - - - 2 4 - - 0
+R - 2 3 2 1 3 2 4 - - 0
+R - - - - - - 2 5 - - 1
+R - 2 3 2 1 3 2 5 - - 0
+R - - - - - - 2 9 - - 1
+R - 2 3 2 1 3 2 9 - - 0
+R - - - - - - 2 10 - - 0
+R - 2 3 2 1 3 2 10 - - 0
+R - - - - - - 2 23 - - 1
+R - 2 3 2 1 3 2 23 - - 0
+R - - - - - - 2 -2 - - 0
+R - 2 3 2 1 3 2 -2 - - 0
+R - - - - - - 3 0 - - 0
+R - 2 3 2 1 3 3 0 - - 0
+R - - - - - - 3 1 - - 1
+R - 2 3 2 1 3 3 1 - - 0
+R - - - - - - 3 4 - - 1
+R - 2 3 2 1 3 3 4 - - 2
+R - - - - - - 3 5 - - 2
+R - 2 3 2 1 3 3 5 - - 1
+R - - - - - - 3 9 - - 0
+R - 2 3 2 1 3 3 9 - - 0
+R - - - - - - 3 10 - - 1
+R - 2 3 2 1 3 3 10 - - 2
+R - - - - - - 3 23 - - 2
+R - 2 3 2 1 3 3 23 - - 1
+R - - - - - - 3 -2 - - 0
+R - 2 3 2 1 3 3 -2 - - 0
+R - - - - - - 5 0 - - 0
+R - 2 3 2 1 3 5 0 - - 0
+R - - - - - - 5 1 - - 1
+R - 2 3 2 1 3 5 1 - - 0
+R - - - - - - 5 4 - - 4
+R - 2 3 2 1 3 5 4 - - 2
+R - - - - - - 5 5 - - 0
+R - 2 3 2 1 3 5 5 - - 4
+R - - - - - - 5 9 - - 4
+R - 2 3 2 1 3 5 9 - - 2
+R - - - - - - 5 10 - - 0
+R - 2 3 2 1 3 5 10 - - 4
+R - - - - - - 5 23 - - 3
+R - 2 3 2 1 3 5 23 - - 0
+R - - - - - - 5 -2 - - 0
+R - 2 3 2 1 3 5 -2 - - 0
+R - - - - - - 24 0 - - 0
+R - 2 3 2 1 3 24 0 - - 0
+R - - - - - - 24 1 - - 1
+R - 2 3 2 1 3 24 1 - - 0
+R - - - - - - 24 4 - - 4
+R - 2 3 2 1 3 24 4 - - 2
+R - - - - - - 24 5 - - 5
+R - 2 3 2 1 3 24 5 - - 4
+R - - - - - - 24 9 - - 9
+R - 2 3 2 1 3 24 9 - - 12
+R - - - - - - 24 10 - - 10
+R - 2 3 2 1 3 24 10 - - 14
+R - - - - - - 24 23 - - 23
+R - 2 3 2 1 3 24 23 - - 16
+R - - - - - - 24 -2 - - 0
+R - 2 3 2 1 3 24 -2 - - 0
+R - - - - - - 100 0 - - 0
+R - 2 3 2 1 3 100 0 - - 0
+R - - - - - - 100 1 - - 1
+R - 2 3 2 1 3 100 1 - - 0
+R - - - - - - 100 4 - - 4
+R - 2 3 2 1 3 100 4 - - 2
+R - - - - - - 100 5 - - 5
+R - 2 3 2 1 3 100 5 - - 4
+R - - - - - - 100 9 - - 9
+R - 2 3 2 1 3 100 9 - - 12
+R - - - - - - 100 10 - - 10
+R - 2 3 2 1 3 100 10 - - 14
+R - - - - - - 100 23 - - 23
+R - 2 3 2 1 3 100 23 - - 40
+R - - - - - - 100 -2 - - 0
+R - 2 3 2 1 3 100 -2 - - 0
+R - - - - - - 7 0 - - 0
+R - 2 3 2 1 3 7 0 - - 0
+R - - - - - - 7 1 - - 1
+R - 2 3 2 1 3 7 1 - - 0
+R - - - - - - 7 4 - - 4
+R - 2 3 2 1 3 7 4 - - 2
+R - - - - - - 7 5 - - 5
+R - 2 3 2 1 3 7 5 - - 4
+R - - - - - - 7 9 - - 2
+R - 2 3 2 1 3 7 9 - - 5
+R - - - - - - 7 10 - - 3
+R - 2 3 2 1 3 7 10 - - 0
+R - - - - - - 7 23 - - 2
+R - 2 3 2 1 3 7 23 - - 5
+R - - - - - - 7 -2 - - 0
+R - 2 3 2 1 3 7 -2 - - 0
+R loop - - - - - 0 0 - - 0
+R loop 2 3 2 1 3 0 0 - - 0
+R loop - - - - - 0 1 - - 0
+R loop 2 3 2 1 3 0 1 - - 0
+R loop - - - - - 0 4 - - 0
+R loop 2 3 2 1 3 0 4 - - 0
+R loop - - - - - 0 5 - - 0
+R loop 2 3 2 1 3 0 5 - - 0
+R loop - - - - - 0 9 - - 0
+R loop 2 3 2 1 3 0 9 - - 0
+R loop - - - - - 0 10 - - 0
+R loop 2 3 2 1 3 0 10 - - 0
+R loop - - - - - 0 23 - - 0
+R loop 2 3 2 1 3 0 23 - - 0
+R loop - - - - - 0 -2 - - 0
+R loop 2 3 2 1 3 0 -2 - - 0
+R loop - - - - - -3 0 - - 0
+R loop 2 3 2 1 3 -3 0 - - 0
+R loop - - - - - -3 1 - - 0
+R loop 2 3 2 1 3 -3 1 - - 0
+R loop - - - - - -3 4 - - 0
+R loop 2 3 2 1 3 -3 4 - - 0
+R loop - - - - - -3 5 - - 0
+R loop 2 3 2 1 3 -3 5 - - 0
+R loop - - - - - -3 9 - - 0
+R loop 2 3 2 1 3 -3 9 - - 0
+R loop - - - - - -3 10 - - 0
+R loop 2 3 2 1 3 -3 10 - - 0
+R loop - - - - - -3 23 - - 0
+R loop 2 3 2 1 3 -3 23 - - 0
+R loop - - - - - -3 -2 - - 0
+R loop 2 3 2 1 3 -3 -2 - - 0
+R loop - - - - - 1 0 - - 0
+R loop 2 3 2 1 3 1 0 - - 0
+R loop - - - - - 1 1 - - 0
+R loop 2 3 2 1 3 1 1 - - 0
+R loop - - - - - 1 4 - - 0
+R loop 2 3 2 1 3 1 4 - - 0
+R loop - - - - - 1 5 - - 0
+R loop 2 3 2 1 3 1 5 - - 0
+R loop - - - - - 1 9 - - 0
+R loop 2 3 2 1 3 1 9 - - 0
+R loop - - - - - 1 10 - - 0
+R loop 2 3 2 1 3 1 10 - - 0
+R loop - - - - - 1 23 - - 0
+R loop 2 3 2 1 3 1 23 - - 0
+R loop - - - - - 1 -2 - - 0
+R loop 2 3 2 1 3 1 -2 - - 0
+R loop - - - - - 2 0 - - 0
+R loop 2 3 2 1 3 2 0 - - 0
+R loop - - - - - 2 1 - - 1
+R loop 2 3 2 1 3 2 1 - - 0
+R loop - - - - - 2 4 - - 0
+R loop 2 3 2 1 3 2 4 - - 0
+R loop - - - - - 2 5 - - 1
+R loop 2 3 2 1 3 2 5 - - 0
+R loop - - - - - 2 9 - - 1
+R loop 2 3 2 1 3 2 9 - - 0
+R loop - - - - - 2 10 - - 0
+R loop 2 3 2 1 3 2 10 - - 0
+R loop - - - - - 2 23 - - 1
+R loop 2 3 2 1 3 2 23 - - 0
+R loop - - - - - 2 -2 - - 0
+R loop 2 3 2 1 3 2 -2 - - 0
+R loop - - - - - 3 0 - - 0
+R loop 2 3 2 1 3 3 0 - - 0
+R loop - - - - - 3 1 - - 1
+R loop 2 3 2 1 3 3 1 - - 0
+R loop - - - - - 3 4 - - 1
+R loop 2 3 2 1 3 3 4 - - 2
+R loop - - - - - 3 5 - - 2
+R loop 2 3 2 1 3 3 5 - - 1
+R loop - - - - - 3 9 - - 0
+R loop 2 3 2 1 3 3 9 - - 0
+R loop - - - - - 3 10 - - 1
+R loop 2 3 2 1 3 3 10 - - 2
+R loop - - - - - 3 23 - - 2
+R loop 2 3 2 1 3 3 23 - - 1
+R loop - - - - - 3 -2 - - 0
+R loop 2 3 2 1 3 3 -2 - - 0
+R loop - - - - - 5 0 - - 0
+R loop 2 3 2 1 3 5 0 - - 0
+R loop - - - - - 5 1 - - 1
+R loop 2 3 2 1 3 5 1 - - 0
+R loop - - - - - 5 4 - - 4
+R loop 2 3 2 1 3 5 4 - - 2
+R loop - - - - - 5 5 - - 0
+R loop 2 3 2 1 3 5 5 - - 4
+R loop - - - - - 5 9 - - 4
+R loop 2 3 2 1 3 5 9 - - 2
+R loop - - - - - 5 10 - - 0
+R loop 2 3 2 1 3 5 10 - - 4
+R loop - - - - - 5 23 - - 3
+R loop 2 3 2 1 3 5 23 - - 0
+R loop - - - - - 5 -2 - - 0
+R loop 2 3 2 1 3 5 -2 - - 0
+R loop - - - - - 24 0 - - 0
+R loop 2 3 2 1 3 24 0 - - 0
+R loop - - - - - 24 1 - - 1
+R loop 2 3 2 1 3 24 1 - - 0
+R loop - - - - - 24 4 - - 4
+R loop 2 3 2 1 3 24 4 - - 2
+R loop - - - - - 24 5 - - 5
+R loop 2 3 2 1 3 24 5 - - 4
+R loop - - - - - 24 9 - - 9
+R loop 2 3 2 1 3 24 9 - - 12
+R loop - - - - - 24 10 - - 10
+R loop 2 3 2 1 3 24 10 - - 14
+R loop - - - - - 24 23 - - 23
+R loop 2 3 2 1 3 24 23 - - 16
+R loop - - - - - 24 -2 - - 0
+R loop 2 3 2 1 3 24 -2 - - 0
+R loop - - - - - 100 0 - - 0
+R loop 2 3 2 1 3 100 0 - - 0
+R loop - - - - - 100 1 - - 1
+R loop 2 3 2 1 3 100 1 - - 0
+R loop - - - - - 100 4 - - 4
+R loop 2 3 2 1 3 100 4 - - 2
+R loop - - - - - 100 5 - - 5
+R loop 2 3 2 1 3 100 5 - - 4
+R loop - - - - - 100 9 - - 9
+R loop 2 3 2 1 3 100 9 - - 12
+R loop - - - - - 100 10 - - 10
+R loop 2 3 2 1 3 100 10 - - 14
+R loop - - - - - 100 23 - - 23
+R loop 2 3 2 1 3 100 23 - - 40
+R loop - - - - - 100 -2 - - 0
+R loop 2 3 2 1 3 100 -2 - - 0
+R loop - - - - - 7 0 - - 0
+R loop 2 3 2 1 3 7 0 - - 0
+R loop - - - - - 7 1 - - 1
+R loop 2 3 2 1 3 7 1 - - 0
+R loop - - - - - 7 4 - - 4
+R loop 2 3 2 1 3 7 4 - - 2
+R loop - - - - - 7 5 - - 5
+R loop 2 3 2 1 3 7 5 - - 4
+R loop - - - - - 7 9 - - 2
+R loop 2 3 2 1 3 7 9 - - 5
+R loop - - - - - 7 10 - - 3
+R loop 2 3 2 1 3 7 10 - - 0
+R loop - - - - - 7 23 - - 2
+R loop 2 3 2 1 3 7 23 - - 5
+R loop - - - - - 7 -2 - - 0
+R loop 2 3 2 1 3 7 -2 - - 0
+R once - - - - - 0 0 - - 0
+R once 2 3 2 1 3 0 0 - - 1
+R once - - - - - 0 1 - - 0
+R once 2 3 2 1 3 0 1 - - 1
+R once - - - - - 0 4 - - 0
+R once 2 3 2 1 3 0 4 - - 3
+R once - - - - - 0 5 - - 0
+R once 2 3 2 1 3 0 5 - - 3
+R once - - - - - 0 9 - - 0
+R once 2 3 2 1 3 0 9 - - 3
+R once - - - - - 0 10 - - 0
+R once 2 3 2 1 3 0 10 - - 3
+R once - - - - - 0 23 - - 0
+R once 2 3 2 1 3 0 23 - - 3
+R once - - - - - 0 -2 - - 0
+R once 2 3 2 1 3 0 -2 - - 1
+R once - - - - - -3 0 - - 0
+R once 2 3 2 1 3 -3 0 - - 1
+R once - - - - - -3 1 - - 0
+R once 2 3 2 1 3 -3 1 - - 1
+R once - - - - - -3 4 - - 0
+R once 2 3 2 1 3 -3 4 - - 3
+R once - - - - - -3 5 - - 0
+R once 2 3 2 1 3 -3 5 - - 3
+R once - - - - - -3 9 - - 0
+R once 2 3 2 1 3 -3 9 - - 3
+R once - - - - - -3 10 - - 0
+R once 2 3 2 1 3 -3 10 - - 3
+R once - - - - - -3 23 - - 0
+R once 2 3 2 1 3 -3 23 - - 3
+R once - - - - - -3 -2 - - 0
+R once 2 3 2 1 3 -3 -2 - - 1
+R once - - - - - 1 0 - - 0
+R once 2 3 2 1 3 1 0 - - 1
+R once - - - - - 1 1 - - 0
+R once 2 3 2 1 3 1 1 - - 1
+R once - - - - - 1 4 - - 0
+R once 2 3 2 1 3 1 4 - - 3
+R once - - - - - 1 5 - - 0
+R once 2 3 2 1 3 1 5 - - 3
+R once - - - - - 1 9 - - 0
+R once 2 3 2 1 3 1 9 - - 3
+R once - - - - - 1 10 - - 0
+R once 2 3 2 1 3 1 10 - - 3
+R once - - - - - 1 23 - - 0
+R once 2 3 2 1 3 1 23 - - 3
+R once - - - - - 1 -2 - - 0
+R once 2 3 2 1 3 1 -2 - - 1
+R once - - - - - 2 0 - - 0
+R once 2 3 2 1 3 2 0 - - 1
+R once - - - - - 2 1 - - 1
+R once 2 3 2 1 3 2 1 - - 1
+R once - - - - - 2 4 - - 1
+R once 2 3 2 1 3 2 4 - - 3
+R once - - - - - 2 5 - - 1
+R once 2 3 2 1 3 2 5 - - 3
+R once - - - - - 2 9 - - 1
+R once 2 3 2 1 3 2 9 - - 3
+R once - - - - - 2 10 - - 1
+R once 2 3 2 1 3 2 10 - - 3
+R once - - - - - 2 23 - - 1
+R once 2 3 2 1 3 2 23 - - 3
+R once - - - - - 2 -2 - - 0
+R once 2 3 2 1 3 2 -2 - - 1
+R once - - - - - 3 0 - - 0
+R once 2 3 2 1 3 3 0 - - 1
+R once - - - - - 3 1 - - 1
+R once 2 3 2 1 3 3 1 - - 1
+R once - - - - - 3 4 - - 2
+R once 2 3 2 1 3 3 4 - - 3
+R once - - - - - 3 5 - - 2
+R once 2 3 2 1 3 3 5 - - 3
+R once - - - - - 3 9 - - 2
+R once 2 3 2 1 3 3 9 - - 3
+R once - - - - - 3 10 - - 2
+R once 2 3 2 1 3 3 10 - - 3
+R once - - - - - 3 23 - - 2
+R once 2 3 2 1 3 3 23 - - 3
+R once - - - - - 3 -2 - - 0
+R once 2 3 2 1 3 3 -2 - - 1
+R once - - - - - 5 0 - - 0
+R once 2 3 2 1 3 5 0 - - 1
+R once - - - - - 5 1 - - 1
+R once 2 3 2 1 3 5 1 - - 1
+R once - - - - - 5 4 - - 4
+R once 2 3 2 1 3 5 4 - - 3
+R once - - - - - 5 5 - - 4
+R once 2 3 2 1 3 5 5 - - 3
+R once - - - - - 5 9 - - 4
+R once 2 3 2 1 3 5 9 - - 3
+R once - - - - - 5 10 - - 4
+R once 2 3 2 1 3 5 10 - - 3
+R once - - - - - 5 23 - - 4
+R once 2 3 2 1 3 5 23 - - 3
+R once - - - - - 5 -2 - - 0
+R once 2 3 2 1 3 5 -2 - - 1
+R once - - - - - 24 0 - - 0
+R once 2 3 2 1 3 24 0 - - 1
+R once - - - - - 24 1 - - 1
+R once 2 3 2 1 3 24 1 - - 1
+R once - - - - - 24 4 - - 4
+R once 2 3 2 1 3 24 4 - - 3
+R once - - - - - 24 5 - - 5
+R once 2 3 2 1 3 24 5 - - 3
+R once - - - - - 24 9 - - 9
+R once 2 3 2 1 3 24 9 - - 3
+R once - - - - - 24 10 - - 10
+R once 2 3 2 1 3 24 10 - - 3
+R once - - - - - 24 23 - - 23
+R once 2 3 2 1 3 24 23 - - 3
+R once - - - - - 24 -2 - - 0
+R once 2 3 2 1 3 24 -2 - - 1
+R once - - - - - 100 0 - - 0
+R once 2 3 2 1 3 100 0 - - 1
+R once - - - - - 100 1 - - 1
+R once 2 3 2 1 3 100 1 - - 1
+R once - - - - - 100 4 - - 4
+R once 2 3 2 1 3 100 4 - - 3
+R once - - - - - 100 5 - - 5
+R once 2 3 2 1 3 100 5 - - 3
+R once - - - - - 100 9 - - 9
+R once 2 3 2 1 3 100 9 - - 3
+R once - - - - - 100 10 - - 10
+R once 2 3 2 1 3 100 10 - - 3
+R once - - - - - 100 23 - - 23
+R once 2 3 2 1 3 100 23 - - 3
+R once - - - - - 100 -2 - - 0
+R once 2 3 2 1 3 100 -2 - - 1
+R once - - - - - 7 0 - - 0
+R once 2 3 2 1 3 7 0 - - 1
+R once - - - - - 7 1 - - 1
+R once 2 3 2 1 3 7 1 - - 1
+R once - - - - - 7 4 - - 4
+R once 2 3 2 1 3 7 4 - - 3
+R once - - - - - 7 5 - - 5
+R once 2 3 2 1 3 7 5 - - 3
+R once - - - - - 7 9 - - 6
+R once 2 3 2 1 3 7 9 - - 3
+R once - - - - - 7 10 - - 6
+R once 2 3 2 1 3 7 10 - - 3
+R once - - - - - 7 23 - - 6
+R once 2 3 2 1 3 7 23 - - 3
+R once - - - - - 7 -2 - - 0
+R once 2 3 2 1 3 7 -2 - - 1
+R pingpong - - - - - 0 0 - - 0
+R pingpong 2 3 2 1 3 0 0 - - 0
+R pingpong - - - - - 0 1 - - 0
+R pingpong 2 3 2 1 3 0 1 - - 0
+R pingpong - - - - - 0 4 - - 0
+R pingpong 2 3 2 1 3 0 4 - - 0
+R pingpong - - - - - 0 5 - - 0
+R pingpong 2 3 2 1 3 0 5 - - 0
+R pingpong - - - - - 0 9 - - 0
+R pingpong 2 3 2 1 3 0 9 - - 0
+R pingpong - - - - - 0 10 - - 0
+R pingpong 2 3 2 1 3 0 10 - - 0
+R pingpong - - - - - 0 23 - - 0
+R pingpong 2 3 2 1 3 0 23 - - 0
+R pingpong - - - - - 0 -2 - - 0
+R pingpong 2 3 2 1 3 0 -2 - - 0
+R pingpong - - - - - -3 0 - - 0
+R pingpong 2 3 2 1 3 -3 0 - - 0
+R pingpong - - - - - -3 1 - - 0
+R pingpong 2 3 2 1 3 -3 1 - - 0
+R pingpong - - - - - -3 4 - - 0
+R pingpong 2 3 2 1 3 -3 4 - - 0
+R pingpong - - - - - -3 5 - - 0
+R pingpong 2 3 2 1 3 -3 5 - - 0
+R pingpong - - - - - -3 9 - - 0
+R pingpong 2 3 2 1 3 -3 9 - - 0
+R pingpong - - - - - -3 10 - - 0
+R pingpong 2 3 2 1 3 -3 10 - - 0
+R pingpong - - - - - -3 23 - - 0
+R pingpong 2 3 2 1 3 -3 23 - - 0
+R pingpong - - - - - -3 -2 - - 0
+R pingpong 2 3 2 1 3 -3 -2 - - 0
+R pingpong - - - - - 1 0 - - 0
+R pingpong 2 3 2 1 3 1 0 - - 0
+R pingpong - - - - - 1 1 - - 0
+R pingpong 2 3 2 1 3 1 1 - - 0
+R pingpong - - - - - 1 4 - - 0
+R pingpong 2 3 2 1 3 1 4 - - 0
+R pingpong - - - - - 1 5 - - 0
+R pingpong 2 3 2 1 3 1 5 - - 0
+R pingpong - - - - - 1 9 - - 0
+R pingpong 2 3 2 1 3 1 9 - - 0
+R pingpong - - - - - 1 10 - - 0
+R pingpong 2 3 2 1 3 1 10 - - 0
+R pingpong - - - - - 1 23 - - 0
+R pingpong 2 3 2 1 3 1 23 - - 0
+R pingpong - - - - - 1 -2 - - 0
+R pingpong 2 3 2 1 3 1 -2 - - 0
+R pingpong - - - - - 2 0 - - 0
+R pingpong 2 3 2 1 3 2 0 - - 0
+R pingpong - - - - - 2 1 - - 1
+R pingpong 2 3 2 1 3 2 1 - - 0
+R pingpong - - - - - 2 4 - - 0
+R pingpong 2 3 2 1 3 2 4 - - 0
+R pingpong - - - - - 2 5 - - 1
+R pingpong 2 3 2 1 3 2 5 - - 0
+R pingpong - - - - - 2 9 - - 1
+R pingpong 2 3 2 1 3 2 9 - - 0
+R pingpong - - - - - 2 10 - - 0
+R pingpong 2 3 2 1 3 2 10 - - 0
+R pingpong - - - - - 2 23 - - 1
+R pingpong 2 3 2 1 3 2 23 - - 0
+R pingpong - - - - - 2 -2 - - 0
+R pingpong 2 3 2 1 3 2 -2 - - 0
+R pingpong - - - - - 3 0 - - 0
+R pingpong 2 3 2 1 3 3 0 - - 0
+R pingpong - - - - - 3 1 - - 1
+R pingpong 2 3 2 1 3 3 1 - - 0
+R pingpong - - - - - 3 4 - - 0
+R pingpong 2 3 2 1 3 3 4 - - 2
+R pingpong - - - - - 3 5 - - 1
+R pingpong 2 3 2 1 3 3 5 - - 0
+R pingpong - - - - - 3 9 - - 1
+R pingpong 2 3 2 1 3 3 9 - - 0
+R pingpong - - - - - 3 10 - - 2
+R pingpong 2 3 2 1 3 3 10 - - 2
+R pingpong - - - - - 3 23 - - 1
+R pingpong 2 3 2 1 3 3 23 - - 0
+R pingpong - - - - - 3 -2 - - 0
+R pingpong 2 3 2 1 3 3 -2 - - 0
+R pingpong - - - - - 5 0 - - 0
+R pingpong 2 3 2 1 3 5 0 - - 0
+R pingpong - - - - - 5 1 - - 1
+R pingpong 2 3 2 1 3 5 1 - - 0
+R pingpong - - - - - 5 4 - - 4
+R pingpong 2 3 2 1 3 5 4 - - 2
+R pingpong - - - - - 5 5 - - 3
+R pingpong 2 3 2 1 3 5 5 - - 4
+R pingpong - - - - - 5 9 - - 1
+R pingpong 2 3 2 1 3 5 9 - - 4
+R pingpong - - - - - 5 10 - - 2
+R pingpong 2 3 2 1 3 5 10 - - 2
+R pingpong - - - - - 5 23 - - 1
+R pingpong 2 3 2 1 3 5 23 - - 0
+R pingpong - - - - - 5 -2 - - 0
+R pingpong 2 3 2 1 3 5 -2 - - 0
+R pingpong - - - - - 24 0 - - 0
+R pingpong 2 3 2 1 3 24 0 - - 0
+R pingpong - - - - - 24 1 - - 1
+R pingpong 2 3 2 1 3 24 1 - - 0
+R pingpong - - - - - 24 4 - - 4
+R pingpong 2 3 2 1 3 24 4 - - 2
+R pingpong - - - - - 24 5 - - 5
+R pingpong 2 3 2 1 3 24 5 - - 4
+R pingpong - - - - - 24 9 - - 9
+R pingpong 2 3 2 1 3 24 9 - - 12
+R pingpong - - - - - 24 10 - - 10
+R pingpong 2 3 2 1 3 24 10 - - 14
+R pingpong - - - - - 24 23 - - 23
+R pingpong 2 3 2 1 3 24 23 - - 6
+R pingpong - - - - - 24 -2 - - 0
+R pingpong 2 3 2 1 3 24 -2 - - 0
+R pingpong - - - - - 100 0 - - 0
+R pingpong 2 3 2 1 3 100 0 - - 0
+R pingpong - - - - - 100 1 - - 1
+R pingpong 2 3 2 1 3 100 1 - - 0
+R pingpong - - - - - 100 4 - - 4
+R pingpong 2 3 2 1 3 100 4 - - 2
+R pingpong - - - - - 100 5 - - 5
+R pingpong 2 3 2 1 3 100 5 - - 4
+R pingpong - - - - - 100 9 - - 9
+R pingpong 2 3 2 1 3 100 9 - - 12
+R pingpong - - - - - 100 10 - - 10
+R pingpong 2 3 2 1 3 100 10 - - 14
+R pingpong - - - - - 100 23 - - 23
+R pingpong 2 3 2 1 3 100 23 - - 40
+R pingpong - - - - - 100 -2 - - 0
+R pingpong 2 3 2 1 3 100 -2 - - 0
+R pingpong - - - - - 7 0 - - 0
+R pingpong 2 3 2 1 3 7 0 - - 0
+R pingpong - - - - - 7 1 - - 1
+R pingpong 2 3 2 1 3 7 1 - - 0
+R pingpong - - - - - 7 4 - - 4
+R pingpong 2 3 2 1 3 7 4 - - 2
+R pingpong - - - - - 7 5 - - 5
+R pingpong 2 3 2 1 3 7 5 - - 4
+R pingpong - - - - - 7 9 - - 3
+R pingpong 2 3 2 1 3 7 9 - - 0
+R pingpong - - - - - 7 10 - - 2
+R pingpong 2 3 2 1 3 7 10 - - 2
+R pingpong - - - - - 7 23 - - 1
+R pingpong 2 3 2 1 3 7 23 - - 4
+R pingpong - - - - - 7 -2 - - 0
+R pingpong 2 3 2 1 3 7 -2 - - 0
+R single - - - - - 0 0 - - 0
+R single 2 3 2 1 3 0 0 - - 0
+R single - - - - - 0 1 - - 0
+R single 2 3 2 1 3 0 1 - - 0
+R single - - - - - 0 4 - - 0
+R single 2 3 2 1 3 0 4 - - 0
+R single - - - - - 0 5 - - 0
+R single 2 3 2 1 3 0 5 - - 0
+R single - - - - - 0 9 - - 0
+R single 2 3 2 1 3 0 9 - - 0
+R single - - - - - 0 10 - - 0
+R single 2 3 2 1 3 0 10 - - 0
+R single - - - - - 0 23 - - 0
+R single 2 3 2 1 3 0 23 - - 0
+R single - - - - - 0 -2 - - 0
+R single 2 3 2 1 3 0 -2 - - 0
+R single - - - - - -3 0 - - 0
+R single 2 3 2 1 3 -3 0 - - 0
+R single - - - - - -3 1 - - 0
+R single 2 3 2 1 3 -3 1 - - 0
+R single - - - - - -3 4 - - 0
+R single 2 3 2 1 3 -3 4 - - 0
+R single - - - - - -3 5 - - 0
+R single 2 3 2 1 3 -3 5 - - 0
+R single - - - - - -3 9 - - 0
+R single 2 3 2 1 3 -3 9 - - 0
+R single - - - - - -3 10 - - 0
+R single 2 3 2 1 3 -3 10 - - 0
+R single - - - - - -3 23 - - 0
+R single 2 3 2 1 3 -3 23 - - 0
+R single - - - - - -3 -2 - - 0
+R single 2 3 2 1 3 -3 -2 - - 0
+R single - - - - - 1 0 - - 0
+R single 2 3 2 1 3 1 0 - - 0
+R single - - - - - 1 1 - - 0
+R single 2 3 2 1 3 1 1 - - 0
+R single - - - - - 1 4 - - 0
+R single 2 3 2 1 3 1 4 - - 0
+R single - - - - - 1 5 - - 0
+R single 2 3 2 1 3 1 5 - - 0
+R single - - - - - 1 9 - - 0
+R single 2 3 2 1 3 1 9 - - 0
+R single - - - - - 1 10 - - 0
+R single 2 3 2 1 3 1 10 - - 0
+R single - - - - - 1 23 - - 0
+R single 2 3 2 1 3 1 23 - - 0
+R single - - - - - 1 -2 - - 0
+R single 2 3 2 1 3 1 -2 - - 0
+R single - - - - - 2 0 - - 0
+R single 2 3 2 1 3 2 0 - - 1
+R single - - - - - 2 1 - - 0
+R single 2 3 2 1 3 2 1 - - 1
+R single - - - - - 2 4 - - 0
+R single 2 3 2 1 3 2 4 - - 1
+R single - - - - - 2 5 - - 0
+R single 2 3 2 1 3 2 5 - - 1
+R single - - - - - 2 9 - - 0
+R single 2 3 2 1 3 2 9 - - 1
+R single - - - - - 2 10 - - 0
+R single 2 3 2 1 3 2 10 - - 1
+R single - - - - - 2 23 - - 0
+R single 2 3 2 1 3 2 23 - - 1
+R single - - - - - 2 -2 - - 0
+R single 2 3 2 1 3 2 -2 - - 1
+R single - - - - - 3 0 - - 0
+R single 2 3 2 1 3 3 0 - - 2
+R single - - - - - 3 1 - - 0
+R single 2 3 2 1 3 3 1 - - 2
+R single - - - - - 3 4 - - 0
+R single 2 3 2 1 3 3 4 - - 2
+R single - - - - - 3 5 - - 0
+R single 2 3 2 1 3 3 5 - - 2
+R single - - - - - 3 9 - - 0
+R single 2 3 2 1 3 3 9 - - 2
+R single - - - - - 3 10 - - 0
+R single 2 3 2 1 3 3 10 - - 2
+R single - - - - - 3 23 - - 0
+R single 2 3 2 1 3 3 23 - - 2
+R single - - - - - 3 -2 - - 0
+R single 2 3 2 1 3 3 -2 - - 2
+R single - - - - - 5 0 - - 0
+R single 2 3 2 1 3 5 0 - - 2
+R single - - - - - 5 1 - - 0
+R single 2 3 2 1 3 5 1 - - 2
+R single - - - - - 5 4 - - 0
+R single 2 3 2 1 3 5 4 - - 2
+R single - - - - - 5 5 - - 0
+R single 2 3 2 1 3 5 5 - - 2
+R single - - - - - 5 9 - - 0
+R single 2 3 2 1 3 5 9 - - 2
+R single - - - - - 5 10 - - 0
+R single 2 3 2 1 3 5 10 - - 2
+R single - - - - - 5 23 - - 0
+R single 2 3 2 1 3 5 23 - - 2
+R single - - - - - 5 -2 - - 0
+R single 2 3 2 1 3 5 -2 - - 2
+R single - - - - - 24 0 - - 0
+R single 2 3 2 1 3 24 0 - - 2
+R single - - - - - 24 1 - - 0
+R single 2 3 2 1 3 24 1 - - 2
+R single - - - - - 24 4 - - 0
+R single 2 3 2 1 3 24 4 - - 2
+R single - - - - - 24 5 - - 0
+R single 2 3 2 1 3 24 5 - - 2
+R single - - - - - 24 9 - - 0
+R single 2 3 2 1 3 24 9 - - 2
+R single - - - - - 24 10 - - 0
+R single 2 3 2 1 3 24 10 - - 2
+R single - - - - - 24 23 - - 0
+R single 2 3 2 1 3 24 23 - - 2
+R single - - - - - 24 -2 - - 0
+R single 2 3 2 1 3 24 -2 - - 2
+R single - - - - - 100 0 - - 0
+R single 2 3 2 1 3 100 0 - - 2
+R single - - - - - 100 1 - - 0
+R single 2 3 2 1 3 100 1 - - 2
+R single - - - - - 100 4 - - 0
+R single 2 3 2 1 3 100 4 - - 2
+R single - - - - - 100 5 - - 0
+R single 2 3 2 1 3 100 5 - - 2
+R single - - - - - 100 9 - - 0
+R single 2 3 2 1 3 100 9 - - 2
+R single - - - - - 100 10 - - 0
+R single 2 3 2 1 3 100 10 - - 2
+R single - - - - - 100 23 - - 0
+R single 2 3 2 1 3 100 23 - - 2
+R single - - - - - 100 -2 - - 0
+R single 2 3 2 1 3 100 -2 - - 2
+R single - - - - - 7 0 - - 0
+R single 2 3 2 1 3 7 0 - - 2
+R single - - - - - 7 1 - - 0
+R single 2 3 2 1 3 7 1 - - 2
+R single - - - - - 7 4 - - 0
+R single 2 3 2 1 3 7 4 - - 2
+R single - - - - - 7 5 - - 0
+R single 2 3 2 1 3 7 5 - - 2
+R single - - - - - 7 9 - - 0
+R single 2 3 2 1 3 7 9 - - 2
+R single - - - - - 7 10 - - 0
+R single 2 3 2 1 3 7 10 - - 2
+R single - - - - - 7 23 - - 0
+R single 2 3 2 1 3 7 23 - - 2
+R single - - - - - 7 -2 - - 0
+R single 2 3 2 1 3 7 -2 - - 2
+R bogus - - - - - 0 0 - - 0
+R bogus 2 3 2 1 3 0 0 - - 0
+R bogus - - - - - 0 1 - - 0
+R bogus 2 3 2 1 3 0 1 - - 0
+R bogus - - - - - 0 4 - - 0
+R bogus 2 3 2 1 3 0 4 - - 0
+R bogus - - - - - 0 5 - - 0
+R bogus 2 3 2 1 3 0 5 - - 0
+R bogus - - - - - 0 9 - - 0
+R bogus 2 3 2 1 3 0 9 - - 0
+R bogus - - - - - 0 10 - - 0
+R bogus 2 3 2 1 3 0 10 - - 0
+R bogus - - - - - 0 23 - - 0
+R bogus 2 3 2 1 3 0 23 - - 0
+R bogus - - - - - 0 -2 - - 0
+R bogus 2 3 2 1 3 0 -2 - - 0
+R bogus - - - - - -3 0 - - 0
+R bogus 2 3 2 1 3 -3 0 - - 0
+R bogus - - - - - -3 1 - - 0
+R bogus 2 3 2 1 3 -3 1 - - 0
+R bogus - - - - - -3 4 - - 0
+R bogus 2 3 2 1 3 -3 4 - - 0
+R bogus - - - - - -3 5 - - 0
+R bogus 2 3 2 1 3 -3 5 - - 0
+R bogus - - - - - -3 9 - - 0
+R bogus 2 3 2 1 3 -3 9 - - 0
+R bogus - - - - - -3 10 - - 0
+R bogus 2 3 2 1 3 -3 10 - - 0
+R bogus - - - - - -3 23 - - 0
+R bogus 2 3 2 1 3 -3 23 - - 0
+R bogus - - - - - -3 -2 - - 0
+R bogus 2 3 2 1 3 -3 -2 - - 0
+R bogus - - - - - 1 0 - - 0
+R bogus 2 3 2 1 3 1 0 - - 0
+R bogus - - - - - 1 1 - - 0
+R bogus 2 3 2 1 3 1 1 - - 0
+R bogus - - - - - 1 4 - - 0
+R bogus 2 3 2 1 3 1 4 - - 0
+R bogus - - - - - 1 5 - - 0
+R bogus 2 3 2 1 3 1 5 - - 0
+R bogus - - - - - 1 9 - - 0
+R bogus 2 3 2 1 3 1 9 - - 0
+R bogus - - - - - 1 10 - - 0
+R bogus 2 3 2 1 3 1 10 - - 0
+R bogus - - - - - 1 23 - - 0
+R bogus 2 3 2 1 3 1 23 - - 0
+R bogus - - - - - 1 -2 - - 0
+R bogus 2 3 2 1 3 1 -2 - - 0
+R bogus - - - - - 2 0 - - 0
+R bogus 2 3 2 1 3 2 0 - - 0
+R bogus - - - - - 2 1 - - 1
+R bogus 2 3 2 1 3 2 1 - - 0
+R bogus - - - - - 2 4 - - 0
+R bogus 2 3 2 1 3 2 4 - - 0
+R bogus - - - - - 2 5 - - 1
+R bogus 2 3 2 1 3 2 5 - - 0
+R bogus - - - - - 2 9 - - 1
+R bogus 2 3 2 1 3 2 9 - - 0
+R bogus - - - - - 2 10 - - 0
+R bogus 2 3 2 1 3 2 10 - - 0
+R bogus - - - - - 2 23 - - 1
+R bogus 2 3 2 1 3 2 23 - - 0
+R bogus - - - - - 2 -2 - - 0
+R bogus 2 3 2 1 3 2 -2 - - 0
+R bogus - - - - - 3 0 - - 0
+R bogus 2 3 2 1 3 3 0 - - 0
+R bogus - - - - - 3 1 - - 1
+R bogus 2 3 2 1 3 3 1 - - 0
+R bogus - - - - - 3 4 - - 1
+R bogus 2 3 2 1 3 3 4 - - 2
+R bogus - - - - - 3 5 - - 2
+R bogus 2 3 2 1 3 3 5 - - 1
+R bogus - - - - - 3 9 - - 0
+R bogus 2 3 2 1 3 3 9 - - 0
+R bogus - - - - - 3 10 - - 1
+R bogus 2 3 2 1 3 3 10 - - 2
+R bogus - - - - - 3 23 - - 2
+R bogus 2 3 2 1 3 3 23 - - 1
+R bogus - - - - - 3 -2 - - 0
+R bogus 2 3 2 1 3 3 -2 - - 0
+R bogus - - - - - 5 0 - - 0
+R bogus 2 3 2 1 3 5 0 - - 0
+R bogus - - - - - 5 1 - - 1
+R bogus 2 3 2 1 3 5 1 - - 0
+R bogus - - - - - 5 4 - - 4
+R bogus 2 3 2 1 3 5 4 - - 2
+R bogus - - - - - 5 5 - - 0
+R bogus 2 3 2 1 3 5 5 - - 4
+R bogus - - - - - 5 9 - - 4
+R bogus 2 3 2 1 3 5 9 - - 2
+R bogus - - - - - 5 10 - - 0
+R bogus 2 3 2 1 3 5 10 - - 4
+R bogus - - - - - 5 23 - - 3
+R bogus 2 3 2 1 3 5 23 - - 0
+R bogus - - - - - 5 -2 - - 0
+R bogus 2 3 2 1 3 5 -2 - - 0
+R bogus - - - - - 24 0 - - 0
+R bogus 2 3 2 1 3 24 0 - - 0
+R bogus - - - - - 24 1 - - 1
+R bogus 2 3 2 1 3 24 1 - - 0
+R bogus - - - - - 24 4 - - 4
+R bogus 2 3 2 1 3 24 4 - - 2
+R bogus - - - - - 24 5 - - 5
+R bogus 2 3 2 1 3 24 5 - - 4
+R bogus - - - - - 24 9 - - 9
+R bogus 2 3 2 1 3 24 9 - - 12
+R bogus - - - - - 24 10 - - 10
+R bogus 2 3 2 1 3 24 10 - - 14
+R bogus - - - - - 24 23 - - 23
+R bogus 2 3 2 1 3 24 23 - - 16
+R bogus - - - - - 24 -2 - - 0
+R bogus 2 3 2 1 3 24 -2 - - 0
+R bogus - - - - - 100 0 - - 0
+R bogus 2 3 2 1 3 100 0 - - 0
+R bogus - - - - - 100 1 - - 1
+R bogus 2 3 2 1 3 100 1 - - 0
+R bogus - - - - - 100 4 - - 4
+R bogus 2 3 2 1 3 100 4 - - 2
+R bogus - - - - - 100 5 - - 5
+R bogus 2 3 2 1 3 100 5 - - 4
+R bogus - - - - - 100 9 - - 9
+R bogus 2 3 2 1 3 100 9 - - 12
+R bogus - - - - - 100 10 - - 10
+R bogus 2 3 2 1 3 100 10 - - 14
+R bogus - - - - - 100 23 - - 23
+R bogus 2 3 2 1 3 100 23 - - 40
+R bogus - - - - - 100 -2 - - 0
+R bogus 2 3 2 1 3 100 -2 - - 0
+R bogus - - - - - 7 0 - - 0
+R bogus 2 3 2 1 3 7 0 - - 0
+R bogus - - - - - 7 1 - - 1
+R bogus 2 3 2 1 3 7 1 - - 0
+R bogus - - - - - 7 4 - - 4
+R bogus 2 3 2 1 3 7 4 - - 2
+R bogus - - - - - 7 5 - - 5
+R bogus 2 3 2 1 3 7 5 - - 4
+R bogus - - - - - 7 9 - - 2
+R bogus 2 3 2 1 3 7 9 - - 5
+R bogus - - - - - 7 10 - - 3
+R bogus 2 3 2 1 3 7 10 - - 0
+R bogus - - - - - 7 23 - - 2
+R bogus 2 3 2 1 3 7 23 - - 5
+R bogus - - - - - 7 -2 - - 0
+R bogus 2 3 2 1 3 7 -2 - - 0
+R Once - - - - - 0 0 - - 0
+R Once 2 3 2 1 3 0 0 - - 0
+R Once - - - - - 0 1 - - 0
+R Once 2 3 2 1 3 0 1 - - 0
+R Once - - - - - 0 4 - - 0
+R Once 2 3 2 1 3 0 4 - - 0
+R Once - - - - - 0 5 - - 0
+R Once 2 3 2 1 3 0 5 - - 0
+R Once - - - - - 0 9 - - 0
+R Once 2 3 2 1 3 0 9 - - 0
+R Once - - - - - 0 10 - - 0
+R Once 2 3 2 1 3 0 10 - - 0
+R Once - - - - - 0 23 - - 0
+R Once 2 3 2 1 3 0 23 - - 0
+R Once - - - - - 0 -2 - - 0
+R Once 2 3 2 1 3 0 -2 - - 0
+R Once - - - - - -3 0 - - 0
+R Once 2 3 2 1 3 -3 0 - - 0
+R Once - - - - - -3 1 - - 0
+R Once 2 3 2 1 3 -3 1 - - 0
+R Once - - - - - -3 4 - - 0
+R Once 2 3 2 1 3 -3 4 - - 0
+R Once - - - - - -3 5 - - 0
+R Once 2 3 2 1 3 -3 5 - - 0
+R Once - - - - - -3 9 - - 0
+R Once 2 3 2 1 3 -3 9 - - 0
+R Once - - - - - -3 10 - - 0
+R Once 2 3 2 1 3 -3 10 - - 0
+R Once - - - - - -3 23 - - 0
+R Once 2 3 2 1 3 -3 23 - - 0
+R Once - - - - - -3 -2 - - 0
+R Once 2 3 2 1 3 -3 -2 - - 0
+R Once - - - - - 1 0 - - 0
+R Once 2 3 2 1 3 1 0 - - 0
+R Once - - - - - 1 1 - - 0
+R Once 2 3 2 1 3 1 1 - - 0
+R Once - - - - - 1 4 - - 0
+R Once 2 3 2 1 3 1 4 - - 0
+R Once - - - - - 1 5 - - 0
+R Once 2 3 2 1 3 1 5 - - 0
+R Once - - - - - 1 9 - - 0
+R Once 2 3 2 1 3 1 9 - - 0
+R Once - - - - - 1 10 - - 0
+R Once 2 3 2 1 3 1 10 - - 0
+R Once - - - - - 1 23 - - 0
+R Once 2 3 2 1 3 1 23 - - 0
+R Once - - - - - 1 -2 - - 0
+R Once 2 3 2 1 3 1 -2 - - 0
+R Once - - - - - 2 0 - - 0
+R Once 2 3 2 1 3 2 0 - - 0
+R Once - - - - - 2 1 - - 1
+R Once 2 3 2 1 3 2 1 - - 0
+R Once - - - - - 2 4 - - 0
+R Once 2 3 2 1 3 2 4 - - 0
+R Once - - - - - 2 5 - - 1
+R Once 2 3 2 1 3 2 5 - - 0
+R Once - - - - - 2 9 - - 1
+R Once 2 3 2 1 3 2 9 - - 0
+R Once - - - - - 2 10 - - 0
+R Once 2 3 2 1 3 2 10 - - 0
+R Once - - - - - 2 23 - - 1
+R Once 2 3 2 1 3 2 23 - - 0
+R Once - - - - - 2 -2 - - 0
+R Once 2 3 2 1 3 2 -2 - - 0
+R Once - - - - - 3 0 - - 0
+R Once 2 3 2 1 3 3 0 - - 0
+R Once - - - - - 3 1 - - 1
+R Once 2 3 2 1 3 3 1 - - 0
+R Once - - - - - 3 4 - - 1
+R Once 2 3 2 1 3 3 4 - - 2
+R Once - - - - - 3 5 - - 2
+R Once 2 3 2 1 3 3 5 - - 1
+R Once - - - - - 3 9 - - 0
+R Once 2 3 2 1 3 3 9 - - 0
+R Once - - - - - 3 10 - - 1
+R Once 2 3 2 1 3 3 10 - - 2
+R Once - - - - - 3 23 - - 2
+R Once 2 3 2 1 3 3 23 - - 1
+R Once - - - - - 3 -2 - - 0
+R Once 2 3 2 1 3 3 -2 - - 0
+R Once - - - - - 5 0 - - 0
+R Once 2 3 2 1 3 5 0 - - 0
+R Once - - - - - 5 1 - - 1
+R Once 2 3 2 1 3 5 1 - - 0
+R Once - - - - - 5 4 - - 4
+R Once 2 3 2 1 3 5 4 - - 2
+R Once - - - - - 5 5 - - 0
+R Once 2 3 2 1 3 5 5 - - 4
+R Once - - - - - 5 9 - - 4
+R Once 2 3 2 1 3 5 9 - - 2
+R Once - - - - - 5 10 - - 0
+R Once 2 3 2 1 3 5 10 - - 4
+R Once - - - - - 5 23 - - 3
+R Once 2 3 2 1 3 5 23 - - 0
+R Once - - - - - 5 -2 - - 0
+R Once 2 3 2 1 3 5 -2 - - 0
+R Once - - - - - 24 0 - - 0
+R Once 2 3 2 1 3 24 0 - - 0
+R Once - - - - - 24 1 - - 1
+R Once 2 3 2 1 3 24 1 - - 0
+R Once - - - - - 24 4 - - 4
+R Once 2 3 2 1 3 24 4 - - 2
+R Once - - - - - 24 5 - - 5
+R Once 2 3 2 1 3 24 5 - - 4
+R Once - - - - - 24 9 - - 9
+R Once 2 3 2 1 3 24 9 - - 12
+R Once - - - - - 24 10 - - 10
+R Once 2 3 2 1 3 24 10 - - 14
+R Once - - - - - 24 23 - - 23
+R Once 2 3 2 1 3 24 23 - - 16
+R Once - - - - - 24 -2 - - 0
+R Once 2 3 2 1 3 24 -2 - - 0
+R Once - - - - - 100 0 - - 0
+R Once 2 3 2 1 3 100 0 - - 0
+R Once - - - - - 100 1 - - 1
+R Once 2 3 2 1 3 100 1 - - 0
+R Once - - - - - 100 4 - - 4
+R Once 2 3 2 1 3 100 4 - - 2
+R Once - - - - - 100 5 - - 5
+R Once 2 3 2 1 3 100 5 - - 4
+R Once - - - - - 100 9 - - 9
+R Once 2 3 2 1 3 100 9 - - 12
+R Once - - - - - 100 10 - - 10
+R Once 2 3 2 1 3 100 10 - - 14
+R Once - - - - - 100 23 - - 23
+R Once 2 3 2 1 3 100 23 - - 40
+R Once - - - - - 100 -2 - - 0
+R Once 2 3 2 1 3 100 -2 - - 0
+R Once - - - - - 7 0 - - 0
+R Once 2 3 2 1 3 7 0 - - 0
+R Once - - - - - 7 1 - - 1
+R Once 2 3 2 1 3 7 1 - - 0
+R Once - - - - - 7 4 - - 4
+R Once 2 3 2 1 3 7 4 - - 2
+R Once - - - - - 7 5 - - 5
+R Once 2 3 2 1 3 7 5 - - 4
+R Once - - - - - 7 9 - - 2
+R Once 2 3 2 1 3 7 9 - - 5
+R Once - - - - - 7 10 - - 3
+R Once 2 3 2 1 3 7 10 - - 0
+R Once - - - - - 7 23 - - 2
+R Once 2 3 2 1 3 7 23 - - 5
+R Once - - - - - 7 -2 - - 0
+R Once 2 3 2 1 3 7 -2 - - 0
+R PINGPONG - - - - - 0 0 - - 0
+R PINGPONG 2 3 2 1 3 0 0 - - 0
+R PINGPONG - - - - - 0 1 - - 0
+R PINGPONG 2 3 2 1 3 0 1 - - 0
+R PINGPONG - - - - - 0 4 - - 0
+R PINGPONG 2 3 2 1 3 0 4 - - 0
+R PINGPONG - - - - - 0 5 - - 0
+R PINGPONG 2 3 2 1 3 0 5 - - 0
+R PINGPONG - - - - - 0 9 - - 0
+R PINGPONG 2 3 2 1 3 0 9 - - 0
+R PINGPONG - - - - - 0 10 - - 0
+R PINGPONG 2 3 2 1 3 0 10 - - 0
+R PINGPONG - - - - - 0 23 - - 0
+R PINGPONG 2 3 2 1 3 0 23 - - 0
+R PINGPONG - - - - - 0 -2 - - 0
+R PINGPONG 2 3 2 1 3 0 -2 - - 0
+R PINGPONG - - - - - -3 0 - - 0
+R PINGPONG 2 3 2 1 3 -3 0 - - 0
+R PINGPONG - - - - - -3 1 - - 0
+R PINGPONG 2 3 2 1 3 -3 1 - - 0
+R PINGPONG - - - - - -3 4 - - 0
+R PINGPONG 2 3 2 1 3 -3 4 - - 0
+R PINGPONG - - - - - -3 5 - - 0
+R PINGPONG 2 3 2 1 3 -3 5 - - 0
+R PINGPONG - - - - - -3 9 - - 0
+R PINGPONG 2 3 2 1 3 -3 9 - - 0
+R PINGPONG - - - - - -3 10 - - 0
+R PINGPONG 2 3 2 1 3 -3 10 - - 0
+R PINGPONG - - - - - -3 23 - - 0
+R PINGPONG 2 3 2 1 3 -3 23 - - 0
+R PINGPONG - - - - - -3 -2 - - 0
+R PINGPONG 2 3 2 1 3 -3 -2 - - 0
+R PINGPONG - - - - - 1 0 - - 0
+R PINGPONG 2 3 2 1 3 1 0 - - 0
+R PINGPONG - - - - - 1 1 - - 0
+R PINGPONG 2 3 2 1 3 1 1 - - 0
+R PINGPONG - - - - - 1 4 - - 0
+R PINGPONG 2 3 2 1 3 1 4 - - 0
+R PINGPONG - - - - - 1 5 - - 0
+R PINGPONG 2 3 2 1 3 1 5 - - 0
+R PINGPONG - - - - - 1 9 - - 0
+R PINGPONG 2 3 2 1 3 1 9 - - 0
+R PINGPONG - - - - - 1 10 - - 0
+R PINGPONG 2 3 2 1 3 1 10 - - 0
+R PINGPONG - - - - - 1 23 - - 0
+R PINGPONG 2 3 2 1 3 1 23 - - 0
+R PINGPONG - - - - - 1 -2 - - 0
+R PINGPONG 2 3 2 1 3 1 -2 - - 0
+R PINGPONG - - - - - 2 0 - - 0
+R PINGPONG 2 3 2 1 3 2 0 - - 0
+R PINGPONG - - - - - 2 1 - - 1
+R PINGPONG 2 3 2 1 3 2 1 - - 0
+R PINGPONG - - - - - 2 4 - - 0
+R PINGPONG 2 3 2 1 3 2 4 - - 0
+R PINGPONG - - - - - 2 5 - - 1
+R PINGPONG 2 3 2 1 3 2 5 - - 0
+R PINGPONG - - - - - 2 9 - - 1
+R PINGPONG 2 3 2 1 3 2 9 - - 0
+R PINGPONG - - - - - 2 10 - - 0
+R PINGPONG 2 3 2 1 3 2 10 - - 0
+R PINGPONG - - - - - 2 23 - - 1
+R PINGPONG 2 3 2 1 3 2 23 - - 0
+R PINGPONG - - - - - 2 -2 - - 0
+R PINGPONG 2 3 2 1 3 2 -2 - - 0
+R PINGPONG - - - - - 3 0 - - 0
+R PINGPONG 2 3 2 1 3 3 0 - - 0
+R PINGPONG - - - - - 3 1 - - 1
+R PINGPONG 2 3 2 1 3 3 1 - - 0
+R PINGPONG - - - - - 3 4 - - 1
+R PINGPONG 2 3 2 1 3 3 4 - - 2
+R PINGPONG - - - - - 3 5 - - 2
+R PINGPONG 2 3 2 1 3 3 5 - - 1
+R PINGPONG - - - - - 3 9 - - 0
+R PINGPONG 2 3 2 1 3 3 9 - - 0
+R PINGPONG - - - - - 3 10 - - 1
+R PINGPONG 2 3 2 1 3 3 10 - - 2
+R PINGPONG - - - - - 3 23 - - 2
+R PINGPONG 2 3 2 1 3 3 23 - - 1
+R PINGPONG - - - - - 3 -2 - - 0
+R PINGPONG 2 3 2 1 3 3 -2 - - 0
+R PINGPONG - - - - - 5 0 - - 0
+R PINGPONG 2 3 2 1 3 5 0 - - 0
+R PINGPONG - - - - - 5 1 - - 1
+R PINGPONG 2 3 2 1 3 5 1 - - 0
+R PINGPONG - - - - - 5 4 - - 4
+R PINGPONG 2 3 2 1 3 5 4 - - 2
+R PINGPONG - - - - - 5 5 - - 0
+R PINGPONG 2 3 2 1 3 5 5 - - 4
+R PINGPONG - - - - - 5 9 - - 4
+R PINGPONG 2 3 2 1 3 5 9 - - 2
+R PINGPONG - - - - - 5 10 - - 0
+R PINGPONG 2 3 2 1 3 5 10 - - 4
+R PINGPONG - - - - - 5 23 - - 3
+R PINGPONG 2 3 2 1 3 5 23 - - 0
+R PINGPONG - - - - - 5 -2 - - 0
+R PINGPONG 2 3 2 1 3 5 -2 - - 0
+R PINGPONG - - - - - 24 0 - - 0
+R PINGPONG 2 3 2 1 3 24 0 - - 0
+R PINGPONG - - - - - 24 1 - - 1
+R PINGPONG 2 3 2 1 3 24 1 - - 0
+R PINGPONG - - - - - 24 4 - - 4
+R PINGPONG 2 3 2 1 3 24 4 - - 2
+R PINGPONG - - - - - 24 5 - - 5
+R PINGPONG 2 3 2 1 3 24 5 - - 4
+R PINGPONG - - - - - 24 9 - - 9
+R PINGPONG 2 3 2 1 3 24 9 - - 12
+R PINGPONG - - - - - 24 10 - - 10
+R PINGPONG 2 3 2 1 3 24 10 - - 14
+R PINGPONG - - - - - 24 23 - - 23
+R PINGPONG 2 3 2 1 3 24 23 - - 16
+R PINGPONG - - - - - 24 -2 - - 0
+R PINGPONG 2 3 2 1 3 24 -2 - - 0
+R PINGPONG - - - - - 100 0 - - 0
+R PINGPONG 2 3 2 1 3 100 0 - - 0
+R PINGPONG - - - - - 100 1 - - 1
+R PINGPONG 2 3 2 1 3 100 1 - - 0
+R PINGPONG - - - - - 100 4 - - 4
+R PINGPONG 2 3 2 1 3 100 4 - - 2
+R PINGPONG - - - - - 100 5 - - 5
+R PINGPONG 2 3 2 1 3 100 5 - - 4
+R PINGPONG - - - - - 100 9 - - 9
+R PINGPONG 2 3 2 1 3 100 9 - - 12
+R PINGPONG - - - - - 100 10 - - 10
+R PINGPONG 2 3 2 1 3 100 10 - - 14
+R PINGPONG - - - - - 100 23 - - 23
+R PINGPONG 2 3 2 1 3 100 23 - - 40
+R PINGPONG - - - - - 100 -2 - - 0
+R PINGPONG 2 3 2 1 3 100 -2 - - 0
+R PINGPONG - - - - - 7 0 - - 0
+R PINGPONG 2 3 2 1 3 7 0 - - 0
+R PINGPONG - - - - - 7 1 - - 1
+R PINGPONG 2 3 2 1 3 7 1 - - 0
+R PINGPONG - - - - - 7 4 - - 4
+R PINGPONG 2 3 2 1 3 7 4 - - 2
+R PINGPONG - - - - - 7 5 - - 5
+R PINGPONG 2 3 2 1 3 7 5 - - 4
+R PINGPONG - - - - - 7 9 - - 2
+R PINGPONG 2 3 2 1 3 7 9 - - 5
+R PINGPONG - - - - - 7 10 - - 3
+R PINGPONG 2 3 2 1 3 7 10 - - 0
+R PINGPONG - - - - - 7 23 - - 2
+R PINGPONG 2 3 2 1 3 7 23 - - 5
+R PINGPONG - - - - - 7 -2 - - 0
+R PINGPONG 2 3 2 1 3 7 -2 - - 0
+R "" - - - - - 0 0 - - 0
+R "" 2 3 2 1 3 0 0 - - 0
+R "" - - - - - 0 1 - - 0
+R "" 2 3 2 1 3 0 1 - - 0
+R "" - - - - - 0 4 - - 0
+R "" 2 3 2 1 3 0 4 - - 0
+R "" - - - - - 0 5 - - 0
+R "" 2 3 2 1 3 0 5 - - 0
+R "" - - - - - 0 9 - - 0
+R "" 2 3 2 1 3 0 9 - - 0
+R "" - - - - - 0 10 - - 0
+R "" 2 3 2 1 3 0 10 - - 0
+R "" - - - - - 0 23 - - 0
+R "" 2 3 2 1 3 0 23 - - 0
+R "" - - - - - 0 -2 - - 0
+R "" 2 3 2 1 3 0 -2 - - 0
+R "" - - - - - -3 0 - - 0
+R "" 2 3 2 1 3 -3 0 - - 0
+R "" - - - - - -3 1 - - 0
+R "" 2 3 2 1 3 -3 1 - - 0
+R "" - - - - - -3 4 - - 0
+R "" 2 3 2 1 3 -3 4 - - 0
+R "" - - - - - -3 5 - - 0
+R "" 2 3 2 1 3 -3 5 - - 0
+R "" - - - - - -3 9 - - 0
+R "" 2 3 2 1 3 -3 9 - - 0
+R "" - - - - - -3 10 - - 0
+R "" 2 3 2 1 3 -3 10 - - 0
+R "" - - - - - -3 23 - - 0
+R "" 2 3 2 1 3 -3 23 - - 0
+R "" - - - - - -3 -2 - - 0
+R "" 2 3 2 1 3 -3 -2 - - 0
+R "" - - - - - 1 0 - - 0
+R "" 2 3 2 1 3 1 0 - - 0
+R "" - - - - - 1 1 - - 0
+R "" 2 3 2 1 3 1 1 - - 0
+R "" - - - - - 1 4 - - 0
+R "" 2 3 2 1 3 1 4 - - 0
+R "" - - - - - 1 5 - - 0
+R "" 2 3 2 1 3 1 5 - - 0
+R "" - - - - - 1 9 - - 0
+R "" 2 3 2 1 3 1 9 - - 0
+R "" - - - - - 1 10 - - 0
+R "" 2 3 2 1 3 1 10 - - 0
+R "" - - - - - 1 23 - - 0
+R "" 2 3 2 1 3 1 23 - - 0
+R "" - - - - - 1 -2 - - 0
+R "" 2 3 2 1 3 1 -2 - - 0
+R "" - - - - - 2 0 - - 0
+R "" 2 3 2 1 3 2 0 - - 0
+R "" - - - - - 2 1 - - 1
+R "" 2 3 2 1 3 2 1 - - 0
+R "" - - - - - 2 4 - - 0
+R "" 2 3 2 1 3 2 4 - - 0
+R "" - - - - - 2 5 - - 1
+R "" 2 3 2 1 3 2 5 - - 0
+R "" - - - - - 2 9 - - 1
+R "" 2 3 2 1 3 2 9 - - 0
+R "" - - - - - 2 10 - - 0
+R "" 2 3 2 1 3 2 10 - - 0
+R "" - - - - - 2 23 - - 1
+R "" 2 3 2 1 3 2 23 - - 0
+R "" - - - - - 2 -2 - - 0
+R "" 2 3 2 1 3 2 -2 - - 0
+R "" - - - - - 3 0 - - 0
+R "" 2 3 2 1 3 3 0 - - 0
+R "" - - - - - 3 1 - - 1
+R "" 2 3 2 1 3 3 1 - - 0
+R "" - - - - - 3 4 - - 1
+R "" 2 3 2 1 3 3 4 - - 2
+R "" - - - - - 3 5 - - 2
+R "" 2 3 2 1 3 3 5 - - 1
+R "" - - - - - 3 9 - - 0
+R "" 2 3 2 1 3 3 9 - - 0
+R "" - - - - - 3 10 - - 1
+R "" 2 3 2 1 3 3 10 - - 2
+R "" - - - - - 3 23 - - 2
+R "" 2 3 2 1 3 3 23 - - 1
+R "" - - - - - 3 -2 - - 0
+R "" 2 3 2 1 3 3 -2 - - 0
+R "" - - - - - 5 0 - - 0
+R "" 2 3 2 1 3 5 0 - - 0
+R "" - - - - - 5 1 - - 1
+R "" 2 3 2 1 3 5 1 - - 0
+R "" - - - - - 5 4 - - 4
+R "" 2 3 2 1 3 5 4 - - 2
+R "" - - - - - 5 5 - - 0
+R "" 2 3 2 1 3 5 5 - - 4
+R "" - - - - - 5 9 - - 4
+R "" 2 3 2 1 3 5 9 - - 2
+R "" - - - - - 5 10 - - 0
+R "" 2 3 2 1 3 5 10 - - 4
+R "" - - - - - 5 23 - - 3
+R "" 2 3 2 1 3 5 23 - - 0
+R "" - - - - - 5 -2 - - 0
+R "" 2 3 2 1 3 5 -2 - - 0
+R "" - - - - - 24 0 - - 0
+R "" 2 3 2 1 3 24 0 - - 0
+R "" - - - - - 24 1 - - 1
+R "" 2 3 2 1 3 24 1 - - 0
+R "" - - - - - 24 4 - - 4
+R "" 2 3 2 1 3 24 4 - - 2
+R "" - - - - - 24 5 - - 5
+R "" 2 3 2 1 3 24 5 - - 4
+R "" - - - - - 24 9 - - 9
+R "" 2 3 2 1 3 24 9 - - 12
+R "" - - - - - 24 10 - - 10
+R "" 2 3 2 1 3 24 10 - - 14
+R "" - - - - - 24 23 - - 23
+R "" 2 3 2 1 3 24 23 - - 16
+R "" - - - - - 24 -2 - - 0
+R "" 2 3 2 1 3 24 -2 - - 0
+R "" - - - - - 100 0 - - 0
+R "" 2 3 2 1 3 100 0 - - 0
+R "" - - - - - 100 1 - - 1
+R "" 2 3 2 1 3 100 1 - - 0
+R "" - - - - - 100 4 - - 4
+R "" 2 3 2 1 3 100 4 - - 2
+R "" - - - - - 100 5 - - 5
+R "" 2 3 2 1 3 100 5 - - 4
+R "" - - - - - 100 9 - - 9
+R "" 2 3 2 1 3 100 9 - - 12
+R "" - - - - - 100 10 - - 10
+R "" 2 3 2 1 3 100 10 - - 14
+R "" - - - - - 100 23 - - 23
+R "" 2 3 2 1 3 100 23 - - 40
+R "" - - - - - 100 -2 - - 0
+R "" 2 3 2 1 3 100 -2 - - 0
+R "" - - - - - 7 0 - - 0
+R "" 2 3 2 1 3 7 0 - - 0
+R "" - - - - - 7 1 - - 1
+R "" 2 3 2 1 3 7 1 - - 0
+R "" - - - - - 7 4 - - 4
+R "" 2 3 2 1 3 7 4 - - 2
+R "" - - - - - 7 5 - - 5
+R "" 2 3 2 1 3 7 5 - - 4
+R "" - - - - - 7 9 - - 2
+R "" 2 3 2 1 3 7 9 - - 5
+R "" - - - - - 7 10 - - 3
+R "" 2 3 2 1 3 7 10 - - 0
+R "" - - - - - 7 23 - - 2
+R "" 2 3 2 1 3 7 23 - - 5
+R "" - - - - - 7 -2 - - 0
+R "" 2 3 2 1 3 7 -2 - - 0
+R - 1.5 1 2 -2 0 -3 1 - - 0
+R once 7 -4 - 5 1 -3 8 - - 1
+R loop 0.5 3 99 -2 4 2 10 - - 1
+R pingpong 1 3 1 1.5 -1 -3 10 - - 0
+R PINGPONG 0.1 2.5 2.7 - 3 2 7 - - 0
+R pingpong -0.5 2.5 99 5 - 100 11 - - -5
+R bogus 3 0 0 5 0 1 1000 - - 0
+R Once 1 100 -3 1.5 3 3 17 - - 0
+R "" 0.1 100 99 -2 - 7 2 - - 0
+R "" 2 0 1 5 2.5 7 -1 - - 0
+R - 3 2.5 -3 2 - 5 7 - - 3
+R "" 2 10 99 2 4 7 6 - - 0
+R once 0.1 100 2.7 - - 2 11 - - 0
+R "" - 10 99 0 -1 7 10 - - 0
+R once 1 0 99 - 1 2 8 - - 1
+R Once 0 -4 - - 2.5 3 5 - - 0
+R once - 100 2.7 1.5 -1 100 7 - - -1
+R - 7 - - 5 -1 7 0 - - 0
+R once 0.1 10 1 - 100 -3 1000 - - 99
+R once 0.5 100 99 -2 4 1 1000 - - 4
+R - 3 1 0 0 - 2 23 - - 0
+R - 1.5 0 2 - 1 1 1000 - - 0
+R - 0 10 99 0 4 24 7 - - 0
+R - - 1 1 0 4 7 1000 - - 5
+R "" 7 2.5 99 0 4 1 40 - - 0
+R Once 0.1 2.5 1 0 3 2 11 - - 0
+R pingpong 0 1 -3 5 4 100 9 - - 8
+R - 0 -4 2.7 5 -1 24 11 - - 15
+R Once 3 2.5 1 0 4 100 6 - - 10
+R bogus 7 - - - -1 -3 4 - - 0
+R "" 7 100 2 0 4 2 99 - - 0
+R "" 0.1 10 -3 -2 0 3 7 - - 0
+R - -1 - 2.7 0 - 24 8 - - -8
+R loop 0.5 -4 99 0 2.5 2 5 - - 0
+R PINGPONG 7 2.5 1 -2 2.5 100 1 - - 0
+R once - 1 - 5 100 100 2 - - 6
+R - - -4 1 1.5 1 2 23 - - 1
+R bogus -1 100 99 - 0 -3 23 - - -0
+R once 0.1 1 - 0 - 3 9 - - 0
+R - - 3 2.7 5 2.5 100 23 - - 20
+R once - 100 2 5 1 100 -1 - - 1
+R single 0.1 - 1 - - 100 8 - - 1
+R once 7 10 2.7 -2 1 -3 1 - - -2
+R pingpong 0 10 - 2 3 2 0 - - 0
+R once 2 1 -3 1.5 1 24 3 - - 1
+R Once 0 - 2 2 1 100 -5 - - 0
+R loop 0 -4 99 5 -1 -3 5 - - 0
+R Once 0.5 3 -3 0 3 -3 1000 - - 0
+R pingpong 3 - 1 0 0 3 7 - - 1
+R pingpong 1 100 2 - 4 0 6 - - 0
+R pingpong 0.1 2.5 -3 -2 2.5 1 4 - - 0
+R PINGPONG -0.5 - - -2 - -3 99 - - -0
+R once 2 0 99 - 1 24 5 - - 1
+R single 7 0 1 2 0 100 17 - - 1
+R loop 7 10 1 2 2.5 7 24 - - 0
+R once 0.5 3 2.7 1.5 4 5 24 - - 4
+R PINGPONG 7 2.5 -3 -2 2.5 24 6 - - 0
+R "" -0.5 3 -3 2 3 100 99 - - -48
+R once 1 100 2.7 2 1 0 1 - - 1
+R bogus - 100 - -2 - 5 0 - - 0
+R "" 3 1 0 1.5 3 0 1000 - - 0
+R PINGPONG 1 10 -3 - - 5 8 - - 0
+R pingpong -0.5 - 99 2 4 -3 5 - - 0
+R bogus 3 3 2.7 - 100 -3 8 - - 0
+R pingpong 0.5 2.5 1 - 1 7 24 - - 2
+R - - 10 -3 2 0 0 23 - - 0
+R single 3 100 2.7 2 4 7 3 - - 2
+R - 0.5 2.5 99 0 100 24 4 - - 0
+R pingpong -1 2.5 99 - - 2 8 - - -0
+R bogus - 1 - 0 1 5 1 - - 0
+R once -1 2.5 2 - 3 100 -5 - - 0
+R single 7 2.5 2 2 3 0 1000 - - 0
+R once - 0 2.7 -2 1 1 2 - - 0
+R single 1 - - 1.5 1 3 24 - - 0
+R bogus 2 -4 1 1.5 1 7 23 - - 5
+R "" -0.5 1 2.7 5 -1 1 17 - - -0
+R single -0.5 10 2.7 - 100 24 2 - - 2
+R once 1 -4 -3 2 4 0 23 - - 4
+R single 1.5 2.5 - 1.5 -1 5 10 - - 0
+R "" -0.5 100 2 5 3 -3 -1 - - -0
+R PINGPONG 2 10 1 2 0 100 1 - - 0
+R pingpong 0.5 3 - - 1 3 6 - - 1
+R Once -0.5 100 - - - 3 5 - - -0
+R once - 100 2 - 0 3 3 - - 0
+R - 0.1 - - - - -3 11 - - 0
+R PINGPONG 0 1 -3 0 3 7 1000 - - 5
+R "" 1 0 2 0 3 7 11 - - 4
+R pingpong 0.5 - -3 - 0 1 40 - - 0
+R Once 1.5 3 -3 - 3 2 9 - - 1
+R PINGPONG 1 2.5 1 -2 1 2 0 - - 0
+R Once -0.5 0 - - 0 2 23 - - -0
+R Once - 3 2 0 100 5 40 - - 2
+R "" 0.1 1 0 0 3 1 23 - - 0
+R loop 0.5 0 1 1.5 100 -3 10 - - 0
+R PINGPONG 7 2.5 99 -2 1 3 17 - - 2
+R bogus 0.5 10 0 2 100 2 5 - - 0
+R single 0 - 0 -2 2.5 -3 5 - - 0
+R "" 2 3 1 5 -1 0 24 - - 0
+R PINGPONG 1.5 0 1 -2 2.5 24 3 - - 4
+R Once - 10 1 0 100 24 -1 - - 0
+R bogus - 1 2 -2 - 100 7 - - 6
+R single 0.1 1 2.7 - 2.5 0 40 - - 0
+R single 0.1 1 2 0 4 5 9 - - 2
+R loop 0.1 10 2 -2 1 3 9 - - 0
+R PINGPONG 7 100 0 - 4 0 1 - - 0
+R once 0 100 - 5 1 7 4 - - 1
+R pingpong 3 0 1 0 3 0 24 - - 0
+R bogus 0.1 3 2.7 0 4 2 0 - - 0
+R once 0.5 3 2 - 2.5 3 4 - - 0
+R - 7 - 2 -2 3 0 8 - - 0
+R bogus 1.5 2.5 -3 -2 - 1 4 - - 0
+R PINGPONG - -4 - -2 3 7 11 - - 1
+R once 2 2.5 -3 0 2.5 1 0 - - 0
+R PINGPONG 2 0 1 - 1 7 9 - - 4
+R PINGPONG -0.5 1 99 1.5 100 24 -5 - - -0
+R loop -0.5 0 0 5 1 3 23 - - -0
+R - 0.1 2.5 - 2 100 1 10 - - 0
+R once 2 100 -3 0 2.5 2 24 - - 0
+R - -0.5 3 - 2 1 5 6 - - -2
+R once - - 2.7 -2 - 5 23 - - 4
+R pingpong 1.5 100 1 - - 100 3 - - 0
+R PINGPONG - 1 1 1.5 -1 1 4 - - 0
+R - -0.5 100 1 0 3 1 0 - - -0
+R bogus 0.1 -4 - 0 2.5 5 6 - - 1
+R single 0.1 - 2 -2 4 0 0 - - 0
+R Once 0 100 2 2 1 1 40 - - 0
+R "" -0.5 100 0 1.5 100 0 1000 - - -0
+R once 3 10 1 1.5 - 3 1 - - 1.5
+R PINGPONG 1 3 -3 1.5 4 2 6 - - 1
+R "" 7 - 0 5 - 0 24 - - 0
+R loop 0 - 0 1.5 - 0 1000 - - 0
+R Once 0 -4 -3 1.5 4 24 5 - - 9
+R Once 3 0 99 2 1 24 17 - - 3
+R PINGPONG 3 -4 2 -2 3 24 24 - - 12
+R once 0.1 - - 1.5 2.5 100 -5 - - 1.5
+R once 0.1 2.5 0 1.5 100 3 1000 - - 100
+R pingpong -1 - 1 1.5 0 -3 6 - - 0
+R "" -1 10 99 2 - -3 5 - - -0
+R PINGPONG - 0 2 5 100 1 0 - - 0
+R pingpong 0.1 100 - 5 100 3 9 - - 0
+R loop 1.5 2.5 0 2 4 100 8 - - 8
+R PINGPONG 1 3 -3 0 4 100 0 - - 0
+R pingpong 3 3 1 2 -1 1 8 - - 0
+R - 1 3 2 1.5 0 -3 -5 - - 0
+R single -1 100 - 0 -1 24 8 - - 0
+R - 0.1 -4 -3 0 -1 2 7 - - 1
+R Once - 1 0 5 -1 3 3 - - 2
+R bogus -1 -4 - 2 1 7 6 - - -3
+R "" 3 2.5 2.7 1.5 2.5 -3 17 - - 0
+R bogus 3 3 - 1.5 100 100 8 - - 15
+R - 1.5 0 2 -2 2.5 3 3 - - 1
+R - - - 1 -2 - 2 0 - - 0
+R PINGPONG 0.5 1 1 1.5 100 5 11 - - 0
+R - -1 3 0 2 100 100 0 - - -0
+R "" 1 0 -3 1.5 0 -3 2 - - 0
+R once 2 100 - -2 0 -3 23 - - -2
+R - 0 0 - - 0 3 0 - - 0
+R once 3 10 0 2 4 24 9 - - 2
+R - 0.1 1 - -2 - 7 1 - - 0
+R PINGPONG -1 0 - - 3 2 2 - - -0
+R - 2 1 - 0 2.5 2 17 - - 0
+R "" 1.5 - 2 1.5 0 2 23 - - 0
+R Once 0 2.5 1 -2 100 24 0 - - 0
+R once - 0 0 - 1 100 -5 - - 0
+R PINGPONG 2 10 - 2 -1 -3 11 - - 0
+R single -0.5 - 2 1.5 2.5 1 2 - - 0
+R "" 0.5 0 99 - 4 5 17 - - 3
+R loop -1 0 0 2 1 5 24 - - -4
+R once 0.1 - 2.7 5 4 7 1 - - 4
+R bogus 3 2.5 0 5 1 24 23 - - 13
+R bogus 7 100 - - 2.5 -3 1000 - - 0
+R once 2 100 - -2 100 1 1 - - -2
+R bogus 7 3 1 -2 100 1 1 - - 0
+R loop 7 1 2 - -1 2 6 - - 1
+R single -1 1 - - 100 5 2 - - 0
+R Once 1.5 1 2.7 2 1 0 1000 - - 0
+R Once 3 10 2 2 -1 7 -1 - - 0
+R once 0.1 0 -3 2 - 3 2 - - 2
+R "" 7 100 1 1.5 100 5 10 - - 0
+R loop -1 - 1 0 3 24 11 - - -11
+R bogus 0 -4 -3 0 2.5 5 23 - - 2
+R "" 2 10 -3 0 4 7 40 - - 4
+R "" - -4 1 -2 3 24 11 - - 15
+R "" 2 - - -2 0 1 17 - - 0
+R - -1 2.5 2 1.5 4 3 4 - - -2
+R - 1 - 2 2 0 3 11 - - 2
+R PINGPONG -1 1 -3 5 - 1 1000 - - -0
+R "" 3 - 99 -2 2.5 -3 7 - - 0
+R once -0.5 3 2.7 5 100 1 99 - - -43
+R single -0.5 0 1 1.5 2.5 -3 9 - - 0
+R bogus 3 0 - -2 3 5 23 - - 4
+R bogus 2 - 2 - 3 1 17 - - 0
+R single - -4 2.7 1.5 0 3 1000 - - 2
+R loop 1.5 100 2.7 2 -1 0 8 - - 0
+R loop 0.5 100 - 2 2.5 100 7 - - 0
+R bogus - 0 2.7 2 4 3 5 - - 2
+R "" 7 3 0 - 3 5 24 - - 2
+R "" 1 2.5 - 0 - 24 5 - - 2
+R bogus - -4 99 -2 4 7 13 - - 3
+R pingpong 0.5 - 2.7 1.5 -1 0 5 - - 0
+R Once 0.5 3 99 1.5 -1 2 0 - - 0
+R loop 0.5 3 0 1.5 3 2 1 - - 0
+R Once 1 - -3 5 4 -3 -1 - - 0
+R bogus - 0 2 5 - 1 3 - - 0
+R pingpong 3 -4 - -2 -1 2 99 - - 1
+R PINGPONG 0 3 99 0 4 5 3 - - 0
+R loop -1 3 2 1.5 -1 3 40 - - -1
+R "" -0.5 100 2 0 3 5 1 - - -0
+R pingpong - -4 - - -1 -3 -5 - - 0
+R pingpong 0.5 -4 2.7 1.5 0 100 1 - - 2
+R "" 1.5 -4 2.7 0 2.5 1 23 - - 0
+R Once -1 0 -3 - 4 100 1000 - - -0
+R - 0.5 10 1 5 2.5 5 2 - - 0
+R "" 2 - - -2 1 0 4 - - 0
+R "" 3 100 1 2 2.5 2 1 - - 0
+R - 1.5 2.5 2 2 4 7 40 - - 0
+R once 0.5 100 - - 1 100 -5 - - 0
+R Once -1 2.5 1 2 1 1 17 - - -0
+R pingpong 1 2.5 99 5 1 24 1 - - 0
+R single 1.5 2.5 2.7 0 3 1 3 - - 0
+R PINGPONG 1.5 -4 1 2 -1 3 1000 - - 0
+R "" 1.5 2.5 -3 1.5 100 3 7 - - 0
+R loop 0.1 - - 5 4 0 24 - - 0
+R single 1 -4 -3 1.5 - 3 4 - - 0
+R "" 3 1 99 1.5 2.5 7 8 - - 0
+R PINGPONG -1 - 1 0 0 -3 8 - - -0
+R bogus -0.5 - -3 1.5 3 2 6 - - -1
+R loop -1 3 2.7 2 0 2 6 - - -1
+R - -1 10 2 5 - 5 2 - - -0
+R "" -0.5 1 1 1.5 4 3 40 - - -2
+R single 0 1 -3 -2 - 3 -1 - - 0
+R loop 1 2.5 - 5 0 2 9 - - 0
+R pingpong - 100 2 1.5 - -3 1 - - 0
+R PINGPONG 0 100 2 5 100 24 23 - - 0
+R bogus 3 100 0 5 100 2 -5 - - 0
+R "" -0.5 3 2.7 5 2.5 24 11 - - -4
+R bogus 3 2.5 2 -2 -1 0 6 - - 0
+R - 2 0 99 1.5 100 -3 24 - - 0
+R pingpong -1 0 0 -2 2.5 100 11 - - -11
+R bogus -0.5 100 2 5 100 7 -5 - - -0
+R - 0 -4 99 1.5 1 100 17 - - 21
+R Once -1 10 2.7 -2 1 100 23 - - -13
+R PINGPONG -0.5 1 2 2 3 24 24 - - -12
+R bogus -0.5 3 -3 5 2.5 3 40 - - -1
+R single 1.5 -4 99 0 0 100 7 - - 99
+R loop 0.1 100 0 1.5 100 -3 9 - - 0
+R PINGPONG 0.1 10 -3 0 0 100 9 - - 0
+R "" 0.1 1 2 5 3 2 40 - - 1
+R - 3 0 99 1.5 3 3 40 - - 0
+R PINGPONG 0.5 2.5 2.7 0 1 1 17 - - 0
+R once -0.5 -4 -3 1.5 - 24 0 - - -0.5
+R pingpong - -4 -3 -2 4 1 24 - - 0
+R once 1.5 100 1 1.5 100 -3 3 - - 1.5
+R once 0 100 2 1.5 1 5 8 - - 1
+R pingpong -1 10 2.7 - - 3 11 - - -1
+R - 0.1 1 -3 -2 1 3 4 - - 0
+R Once 0 100 2.7 0 - 100 7 - - 0
+R single 0.5 0 1 5 2.5 5 3 - - 1
+R - 0.5 100 2 2 -1 -3 3 - - 0
+R Once -1 0 -3 1.5 3 -3 13 - - -0
+R once 0 - - - - 9 7 - - 7
+R once NaN - - - - 9 7 - - 7
+R once - NaN - - - 9 7 - - 7
+R once 2 0 - - - 9 7 - - 8
+R once 3 5 - - - 9 2 - - 0
+R once 3 5 - - - 9 12 - - 8
+R once 3 2 - - - 9 12 - - 8
+R loop 0 - - - - 9 7 - - 7
+R loop NaN - - - - 9 7 - - 7
+R loop - NaN - - - 9 7 - - 7
+R loop 2 0 - - - 9 7 - - 5
+R loop 3 5 - - - 9 2 - - 0
+R loop 3 5 - - - 9 12 - - 3
+R loop 3 2 - - - 9 12 - - 3
+R pingpong 0 - - - - 9 7 - - 7
+R pingpong NaN - - - - 9 7 - - 7
+R pingpong - NaN - - - 9 7 - - 7
+R pingpong 2 0 - - - 9 7 - - 2
+R pingpong 3 5 - - - 9 2 - - 0
+R pingpong 3 5 - - - 9 12 - - 5
+R pingpong 3 2 - - - 9 12 - - 2
+R single 0 - - - - 9 7 - - 0
+R single NaN - - - - 9 7 - - 0
+R single - NaN - - - 9 7 - - 0
+R single 2 0 - - - 9 7 - - 0
+R single 3 5 - - - 9 2 - - 0
+R single 3 5 - - - 9 12 - - 0
+R single 3 2 - - - 9 12 - - 0
+R once - - - 1 0 9 4 - - 0
+R once - - - 1 -0 9 4 - - -0
+R once - - - 1 1 9 4 - - 1
+R once - - - 1 2.5 9 4 - - 2.5
+R once - - - 1 100 9 4 - - 5
+R once - - - 1 NaN 9 4 - - NaN
+R once - - - 1 Infinity 9 4 - - 5
+R once - - - 1 -Infinity 9 4 - - -Infinity
+R loop NaN - - - - 9 4 - - 4
+R once NaN - - - - 9 4 - - 4
+R pingpong NaN - - - - 9 4 - - 4
+R loop Infinity - - - - 9 4 - - NaN
+R once Infinity - - - - 9 4 - - 8
+R pingpong Infinity - - - - 9 4 - - NaN
+R loop -Infinity - - - - 9 4 - - NaN
+R once -Infinity - - - - 9 4 - - -Infinity
+R pingpong -Infinity - - - - 9 4 - - NaN
+R loop 1e308 - - - - 9 4 - - NaN
+R once 1e308 - - - - 9 4 - - 8
+R pingpong 1e308 - - - - 9 4 - - NaN
+R loop -1 - - - - 9 4 - - -4
+R once -1 - - - - 9 4 - - -4
+R pingpong -1 - - - - 9 4 - - -4
+R loop 1e300 - - - - 9 1000000 - - 0
+R once 1e300 - - - - 9 1000000 - - 8
+R pingpong 1e300 - - - - 9 1000000 - - 0
+R - 2 1 - - - 5 3 0.5 - 1
+R - 2 1 - - - 5 3 -0.5 - 0
+R - 2 1 - - - 5 3 2.5 - 3
+R - 2 1 - - - 5 3 -2.5 - 0
+R - 2 1 - - - 5 3 7.4 - 4
+R - 2 1 - - - 5 3 -3 - 0
+R - 2 1 - - - 5 3 1000000000 - 4
+R - 2 1 - - - 5 3 0.49999999999999994 - 0
+R - 2 1 - - - 5 3 3 - 3
+R - 2 1 - - - 5 3 1.4999999999999999 - 2
+R - 2 1 - - - 5 3 2.4999999999999996 - 2
+R - 2 1 - - - 5 3 null - 4
+R - 2 1 - - - 5 3 NaN - NaN
+R - 2 1 - - - 5 3 Infinity - 4
+R - 2 1 - - - 5 3 -Infinity - 0
+R - - - - - - 1 3 4 - 0
+R - - - - - - 0 3 4 - 0
+R once 2 1 - - - 5 3 0.5 - 1
+R once 2 1 - - - 5 3 -0.5 - 0
+R once 2 1 - - - 5 3 2.5 - 3
+R once 2 1 - - - 5 3 -2.5 - 0
+R once 2 1 - - - 5 3 7.4 - 4
+R once 2 1 - - - 5 3 -3 - 0
+R once 2 1 - - - 5 3 1000000000 - 4
+R once 2 1 - - - 5 3 0.49999999999999994 - 0
+R once 2 1 - - - 5 3 3 - 3
+R once 2 1 - - - 5 3 1.4999999999999999 - 2
+R once 2 1 - - - 5 3 2.4999999999999996 - 2
+R once 2 1 - - - 5 3 null - 4
+R once 2 1 - - - 5 3 NaN - NaN
+R once 2 1 - - - 5 3 Infinity - 4
+R once 2 1 - - - 5 3 -Infinity - 0
+R once - - - - - 1 3 4 - 0
+R once - - - - - 0 3 4 - 0
+R pingpong 2 1 - - - 5 3 0.5 - 1
+R pingpong 2 1 - - - 5 3 -0.5 - 0
+R pingpong 2 1 - - - 5 3 2.5 - 3
+R pingpong 2 1 - - - 5 3 -2.5 - 0
+R pingpong 2 1 - - - 5 3 7.4 - 4
+R pingpong 2 1 - - - 5 3 -3 - 0
+R pingpong 2 1 - - - 5 3 1000000000 - 4
+R pingpong 2 1 - - - 5 3 0.49999999999999994 - 0
+R pingpong 2 1 - - - 5 3 3 - 3
+R pingpong 2 1 - - - 5 3 1.4999999999999999 - 2
+R pingpong 2 1 - - - 5 3 2.4999999999999996 - 2
+R pingpong 2 1 - - - 5 3 null - 4
+R pingpong 2 1 - - - 5 3 NaN - NaN
+R pingpong 2 1 - - - 5 3 Infinity - 4
+R pingpong 2 1 - - - 5 3 -Infinity - 0
+R pingpong - - - - - 1 3 4 - 0
+R pingpong - - - - - 0 3 4 - 0
+R single 2 1 - - - 5 3 0.5 - 1
+R single 2 1 - - - 5 3 -0.5 - 0
+R single 2 1 - - - 5 3 2.5 - 3
+R single 2 1 - - - 5 3 -2.5 - 0
+R single 2 1 - - - 5 3 7.4 - 4
+R single 2 1 - - - 5 3 -3 - 0
+R single 2 1 - - - 5 3 1000000000 - 4
+R single 2 1 - - - 5 3 0.49999999999999994 - 0
+R single 2 1 - - - 5 3 3 - 3
+R single 2 1 - - - 5 3 1.4999999999999999 - 2
+R single 2 1 - - - 5 3 2.4999999999999996 - 2
+R single 2 1 - - - 5 3 null - 0
+R single 2 1 - - - 5 3 NaN - NaN
+R single 2 1 - - - 5 3 Infinity - 4
+R single 2 1 - - - 5 3 -Infinity - 0
+R single - - - - - 1 3 4 - 0
+R single - - - - - 0 3 4 - 0
+R once 2 - - - - 5 0 - 1:2:- 2
+R once 2 - - - - 1 0 - 1:2:- 0
+R once 2 - - - - 0 0 - 1:2:- 0
+R once 2 - - - - 5 1 - 1:2:- 2
+R once 2 - - - - 1 1 - 1:2:- 0
+R once 2 - - - - 0 1 - 1:2:- 0
+R once 2 - - - - 5 2 - 1:2:- 2
+R once 2 - - - - 1 2 - 1:2:- 0
+R once 2 - - - - 0 2 - 1:2:- 0
+R once 2 - - - - 5 3 - 1:2:- 2
+R once 2 - - - - 1 3 - 1:2:- 0
+R once 2 - - - - 0 3 - 1:2:- 0
+R once 2 - - - - 5 5 - 1:2:- 2
+R once 2 - - - - 1 5 - 1:2:- 0
+R once 2 - - - - 0 5 - 1:2:- 0
+R once 2 - - - - 5 8 - 1:2:- 2
+R once 2 - - - - 1 8 - 1:2:- 0
+R once 2 - - - - 0 8 - 1:2:- 0
+R once 2 - - - - 5 -1 - 1:2:- 0
+R once 2 - - - - 1 -1 - 1:2:- 0
+R once 2 - - - - 0 -1 - 1:2:- 0
+R once 2 - - - - 5 0 - 1:-:- 0
+R once 2 - - - - 1 0 - 1:-:- 0
+R once 2 - - - - 0 0 - 1:-:- 0
+R once 2 - - - - 5 1 - 1:-:- 2
+R once 2 - - - - 1 1 - 1:-:- 0
+R once 2 - - - - 0 1 - 1:-:- 0
+R once 2 - - - - 5 2 - 1:-:- 4
+R once 2 - - - - 1 2 - 1:-:- 0
+R once 2 - - - - 0 2 - 1:-:- 0
+R once 2 - - - - 5 3 - 1:-:- 4
+R once 2 - - - - 1 3 - 1:-:- 0
+R once 2 - - - - 0 3 - 1:-:- 0
+R once 2 - - - - 5 5 - 1:-:- 4
+R once 2 - - - - 1 5 - 1:-:- 0
+R once 2 - - - - 0 5 - 1:-:- 0
+R once 2 - - - - 5 8 - 1:-:- 4
+R once 2 - - - - 1 8 - 1:-:- 0
+R once 2 - - - - 0 8 - 1:-:- 0
+R once 2 - - - - 5 -1 - 1:-:- 0
+R once 2 - - - - 1 -1 - 1:-:- 0
+R once 2 - - - - 0 -1 - 1:-:- 0
+R once 2 - - - - 5 0 - 0:2:- 0
+R once 2 - - - - 1 0 - 0:2:- 0
+R once 2 - - - - 0 0 - 0:2:- 0
+R once 2 - - - - 5 1 - 0:2:- 2
+R once 2 - - - - 1 1 - 0:2:- 0
+R once 2 - - - - 0 1 - 0:2:- 0
+R once 2 - - - - 5 2 - 0:2:- 4
+R once 2 - - - - 1 2 - 0:2:- 0
+R once 2 - - - - 0 2 - 0:2:- 0
+R once 2 - - - - 5 3 - 0:2:- 4
+R once 2 - - - - 1 3 - 0:2:- 0
+R once 2 - - - - 0 3 - 0:2:- 0
+R once 2 - - - - 5 5 - 0:2:- 4
+R once 2 - - - - 1 5 - 0:2:- 0
+R once 2 - - - - 0 5 - 0:2:- 0
+R once 2 - - - - 5 8 - 0:2:- 4
+R once 2 - - - - 1 8 - 0:2:- 0
+R once 2 - - - - 0 8 - 0:2:- 0
+R once 2 - - - - 5 -1 - 0:2:- 0
+R once 2 - - - - 1 -1 - 0:2:- 0
+R once 2 - - - - 0 -1 - 0:2:- 0
+R once 2 - - - - 5 0 - ~ 0
+R once 2 - - - - 1 0 - ~ 0
+R once 2 - - - - 0 0 - ~ 0
+R once 2 - - - - 5 1 - ~ 2
+R once 2 - - - - 1 1 - ~ 0
+R once 2 - - - - 0 1 - ~ 0
+R once 2 - - - - 5 2 - ~ 4
+R once 2 - - - - 1 2 - ~ 0
+R once 2 - - - - 0 2 - ~ 0
+R once 2 - - - - 5 3 - ~ 4
+R once 2 - - - - 1 3 - ~ 0
+R once 2 - - - - 0 3 - ~ 0
+R once 2 - - - - 5 5 - ~ 4
+R once 2 - - - - 1 5 - ~ 0
+R once 2 - - - - 0 5 - ~ 0
+R once 2 - - - - 5 8 - ~ 4
+R once 2 - - - - 1 8 - ~ 0
+R once 2 - - - - 0 8 - ~ 0
+R once 2 - - - - 5 -1 - ~ 0
+R once 2 - - - - 1 -1 - ~ 0
+R once 2 - - - - 0 -1 - ~ 0
+R once 2 - - - - 5 0 - 1:0:-,1:-:- 0
+R once 2 - - - - 1 0 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 0 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 1 - 1:0:-,1:-:- 2
+R once 2 - - - - 1 1 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 1 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 2 - 1:0:-,1:-:- 4
+R once 2 - - - - 1 2 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 2 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 3 - 1:0:-,1:-:- 4
+R once 2 - - - - 1 3 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 3 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 5 - 1:0:-,1:-:- 4
+R once 2 - - - - 1 5 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 5 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 8 - 1:0:-,1:-:- 4
+R once 2 - - - - 1 8 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 8 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 -1 - 1:0:-,1:-:- 0
+R once 2 - - - - 1 -1 - 1:0:-,1:-:- 0
+R once 2 - - - - 0 -1 - 1:0:-,1:-:- 0
+R once 2 - - - - 5 0 - 1:3:-,1:-:- 3
+R once 2 - - - - 1 0 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 0 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 1 - 1:3:-,1:-:- 2
+R once 2 - - - - 1 1 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 1 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 2 - 1:3:-,1:-:- 4
+R once 2 - - - - 1 2 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 2 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 3 - 1:3:-,1:-:- 4
+R once 2 - - - - 1 3 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 3 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 5 - 1:3:-,1:-:- 4
+R once 2 - - - - 1 5 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 5 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 8 - 1:3:-,1:-:- 4
+R once 2 - - - - 1 8 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 8 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 -1 - 1:3:-,1:-:- 0
+R once 2 - - - - 1 -1 - 1:3:-,1:-:- 0
+R once 2 - - - - 0 -1 - 1:3:-,1:-:- 0
+R once 2 - - - - 5 0 - 1:3:-,0:-:-,1:1:- 3
+R once 2 - - - - 1 0 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 0 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 1 - 1:3:-,0:-:-,1:1:- 3
+R once 2 - - - - 1 1 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 1 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 2 - 1:3:-,0:-:-,1:1:- 1
+R once 2 - - - - 1 2 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 2 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 3 - 1:3:-,0:-:-,1:1:- 1
+R once 2 - - - - 1 3 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 3 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 5 - 1:3:-,0:-:-,1:1:- 1
+R once 2 - - - - 1 5 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 5 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 8 - 1:3:-,0:-:-,1:1:- 1
+R once 2 - - - - 1 8 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 8 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 -1 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 1 -1 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 0 -1 - 1:3:-,0:-:-,1:1:- 0
+R once 2 - - - - 5 0 - 1:3:-,1:n:- 3
+R once 2 - - - - 1 0 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 0 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 1 - 1:3:-,1:n:- 2
+R once 2 - - - - 1 1 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 1 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 2 - 1:3:-,1:n:- 4
+R once 2 - - - - 1 2 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 2 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 3 - 1:3:-,1:n:- 4
+R once 2 - - - - 1 3 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 3 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 5 - 1:3:-,1:n:- 4
+R once 2 - - - - 1 5 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 5 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 8 - 1:3:-,1:n:- 4
+R once 2 - - - - 1 8 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 8 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 -1 - 1:3:-,1:n:- 0
+R once 2 - - - - 1 -1 - 1:3:-,1:n:- 0
+R once 2 - - - - 0 -1 - 1:3:-,1:n:- 0
+R once 2 - - - - 5 0 - 1:2.9:- 2
+R once 2 - - - - 1 0 - 1:2.9:- 0
+R once 2 - - - - 0 0 - 1:2.9:- 0
+R once 2 - - - - 5 1 - 1:2.9:- 2
+R once 2 - - - - 1 1 - 1:2.9:- 0
+R once 2 - - - - 0 1 - 1:2.9:- 0
+R once 2 - - - - 5 2 - 1:2.9:- 2
+R once 2 - - - - 1 2 - 1:2.9:- 0
+R once 2 - - - - 0 2 - 1:2.9:- 0
+R once 2 - - - - 5 3 - 1:2.9:- 2
+R once 2 - - - - 1 3 - 1:2.9:- 0
+R once 2 - - - - 0 3 - 1:2.9:- 0
+R once 2 - - - - 5 5 - 1:2.9:- 2
+R once 2 - - - - 1 5 - 1:2.9:- 0
+R once 2 - - - - 0 5 - 1:2.9:- 0
+R once 2 - - - - 5 8 - 1:2.9:- 2
+R once 2 - - - - 1 8 - 1:2.9:- 0
+R once 2 - - - - 0 8 - 1:2.9:- 0
+R once 2 - - - - 5 -1 - 1:2.9:- 0
+R once 2 - - - - 1 -1 - 1:2.9:- 0
+R once 2 - - - - 0 -1 - 1:2.9:- 0
+R once 2 - - - - 5 0 - 1:-1:- 0
+R once 2 - - - - 1 0 - 1:-1:- 0
+R once 2 - - - - 0 0 - 1:-1:- 0
+R once 2 - - - - 5 1 - 1:-1:- 0
+R once 2 - - - - 1 1 - 1:-1:- 0
+R once 2 - - - - 0 1 - 1:-1:- 0
+R once 2 - - - - 5 2 - 1:-1:- 0
+R once 2 - - - - 1 2 - 1:-1:- 0
+R once 2 - - - - 0 2 - 1:-1:- 0
+R once 2 - - - - 5 3 - 1:-1:- 0
+R once 2 - - - - 1 3 - 1:-1:- 0
+R once 2 - - - - 0 3 - 1:-1:- 0
+R once 2 - - - - 5 5 - 1:-1:- 0
+R once 2 - - - - 1 5 - 1:-1:- 0
+R once 2 - - - - 0 5 - 1:-1:- 0
+R once 2 - - - - 5 8 - 1:-1:- 0
+R once 2 - - - - 1 8 - 1:-1:- 0
+R once 2 - - - - 0 8 - 1:-1:- 0
+R once 2 - - - - 5 -1 - 1:-1:- 0
+R once 2 - - - - 1 -1 - 1:-1:- 0
+R once 2 - - - - 0 -1 - 1:-1:- 0
+R once 2 - - - - 5 0 - 1:99:- 4
+R once 2 - - - - 1 0 - 1:99:- 0
+R once 2 - - - - 0 0 - 1:99:- 0
+R once 2 - - - - 5 1 - 1:99:- 4
+R once 2 - - - - 1 1 - 1:99:- 0
+R once 2 - - - - 0 1 - 1:99:- 0
+R once 2 - - - - 5 2 - 1:99:- 4
+R once 2 - - - - 1 2 - 1:99:- 0
+R once 2 - - - - 0 2 - 1:99:- 0
+R once 2 - - - - 5 3 - 1:99:- 4
+R once 2 - - - - 1 3 - 1:99:- 0
+R once 2 - - - - 0 3 - 1:99:- 0
+R once 2 - - - - 5 5 - 1:99:- 4
+R once 2 - - - - 1 5 - 1:99:- 0
+R once 2 - - - - 0 5 - 1:99:- 0
+R once 2 - - - - 5 8 - 1:99:- 4
+R once 2 - - - - 1 8 - 1:99:- 0
+R once 2 - - - - 0 8 - 1:99:- 0
+R once 2 - - - - 5 -1 - 1:99:- 0
+R once 2 - - - - 1 -1 - 1:99:- 0
+R once 2 - - - - 0 -1 - 1:99:- 0
+R once 2 - - - - 5 0 - 1:Infinity:- 4
+R once 2 - - - - 1 0 - 1:Infinity:- 0
+R once 2 - - - - 0 0 - 1:Infinity:- 0
+R once 2 - - - - 5 1 - 1:Infinity:- 4
+R once 2 - - - - 1 1 - 1:Infinity:- 0
+R once 2 - - - - 0 1 - 1:Infinity:- 0
+R once 2 - - - - 5 2 - 1:Infinity:- 4
+R once 2 - - - - 1 2 - 1:Infinity:- 0
+R once 2 - - - - 0 2 - 1:Infinity:- 0
+R once 2 - - - - 5 3 - 1:Infinity:- 4
+R once 2 - - - - 1 3 - 1:Infinity:- 0
+R once 2 - - - - 0 3 - 1:Infinity:- 0
+R once 2 - - - - 5 5 - 1:Infinity:- 4
+R once 2 - - - - 1 5 - 1:Infinity:- 0
+R once 2 - - - - 0 5 - 1:Infinity:- 0
+R once 2 - - - - 5 8 - 1:Infinity:- 4
+R once 2 - - - - 1 8 - 1:Infinity:- 0
+R once 2 - - - - 0 8 - 1:Infinity:- 0
+R once 2 - - - - 5 -1 - 1:Infinity:- 0
+R once 2 - - - - 1 -1 - 1:Infinity:- 0
+R once 2 - - - - 0 -1 - 1:Infinity:- 0
+R once 2 - - - - 5 0 - 1:-Infinity:- 0
+R once 2 - - - - 1 0 - 1:-Infinity:- 0
+R once 2 - - - - 0 0 - 1:-Infinity:- 0
+R once 2 - - - - 5 1 - 1:-Infinity:- 0
+R once 2 - - - - 1 1 - 1:-Infinity:- 0
+R once 2 - - - - 0 1 - 1:-Infinity:- 0
+R once 2 - - - - 5 2 - 1:-Infinity:- 0
+R once 2 - - - - 1 2 - 1:-Infinity:- 0
+R once 2 - - - - 0 2 - 1:-Infinity:- 0
+R once 2 - - - - 5 3 - 1:-Infinity:- 0
+R once 2 - - - - 1 3 - 1:-Infinity:- 0
+R once 2 - - - - 0 3 - 1:-Infinity:- 0
+R once 2 - - - - 5 5 - 1:-Infinity:- 0
+R once 2 - - - - 1 5 - 1:-Infinity:- 0
+R once 2 - - - - 0 5 - 1:-Infinity:- 0
+R once 2 - - - - 5 8 - 1:-Infinity:- 0
+R once 2 - - - - 1 8 - 1:-Infinity:- 0
+R once 2 - - - - 0 8 - 1:-Infinity:- 0
+R once 2 - - - - 5 -1 - 1:-Infinity:- 0
+R once 2 - - - - 1 -1 - 1:-Infinity:- 0
+R once 2 - - - - 0 -1 - 1:-Infinity:- 0
+R once 2 - - - - 5 0 - 1:NaN:- NaN
+R once 2 - - - - 1 0 - 1:NaN:- NaN
+R once 2 - - - - 0 0 - 1:NaN:- NaN
+R once 2 - - - - 5 1 - 1:NaN:- NaN
+R once 2 - - - - 1 1 - 1:NaN:- NaN
+R once 2 - - - - 0 1 - 1:NaN:- NaN
+R once 2 - - - - 5 2 - 1:NaN:- NaN
+R once 2 - - - - 1 2 - 1:NaN:- NaN
+R once 2 - - - - 0 2 - 1:NaN:- NaN
+R once 2 - - - - 5 3 - 1:NaN:- NaN
+R once 2 - - - - 1 3 - 1:NaN:- NaN
+R once 2 - - - - 0 3 - 1:NaN:- NaN
+R once 2 - - - - 5 5 - 1:NaN:- NaN
+R once 2 - - - - 1 5 - 1:NaN:- NaN
+R once 2 - - - - 0 5 - 1:NaN:- NaN
+R once 2 - - - - 5 8 - 1:NaN:- NaN
+R once 2 - - - - 1 8 - 1:NaN:- NaN
+R once 2 - - - - 0 8 - 1:NaN:- NaN
+R once 2 - - - - 5 -1 - 1:NaN:- 0
+R once 2 - - - - 1 -1 - 1:NaN:- 0
+R once 2 - - - - 0 -1 - 1:NaN:- 0
+R once 2 - - - - 5 0 - 1:0:0 0
+R once 2 - - - - 1 0 - 1:0:0 0
+R once 2 - - - - 0 0 - 1:0:0 0
+R once 2 - - - - 5 1 - 1:0:0 0
+R once 2 - - - - 1 1 - 1:0:0 0
+R once 2 - - - - 0 1 - 1:0:0 0
+R once 2 - - - - 5 2 - 1:0:0 0
+R once 2 - - - - 1 2 - 1:0:0 0
+R once 2 - - - - 0 2 - 1:0:0 0
+R once 2 - - - - 5 3 - 1:0:0 0
+R once 2 - - - - 1 3 - 1:0:0 0
+R once 2 - - - - 0 3 - 1:0:0 0
+R once 2 - - - - 5 5 - 1:0:0 0
+R once 2 - - - - 1 5 - 1:0:0 0
+R once 2 - - - - 0 5 - 1:0:0 0
+R once 2 - - - - 5 8 - 1:0:0 0
+R once 2 - - - - 1 8 - 1:0:0 0
+R once 2 - - - - 0 8 - 1:0:0 0
+R once 2 - - - - 5 -1 - 1:0:0 0
+R once 2 - - - - 1 -1 - 1:0:0 0
+R once 2 - - - - 0 -1 - 1:0:0 0
+R once 2 - - - - 5 0 - 1:2:1 2
+R once 2 - - - - 1 0 - 1:2:1 0
+R once 2 - - - - 0 0 - 1:2:1 0
+R once 2 - - - - 5 1 - 1:2:1 2
+R once 2 - - - - 1 1 - 1:2:1 0
+R once 2 - - - - 0 1 - 1:2:1 0
+R once 2 - - - - 5 2 - 1:2:1 2
+R once 2 - - - - 1 2 - 1:2:1 0
+R once 2 - - - - 0 2 - 1:2:1 0
+R once 2 - - - - 5 3 - 1:2:1 2
+R once 2 - - - - 1 3 - 1:2:1 0
+R once 2 - - - - 0 3 - 1:2:1 0
+R once 2 - - - - 5 5 - 1:2:1 2
+R once 2 - - - - 1 5 - 1:2:1 0
+R once 2 - - - - 0 5 - 1:2:1 0
+R once 2 - - - - 5 8 - 1:2:1 2
+R once 2 - - - - 1 8 - 1:2:1 0
+R once 2 - - - - 0 8 - 1:2:1 0
+R once 2 - - - - 5 -1 - 1:2:1 0
+R once 2 - - - - 1 -1 - 1:2:1 0
+R once 2 - - - - 0 -1 - 1:2:1 0
+R once 2 - - - - 5 0 - 1:-:1 0
+R once 2 - - - - 1 0 - 1:-:1 0
+R once 2 - - - - 0 0 - 1:-:1 0
+R once 2 - - - - 5 1 - 1:-:1 2
+R once 2 - - - - 1 1 - 1:-:1 0
+R once 2 - - - - 0 1 - 1:-:1 0
+R once 2 - - - - 5 2 - 1:-:1 4
+R once 2 - - - - 1 2 - 1:-:1 0
+R once 2 - - - - 0 2 - 1:-:1 0
+R once 2 - - - - 5 3 - 1:-:1 4
+R once 2 - - - - 1 3 - 1:-:1 0
+R once 2 - - - - 0 3 - 1:-:1 0
+R once 2 - - - - 5 5 - 1:-:1 4
+R once 2 - - - - 1 5 - 1:-:1 0
+R once 2 - - - - 0 5 - 1:-:1 0
+R once 2 - - - - 5 8 - 1:-:1 4
+R once 2 - - - - 1 8 - 1:-:1 0
+R once 2 - - - - 0 8 - 1:-:1 0
+R once 2 - - - - 5 -1 - 1:-:1 0
+R once 2 - - - - 1 -1 - 1:-:1 0
+R once 2 - - - - 0 -1 - 1:-:1 0
+R once 2 - - - - 5 0 - 1:4:-,~,~,1:1:- 4
+R once 2 - - - - 1 0 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 0 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 1 - 1:4:-,~,~,1:1:- 4
+R once 2 - - - - 1 1 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 1 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 2 - 1:4:-,~,~,1:1:- 4
+R once 2 - - - - 1 2 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 2 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 3 - 1:4:-,~,~,1:1:- 1
+R once 2 - - - - 1 3 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 3 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 5 - 1:4:-,~,~,1:1:- 1
+R once 2 - - - - 1 5 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 5 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 8 - 1:4:-,~,~,1:1:- 1
+R once 2 - - - - 1 8 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 8 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 -1 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 1 -1 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 0 -1 - 1:4:-,~,~,1:1:- 0
+R once 2 - - - - 5 0 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 0 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 0 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 1 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 1 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 1 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 2 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 2 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 2 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 3 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 3 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 3 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 5 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 5 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 5 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 8 - 1:1:-,0:7:-,0:7:- 1
+R once 2 - - - - 1 8 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 8 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 5 -1 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 1 -1 - 1:1:-,0:7:-,0:7:- 0
+R once 2 - - - - 0 -1 - 1:1:-,0:7:-,0:7:- 0
+R single - - 4 - - 9 5 1.4 1:3:- 3
+R single - - 4 - - 9 5 - 1:3:- 3
+R single - - 4 - - 9 5 1.4 1:-:-,1:3:- 3
+R single - - 4 - - 9 5 - 1:-:-,1:3:- 3
+R single - - 4 - - 9 5 1.4 1:3:-,1:-:- 1
+R single - - 4 - - 9 5 - 1:3:-,1:-:- 4
+R loop - - - - - 5 40 - 1:2:-,0:-:- 2
+R loop - - - - - 5 40 - 1:4:- 4
+R loop - - - - - 5 40 - 0:4:-,0:4:- 0
+R - 3 2 - - - 100 12 - - 30
+R - - 6 - - - 5 2 - - 0
+R - 0 - - - - 5 3 - - 3
+R pingpong - - - - - 4 5 - - 1
+R pingpong - - - - - 1 7 - - 0
+R once - - - - - 5 9 - - 4
+R once - - - 0 0 10 4 - - 0
+R single - - 99 - - 5 0 - - 4
+R - - - - - - 0 3 - - 0
+R once - - - - - 9 3 - 1:6:-,~,1:-:-,~ 3
+R single - - 3 - - 5 0 4 1:1:- 1
+R single 9 - 3 - - 5 3 0.49999999999999994 - 0
+R single 9 - 3 - - 5 3 0.5 - 1
+B 0 1:2:- 0
+B 1 1:2:- 0
+B 2 1:2:- 0
+B 3 1:2:- 0
+B 4 1:2:- 0
+B 9 1:2:- 0
+B -1 1:2:- 0
+B 1000 1:2:- 0
+B 0 1:-:- 0
+B 1 1:-:- 0
+B 2 1:-:- 0
+B 3 1:-:- 0
+B 4 1:-:- 0
+B 9 1:-:- 0
+B -1 1:-:- 0
+B 1000 1:-:- 0
+B 0 0:2:- 0
+B 1 0:2:- 0
+B 2 0:2:- 0
+B 3 0:2:- 0
+B 4 0:2:- 0
+B 9 0:2:- 0
+B -1 0:2:- 0
+B 1000 0:2:- 0
+B 0 ~ 0
+B 1 ~ 0
+B 2 ~ 0
+B 3 ~ 0
+B 4 ~ 0
+B 9 ~ 0
+B -1 ~ 0
+B 1000 ~ 0
+B 0 1:0:-,1:-:- 0
+B 1 1:0:-,1:-:- 0
+B 2 1:0:-,1:-:- 0
+B 3 1:0:-,1:-:- 0
+B 4 1:0:-,1:-:- 0
+B 9 1:0:-,1:-:- 0
+B -1 1:0:-,1:-:- 0
+B 1000 1:0:-,1:-:- 0
+B 0 1:3:-,1:-:- 0
+B 1 1:3:-,1:-:- 0
+B 2 1:3:-,1:-:- 0
+B 3 1:3:-,1:-:- 0
+B 4 1:3:-,1:-:- 0
+B 9 1:3:-,1:-:- 0
+B -1 1:3:-,1:-:- 0
+B 1000 1:3:-,1:-:- 0
+B 0 1:3:-,0:-:-,1:1:- 0
+B 1 1:3:-,0:-:-,1:1:- 0
+B 2 1:3:-,0:-:-,1:1:- 0
+B 3 1:3:-,0:-:-,1:1:- 0
+B 4 1:3:-,0:-:-,1:1:- 0
+B 9 1:3:-,0:-:-,1:1:- 0
+B -1 1:3:-,0:-:-,1:1:- 0
+B 1000 1:3:-,0:-:-,1:1:- 0
+B 0 1:3:-,1:n:- 0
+B 1 1:3:-,1:n:- 0
+B 2 1:3:-,1:n:- 0
+B 3 1:3:-,1:n:- 0
+B 4 1:3:-,1:n:- 0
+B 9 1:3:-,1:n:- 0
+B -1 1:3:-,1:n:- 0
+B 1000 1:3:-,1:n:- 0
+B 0 1:2.9:- 0
+B 1 1:2.9:- 0
+B 2 1:2.9:- 0
+B 3 1:2.9:- 0
+B 4 1:2.9:- 0
+B 9 1:2.9:- 0
+B -1 1:2.9:- 0
+B 1000 1:2.9:- 0
+B 0 1:-1:- 0
+B 1 1:-1:- 0
+B 2 1:-1:- 0
+B 3 1:-1:- 0
+B 4 1:-1:- 0
+B 9 1:-1:- 0
+B -1 1:-1:- 0
+B 1000 1:-1:- 0
+B 0 1:99:- 0
+B 1 1:99:- 0
+B 2 1:99:- 0
+B 3 1:99:- 0
+B 4 1:99:- 0
+B 9 1:99:- 0
+B -1 1:99:- 0
+B 1000 1:99:- 0
+B 0 1:Infinity:- 0
+B 1 1:Infinity:- 0
+B 2 1:Infinity:- 0
+B 3 1:Infinity:- 0
+B 4 1:Infinity:- 0
+B 9 1:Infinity:- 0
+B -1 1:Infinity:- 0
+B 1000 1:Infinity:- 0
+B 0 1:-Infinity:- 0
+B 1 1:-Infinity:- 0
+B 2 1:-Infinity:- 0
+B 3 1:-Infinity:- 0
+B 4 1:-Infinity:- 0
+B 9 1:-Infinity:- 0
+B -1 1:-Infinity:- 0
+B 1000 1:-Infinity:- 0
+B 0 1:NaN:- 0
+B 1 1:NaN:- 0
+B 2 1:NaN:- 0
+B 3 1:NaN:- 0
+B 4 1:NaN:- 0
+B 9 1:NaN:- 0
+B -1 1:NaN:- 0
+B 1000 1:NaN:- 0
+B 0 1:0:0 0
+B 1 1:0:0 0
+B 2 1:0:0 0
+B 3 1:0:0 0
+B 4 1:0:0 0
+B 9 1:0:0 0
+B -1 1:0:0 0
+B 1000 1:0:0 0
+B 0 1:2:1 1
+B 1 1:2:1 1
+B 2 1:2:1 1
+B 3 1:2:1 1
+B 4 1:2:1 1
+B 9 1:2:1 1
+B -1 1:2:1 0
+B 1000 1:2:1 1
+B 0 1:-:1 1
+B 1 1:-:1 1
+B 2 1:-:1 1
+B 3 1:-:1 1
+B 4 1:-:1 1
+B 9 1:-:1 1
+B -1 1:-:1 0
+B 1000 1:-:1 1
+B 0 1:4:-,~,~,1:1:- 0
+B 1 1:4:-,~,~,1:1:- 0
+B 2 1:4:-,~,~,1:1:- 0
+B 3 1:4:-,~,~,1:1:- 0
+B 4 1:4:-,~,~,1:1:- 0
+B 9 1:4:-,~,~,1:1:- 0
+B -1 1:4:-,~,~,1:1:- 0
+B 1000 1:4:-,~,~,1:1:- 0
+B 0 1:1:-,0:7:-,0:7:- 0
+B 1 1:1:-,0:7:-,0:7:- 0
+B 2 1:1:-,0:7:-,0:7:- 0
+B 3 1:1:-,0:7:-,0:7:- 0
+B 4 1:1:-,0:7:-,0:7:- 0
+B 9 1:1:-,0:7:-,0:7:- 0
+B -1 1:1:-,0:7:-,0:7:- 0
+B 1000 1:1:-,0:7:-,0:7:- 0
+B 0 1:-:1,0:-:1 1
+B 1 1:-:1,0:-:1 1
+B 2 1:-:1,0:-:1 1
+B 3 1:-:1,0:-:1 1
+B 4 1:-:1,0:-:1 1
+B 9 1:-:1,0:-:1 1
+B -1 1:-:1,0:-:1 0
+B 1000 1:-:1,0:-:1 1
+B 0 1:-:1,1:-:- 1
+B 1 1:-:1,1:-:- 0
+B 2 1:-:1,1:-:- 0
+B 3 1:-:1,1:-:- 0
+B 4 1:-:1,1:-:- 0
+B 9 1:-:1,1:-:- 0
+B -1 1:-:1,1:-:- 0
+B 1000 1:-:1,1:-:- 0
+B 0 1:-:-,1:-:1 0
+B 1 1:-:-,1:-:1 1
+B 2 1:-:-,1:-:1 1
+B 3 1:-:-,1:-:1 1
+B 4 1:-:-,1:-:1 1
+B 9 1:-:-,1:-:1 1
+B -1 1:-:-,1:-:1 0
+B 1000 1:-:-,1:-:1 1
+B 0 1:-:1,~,1:-:0 1
+B 1 1:-:1,~,1:-:0 1
+B 2 1:-:1,~,1:-:0 0
+B 3 1:-:1,~,1:-:0 0
+B 4 1:-:1,~,1:-:0 0
+B 9 1:-:1,~,1:-:0 0
+B -1 1:-:1,~,1:-:0 0
+B 1000 1:-:1,~,1:-:0 0
+B 0 1:-:0,1:-:1 0
+B 1 1:-:0,1:-:1 1
+B 2 1:-:0,1:-:1 1
+B 3 1:-:0,1:-:1 1
+B 4 1:-:0,1:-:1 1
+B 9 1:-:0,1:-:1 1
+B -1 1:-:0,1:-:1 0
+B 1000 1:-:0,1:-:1 1
+B 0 1:2:1,1:3:- 1
+B 1 1:2:1,1:3:- 0
+B 2 1:2:1,1:3:- 0
+B 3 1:2:1,1:3:- 0
+B 4 1:2:1,1:3:- 0
+B 9 1:2:1,1:3:- 0
+B -1 1:2:1,1:3:- 0
+B 1000 1:2:1,1:3:- 0
+B 0 0:-:1 0
+B 1 0:-:1 0
+B 2 0:-:1 0
+B 3 0:-:1 0
+B 4 0:-:1 0
+B 9 0:-:1 0
+B -1 0:-:1 0
+B 1000 0:-:1 0
+B 0 0:-:1,1:-:- 0
+B 1 0:-:1,1:-:- 0
+B 2 0:-:1,1:-:- 0
+B 3 0:-:1,1:-:- 0
+B 4 0:-:1,1:-:- 0
+B 9 0:-:1,1:-:- 0
+B -1 0:-:1,1:-:- 0
+B 1000 0:-:1,1:-:- 0
+B 0 1:-:1,1:2:-,0:-:1 1
+B 1 1:-:1,1:2:-,0:-:1 0
+B 2 1:-:1,1:2:-,0:-:1 0
+B 3 1:-:1,1:2:-,0:-:1 0
+B 4 1:-:1,1:2:-,0:-:1 0
+B 9 1:-:1,1:2:-,0:-:1 0
+B -1 1:-:1,1:2:-,0:-:1 0
+B 1000 1:-:1,1:2:-,0:-:1 0
+O once 2 1 - - - 7 0 - 1:2:- 2
+O once 2 1 - - - 7 0 2.2 1:2:- 2
+O pingpong 2 1 - - - 7 0 - 1:2:- 2
+O pingpong 2 1 - - - 7 0 2.2 1:2:- 2
+O once 2 1 - - - 7 1 - 1:2:- 2
+O once 2 1 - - - 7 1 2.2 1:2:- 2
+O pingpong 2 1 - - - 7 1 - 1:2:- 2
+O pingpong 2 1 - - - 7 1 2.2 1:2:- 2
+O once 2 1 - - - 7 3 - 1:2:- 2
+O once 2 1 - - - 7 3 2.2 1:2:- 2
+O pingpong 2 1 - - - 7 3 - 1:2:- 2
+O pingpong 2 1 - - - 7 3 2.2 1:2:- 2
+O once 2 1 - - - 7 6 - 1:2:- 2
+O once 2 1 - - - 7 6 2.2 1:2:- 2
+O pingpong 2 1 - - - 7 6 - 1:2:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:2:- 2
+O once 2 1 - - - 7 0 - 1:-:- 0
+O once 2 1 - - - 7 0 2.2 1:-:- 2
+O pingpong 2 1 - - - 7 0 - 1:-:- 0
+O pingpong 2 1 - - - 7 0 2.2 1:-:- 2
+O once 2 1 - - - 7 1 - 1:-:- 0
+O once 2 1 - - - 7 1 2.2 1:-:- 2
+O pingpong 2 1 - - - 7 1 - 1:-:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:-:- 2
+O once 2 1 - - - 7 3 - 1:-:- 4
+O once 2 1 - - - 7 3 2.2 1:-:- 2
+O pingpong 2 1 - - - 7 3 - 1:-:- 4
+O pingpong 2 1 - - - 7 3 2.2 1:-:- 2
+O once 2 1 - - - 7 6 - 1:-:- 6
+O once 2 1 - - - 7 6 2.2 1:-:- 2
+O pingpong 2 1 - - - 7 6 - 1:-:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:-:- 2
+O once 2 1 - - - 7 0 - 0:2:- 0
+O once 2 1 - - - 7 0 2.2 0:2:- 2
+O pingpong 2 1 - - - 7 0 - 0:2:- 0
+O pingpong 2 1 - - - 7 0 2.2 0:2:- 2
+O once 2 1 - - - 7 1 - 0:2:- 0
+O once 2 1 - - - 7 1 2.2 0:2:- 2
+O pingpong 2 1 - - - 7 1 - 0:2:- 0
+O pingpong 2 1 - - - 7 1 2.2 0:2:- 2
+O once 2 1 - - - 7 3 - 0:2:- 4
+O once 2 1 - - - 7 3 2.2 0:2:- 2
+O pingpong 2 1 - - - 7 3 - 0:2:- 4
+O pingpong 2 1 - - - 7 3 2.2 0:2:- 2
+O once 2 1 - - - 7 6 - 0:2:- 6
+O once 2 1 - - - 7 6 2.2 0:2:- 2
+O pingpong 2 1 - - - 7 6 - 0:2:- 2
+O pingpong 2 1 - - - 7 6 2.2 0:2:- 2
+O once 2 1 - - - 7 0 - ~ 0
+O once 2 1 - - - 7 0 2.2 ~ 2
+O pingpong 2 1 - - - 7 0 - ~ 0
+O pingpong 2 1 - - - 7 0 2.2 ~ 2
+O once 2 1 - - - 7 1 - ~ 0
+O once 2 1 - - - 7 1 2.2 ~ 2
+O pingpong 2 1 - - - 7 1 - ~ 0
+O pingpong 2 1 - - - 7 1 2.2 ~ 2
+O once 2 1 - - - 7 3 - ~ 4
+O once 2 1 - - - 7 3 2.2 ~ 2
+O pingpong 2 1 - - - 7 3 - ~ 4
+O pingpong 2 1 - - - 7 3 2.2 ~ 2
+O once 2 1 - - - 7 6 - ~ 6
+O once 2 1 - - - 7 6 2.2 ~ 2
+O pingpong 2 1 - - - 7 6 - ~ 2
+O pingpong 2 1 - - - 7 6 2.2 ~ 2
+O once 2 1 - - - 7 0 - 1:0:-,1:-:- 0
+O once 2 1 - - - 7 0 2.2 1:0:-,1:-:- 0
+O pingpong 2 1 - - - 7 0 - 1:0:-,1:-:- 0
+O pingpong 2 1 - - - 7 0 2.2 1:0:-,1:-:- 0
+O once 2 1 - - - 7 1 - 1:0:-,1:-:- 0
+O once 2 1 - - - 7 1 2.2 1:0:-,1:-:- 2
+O pingpong 2 1 - - - 7 1 - 1:0:-,1:-:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:0:-,1:-:- 2
+O once 2 1 - - - 7 3 - 1:0:-,1:-:- 4
+O once 2 1 - - - 7 3 2.2 1:0:-,1:-:- 2
+O pingpong 2 1 - - - 7 3 - 1:0:-,1:-:- 4
+O pingpong 2 1 - - - 7 3 2.2 1:0:-,1:-:- 2
+O once 2 1 - - - 7 6 - 1:0:-,1:-:- 6
+O once 2 1 - - - 7 6 2.2 1:0:-,1:-:- 2
+O pingpong 2 1 - - - 7 6 - 1:0:-,1:-:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:0:-,1:-:- 2
+O once 2 1 - - - 7 0 - 1:3:-,1:-:- 3
+O once 2 1 - - - 7 0 2.2 1:3:-,1:-:- 3
+O pingpong 2 1 - - - 7 0 - 1:3:-,1:-:- 3
+O pingpong 2 1 - - - 7 0 2.2 1:3:-,1:-:- 3
+O once 2 1 - - - 7 1 - 1:3:-,1:-:- 0
+O once 2 1 - - - 7 1 2.2 1:3:-,1:-:- 2
+O pingpong 2 1 - - - 7 1 - 1:3:-,1:-:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:3:-,1:-:- 2
+O once 2 1 - - - 7 3 - 1:3:-,1:-:- 4
+O once 2 1 - - - 7 3 2.2 1:3:-,1:-:- 2
+O pingpong 2 1 - - - 7 3 - 1:3:-,1:-:- 4
+O pingpong 2 1 - - - 7 3 2.2 1:3:-,1:-:- 2
+O once 2 1 - - - 7 6 - 1:3:-,1:-:- 6
+O once 2 1 - - - 7 6 2.2 1:3:-,1:-:- 2
+O pingpong 2 1 - - - 7 6 - 1:3:-,1:-:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:3:-,1:-:- 2
+O once 2 1 - - - 7 0 - 1:3:-,0:-:-,1:1:- 3
+O once 2 1 - - - 7 0 2.2 1:3:-,0:-:-,1:1:- 3
+O pingpong 2 1 - - - 7 0 - 1:3:-,0:-:-,1:1:- 3
+O pingpong 2 1 - - - 7 0 2.2 1:3:-,0:-:-,1:1:- 3
+O once 2 1 - - - 7 1 - 1:3:-,0:-:-,1:1:- 3
+O once 2 1 - - - 7 1 2.2 1:3:-,0:-:-,1:1:- 3
+O pingpong 2 1 - - - 7 1 - 1:3:-,0:-:-,1:1:- 3
+O pingpong 2 1 - - - 7 1 2.2 1:3:-,0:-:-,1:1:- 3
+O once 2 1 - - - 7 3 - 1:3:-,0:-:-,1:1:- 1
+O once 2 1 - - - 7 3 2.2 1:3:-,0:-:-,1:1:- 1
+O pingpong 2 1 - - - 7 3 - 1:3:-,0:-:-,1:1:- 1
+O pingpong 2 1 - - - 7 3 2.2 1:3:-,0:-:-,1:1:- 1
+O once 2 1 - - - 7 6 - 1:3:-,0:-:-,1:1:- 1
+O once 2 1 - - - 7 6 2.2 1:3:-,0:-:-,1:1:- 1
+O pingpong 2 1 - - - 7 6 - 1:3:-,0:-:-,1:1:- 1
+O pingpong 2 1 - - - 7 6 2.2 1:3:-,0:-:-,1:1:- 1
+O once 2 1 - - - 7 0 - 1:3:-,1:n:- 3
+O once 2 1 - - - 7 0 2.2 1:3:-,1:n:- 3
+O pingpong 2 1 - - - 7 0 - 1:3:-,1:n:- 3
+O pingpong 2 1 - - - 7 0 2.2 1:3:-,1:n:- 3
+O once 2 1 - - - 7 1 - 1:3:-,1:n:- 0
+O once 2 1 - - - 7 1 2.2 1:3:-,1:n:- 2
+O pingpong 2 1 - - - 7 1 - 1:3:-,1:n:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:3:-,1:n:- 2
+O once 2 1 - - - 7 3 - 1:3:-,1:n:- 4
+O once 2 1 - - - 7 3 2.2 1:3:-,1:n:- 2
+O pingpong 2 1 - - - 7 3 - 1:3:-,1:n:- 4
+O pingpong 2 1 - - - 7 3 2.2 1:3:-,1:n:- 2
+O once 2 1 - - - 7 6 - 1:3:-,1:n:- 6
+O once 2 1 - - - 7 6 2.2 1:3:-,1:n:- 2
+O pingpong 2 1 - - - 7 6 - 1:3:-,1:n:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:3:-,1:n:- 2
+O once 2 1 - - - 7 0 - 1:2.9:- 2
+O once 2 1 - - - 7 0 2.2 1:2.9:- 2
+O pingpong 2 1 - - - 7 0 - 1:2.9:- 2
+O pingpong 2 1 - - - 7 0 2.2 1:2.9:- 2
+O once 2 1 - - - 7 1 - 1:2.9:- 2
+O once 2 1 - - - 7 1 2.2 1:2.9:- 2
+O pingpong 2 1 - - - 7 1 - 1:2.9:- 2
+O pingpong 2 1 - - - 7 1 2.2 1:2.9:- 2
+O once 2 1 - - - 7 3 - 1:2.9:- 2
+O once 2 1 - - - 7 3 2.2 1:2.9:- 2
+O pingpong 2 1 - - - 7 3 - 1:2.9:- 2
+O pingpong 2 1 - - - 7 3 2.2 1:2.9:- 2
+O once 2 1 - - - 7 6 - 1:2.9:- 2
+O once 2 1 - - - 7 6 2.2 1:2.9:- 2
+O pingpong 2 1 - - - 7 6 - 1:2.9:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:2.9:- 2
+O once 2 1 - - - 7 0 - 1:-1:- 0
+O once 2 1 - - - 7 0 2.2 1:-1:- 0
+O pingpong 2 1 - - - 7 0 - 1:-1:- 0
+O pingpong 2 1 - - - 7 0 2.2 1:-1:- 0
+O once 2 1 - - - 7 1 - 1:-1:- 0
+O once 2 1 - - - 7 1 2.2 1:-1:- 0
+O pingpong 2 1 - - - 7 1 - 1:-1:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:-1:- 0
+O once 2 1 - - - 7 3 - 1:-1:- 0
+O once 2 1 - - - 7 3 2.2 1:-1:- 0
+O pingpong 2 1 - - - 7 3 - 1:-1:- 0
+O pingpong 2 1 - - - 7 3 2.2 1:-1:- 0
+O once 2 1 - - - 7 6 - 1:-1:- 0
+O once 2 1 - - - 7 6 2.2 1:-1:- 0
+O pingpong 2 1 - - - 7 6 - 1:-1:- 0
+O pingpong 2 1 - - - 7 6 2.2 1:-1:- 0
+O once 2 1 - - - 7 0 - 1:99:- 6
+O once 2 1 - - - 7 0 2.2 1:99:- 6
+O pingpong 2 1 - - - 7 0 - 1:99:- 6
+O pingpong 2 1 - - - 7 0 2.2 1:99:- 6
+O once 2 1 - - - 7 1 - 1:99:- 6
+O once 2 1 - - - 7 1 2.2 1:99:- 6
+O pingpong 2 1 - - - 7 1 - 1:99:- 6
+O pingpong 2 1 - - - 7 1 2.2 1:99:- 6
+O once 2 1 - - - 7 3 - 1:99:- 6
+O once 2 1 - - - 7 3 2.2 1:99:- 6
+O pingpong 2 1 - - - 7 3 - 1:99:- 6
+O pingpong 2 1 - - - 7 3 2.2 1:99:- 6
+O once 2 1 - - - 7 6 - 1:99:- 6
+O once 2 1 - - - 7 6 2.2 1:99:- 6
+O pingpong 2 1 - - - 7 6 - 1:99:- 6
+O pingpong 2 1 - - - 7 6 2.2 1:99:- 6
+O once 2 1 - - - 7 0 - 1:Infinity:- 6
+O once 2 1 - - - 7 0 2.2 1:Infinity:- 6
+O pingpong 2 1 - - - 7 0 - 1:Infinity:- 6
+O pingpong 2 1 - - - 7 0 2.2 1:Infinity:- 6
+O once 2 1 - - - 7 1 - 1:Infinity:- 6
+O once 2 1 - - - 7 1 2.2 1:Infinity:- 6
+O pingpong 2 1 - - - 7 1 - 1:Infinity:- 6
+O pingpong 2 1 - - - 7 1 2.2 1:Infinity:- 6
+O once 2 1 - - - 7 3 - 1:Infinity:- 6
+O once 2 1 - - - 7 3 2.2 1:Infinity:- 6
+O pingpong 2 1 - - - 7 3 - 1:Infinity:- 6
+O pingpong 2 1 - - - 7 3 2.2 1:Infinity:- 6
+O once 2 1 - - - 7 6 - 1:Infinity:- 6
+O once 2 1 - - - 7 6 2.2 1:Infinity:- 6
+O pingpong 2 1 - - - 7 6 - 1:Infinity:- 6
+O pingpong 2 1 - - - 7 6 2.2 1:Infinity:- 6
+O once 2 1 - - - 7 0 - 1:-Infinity:- 0
+O once 2 1 - - - 7 0 2.2 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 0 - 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 0 2.2 1:-Infinity:- 0
+O once 2 1 - - - 7 1 - 1:-Infinity:- 0
+O once 2 1 - - - 7 1 2.2 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 1 - 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:-Infinity:- 0
+O once 2 1 - - - 7 3 - 1:-Infinity:- 0
+O once 2 1 - - - 7 3 2.2 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 3 - 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 3 2.2 1:-Infinity:- 0
+O once 2 1 - - - 7 6 - 1:-Infinity:- 0
+O once 2 1 - - - 7 6 2.2 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 6 - 1:-Infinity:- 0
+O pingpong 2 1 - - - 7 6 2.2 1:-Infinity:- 0
+O once 2 1 - - - 7 0 - 1:NaN:- NaN
+O once 2 1 - - - 7 0 2.2 1:NaN:- NaN
+O pingpong 2 1 - - - 7 0 - 1:NaN:- NaN
+O pingpong 2 1 - - - 7 0 2.2 1:NaN:- NaN
+O once 2 1 - - - 7 1 - 1:NaN:- NaN
+O once 2 1 - - - 7 1 2.2 1:NaN:- NaN
+O pingpong 2 1 - - - 7 1 - 1:NaN:- NaN
+O pingpong 2 1 - - - 7 1 2.2 1:NaN:- NaN
+O once 2 1 - - - 7 3 - 1:NaN:- NaN
+O once 2 1 - - - 7 3 2.2 1:NaN:- NaN
+O pingpong 2 1 - - - 7 3 - 1:NaN:- NaN
+O pingpong 2 1 - - - 7 3 2.2 1:NaN:- NaN
+O once 2 1 - - - 7 6 - 1:NaN:- NaN
+O once 2 1 - - - 7 6 2.2 1:NaN:- NaN
+O pingpong 2 1 - - - 7 6 - 1:NaN:- NaN
+O pingpong 2 1 - - - 7 6 2.2 1:NaN:- NaN
+O once 2 1 - - - 7 0 - 1:0:0 0
+O once 2 1 - - - 7 0 2.2 1:0:0 0
+O pingpong 2 1 - - - 7 0 - 1:0:0 0
+O pingpong 2 1 - - - 7 0 2.2 1:0:0 0
+O once 2 1 - - - 7 1 - 1:0:0 0
+O once 2 1 - - - 7 1 2.2 1:0:0 0
+O pingpong 2 1 - - - 7 1 - 1:0:0 0
+O pingpong 2 1 - - - 7 1 2.2 1:0:0 0
+O once 2 1 - - - 7 3 - 1:0:0 0
+O once 2 1 - - - 7 3 2.2 1:0:0 0
+O pingpong 2 1 - - - 7 3 - 1:0:0 0
+O pingpong 2 1 - - - 7 3 2.2 1:0:0 0
+O once 2 1 - - - 7 6 - 1:0:0 0
+O once 2 1 - - - 7 6 2.2 1:0:0 0
+O pingpong 2 1 - - - 7 6 - 1:0:0 0
+O pingpong 2 1 - - - 7 6 2.2 1:0:0 0
+O once 2 1 - - - 7 0 - 1:2:1 b
+O once 2 1 - - - 7 0 2.2 1:2:1 b
+O pingpong 2 1 - - - 7 0 - 1:2:1 b
+O pingpong 2 1 - - - 7 0 2.2 1:2:1 b
+O once 2 1 - - - 7 1 - 1:2:1 b
+O once 2 1 - - - 7 1 2.2 1:2:1 b
+O pingpong 2 1 - - - 7 1 - 1:2:1 b
+O pingpong 2 1 - - - 7 1 2.2 1:2:1 b
+O once 2 1 - - - 7 3 - 1:2:1 b
+O once 2 1 - - - 7 3 2.2 1:2:1 b
+O pingpong 2 1 - - - 7 3 - 1:2:1 b
+O pingpong 2 1 - - - 7 3 2.2 1:2:1 b
+O once 2 1 - - - 7 6 - 1:2:1 b
+O once 2 1 - - - 7 6 2.2 1:2:1 b
+O pingpong 2 1 - - - 7 6 - 1:2:1 b
+O pingpong 2 1 - - - 7 6 2.2 1:2:1 b
+O once 2 1 - - - 7 0 - 1:-:1 b
+O once 2 1 - - - 7 0 2.2 1:-:1 b
+O pingpong 2 1 - - - 7 0 - 1:-:1 b
+O pingpong 2 1 - - - 7 0 2.2 1:-:1 b
+O once 2 1 - - - 7 1 - 1:-:1 b
+O once 2 1 - - - 7 1 2.2 1:-:1 b
+O pingpong 2 1 - - - 7 1 - 1:-:1 b
+O pingpong 2 1 - - - 7 1 2.2 1:-:1 b
+O once 2 1 - - - 7 3 - 1:-:1 b
+O once 2 1 - - - 7 3 2.2 1:-:1 b
+O pingpong 2 1 - - - 7 3 - 1:-:1 b
+O pingpong 2 1 - - - 7 3 2.2 1:-:1 b
+O once 2 1 - - - 7 6 - 1:-:1 b
+O once 2 1 - - - 7 6 2.2 1:-:1 b
+O pingpong 2 1 - - - 7 6 - 1:-:1 b
+O pingpong 2 1 - - - 7 6 2.2 1:-:1 b
+O once 2 1 - - - 7 0 - 1:4:-,~,~,1:1:- 4
+O once 2 1 - - - 7 0 2.2 1:4:-,~,~,1:1:- 4
+O pingpong 2 1 - - - 7 0 - 1:4:-,~,~,1:1:- 4
+O pingpong 2 1 - - - 7 0 2.2 1:4:-,~,~,1:1:- 4
+O once 2 1 - - - 7 1 - 1:4:-,~,~,1:1:- 4
+O once 2 1 - - - 7 1 2.2 1:4:-,~,~,1:1:- 4
+O pingpong 2 1 - - - 7 1 - 1:4:-,~,~,1:1:- 4
+O pingpong 2 1 - - - 7 1 2.2 1:4:-,~,~,1:1:- 4
+O once 2 1 - - - 7 3 - 1:4:-,~,~,1:1:- 1
+O once 2 1 - - - 7 3 2.2 1:4:-,~,~,1:1:- 1
+O pingpong 2 1 - - - 7 3 - 1:4:-,~,~,1:1:- 1
+O pingpong 2 1 - - - 7 3 2.2 1:4:-,~,~,1:1:- 1
+O once 2 1 - - - 7 6 - 1:4:-,~,~,1:1:- 1
+O once 2 1 - - - 7 6 2.2 1:4:-,~,~,1:1:- 1
+O pingpong 2 1 - - - 7 6 - 1:4:-,~,~,1:1:- 1
+O pingpong 2 1 - - - 7 6 2.2 1:4:-,~,~,1:1:- 1
+O once 2 1 - - - 7 0 - 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 0 2.2 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 0 - 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 0 2.2 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 1 - 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 1 2.2 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 1 - 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 1 2.2 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 3 - 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 3 2.2 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 3 - 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 3 2.2 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 6 - 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 6 2.2 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 6 - 1:1:-,0:7:-,0:7:- 1
+O pingpong 2 1 - - - 7 6 2.2 1:1:-,0:7:-,0:7:- 1
+O once 2 1 - - - 7 0 - 1:-:1,0:-:1 b
+O once 2 1 - - - 7 0 2.2 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 0 - 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 0 2.2 1:-:1,0:-:1 b
+O once 2 1 - - - 7 1 - 1:-:1,0:-:1 b
+O once 2 1 - - - 7 1 2.2 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 1 - 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 1 2.2 1:-:1,0:-:1 b
+O once 2 1 - - - 7 3 - 1:-:1,0:-:1 b
+O once 2 1 - - - 7 3 2.2 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 3 - 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 3 2.2 1:-:1,0:-:1 b
+O once 2 1 - - - 7 6 - 1:-:1,0:-:1 b
+O once 2 1 - - - 7 6 2.2 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 6 - 1:-:1,0:-:1 b
+O pingpong 2 1 - - - 7 6 2.2 1:-:1,0:-:1 b
+O once 2 1 - - - 7 0 - 1:-:1,1:-:- b
+O once 2 1 - - - 7 0 2.2 1:-:1,1:-:- b
+O pingpong 2 1 - - - 7 0 - 1:-:1,1:-:- b
+O pingpong 2 1 - - - 7 0 2.2 1:-:1,1:-:- b
+O once 2 1 - - - 7 1 - 1:-:1,1:-:- 0
+O once 2 1 - - - 7 1 2.2 1:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 1 - 1:-:1,1:-:- 0
+O pingpong 2 1 - - - 7 1 2.2 1:-:1,1:-:- 2
+O once 2 1 - - - 7 3 - 1:-:1,1:-:- 4
+O once 2 1 - - - 7 3 2.2 1:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 3 - 1:-:1,1:-:- 4
+O pingpong 2 1 - - - 7 3 2.2 1:-:1,1:-:- 2
+O once 2 1 - - - 7 6 - 1:-:1,1:-:- 6
+O once 2 1 - - - 7 6 2.2 1:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 6 - 1:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 6 2.2 1:-:1,1:-:- 2
+O once 2 1 - - - 7 0 - 1:-:-,1:-:1 0
+O once 2 1 - - - 7 0 2.2 1:-:-,1:-:1 2
+O pingpong 2 1 - - - 7 0 - 1:-:-,1:-:1 0
+O pingpong 2 1 - - - 7 0 2.2 1:-:-,1:-:1 2
+O once 2 1 - - - 7 1 - 1:-:-,1:-:1 b
+O once 2 1 - - - 7 1 2.2 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 1 - 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 1 2.2 1:-:-,1:-:1 b
+O once 2 1 - - - 7 3 - 1:-:-,1:-:1 b
+O once 2 1 - - - 7 3 2.2 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 3 - 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 3 2.2 1:-:-,1:-:1 b
+O once 2 1 - - - 7 6 - 1:-:-,1:-:1 b
+O once 2 1 - - - 7 6 2.2 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 6 - 1:-:-,1:-:1 b
+O pingpong 2 1 - - - 7 6 2.2 1:-:-,1:-:1 b
+O once 2 1 - - - 7 0 - 1:-:1,~,1:-:0 b
+O once 2 1 - - - 7 0 2.2 1:-:1,~,1:-:0 b
+O pingpong 2 1 - - - 7 0 - 1:-:1,~,1:-:0 b
+O pingpong 2 1 - - - 7 0 2.2 1:-:1,~,1:-:0 b
+O once 2 1 - - - 7 1 - 1:-:1,~,1:-:0 b
+O once 2 1 - - - 7 1 2.2 1:-:1,~,1:-:0 b
+O pingpong 2 1 - - - 7 1 - 1:-:1,~,1:-:0 b
+O pingpong 2 1 - - - 7 1 2.2 1:-:1,~,1:-:0 b
+O once 2 1 - - - 7 3 - 1:-:1,~,1:-:0 4
+O once 2 1 - - - 7 3 2.2 1:-:1,~,1:-:0 2
+O pingpong 2 1 - - - 7 3 - 1:-:1,~,1:-:0 4
+O pingpong 2 1 - - - 7 3 2.2 1:-:1,~,1:-:0 2
+O once 2 1 - - - 7 6 - 1:-:1,~,1:-:0 6
+O once 2 1 - - - 7 6 2.2 1:-:1,~,1:-:0 2
+O pingpong 2 1 - - - 7 6 - 1:-:1,~,1:-:0 2
+O pingpong 2 1 - - - 7 6 2.2 1:-:1,~,1:-:0 2
+O once 2 1 - - - 7 0 - 1:-:0,1:-:1 0
+O once 2 1 - - - 7 0 2.2 1:-:0,1:-:1 2
+O pingpong 2 1 - - - 7 0 - 1:-:0,1:-:1 0
+O pingpong 2 1 - - - 7 0 2.2 1:-:0,1:-:1 2
+O once 2 1 - - - 7 1 - 1:-:0,1:-:1 b
+O once 2 1 - - - 7 1 2.2 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 1 - 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 1 2.2 1:-:0,1:-:1 b
+O once 2 1 - - - 7 3 - 1:-:0,1:-:1 b
+O once 2 1 - - - 7 3 2.2 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 3 - 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 3 2.2 1:-:0,1:-:1 b
+O once 2 1 - - - 7 6 - 1:-:0,1:-:1 b
+O once 2 1 - - - 7 6 2.2 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 6 - 1:-:0,1:-:1 b
+O pingpong 2 1 - - - 7 6 2.2 1:-:0,1:-:1 b
+O once 2 1 - - - 7 0 - 1:2:1,1:3:- b
+O once 2 1 - - - 7 0 2.2 1:2:1,1:3:- b
+O pingpong 2 1 - - - 7 0 - 1:2:1,1:3:- b
+O pingpong 2 1 - - - 7 0 2.2 1:2:1,1:3:- b
+O once 2 1 - - - 7 1 - 1:2:1,1:3:- 3
+O once 2 1 - - - 7 1 2.2 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 1 - 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 1 2.2 1:2:1,1:3:- 3
+O once 2 1 - - - 7 3 - 1:2:1,1:3:- 3
+O once 2 1 - - - 7 3 2.2 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 3 - 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 3 2.2 1:2:1,1:3:- 3
+O once 2 1 - - - 7 6 - 1:2:1,1:3:- 3
+O once 2 1 - - - 7 6 2.2 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 6 - 1:2:1,1:3:- 3
+O pingpong 2 1 - - - 7 6 2.2 1:2:1,1:3:- 3
+O once 2 1 - - - 7 0 - 0:-:1 0
+O once 2 1 - - - 7 0 2.2 0:-:1 2
+O pingpong 2 1 - - - 7 0 - 0:-:1 0
+O pingpong 2 1 - - - 7 0 2.2 0:-:1 2
+O once 2 1 - - - 7 1 - 0:-:1 0
+O once 2 1 - - - 7 1 2.2 0:-:1 2
+O pingpong 2 1 - - - 7 1 - 0:-:1 0
+O pingpong 2 1 - - - 7 1 2.2 0:-:1 2
+O once 2 1 - - - 7 3 - 0:-:1 4
+O once 2 1 - - - 7 3 2.2 0:-:1 2
+O pingpong 2 1 - - - 7 3 - 0:-:1 4
+O pingpong 2 1 - - - 7 3 2.2 0:-:1 2
+O once 2 1 - - - 7 6 - 0:-:1 6
+O once 2 1 - - - 7 6 2.2 0:-:1 2
+O pingpong 2 1 - - - 7 6 - 0:-:1 2
+O pingpong 2 1 - - - 7 6 2.2 0:-:1 2
+O once 2 1 - - - 7 0 - 0:-:1,1:-:- 0
+O once 2 1 - - - 7 0 2.2 0:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 0 - 0:-:1,1:-:- 0
+O pingpong 2 1 - - - 7 0 2.2 0:-:1,1:-:- 2
+O once 2 1 - - - 7 1 - 0:-:1,1:-:- 0
+O once 2 1 - - - 7 1 2.2 0:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 1 - 0:-:1,1:-:- 0
+O pingpong 2 1 - - - 7 1 2.2 0:-:1,1:-:- 2
+O once 2 1 - - - 7 3 - 0:-:1,1:-:- 4
+O once 2 1 - - - 7 3 2.2 0:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 3 - 0:-:1,1:-:- 4
+O pingpong 2 1 - - - 7 3 2.2 0:-:1,1:-:- 2
+O once 2 1 - - - 7 6 - 0:-:1,1:-:- 6
+O once 2 1 - - - 7 6 2.2 0:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 6 - 0:-:1,1:-:- 2
+O pingpong 2 1 - - - 7 6 2.2 0:-:1,1:-:- 2
+O once 2 1 - - - 7 0 - 1:-:1,1:2:-,0:-:1 b
+O once 2 1 - - - 7 0 2.2 1:-:1,1:2:-,0:-:1 b
+O pingpong 2 1 - - - 7 0 - 1:-:1,1:2:-,0:-:1 b
+O pingpong 2 1 - - - 7 0 2.2 1:-:1,1:2:-,0:-:1 b
+O once 2 1 - - - 7 1 - 1:-:1,1:2:-,0:-:1 2
+O once 2 1 - - - 7 1 2.2 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 1 - 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 1 2.2 1:-:1,1:2:-,0:-:1 2
+O once 2 1 - - - 7 3 - 1:-:1,1:2:-,0:-:1 2
+O once 2 1 - - - 7 3 2.2 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 3 - 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 3 2.2 1:-:1,1:2:-,0:-:1 2
+O once 2 1 - - - 7 6 - 1:-:1,1:2:-,0:-:1 2
+O once 2 1 - - - 7 6 2.2 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 6 - 1:-:1,1:2:-,0:-:1 2
+O pingpong 2 1 - - - 7 6 2.2 1:-:1,1:2:-,0:-:1 2
+A 0 - - 0 0 - -
+A 0 - - 3 0 - -
+A 0 - - 2.5 0 - -
+A 0 - 0 0 0 - 0
+A 0 - 0 3 0 - 0
+A 0 - 0 2.5 0 - 0
+A 0 - 1 0 0 - 1
+A 0 - 1 3 0 - 1
+A 0 - 1 2.5 0 - 1
+A 0 n - 0 0 n -
+A 0 n - 3 0 n -
+A 0 n - 2.5 0 n -
+A 0 n 0 0 0 n 0
+A 0 n 0 3 0 n 0
+A 0 n 0 2.5 0 n 0
+A 0 n 1 0 0 n 1
+A 0 n 1 3 0 n 1
+A 0 n 1 2.5 0 n 1
+A 0 4 - 0 0 4 -
+A 0 4 - 3 0 4 -
+A 0 4 - 2.5 0 4 -
+A 0 4 0 0 0 4 0
+A 0 4 0 3 0 4 0
+A 0 4 0 2.5 0 4 0
+A 0 4 1 0 0 4 1
+A 0 4 1 3 0 4 1
+A 0 4 1 2.5 0 4 1
+A 1 - - 0 1 0 -
+A 1 - - 3 1 3 -
+A 1 - - 2.5 1 2.5 -
+A 1 - 0 0 1 0 -
+A 1 - 0 3 1 3 -
+A 1 - 0 2.5 1 2.5 -
+A 1 - 1 0 1 0 -
+A 1 - 1 3 1 3 -
+A 1 - 1 2.5 1 2.5 -
+A 1 n - 0 1 0 -
+A 1 n - 3 1 3 -
+A 1 n - 2.5 1 2.5 -
+A 1 n 0 0 1 0 -
+A 1 n 0 3 1 3 -
+A 1 n 0 2.5 1 2.5 -
+A 1 n 1 0 1 0 -
+A 1 n 1 3 1 3 -
+A 1 n 1 2.5 1 2.5 -
+A 1 4 - 0 1 0 -
+A 1 4 - 3 1 3 -
+A 1 4 - 2.5 1 2.5 -
+A 1 4 0 0 1 0 -
+A 1 4 0 3 1 3 -
+A 1 4 0 2.5 1 2.5 -
+A 1 4 1 0 1 0 -
+A 1 4 1 3 1 3 -
+A 1 4 1 2.5 1 2.5 -
