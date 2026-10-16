@@ -2,6 +2,11 @@
 //! No glyph/layout/render engine, network, state owner or resource budget.
 use read_fonts::{FontRef, TableProvider};
 use std::sync::Arc;
+#[cfg(feature = "font_asset_wire")]
+#[path = "font_asset_project.rs"]
+mod project_bridge;
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use project_bridge::admitted_font_source;
 
 // Ceiling only: the caller still reserves actual CAPACITY in the existing
 // encoded ledger. This validator neither creates nor enforces a second quota.
@@ -21,6 +26,9 @@ pub(crate) struct FontAssetLimits {
     tables: usize,
 }
 impl FontAssetLimits {
+    pub(crate) fn encoded_byte_limit(self) -> usize {
+        self.encoded
+    }
     pub(crate) fn new(encoded: usize, tables: usize) -> Result<Self, FontAssetError> {
         if encoded == 0 || encoded > MAX_ENCODED || tables == 0 || tables > MAX_TABLES {
             return Err(FontAssetError::Limit);

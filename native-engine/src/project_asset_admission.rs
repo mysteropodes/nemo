@@ -1,3 +1,4 @@
+//! PHASE TWO PRIVATE ONLY: do not relax owner guard before working font wire.
 //! pending tickets from the SAME existing owner ledger.
 use crate::object_document::{AssetKind, ProjectEnvelope, ProjectReferenceState};
 use crate::revision::object_revision::encoded_retention_budget::{
@@ -19,8 +20,12 @@ pub(super) fn pending_charges(
     if project.asset_inventory().is_some_and(|assets| {
         assets.records().iter().any(|record| {
             record.source().encoded_allocation().is_some()
-                && (record.kind() != AssetKind::Image
-                    || record.source().media_type() != Some("image/png"))
+                && !((record.kind() == AssetKind::Image
+                    && record.source().media_type() == Some("image/png")
+                    && !record.source().has_font_admission())
+                    || (record.kind() == AssetKind::Font
+                        && record.source().has_font_admission()
+                        && record.source().media_type() == Some("font/ttf")))
         })
     }) {
         return Err("asset media codec unavailable");

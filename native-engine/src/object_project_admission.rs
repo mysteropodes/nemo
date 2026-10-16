@@ -17,7 +17,7 @@ const DECODER_BYTES: usize = 64 * 1024 * 1024;
 const DIMENSION: u32 = 8192;
 
 fn wire_limits() -> ProjectWireLimits {
-    ProjectWireLimits::new(ENVELOPE_BYTES, DRAWING_BYTES)
+    let limits = ProjectWireLimits::new(ENVELOPE_BYTES, DRAWING_BYTES)
         .unwrap()
         .with_png_limits(
             ENCODED_BYTES,
@@ -26,7 +26,11 @@ fn wire_limits() -> ProjectWireLimits {
             DIMENSION,
             DIMENSION,
         )
-        .unwrap()
+        .unwrap();
+    #[cfg(feature = "font_asset_wire")]
+    let limits = limits
+        .with_font_limits(crate::object_codec::FontAssetLimits::new(ENCODED_BYTES, 256).unwrap());
+    limits
 }
 fn png_limits() -> ImageAssetLimits {
     ImageAssetLimits::new(

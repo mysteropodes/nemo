@@ -125,3 +125,7 @@ impl ObjectSnapshot {
 #[cfg(test)]
 #[path = "../tests/project_asset_wire.rs"]
 mod asset_tests;
+
+#[cfg(all(test, feature = "font_asset_wire"))]
+#[path = "../tests/font_asset_wire.rs"]
+mod font_tests;

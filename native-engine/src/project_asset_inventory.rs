@@ -1,3 +1,4 @@
+//! PHASE TWO PRIVATE ONLY: requires paired font wire/owner admission before use.
 //! D01/G27A immutable asset values. A2 owner; A1 independent reviewer.
 //! No decoder, file access, revision publisher or second resource budget.
 use std::collections::{HashMap, HashSet};
@@ -60,6 +61,13 @@ impl AssetKind {
 
 #[derive(Debug, Clone, PartialEq)]
 enum SourceValue {
+    // Constructed only after the native font codec's borrowed-byte admission.
+    // This type provenance is recomputed on import, never a saved runtime flag.
+    #[cfg(feature = "font_asset_wire")]
+    AdmittedFont {
+        media_type: &'static str,
+        allocation: Arc<Vec<u8>>,
+    },
     Embedded {
         media_type: String,
         allocation: Arc<Vec<u8>>,
@@ -74,6 +82,39 @@ enum SourceValue {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AssetSource(SourceValue);
 impl AssetSource {
+    /// PRECONDITION: native font codec validated this exact allocation, and the
+    /// existing owner reserved CAPACITY before its byte copy. Generic embedded
+    /// MIME labels cannot construct this variant. No publication occurs here.
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn admitted_font(
+        media_type: &'static str,
+        allocation: Arc<Vec<u8>>,
+        admitted_capacity_limit: usize,
+    ) -> Result<Self, AssetError> {
+        if media_type != "font/ttf" {
+            return Err(AssetError::Source);
+        }
+        if allocation.is_empty()
+            || admitted_capacity_limit == 0
+            || allocation.capacity() > admitted_capacity_limit
+        {
+            return Err(AssetError::Limit);
+        }
+        Ok(Self(SourceValue::AdmittedFont {
+            media_type,
+            allocation,
+        }))
+    }
+    pub(crate) fn has_font_admission(&self) -> bool {
+        #[cfg(feature = "font_asset_wire")]
+        {
+            matches!(&self.0, SourceValue::AdmittedFont { .. })
+        }
+        #[cfg(not(feature = "font_asset_wire"))]
+        {
+            false
+        }
+    }
     /// PRECONDITION: the owning transaction already admitted the codec and
     /// reserved/charged this allocation's CAPACITY in its existing ledger.
     /// This value retains that allocation; it does not enforce the shared quota.
@@ -117,11 +158,15 @@ impl AssetSource {
     pub(crate) fn encoded_allocation(&self) -> Option<&Arc<Vec<u8>>> {
         match &self.0 {
             SourceValue::Embedded { allocation, .. } => Some(allocation),
+            #[cfg(feature = "font_asset_wire")]
+            SourceValue::AdmittedFont { allocation, .. } => Some(allocation),
             SourceValue::Linked { .. } => None,
         }
     }
     pub(crate) fn media_type(&self) -> Option<&str> {
         match &self.0 {
+            #[cfg(feature = "font_asset_wire")]
+            SourceValue::AdmittedFont { media_type, .. } => Some(*media_type),
             SourceValue::Embedded { media_type, .. } => Some(media_type),
             SourceValue::Linked { .. } => None,
         }
@@ -130,6 +175,8 @@ impl AssetSource {
         match &self.0 {
             SourceValue::Linked { locator } => Some(locator),
             SourceValue::Embedded { .. } => None,
+            #[cfg(feature = "font_asset_wire")]
+            SourceValue::AdmittedFont { .. } => None,
         }
     }
 }

@@ -8,6 +8,8 @@ pub use crate::object_document::{
 #[cfg(feature = "font_asset_admission")]
 #[path = "font_asset_admission.rs"]
 mod font_assets;
+#[cfg(feature = "font_asset_wire")]
+pub(crate) use font_assets::admitted_font_source;
 #[cfg(feature = "font_asset_admission")]
 pub(crate) use font_assets::{
     admit_reserved_font, validate_font, AdmittedFont, FontAssetError, FontAssetLimits,

@@ -15,6 +15,17 @@ const FORMAT: &str = "nemo.native-project-document";
 const MAX_ENVELOPE: usize = 32 * 1024 * 1024;
 const MAX_DRAWING: usize = 8 * 1024 * 1024;
 
+#[cfg(feature = "font_asset_wire")]
+impl From<crate::object_codec::FontAssetError> for ProjectWireError {
+    fn from(error: crate::object_codec::FontAssetError) -> Self {
+        match error {
+            crate::object_codec::FontAssetError::Limit => Self::Budget,
+            crate::object_codec::FontAssetError::Unsupported => Self::Unsupported,
+            crate::object_codec::FontAssetError::Invalid => Self::Invalid,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ProjectWireError {
     Budget,
@@ -38,8 +49,15 @@ pub(crate) struct ProjectWireLimits {
     drawing_bytes: usize,
     #[cfg(feature = "project_media_codec")]
     png: Option<(usize, ImageAssetLimits)>,
+    #[cfg(feature = "font_asset_wire")]
+    font: Option<crate::object_codec::FontAssetLimits>,
 }
 impl ProjectWireLimits {
+    #[cfg(feature = "font_asset_wire")]
+    pub(crate) fn with_font_limits(mut self, font: crate::object_codec::FontAssetLimits) -> Self {
+        self.font = Some(font);
+        self
+    }
     pub(crate) fn new(
         envelope_bytes: usize,
         drawing_bytes: usize,
@@ -56,6 +74,8 @@ impl ProjectWireLimits {
             drawing_bytes,
             #[cfg(feature = "project_media_codec")]
             png: None,
+            #[cfg(feature = "font_asset_wire")]
+            font: None,
         })
     }
     #[cfg(feature = "project_media_codec")]

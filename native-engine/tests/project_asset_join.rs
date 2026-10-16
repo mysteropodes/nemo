@@ -4,6 +4,75 @@ use crate::object_document::{AssetId, AssetInventory, AssetKind, AssetRecord, As
 use crate::revision::ObjectSnapshot;
 use std::sync::Arc;
 
+#[cfg(feature = "font_asset_wire")]
+#[test]
+fn validated_font_aliases_share_reserved_capacity_through_last_snapshot_pin() {
+    const FONT: &[u8] = include_bytes!("../../src/fonts/Roboto-Regular.ttf");
+    let budget = EncodedRetentionBudget::new(FONT.len()).unwrap();
+    let mut permit = budget.reserve(FONT.len()).unwrap();
+    let mut bytes = permit.allocate().unwrap();
+    bytes.copy_from_slice(FONT);
+    let bytes = Arc::new(bytes);
+    let weak = Arc::downgrade(&bytes);
+    let source = crate::object_codec::admitted_font_source(
+        Arc::clone(&bytes),
+        crate::object_codec::FontAssetLimits::new(FONT.len(), 256).unwrap(),
+    )
+    .unwrap();
+    assert!(source.has_font_admission());
+    assert!(Arc::ptr_eq(source.encoded_allocation().unwrap(), &bytes));
+    permit.bind(&bytes).unwrap();
+    let records = ["font-first", "font-alias"]
+        .into_iter()
+        .map(|id| {
+            Arc::new(
+                AssetRecord::new(
+                    AssetId::new(id.into()).unwrap(),
+                    id.into(),
+                    AssetKind::Font,
+                    source.clone(),
+                )
+                .unwrap(),
+            )
+        })
+        .collect();
+    let inventory = AssetInventory::new(records, Vec::new(), 2, 0).unwrap();
+    let retained = project()
+        .with_reference(ProjectReferenceState::NoMedia)
+        .with_asset_inventory(Some(inventory));
+    // The sole budget is already full. Owner admission can only succeed by
+    // recognizing both validated sources as aliases of this exact allocation.
+    assert_eq!(budget.used(), Ok(FONT.len()));
+    let snapshot = ObjectSnapshot::project_entry(
+        "font-alias".into(),
+        retained,
+        &budget,
+        ObjectSnapshot::from_value,
+    )
+    .unwrap();
+    let old_pin = snapshot.clone();
+    drop((snapshot, source, bytes, permit));
+    assert!(weak.upgrade().is_some());
+    assert_eq!(budget.used(), Ok(FONT.len()));
+    let records = old_pin
+        .project()
+        .unwrap()
+        .asset_inventory()
+        .unwrap()
+        .records();
+    assert!(Arc::ptr_eq(
+        records[0].source().encoded_allocation().unwrap(),
+        records[1].source().encoded_allocation().unwrap()
+    ));
+    assert_eq!(
+        records[0].source().encoded_allocation().unwrap().as_slice(),
+        FONT
+    );
+    drop(old_pin);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(budget.used(), Ok(0));
+}
+
 fn project() -> ProjectEnvelope {
     use crate::object_codec::encoded_wire_test::{limits, wire};
     crate::object_codec::decode_allocated_project(
