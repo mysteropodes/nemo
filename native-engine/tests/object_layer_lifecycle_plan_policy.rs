@@ -1,9 +1,9 @@
 //! Hand-written literal controls for the lock / transform-parent policy port
 //! (L02-E). The kernel asks the port only about layers that carry lock or parent
 //! facts, never fabricates a decision, and forwards a refusal with its operation
-//! and layer. The codec still refuses locked and parented layers, so a permissive
-//! provider cannot make a plan that keeps such a layer succeed; deleting the layer
-//! itself can.
+//! and layer. The codec admits Boolean lock metadata; the policy port still
+//! decides edits to locked layers. Transform-parent metadata remains unavailable,
+//! so a permissive provider cannot retain a parented layer in an admitted plan.
 
 use super::fixture::{admitted, build, layer_uids, plain, text_of};
 use super::{
@@ -53,6 +53,7 @@ fn locked(count: usize, index: usize) -> ObjectDocument {
 fn a_locked_layer_needs_a_provider_and_ordinary_layers_do_not() {
     let document = locked(3, 1);
     let bytes = text_of(&document);
+    assert!(admitted(&document), "Boolean lock metadata is admitted");
     let refused = |op: LayerOp, got: Result<super::LifecyclePlan, LifecycleError>, refusal| {
         let want = LifecycleError::Policy {
             op,
@@ -102,23 +103,29 @@ fn a_locked_layer_needs_a_provider_and_ordinary_layers_do_not() {
         "moving an unlocked layer asks nobody"
     );
     assert!(
-        !admitted(&free.document),
-        "the codec still refuses the lock"
+        admitted(&free.document),
+        "Boolean lock metadata is admitted"
     );
+    assert_eq!(free.document.layers[0].locked, Presence::Present(true));
+    assert_eq!(free.document.layers[0].shy, Presence::Missing);
     let noop = plan_rename(&document, "L1", "L1", &log).expect("rename");
     assert!(
         !noop.changed && log.0.borrow().is_empty(),
         "a no-op needs no permission"
     );
+    assert_eq!(text_of(&noop.document), bytes);
     let removed = plan_delete(&document, &pick("L1", &[]), &log).expect("delete with a provider");
     assert_eq!(layer_uids(&removed.document), ["L0", "L2"]);
     assert_eq!(*log.0.borrow(), [(LayerOp::Delete, "L1".to_string())]);
     assert!(admitted(&removed.document), "no locked layer is left");
     let kept = plan_rename(&document, "L1", "q", &Allow).expect("rename with a provider");
     assert!(
-        kept.changed && !admitted(&kept.document),
-        "the codec still refuses the lock"
+        kept.changed && admitted(&kept.document),
+        "Boolean lock metadata is admitted after a permitted edit"
     );
+    assert_eq!(kept.document.layers[1].locked, Presence::Present(true));
+    assert_eq!(kept.document.layers[1].shy, Presence::Missing);
+    assert_eq!(text_of(&document), bytes);
 }
 
 #[test]
