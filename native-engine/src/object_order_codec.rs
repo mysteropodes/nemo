@@ -3,8 +3,8 @@ use crate::object_codec::{
     parse, validate, validate_content, ObjectCodecError, ObjectCodecErrorKind, ObjectDocument,
 };
 use crate::object_document::{
-    AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord, OrderContext, OrderCurvePoint,
-    OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
+    validate_property_holders, AuthoredOrder, FrameScopeKind, ObjectLayer, ObjectRecord,
+    OrderContext, OrderCurvePoint, OrderPlan, OrderedObjectDocument, OBJECT_DOCUMENT_FORMAT,
 };
 use serde_json::Number;
 use std::collections::{HashMap, HashSet};
@@ -205,6 +205,12 @@ fn ordered(document: &OrderedObjectDocument) -> Result<(), ObjectCodecError> {
         document.total_frames,
         &document.layers,
         &document.objects,
+    )?;
+    validate_property_holders(
+        &document.property_holders,
+        &document.layers,
+        &document.objects,
+        Some(&document.composition_order),
     )
 }
 
@@ -226,6 +232,12 @@ pub(crate) fn validate_storage_order(
         document.total_frames,
         &document.layers,
         &document.objects,
+    )?;
+    validate_property_holders(
+        &document.property_holders,
+        &document.layers,
+        &document.objects,
+        Some(plan),
     )
 }
 
@@ -253,6 +265,7 @@ pub fn migrate_ordered_project(
         total_frames: document.total_frames,
         layers: document.layers.clone(),
         objects: document.objects.clone(),
+        property_holders: document.property_holders.clone(),
         composition_order: plan,
     };
     ordered(&migrated)?;

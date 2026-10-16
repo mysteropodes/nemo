@@ -408,6 +408,7 @@ mod tests {
                 "limit-layer".into(),
             )],
             objects: vec![],
+            property_holders: Default::default(),
             composition_order: Default::default(),
         };
         let bare = ObjectSnapshot::from_admitted("limit-test".into(), document.clone()).unwrap();

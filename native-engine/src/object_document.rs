@@ -10,6 +10,16 @@ mod order;
 pub use order::OrderedObjectDocument;
 pub(crate) use order::*;
 
+#[path = "object_properties.rs"]
+mod properties;
+pub(crate) use properties::validate_property_holders;
+pub use properties::{
+    ExpressionControl, PropertyHolder, PropertyHolderTarget, PropertyMetadata, PropertyRecord,
+};
+#[cfg(test)]
+#[path = "../tests/object_properties.rs"]
+mod property_tests;
+
 #[path = "project_media_envelope.rs"]
 mod project;
 pub(crate) use project::{
@@ -31,6 +41,8 @@ pub struct ObjectDocument {
     pub(crate) total_frames: u32,
     pub(crate) layers: Vec<ObjectLayer>,
     pub(crate) objects: Vec<ObjectRecord>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) composition_order: Presence<OrderPlan>,
 }
@@ -160,6 +172,7 @@ pub(crate) use object_deserialize;
 
 object_deserialize!(ObjectDocument { format: String, format_version: u32, total_frames: u32,
     layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
+    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
     #[serde(default)] visible: Presence<bool>, #[serde(default)] timing: Presence<LayerTiming> });
@@ -200,6 +213,10 @@ object_deserialize!(SolidFill {
 });
 
 impl ObjectDocument {
+    /// Immutable authored holder metadata; absence is not an empty authored table.
+    pub fn property_holders(&self) -> Option<&[PropertyHolder]> {
+        self.property_holders.value().map(Vec::as_slice)
+    }
     pub fn format_version(&self) -> u32 {
         self.format_version
     }
