@@ -42,6 +42,10 @@ mod timing_tests;
 #[path = "object_media_timing_core.rs"]
 #[allow(dead_code)]
 pub(crate) mod media_timing;
+// L02-A (#2117): lane-2 group/boolean/clipboard/lifecycle family aggregator.
+#[path = "object_group_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_group_kernels;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
