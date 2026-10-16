@@ -4,3 +4,6 @@
 #[path = "object_scene_style_paint.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_paint;
+#[path = "object_scene_style_stroke.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_style_stroke;
