@@ -1482,7 +1482,7 @@ test('isolated negative controls fail closed and restore every touched byte', (t
     assert.deepEqual(d35Discovered.diagnostics, []);
     const d35Sources = d35Discovered.entries.filter((entry) => entry.path.endsWith('.rs')).map((entry) => entry.path);
     const d35Exclusions = readJson(clone, 'engineering/boundaries/profiles/rust.coverage.json').exclusions;
-    const d35Coverage = () => checkSourceCoverage(readJson(clone, PROFILE), {
+    const d35Coverage = () => checkRustSourceCoverage(readJson(clone, PROFILE), {
       root: clone, sourcePaths: d35Sources, exclusions: d35Exclusions,
     });
     assert.deepEqual(d35Coverage().violations, []);
