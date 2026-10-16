@@ -2582,6 +2582,18 @@
       "publicApi": [
         "native-font-resources.js"
       ]
+    },
+    {
+      "id": "app.settings.preferences.ui.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "settings-preferences-ui.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "settings-preferences-ui.js"
+      ]
     }
   ],
   "layerRules": {
