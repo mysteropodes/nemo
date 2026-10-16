@@ -1,0 +1,22 @@
+/* Active only after a correlated native presentation. Ordinary DOM chrome stays opaque. */
+html.nemo-native-underlay,
+html.nemo-native-underlay body,
+html.nemo-native-underlay #app,
+html.nemo-native-underlay #canvas-area { background: transparent; }
+html.nemo-native-underlay body { isolation: isolate; }
+html.nemo-native-underlay body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--gutter), var(--gutter)) left top /
+      var(--nemo-native-left) 100% no-repeat,
+    linear-gradient(var(--gutter), var(--gutter)) right top /
+      calc(100% - var(--nemo-native-right)) 100% no-repeat,
+    linear-gradient(var(--gutter), var(--gutter)) var(--nemo-native-left) top /
+      calc(var(--nemo-native-right) - var(--nemo-native-left)) var(--nemo-native-top) no-repeat,
+    linear-gradient(var(--gutter), var(--gutter)) var(--nemo-native-left) bottom /
+      calc(var(--nemo-native-right) - var(--nemo-native-left)) calc(100% - var(--nemo-native-bottom)) no-repeat;
+}

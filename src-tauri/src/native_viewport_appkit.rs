@@ -99,7 +99,10 @@ impl OwnedView {
         };
         unsafe {
             let _: () = msg_send![raw, setWantsLayer: true];
-            let _: () = msg_send![content_view, addSubview: raw];
+            // NSWindowBelow with a nil sibling keeps the existing WKWebView above
+            // this surface. DOM menus and editing overlays must composite over it.
+            let _: () = msg_send![content_view, addSubview: raw
+                positioned: -1_isize relativeTo: ptr::null_mut::<Object>()];
         }
         view.attached = true;
         view.apply_mapping(mapping)?;

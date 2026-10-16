@@ -1,6 +1,8 @@
 //! Frozen independent full-document bytes and real private write/reopen controls.
 use crate::native_object_bootstrap::{
-    bootstrap_raw, reopen::bootstrap_request, save::save_request,
+    bootstrap_raw,
+    reopen::bootstrap_request,
+    save::{save_request, save_selected_request},
 };
 use crate::{
     application_mcp::ApplicationMcp,
@@ -310,6 +312,106 @@ fn strict_original_raw_envelope_and_pins_refuse_with_zero_disk_effect() {
         |_, _| panic!("scope reached effect")
     )
     .is_err());
+}
+
+#[test]
+fn selected_file_dialog_scope_publishes_without_global_sibling_authority() {
+    let scratch = Scratch::new();
+    let app = tauri::test::mock_app();
+    let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+    let destination = scratch.0.join("selected.json");
+    let unrelated = scratch.0.join("unrelated.json");
+    scope.allow_file(&destination).unwrap();
+    assert!(scope.is_allowed(&destination));
+    assert!(!scope.is_allowed(&unrelated));
+    let state = ApplicationMcp::default();
+    let pins = install(&state, ORIGINAL);
+    let receipt = save_selected_request(
+        &app,
+        &state,
+        &request(&pins, 0, &destination).to_string(),
+        |path| scope.is_allowed(path),
+        |_, _| Ok(()),
+    )
+    .unwrap();
+    let receipt = serde_json::to_value(receipt).unwrap();
+    assert_eq!(receipt["published"], true);
+    assert_eq!(receipt["cleanupPending"], false);
+    assert_eq!(fs::read_to_string(&destination).unwrap(), ORIGINAL);
+    assert_eq!(scratch.files(), 1);
+    assert!(!scope.is_allowed(&unrelated));
+    let changed = request(&pins, 0, &unrelated);
+    assert!(save_selected_request(
+        &app,
+        &state,
+        &changed.to_string(),
+        |path| scope.is_allowed(path),
+        |_, _| panic!("a changed destination reached a filesystem effect"),
+    )
+    .is_err());
+    assert_eq!(scratch.files(), 1);
+}
+
+#[test]
+fn selected_file_revocation_before_create_or_publish_leaves_no_output() {
+    for revoke_at in ["create", "link"] {
+        let scratch = Scratch::new();
+        let app = tauri::test::mock_app();
+        let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+        let destination = scratch.0.join("selected.json");
+        scope.allow_file(&destination).unwrap();
+        let state = ApplicationMcp::default();
+        let pins = install(&state, ORIGINAL);
+        let result = save_selected_request(
+            &app,
+            &state,
+            &request(&pins, 0, &destination).to_string(),
+            |path| scope.is_allowed(path),
+            |phase, _| {
+                if phase == revoke_at {
+                    scope.forbid_file(&destination).unwrap();
+                }
+                Ok(())
+            },
+        );
+        assert!(result.is_err(), "{revoke_at}");
+        assert!(!destination.exists(), "{revoke_at}");
+        assert_eq!(scratch.files(), 0, "{revoke_at}: staging cleanup");
+        assert!(!scope.is_allowed(&destination));
+        assert_eq!(
+            serialized(&state, &pins, 0)["result"]["documentJson"],
+            ORIGINAL
+        );
+    }
+}
+
+#[test]
+fn selected_file_collision_preserves_foreign_destination_and_cleans_staging() {
+    let scratch = Scratch::new();
+    let app = tauri::test::mock_app();
+    let scope = tauri::fs::Scope::new(&app, &Default::default()).unwrap();
+    let destination = scratch.0.join("selected.json");
+    scope.allow_file(&destination).unwrap();
+    let state = ApplicationMcp::default();
+    let pins = install(&state, ORIGINAL);
+    assert!(save_selected_request(
+        &app,
+        &state,
+        &request(&pins, 0, &destination).to_string(),
+        |path| scope.is_allowed(path),
+        |phase, _| {
+            if phase == "link" {
+                fs::write(&destination, "foreign destination")?;
+            }
+            Ok(())
+        },
+    )
+    .is_err());
+    assert_eq!(
+        fs::read_to_string(&destination).unwrap(),
+        "foreign destination"
+    );
+    assert_eq!(scratch.files(), 1);
 }
 
 #[path = "native_object_save_failure_tests.rs"]

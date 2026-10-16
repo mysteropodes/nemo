@@ -12,6 +12,55 @@ struct NonObjectFixture {
     instance: String,
     pump: TerminalPump,
 }
+
+#[test]
+#[cfg(unix)]
+fn normal_recursive_scope_publishes_without_allowing_hidden_siblings() {
+    let scratch = Scratch::new();
+    let state = ApplicationMcp::default();
+    let pins = install(&state, ORIGINAL);
+    let destination = scratch.0.join("scoped.json");
+    let pattern = tauri::fs::Pattern::new(&format!(
+        "{}/**",
+        tauri::fs::Pattern::escape(&scratch.0.to_string_lossy())
+    ))
+    .unwrap();
+    let hidden = scratch.0.join(".unrelated-secret");
+    // The real pinned Tauri glob type: plain glob defaults allow a dotfile,
+    // while Tauri's Unix scope explicitly requires a literal leading dot.
+    let mut options = Default::default();
+    assert!(pattern.matches_path_with(&hidden, options));
+    options.require_literal_separator = true;
+    options.require_literal_leading_dot = true;
+    assert!(pattern.matches_path_with(&destination, options));
+    assert!(!pattern.matches_path_with(&hidden, options));
+
+    let receipt = save_request(
+        &state,
+        &request(&pins, 0, &destination).to_string(),
+        |path| pattern.matches_path_with(path, options),
+        |_, _| Ok(()),
+    )
+    .expect("an authorized ordinary destination must publish without a hidden-file grant");
+    let receipt = serde_json::to_value(receipt).unwrap();
+    assert_eq!(receipt["published"], true);
+    assert_eq!(receipt["cleanupPending"], false);
+    assert_eq!(fs::read_to_string(&destination).unwrap(), ORIGINAL);
+    assert_eq!(scratch.files(), 1, "no staging sibling remains");
+    assert!(!pattern.matches_path_with(&hidden, options));
+
+    // A picker-only destination grant still cannot authorize an arbitrary
+    // staging sibling; the fix must retain both existing scope checks.
+    let second = scratch.0.join("picker-only.json");
+    assert!(save_request(
+        &state,
+        &request(&pins, 0, &second).to_string(),
+        |path| path == second,
+        |_, _| panic!("destination-only permission reached a filesystem effect"),
+    )
+    .is_err());
+    assert_eq!(scratch.files(), 1);
+}
 impl NativeDispatch for NonObjectFixture {
     fn instance_id(&self) -> &str {
         &self.instance
