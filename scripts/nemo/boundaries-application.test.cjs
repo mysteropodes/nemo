@@ -230,7 +230,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
     [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 136, 183, 184, 185, 186, 187, 188, 189, 190, 191]);
+      27, 136, 184, 185, 186, 187, 188, 189, 190, 191, 192]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -251,6 +251,15 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.deepEqual(updaterTags, ['<script src="js/adapters/updater-platform.js"></script>']);
   assert.equal(actual.get(updaterPath).scriptOrdinal + 1,
     actual.get('src/js/updater-bridge.js').scriptOrdinal);
+  const kitsuServicePath = 'src/js/adapters/kitsu-service.js';
+  const kitsuService = policy.retainedSources.find((record) => record.path === kitsuServicePath);
+  assert.equal(kitsuService.moduleId, 'app.kitsu.service.adapter');
+  assert.equal(kitsuService.executionClass, 'document-classic');
+  assert.deepEqual(kitsuService.loadSites, [actual.get(kitsuServicePath)]);
+  const kitsuServiceTags = html.filter((line) => line.includes('src="js/adapters/kitsu-service.js"'));
+  assert.deepEqual(kitsuServiceTags, ['<script src="js/adapters/kitsu-service.js"></script>']);
+  assert.equal(actual.get(kitsuServicePath).scriptOrdinal + 1,
+    actual.get('src/js/kitsu.js').scriptOrdinal);
 });
 
 test('bootstrap numerical observations match actual HTML and retained declarations', () => {
