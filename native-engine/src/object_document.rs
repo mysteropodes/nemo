@@ -35,6 +35,8 @@ pub(crate) use project::{
 #[path = "object_layer_timing.rs"]
 mod timing;
 pub(crate) use timing::{LayerTiming, LayerTimingError};
+#[allow(unused_imports)]
+pub(crate) use timing::TimingEdit;
 #[cfg(all(test, feature = "history", feature = "project_media_codec"))]
 #[path = "../tests/object_timing.rs"]
 mod timing_tests;
@@ -50,6 +52,12 @@ pub(crate) mod object_group_kernels;
 #[path = "object_raster_asset_kernels.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_kernels;
+
+// L01-D (#2107): editable-vector-path record body (storage DTO; admission is object_vector_codec.rs).
+#[path = "object_vector_record.rs"]
+#[allow(dead_code)]
+mod vector_record;
+pub(crate) use vector_record::{VectorBody, VECTOR_FAMILY};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -128,7 +136,12 @@ pub struct ObjectRecord {
     pub(crate) family: String,
     pub(crate) target: ObjectTarget,
     pub(crate) geometry: ObjectGeometry,
-    pub(crate) fill: SolidFill,
+    /// Legacy family: a required solid fill. Vector family: explicit null (no fill) or solid.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) fill: Presence<Option<SolidFill>>,
+    /// Present exactly for the `editable-vector-path` family.
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) vector: Presence<VectorBody>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -218,7 +231,8 @@ object_deserialize!(ObjectRecord {
     family: String,
     target: ObjectTarget,
     geometry: ObjectGeometry,
-    fill: SolidFill
+    #[serde(default)] fill: Presence<Option<SolidFill>>,
+    #[serde(default)] vector: Presence<VectorBody>
 });
 object_deserialize!(ObjectGeometry { kind: String, closed: bool, coordinate_space: String,
     handle_space: String, segments: Vec<ObjectSegment> });
@@ -273,6 +287,15 @@ impl ObjectDocument {
 impl ObjectRecord {
     pub fn target(&self) -> &ObjectTarget {
         &self.target
+    }
+    /// The solid fill; `None` for an explicit null (no fill) or an absent slot.
+    pub(crate) fn solid_fill(&self) -> Option<&SolidFill> {
+        self.fill.value().and_then(Option::as_ref)
+    }
+    /// The vector body of an `editable-vector-path` record.
+    #[allow(dead_code)]
+    pub(crate) fn vector(&self) -> Option<&VectorBody> {
+        self.vector.value()
     }
 }
 impl SolidFill {

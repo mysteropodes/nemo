@@ -69,6 +69,10 @@ pub(crate) mod encoded_wire_test {
 
 #[path = "object_order_codec.rs"]
 mod order;
+// L01-D (#2107): admission of the editable-vector-path family.
+#[path = "object_vector_codec.rs"]
+#[allow(dead_code)]
+mod object_vector_codec;
 pub use crate::object_document::OrderedObjectDocument;
 pub use order::{decode_ordered_project, encode_ordered_project, migrate_ordered_project};
 
@@ -298,7 +302,10 @@ pub(crate) fn validate_content(
     }
     let mut targets = HashSet::new();
     for record in objects {
-        if record.schema_version != 1 || record.family != "closed-solid-fill-cubic-path" {
+        let vector_family = record.family == crate::object_document::VECTOR_FAMILY;
+        if record.schema_version != 1
+            || (record.family != "closed-solid-fill-cubic-path" && !vector_family)
+        {
             return Err(reject(Unsupported, "unsupported object schema or family"));
         }
         let valid_target = if complete_contexts {
@@ -316,6 +323,10 @@ pub(crate) fn validate_content(
         }
         if !targets.insert(&record.target) {
             return Err(reject(DuplicateId, "duplicate scoped object key"));
+        }
+        if vector_family {
+            object_vector_codec::validate_vector_record(record)?;
+            continue;
         }
         let geometry = &record.geometry;
         if geometry.kind != "cubic-path"
@@ -341,7 +352,16 @@ pub(crate) fn validate_content(
                 }
             }
         }
-        let fill = &record.fill;
+        if !record.vector.missing() {
+            return Err(reject(
+                Unsupported,
+                "vector body requires the editable-vector-path family",
+            ));
+        }
+        let fill = match record.solid_fill() {
+            Some(fill) => fill,
+            None => return Err(reject(Invalid, "legacy family requires a solid fill")),
+        };
         if fill.kind != "solid" {
             return Err(reject(Unsupported, "only solid fill is supported"));
         }

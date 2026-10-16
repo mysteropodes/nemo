@@ -8,8 +8,12 @@ use crate::export_job_lifecycle::{
 };
 #[path = "object_export_job.rs"]
 mod object;
-#[path = "object_export_host.rs"]
-mod object_host;
+#[path = "native_vector_export_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_vector_export;
+#[path = "native_media_export_core.rs"]
+#[allow(dead_code)]
+pub(crate) mod native_media_export;
 pub use crate::export_job_lifecycle::{
     CleanupReceipt, CleanupStatus, ExportJobError, ExportJobErrorKind, ExportReleaseReconciliation,
     ExternalEffectDisposition, JobError, JobReceipt, JobStatus, ReconciliationStage,

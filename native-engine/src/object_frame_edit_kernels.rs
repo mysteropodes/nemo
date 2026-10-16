@@ -7,3 +7,6 @@ pub(crate) mod object_frame_clipboard_packet;
 #[path = "object_frame_edit_ranges.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_frame_edit_ranges;
+#[path = "object_frame_edit_document.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_frame_edit_document;

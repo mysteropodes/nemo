@@ -16,3 +16,8 @@ pub(crate) mod object_scene_style_paint;
 #[path = "object_scene_style_stroke.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_scene_style_stroke;
+
+// L07-C: private pinned multi-producer scene join (ScenePin, plan order, unavailable entries, declared resources).
+#[path = "object_scene_producer_pin.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_producer_pin;

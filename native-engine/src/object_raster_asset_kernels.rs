@@ -5,3 +5,8 @@
 #[path = "object_raster_asset_item.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_raster_asset_item;
+
+// L06-D (#2154): raster/media asset admission policy.
+#[path = "object_raster_asset_admission.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_raster_asset_admission;
