@@ -10,6 +10,10 @@
 //! `kcam1 cam KEYS FRAME CW CH POSE MAT` and `kcam1 bez T EASE(4 joined by .) Y`.
 //! KEYS is `^` null, `!` undefined, `.` empty, else `frame,x,y,w,rot,ease,hOut,hIn`
 //! keys joined by `;`. Numbers compare on bits; two NaNs match (payload ignored).
+//! One exception: when the pose has a roll, the matrix goes through `cos`/`sin`,
+//! whose last ulp is libm-dependent (macOS differs from the Linux/V8 oracle),
+//! so each matrix group may differ by `TRIG_ULPS` units of roundoff of its
+//! largest entry. Poses, rows without roll and `bez` rows stay bit-exact.
 
 use crate::evaluation::property_camera_eval::{
     bezier_ease, camera_at_frame, camera_matrix_at_frame, CameraKey, CameraPose, DEFAULT_EASE,
@@ -96,6 +100,35 @@ fn all_same(a: &[f64], b: &[f64]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| same(*x, *y))
 }
 
+const TRIG_ULPS: f64 = 4.0;
+
+/// Bit-equal, or a finite rounding difference within `TRIG_ULPS` of the
+/// group's magnitude (a signed-zero mismatch never passes).
+fn trig_near(a: &[f64], b: &[f64]) -> bool {
+    let mag = a
+        .iter()
+        .chain(b)
+        .filter(|x| x.is_finite())
+        .fold(0.0_f64, |m, x| m.max(x.abs()));
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(&x, &y)| {
+            same(x, y)
+                || (x.is_finite()
+                    && y.is_finite()
+                    && x != y
+                    && (x - y).abs() <= TRIG_ULPS * mag * f64::EPSILON)
+        })
+}
+
+/// Linear part and translation are separate magnitude groups.
+fn mat_matches(g: &[f64; 6], w: &[f64; 6], rolled: bool) -> bool {
+    if rolled {
+        trig_near(&g[..4], &w[..4]) && trig_near(&g[4..], &w[4..])
+    } else {
+        all_same(g, w)
+    }
+}
+
 fn k(frame: f64, x: f64, y: f64, w: f64) -> CameraKey {
     CameraKey {
         frame,
@@ -125,7 +158,7 @@ fn oracle_has_expected_shape() {
 }
 
 #[test]
-fn every_cam_row_is_bit_identical() {
+fn every_cam_row_matches_the_oracle() {
     let mut n = 0;
     for (i, r) in cam_rows().iter().enumerate() {
         let ks = r.keys.as_deref();
@@ -138,7 +171,10 @@ fn every_cam_row_is_bit_identical() {
         let m = camera_matrix_at_frame(ks, r.frame, r.cw, r.ch);
         match (&m, &r.mat) {
             (None, None) => {}
-            (Some(g), Some(w)) => assert!(all_same(g, w), "row {i} matrix {g:?} != {w:?}"),
+            (Some(g), Some(w)) => {
+                let rolled = got.is_some_and(|p| p[3] != 0.0 && !p[3].is_nan());
+                assert!(mat_matches(g, w, rolled), "row {i} matrix {g:?} != {w:?}")
+            }
             _ => panic!("row {i} matrix presence {m:?} vs {:?}", r.mat),
         }
         n += 1;
@@ -311,4 +347,22 @@ fn nan_rot_reads_as_zero_and_skips_the_roll() {
     b.rot = Some(90.0);
     let a = linear(a);
     assert_eq!(pose(&[a, b], 5.0).rot, 45.0);
+}
+
+#[test]
+fn trig_tolerance_still_rejects_real_mistakes() {
+    let mut a = k(0.0, 100.0, 100.0, 960.0);
+    a.rot = Some(30.0);
+    let mut b = a;
+    b.rot = Some(-30.0);
+    let m = camera_matrix_at_frame(Some(&[a]), 0.0, 1920.0, 1080.0).unwrap();
+    let flipped = camera_matrix_at_frame(Some(&[b]), 0.0, 1920.0, 1080.0).unwrap();
+    assert!(mat_matches(&m, &m, true));
+    assert!(!mat_matches(&flipped, &m, true));
+    let mut nudged = m;
+    nudged[4] *= 1.0 + 1e-12;
+    assert!(!mat_matches(&nudged, &m, true));
+    let mut one_ulp = m;
+    one_ulp[0] = f64::from_bits(m[0].to_bits() + 1);
+    assert!(mat_matches(&one_ulp, &m, true) && !mat_matches(&one_ulp, &m, false));
 }
