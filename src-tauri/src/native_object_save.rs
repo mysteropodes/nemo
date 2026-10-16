@@ -111,7 +111,7 @@ pub(super) fn save_request(
         return Err(invalid());
     }
     let destination = parent.join(name);
-    let staged = parent.join(format!(".nemo-object-{}.tmp", uuid::Uuid::new_v4()));
+    let staged = parent.join(format!("nemo-object-{}.tmp", uuid::Uuid::new_v4()));
     if !allowed(&destination) || !allowed(&staged) {
         return Err(host_error(
             "unavailable",
