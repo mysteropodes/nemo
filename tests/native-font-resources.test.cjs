@@ -215,16 +215,28 @@ function actualDesktopBridge(f){
 test('actual desktop bridge explicitly loads Google Bold without prewarm and preserves Regular on refused Bold',async()=>{
   const f=await fixture(),bridge=actualDesktopBridge(f);await bridge.addGoogleFont('Choice');
   assert.deepEqual(f.requests.filter(r=>r.expectedRevision!==undefined).map(r=>r.payload.source.weight),[400]);
-  const hold=deferred();f.hold(hold);const pending=bridge.buildVectorTextGroup('X','Google:Choice-Regular',12,'#fff','left',null,{x:0,y:0},null,{bold:true});
+  const hold=deferred();f.hold(hold);const pending=bridge.buildVectorTextGroup('X','Google:Choice',12,'#fff','left',null,{x:0,y:0},null,{bold:true});
+  pending.catch(()=>{}); // Keep an early refusal observable until the explicit assertions below.
   await turn();assert.equal(Object.hasOwn(bridge.VECTOR_FONTS,'Google:Choice-Bold'),false);
   assert.deepEqual(f.requests.filter(r=>r.expectedRevision!==undefined).map(r=>r.payload.source.weight),[400,700]);
   hold.resolve();await assert.rejects(pending,/charToGlyph/);assert.equal(Object.hasOwn(bridge.VECTOR_FONTS,'Google:Choice-Bold'),true);
   f.hold(null);const count=f.requests.filter(r=>r.expectedRevision!==undefined).length;
-  await assert.rejects(bridge.buildVectorTextGroup('X','Google:Choice-Regular',12,'#fff','left',null,{x:0,y:0},null,{bold:true}),/charToGlyph/);
+  await assert.rejects(bridge.buildVectorTextGroup('X','Google:Choice',12,'#fff','left',null,{x:0,y:0},null,{bold:true}),/charToGlyph/);
   assert.equal(f.requests.filter(r=>r.expectedRevision!==undefined).length,count);assert.equal(f.parsed(),2);
   const g=await fixture(),refused=actualDesktopBridge(g);await refused.addGoogleFont('Refused');g.mode('refuse');
-  await assert.rejects(refused.buildVectorTextGroup('X','Google:Refused-Regular',12,'#fff','left',null,{x:0,y:0},null,{bold:true}),/refused/);
+  await assert.rejects(refused.buildVectorTextGroup('X','Google:Refused',12,'#fff','left',null,{x:0,y:0},null,{bold:true}),/refused/);
   assert.equal(Object.hasOwn(refused.VECTOR_FONTS,'Google:Refused-Bold'),false);assert.equal(Object.hasOwn(refused.VECTOR_FONTS,'Google:Refused-Regular'),true);
+});
+test('Document font import facade preserves authoritative asset identity and reloads it without source import',async()=>{
+  const f=await fixture(),bridge=actualDesktopBridge(f);
+  const result=await bridge.importNativeFontSource(bundled);
+  assert.equal(result.assetId,f.assetId);assert.deepEqual(result.font,{parsed:1});
+  const before=f.requests.filter(r=>r.expectedRevision!==undefined).length;
+  const rows=await bridge.listNativeFontAssets();assert.equal(rows[0].assetId,result.assetId);
+  assert.equal(await bridge.loadNativeFontAsset(result.assetId),result.font);
+  assert.equal(f.requests.filter(r=>r.expectedRevision!==undefined).length,before);
+  const g=await fixture();g.assets.dispose();await assert.rejects(g.assets.importNativeSource(bundled),/disposed/);
+  assert.equal(g.requests.filter(r=>r.expectedRevision!==undefined).length,0);
 });
 test('actual SDK rejects inconsistent catalog pagination, noncanonical base64 pad bits and future receipt revision',async()=>{
   const base={apiVersion:2,requestId:'r',instanceId:'i',documentId:'d',operation:'query.document.object.asset.font',payload:{action:'list',atRevision:0,documentSnapshotId:'s',offset:0,limit:1}};

@@ -447,6 +447,7 @@
     ports={
       projectionReady:function(info){return !!root.NemoNativeObjectProjectFile&&root.NemoNativeObjectProjectFile.projectionReadyForUI(root,info)===true;},
       currentSession:function(){return uiSession(root);},
+      fontResources:function(){var f=root.SMVectorText;return f&&['listNativeFontAssets','loadNativeFontAsset','importNativeFontSource'].every(function(k){return typeof f[k]==='function';})?Object.freeze({list:f.listNativeFontAssets,load:f.loadNativeFontAsset,importSource:f.importNativeFontSource}):null;},
       readPropertyMetadata:function(selector){
         var session=uiSession(root);
         if(!session)return Promise.reject(new Error('Native metadata session is unavailable'));

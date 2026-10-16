@@ -52,6 +52,7 @@
     views.delete(root);
     var timing=timings.get(root);if(timing){timing.latest=null;timing.serial++;timing.job=null;}
     var prior=inspectors.get(root);if(!prior)return;
+    if(prior.fonts)prior.fonts.retire();
     prior.children.forEach(function(saved){saved.node.hidden=saved.hidden;saved.node.style.display=saved.display;});
     if(prior.trigger&&prior.trigger.node.parentNode===prior.reference){
       var next=prior.trigger.next;
@@ -121,6 +122,10 @@
         expand.addEventListener('click',function(){if(root.togglePropsPanelCollapse)root.togglePropsPanelCollapse(false);else panel.classList.remove('collapsed');});rail.replaceChildren(expand);}
     }
     settingsInspector(root,prior,ports,info);
+    if(!prior.fonts&&root.NemoNativeFontPanel&&typeof ports.fontResources==='function')prior.fonts=root.NemoNativeFontPanel.create(prior.section,{
+      document:root.document,resources:ports.fontResources,readInfo:function(){var session=ports.currentSession();return session&&session.isActive()?session.info():null;}
+    });
+    if(prior.fonts)prior.fonts.refresh();
     prior.children.forEach(function(saved){saved.node.hidden=true;saved.node.style.display='none';});
     paintMotion(root,ports,prior);
   }
