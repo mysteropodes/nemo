@@ -7,6 +7,9 @@ use std::collections::HashMap;
 #[path = "object_order_evaluation.rs"]
 mod order;
 pub use order::{NumericElementOrder, NumericLayerOrder, NumericOrderPlan};
+#[path = "object_property_sampling.rs"]
+mod property_sampling;
+pub use property_sampling::{sample_property_raw, PropertySampleError};
 
 /// All pins are mandatory, including the snapshot identity within a revision.
 #[derive(Debug, Clone)]
