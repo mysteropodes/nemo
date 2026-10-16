@@ -121,13 +121,13 @@
   "bootstrapObservations": {
     "path": "src/index.html",
     "scriptOrdinalConvention": "One-based order of all script start tags, including inline and excluded vendor tags.",
-    "totalScriptTags": 194,
-    "externalClassicTags": 191,
+    "totalScriptTags": 195,
+    "externalClassicTags": 192,
     "externalModuleTags": 2,
     "inlineClassicTags": 1,
-    "retainedClassicTags": 187,
+    "retainedClassicTags": 188,
     "retainedModuleTags": 2,
-    "classicTagsUnderSrcJsIncludingVendors": 190,
+    "classicTagsUnderSrcJsIncludingVendors": 191,
     "inlineScripts": [
       {
         "path": "src/index.html",
@@ -262,8 +262,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2489,
-          "scriptOrdinal": 143
+          "line": 2490,
+          "scriptOrdinal": 144
         }
       ]
     },
@@ -691,8 +691,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2512,
-          "scriptOrdinal": 165
+          "line": 2513,
+          "scriptOrdinal": 166
         }
       ]
     },
@@ -703,8 +703,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2539,
-          "scriptOrdinal": 190
+          "line": 2540,
+          "scriptOrdinal": 191
         }
       ]
     },
@@ -751,8 +751,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2531,
-          "scriptOrdinal": 182
+          "line": 2532,
+          "scriptOrdinal": 183
         }
       ]
     },
@@ -763,8 +763,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2541,
-          "scriptOrdinal": 192
+          "line": 2542,
+          "scriptOrdinal": 193
         }
       ]
     },
@@ -823,8 +823,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2532,
-          "scriptOrdinal": 183
+          "line": 2533,
+          "scriptOrdinal": 184
         }
       ]
     },
@@ -835,8 +835,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2535,
-          "scriptOrdinal": 186
+          "line": 2536,
+          "scriptOrdinal": 187
         }
       ]
     },
@@ -871,8 +871,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2534,
-          "scriptOrdinal": 185
+          "line": 2535,
+          "scriptOrdinal": 186
         }
       ]
     },
@@ -907,8 +907,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2533,
-          "scriptOrdinal": 184
+          "line": 2534,
+          "scriptOrdinal": 185
         }
       ]
     },
@@ -919,8 +919,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2540,
-          "scriptOrdinal": 191
+          "line": 2541,
+          "scriptOrdinal": 192
         }
       ]
     },
@@ -980,8 +980,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2519,
-          "scriptOrdinal": 172
+          "line": 2520,
+          "scriptOrdinal": 173
         }
       ]
     },
@@ -1064,8 +1064,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2536,
-          "scriptOrdinal": 187
+          "line": 2537,
+          "scriptOrdinal": 188
         }
       ]
     },
@@ -1220,8 +1220,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2504,
-          "scriptOrdinal": 157
+          "line": 2505,
+          "scriptOrdinal": 158
         }
       ]
     },
@@ -1257,8 +1257,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2496,
-          "scriptOrdinal": 150
+          "line": 2497,
+          "scriptOrdinal": 151
         }
       ]
     },
@@ -1269,8 +1269,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2500,
-          "scriptOrdinal": 154
+          "line": 2501,
+          "scriptOrdinal": 155
         }
       ]
     },
@@ -1293,8 +1293,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2513,
-          "scriptOrdinal": 166
+          "line": 2514,
+          "scriptOrdinal": 167
         }
       ]
     },
@@ -1305,8 +1305,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2514,
-          "scriptOrdinal": 167
+          "line": 2515,
+          "scriptOrdinal": 168
         }
       ]
     },
@@ -1317,8 +1317,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2538,
-          "scriptOrdinal": 189
+          "line": 2539,
+          "scriptOrdinal": 190
         }
       ]
     },
@@ -1329,8 +1329,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2537,
-          "scriptOrdinal": 188
+          "line": 2538,
+          "scriptOrdinal": 189
         }
       ]
     },
@@ -1365,8 +1365,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2515,
-          "scriptOrdinal": 168
+          "line": 2516,
+          "scriptOrdinal": 169
         }
       ]
     },
@@ -1552,8 +1552,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2517,
-          "scriptOrdinal": 170
+          "line": 2518,
+          "scriptOrdinal": 171
         }
       ]
     },
@@ -1600,8 +1600,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2505,
-          "scriptOrdinal": 158
+          "line": 2506,
+          "scriptOrdinal": 159
         }
       ]
     },
@@ -1612,8 +1612,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2523,
-          "scriptOrdinal": 176
+          "line": 2524,
+          "scriptOrdinal": 177
         }
       ]
     },
@@ -1711,8 +1711,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2495,
-          "scriptOrdinal": 149
+          "line": 2496,
+          "scriptOrdinal": 150
         }
       ]
     },
@@ -1723,8 +1723,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2525,
-          "scriptOrdinal": 178
+          "line": 2526,
+          "scriptOrdinal": 179
         }
       ]
     },
@@ -1735,8 +1735,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2501,
-          "scriptOrdinal": 155
+          "line": 2502,
+          "scriptOrdinal": 156
         }
       ]
     },
@@ -1759,8 +1759,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2510,
-          "scriptOrdinal": 163
+          "line": 2511,
+          "scriptOrdinal": 164
         }
       ]
     },
@@ -1771,8 +1771,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2518,
-          "scriptOrdinal": 171
+          "line": 2519,
+          "scriptOrdinal": 172
         }
       ]
     },
@@ -1819,8 +1819,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2491,
-          "scriptOrdinal": 145
+          "line": 2492,
+          "scriptOrdinal": 146
         }
       ]
     },
@@ -1831,8 +1831,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2490,
-          "scriptOrdinal": 144
+          "line": 2491,
+          "scriptOrdinal": 145
         }
       ]
     },
@@ -1843,8 +1843,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2485,
-          "scriptOrdinal": 142
+          "line": 2486,
+          "scriptOrdinal": 143
         }
       ]
     },
@@ -1855,8 +1855,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2484,
-          "scriptOrdinal": 141
+          "line": 2485,
+          "scriptOrdinal": 142
         }
       ]
     },
@@ -2479,8 +2479,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2497,
-          "scriptOrdinal": 151
+          "line": 2498,
+          "scriptOrdinal": 152
         }
       ]
     },
@@ -2503,8 +2503,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2499,
-          "scriptOrdinal": 153
+          "line": 2500,
+          "scriptOrdinal": 154
         }
       ]
     },
@@ -2611,8 +2611,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2526,
-          "scriptOrdinal": 179
+          "line": 2527,
+          "scriptOrdinal": 180
         }
       ]
     },
@@ -2623,8 +2623,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2508,
-          "scriptOrdinal": 161
+          "line": 2509,
+          "scriptOrdinal": 162
         }
       ]
     },
@@ -2635,8 +2635,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2507,
-          "scriptOrdinal": 160
+          "line": 2508,
+          "scriptOrdinal": 161
         }
       ]
     },
@@ -2683,8 +2683,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2494,
-          "scriptOrdinal": 148
+          "line": 2495,
+          "scriptOrdinal": 149
         }
       ]
     },
@@ -2719,8 +2719,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2527,
-          "scriptOrdinal": 180
+          "line": 2528,
+          "scriptOrdinal": 181
         }
       ]
     },
@@ -2731,8 +2731,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2492,
-          "scriptOrdinal": 146
+          "line": 2493,
+          "scriptOrdinal": 147
         }
       ]
     },
@@ -2755,8 +2755,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2524,
-          "scriptOrdinal": 177
+          "line": 2525,
+          "scriptOrdinal": 178
         }
       ]
     },
@@ -2767,8 +2767,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2506,
-          "scriptOrdinal": 159
+          "line": 2507,
+          "scriptOrdinal": 160
         }
       ]
     },
@@ -2779,8 +2779,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2520,
-          "scriptOrdinal": 173
+          "line": 2521,
+          "scriptOrdinal": 174
         }
       ]
     },
@@ -2803,8 +2803,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2516,
-          "scriptOrdinal": 169
+          "line": 2517,
+          "scriptOrdinal": 170
         }
       ]
     },
@@ -2815,8 +2815,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2522,
-          "scriptOrdinal": 175
+          "line": 2523,
+          "scriptOrdinal": 176
         }
       ]
     },
@@ -2863,8 +2863,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2521,
-          "scriptOrdinal": 174
+          "line": 2522,
+          "scriptOrdinal": 175
         }
       ]
     },
@@ -2887,8 +2887,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2509,
-          "scriptOrdinal": 162
+          "line": 2510,
+          "scriptOrdinal": 163
         }
       ]
     },
@@ -2899,8 +2899,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2493,
-          "scriptOrdinal": 147
+          "line": 2494,
+          "scriptOrdinal": 148
         }
       ]
     },
@@ -3022,8 +3022,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2498,
-          "scriptOrdinal": 152
+          "line": 2499,
+          "scriptOrdinal": 153
         }
       ]
     },
@@ -3034,8 +3034,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2528,
-          "scriptOrdinal": 181
+          "line": 2529,
+          "scriptOrdinal": 182
         }
       ]
     },
@@ -3064,14 +3064,26 @@
       ]
     },
     {
-      "path": "src/js/updater-bridge.js",
-      "moduleId": "app.updater.bridge",
+      "path": "src/js/adapters/updater-platform.js",
+      "moduleId": "app.updater.platform.adapter",
       "executionClass": "document-classic",
       "loadSites": [
         {
           "path": "src/index.html",
           "line": 2483,
           "scriptOrdinal": 140
+        }
+      ]
+    },
+    {
+      "path": "src/js/updater-bridge.js",
+      "moduleId": "app.updater.bridge",
+      "executionClass": "document-classic",
+      "loadSites": [
+        {
+          "path": "src/index.html",
+          "line": 2484,
+          "scriptOrdinal": 141
         }
       ]
     },
@@ -3106,8 +3118,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2502,
-          "scriptOrdinal": 156
+          "line": 2503,
+          "scriptOrdinal": 157
         }
       ]
     },
@@ -3129,8 +3141,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2511,
-          "scriptOrdinal": 164
+          "line": 2512,
+          "scriptOrdinal": 165
         }
       ]
     },
@@ -3166,8 +3178,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2544,
-          "scriptOrdinal": 194
+          "line": 2545,
+          "scriptOrdinal": 195
         }
       ]
     },
@@ -3178,8 +3190,8 @@
       "loadSites": [
         {
           "path": "src/index.html",
-          "line": 2542,
-          "scriptOrdinal": 193
+          "line": 2543,
+          "scriptOrdinal": 194
         }
       ]
     },

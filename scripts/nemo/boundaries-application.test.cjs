@@ -230,7 +230,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
     [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 136, 182, 183, 184, 185, 186, 187, 188, 189, 190]);
+      27, 136, 183, 184, 185, 186, 187, 188, 189, 190, 191]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -242,6 +242,15 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 134);
   assert.equal(actual.get(projectEntry).scriptOrdinal, 135);
   assert.equal(actual.get('src/js/project.js').scriptOrdinal, 137);
+  const updaterPath = 'src/js/adapters/updater-platform.js';
+  const updater = policy.retainedSources.find((record) => record.path === updaterPath);
+  assert.equal(updater.moduleId, 'app.updater.platform.adapter');
+  assert.equal(updater.executionClass, 'document-classic');
+  assert.deepEqual(updater.loadSites, [actual.get(updaterPath)]);
+  const updaterTags = html.filter((line) => line.includes('src="js/adapters/updater-platform.js"'));
+  assert.deepEqual(updaterTags, ['<script src="js/adapters/updater-platform.js"></script>']);
+  assert.equal(actual.get(updaterPath).scriptOrdinal + 1,
+    actual.get('src/js/updater-bridge.js').scriptOrdinal);
 });
 
 test('bootstrap numerical observations match actual HTML and retained declarations', () => {
