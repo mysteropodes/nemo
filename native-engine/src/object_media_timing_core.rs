@@ -5,3 +5,6 @@
 
 #[path = "object_media_timing_video.rs"]
 pub(crate) mod object_media_timing_video;
+
+#[path = "object_media_timing_audio.rs"]
+pub(crate) mod object_media_timing_audio;
