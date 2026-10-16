@@ -1,7 +1,6 @@
 //! Stable selection edits prepared against one retained native snapshot.
-use super::curves::{self, CurvePreset, InfluenceSide};
-use super::PreparedPropertyEdit;
-use crate::commands::ObjectFillOwner;
+use crate::commands::object_fill_owner::property_edit::curves::{self, CurvePreset, InfluenceSide};
+use crate::commands::{ObjectFillOwner, PreparedPropertyEdit};
 use crate::object_document::{
     object_deserialize, OrderKey, OrderTrack, Presence, PropertyHolderTarget,
 };
