@@ -3,10 +3,10 @@
  "generator": "scripts/nemo/inventory.cjs",
  "generatorVersion": 4,
  "source": {
-  "head": "860e06a8f5ae34886ef322f4566c3ee578755605",
-  "describe": "v0.7.0-alpha.4-2047-g860e06a8"
+  "head": "d612648f95e4a38b0c47dab6d092145b52a9212e",
+  "describe": "v0.7.0-alpha.4-2072-gd612648f-dirty"
  },
- "inputsDigest": "833f4680373f743fda22d908bc26926219103af95c536ba0b20b0c433934d1d1",
+ "inputsDigest": "5453644a09520b497a126d4aac4e5c97079237891508a03cfb944bec34824262",
  "states": [
   "inventoried",
   "characterized",
@@ -52,7 +52,7 @@
    "storyboard": 17
   },
   "byConsumer": {
-   "native": 295,
+   "native": 294,
    "export": 5,
    "animation": 476,
    "history": 358,
@@ -398,7 +398,7 @@
    "capability": "Check for updates",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/updater-bridge.js:245 init()"
+    "src/js/updater-bridge.js:246 init()"
    ],
    "events": [
     "click"
@@ -421,10 +421,10 @@
     "container": "settings-modal",
     "modal": true,
     "hiddenAtLoad": true,
-    "functionsVisited": 29,
+    "functionsVisited": 31,
     "via": "variable btn",
     "references": [
-     "src/js/updater-bridge.js:89 checkForUpdate()"
+     "src/js/updater-bridge.js:90 checkForUpdate()"
     ]
    },
    "fixtures": [
@@ -9069,7 +9069,7 @@
    "capability": "mac update btn",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/updater-bridge.js:166 initMacUpdateButton()"
+    "src/js/updater-bridge.js:167 initMacUpdateButton()"
    ],
    "events": [
     "click"
@@ -9079,10 +9079,8 @@
    ],
    "mcp": "none (R14)",
    "sdk": "none",
-   "consumers": {
-    "native": 1
-   },
-   "platforms": "desktop (native bridge); browser degrades or is gated",
+   "consumers": {},
+   "platforms": "browser and desktop",
    "status": "inventoried",
    "nextGate": "R12/R13: characterize against a fixture and diagnostics",
    "source": "src/index.html:121",
@@ -9092,11 +9090,11 @@
     "container": "",
     "modal": false,
     "hiddenAtLoad": false,
-    "functionsVisited": 17,
+    "functionsVisited": 32,
     "via": "helper macBtn()",
     "references": [
-     "src/js/updater-bridge.js:137 macBtn()",
-     "src/js/updater-bridge.js:139 macBtnSetState()"
+     "src/js/updater-bridge.js:138 macBtn()",
+     "src/js/updater-bridge.js:140 macBtnSetState()"
     ]
    },
    "fixtures": [
@@ -17470,7 +17468,7 @@
    "capability": "See recent changes…",
    "area": "project-lifecycle-integrations",
    "handler": [
-    "src/js/updater-bridge.js:198 initWebChangelog()"
+    "src/js/updater-bridge.js:199 initWebChangelog()"
    ],
    "events": [
     "click"
