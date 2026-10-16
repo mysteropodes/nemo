@@ -302,3 +302,55 @@ fn active_expression_freeze_requires_native_evaluator_and_preserves_authored_sta
     assert_eq!(wire(&o), value);
     assert_eq!((o.content_revision(), o.history_depths()), (0, (0, 0)));
 }
+
+#[test]
+fn numeric_spelling_noop_preserves_bytes_revision_and_redo_in_both_directions() {
+    for (before, same) in [(json!(25), json!(25.0)), (json!(25.0), json!(25))] {
+        let mut o = owner();
+        let value =
+            |v: Value| payload("opacity", json!({"kind":"setValue","frame":0,"values":[v]}));
+        apply(&mut o, value(before)).unwrap();
+        apply(&mut o, value(json!(30))).unwrap();
+        o.undo(2).unwrap();
+        let snapshot = o.acquire_snapshot(3).unwrap();
+        let bytes = encode_storage_project(snapshot.document()).unwrap();
+        assert_eq!(apply(&mut o, value(same)).unwrap(), 3);
+        assert_eq!(o.history_depths(), (1, 1));
+        assert_eq!(
+            encode_storage_project(o.acquire_snapshot(3).unwrap().document()).unwrap(),
+            bytes
+        );
+        assert_eq!(o.redo(3).unwrap(), 4);
+        assert_eq!(record(&o)["static"], json!([30]));
+    }
+}
+#[test]
+fn numeric_key_and_curve_spelling_noop_preserves_redo_but_real_change_commits() {
+    let mut o = owner();
+    let original = payload(
+        "opacity",
+        json!({"kind":"setKey","frame":4,"values":[25],
+        "curvePoints":[{"x":0,"y":0,"tx":0,"ty":0},{"x":1,"y":1,"tx":0,"ty":0}]}),
+    );
+    apply(&mut o, original).unwrap();
+    apply(&mut o, payload("opacity", set_value(4., 30.))).unwrap();
+    o.undo(2).unwrap();
+    let bytes = encode_storage_project(o.acquire_snapshot(3).unwrap().document()).unwrap();
+    let same = payload(
+        "opacity",
+        json!({"kind":"setKey","frame":4.0,"values":[25.0],
+        "curvePoints":[{"x":0.0,"y":0.0,"tx":0.0,"ty":0.0},{"x":1.0,"y":1.0,"tx":0.0,"ty":0.0}]}),
+    );
+    assert_eq!(apply(&mut o, same).unwrap(), 3);
+    assert_eq!(o.history_depths(), (1, 1));
+    assert_eq!(
+        encode_storage_project(o.acquire_snapshot(3).unwrap().document()).unwrap(),
+        bytes
+    );
+    assert_eq!(
+        apply(&mut o, payload("opacity", set_value(4., 25.5))).unwrap(),
+        4
+    );
+    assert_eq!(o.history_depths(), (2, 0));
+    assert_eq!(record(&o)["track"]["keys"][0]["v"], json!([25.5]));
+}

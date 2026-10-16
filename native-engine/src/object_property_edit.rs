@@ -56,6 +56,30 @@ fn finite(n: &Number) -> Result<f64, DispatchErrorCode> {
         .filter(|v| v.is_finite())
         .ok_or(DispatchErrorCode::InvalidRequest)
 }
+// Motion compares numbers in the JavaScript numeric domain. Preserve the original
+// JSON spelling for equal values so a no-op cannot allocate history or erase redo.
+fn preserve_number(before: &Number, after: &mut Number) {
+    if before.as_f64() == after.as_f64() {
+        *after = before.clone();
+    }
+}
+fn preserve_values(before: &[Number], after: &mut [Number]) {
+    for (before, after) in before.iter().zip(after) {
+        preserve_number(before, after);
+    }
+}
+fn preserve_curve(before: &[OrderCurvePoint], after: &mut [OrderCurvePoint]) {
+    for (before, after) in before.iter().zip(after) {
+        preserve_number(&before.x, &mut after.x);
+        preserve_number(&before.y, &mut after.y);
+        if let (Presence::Present(before), Presence::Present(after)) = (&before.tx, &mut after.tx) {
+            preserve_number(before, after);
+        }
+        if let (Presence::Present(before), Presence::Present(after)) = (&before.ty, &mut after.ty) {
+            preserve_number(before, after);
+        }
+    }
+}
 fn default_curve() -> Vec<OrderCurvePoint> {
     [(0., 0.), (0.25, 0.156), (0.5, 0.5), (0.75, 0.844), (1., 1.)]
         .into_iter()
@@ -82,14 +106,18 @@ fn track(record: &mut PropertyRecord) -> &mut OrderTrack {
 fn set_key(
     record: &mut PropertyRecord,
     frame: Number,
-    values: Vec<Number>,
+    mut values: Vec<Number>,
     curve: Option<Vec<OrderCurvePoint>>,
 ) {
     let keys = &mut track(record).keys;
     let at = frame.as_f64().unwrap();
     if let Some(key) = keys.iter_mut().find(|key| key.frame.as_f64() == Some(at)) {
+        preserve_values(&key.v, &mut values);
         key.v = values;
-        if let Some(curve) = curve {
+        if let Some(mut curve) = curve {
+            if let Some(Some(before)) = key.curve_points.value() {
+                preserve_curve(before, &mut curve);
+            }
             key.curve_points = Presence::Present(Some(curve));
         }
     } else {
@@ -165,7 +193,7 @@ impl ObjectFillOwner {
             });
         let before = record.clone();
         match payload.action {
-            PropertyAction::SetValue { frame, values } => {
+            PropertyAction::SetValue { frame, mut values } => {
                 finite(&frame)?;
                 if values.len() != metadata.dimension() {
                     return Err(DispatchErrorCode::InvalidRequest);
@@ -176,6 +204,9 @@ impl ObjectFillOwner {
                 if keyed(&record) {
                     set_key(&mut record, frame, values, None);
                 } else {
+                    if let Some(before) = record.static_value.value() {
+                        preserve_values(before, &mut values);
+                    }
                     record.static_value = Presence::Present(values);
                 }
             }
