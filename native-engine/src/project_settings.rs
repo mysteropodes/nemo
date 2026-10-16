@@ -156,3 +156,7 @@ impl ProjectMetadata {
         (self.wa_in, self.wa_out)
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/project_settings.rs"]
+mod tests;
