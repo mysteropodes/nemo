@@ -247,6 +247,27 @@ pub(crate) fn validate_content(
     }
     let mut layers = HashSet::new();
     for layer in declared_layers {
+        // This admission preserves the default edit policy. A locked layer or
+        // transform parent needs its own command/evaluation consumer contract.
+        if layer.locked.value() == Some(&true)
+            || layer.parent_layer_uid.value().is_some_and(Option::is_some)
+        {
+            return Err(reject(
+                Unsupported,
+                "layer locking and parenting are unavailable",
+            ));
+        }
+        if let Some(color) = layer.color.value() {
+            if color.len() != 7
+                || !color.starts_with('#')
+                || !color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+            {
+                return Err(reject(
+                    Invalid,
+                    "layer color must be a six-digit hexadecimal color",
+                ));
+            }
+        }
         if let Some(timing) = layer.timing.value() {
             timing.validate(total_frames).map_err(|error| {
                 let (kind, message) = match error {

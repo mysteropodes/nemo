@@ -63,6 +63,7 @@ fn expected(mut before: Value, revision: u64) -> Value {
     };
     before["layers"].as_array_mut().unwrap().push(
         json!({"layerUid":id,"name":"新しい Layer","visible":true,
+            "locked":false,"color":"#F0A585","parentLayerUid":null,
             "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
                 "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}),
     );
@@ -390,10 +391,108 @@ fn actual_frame_packets_retain_old_layers_and_admit_new_empty_layer_metadata() {
         assert_eq!(after.source_layers()[2].layer_uid(), "native-layer:1:1");
         assert_eq!(after.source_layers()[2].name(), Some("新しい Layer"));
         assert!(after.source_layers()[2].visible());
+        let metadata = serde_json::to_value(&after.source_layers()[2]).unwrap();
+        assert_eq!(metadata["locked"], false);
+        assert_eq!(metadata["color"], "#F0A585");
+        assert!(metadata["parentLayerUid"].is_null());
         assert_eq!(before.records().count(), after.records().count());
         assert_eq!(after.records().count(), 1);
         assert_eq!(before.content_revision(), 0);
         assert_eq!(after.content_revision(), 1);
         assert_eq!(packet(&zero).source_layers().len(), 2);
+    }
+}
+
+#[test]
+fn creation_palette_wraps_by_layer_count_and_undo_does_not_consume_a_color() {
+    let colors = [
+        "#F0A585", "#E88BAE", "#E7C74C", "#EE7C58", "#7EA0FA", "#5FD1C4", "#5FA875", "#B49BE6",
+        "#F0A585",
+    ];
+    for version in [1, 2] {
+        let mut owner = owner(version);
+        for (i, color) in colors.iter().enumerate() {
+            let req = request(&owner, &format!("palette-{i}"));
+            assert_eq!(dispatch(&mut owner, &req)["ok"], true);
+            let after = value(&owner);
+            let layer = after["layers"].as_array().unwrap().last().unwrap();
+            assert_eq!(layer["color"], *color);
+            assert_eq!(layer["locked"], false);
+            assert_eq!(layer.get("parentLayerUid"), Some(&Value::Null));
+        }
+        let last = value(&owner)["layers"][10].clone();
+        owner.undo(owner.content_revision()).unwrap();
+        let req = request(&owner, "after-palette-undo");
+        assert_eq!(dispatch(&mut owner, &req)["ok"], true);
+        let next = value(&owner)["layers"][10].clone();
+        assert_eq!(next["color"], last["color"]);
+        assert_ne!(next["layerUid"], last["layerUid"]);
+    }
+}
+
+#[test]
+fn layer_defaults_preserve_missing_fields_custom_color_and_original_snapshots() {
+    for version in [1, 2] {
+        let mut source = drawing(version);
+        source["layers"][0]["locked"] = json!(false);
+        source["layers"][0]["color"] = json!("#aB12ef");
+        source["layers"][0]["parentLayerUid"] = Value::Null;
+        let admitted = decode_storage_project(source.to_string().as_bytes()).unwrap();
+        let mut owner = NativeObjectHistory::new("metadata", admitted).unwrap();
+        let old = current(&owner);
+        let req = request(&owner, "preserve-labels");
+        assert_eq!(dispatch(&mut owner, &req)["ok"], true);
+        let after = value(&owner);
+        assert_eq!(after["layers"][0], source["layers"][0]);
+        assert_eq!(after["layers"][1], source["layers"][1]);
+        let bytes = encode_storage_project(current(&owner).document()).unwrap();
+        assert_eq!(
+            encode_storage_project(&decode_storage_project(&bytes).unwrap()).unwrap(),
+            bytes
+        );
+        owner.undo(1).unwrap();
+        assert_eq!(value(&owner), source);
+        owner.redo(2).unwrap();
+        assert_eq!(value(&owner), after);
+        assert_eq!(serde_json::to_value(old.document()).unwrap(), source);
+    }
+}
+
+#[test]
+fn layer_defaults_refuse_unimplemented_policy_malformed_values_and_duplicate_fields() {
+    for version in [1, 2] {
+        for (field, invalid) in [
+            ("locked", json!(true)),
+            ("locked", Value::Null),
+            ("locked", json!(0)),
+            ("parentLayerUid", json!("L0")),
+            ("parentLayerUid", json!(false)),
+            ("color", Value::Null),
+            ("color", json!(12)),
+            ("color", json!("red")),
+            ("color", json!("#123")),
+            ("color", json!("#12345g")),
+            ("color", json!("#12345678")),
+            ("color", json!("#é2345")),
+        ] {
+            let mut source = drawing(version);
+            source["layers"][0][field] = invalid;
+            assert!(
+                decode_storage_project(source.to_string().as_bytes()).is_err(),
+                "{source}"
+            );
+        }
+        for duplicate in [
+            r#""locked":false,"locked":false,"#,
+            r##""color":"#123456","color":"#654321","##,
+            r#""parentLayerUid":null,"parentLayerUid":null,"#,
+        ] {
+            let raw = drawing(version).to_string().replacen(
+                r#""name":"Original""#,
+                &format!("{duplicate}\"name\":\"Original\""),
+                1,
+            );
+            assert!(decode_storage_project(raw.as_bytes()).is_err(), "{raw}");
+        }
     }
 }

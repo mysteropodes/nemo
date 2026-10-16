@@ -181,6 +181,7 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
             "project":{"canvasW":640,"canvasH":360,"fps":fps},
             "drawing":{"format":"nemo.native-object-document","formatVersion":2,
                 "totalFrames":frames,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
+                    "locked":false,"color":"#5FA875","parentLayerUid":null,
                     "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
                         "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],
                 "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",
@@ -195,8 +196,12 @@ fn blank_project_preserves_explicit_settings_and_five_second_baseline_after_reop
             (info["totalFrames"].as_u64(), info["fps"].as_f64()),
             (Some(frames as u64), Some(fps))
         );
-        assert_eq!(info["layers"], json!([{"layerUid":"layer-1","name":"Layer 1","visible":true}]),
-            "existing file-info metadata stays UID/name/visible; canonical timing uses its own read");
+        assert_eq!(
+            info["layers"],
+            json!([{"layerUid":"layer-1","name":"Layer 1","visible":true,
+            "locked":false,"color":"#5FA875","parentLayerUid":null}]),
+            "file-info publishes native layer defaults; timing keeps its own read"
+        );
         let reopened = NativeObjectHistory::from_project_file("new", &bytes).unwrap();
         let another = NativeObjectHistory::new_blank_project("new", 640, 360, fps).unwrap();
         assert_ne!(reopened.document_id(), original.document_id());
@@ -305,6 +310,7 @@ fn blank_replacement_prepares_immutably_and_commits_in_the_original_history() {
         "project":{"canvasW":640,"canvasH":360,"fps":29.97},
         "drawing":{"format":"nemo.native-object-document","formatVersion":2,
             "totalFrames":150,"layers":[{"layerUid":"layer-1","name":"Layer 1","visible":true,
+                    "locked":false,"color":"#5FA875","parentLayerUid":null,
                 "timing":{"format":"nemo.native-layer-timing","formatVersion":1,"family":"drawing",
                     "contextId":"scene-root","keys":[{"frame":0}],"samples":[]}}],
             "objects":[],"compositionOrder":{"format":"nemo.native-object-order-plan",

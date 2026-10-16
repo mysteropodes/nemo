@@ -62,12 +62,11 @@ fn blank_project(
         format: OBJECT_DOCUMENT_FORMAT.into(),
         format_version: 2,
         total_frames: frames as u32,
-        layers: vec![ObjectLayer {
-            layer_uid: "layer-1".into(),
-            name: Presence::Present("Layer 1".into()),
-            visible: Presence::Present(true),
-            timing: Presence::Present(crate::object_document::LayerTiming::blank_drawing()),
-        }],
+        layers: vec![ObjectLayer::blank_drawing(
+            "layer-1".into(),
+            "Layer 1".into(),
+            0,
+        )],
         objects: vec![],
         property_holders: Presence::Missing,
         // Native painting consumes the explicit v2 order plan even when empty.
@@ -307,6 +306,15 @@ fn project_snapshot_info(
             }
             if let Some(visible) = layer.visible.value() {
                 info["visible"] = serde_json::json!(visible);
+            }
+            if let Some(locked) = layer.locked.value() {
+                info["locked"] = serde_json::json!(locked);
+            }
+            if let Some(color) = layer.color.value() {
+                info["color"] = serde_json::json!(color);
+            }
+            if let Some(parent) = layer.parent_layer_uid.value() {
+                info["parentLayerUid"] = serde_json::json!(parent);
             }
             info
         })
