@@ -7,7 +7,7 @@
 //! count, `NoChange` (nothing to publish), or a typed error. The input is never mutated, so a refusal
 //! cannot leave a partial edit. Document totals, per-frame content, lock/shy policy, markers and
 //! in/out points belong to the callers; this kernel owns only which frames carry keys and samples.
-use super::{LayerTiming, LayerTimingError, TimingKey, MAX_ENTRIES};
+use crate::object_document::timing::{LayerTiming, LayerTimingError, TimingKey, MAX_ENTRIES};
 
 /// Result of a sparse edit. `NoChange` means history must not publish and redo must survive.
 #[derive(Debug, Clone, PartialEq)]

@@ -3,7 +3,9 @@
 //!
 //! A selection is a list of item indices into the layer (selection order, which
 //! is NOT z-order). Every refusal is decided before the first write.
-use super::{CombineMode, GroupEntry, GroupError, GroupLayer, ROOT_DEPTH_CAP};
+use crate::object_document::object_group_kernels::object_group_hierarchy::{
+    CombineMode, GroupEntry, GroupError, GroupLayer, ROOT_DEPTH_CAP,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum GroupUnit {

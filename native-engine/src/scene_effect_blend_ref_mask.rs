@@ -11,7 +11,7 @@
 //! the final combined silhouette only, is `blur.wgsl`'s separable Gaussian and
 //! runs only above 0.01; the silhouette finally multiplies the layer alpha.
 
-use super::{matte_pixel, Rgba};
+use crate::object_render_scene::scene_effect_kernels::scene_effect_blend_ref::{matte_pixel, Rgba};
 
 /// Mask mode vocabulary of `MaskIn::mode`; the wire default is `add`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
