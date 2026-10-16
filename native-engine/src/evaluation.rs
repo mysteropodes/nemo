@@ -53,6 +53,26 @@ pub(crate) mod property_projection_3d;
 #[path = "object_montage_timing.rs"]
 #[allow(dead_code)]
 pub(crate) mod object_montage_timing;
+// L01-A (#2129): lane-1 vector/parametric/path-effect family aggregator.
+#[path = "object_vector_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_vector_kernels;
+// L03-A (#2138): lane-3 image-mesh family aggregator (private kernels declared there).
+#[path = "object_image_mesh_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_image_mesh_kernels;
+// L04-A (#2120): lane-4 component/storyboard/duplicator family aggregator.
+#[path = "object_component_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_component_kernels;
+// L06-A (#2135): lane-6 text layout/glyph family aggregator.
+#[path = "object_text_layout_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_text_layout_kernels;
+// L07-A (#2141): lane-7 typed scene/style family aggregator.
+#[path = "object_scene_style_kernels.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_scene_style_kernels;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
