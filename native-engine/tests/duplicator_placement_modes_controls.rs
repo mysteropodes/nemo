@@ -116,7 +116,8 @@ fn resolution_rule_mistakes_are_detected() {
             }
             let same = match (resolve_owned(&owned), &t[2..]) {
                 (Ok(None), ["-"]) => true,
-                (Ok(Some(i)), [len, ..]) => bits(i.length) == bits(hex(len)),
+                (Ok(Some(i)), [len, ..]) => u64::from_str_radix(len, 16)
+                    .map_or(false, |b| bits(i.length) == bits(f64::from_bits(b))),
                 (Err(_), ["throw"]) => true,
                 _ => false,
             };

@@ -118,6 +118,28 @@ pub(crate) fn mesh(t: &str) -> OwnedMesh {
     }
 }
 
+/// `scenePayloadFor` reads the mesh back from the store, and the generator
+/// loads it there through `clone` (`JSON.parse(JSON.stringify(m))`, tools/gen.cjs
+/// line 166), so a stored coordinate can never be `-0`: JSON writes it as `0`.
+/// The row token keeps the authored mesh; this applies the same round trip.
+/// Finite inputs only: JSON would turn a non-finite coordinate into `null`.
+fn stored(mut m: OwnedMesh) -> OwnedMesh {
+    for p in m
+        .outline
+        .iter_mut()
+        .chain(m.verts.iter_mut())
+        .chain(m.offsets.iter_mut())
+    {
+        for c in p.iter_mut() {
+            assert!(c.is_finite(), "stored mesh coordinates are finite");
+            if *c == 0.0 {
+                *c = 0.0;
+            }
+        }
+    }
+    m
+}
+
 pub(crate) fn rect(t: &str) -> MeshRect {
     let f: Vec<&str> = t.split(',').collect();
     MeshRect {
@@ -254,7 +276,7 @@ pub(crate) fn scene_run(f: SceneFn) -> Run {
     let (mut n, mut bad) = (0, Vec::new());
     for (line, t) in rows("sp") {
         n += 1;
-        let (m, r, p) = (mesh(t[1]), rect(t[2]), pose(t[3]));
+        let (m, r, p) = (stored(mesh(t[1])), rect(t[2]), pose(t[3]));
         if !payload_same(&f(&m.view(), &r, p.as_deref()), &payload(t[4])) {
             bad.push(label(line, &t));
         }
