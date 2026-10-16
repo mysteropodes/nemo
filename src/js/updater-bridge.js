@@ -9,7 +9,8 @@
 // few seconds after launch that only bothers the user if something's
 // actually available.
 (function () {
-  function tauriOk() { return typeof window.__TAURI__ !== 'undefined' && window.__TAURI__.updater; }
+  var platform = window.NemoUpdaterPlatform.desktop(window);
+  function tauriOk() { return platform.available(); }
 
   // Reads the version straight from the Tauri app API instead of a
   // hardcoded string in index.html — <title> and #status-text used to say
@@ -19,9 +20,9 @@
   // "version", read at runtime via getVersion()) instead of three places
   // to remember to edit by hand.
   async function showVersion() {
-    if (typeof window.__TAURI__ === 'undefined' || !window.__TAURI__.app) return;
+    if (!platform.hasVersion()) return;
     try {
-      var v = await window.__TAURI__.app.getVersion();
+      var v = await platform.version();
       var vEl = document.getElementById('app-version-txt');
       if (vEl) vEl.textContent = v;
       var vElAbout = document.getElementById('app-version-txt-about');
@@ -46,7 +47,7 @@
       var total = 0, received = 0;
       showToast(window.SM.t('updaterDownloading'));
       if (statusEl) statusEl.textContent = window.SM.t('updaterDownloadingShort');
-      await update.downloadAndInstall(function (ev) {
+      await platform.install(update, function (ev) {
         if (ev.event === 'Started') {
           total = ev.data.contentLength || 0;
         } else if (ev.event === 'Progress') {
@@ -65,11 +66,11 @@
       // reported as "did nothing" the first time — the update HAD worked,
       // there was just no visible confirmation and no easy way to actually
       // pick up the new build besides quitting and reopening by hand).
-      var restartNow = tauriOk() && window.__TAURI__.process
-        ? await window.__TAURI__.dialog.confirm(window.SM.t('updaterRestartConfirm').replace('{v}', update.version), { title: window.SM.t('updaterRestartConfirmTitle') })
+      var restartNow = tauriOk() && platform.canRelaunch()
+        ? await platform.confirm(window.SM.t('updaterRestartConfirm').replace('{v}', update.version), { title: window.SM.t('updaterRestartConfirmTitle') })
         : false;
       if (restartNow) {
-        await window.__TAURI__.process.relaunch();
+        await platform.relaunch();
       } else {
         showToast(window.SM.t('updaterInstalledToast').replace('{v}', update.version));
       }
@@ -92,7 +93,7 @@
     if (btn) { btn.disabled = true; }
     if (statusEl && !silent) statusEl.innerHTML = window.SM.t('updaterSearching');
     try {
-      var update = await window.__TAURI__.updater.check();
+      var update = await platform.check();
       if (!update) {
         if (statusEl) statusEl.innerHTML = window.SM.t('updaterUpToDateStatus');
         showVersion();
@@ -106,8 +107,8 @@
         // synchronous boolean like a real browser, so `if (confirm(msg))`
         // was always truthy (a Promise object) and installed unconditionally
         // regardless of what the user actually clicked. The real, supported,
-        // Promise<boolean> API is window.__TAURI__.dialog.confirm().
-        var proceed = await window.__TAURI__.dialog.confirm(msg, { title: window.SM.t('updaterAvailableDialogTitle') });
+        // Promise<boolean> API is platform.confirm().
+        var proceed = await platform.confirm(msg, { title: window.SM.t('updaterAvailableDialogTitle') });
         if (proceed) await doInstall(update, statusEl);
       }
     } catch (e) {
@@ -149,7 +150,7 @@
     var update = _macPendingUpdate;
     macBtnSetState('downloading');
     try {
-      await update.downloadAndInstall(function () {}); // progress not surfaced on this compact icon — the Réglages panel's own status line (doInstall) already covers that for the manual-check flow
+      await platform.install(update, function () {}); // progress not surfaced on this compact icon — the Réglages panel's own status line (doInstall) already covers that for the manual-check flow
       macBtnSetState('installed');
       showToast(window.SM.t('updaterMacInstalledToast').replace('{v}', update.version));
     } catch (e) {
@@ -165,7 +166,7 @@
     if (!btn) return;
     btn.addEventListener('click', function () {
       if (btn.classList.contains('state-available')) macBtnDownload();
-      else if (btn.classList.contains('state-installed')) { if (window.__TAURI__.process) window.__TAURI__.process.relaunch(); }
+      else if (btn.classList.contains('state-installed')) { if (platform.canRelaunch()) platform.relaunch(); }
     });
   }
   // Silent check populates the titlebar icon instead of interrupting with
@@ -176,7 +177,7 @@
   async function macSilentCheck() {
     if (!isMac() || !tauriOk()) return;
     try {
-      var update = await window.__TAURI__.updater.check();
+      var update = await platform.check();
       if (update) { _macPendingUpdate = update; macBtnSetState('available'); }
     } catch (e) { console.warn('[updater] mac silent check failed', e); }
   }
@@ -247,8 +248,8 @@
     // macOS) — Rust (src-tauri/src/lib.rs setup()) inserts that item into
     // the default menu and emits this event on click; same check as the
     // Réglages button, just reachable from the menu too.
-    if (tauriOk() && window.__TAURI__.event) {
-      window.__TAURI__.event.listen('menu-check-update', function () { checkForUpdate(false); });
+    if (tauriOk() && platform.canListen()) {
+      platform.listen('menu-check-update', function () { checkForUpdate(false); });
     }
     // Silent startup check, a few seconds in so it never competes with the
     // app's own initial layout/engine-init work for the first paint. On
