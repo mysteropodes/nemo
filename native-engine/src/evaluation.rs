@@ -48,6 +48,11 @@ pub(crate) mod property_camera_eval;
 #[path = "property_projection_3d.rs"]
 #[allow(dead_code)]
 pub(crate) mod property_projection_3d;
+// L10-A (#2123): private montage timing kernel (retime, totals, source-frame map,
+// looping montage-layer frame, montage-view segments); consumers arrive in L10-I.
+#[path = "object_montage_timing.rs"]
+#[allow(dead_code)]
+pub(crate) mod object_montage_timing;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 
