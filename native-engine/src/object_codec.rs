@@ -24,7 +24,8 @@ pub(crate) use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
 #[cfg(all(feature = "history", feature = "project_media_codec"))]
 pub(crate) use project::{
     decode_allocated_project, decode_validated_project, encode_project as encode_project_envelope,
-    ProjectWireError, ProjectWireLimits,
+    prepare_project_wire, DecodedProjectWire, PreparedProjectWire, ProjectWireError,
+    ProjectWireLimits,
 };
 
 /// Literal wire and lifetime harness for the private managed codec consumer.
