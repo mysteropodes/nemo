@@ -316,6 +316,11 @@
           payload:{command:'object.layer.visibility.set',layerUid:layerUid,visible:visible}};
       },'nemo_native_dispatch');
     }
+    function createLayer(name,expected){return mutation(function(pin){
+      if(!same(pin,expected)||typeof name!=='string'||!name)throw new Error('Native Drawing create intent is stale or invalid');
+      return {apiVersion:2,requestId:requestId('layer-create'),instanceId:pin.instanceId,documentId:pin.documentId,
+        operation:'command.document.object.layer.create',expectedRevision:pin.contentRevision,payload:{command:'object.layer.create',name:name}};
+    },'nemo_native_dispatch');}
     function setLayerVisibility(layerUid,visible){
       if(typeof visible!=='boolean')return Promise.reject(new Error('Native layer visibility target or value is invalid'));
       return visibilityIntent(layerUid,visible);
@@ -378,6 +383,8 @@
     });}
     return Object.freeze({openPath:openPath,newProject:newProject,isActive:active,isIndeterminate:function(){return phase==='indeterminate';},blocksLegacy:function(){return phase!=='idle'||openingRequested;},
       info:function(){return info;},requestId:requestId,reference:reference,historyFromUi:history,setLayerVisibility:setLayerVisibility,readLayerTiming:readLayerTiming,
+      get createLayer(){return subscription&&!synchronizing&&active()&&presentedSession()&&ports.projectionReady(info)&&
+        (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?createLayer:undefined;},
       get toggleLayerVisibility(){return subscription&&!synchronizing&&active()&&ports.projectionReady(info)&&
         (typeof ports.subscriptionActive!=='function'||ports.subscriptionActive())?toggleLayerVisibility:undefined;},
       presentPreview:presentPreview,renderPreview:renderPreview,exportPng:exportPng,readPresentedObjectSession:presentedSession,

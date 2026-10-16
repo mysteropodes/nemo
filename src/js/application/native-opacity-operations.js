@@ -225,7 +225,7 @@
         'duplicateSelectedFrames', 'setFps', 'setCanvasSize', 'setCanvasBg',
         'setCanvasClip', 'setSafetyZones', 'setCurve', 'setResamplePts', 'setTweenStep',
         'setWorkArea', 'setTotalFrames', 'toggleFolderLayerCollapsed',
-        'addLayer', 'addNullLayer', 'reparentLayersIntoFolder', 'removeLayerFromFolder',
+        'addNullLayer', 'reparentLayersIntoFolder', 'removeLayerFromFolder',
         'addEffectLayer', 'addGuideLayer', 'addJoystickLayer', 'addSliderLayer',
         'addFolderLayer', 'deleteLayer', 'trimToWorkArea', 'setLayerKeyLock',
         'toggleLayerMotionBlur', 'toggleMotionBlurComp', 'setMotionBlurSettings',
