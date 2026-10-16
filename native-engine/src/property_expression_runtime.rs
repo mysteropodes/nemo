@@ -13,7 +13,8 @@
 //! Deliberately not modelled: JavaScript's `_depthTripped` bookkeeping, which
 //! lets a depth warning raised by an inner hop survive an outer success (a
 //! reporting detail of the shared `lastError` slot, not a value); and the
-//! toast/re-render side effects of a timeout.
+//! toast/re-render side effects of a timeout. The `_depthTripped` behavior
+//! must be carried into the D10/D11 consumer, which owns the shared slot.
 
 /// Most nested cross-layer evaluations allowed (`EXPR_MAX_DEPTH`).
 pub(crate) const EXPR_MAX_DEPTH: u32 = 8;
@@ -117,7 +118,9 @@ fn all_finite(items: &[GuestValue]) -> Option<Vec<f64>> {
         .collect()
 }
 
-/// How one guest evaluation ended, classified by the caller.
+/// How one guest evaluation ended, classified by the caller. The caller
+/// must apply the JS precedence: a compile (`Syntax`) failure is checked
+/// first, then `TooDeep`, then the guest's own `Thrown`/`Timeout`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Outcome {
     /// The guest returned a value.
@@ -155,7 +158,8 @@ pub(crate) struct Fallback {
 
 /// The tail of `evalExpressionFor` plus `valueAtFrame`'s `?? raw`: a good
 /// result is the value with no diagnostic; every failure yields `raw`
-/// unchanged and the matching diagnostic.
+/// unchanged and the matching diagnostic. It takes an already-classified
+/// outcome; the caller applies the precedence documented on [`Outcome`].
 pub(crate) fn evaluate_with_fallback(dim: Dim, raw: &[f64], outcome: Outcome) -> Fallback {
     let failed = |diagnostic, disable| Fallback {
         value: raw.to_vec(),
@@ -191,14 +195,16 @@ pub(crate) struct ContextTarget {
 /// are deliberately NOT part of the key: the JavaScript compares only
 /// `code` and the global preamble (`exprGlobals()`), because controls are
 /// read at call time through closures, never baked into the compiled body.
+/// The property is part of the key: JS caches per `holder._exprCompiled[prop]`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CacheKey {
     pub(crate) code: String,
     pub(crate) preamble: String,
     pub(crate) context: ContextTarget,
+    pub(crate) prop: String,
 }
 
-/// A cached entry is reusable only when code, preamble and context all match.
+/// A cached entry is reusable only when code, preamble, context and prop all match.
 pub(crate) fn cache_hit(cached: &CacheKey, wanted: &CacheKey) -> bool {
     cached == wanted
 }

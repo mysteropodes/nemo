@@ -253,6 +253,7 @@ fn key(code: &str, preamble: &str, layer: &str, stroke: Option<&str>) -> CacheKe
             layer_uid: layer.into(),
             stroke_id: stroke.map(Into::into),
         },
+        prop: "position".into(),
     }
 }
 
@@ -279,6 +280,15 @@ fn cache_hit_needs_code_preamble_and_context_to_agree() {
     let mut other_context = base.clone();
     other_context.context.context_id = "symbol-1".into();
     assert!(!cache_hit(&base, &other_context), "context change");
+}
+
+#[test]
+fn cache_key_includes_the_property() {
+    let position = key("value", "var a=1;", "L1", None);
+    let mut rotation = position.clone();
+    rotation.prop = "rotation".into();
+    assert!(!cache_hit(&position, &rotation));
+    assert!(cache_hit(&rotation, &rotation.clone()));
 }
 
 #[test]
