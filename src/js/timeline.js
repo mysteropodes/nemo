@@ -10789,8 +10789,8 @@ document.getElementById('p-taper').addEventListener('change',function(){window.S
 document.getElementById('p-shadowmode').addEventListener('change',function(){window.SM.setShadowMode(this.checked);});
 document.getElementById('p-maskmode').addEventListener('change',function(){window.SM.setMaskMode(this.checked);});
 document.getElementById('p-maskmode-type').addEventListener('change',function(){window.SM.setMaskModeType(this.value);});
-document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),state.canvasH);});
-document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(state.canvasW,parseInt(this.value));});
+document.getElementById('p-cw').addEventListener('change',function(){window.SM.setCanvasSize(parseInt(this.value),_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)/_dimsLockRatio)):state.canvasH);});
+document.getElementById('p-ch').addEventListener('change',function(){window.SM.setCanvasSize(_dimsLockRatio?Math.max(1,Math.round(parseFloat(this.value)*_dimsLockRatio)):state.canvasW,parseInt(this.value));});
 document.getElementById('p-cbg').addEventListener('input',function(){var c=this.dataset.hex8;window.SM.setCanvasBg(c&&c.slice(0,7).toLowerCase()===this.value.toLowerCase()?c:this.value);});
 document.getElementById('btn-clip').addEventListener('click',function(){window.SM.setCanvasClip(!state.canvasClip);this.classList.toggle('active',state.canvasClip);});
 document.getElementById('btn-safety').addEventListener('click',function(){window.SM.setSafetyZones(!state.safetyZones);this.classList.toggle('active',state.safetyZones);});

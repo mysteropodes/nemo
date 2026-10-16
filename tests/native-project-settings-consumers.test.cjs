@@ -103,7 +103,7 @@ test('F04 dirty numeric blur/change cannot write into a replacement document bef
   const p=h.panel(),root=p.root,field=root.document.nodes.get(id),writes=[];let current=h.metadata(),focusedValue;
   root.NemoNativeProjectSettingsController={edit(action){writes.push({documentId:current.documentId,generation:current.lifecycleGeneration,action});}};
   root.SM={setCanvasSize:(w,height)=>root.NemoNativeProjectSettingsController.edit({kind:'setCanvasSize',width:w,height}),setFps:fps=>root.NemoNativeProjectSettingsController.edit({kind:'setFps',fps})};
-  const listener=h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+id+"').addEventListener('change'"));vm.runInNewContext(listener,{window:root,state:root.state,document:root.document});
+  const listener=h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+id+"').addEventListener('change'"));vm.runInNewContext(listener,{window:root,state:root.state,document:root.document,_dimsLockRatio:null});
   field.focus=()=>{root.document.activeElement=field;focusedValue=field.value;field.dispatch('focus');};
   field.blur=()=>{if(root.document.activeElement!==field)return;root.document.activeElement=null;if(field.value!==focusedValue)field.dispatch('change');field.dispatch('blur');};
   h.nativeRender(p);field.focus();field.value=id==='p-cw'?'777':'29.97';
@@ -120,3 +120,18 @@ test('F04 dragging a one-frame work area at zero keeps its one-frame extent',()=
 
 test('F04 FPS intent stops the old clock before delayed native dispatch/publication',async()=>{const p=playbackConsumer();p.start();await p.tick(100);const release=p.holdBeforeCommit(),edit=p.editFps();for(let n=0;n<12&&p.writes()===0;n++)await Promise.resolve();assert.equal(p.writes(),1);assert.equal(p.root.state.playing,false);await p.tick(200);assert.equal(p.root.state.currentFrame,2);release();assert.equal((await edit).status,'applied-presented');await p.tick(300);assert.equal(p.root.state.currentFrame,6);assert.equal(p.root.state.playing,true);});
 test('F04 rapid FPS input stays bounded during native same-frame restoration',async()=>{const p=playbackConsumer();p.start();await p.tick(100);const release=p.holdRestore(),requests=[];for(let fps=1;fps<=50;fps++)requests.push(p.editFps(fps));for(const earlier of requests.slice(0,-1))assert.equal((await earlier).status,'superseded');assert.equal(p.writes(),0);release();assert.equal((await requests.at(-1)).status,'applied-presented');assert.equal(p.writes(),1);assert.equal(p.root.state.fps,50);assert.equal(p.root.state.playing,true);});
+test('F04 delayed native width/height input then change preserves locked and unlocked dimensions',async()=>{
+ for(const id of['p-cw','p-ch'])for(const locked of[true,false]){
+  const p=h.panel(),root=p.root,calls=[],requests=[];let info=h.metadata(),release,publications=0;const gate=new Promise(resolve=>{release=resolve;});h.nativeRender(p);
+  const session={info:()=>info,readPresentedObjectSession:()=>presented(info,7),async editProjectSettings(action,before){assert.strictEqual(before,info);calls.push(action);if(calls.length===1)await gate;
+   const applied=info.canvasW!==action.width||info.canvasH!==action.height;if(applied){publications++;info={...info,canvasW:action.width,canvasH:action.height,contentRevision:info.contentRevision+1,documentSnapshotId:'ratio-'+publications};h.Files.refreshLayerTable(root,info);}
+   return {apiVersion:2,ok:true,instanceId:info.instanceId,documentId:info.documentId,contentRevision:info.contentRevision,result:{applied,historyEntriesAdded:applied?1:0}};}};
+  const intent=require('../src/js/adapters/native-project-settings-intent.js').create({currentSession:()=>session,frame:()=>7,selection:()=>[A.layerUid],available:()=>true});
+  root.SM={setCanvasSize(w,height){const request=intent.edit({kind:'setCanvasSize',width:w,height});requests.push(request);return request;}};
+  const start=h.timeline.indexOf('var _dimsLockRatio=null;'),end=h.timeline.indexOf('// Paint the panel',start),change=h.timeline.split('\n').find(line=>line.startsWith("document.getElementById('"+id+"').addEventListener('change'"));
+  vm.runInNewContext(h.timeline.slice(start,end)+'\n'+change,{window:root,state:root.state,document:root.document});if(locked)root.document.nodes.get('btn-dims-lock').click();
+  const field=root.document.nodes.get(id);field.dispatch('focus');field.value=id==='p-cw'?'640':'360';field.dispatch('input');field.dispatch('change');
+  assert.equal(calls.length,1);assert.equal(requests.length,2);assert.equal(root.state.canvasW,320);assert.equal(root.state.canvasH,180);release();await Promise.all(requests);
+  assert.deepEqual([info.canvasW,info.canvasH],locked?[640,360]:id==='p-cw'?[640,180]:[320,360],id+' ratio='+locked);assert.equal(publications,1);assert.equal(calls.length,2);assert.equal((await requests[1]).status,'unchanged');
+ }
+});
