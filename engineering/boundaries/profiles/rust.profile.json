@@ -44,7 +44,7 @@
       "id": "rust.native.engine.commands",
       "layer": "native-commands",
       "dir": "native-engine/src",
-      "files": ["commands.rs", "object_fill.rs", "object_fill_owner.rs"],
+      "files": ["commands.rs", "object_fill.rs", "object_fill_owner.rs", "object_property_edit.rs"],
       "publicApi": ["commands.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -60,7 +60,7 @@
       "id": "rust.native.engine.evaluation",
       "layer": "native-evaluation",
       "dir": "native-engine/src",
-      "files": ["evaluation.rs", "animation_curve.rs", "object_frame_packet.rs", "object_order_evaluation.rs", "expression_noise.rs", "expression_random.rs", "expression_math.rs", "expression_time.rs", "motion_parent_chain.rs"],
+      "files": ["evaluation.rs", "animation_curve.rs", "object_frame_packet.rs", "object_order_evaluation.rs", "expression_noise.rs", "expression_random.rs", "expression_math.rs", "expression_time.rs", "motion_parent_chain.rs", "property_expression_runtime.rs", "property_transform_eval.rs", "property_follow_path_sample.rs", "object_property_sampling.rs"],
       "publicApi": ["evaluation.rs", "animation_curve.rs", "object_frame_packet.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -140,7 +140,7 @@
       "id": "rust.native.engine.read-queries",
       "layer": "native-read-queries",
       "dir": "native-engine/src",
-      "files": ["read_queries.rs", "object_snapshot.rs", "object_timing_snapshot.rs", "object_project_admission.rs", "reference_image_resources.rs"],
+      "files": ["read_queries.rs", "object_snapshot.rs", "object_timing_snapshot.rs", "object_project_admission.rs", "reference_image_resources.rs", "object_property_read.rs"],
       "publicApi": ["read_queries.rs", "object_snapshot.rs"],
       "sizeProfile": "Rust production module"
     },
@@ -148,7 +148,7 @@
       "id": "rust.native.engine.tests",
       "layer": "tests",
       "dir": "native-engine/tests",
-      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "compositor_readback.rs", "compositor_object_target.rs", "desktop_viewport.rs", "object_desktop_viewport.rs", "object_viewport_consumer.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs", "object_export_job_lifecycle.rs", "object_png_output.rs", "history.rs", "project_structure.rs", "project_media_codec.rs", "object_project_admission.rs", "object_project_history.rs", "object_layer_create.rs", "object_properties.rs", "object_timing.rs", "object_project_replacement.rs", "project_media_workflow.rs", "object_reference_dispatch.rs", "render_geometry.rs", "scheduler.rs", "object_scheduler.rs", "object_codec.rs", "object_order_codec.rs", "object_read.rs", "object_fill.rs", "object_history.rs", "object_resource_leases.rs", "object_order_history.rs", "object_command_dispatch.rs", "object_history_dispatch.rs", "object_frame_packet.rs", "object_exposure.rs", "object_order_evaluation.rs", "object_render_scene.rs", "object_reference_viewport.rs", "object_compositor.rs", "object_scheduled_compositor.rs", "object_scheduled_scene_witness.rs", "reference_image_asset.rs", "reference_png_scanlines.rs", "image_resource_budget.rs", "reference_image_resources.rs", "reference_png_rows.rs", "expression_noise.rs", "expression_random.rs", "expression_math.rs", "expression_time.rs", "motion_parent_chain.rs", "motion_parent_chain_controls.rs", "object_expression_pin.rs", "object_expression_runtime.rs"],
+      "files": ["application.rs", "application_read.rs", "application_replacement.rs", "application_diagnostics.rs", "application_reproduction.rs", "reproduction_catalog.rs", "reproduction_lifecycle.rs", "reproduction_decode.rs", "reproduction_replay.rs", "reproduction_report.rs", "authored_curve_consumers.rs", "codec.rs", "commands.rs", "compositor.rs", "compositor_readback.rs", "compositor_object_target.rs", "desktop_viewport.rs", "object_desktop_viewport.rs", "object_viewport_consumer.rs", "evaluation.rs", "export_job.rs", "export_job_lifecycle.rs", "object_export_job.rs", "object_export_job_lifecycle.rs", "object_png_output.rs", "history.rs", "project_structure.rs", "project_media_codec.rs", "object_project_admission.rs", "object_project_history.rs", "object_layer_create.rs", "object_properties.rs", "object_timing.rs", "object_project_replacement.rs", "project_media_workflow.rs", "object_reference_dispatch.rs", "render_geometry.rs", "scheduler.rs", "object_scheduler.rs", "object_codec.rs", "object_order_codec.rs", "object_read.rs", "object_fill.rs", "object_history.rs", "object_resource_leases.rs", "object_order_history.rs", "object_command_dispatch.rs", "object_history_dispatch.rs", "object_frame_packet.rs", "object_exposure.rs", "object_order_evaluation.rs", "object_render_scene.rs", "object_reference_viewport.rs", "object_compositor.rs", "object_scheduled_compositor.rs", "object_scheduled_scene_witness.rs", "reference_image_asset.rs", "reference_png_scanlines.rs", "image_resource_budget.rs", "reference_image_resources.rs", "reference_png_rows.rs", "expression_noise.rs", "expression_random.rs", "expression_math.rs", "expression_time.rs", "motion_parent_chain.rs", "motion_parent_chain_controls.rs", "property_expression_runtime.rs", "property_expression_runtime_controls.rs", "property_transform_eval.rs", "property_transform_eval_controls.rs", "property_follow_path_sample.rs", "property_follow_path_sample_controls.rs", "object_expression_pin.rs", "object_expression_runtime.rs", "object_property_edit.rs", "object_property_sampling.rs"],
       "publicApi": [],
       "sizeProfile": "Rust production module"
     },

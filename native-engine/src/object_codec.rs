@@ -2,7 +2,9 @@
 #[cfg(feature = "commands")]
 pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
-pub use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget};
+pub use crate::object_document::{
+    FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget, PropertyHolderTarget,
+};
 use crate::object_document::{
     ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
@@ -247,6 +249,27 @@ pub(crate) fn validate_content(
     }
     let mut layers = HashSet::new();
     for layer in declared_layers {
+        // This admission preserves the default edit policy. A locked layer or
+        // transform parent needs its own command/evaluation consumer contract.
+        if layer.locked.value() == Some(&true)
+            || layer.parent_layer_uid.value().is_some_and(Option::is_some)
+        {
+            return Err(reject(
+                Unsupported,
+                "layer locking and parenting are unavailable",
+            ));
+        }
+        if let Some(color) = layer.color.value() {
+            if color.len() != 7
+                || !color.starts_with('#')
+                || !color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+            {
+                return Err(reject(
+                    Invalid,
+                    "layer color must be a six-digit hexadecimal color",
+                ));
+            }
+        }
         if let Some(timing) = layer.timing.value() {
             timing.validate(total_frames).map_err(|error| {
                 let (kind, message) = match error {

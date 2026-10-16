@@ -56,6 +56,12 @@ pub struct ObjectLayer {
     #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) visible: Presence<bool>,
     #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) locked: Presence<bool>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) color: Presence<String>,
+    #[serde(skip_serializing_if = "Presence::missing")]
+    pub(crate) parent_layer_uid: Presence<Option<String>>,
+    #[serde(skip_serializing_if = "Presence::missing")]
     pub(crate) timing: Presence<LayerTiming>,
 }
 
@@ -175,7 +181,10 @@ object_deserialize!(ObjectDocument { format: String, format_version: u32, total_
     #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>,
     #[serde(default)] composition_order: Presence<OrderPlan> });
 object_deserialize!(ObjectLayer { layer_uid: String, #[serde(default)] name: Presence<String>,
-    #[serde(default)] visible: Presence<bool>, #[serde(default)] timing: Presence<LayerTiming> });
+    #[serde(default)] visible: Presence<bool>, #[serde(default)] locked: Presence<bool>,
+    #[serde(default)] color: Presence<String>,
+    #[serde(default)] parent_layer_uid: Presence<Option<String>>,
+    #[serde(default)] timing: Presence<LayerTiming> });
 object_deserialize!(ObjectTarget {
     context_id: String,
     frame_scope: FrameScope,
@@ -257,12 +266,31 @@ impl SolidFill {
     }
 }
 impl ObjectLayer {
+    /// Native New and Add share the existing desktop creation defaults. The
+    /// palette is selected by the number of layers before insertion, not revision.
+    pub(crate) fn blank_drawing(layer_uid: String, name: String, existing_layers: usize) -> Self {
+        const COLORS: [&str; 8] = [
+            "#5FA875", "#B49BE6", "#F0A585", "#E88BAE", "#E7C74C", "#EE7C58", "#7EA0FA", "#5FD1C4",
+        ];
+        Self {
+            layer_uid,
+            name: Presence::Present(name),
+            visible: Presence::Present(true),
+            locked: Presence::Present(false),
+            color: Presence::Present(COLORS[existing_layers % COLORS.len()].into()),
+            parent_layer_uid: Presence::Present(None),
+            timing: Presence::Present(LayerTiming::blank_drawing()),
+        }
+    }
     /// Identified, unnamed layer with earlier native-file visibility semantics.
     pub(crate) fn identified(layer_uid: String) -> Self {
         Self {
             layer_uid,
             name: Presence::Missing,
             visible: Presence::Missing,
+            locked: Presence::Missing,
+            color: Presence::Missing,
+            parent_layer_uid: Presence::Missing,
             timing: Presence::Missing,
         }
     }

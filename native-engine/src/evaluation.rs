@@ -30,6 +30,15 @@ pub(crate) mod expression_time;
 #[path = "motion_parent_chain.rs"]
 #[allow(dead_code)]
 pub(crate) mod motion_parent_chain;
+#[path = "property_expression_runtime.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_expression_runtime;
+#[path = "property_transform_eval.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_transform_eval;
+#[path = "property_follow_path_sample.rs"]
+#[allow(dead_code)]
+pub(crate) mod property_follow_path_sample;
 
 pub const SUPPORTED_CONTEXT_ID: &str = "scene-root";
 

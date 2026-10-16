@@ -9,6 +9,9 @@ use crate::request_receipts::DispatchErrorCode;
 use crate::revision::ObjectRevisionOwner;
 use serde::Deserialize;
 use std::collections::HashSet;
+#[path = "object_property_edit.rs"]
+mod property_edit;
+pub(crate) use property_edit::PreparedPropertyEdit;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ReferenceEdit {
@@ -121,12 +124,11 @@ impl ObjectFillOwner {
                 });
             }
         }
-        document.layers.push(ObjectLayer {
-            layer_uid: layer_uid.clone(),
-            name: Presence::Present(payload.name),
-            visible: Presence::Present(true),
-            timing: Presence::Present(crate::object_document::LayerTiming::blank_drawing()),
-        });
+        document.layers.push(ObjectLayer::blank_drawing(
+            layer_uid.clone(),
+            payload.name,
+            document.layers.len(),
+        ));
         ObjectSnapshot::validate_drawing(&document)
             .map_err(|_| DispatchErrorCode::InvalidRequest)?;
         Ok(PreparedLayerCreate {

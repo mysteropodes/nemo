@@ -1,7 +1,7 @@
 //! Staged object edits/history authority; no transport, retries or replacement port.
 use crate::commands::{
     ObjectFillOwner, PreparedLayerCreate, PreparedLayerVisibility, PreparedObjectFill,
-    PreparedReferenceEdit, ReferenceEdit,
+    PreparedPropertyEdit, PreparedReferenceEdit, ReferenceEdit,
 };
 use crate::object_document::{ObjectDocument, ProjectEnvelope};
 use crate::request_receipts::DispatchErrorCode;
@@ -24,6 +24,12 @@ mod project_tests;
 #[cfg(test)]
 #[path = "../tests/object_layer_create.rs"]
 mod layer_create_tests;
+#[cfg(test)]
+#[path = "../tests/object_property_edit.rs"]
+mod property_edit_tests;
+#[cfg(all(test, feature = "evaluation"))]
+#[path = "../tests/object_property_sampling.rs"]
+mod property_sampling_tests;
 
 #[cfg(feature = "project_media_codec")]
 #[path = "object_project_history.rs"]
@@ -41,6 +47,27 @@ pub struct NativeObjectHistory {
 }
 
 impl NativeObjectHistory {
+    pub(crate) fn prepare_property_edit_json(
+        &self,
+        bytes: &[u8],
+    ) -> Result<PreparedPropertyEdit, DispatchErrorCode> {
+        self.owner.prepare_property_edit_json(bytes)
+    }
+    pub(crate) fn commit_property_edit(
+        &mut self,
+        candidate: PreparedPropertyEdit,
+    ) -> Result<u64, DispatchErrorCode> {
+        let before = self.content_revision();
+        let after = self.owner.commit_property_edit(candidate)?;
+        if before != after {
+            self.undo.push(ObjectHistoryEntry {
+                before_revision: before,
+                after_revision: after,
+            });
+            self.redo.clear();
+        }
+        Ok(after)
+    }
     pub(crate) fn prepare_layer_create_json(
         &self,
         bytes: &[u8],
