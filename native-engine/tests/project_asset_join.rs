@@ -135,3 +135,60 @@ fn nonempty_placement_cannot_enter_owner_before_its_real_consumer_exists() {
     assert!(pending_charges(&value, &budget).is_err());
     assert_eq!(budget.used(), Ok(0));
 }
+
+#[test]
+fn typed_embedded_kind_and_media_refuse_before_any_ticket_or_identity() {
+    let base = project();
+    let ProjectReferenceState::StillImage(reference) = base.reference_state() else {
+        panic!()
+    };
+    let original_allocation = Arc::clone(reference.encoded_allocation());
+    let original_metadata = *base.project();
+    // These PNG sources really passed the existing PNG codec in project().
+    // Changing AssetRecord.kind does not change that valid source precondition.
+    for (kind, media) in [
+        (AssetKind::Font, "image/png"),
+        (AssetKind::Video, "image/png"),
+        (AssetKind::Audio, "image/png"),
+        // Structural unsupported media controls do not claim JPEG/font decoding.
+        (AssetKind::Image, "image/jpeg"),
+        (AssetKind::Font, "font/ttf"),
+    ] {
+        let source =
+            AssetSource::admitted_embedded(media.into(), Arc::clone(&original_allocation), 1024)
+                .unwrap();
+        let record = AssetRecord::new(
+            AssetId::new("typed-source".into()).unwrap(),
+            "Typed source".into(),
+            kind,
+            source,
+        )
+        .unwrap();
+        let inventory = AssetInventory::new(vec![Arc::new(record)], Vec::new(), 1, 0).unwrap();
+        let project = base.with_asset_inventory(Some(inventory));
+        let budget = EncodedRetentionBudget::new(1).unwrap();
+        // Even the reference would exceed this quota if any ticket ran first.
+        let result =
+            ObjectSnapshot::project_entry("typed-refusal".into(), project, &budget, |_, _| {
+                panic!("unsupported source cannot issue identity")
+            });
+        assert_eq!(result.err(), Some("asset media codec unavailable"));
+        assert_eq!(budget.used(), Ok(0));
+        assert_eq!(*base.project(), original_metadata);
+        assert!(base.asset_inventory().is_none());
+        let ProjectReferenceState::StillImage(unchanged) = base.reference_state() else {
+            panic!()
+        };
+        assert!(Arc::ptr_eq(
+            unchanged.encoded_allocation(),
+            &original_allocation
+        ));
+    }
+    let positive = base.with_asset_inventory(Some(inventory(&base, true)));
+    let budget = EncodedRetentionBudget::new(original_allocation.capacity()).unwrap();
+    let tickets = pending_charges(&positive, &budget).unwrap();
+    assert_eq!(tickets.len(), 3);
+    assert_eq!(budget.used(), Ok(original_allocation.capacity()));
+    drop(tickets);
+    assert_eq!(budget.used(), Ok(0));
+}

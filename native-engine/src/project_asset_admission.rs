@@ -1,6 +1,6 @@
 //! pending tickets from the SAME existing owner ledger.
 use super::encoded_retention_budget::{Admission, EncodedRetentionBudget};
-use crate::object_document::{ProjectEnvelope, ProjectReferenceState};
+use crate::object_document::{AssetKind, ProjectEnvelope, ProjectReferenceState};
 
 pub(super) fn pending_charges(
     project: &ProjectEnvelope,
@@ -11,6 +11,17 @@ pub(super) fn pending_charges(
         .is_some_and(|assets| !assets.placements().is_empty() || assets.records().len() > 1024)
     {
         return Err("asset placement or catalog unavailable");
+    }
+    // A source's codec precondition does not establish its record's kind.
+    // Keep typed entry as strict as wire admission BEFORE charging/identity.
+    if project.asset_inventory().is_some_and(|assets| {
+        assets.records().iter().any(|record| {
+            record.source().encoded_allocation().is_some()
+                && (record.kind() != AssetKind::Image
+                    || record.source().media_type() != Some("image/png"))
+        })
+    }) {
+        return Err("asset media codec unavailable");
     }
     let reference = project.reference_state();
     let mut count = usize::from(matches!(&reference, ProjectReferenceState::StillImage(_)));
