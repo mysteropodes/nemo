@@ -4,7 +4,7 @@ pub(crate) use crate::object_document::object_deserialize;
 // The codec admission port exposes the immutable types consumed by reads.
 pub use crate::object_document::{FrameScopeKind, ObjectDocument, ObjectRecord, ObjectTarget};
 use crate::object_document::{
-    ObjectLayer, Presence, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
+    ObjectLayer, Presence, PropertyHolder, OBJECT_DOCUMENT_FORMAT, OBJECT_DOCUMENT_FORMAT_VERSION,
 };
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -109,6 +109,7 @@ pub fn decode_project(bytes: &[u8]) -> Result<ObjectDocument, ObjectCodecError> 
         total_frames: wire.total_frames,
         layers: wire.layers,
         objects: wire.objects,
+        property_holders: wire.property_holders,
         composition_order: Presence::Missing,
     };
     validate(&document)?;
@@ -122,10 +123,12 @@ struct LegacyDocument {
     total_frames: u32,
     layers: Vec<ObjectLayer>,
     objects: Vec<ObjectRecord>,
+    property_holders: Presence<Vec<PropertyHolder>>,
 }
 crate::object_document::object_deserialize!(LegacyDocument {
     format: String, format_version: u32, total_frames: u32,
-    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>
+    layers: Vec<ObjectLayer>, objects: Vec<ObjectRecord>,
+    #[serde(default)] property_holders: Presence<Vec<PropertyHolder>>
 });
 
 /// Explicit core storage admission; both attempts read the original raw bytes.
@@ -194,6 +197,37 @@ pub(crate) fn validate(document: &ObjectDocument) -> Result<(), ObjectCodecError
         &document.layers,
         &document.objects,
         false,
+    )?;
+    validate_property_holders(
+        &document.property_holders,
+        &document.layers,
+        &document.objects,
+        None,
+    )
+}
+
+pub(crate) fn validate_property_holders(
+    holders: &Presence<Vec<PropertyHolder>>,
+    layers: &[ObjectLayer],
+    records: &[ObjectRecord],
+    plan: Option<&crate::object_document::OrderPlan>,
+) -> Result<(), ObjectCodecError> {
+    use crate::object_document::PropertyAdmissionError;
+    crate::object_document::validate_property_holders(holders, layers, records, plan).map_err(
+        |error| {
+            let (kind, message) = match error {
+                PropertyAdmissionError::Invalid(message) => {
+                    (ObjectCodecErrorKind::Invalid, message)
+                }
+                PropertyAdmissionError::Unsupported(message) => {
+                    (ObjectCodecErrorKind::Unsupported, message)
+                }
+                PropertyAdmissionError::DuplicateId(message) => {
+                    (ObjectCodecErrorKind::DuplicateId, message)
+                }
+            };
+            ObjectCodecError::new(kind, message)
+        },
     )
 }
 

@@ -69,6 +69,7 @@ fn blank_project(
             timing: Presence::Present(crate::object_document::LayerTiming::blank_drawing()),
         }],
         objects: vec![],
+        property_holders: Presence::Missing,
         // Native painting consumes the explicit v2 order plan even when empty.
         composition_order: Presence::Present(OrderPlan {
             format: "nemo.native-object-order-plan".into(),

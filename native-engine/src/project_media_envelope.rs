@@ -248,6 +248,7 @@ mod tests {
                 ObjectLayer::identified("0".into()),
             ],
             objects,
+            property_holders: Presence::Missing,
             composition_order: if version == 1 {
                 Presence::Missing
             } else {

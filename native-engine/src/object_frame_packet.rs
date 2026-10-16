@@ -306,6 +306,15 @@ where
     if selector.frame >= document.total_frames() {
         return Err(ObjectFrameError::FrameOutOfRange.into());
     }
+    // The typed holder table is admitted for persistence and native reads.
+    // Until its sampled values reach this producer, never paint unmodified
+    // geometry while silently ignoring authored Motion properties.
+    if document
+        .property_holders()
+        .is_some_and(|holders| !holders.is_empty())
+    {
+        return Err(ObjectFrameError::Unavailable.into());
+    }
     let source_frames: Vec<_> = document
         .layers()
         .iter()
