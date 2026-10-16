@@ -10,6 +10,35 @@ const { checkApplicationPolicy, checkApplicationSize } = require('./lib/boundari
 const ROOT = path.resolve(__dirname, '../..');
 const read = (name) => JSON.parse(fs.readFileSync(path.join(ROOT, 'engineering/boundaries/profiles', name), 'utf8'));
 
+test('G41 retained font loader is parser-blocking before the unchanged vector consumer', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'src/index.html'), 'utf8');
+  const loader = 'js/adapters/font-assets.js';
+  function requireOrder(value) {
+    const scripts = [...value.matchAll(/<script\b([^>]*)>/gi)].map((m, i) => ({
+      attrs: m[1], ordinal: i + 1, src: m[1].match(/\bsrc=["']([^"']+)["']/)?.[1],
+    }));
+    const one = (name) => { const found = scripts.filter(s => s.src === name); assert.equal(found.length, 1, name); return found[0]; };
+    const parser = one('js/opentype.min.js'), assets = one(loader), consumer = one('js/vector-text-bridge.js');
+    for (const tag of [parser, assets, consumer]) assert.doesNotMatch(tag.attrs, /\b(?:async|defer|type)(?:\s|=|$)/i);
+    assert.equal(assets.ordinal, parser.ordinal + 1);
+    assert.equal(consumer.ordinal, assets.ordinal + 1);
+    assert.equal(assets.ordinal, 36);
+  }
+  requireOrder(html);
+  const tag = `<script src="${loader}"></script>`;
+  for (const mutant of [
+    html.replace(tag, ''), html.replace(tag, `<script defer src="${loader}"></script>`),
+    html.replace(tag, `<script async src="${loader}"></script>`),
+    html.replace(tag, `<script type="module" src="${loader}"></script>`),
+    html.replace(tag, '').replace('<script src="js/vector-text-bridge.js"></script>', `<script src="js/vector-text-bridge.js"></script>${tag}`),
+    html.replace(tag, tag + tag),
+  ]) assert.throws(() => requireOrder(mutant));
+  const entry = read('app-js.coverage.json').retainedSources.find(s => s.path === 'src/' + loader);
+  assert.equal(entry.moduleId, 'app.font.assets.adapter');
+  assert.equal(entry.executionClass, 'document-classic');
+  assert.equal(entry.loadSites[0].scriptOrdinal, 36);
+});
+
 test('adopted application policy composes fresh discovery, exact coverage and provenance pins', () => {
   const policy = read('app-js.coverage.json');
   const result = checkApplicationPolicy(read('app-js.profile.json'), policy, { root: ROOT });
@@ -229,7 +258,7 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   }
   assert.deepEqual(paths.map((sourcePath) => actual.get(sourcePath).scriptOrdinal),
     [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      135, 181, 182, 183, 184, 185, 186, 187, 188, 189]);
+      136, 182, 183, 184, 185, 186, 187, 188, 189, 190]);
   assert.ok(actual.get('src/js/adapters/native-object-inactive-project-tabs.js').scriptOrdinal
     < actual.get('src/js/project.js').scriptOrdinal, 'inactive-tab adapter loads before the project consumer');
   const projectEntry = 'src/js/adapters/native-opacity-project-entry.js';
@@ -237,10 +266,10 @@ test('N20 contract, authority, adapters and bootstrap load in their frozen order
   assert.equal(entry.moduleId, 'adapter.native.opacity.project.entry');
   assert.equal(entry.executionClass, 'document-classic');
   assert.deepEqual(entry.loadSites, [actual.get(projectEntry)]);
-  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 132);
-  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 133);
-  assert.equal(actual.get(projectEntry).scriptOrdinal, 134);
-  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 136);
+  assert.equal(actual.get('src/js/adapters/project-dirty-baseline.js').scriptOrdinal, 133);
+  assert.equal(actual.get('src/js/adapters/project-native-version-restore.js').scriptOrdinal, 134);
+  assert.equal(actual.get(projectEntry).scriptOrdinal, 135);
+  assert.equal(actual.get('src/js/project.js').scriptOrdinal, 137);
 });
 
 test('bootstrap numerical observations match actual HTML and retained declarations', () => {
@@ -332,14 +361,14 @@ test('U03 localization runtime is parser-blocking immediately before dictionarie
   const runtimePath = 'js/adapters/i18n-runtime.js', dataPath = 'js/i18n.js';
   const runtime = scripts.filter((entry) => entry.src === runtimePath), data = scripts.filter((entry) => entry.src === dataPath);
   assert.equal(runtime.length, 1); assert.equal(data.length, 1);
-  assert.equal(runtime[0].ordinal, 80); assert.equal(data[0].ordinal, 81);
+  assert.equal(runtime[0].ordinal, 81); assert.equal(data[0].ordinal, 82);
   assert.equal(runtime[0].ordinal + 1, data[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/app.js').ordinal < runtime[0].ordinal);
   assert.ok(scripts.find((entry) => entry.src === 'js/timeline.js').ordinal < runtime[0].ordinal);
   for (const entry of [...runtime, ...data]) assert.doesNotMatch(entry.attrs, /\b(?:async|defer|type)\s*(?:=|\s|$)/i);
   const policy = read('app-js.coverage.json'), retained = policy.retainedSources.find((entry) => entry.path === 'src/' + runtimePath);
   assert.equal(retained.moduleId, 'app.i18n.runtime.adapter'); assert.equal(retained.executionClass, 'document-classic');
-  assert.equal(retained.loadSites[0].scriptOrdinal, 80);
+  assert.equal(retained.loadSites[0].scriptOrdinal, 81);
   const callbacks = [], storage = [], events = new Map(), scope = {state: {}, SM: {retained: true, afterI18n: callbacks}};
   scope.window = scope; scope.document = {readyState: 'loading', querySelectorAll: () => [], getElementById: () => null,
     addEventListener(name, callback) {events.set(name, callback);}};

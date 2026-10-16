@@ -2092,33 +2092,49 @@
       "id": "app.native.drawing-add.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
-      "files": ["native-drawing-add.js"],
+      "files": [
+        "native-drawing-add.js"
+      ],
       "sizeProfile": "Platform/engine adapter",
-      "publicApi": ["native-drawing-add.js"]
+      "publicApi": [
+        "native-drawing-add.js"
+      ]
     },
     {
       "id": "app.native.drawing-add.desktop.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
-      "files": ["native-drawing-add-desktop.js"],
+      "files": [
+        "native-drawing-add-desktop.js"
+      ],
       "sizeProfile": "Platform/engine adapter",
-      "publicApi": ["native-drawing-add-desktop.js"]
+      "publicApi": [
+        "native-drawing-add-desktop.js"
+      ]
     },
     {
       "id": "app.native.project-settings.intent.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
-      "files": ["native-project-settings-intent.js"],
+      "files": [
+        "native-project-settings-intent.js"
+      ],
       "sizeProfile": "Platform/engine adapter",
-      "publicApi": ["native-project-settings-intent.js"]
+      "publicApi": [
+        "native-project-settings-intent.js"
+      ]
     },
     {
       "id": "app.native.project-settings.desktop.adapter",
       "layer": "adapters",
       "dir": "src/js/adapters",
-      "files": ["native-project-settings-desktop.js"],
+      "files": [
+        "native-project-settings-desktop.js"
+      ],
       "sizeProfile": "Platform/engine adapter",
-      "publicApi": ["native-project-settings-desktop.js"]
+      "publicApi": [
+        "native-project-settings-desktop.js"
+      ]
     },
     {
       "id": "app.native.object.project.adapter",
@@ -2442,6 +2458,18 @@
       "sizeProfile": "Platform/engine adapter",
       "publicApi": [
         "tutorial-native-placement.js"
+      ]
+    },
+    {
+      "id": "app.font.assets.adapter",
+      "layer": "adapters",
+      "dir": "src/js/adapters",
+      "files": [
+        "font-assets.js"
+      ],
+      "sizeProfile": "Platform/engine adapter",
+      "publicApi": [
+        "font-assets.js"
       ]
     }
   ],
