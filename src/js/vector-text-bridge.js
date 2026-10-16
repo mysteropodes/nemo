@@ -49,13 +49,15 @@ var VECTOR_FONTS = {
   'Manrope-Regular': { url: 'fonts/Manrope-Regular.ttf', label: 'Manrope' },
   'Inter-Regular': { url: 'fonts/Inter-Regular.ttf', label: 'Inter' },
 };
-var _vecFontCache = {};
+var _vectorFontAssets = window.NemoFontAssets.create({
+  fonts: VECTOR_FONTS,
+  fetch: function (url) { return fetch(url); },
+  parse: function (bytes) { return opentype.parse(bytes); },
+  isDesktop: function () { return typeof window.__TAURI__ !== 'undefined'; },
+  invoke: function (command, args) { return window.__TAURI__.core.invoke(command, args); },
+});
 function loadVectorFont(key) {
-  if (_vecFontCache[key]) return _vecFontCache[key];
-  var spec = VECTOR_FONTS[key];
-  if (!spec) return Promise.reject(new Error('unknown vector font ' + key));
-  _vecFontCache[key] = fetch(spec.url).then(function (r) { return r.arrayBuffer(); }).then(function (buf) { return opentype.parse(buf); });
-  return _vecFontCache[key];
+  return _vectorFontAssets.load(key);
 }
 // Pre-warm the Regular weight of every bundled family on script load — the
 // common case for a first placement, so it doesn't stall on a network
@@ -380,39 +382,15 @@ function vectorTextGroupMembers(root) {
 // Worker route doing the same UA-spoofed relay (worker/index.js's
 // /api/google-font, added 2026-08-28 — mirrors worker-feedback/'s own
 // trust-boundary role).
-function tauriOk() { return typeof window.__TAURI__ !== 'undefined'; }
-function base64ToArrayBuffer(b64) {
-  var bin = atob(b64);
-  var bytes = new Uint8Array(bin.length);
-  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
-}
-// Registers ONE weight of a family into VECTOR_FONTS/_vecFontCache under
+// The font-assets adapter owns byte transport, parsing and cache lifetime.
+// Registers ONE accepted weight of a family into VECTOR_FONTS under
 // 'Google:<family>-Regular'/'-Bold' — same key shape as the bundled fonts
 // above, so buildVectorTextGroup's existing baseFamily/resolvedFontKey
 // logic (the regex-strip-then-reattach-Bold-or-Regular dance) treats a
 // live-fetched family identically to a bundled one, Bold toggle included,
 // with no special-casing needed anywhere else in this file.
 function fetchGoogleFontWeight(family, weight, italic) {
-  var key = 'Google:' + family + '-' + (weight >= 600 ? 'Bold' : 'Regular');
-  if (_vecFontCache[key]) return _vecFontCache[key];
-  var p;
-  if (tauriOk()) {
-    p = window.__TAURI__.core.invoke('fetch_google_font', { family: family, weight: weight, italic: !!italic })
-      .then(function (b64) { return opentype.parse(base64ToArrayBuffer(b64)); });
-  } else {
-    // Web build: same UA-trick, proxied server-side (browsers forbid
-    // overriding the User-Agent header from fetch()) by the nemo-editor
-    // Worker's /api/google-font route (worker/index.js).
-    var qs = 'family=' + encodeURIComponent(family) + '&weight=' + weight + (italic ? '&italic=1' : '');
-    p = fetch('/api/google-font?' + qs).then(function (r) {
-      if (!r.ok) throw new Error('Google Fonts: family not found or fetch failed');
-      return r.arrayBuffer();
-    }).then(function (buf) { return opentype.parse(buf); });
-  }
-  _vecFontCache[key] = p;
-  VECTOR_FONTS[key] = { url: null, label: family + (weight >= 600 ? ' Bold' : '') };
-  return p;
+  return _vectorFontAssets.googleWeight(family, weight, italic);
 }
 // Adds a family by NAME (what the UI actually collects) — fetches Regular
 // (required: failure here means the typed name doesn't exist on Google
@@ -423,12 +401,7 @@ function fetchGoogleFontWeight(family, weight, italic) {
 // Resolves to the Regular key, ready to pass straight into
 // buildVectorTextGroup as fontKey.
 function addGoogleFont(family) {
-  family = (family || '').trim();
-  if (!family) return Promise.reject(new Error('empty family name'));
-  return fetchGoogleFontWeight(family, 400, false).then(function () {
-    fetchGoogleFontWeight(family, 700, false).catch(function () {});
-    return 'Google:' + family + '-Regular';
-  });
+  return _vectorFontAssets.addGoogle(family);
 }
 window.SMVectorText = {
   VECTOR_FONTS: VECTOR_FONTS,
